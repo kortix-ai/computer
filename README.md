@@ -11,7 +11,7 @@ This directory contains the Kortix Computer frontend application, built with Nex
 
 ### 1. Install Dependencies
 
-From the project root (`kortix/suna/`), install all workspace dependencies:
+From the project root (`computer`), install all workspace dependencies:
 
 ```bash
 pnpm install
