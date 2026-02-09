@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env*.local
+.env.production
+.env.development
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Next.js
+.vercel/
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Package manager locks (if using root lockfile)
+# Uncomment if you want to ignore nested lockfiles
+# pnpm-lock.yaml
+# package-lock.json
+# yarn.lock
+
