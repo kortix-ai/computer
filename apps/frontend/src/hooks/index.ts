@@ -27,10 +27,6 @@ export * from './dashboard/use-initiate-agent';
 // Usage
 export * from './usage/use-health';
 
-// Knowledge Base
-export * from './knowledge-base/use-knowledge-base-queries';
-export * from './knowledge-base/use-folders';
-
 // Triggers
 export * from './triggers';
 

@@ -4,36 +4,26 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  BadgeCheck,
   Bell,
   BookOpen,
-  ChevronDown,
   ChevronsUpDown,
   ChevronRight,
-  Command,
   CreditCard,
   Key,
   LogOut,
-  Plus,
   Settings,
-  User,
-  AudioWaveform,
   Sun,
   Moon,
   KeyRound,
   Plug,
   Zap,
-  DollarSign,
-  Users,
   BarChart3,
-  FileText,
   TrendingDown,
   MessageSquare,
   Heart,
   LifeBuoy,
   AlertTriangle,
 } from 'lucide-react';
-import { useAccounts } from '@/hooks/account';
 import { useAccountState } from '@/hooks/billing';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -45,12 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import {
   SidebarMenu,
@@ -64,7 +49,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { useTheme } from 'next-themes';
@@ -76,9 +60,9 @@ import { TierBadge } from '@/components/billing/tier-badge';
 import { useTranslations } from 'next-intl';
 import { useReferralDialog } from '@/stores/referral-dialog';
 import { ReferralDialog } from '@/components/referrals/referral-dialog';
-import { Badge } from '@/components/ui/badge';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { trackCtaUpgrade } from '@/lib/analytics/gtm';
+import { ServerSelector } from '@/components/sidebar/server-selector';
 
 export function NavUserWithTeams({
   user,
@@ -95,7 +79,6 @@ export function NavUserWithTeams({
   const t = useTranslations('sidebar');
   const router = useRouter();
   const { isMobile } = useSidebar();
-  const { data: accounts } = useAccounts();
   const { data: accountState } = useAccountState({ enabled: true });
   const [showNewTeamDialog, setShowNewTeamDialog] = React.useState(false);
   const [showSettingsModal, setShowSettingsModal] = React.useState(false);
@@ -108,81 +91,6 @@ export function NavUserWithTeams({
   const isFreeTier = accountState?.subscription?.tier_key === 'free' ||
     accountState?.tier?.name === 'free' ||
     !accountState?.subscription?.tier_key;
-
-  // Prepare personal account and team accounts
-  const personalAccount = React.useMemo(
-    () => accounts?.find((account) => account.personal_account),
-    [accounts],
-  );
-  const teamAccounts = React.useMemo(
-    () => accounts?.filter((account) => !account.personal_account),
-    [accounts],
-  );
-
-  // Create a default list of teams with logos for the UI (will show until real data loads)
-  const defaultTeams = [
-    {
-      name: personalAccount?.name || 'Personal Account',
-      logo: Command,
-      plan: 'Personal',
-      account_id: personalAccount?.account_id,
-      slug: personalAccount?.slug,
-      personal_account: true,
-    },
-    ...(teamAccounts?.map((team) => ({
-      name: team.name,
-      logo: AudioWaveform,
-      plan: 'Team',
-      account_id: team.account_id,
-      slug: team.slug,
-      personal_account: false,
-    })) || []),
-  ];
-
-  // Use the first team or first entry in defaultTeams as activeTeam
-  const [activeTeam, setActiveTeam] = React.useState(defaultTeams[0]);
-
-  // Update active team when accounts load
-  React.useEffect(() => {
-    if (accounts?.length) {
-      const currentTeam = accounts.find(
-        (account) => account.account_id === activeTeam.account_id,
-      );
-      if (currentTeam) {
-        setActiveTeam({
-          name: currentTeam.name,
-          logo: currentTeam.personal_account ? Command : AudioWaveform,
-          plan: currentTeam.personal_account ? 'Personal' : 'Team',
-          account_id: currentTeam.account_id,
-          slug: currentTeam.slug,
-          personal_account: currentTeam.personal_account,
-        });
-      } else {
-        // If current team not found, set first available account as active
-        const firstAccount = accounts[0];
-        setActiveTeam({
-          name: firstAccount.name,
-          logo: firstAccount.personal_account ? Command : AudioWaveform,
-          plan: firstAccount.personal_account ? 'Personal' : 'Team',
-          account_id: firstAccount.account_id,
-          slug: firstAccount.slug,
-          personal_account: firstAccount.personal_account,
-        });
-      }
-    }
-  }, [accounts, activeTeam.account_id]);
-
-  // Handle team selection
-  const handleTeamSelect = (team) => {
-    setActiveTeam(team);
-
-    // Navigate to the appropriate dashboard
-    if (team.personal_account) {
-      router.push('/dashboard');
-    } else {
-      router.push(`/${team.slug}`);
-    }
-  };
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -200,10 +108,6 @@ export function NavUserWithTeams({
       .toUpperCase()
       .substring(0, 2);
   };
-
-  if (!activeTeam) {
-    return null;
-  }
 
   return (
     <Dialog open={showNewTeamDialog} onOpenChange={setShowNewTeamDialog}>
@@ -271,87 +175,9 @@ export function NavUserWithTeams({
               align="start"
               sideOffset={4}
             >
-              {/* Teams Section */}
-              {personalAccount && (
-                <>
-                  <DropdownMenuLabel className="text-muted-foreground text-xs px-2 py-1.5">
-                    {t('workspaces')}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem
-                    key={personalAccount.account_id}
-                    onClick={() =>
-                      handleTeamSelect({
-                        name: personalAccount.name,
-                        logo: Command,
-                        plan: 'Personal',
-                        account_id: personalAccount.account_id,
-                        slug: personalAccount.slug,
-                        personal_account: true,
-                      })
-                    }
-                    className="gap-2 p-2"
-                  >
-                    <div className="flex size-6 items-center justify-center rounded-xs border">
-                      <Command className="size-4 shrink-0" />
-                    </div>
-                    <span className="flex-1">{personalAccount.name}</span>
-                    {activeTeam.account_id === personalAccount.account_id && (
-                      <div className="size-4 flex items-center justify-center">
-                        <div className="size-1.5 rounded-full bg-primary" />
-                      </div>
-                    )}
-                  </DropdownMenuItem>
-                </>
-              )}
-
-              {teamAccounts?.length > 0 && (
-                <>
-                  {teamAccounts.map((team, index) => (
-                    <DropdownMenuItem
-                      key={team.account_id}
-                      onClick={() =>
-                        handleTeamSelect({
-                          name: team.name,
-                          logo: AudioWaveform,
-                          plan: 'Team',
-                          account_id: team.account_id,
-                          slug: team.slug,
-                          personal_account: false,
-                        })
-                      }
-                      className="gap-2 p-2"
-                    >
-                      <div className="flex size-6 items-center justify-center rounded-xs border">
-                        <AudioWaveform className="size-4 shrink-0" />
-                      </div>
-                      <span className="flex-1">{team.name}</span>
-                      {activeTeam.account_id === team.account_id && (
-                        <div className="size-4 flex items-center justify-center">
-                          <div className="size-1.5 rounded-full bg-primary" />
-                        </div>
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* <DropdownMenuSeparator />
-              <DialogTrigger asChild>
-                <DropdownMenuItem 
-                  className="gap-2 p-2"
-                  onClick={() => {
-                    setShowNewTeamDialog(true)
-                  }}
-                >
-                  <div className="bg-background flex size-6 items-center justify-center rounded-md border">
-                    <Plus className="size-4" />
-                  </div>
-                  <div className="text-muted-foreground font-medium">Add team</div>
-                </DropdownMenuItem>
-              </DialogTrigger> */}
-              {(personalAccount || (teamAccounts && teamAccounts.length > 0)) && (
-                <DropdownMenuSeparator className="my-1" />
-              )}
+              {/* Servers Section */}
+              <ServerSelector />
+              <DropdownMenuSeparator className="my-1" />
 
               {/* General Section */}
               <DropdownMenuLabel className="text-muted-foreground text-xs px-2 py-1.5">
@@ -367,12 +193,6 @@ export function NavUserWithTeams({
                 >
                   <Zap className="h-4 w-4" />
                   <span>Plan</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/knowledge" className="gap-2 p-2">
-                    <FileText className="h-4 w-4" />
-                    <span>Knowledge Base</span>
-                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/support" className="gap-2 p-2">

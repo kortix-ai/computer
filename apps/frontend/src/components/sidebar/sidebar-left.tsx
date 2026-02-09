@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Library, Menu, Plus, Zap, MessageCircle, PanelLeftOpen, PanelLeftClose, Search, Users, FolderOpen, FolderGit2, Bot, Wrench } from 'lucide-react';
+import { Menu, Plus, MessageCircle, PanelLeftOpen, PanelLeftClose, Search, FolderOpen, Bot, Wrench } from 'lucide-react';
 
 import { NavAgents } from '@/components/sidebar/nav-agents';
 import { OpenCodeAgentsList } from '@/components/sidebar/opencode-agents-list';
@@ -10,7 +10,7 @@ import { OpenCodeToolsList } from '@/components/sidebar/opencode-tools-list';
 import { OpenCodeProjectSelector } from '@/components/sidebar/opencode-project-selector';
 import { NavUserWithTeams } from '@/components/sidebar/nav-user-with-teams';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
-import { siteConfig } from '@/lib/site-config';
+
 import {
   Sidebar,
   SidebarContent,
@@ -18,17 +18,13 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { NewAgentDialog } from '@/components/agents/new-agent-dialog';
+
 import { ThreadSearchModal } from '@/components/sidebar/thread-search-modal';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useTheme } from 'next-themes';
+
 import { useRouter } from 'next/navigation';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/utils';
 import { cn } from '@/lib/utils';
@@ -100,11 +96,9 @@ export function SidebarLeft({
   const t = useTranslations('sidebar');
   const { state, setOpen, setOpenMobile } = useSidebar();
   const isMobile = useIsMobile();
-  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [activeView, setActiveView] = useState<'sessions' | 'agents' | 'tools'>('sessions');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [showEnterpriseCard, setShowEnterpriseCard] = useState(true);
   const [user, setUser] = useState<{
     name: string;
     email: string;
@@ -119,7 +113,7 @@ export function SidebarLeft({
 
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [showNewAgentDialog, setShowNewAgentDialog] = useState(false);
+
   const [showSearchModal, setShowSearchModal] = useState(false);
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
 
@@ -530,10 +524,7 @@ export function SidebarLeft({
         <UserProfileSection user={user} />
       </div>
       <SidebarRail />
-      <NewAgentDialog
-        open={showNewAgentDialog}
-        onOpenChange={setShowNewAgentDialog}
-      />
+
       <ThreadSearchModal
         open={showSearchModal}
         onOpenChange={setShowSearchModal}

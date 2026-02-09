@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Search, Check, ChevronDown, Plus, Plug, Brain, LibraryBig, Zap, Sparkles, ChevronLeft } from 'lucide-react';
+import { Search, Check, ChevronDown, Plus, Plug, LibraryBig, Zap, Sparkles, ChevronLeft } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useAgents } from '@/hooks/agents/use-agents';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
@@ -59,7 +59,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
     const [showNewAgentDialog, setShowNewAgentDialog] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const [agentConfigDialog, setAgentConfigDialog] = useState<{ open: boolean; tab: 'instructions' | 'knowledge' | 'triggers' | 'tools' | 'integrations' }>({ open: false, tab: 'instructions' });
+    const [agentConfigDialog, setAgentConfigDialog] = useState<{ open: boolean; tab: 'instructions' | 'triggers' | 'tools' | 'integrations' }>({ open: false, tab: 'instructions' });
     const { data: accountState } = useAccountState();
     const { openPricingModal } = usePricingModalStore();
     const [isMobile, setIsMobile] = useState(false);
@@ -175,7 +175,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
         return agents[0];
     }, [agents, selectedAgentId, sunaAgent]);
 
-    const handleQuickAction = useCallback((action: 'instructions' | 'knowledge' | 'triggers' | 'tools') => {
+    const handleQuickAction = useCallback((action: 'instructions' | 'triggers' | 'tools') => {
         if (!selectedAgentId && !displayAgent?.agent_id) {
             return;
         }
@@ -342,7 +342,6 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                 <div className="flex items-center gap-2">
                     {[
                         { action: 'instructions' as const, icon: Plug, label: 'Instructions' },
-                        { action: 'knowledge' as const, icon: Brain, label: 'Knowledge' },
                         { action: 'integrations' as const, icon: LibraryBig, label: 'Integrations' },
                         { action: 'triggers' as const, icon: Zap, label: 'Triggers' },
                     ].map(({ action, icon: Icon, label }) => (

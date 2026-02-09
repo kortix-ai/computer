@@ -39,7 +39,6 @@
       "billing": "Fatturazione",
       "usage": "Utilizzo",
       "referrals": "Referral",
-      "knowledgeBase": "Base di conoscenza",
       "integrations": "Integrazioni",
       "envManager": "Gestore ambiente"
     },
@@ -181,48 +180,9 @@
     "usage": {
       "title": "Utilizzo"
     },
-    "knowledgeBase": {
-      "opening": "Apertura base di conoscenza",
-      "redirecting": "Reindirizzamento alla pagina della base di conoscenza..."
-    },
     "integrations": {
       "opening": "Apertura integrazioni",
       "redirecting": "Reindirizzamento alla pagina delle integrazioni..."
-    },
-    "memory": {
-      "title": "Memoria IA",
-      "description": "Ricorda automaticamente il contesto tra le conversazioni",
-      "enabled": "Abilitata",
-      "disabled": "Disabilitata",
-      "notAvailable": "La memoria non è disponibile nel tuo piano attuale. Passa a Plus o superiore per abilitare la memoria automatica.",
-      "usage": "Utilizzo della Memoria",
-      "available": "{count} ricordi disponibili",
-      "noLimit": "Illimitato",
-      "yourMemories": "I Tuoi Ricordi",
-      "yourMemoriesDescription": "Visualizza e gestisci ciò che l'IA ricorda di te",
-      "clearAll": "Cancella Tutto",
-      "deleteAllTitle": "Eliminare tutti i ricordi?",
-      "deleteAllDescription": "Questo eliminerà permanentemente tutti i {count} ricordi. L'IA non ricorderà più le informazioni dalle conversazioni passate. Questa azione non può essere annullata.",
-      "deleteAllButton": "Elimina Tutti i Ricordi",
-      "noMemoriesYet": "Ancora nessun ricordo",
-      "noMemoriesDescription": "Avvia una conversazione e l'IA ricorderà automaticamente informazioni importanti su di te",
-      "searchMemories": "Cerca ricordi...",
-      "filterByType": "Filtra per tipo",
-      "allTypes": "Tutti i Tipi",
-      "personalFacts": "Fatti Personali",
-      "preferences": "Preferenze",
-      "context": "Contesto",
-      "conversations": "Conversazioni",
-      "noMatchingMemories": "Nessun ricordo corrispondente",
-      "adjustFilters": "Prova ad aggiustare i tuoi filtri o la query di ricerca",
-      "loadMore": "Carica Altro",
-      "loading": "Caricamento dei ricordi...",
-      "memoryTypes": {
-        "fact": "Fatto",
-        "preference": "Preferenza",
-        "context": "Contesto",
-        "conversation_summary": "Conversazione"
-      }
     }
   },
   "triggers": {
@@ -320,7 +280,6 @@
     "localEnvManager": "Gestore .Env locale",
     "advanced": "Avanzato",
     "plan": "Piano",
-    "knowledgeBase": "Base di conoscenza",
     "conversation": "conversazione",
     "conversations": "conversazioni",
     "noConversations": "Ancora nessun chat",
@@ -407,7 +366,6 @@
     "scrollToBottom": "Scorri in basso",
     "tools": "Strumenti",
     "instructions": "Istruzioni",
-    "knowledge": "Conoscenza",
     "triggers": "Trigger",
     "agents": "Agenti",
     "superWorker": "Super Worker",
@@ -1017,7 +975,7 @@
       "proposal": { "name": "Proposta", "description": "Proposta commerciale" },
       "report": { "name": "Report", "description": "Formato report dettagliato" },
       "guide": { "name": "Guida", "description": "Guida passo-passo" },
-      "wiki": { "name": "Wiki", "description": "Articolo della knowledge base" },
+      "wiki": { "name": "Wiki", "description": "Articolo wiki" },
       "policy": { "name": "Politica", "description": "Documento politico" },
       "meeting-notes": { "name": "Note di riunione", "description": "Verbale di riunione" }
     },

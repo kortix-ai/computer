@@ -10,15 +10,6 @@ import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { useOpenCodeAgents } from '@/hooks/opencode/use-opencode-sessions';
 import type { OpenCodeAgent } from '@/lib/api/opencode';
 
-function getAgentModeLabel(mode: string): string {
-  switch (mode) {
-    case 'primary': return 'Primary';
-    case 'subagent': return 'Sub-agent';
-    case 'all': return 'All';
-    default: return mode;
-  }
-}
-
 function AgentItem({
   agent,
   isActive,
@@ -50,12 +41,15 @@ function AgentItem({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{agent.name}</div>
-          {agent.model && (
+          {agent.description && (
             <div className="text-xs text-muted-foreground truncate">
-              {agent.model.modelID}
+              {agent.description}
             </div>
           )}
         </div>
+        <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
+          {agent.mode}
+        </span>
         <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       </div>
     </SpotlightCard>
@@ -88,15 +82,6 @@ export function OpenCodeAgentsList() {
         a.description?.toLowerCase().includes(q)
     );
   }, [agents, searchQuery]);
-
-  const primaryAgents = useMemo(
-    () => filteredAgents.filter((a) => a.mode === 'primary' || a.mode === 'all'),
-    [filteredAgents]
-  );
-  const subAgents = useMemo(
-    () => filteredAgents.filter((a) => a.mode === 'subagent'),
-    [filteredAgents]
-  );
 
   const isAgentActive = (name: string) => {
     return pathname?.includes(`/agents/config/${encodeURIComponent(name)}`) || false;
@@ -141,47 +126,16 @@ export function OpenCodeAgentsList() {
             </p>
           </div>
         ) : (
-          <>
-            {primaryAgents.length > 0 && (
-              <div>
-                {!searchQuery && (
-                  <div className="text-xs font-medium text-muted-foreground px-2.5 pb-2 pt-2">
-                    Primary Agents
-                  </div>
-                )}
-                <div className="space-y-1">
-                  {primaryAgents.map((agent) => (
-                    <AgentItem
-                      key={agent.name}
-                      agent={agent}
-                      isActive={isAgentActive(agent.name)}
-                      onClick={handleAgentClick}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {subAgents.length > 0 && (
-              <div className="pt-2">
-                {!searchQuery && (
-                  <div className="text-xs font-medium text-muted-foreground px-2.5 pb-2">
-                    Sub-agents
-                  </div>
-                )}
-                <div className="space-y-1">
-                  {subAgents.map((agent) => (
-                    <AgentItem
-                      key={agent.name}
-                      agent={agent}
-                      isActive={isAgentActive(agent.name)}
-                      onClick={handleAgentClick}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+          <div className="space-y-1">
+            {filteredAgents.map((agent) => (
+              <AgentItem
+                key={agent.name}
+                agent={agent}
+                isActive={isAgentActive(agent.name)}
+                onClick={handleAgentClick}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

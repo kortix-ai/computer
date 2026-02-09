@@ -4,18 +4,29 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getOpenCodeEventStreamUrl } from '@/lib/api/opencode';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
+import { useServerStore } from '@/stores/server-store';
 import { opencodeKeys } from './use-opencode-sessions';
 
 /**
  * Connects to OpenCode's SSE event stream (GET /event) and
  * invalidates React Query caches when relevant events arrive.
+ *
+ * Automatically reconnects when the active server changes (serverVersion bumps).
  */
 export function useOpenCodeEventStream() {
   const queryClient = useQueryClient();
   const setStatus = useOpenCodeSessionStatusStore((s) => s.setStatus);
+  const clearStatuses = useOpenCodeSessionStatusStore((s) => s.setStatuses);
+  const serverVersion = useServerStore((s) => s.serverVersion);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
+    // On every server change: nuke all opencode caches, clear session statuses
+    clearStatuses({});
+    queryClient.removeQueries({ queryKey: opencodeKeys.all });
+    // Re-fetch fresh data for the new server
+    queryClient.invalidateQueries({ queryKey: opencodeKeys.all });
+
     const url = getOpenCodeEventStreamUrl();
     const es = new EventSource(url);
     eventSourceRef.current = es;
@@ -26,7 +37,7 @@ export function useOpenCodeEventStream() {
         const type: string = data?.type;
         if (!type) return;
 
-        // Message events → invalidate messages for the session
+        // Message events -> invalidate messages for the session
         if (type === 'message.updated' || type === 'message.removed') {
           const sessionID = data.properties?.info?.sessionID;
           if (sessionID) {
@@ -42,7 +53,7 @@ export function useOpenCodeEventStream() {
           }
         }
 
-        // Session lifecycle events → invalidate sessions list + individual session
+        // Session lifecycle events -> invalidate sessions list + individual session
         if (
           type === 'session.created' ||
           type === 'session.updated' ||
@@ -55,7 +66,7 @@ export function useOpenCodeEventStream() {
           }
         }
 
-        // Session status events → update Zustand store
+        // Session status events -> update Zustand store
         if (type === 'session.status') {
           const sessionID = data.properties?.sessionID;
           const status = data.properties?.status;
@@ -84,5 +95,6 @@ export function useOpenCodeEventStream() {
       es.close();
       eventSourceRef.current = null;
     };
-  }, [queryClient, setStatus]);
+    // serverVersion in deps: when it bumps, tear down old EventSource, clear caches, reconnect
+  }, [queryClient, setStatus, clearStatuses, serverVersion]);
 }

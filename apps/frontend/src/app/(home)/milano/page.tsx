@@ -1,22 +1,20 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense, lazy } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { MapPin } from 'lucide-react';
 import { AnimatedBg } from '@/components/ui/animated-bg';
-import { useIsMobile, useLeadingDebouncedCallback } from '@/hooks/utils';
-import { ChatInput, ChatInputHandles } from '@/components/thread/chat-input/chat-input';
+import { useIsMobile } from '@/hooks/utils';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter } from 'next/navigation';
-import { useOptimisticAgentStart } from '@/hooks/threads';
-import { useAgentSelection } from '@/stores/agent-selection-store';
-import { useSunaModePersistence } from '@/stores/suna-modes-store';
-import { useQuery } from '@tanstack/react-query';
-import { agentKeys } from '@/hooks/agents/keys';
-import { getAgents } from '@/hooks/agents/utils';
-
-const SunaModesPanel = lazy(() => 
-  import('@/components/dashboard/suna-modes-panel').then(mod => ({ default: mod.SunaModesPanel }))
-);
+import {
+  useCreateOpenCodeSession,
+  useOpenCodeAgents,
+  useOpenCodeProviders,
+  useOpenCodeCommands,
+} from '@/hooks/opencode/use-opencode-sessions';
+import { SessionChatInput, flattenModels } from '@/components/session/session-chat-input';
+import { toast } from '@/lib/toast';
+import type { OpenCodeCommand } from '@/lib/api/opencode';
 
 // Mobile users are redirected at the edge by middleware (hyper-fast)
 // This page only renders for desktop users
@@ -24,87 +22,73 @@ const SunaModesPanel = lazy(() =>
 export default function MilanoPage() {
   const isMobile = useIsMobile();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const chatInputRef = useRef<ChatInputHandles>(null);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<{ providerID: string; modelID: string } | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { selectedAgentId, setSelectedAgent, initializeFromAgents } = useAgentSelection();
-  
-  // Use centralized optimistic agent start hook
-  const { startAgent, isStarting: isOptimisticStarting } = useOptimisticAgentStart('/');
-  const {
-    selectedMode,
-    selectedCharts,
-    selectedOutputFormat,
-    selectedTemplate,
-    setSelectedMode,
-    setSelectedCharts,
-    setSelectedOutputFormat,
-    setSelectedTemplate,
-  } = useSunaModePersistence();
+  const createSession = useCreateOpenCodeSession();
 
-  const { data: agentsResponse } = useQuery({
-    queryKey: agentKeys.list({
-      limit: 100,
-      sort_by: 'name',
-      sort_order: 'asc'
-    }),
-    queryFn: () => getAgents({
-      limit: 100,
-      sort_by: 'name',
-      sort_order: 'asc'
-    }),
-    enabled: !!user && !isLoading,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
+  // Fetch agents, providers, commands from OpenCode server
+  const { data: agents } = useOpenCodeAgents();
+  const { data: providers } = useOpenCodeProviders();
+  const { data: commands } = useOpenCodeCommands();
 
-  const agents = Array.isArray(agentsResponse?.agents) ? agentsResponse.agents : [];
+  const visibleAgents = useMemo(
+    () => (agents || []).filter((a) => a.mode !== 'subagent' && !a.hidden),
+    [agents],
+  );
 
-  useEffect(() => {
-    if (agents.length > 0) {
-      initializeFromAgents(agents, undefined, setSelectedAgent);
+  const flatModels = useMemo(() => flattenModels(providers), [providers]);
+
+  const currentVariants = useMemo(() => {
+    if (!selectedModel) {
+      const first = flatModels[0];
+      return first?.variants ? Object.keys(first.variants) : [];
     }
-  }, [agents, initializeFromAgents, setSelectedAgent]);
+    const model = flatModels.find(
+      (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID,
+    );
+    return model?.variants ? Object.keys(model.variants) : [];
+  }, [selectedModel, flatModels]);
 
-  const selectedAgent = selectedAgentId
-    ? agents.find(agent => agent.agent_id === selectedAgentId)
-    : null;
-  const isSunaAgent = !user || selectedAgent?.metadata?.is_suna_default || false;
+  const handleSend = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isSubmitting) return;
 
-  const handleChatInputSubmit = useLeadingDebouncedCallback(async (
-    message: string,
-    options?: { model_name?: string; enable_thinking?: boolean }
-  ) => {
-    const pendingFiles = chatInputRef.current?.getPendingFiles() || [];
-    
-    if ((!message.trim() && !pendingFiles.length) || isSubmitting || isOptimisticStarting) return;
-    if (!user && !isLoading) {
-      router.push('/auth');
-      return;
-    }
+      if (!user && !isLoading) {
+        router.push('/auth');
+        return;
+      }
 
-    setIsSubmitting(true);
+      setIsSubmitting(true);
+      try {
+        sessionStorage.setItem('opencode_pending_prompt', text);
 
-    console.log('[Milano] Starting agent with:', {
-      prompt: message.substring(0, 100),
-      promptLength: message.length,
-      model_name: options?.model_name,
-      agent_id: selectedAgentId,
-      filesCount: pendingFiles.length,
-    });
+        const options: Record<string, unknown> = {};
+        if (selectedAgent) options.agent = selectedAgent;
+        if (selectedModel) options.model = selectedModel;
+        if (selectedVariant) options.variant = selectedVariant;
+        if (Object.keys(options).length > 0) {
+          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
+        }
 
-    const result = await startAgent({
-      message,
-      files: pendingFiles.length > 0 ? pendingFiles : undefined,
-      modelName: options?.model_name,
-      agentId: selectedAgentId || undefined,
-    });
+        const session = await createSession.mutateAsync();
+        router.push(`/sessions/${session.id}?new=true`);
+      } catch (error) {
+        sessionStorage.removeItem('opencode_pending_prompt');
+        sessionStorage.removeItem('opencode_pending_options');
+        setIsSubmitting(false);
+        toast.error('Failed to create session');
+      }
+    },
+    [isSubmitting, user, isLoading, createSession, router, selectedAgent, selectedModel, selectedVariant],
+  );
 
-    if (!result) {
-      setIsSubmitting(false);
-    }
-  }, 1200);
+  const handleCommand = useCallback((_cmd: OpenCodeCommand) => {
+    // On landing pages, slash commands are a no-op
+  }, []);
 
   return (
     <main className="w-full">
@@ -132,51 +116,31 @@ export default function MilanoPage() {
                   Il Tuo Worker IA Autonomo
                 </h2>
                 <p className="text-sm sm:text-base text-muted-foreground/80 font-normal text-balance leading-relaxed">
-                  Costruito per compiti complessi, progettato per tutto. L'assistente IA definitivo che gestisce tutto—dalle richieste semplici ai progetti mega-complessi.
+                  Costruito per compiti complessi, progettato per tutto. L&apos;assistente IA definitivo che gestisce tutto—dalle richieste semplici ai progetti mega-complessi.
                 </p>
               </div>
 
               <div className="flex flex-col items-center w-full max-w-3xl mx-auto gap-2 flex-wrap justify-center px-4 sm:px-0">
                 <div className="w-full relative">
-                  <div className="relative z-10">
-                    <ChatInput
-                      ref={chatInputRef}
-                      onSubmit={handleChatInputSubmit}
-                      placeholder="Descrivi il tuo compito..."
-                      loading={isSubmitting}
-                      disabled={isSubmitting}
-                      value={inputValue}
-                      onChange={setInputValue}
-                      isLoggedIn={!!user}
-                      selectedAgentId={selectedAgentId}
-                      onAgentSelect={setSelectedAgent}
-                      autoFocus={false}
-                      enableAdvancedConfig={false}
-                      selectedMode={selectedMode}
-                      onModeDeselect={() => setSelectedMode(null)}
-                    />
-                  </div>
+                  <SessionChatInput
+                    onSend={handleSend}
+                    disabled={isSubmitting}
+                    placeholder="Descrivi il tuo compito..."
+                    agents={visibleAgents}
+                    selectedAgent={selectedAgent}
+                    onAgentChange={setSelectedAgent}
+                    models={flatModels}
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
+                    variants={currentVariants}
+                    selectedVariant={selectedVariant}
+                    onVariantChange={setSelectedVariant}
+                    commands={commands || []}
+                    onCommand={handleCommand}
+                    autoFocus={false}
+                  />
                 </div>
               </div>
-
-              {isSunaAgent && (
-                <div className="w-full max-w-3xl mx-auto mt-4 px-4 sm:px-0">
-                  <Suspense fallback={<div className="h-24 animate-pulse bg-muted/10 rounded-lg" />}>
-                    <SunaModesPanel
-                      selectedMode={selectedMode}
-                      onModeSelect={setSelectedMode}
-                      onSelectPrompt={setInputValue}
-                      isMobile={isMobile}
-                      selectedCharts={selectedCharts}
-                      onChartsChange={setSelectedCharts}
-                      selectedOutputFormat={selectedOutputFormat}
-                      onOutputFormatChange={setSelectedOutputFormat}
-                      selectedTemplate={selectedTemplate}
-                      onTemplateChange={setSelectedTemplate}
-                    />
-                  </Suspense>
-                </div>
-              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,10 @@
-const OPENCODE_URL = process.env.NEXT_PUBLIC_OPENCODE_URL || 'http://localhost:4096';
+import { getActiveOpenCodeUrl } from '@/stores/server-store';
+
+// Dynamic URL: reads from the server store (persisted in localStorage).
+// Falls back to NEXT_PUBLIC_OPENCODE_URL or http://localhost:4096.
+function getOpenCodeUrl(): string {
+  return getActiveOpenCodeUrl();
+}
 
 // --- Types ---
 
@@ -77,7 +83,7 @@ export interface OpenCodeMessageWithParts {
 // --- API Functions ---
 
 async function opencodeFetch<T>(path: string): Promise<T> {
-  const response = await fetch(`${OPENCODE_URL}${path}`, {
+  const response = await fetch(`${getOpenCodeUrl()}${path}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
@@ -102,7 +108,7 @@ export async function getOpenCodeSession(sessionId: string): Promise<OpenCodeSes
 }
 
 export async function createOpenCodeSession(): Promise<OpenCodeSession> {
-  const response = await fetch(`${OPENCODE_URL}/session`, {
+  const response = await fetch(`${getOpenCodeUrl()}/session`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
@@ -117,7 +123,7 @@ export async function createOpenCodeSession(): Promise<OpenCodeSession> {
 }
 
 export async function deleteOpenCodeSession(sessionId: string): Promise<void> {
-  const response = await fetch(`${OPENCODE_URL}/session/${sessionId}`, {
+  const response = await fetch(`${getOpenCodeUrl()}/session/${sessionId}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -177,7 +183,7 @@ export async function sendOpenCodeMessage(
   parts: OpenCodePromptPart[],
   options?: SendOpenCodeMessageOptions,
 ): Promise<void> {
-  const response = await fetch(`${OPENCODE_URL}/session/${sessionId}/prompt_async`, {
+  const response = await fetch(`${getOpenCodeUrl()}/session/${sessionId}/prompt_async`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts, ...options }),
@@ -190,7 +196,7 @@ export async function sendOpenCodeMessage(
 }
 
 export async function abortOpenCodeSession(sessionId: string): Promise<void> {
-  const response = await fetch(`${OPENCODE_URL}/session/${sessionId}/abort`, {
+  const response = await fetch(`${getOpenCodeUrl()}/session/${sessionId}/abort`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -202,7 +208,7 @@ export async function abortOpenCodeSession(sessionId: string): Promise<void> {
 }
 
 export function getOpenCodeEventStreamUrl(): string {
-  return `${OPENCODE_URL}/event`;
+  return `${getOpenCodeUrl()}/event`;
 }
 
 // --- Agent Types & API ---
@@ -321,7 +327,7 @@ export async function executeOpenCodeCommand(
   command: string,
   args?: string,
 ): Promise<void> {
-  const response = await fetch(`${OPENCODE_URL}/session/${sessionId}/command`, {
+  const response = await fetch(`${getOpenCodeUrl()}/session/${sessionId}/command`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ command, arguments: args || '' }),
@@ -334,7 +340,7 @@ export async function executeOpenCodeCommand(
 }
 
 export async function summarizeOpenCodeSession(sessionId: string): Promise<void> {
-  const response = await fetch(`${OPENCODE_URL}/session/${sessionId}/summarize`, {
+  const response = await fetch(`${getOpenCodeUrl()}/session/${sessionId}/summarize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),

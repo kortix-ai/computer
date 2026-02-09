@@ -180,29 +180,6 @@ export function FileBrowser({
     }
   };
 
-  const handleAddToKnowledgeBase = () => {
-    if (isDownloadRestricted) {
-      openUpgradeModal();
-      return;
-    }
-    if (selectedFile && fileContent) {
-      // Create a blob and download the file so user can upload it to knowledge base
-      const blob = new Blob([fileContent], { type: 'text/plain' });
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = selectedFile.split('/').pop() || 'file.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success('File downloaded - you can now upload it to knowledge base using the Upload Files button');
-      setIsOpen(false);
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -333,9 +310,6 @@ export function FileBrowser({
 
         {selectedFile && fileContent && onSelectFile && (
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={handleAddToKnowledgeBase}>
-              Add to Knowledge Base
-            </Button>
             <Button onClick={handleSelectFile}>Select File</Button>
           </div>
         )}

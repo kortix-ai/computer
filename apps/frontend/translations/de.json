@@ -39,7 +39,6 @@
       "billing": "Abrechnung",
       "usage": "Nutzung",
       "referrals": "Empfehlungen",
-      "knowledgeBase": "Wissensdatenbank",
       "integrations": "Integrationen",
       "envManager": "Umgebungs-Manager"
     },
@@ -181,48 +180,9 @@
     "usage": {
       "title": "Nutzung"
     },
-    "knowledgeBase": {
-      "opening": "Wissensdatenbank wird geöffnet",
-      "redirecting": "Weiterleitung zur Wissensdatenbank-Seite..."
-    },
     "integrations": {
       "opening": "Integrationen werden geöffnet",
       "redirecting": "Weiterleitung zur Integrations-Seite..."
-    },
-    "memory": {
-      "title": "KI-Gedächtnis",
-      "description": "Kontext über Gespräche hinweg automatisch merken",
-      "enabled": "Aktiviert",
-      "disabled": "Deaktiviert",
-      "notAvailable": "Gedächtnis ist in Ihrem aktuellen Plan nicht verfügbar. Upgraden Sie auf Plus oder höher, um automatisches Gedächtnis zu aktivieren.",
-      "usage": "Gedächtnis-Nutzung",
-      "available": "{count} Erinnerungen verfügbar",
-      "noLimit": "Unbegrenzt",
-      "yourMemories": "Ihre Erinnerungen",
-      "yourMemoriesDescription": "Sehen und verwalten Sie, was die KI über Sie merkt",
-      "clearAll": "Alle löschen",
-      "deleteAllTitle": "Alle Erinnerungen löschen?",
-      "deleteAllDescription": "Dies wird alle {count} Erinnerungen dauerhaft löschen. Die KI wird sich nicht mehr an Informationen aus früheren Gesprächen erinnern. Diese Aktion kann nicht rückgängig gemacht werden.",
-      "deleteAllButton": "Alle Erinnerungen löschen",
-      "noMemoriesYet": "Noch keine Erinnerungen",
-      "noMemoriesDescription": "Starten Sie ein Gespräch und die KI wird sich automatisch wichtige Informationen über Sie merken",
-      "searchMemories": "Erinnerungen durchsuchen...",
-      "filterByType": "Nach Typ filtern",
-      "allTypes": "Alle Typen",
-      "personalFacts": "Persönliche Fakten",
-      "preferences": "Präferenzen",
-      "context": "Kontext",
-      "conversations": "Gespräche",
-      "noMatchingMemories": "Keine passenden Erinnerungen",
-      "adjustFilters": "Versuchen Sie, Ihre Filter oder Suchanfrage anzupassen",
-      "loadMore": "Mehr laden",
-      "loading": "Erinnerungen werden geladen...",
-      "memoryTypes": {
-        "fact": "Fakt",
-        "preference": "Präferenz",
-        "context": "Kontext",
-        "conversation_summary": "Gespräch"
-      }
     }
   },
   "triggers": {
@@ -320,7 +280,6 @@
     "localEnvManager": "Lokaler .Env-Manager",
     "advanced": "Erweitert",
     "plan": "Plan",
-    "knowledgeBase": "Wissensdatenbank",
     "conversation": "Unterhaltung",
     "conversations": "Unterhaltungen",
     "noConversations": "Noch keine Chats",
@@ -407,7 +366,6 @@
     "scrollToBottom": "Nach unten scrollen",
     "tools": "Werkzeuge",
     "instructions": "Anweisungen",
-    "knowledge": "Wissen",
     "triggers": "Trigger",
     "agents": "Worker",
     "superWorker": "Super Worker",
@@ -1015,7 +973,7 @@
       "proposal": { "name": "Vorschlag", "description": "Geschäftsvorschlag" },
       "report": { "name": "Bericht", "description": "Detailliertes Berichtsformat" },
       "guide": { "name": "Anleitung", "description": "Schritt-für-Schritt-Anleitung" },
-      "wiki": { "name": "Wiki", "description": "Wissensbasis-Artikel" },
+      "wiki": { "name": "Wiki", "description": "Wiki-Artikel" },
       "policy": { "name": "Richtlinie", "description": "Richtliniendokument" },
       "meeting-notes": { "name": "Besprechungsnotizen", "description": "Besprechungsprotokoll" }
     },

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Zap, BookOpen, ChevronRight, Plus, Clock, PlugZap } from 'lucide-react';
+import { Zap, ChevronRight, Plus, Clock, PlugZap } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
@@ -15,8 +15,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { TriggerCreationDialog } from '@/components/triggers/trigger-creation-dialog';
 import { useAllTriggers } from '@/hooks/triggers/use-all-triggers';
-import Link from 'next/link';
-
 export function NavGlobalConfig() {
     const { setOpenMobile, isMobile } = useSidebar();
     const pathname = usePathname();
@@ -27,8 +25,6 @@ export function NavGlobalConfig() {
 
     const isTriggersActive = pathname?.includes('/triggers');
     const activeTriggerIdFromUrl = searchParams.get('trigger_id');
-    const isKnowledgeBaseActive = pathname?.includes('/knowledge');
-
     const handleNavigation = (path: string) => {
         router.push(path);
         if (isMobile) {
