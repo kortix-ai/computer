@@ -90,7 +90,7 @@ async function handleKortixProxy(
   // Inject OUR API key (replacing whatever was there)
   body = injectApiKey(service, headers, body);
 
-  console.log(`[PROXY] ${service.name} (kortix:${accountId}) ${method} ${subPath}`);
+  console.log(`[PROXY] ${service.name} (kortix:${accountId}) ${method} ${subPath} → ${targetUrl}`);
 
   const upstream = await fetch(targetUrl, {
     method,
