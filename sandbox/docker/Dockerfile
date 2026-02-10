@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-RUN apt-get update && apt-get install -y git supervisor curl unzip dnsmasq && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git supervisor curl unzip && rm -rf /var/lib/apt/lists/*
 
 # Install Bun (required for OpenCode plugins and Kortix Master)
 RUN curl -fsSL https://bun.sh/install | bash
@@ -36,10 +36,6 @@ RUN cp /app/kortix-master/package.json /root/.config/opencode/package.json && \
 
 # Create secrets directory with proper permissions
 RUN mkdir -p /app/secrets && chmod 700 /app/secrets
-
-# dnsmasq config for API proxy DNS interception (activated by entrypoint in cloud mode)
-RUN mkdir -p /etc/dnsmasq.d
-COPY dnsmasq.conf /etc/dnsmasq.d/kortix-proxy.conf
 
 # Supervisor and workspace setup
 RUN mkdir -p /workspace /var/log/supervisor /var/run

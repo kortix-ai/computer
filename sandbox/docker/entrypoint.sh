@@ -1,28 +1,32 @@
 #!/bin/bash
 set -e
 
+# Ensure SDK URL env vars exist (supervisord requires them for %(ENV_...)s expansion)
+export TAVILY_API_URL="${TAVILY_API_URL:-}"
+export SERPER_API_URL="${SERPER_API_URL:-}"
+export FIRECRAWL_API_URL="${FIRECRAWL_API_URL:-}"
+export REPLICATE_API_URL="${REPLICATE_API_URL:-}"
+export CONTEXT7_API_URL="${CONTEXT7_API_URL:-}"
+
 if [ "$ENV_MODE" = "cloud" ] || [ "$ENV_MODE" = "production" ]; then
-    echo "[Kortix] Cloud mode — enabling API proxy DNS interception"
+    echo "[Kortix] Cloud mode — enabling API proxy routing"
 
-    # Point container DNS to local dnsmasq
-    echo "nameserver 127.0.0.1" > /etc/resolv.conf
-
-    # Override SDK base URLs to route through Kortix router
-    # KORTIX_ROUTER_URL is passed as env var (e.g. https://router-api.kortix.com)
-    if [ -n "$KORTIX_ROUTER_URL" ]; then
-        export TAVILY_API_URL="${KORTIX_ROUTER_URL}/tavily"
-        export SERPER_API_URL="${KORTIX_ROUTER_URL}/serper"
-        export FIRECRAWL_API_URL="${KORTIX_ROUTER_URL}/firecrawl"
-        export REPLICATE_API_URL="${KORTIX_ROUTER_URL}/replicate"
-        export CONTEXT7_API_URL="${KORTIX_ROUTER_URL}/context7"
-        echo "[Kortix] SDK URLs routed through ${KORTIX_ROUTER_URL}"
+    if [ -z "$KORTIX_API_URL" ]; then
+        echo "[Kortix] ERROR: KORTIX_API_URL is required in cloud mode"
+        exit 1
     fi
-else
-    echo "[Kortix] Local mode — DNS interception disabled"
 
-    # Remove dnsmasq config so it starts idle (no overrides)
-    rm -f /etc/dnsmasq.d/kortix-proxy.conf
+    # Override SDK base URLs to route through Kortix router proxy
+    # These env vars are picked up by the SDKs inside the sandbox
+    export TAVILY_API_URL="${KORTIX_API_URL}/tavily"
+    export SERPER_API_URL="${KORTIX_API_URL}/serper"
+    export FIRECRAWL_API_URL="${KORTIX_API_URL}/firecrawl"
+    export REPLICATE_API_URL="${KORTIX_API_URL}/replicate"
+    export CONTEXT7_API_URL="${KORTIX_API_URL}/context7"
+    echo "[Kortix] SDK URLs routed through ${KORTIX_API_URL}"
+else
+    echo "[Kortix] Local mode — proxy routing disabled"
 fi
 
-# Start supervisord (manages kortix-master, opencode, dnsmasq)
+# Start supervisord (manages kortix-master, opencode)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

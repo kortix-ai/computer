@@ -100,7 +100,6 @@ async def create_sandbox(password: str, project_id: str = None, kortix_token: st
             "KORTIX_API_URL": config.KORTIX_API_URL or "https://api.kortix.ai",
             "KORTIX_TOKEN": kortix_token or "00000",  # Token for Kortix router auth (00000 = test mode)
             "ENV_MODE": getattr(config, 'ENV_MODE', None) or "local",
-            "KORTIX_ROUTER_URL": getattr(config, 'KORTIX_ROUTER_URL', None) or "",
         },
         # resources=Resources(
         #     cpu=2,
