@@ -6,13 +6,17 @@ export type KeyInjectionMethod =
   | { type: 'json_body_field'; field: string }
   | { type: 'header'; headerName: string; prefix?: string };
 
-// === Included Route Definition ===
+// === Allowed Route Definition ===
 
-export interface IncludedRoute {
-  /** Path prefix to match (e.g. "/search" matches "/search" and "/search?q=foo") */
+export interface AllowedRoute {
+  /** Path to match. Exact match unless prefixMatch is true. */
   path: string;
   /** Allowed HTTP methods */
   methods: string[];
+  /** If true, match path as prefix (e.g. "/v1/predictions" matches "/v1/predictions/abc123") */
+  prefixMatch?: boolean;
+  /** Override billing tool name for this specific route (for per-model billing) */
+  billingToolName?: string;
 }
 
 // === Proxy Service Configuration ===
@@ -27,8 +31,8 @@ export interface ProxyServiceConfig {
   /** How to inject the API key into upstream requests */
   keyInjection: KeyInjectionMethod;
   /** Only these routes are allowed when using Kortix's key (prevents cost abuse) */
-  allowedRoutes: IncludedRoute[];
-  /** Tool name for billing attribution */
+  allowedRoutes: AllowedRoute[];
+  /** Default tool name for billing attribution (can be overridden per-route) */
   billingToolName: string;
 }
 
@@ -69,7 +73,7 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
       allowedRoutes: [
         { path: '/v1/scrape', methods: ['POST'] },
-        { path: '/v1/crawl', methods: ['POST', 'GET'] },
+        { path: '/v1/crawl', methods: ['POST', 'GET'], prefixMatch: true },
         { path: '/v1/map', methods: ['POST'] },
         { path: '/v1/search', methods: ['POST'] },
       ],
@@ -82,9 +86,17 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
       getKortixApiKey: () => config.REPLICATE_API_TOKEN,
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Token ' },
       allowedRoutes: [
-        // SDK flow: POST /v1/models/{owner}/{name}/predictions → GET /v1/predictions/{id}
-        { path: '/v1/predictions', methods: ['POST', 'GET'] },
-        { path: '/v1/models', methods: ['POST', 'GET'] },
+        // Allowed models — locked to specific models, each with own billing
+        {
+          path: '/v1/models/google/nano-banana/predictions',
+          methods: ['POST'],
+          billingToolName: 'proxy_replicate_nano_banana',
+        },
+        {
+          path: '/v1/models/openai/gpt-image-1.5/predictions',
+          methods: ['POST'],
+          billingToolName: 'proxy_replicate_gpt_image',
+        },
       ],
       billingToolName: 'proxy_replicate',
     },
@@ -106,28 +118,34 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
 // === Route Matching ===
 
 /**
- * Check if a request method+path is allowed in the service's included routes.
- * Uses prefix matching: "/v1/predictions/abc123" matches included route "/v1/predictions".
+ * Check if a request method+path is allowed. Returns the matching route or null.
  */
-export function isRouteAllowed(
+export function matchAllowedRoute(
   method: string,
   path: string,
-  allowedRoutes: IncludedRoute[]
-): boolean {
+  allowedRoutes: AllowedRoute[]
+): AllowedRoute | null {
   const upperMethod = method.toUpperCase();
-  const normalizedPath = path.split('?')[0]; // strip query string
+  const normalizedPath = path.split('?')[0];
 
   for (const route of allowedRoutes) {
     if (!route.methods.includes(upperMethod)) continue;
 
-    // Exact match or prefix match (path starts with route.path followed by / or end)
-    if (
-      normalizedPath === route.path ||
-      normalizedPath.startsWith(route.path + '/')
-    ) {
-      return true;
+    if (route.prefixMatch) {
+      // Prefix match: "/v1/predictions" matches "/v1/predictions/abc123"
+      if (
+        normalizedPath === route.path ||
+        normalizedPath.startsWith(route.path + '/')
+      ) {
+        return route;
+      }
+    } else {
+      // Exact match only
+      if (normalizedPath === route.path) {
+        return route;
+      }
     }
   }
 
-  return false;
+  return null;
 }

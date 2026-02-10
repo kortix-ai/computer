@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import {
   getProxyServices,
-  isRouteAllowed,
+  matchAllowedRoute,
   type ProxyServiceConfig,
 } from '../config/proxy-services';
 import { validateSecretKey } from '../repositories/api-keys';
@@ -20,17 +20,12 @@ for (const [prefix, serviceConfig] of Object.entries(services)) {
 
 // === Core Proxy Handler ===
 //
-// Two modes:
+// 1. Valid KORTIX token (sk_xxx in our DB)
+//    → Match against allowedRoutes (exact model paths for replicate, etc.)
+//    → Inject Kortix's API key, forward, bill user with route-specific pricing.
 //
-// 1. Request has a valid KORTIX token (sk_xxx validated against our DB)
-//    → This is our user, using our infrastructure.
-//    → Check if route is in includedRoutes (we only allow certain endpoints through our key).
-//    → Inject Kortix's own API key for the upstream service.
-//    → Forward to upstream, bill the user.
-//
-// 2. Request does NOT have a valid Kortix token (user has their own API key)
-//    → Just passthrough. Forward everything as-is to upstream.
-//    → No billing, no gating, no interference.
+// 2. Not a Kortix token (user's own API key)
+//    → Pure passthrough. No billing, no gating.
 
 async function handleProxy(c: any, service: ProxyServiceConfig, prefix: string) {
   const fullPath = new URL(c.req.url).pathname;
@@ -44,15 +39,13 @@ async function handleProxy(c: any, service: ProxyServiceConfig, prefix: string) 
   const auth = await tryAuthenticate(c);
 
   if (auth.isKortixUser && auth.accountId) {
-    // Kortix user → inject our key, bill them
     return handleKortixProxy(c, service, subPath, queryString, method, auth.accountId);
   } else {
-    // Not our user → pure passthrough, their own key
     return handlePassthrough(c, service, subPath, queryString, method);
   }
 }
 
-// === Kortix User: inject our API key, bill them ===
+// === Kortix User: match allowed route, inject our key, bill with route-specific pricing ===
 
 async function handleKortixProxy(
   c: any,
@@ -62,20 +55,18 @@ async function handleKortixProxy(
   method: string,
   accountId: string
 ) {
-  // Only allow included routes through our key
-  if (!isRouteAllowed(method, subPath, service.allowedRoutes)) {
+  const matchedRoute = matchAllowedRoute(method, subPath, service.allowedRoutes);
+  if (!matchedRoute) {
     throw new HTTPException(403, {
       message: `Route not available: ${method} ${subPath}`,
     });
   }
 
-  // Check credits
-  const creditCheck = await checkCredits(accountId);
+  const creditCheck = await checkCredits(accountId, 0.01, { skipDevCheck: true });
   if (!creditCheck.hasCredits) {
     throw new HTTPException(402, { message: creditCheck.message });
   }
 
-  // Check that we have a key configured for this service
   const kortixKey = service.getKortixApiKey();
   if (!kortixKey) {
     throw new HTTPException(503, {
@@ -87,10 +78,12 @@ async function handleKortixProxy(
   const headers = buildForwardHeaders(c);
   let body = await getRequestBody(c, method);
 
-  // Inject OUR API key (replacing whatever was there)
   body = injectApiKey(service, headers, body);
 
-  console.log(`[PROXY] ${service.name} (kortix:${accountId}) ${method} ${subPath} → ${targetUrl}`);
+  // Route-specific billing overrides service default
+  const billingToolName = matchedRoute.billingToolName || service.billingToolName;
+
+  console.log(`[PROXY] ${service.name} (kortix:${accountId}) ${method} ${subPath} → ${targetUrl} [bill:${billingToolName}]`);
 
   const upstream = await fetch(targetUrl, {
     method,
@@ -100,12 +93,14 @@ async function handleKortixProxy(
     duplex: 'half',
   });
 
-  // Bill the user (fire-and-forget)
+  // Bill the user (fire-and-forget, don't block response)
   deductToolCredits(
     accountId,
-    service.billingToolName,
+    billingToolName,
     0,
     `Proxy ${service.name}: ${method} ${subPath}`,
+    undefined,
+    { skipDevCheck: true },
   ).catch((err) => console.error(`[PROXY] Billing error: ${err}`));
 
   return new Response(upstream.body, {
@@ -115,7 +110,7 @@ async function handleKortixProxy(
   });
 }
 
-// === Not Kortix user: pure passthrough, no billing ===
+// === Not Kortix user: pure passthrough ===
 
 async function handlePassthrough(
   c: any,
@@ -147,11 +142,6 @@ async function handlePassthrough(
 
 // === Helpers ===
 
-/**
- * Check if the request has a valid Kortix token.
- * Only sk_xxx keys validated against our DB count as "Kortix user".
- * Anything else (user's own Tavily key, etc.) is not ours → passthrough.
- */
 async function tryAuthenticate(c: any): Promise<{ isKortixUser: boolean; accountId?: string }> {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -161,12 +151,10 @@ async function tryAuthenticate(c: any): Promise<{ isKortixUser: boolean; account
   const token = authHeader.slice(7);
   if (!token) return { isKortixUser: false };
 
-  // Test token (dev mode)
   if (token === '00000') {
     return { isKortixUser: true, accountId: 'test_account' };
   }
 
-  // Validate sk_xxx against our DB
   if (token.startsWith('sk_') && isSupabaseConfigured()) {
     try {
       const result = await validateSecretKey(token);
@@ -178,7 +166,6 @@ async function tryAuthenticate(c: any): Promise<{ isKortixUser: boolean; account
     }
   }
 
-  // Anything else is NOT a Kortix token → passthrough
   return { isKortixUser: false };
 }
 
@@ -197,9 +184,6 @@ async function getRequestBody(c: any, method: string): Promise<ArrayBuffer | str
   return await c.req.raw.clone().arrayBuffer();
 }
 
-/**
- * Inject Kortix's own API key, replacing whatever auth the request had.
- */
 function injectApiKey(
   service: ProxyServiceConfig,
   headers: Headers,

@@ -18,15 +18,16 @@ const TEST_ACCOUNT = 'test_account';
  */
 export async function checkCredits(
   accountId: string,
-  minimumRequired: number = 0.01
+  minimumRequired: number = 0.01,
+  options?: { skipDevCheck?: boolean }
 ): Promise<BillingCheckResult> {
   // Skip billing for test account
   if (accountId === TEST_ACCOUNT) {
     return { hasCredits: true, message: 'Test mode', balance: 999999 };
   }
 
-  // Skip billing in development mode
-  if (config.isDevelopment()) {
+  // Skip billing in development mode (unless caller opts out, e.g. proxy routes)
+  if (!options?.skipDevCheck && config.isDevelopment()) {
     return { hasCredits: true, message: 'Development mode', balance: 999999 };
   }
 
@@ -57,15 +58,16 @@ export async function deductToolCredits(
   toolName: string,
   resultCount: number = 0,
   description?: string,
-  sessionId?: string
+  sessionId?: string,
+  options?: { skipDevCheck?: boolean }
 ): Promise<BillingDeductResult> {
   // Skip billing for test account
   if (accountId === TEST_ACCOUNT) {
     return { success: true, cost: 0, newBalance: 999999, skipped: true, reason: 'test_token' };
   }
 
-  // Skip billing in development mode
-  if (config.isDevelopment()) {
+  // Skip billing in development mode (unless caller opts out, e.g. proxy routes)
+  if (!options?.skipDevCheck && config.isDevelopment()) {
     return { success: true, cost: 0, newBalance: 999999, skipped: true, reason: 'development_mode' };
   }
 

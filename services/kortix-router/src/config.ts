@@ -108,6 +108,16 @@ export const TOOL_PRICING: Record<string, ToolPricing> = {
     perResultCost: 0,
     markupMultiplier: 1.5,
   },
+  proxy_replicate_nano_banana: {
+    baseCost: 0.01,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_replicate_gpt_image: {
+    baseCost: 0.05,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
   proxy_context7: {
     baseCost: 0.001,
     perResultCost: 0,
