@@ -1,3 +1,7 @@
 [submodule "services/lss"]
 	path = services/lss
 	url = https://github.com/kortix-ai/lss.git
+[submodule "services/opencode"]
+	path = services/opencode
+	url = https://github.com/kortix-ai/opencode.git
+	branch = kortix
