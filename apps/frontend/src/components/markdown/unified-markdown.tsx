@@ -4,6 +4,8 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Streamdown } from 'streamdown';
 import { Check, Copy } from 'lucide-react';
+import { codeToHtml } from 'shiki';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { MermaidRenderer } from '@/components/ui/mermaid-renderer';
 import { isMermaidCode } from '@/lib/mermaid-utils';
@@ -72,6 +74,47 @@ function CopyButton({ code }: { code: string }) {
         <Copy className="h-4 w-4" />
       )}
     </button>
+  );
+}
+
+// Syntax-highlighted code using Shiki
+function HighlightedCode({ code, language, children }: { code: string; language: string; children: React.ReactNode }) {
+  const { resolvedTheme } = useTheme();
+  const [html, setHtml] = useState<string | null>(null);
+  const theme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
+
+  useEffect(() => {
+    let cancelled = false;
+    codeToHtml(code, {
+      lang: language,
+      theme,
+      transformers: [{
+        pre(node) {
+          if (node.properties.style) {
+            node.properties.style = (node.properties.style as string)
+              .replace(/background-color:[^;]+;?/g, '');
+          }
+        },
+      }],
+    })
+      .then((result) => { if (!cancelled) setHtml(result); })
+      .catch(() => { /* fallback to plain text for unknown languages */ });
+    return () => { cancelled = true; };
+  }, [code, language, theme]);
+
+  if (html) {
+    return (
+      <code
+        className="text-[13px] font-mono leading-relaxed whitespace-pre [&_pre]:contents [&_code]:contents"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  }
+
+  return (
+    <code className="text-[13px] font-mono leading-relaxed text-inherit whitespace-pre">
+      {children}
+    </code>
   );
 }
 
@@ -286,7 +329,12 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
                 return <MermaidRenderer chart={code} className="my-5" />;
               }
 
-              // Block code inside pre - inherit styles, clean mono font
+              // Syntax-highlighted block code
+              if (language) {
+                return <HighlightedCode code={code} language={language}>{children}</HighlightedCode>;
+              }
+
+              // Block code without language - plain mono font
               return (
                 <code className="text-[13px] font-mono leading-relaxed text-inherit whitespace-pre">
                   {children}
