@@ -1,0 +1,3 @@
+[submodule "services/lss"]
+	path = services/lss
+	url = https://github.com/kortix-ai/lss.git
