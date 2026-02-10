@@ -481,6 +481,13 @@ function SessionTurn({
     [sessionStatus, isLast],
   );
   const hasSteps = useMemo(() => turnHasSteps(allParts), [allParts]);
+  const lastTodoWriteId = useMemo(() => {
+    for (let i = allParts.length - 1; i >= 0; i--) {
+      const p = allParts[i].part;
+      if (isToolPart(p) && p.tool === 'todowrite') return p.id;
+    }
+    return undefined;
+  }, [allParts]);
   const lastTextPart = useMemo(() => findLastTextPart(allParts), [allParts]);
   const responsePartId = lastTextPart?.id;
   const response = lastTextPart?.text?.trim();
@@ -636,15 +643,17 @@ function SessionTurn({
           <button
             onClick={onToggleSteps}
             aria-expanded={stepsExpanded}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1 mt-3"
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1 mt-3 cursor-pointer"
           >
             {/* Indicator icon */}
-            {working ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <ChevronDown
-                className={cn('size-3 transition-transform', stepsExpanded ? '' : '-rotate-90')}
-              />
+            <ChevronRight
+              className={cn(
+                'size-3 transition-transform flex-shrink-0 text-muted-foreground',
+                stepsExpanded && 'rotate-90',
+              )}
+            />
+            {working && (
+              <Loader2 className="size-3 animate-spin flex-shrink-0" />
             )}
 
             {/* Status text / retry info / show-hide label */}
@@ -725,6 +734,8 @@ function SessionTurn({
             // Tool parts
             if (isToolPart(part)) {
               if (!shouldShowToolPart(part)) return null;
+              // Only show the last todowrite (it contains the latest state)
+              if (part.tool === 'todowrite' && part.id !== lastTodoWriteId) return null;
               // Hide tool parts that have active permission/question
               if (isToolPartHidden(part, message.info.id, hidden)) return null;
 
