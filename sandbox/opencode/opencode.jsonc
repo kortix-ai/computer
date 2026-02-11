@@ -3,8 +3,8 @@
   "plugin": ["opencode-pty", "./plugin/worktree.ts"], // ["@tarquinen/opencode-dcp@latest"],
   "autoupdate": true,
   "default_agent": "kortix-main",
-  "model": "kortix/power",
-  "small_model": "kortix/basic",
+  "model": "anthropic/claude-sonnet-4-20250514",
+  "small_model": "anthropic/claude-3-5-haiku-20241022",
   "provider": {
     "kortix": {
       "npm": "@ai-sdk/openai-compatible",
@@ -85,6 +85,9 @@
           }
         }
       }
+    },
+    "anthropic": {
+      "name": "Anthropic"
     }
   },
   "mcp": {
