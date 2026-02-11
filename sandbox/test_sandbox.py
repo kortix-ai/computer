@@ -1,21 +1,27 @@
 import asyncio
 import json
+import os
 from daytona_sdk import AsyncDaytona, DaytonaConfig, CreateSandboxFromSnapshotParams
 
 SNAPSHOT = "kortix-sandbox-v0.3.0"
 
-# Your ngrok URL pointing to kortix-router (localhost:8008)
-KORTIX_API_URL = "https://4448-95-85-157-6.ngrok-free.app"
-KORTIX_TOKEN = "sk_XVENRFj2DMmSFs0ydRChyCNqg5tG5XlV"
+# Load from environment or sandbox/.env
+DAYTONA_API_KEY = os.environ.get("DAYTONA_API_KEY", "")
+KORTIX_API_URL = os.environ.get("KORTIX_API_URL", "")
+KORTIX_TOKEN = os.environ.get("KORTIX_TOKEN", "")
 
 
 async def main():
-    config = DaytonaConfig()
+    if not DAYTONA_API_KEY:
+        print("ERROR: DAYTONA_API_KEY not set. Export it or add to sandbox/.env")
+        return
+
+    config = DaytonaConfig(api_key=DAYTONA_API_KEY)
     daytona = AsyncDaytona(config)
 
     print(f"Creating sandbox with {SNAPSHOT}...")
-    print(f"API URL: {KORTIX_API_URL}")
-    print(f"Token: {KORTIX_TOKEN[:10]}...")
+    print(f"KORTIX_API_URL: {KORTIX_API_URL or '(not set)'}")
+    print(f"KORTIX_TOKEN: {KORTIX_TOKEN[:10]}..." if KORTIX_TOKEN else "KORTIX_TOKEN: (not set)")
 
     params = CreateSandboxFromSnapshotParams(
         snapshot=SNAPSHOT,
@@ -31,7 +37,7 @@ async def main():
         auto_archive_interval=30,
     )
 
-    sandbox = await daytona.create(params)
+    sandbox = await daytona.create(params, timeout=300)
     print(f"Sandbox ID: {sandbox.id}")
 
     # s6-overlay starts all services automatically — no need to launch supervisord.
@@ -49,7 +55,7 @@ async def main():
 
     print("\n--- Environment check ---")
     result = await sandbox.process.exec(
-        "echo 'KORTIX_API_URL:' $KORTIX_API_URL && echo 'KORTIX_TOKEN:' ${KORTIX_TOKEN:0:10}... && echo 'ENV_MODE:' $ENV_MODE"
+        "echo 'KORTIX_API_URL:' $KORTIX_API_URL && echo 'ENV_MODE:' $ENV_MODE"
     )
     print(result.result)
 
