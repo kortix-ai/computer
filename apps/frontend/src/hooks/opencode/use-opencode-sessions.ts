@@ -139,9 +139,13 @@ export function useCreateOpenCodeSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (options: { directory?: string; title?: string } | void) => {
       const client = getClient();
-      const result = await client.session.create();
+      const opts = options || {};
+      const result = await client.session.create({
+        directory: opts.directory,
+        title: opts.title,
+      });
       return unwrap(result);
     },
     onSuccess: () => {

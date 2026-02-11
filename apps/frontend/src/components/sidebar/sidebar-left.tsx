@@ -90,7 +90,19 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
+    // Derive initial project from URL if on a project page
+    const match = typeof window !== 'undefined' && window.location.pathname.match(/^\/projects\/([^/]+)/);
+    return match ? match[1] : null;
+  });
+
+  // Sync selectedProjectId from URL when navigating to/from project pages
+  useEffect(() => {
+    const match = pathname?.match(/^\/projects\/([^/]+)/);
+    if (match) {
+      setSelectedProjectId(match[1]);
+    }
+  }, [pathname]);
 
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
 
