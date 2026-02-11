@@ -11,6 +11,15 @@ import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 
+function cleanTaskOutput(raw: string): string {
+  return raw
+    .replace(/^task_id:\s.*$/m, '')
+    .replace(/^agentId:\s.*$/m, '')
+    .replace(/<\/?task_result>/g, '')
+    .replace(/<usage>[\s\S]*?<\/usage>/g, '')
+    .trim();
+}
+
 export function OcTaskToolView({
   toolCall,
   toolResult,
@@ -23,7 +32,8 @@ export function OcTaskToolView({
   const subagentType = (args.subagent_type as string) || '';
   const description = (args.description as string) || '';
   const ocState = args._oc_state as any;
-  const output = toolResult?.output || (ocState?.output) || '';
+  const rawOutput = toolResult?.output || (ocState?.output) || '';
+  const output = rawOutput ? cleanTaskOutput(String(rawOutput)) : '';
 
   const title = subagentType ? `Agent: ${subagentType}` : 'Sub-Agent Task';
 
