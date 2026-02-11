@@ -167,18 +167,21 @@ preview.all('/:sandboxId/:port/*', async (c) => {
   const remainingPath = fullPath.startsWith(prefixPattern)
     ? fullPath.slice(prefixPattern.length) || '/'
     : '/';
-  const queryString = new URL(c.req.url).search;
+  // Strip auth-related query params before forwarding to upstream
+  const upstreamUrl = new URL(c.req.url);
+  upstreamUrl.searchParams.delete('token');
+  const queryString = upstreamUrl.search;
 
   // preview URL from Daytona is the full base (e.g. https://8080-abc123.proxy.daytona.work)
   // Append remaining path
   const targetUrl = previewUrl.replace(/\/$/, '') + remainingPath + queryString;
 
-  // 4. Build forwarding headers
+  // 4. Build forwarding headers (strip auth — don't leak user JWT to sandbox)
   const headers = new Headers();
   for (const [key, value] of c.req.raw.headers.entries()) {
-    if (key.toLowerCase() !== 'host') {
-      headers.set(key, value);
-    }
+    const lower = key.toLowerCase();
+    if (lower === 'host' || lower === 'authorization') continue;
+    headers.set(key, value);
   }
 
   // Inject Daytona headers

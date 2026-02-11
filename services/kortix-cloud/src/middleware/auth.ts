@@ -3,23 +3,28 @@ import { HTTPException } from 'hono/http-exception';
 import { getSupabase } from '../lib/supabase';
 
 /**
- * Validates Supabase JWT from Authorization header.
+ * Validates Supabase JWT from either:
+ *  1. Authorization: Bearer <token> header (standard)
+ *  2. ?token=<token> query parameter (for EventSource/SSE which can't set headers)
+ *
  * Sets userId in context on success.
  */
 export async function authMiddleware(c: Context, next: Next) {
+  // Try Authorization header first, fall back to ?token= query param
   const authHeader = c.req.header('Authorization');
+  let token: string | undefined;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new HTTPException(401, {
-      message: 'Missing or invalid Authorization header',
-    });
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
   }
 
-  const token = authHeader.slice(7);
+  if (!token) {
+    token = c.req.query('token') || undefined;
+  }
 
   if (!token) {
     throw new HTTPException(401, {
-      message: 'Missing token in Authorization header',
+      message: 'Missing authentication token',
     });
   }
 
