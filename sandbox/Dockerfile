@@ -20,6 +20,9 @@ RUN for i in 1 2 3; do curl -fsSL https://bun.sh/install | bash && break || slee
 RUN pip3 install --break-system-packages --timeout=120 --retries=3 \
         playwright==1.58.0 pypdf2==3.0.1 python-pptx==1.0.2 pillow==12.1.0
 
+# Install uv (Python package runner) — used by presentation-gen tool scripts
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
 # ── LSS (Local Semantic Search + file-watcher sync) ─────────────────────────
 # Install from PyPI. Provides: `lss` (search CLI), `lss-sync` (file-watcher daemon)
 # https://pypi.org/project/local-semantic-search/
