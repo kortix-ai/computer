@@ -10,6 +10,7 @@ import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { useOcFileOpen } from './useOcFileOpen';
 
 function getFilename(path: string | undefined): string {
   if (!path) return '';
@@ -36,8 +37,11 @@ export function OcEditToolView({
   const filePath = (args.filePath as string) || (args.target_filepath as string) || '';
   const ocState = args._oc_state as any;
 
-  const filename = getFilename(filePath);
-  const dir = getDirectory(filePath);
+  const { openFile, toDisplayPath } = useOcFileOpen();
+
+  const displayPath = toDisplayPath(filePath);
+  const filename = getFilename(displayPath);
+  const dir = getDirectory(displayPath);
 
   // Extract diff info from metadata
   const metadata = ocState?.metadata || {};
@@ -71,6 +75,7 @@ export function OcEditToolView({
             icon={FileCode2}
             title={filename || 'Edit File'}
             subtitle={dir}
+            onTitleClick={filePath ? () => openFile(filePath) : undefined}
           />
           {(additions != null || deletions != null) && (
             <div className="flex items-center gap-2 text-xs flex-shrink-0">
@@ -122,7 +127,7 @@ export function OcEditToolView({
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">
-                File edited: <span className="font-mono text-foreground">{filePath}</span>
+                File edited: <span className="font-mono text-foreground">{displayPath}</span>
               </div>
             )}
           </div>

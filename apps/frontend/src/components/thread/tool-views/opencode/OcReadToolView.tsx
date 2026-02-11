@@ -10,6 +10,7 @@ import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { useOcFileOpen } from './useOcFileOpen';
 
 function getFilename(path: string | undefined): string {
   if (!path) return '';
@@ -28,13 +29,6 @@ function getExtension(filename: string): string {
   const idx = filename.lastIndexOf('.');
   if (idx < 0) return '';
   return filename.substring(idx + 1);
-}
-
-function toRelativePath(fullPath: string): string {
-  // Strip common home-dir prefixes to get a shorter relative-ish path
-  return fullPath
-    .replace(/^\/Users\/[^/]+\//, '~/')
-    .replace(/^\/home\/[^/]+\//, '~/');
 }
 
 function cleanReadOutput(raw: string): string {
@@ -57,7 +51,6 @@ export function OcReadToolView({
   const ocState = args._oc_state as any;
 
   const filename = getFilename(filePath);
-  const dir = getDirectory(filePath);
   const ext = getExtension(filename);
 
   // Extract loaded files from metadata
@@ -75,6 +68,11 @@ export function OcReadToolView({
   // For multiple files, track which ones are expanded
   const allPaths = loaded.length > 0 ? loaded : filePath ? [filePath] : [];
   const isSingleFile = allPaths.length <= 1;
+
+  const { openFile, openFileWithList, toDisplayPath } = useOcFileOpen();
+
+  const displayPath = toDisplayPath(filePath);
+  const displayDir = getDirectory(displayPath);
 
   const [expanded, setExpanded] = useState(false);
 
@@ -98,7 +96,8 @@ export function OcReadToolView({
           <ToolViewIconTitle
             icon={Eye}
             title={filename || 'Read File'}
-            subtitle={dir}
+            subtitle={displayDir}
+            onTitleClick={filePath ? () => openFile(filePath) : undefined}
           />
           <div className="flex items-center gap-2 text-xs flex-shrink-0">
             {allPaths.length > 1 && (
@@ -122,13 +121,19 @@ export function OcReadToolView({
             {isSingleFile ? (
               <SingleFileRow
                 filePath={filePath}
+                displayPath={displayPath}
                 ext={ext}
                 output={output}
                 expanded={expanded}
                 onToggle={() => setExpanded(!expanded)}
+                onOpenFile={() => openFileWithList(filePath, allPaths)}
               />
             ) : (
-              <MultiFileList paths={allPaths} />
+              <MultiFileList
+                paths={allPaths}
+                toDisplayPath={toDisplayPath}
+                onFileClick={(fp) => openFileWithList(fp, allPaths)}
+              />
             )}
           </div>
         </ScrollArea>
@@ -159,19 +164,24 @@ export function OcReadToolView({
 
 function SingleFileRow({
   filePath,
+  displayPath,
   ext,
   output,
   expanded,
   onToggle,
+  onOpenFile,
 }: {
   filePath: string;
+  displayPath: string;
   ext: string;
   output: string;
   expanded: boolean;
   onToggle: () => void;
+  onOpenFile: () => void;
 }) {
   const hasContent = !!output;
-  const relativePath = toRelativePath(filePath);
+  const filename = getFilename(displayPath);
+  const dir = getDirectory(displayPath);
 
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
@@ -188,8 +198,15 @@ function SingleFileRow({
         ) : (
           <FileText className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400 flex-shrink-0" />
         )}
-        <span className="font-mono text-xs text-foreground truncate flex-1">
-          {relativePath}
+        <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
+          <span
+            className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+            onClick={(e) => { e.stopPropagation(); onOpenFile(); }}
+            title={displayPath}
+          >
+            {filename}
+          </span>
+          {dir && <span className="text-muted-foreground/40 truncate text-[11px]">{dir}</span>}
         </span>
         {hasContent && (
           <span className="text-[10px] text-muted-foreground flex-shrink-0 uppercase tracking-wider">
@@ -209,36 +226,34 @@ function SingleFileRow({
   );
 }
 
-function MultiFileList({ paths }: { paths: string[] }) {
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-
+function MultiFileList({
+  paths,
+  toDisplayPath,
+  onFileClick,
+}: {
+  paths: string[];
+  toDisplayPath: (p: string) => string;
+  onFileClick: (path: string) => void;
+}) {
   return (
-    <div className="space-y-1.5">
+    <div className="py-1">
       {paths.map((fp, i) => {
-        const fname = getFilename(fp);
-        const fext = getExtension(fname);
-        const relativePath = toRelativePath(fp);
-        const isExpanded = expandedIndex === i;
+        const dp = toDisplayPath(fp);
+        const fname = getFilename(dp);
+        const dir = getDirectory(dp);
 
         return (
           <div
             key={i}
-            className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950"
+            className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors group"
+            onClick={() => onFileClick(fp)}
+            title={dp}
           >
-            <div
-              className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-              onClick={() => setExpandedIndex(isExpanded ? null : i)}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              )}
-              <FileText className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400 flex-shrink-0" />
-              <span className="font-mono text-xs text-foreground truncate flex-1">
-                {relativePath}
-              </span>
-            </div>
+            <FileText className="h-3.5 w-3.5 text-sky-500/70 dark:text-sky-400/70 flex-shrink-0 group-hover:text-sky-500 dark:group-hover:text-sky-400 transition-colors" />
+            <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden">
+              <span className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0">{fname}</span>
+              {dir && <span className="text-muted-foreground/40 truncate text-[11px]">{dir}</span>}
+            </span>
           </div>
         );
       })}

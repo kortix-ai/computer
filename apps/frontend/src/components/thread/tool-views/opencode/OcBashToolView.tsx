@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Terminal, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Terminal, CheckCircle, AlertCircle, Clock, Info } from 'lucide-react';
 import { ToolViewProps } from '../types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,40 @@ import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 function stripAnsi(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
+
+interface BashMetadata {
+  message: string;
+  isTimeout: boolean;
+  timeoutMs: number | null;
+}
+
+/** Extract and strip <bash_metadata> and similar XML tags from output */
+function extractMetadata(output: string): { cleanOutput: string; metadata: BashMetadata[] } {
+  const metadata: BashMetadata[] = [];
+
+  // Strip <bash_metadata>...</bash_metadata>
+  const cleanOutput = output.replace(/<bash_metadata>([\s\S]*?)<\/bash_metadata>/g, (_, content) => {
+    const msg = content.trim();
+    const timeoutMatch = msg.match(/timeout\s+(\d+)\s*ms/i);
+    metadata.push({
+      message: msg,
+      isTimeout: /timeout|timed?\s*out/i.test(msg),
+      timeoutMs: timeoutMatch ? parseInt(timeoutMatch[1], 10) : null,
+    });
+    return '';
+  })
+  // Also strip any other stray metadata-like XML tags
+  .replace(/<\/?(?:system_info|exit_code|stderr_note)>[\s\S]*?(?:<\/\w+>|$)/g, '')
+  .trim();
+
+  return { cleanOutput, metadata };
+}
+
+function formatTimeout(ms: number): string {
+  if (ms >= 60000) return `${(ms / 60000).toFixed(1)}m`;
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${ms}ms`;
 }
 
 export function OcBashToolView({
@@ -33,7 +67,13 @@ export function OcBashToolView({
   const rawOutput = toolResult?.output
     || (ocState?.status === 'running' && ocState?.metadata?.output)
     || '';
-  const output = typeof rawOutput === 'string' ? stripAnsi(rawOutput) : '';
+  const strippedAnsi = typeof rawOutput === 'string' ? stripAnsi(rawOutput) : '';
+
+  // Extract metadata tags from output
+  const { cleanOutput, metadata } = useMemo(
+    () => extractMetadata(strippedAnsi),
+    [strippedAnsi]
+  );
 
   const isError = toolResult?.success === false || !!toolResult?.error;
 
@@ -50,7 +90,7 @@ export function OcBashToolView({
     );
   }
 
-  const codeBlock = `\`\`\`bash\n$ ${command}${output ? '\n' + output : ''}\n\`\`\``;
+  const codeBlock = `\`\`\`bash\n$ ${command}${cleanOutput ? '\n' + cleanOutput : ''}\n\`\`\``;
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
@@ -66,8 +106,41 @@ export function OcBashToolView({
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
-          <div className="p-4">
+          <div className="p-4 space-y-3">
             <UnifiedMarkdown content={codeBlock} isStreaming={false} />
+
+            {metadata.map((meta, i) => (
+              <div
+                key={i}
+                className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border text-xs ${
+                  meta.isTimeout
+                    ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50'
+                    : 'bg-zinc-50/50 dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-700/50'
+                }`}
+              >
+                {meta.isTimeout ? (
+                  <Clock className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <Info className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500 flex-shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className={meta.isTimeout
+                    ? 'text-amber-700 dark:text-amber-300'
+                    : 'text-muted-foreground'
+                  }>
+                    {meta.isTimeout && meta.timeoutMs
+                      ? `Command timed out after ${formatTimeout(meta.timeoutMs)}`
+                      : meta.message
+                    }
+                  </span>
+                </div>
+                {meta.isTimeout && meta.timeoutMs && (
+                  <Badge variant="outline" className="h-5 py-0 text-[10px] flex-shrink-0 bg-amber-100/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400">
+                    {formatTimeout(meta.timeoutMs)}
+                  </Badge>
+                )}
+              </div>
+            ))}
           </div>
         </ScrollArea>
       </CardContent>
@@ -82,6 +155,11 @@ export function OcBashToolView({
             <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
               <AlertCircle className="h-3 w-3" />
               Failed
+            </Badge>
+          ) : metadata.some((m) => m.isTimeout) ? (
+            <Badge variant="outline" className="h-6 py-0.5 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-300">
+              <Clock className="h-3 w-3" />
+              Timed Out
             </Badge>
           ) : (
             <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">

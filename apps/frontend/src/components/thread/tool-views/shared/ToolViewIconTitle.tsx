@@ -11,6 +11,8 @@ export interface ToolViewIconTitleProps {
   title: string;
   /** Optional subtitle or description */
   subtitle?: string;
+  /** Optional click handler for the title (e.g. to open a file) */
+  onTitleClick?: () => void;
   /** Additional classes for the container */
   className?: string;
 }
@@ -24,6 +26,7 @@ export function ToolViewIconTitle({
   icon: Icon,
   title,
   subtitle,
+  onTitleClick,
   className,
 }: ToolViewIconTitleProps) {
   return (
@@ -32,9 +35,19 @@ export function ToolViewIconTitle({
         <Icon className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-base font-medium text-zinc-900 dark:text-zinc-100 truncate">
-          {title}
-        </div>
+        {onTitleClick ? (
+          <div
+            className="text-base font-medium text-zinc-900 dark:text-zinc-100 truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            onClick={onTitleClick}
+            title={subtitle || undefined}
+          >
+            {title}
+          </div>
+        ) : (
+          <div className="text-base font-medium text-zinc-900 dark:text-zinc-100 truncate">
+            {title}
+          </div>
+        )}
         {subtitle && (
           <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
             {subtitle}

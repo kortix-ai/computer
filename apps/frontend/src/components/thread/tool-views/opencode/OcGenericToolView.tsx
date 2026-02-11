@@ -19,6 +19,7 @@ import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { useOcFileOpen } from './useOcFileOpen';
 
 /** Convert tool names like "apply_patch" or "oc-multi-edit" to "Apply Patch" / "Multi Edit" */
 function humanizeToolName(raw: string): string {
@@ -73,6 +74,12 @@ function detectLang(key: string, val: string): string {
   return '';
 }
 
+/** Check if a value looks like an absolute file path */
+function isAbsolutePath(val: unknown): boolean {
+  if (typeof val !== 'string') return false;
+  return val.startsWith('/') && !val.includes('\n') && val.length < 500;
+}
+
 export function OcGenericToolView({
   toolCall,
   toolResult,
@@ -89,6 +96,8 @@ export function OcGenericToolView({
   const title = humanizeToolName(ocState?.title || ocTool);
   const ToolIcon = pickToolIcon(ocTool);
   const colors = pickToolColor(ocTool);
+
+  const { toDisplayPath } = useOcFileOpen();
 
   // Build clean arguments without internal adapter fields
   const cleanArgs = useMemo(() => {
@@ -151,7 +160,7 @@ export function OcGenericToolView({
 
             {/* Simple args as key-value pairs */}
             {simpleEntries.length > 0 && (
-              <SimpleArgsSection entries={simpleEntries} />
+              <SimpleArgsSection entries={simpleEntries} toDisplayPath={toDisplayPath} />
             )}
 
             {/* Code / multiline args as collapsible code blocks */}
@@ -226,20 +235,30 @@ function ErrorSection({ message }: { message: string }) {
   );
 }
 
-function SimpleArgsSection({ entries }: { entries: [string, unknown][] }) {
+function SimpleArgsSection({
+  entries,
+  toDisplayPath,
+}: {
+  entries: [string, unknown][];
+  toDisplayPath: (p: string) => string;
+}) {
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
       <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-        {entries.map(([key, val]) => (
-          <div key={key} className="flex items-start gap-3 px-3 py-2">
-            <span className="text-[11px] font-medium text-muted-foreground min-w-[80px] pt-0.5 flex-shrink-0 font-mono">
-              {key}
-            </span>
-            <span className="text-xs text-foreground break-all font-mono">
-              {typeof val === 'string' ? val : JSON.stringify(val)}
-            </span>
-          </div>
-        ))}
+        {entries.map(([key, val]) => {
+          // Convert absolute file paths in arg values to relative display paths
+          const displayVal = isAbsolutePath(val) ? toDisplayPath(val as string) : (typeof val === 'string' ? val : JSON.stringify(val));
+          return (
+            <div key={key} className="flex items-start gap-3 px-3 py-2">
+              <span className="text-[11px] font-medium text-muted-foreground min-w-[80px] pt-0.5 flex-shrink-0 font-mono">
+                {key}
+              </span>
+              <span className="text-xs text-foreground break-all font-mono">
+                {displayVal}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

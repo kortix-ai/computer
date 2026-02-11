@@ -10,6 +10,7 @@ import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { useOcFileOpen } from './useOcFileOpen';
 
 function getFilename(path: string | undefined): string {
   if (!path) return '';
@@ -36,8 +37,11 @@ export function OcWriteToolView({
   const filePath = (args.filePath as string) || '';
   const content = (args.content as string) || '';
 
-  const filename = getFilename(filePath);
-  const dir = getDirectory(filePath);
+  const { openFile, toDisplayPath } = useOcFileOpen();
+
+  const displayPath = toDisplayPath(filePath);
+  const filename = getFilename(displayPath);
+  const dir = getDirectory(displayPath);
   const ext = filename.split('.').pop() || '';
 
   const isError = toolResult?.success === false || !!toolResult?.error;
@@ -63,6 +67,7 @@ export function OcWriteToolView({
             icon={FilePlus2}
             title={filename || 'Write File'}
             subtitle={dir}
+            onTitleClick={filePath ? () => openFile(filePath) : undefined}
           />
           {content && (
             <div className="text-xs text-muted-foreground flex-shrink-0">
@@ -82,7 +87,7 @@ export function OcWriteToolView({
               />
             ) : (
               <div className="text-sm text-muted-foreground">
-                File written: <span className="font-mono text-foreground">{filePath}</span>
+                File written: <span className="font-mono text-foreground">{displayPath}</span>
               </div>
             )}
           </div>

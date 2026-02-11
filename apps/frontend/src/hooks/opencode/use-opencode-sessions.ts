@@ -12,6 +12,7 @@ import type {
   SessionStatus,
   PermissionRule,
   Model,
+  Path as PathInfo,
   ProviderListResponse as SdkProviderListResponse,
 } from '@kortix/opencode-sdk/v2/client';
 
@@ -19,7 +20,7 @@ import type {
 // Re-export SDK types for consumers
 // ============================================================================
 
-export type { Session, Message, Part, Agent, Command, Project, SessionStatus, PermissionRule, Model };
+export type { Session, Message, Part, Agent, Command, Project, SessionStatus, PermissionRule, Model, PathInfo };
 
 /**
  * Shape returned by `client.session.messages()`:
@@ -88,6 +89,7 @@ export const opencodeKeys = {
   currentProject: () => ['opencode', 'project', 'current'] as const,
   commands: () => ['opencode', 'commands'] as const,
   providers: () => ['opencode', 'providers'] as const,
+  pathInfo: () => ['opencode', 'path-info'] as const,
 };
 
 // ============================================================================
@@ -396,6 +398,23 @@ export function useOpenCodeCurrentProject() {
     },
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
+  });
+}
+
+// ============================================================================
+// Path Info Hook
+// ============================================================================
+
+export function useOpenCodePathInfo() {
+  return useQuery<PathInfo>({
+    queryKey: opencodeKeys.pathInfo(),
+    queryFn: async () => {
+      const client = getClient();
+      const result = await client.path.get();
+      return unwrap(result);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 }
 
