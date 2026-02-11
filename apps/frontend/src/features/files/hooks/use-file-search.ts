@@ -13,11 +13,8 @@ export const fileSearchKeys = {
 };
 
 /**
- * Search for files by name (fuzzy match).
+ * Search for files and directories by name (fuzzy match).
  * Uses GET /find/file?query=<q>.
- *
- * When no type filter is given, searches for both files and directories
- * in parallel and merges results (directories first, then files).
  *
  * Enable only when the user has typed a query (debounce upstream).
  */
@@ -30,27 +27,7 @@ export function useFileSearch(
 
   return useQuery<string[]>({
     queryKey: fileSearchKeys.files(serverUrl, query),
-    queryFn: async () => {
-      // If a specific type is requested, do a single fetch
-      if (options?.type) {
-        return findFiles(query, { type: options.type, limit });
-      }
-      // Otherwise fetch both files and directories in parallel
-      const [dirs, files] = await Promise.all([
-        findFiles(query, { type: 'directory', limit }),
-        findFiles(query, { type: 'file', limit }),
-      ]);
-      // Merge: directories first, then files, deduped
-      const seen = new Set<string>();
-      const merged: string[] = [];
-      for (const d of dirs) {
-        if (!seen.has(d)) { seen.add(d); merged.push(d); }
-      }
-      for (const f of files) {
-        if (!seen.has(f)) { seen.add(f); merged.push(f); }
-      }
-      return merged.slice(0, limit);
-    },
+    queryFn: () => findFiles(query, { type: options?.type, limit }),
     enabled: query.length > 0 && options?.enabled !== false,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
