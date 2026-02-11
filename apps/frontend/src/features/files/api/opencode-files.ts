@@ -156,8 +156,8 @@ export async function findFiles(
   const client = getClient();
   const result = await client.find.files({
     query,
-    ...(options?.type ? { type: options.type } : {}),
-    ...(options?.limit ? { limit: options.limit } : {}),
+    type: options?.type,
+    limit: options?.limit,
   });
   return unwrap(result);
 }

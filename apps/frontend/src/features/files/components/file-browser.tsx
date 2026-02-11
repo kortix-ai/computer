@@ -18,6 +18,16 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useFilesStore } from '../store/files-store';
 import { useFileList, useServerHealth } from '../hooks';
 import { useFileUpload, useFileDelete, useFileMkdir, useFileRename } from '../hooks/use-file-mutations';
@@ -55,9 +65,10 @@ export function FileBrowser() {
   const mkdirMutation = useFileMkdir();
   const renameMutation = useFileRename();
 
-  // Upload state
+  // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
 
@@ -152,23 +163,24 @@ export function FileBrowser() {
     [renameMutation],
   );
 
-  // Delete a file/folder
-  const handleDelete = useCallback(
-    async (node: FileNode) => {
-      const confirmed = window.confirm(
-        `Delete ${node.type === 'directory' ? 'folder' : 'file'} "${node.name}"?`,
-      );
-      if (!confirmed) return;
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
 
-      try {
-        await deleteMutation.mutateAsync({ filePath: node.path });
-        toast.success(`Deleted ${node.name}`);
-      } catch (err) {
-        toast.error(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      }
-    },
-    [deleteMutation],
-  );
+  const handleDelete = useCallback((node: FileNode) => {
+    setDeleteTarget(node);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync({ filePath: deleteTarget.path });
+      toast.success(`Deleted ${deleteTarget.name}`);
+    } catch (err) {
+      toast.error(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, deleteMutation]);
 
   // Upload file
   const handleUpload = useCallback(() => {
@@ -455,6 +467,46 @@ export function FileBrowser() {
           </ContextMenu>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent
+          className="sm:max-w-md"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            deleteButtonRef.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.type === 'directory' ? 'folder' : 'file'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold text-foreground">
+                &quot;{deleteTarget?.name}&quot;
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              ref={deleteButtonRef}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
