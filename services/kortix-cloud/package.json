@@ -1,0 +1,22 @@
+{
+  "name": "kortix-cloud",
+  "version": "1.0.0",
+  "description": "Kortix Cloud - Daytona preview proxy service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@daytonaio/sdk": "^0.140.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "hono": "^4.4.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.9",
+    "typescript": "^5.4.0"
+  }
+}
