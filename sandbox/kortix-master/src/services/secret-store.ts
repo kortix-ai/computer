@@ -15,8 +15,9 @@ export class SecretStore {
   private salt: Buffer | null = null
 
   constructor() {
-    this.secretsPath = config.SECRET_FILE_PATH
-    this.saltPath = config.SALT_FILE_PATH
+    // Read from process.env to allow runtime override for testing
+    this.secretsPath = process.env.SECRET_FILE_PATH || '/app/secrets/.secrets.json'
+    this.saltPath = process.env.SALT_FILE_PATH || '/app/secrets/.salt'
   }
 
   private async ensureDirectories() {
@@ -43,8 +44,8 @@ export class SecretStore {
 
   private async getKey(): Promise<Buffer> {
     const salt = await this.getSalt()
-    // Derive key from KORTIX_TOKEN and salt
-    return scryptSync(config.KORTIX_TOKEN || 'default-key', salt, 32)
+    // Derive key from KORTIX_TOKEN and salt (read from process.env for testing)
+    return scryptSync(process.env.KORTIX_TOKEN || 'default-key', salt, 32)
   }
 
   private async encrypt(text: string): Promise<string> {
@@ -116,5 +117,40 @@ export class SecretStore {
   async listKeys(): Promise<string[]> {
     const data = await this.loadSecrets()
     return Object.keys(data.secrets)
+  }
+
+  async loadIntoProcessEnv(): Promise<void> {
+    const keys = await this.listKeys()
+    let loadedCount = 0
+    for (const key of keys) {
+      const value = await this.get(key)
+      if (value !== null) {
+        process.env[key] = value
+        loadedCount++
+      }
+    }
+    console.log(`[SecretStore] Loaded ${loadedCount} environment variables into process.env`)
+  }
+
+  async getAll(): Promise<Record<string, string>> {
+    const keys = await this.listKeys()
+    const result: Record<string, string> = {}
+    for (const key of keys) {
+      const value = await this.get(key)
+      if (value !== null) {
+        result[key] = value
+      }
+    }
+    return result
+  }
+
+  async setEnv(key: string, value: string): Promise<void> {
+    await this.set(key, value)
+    process.env[key] = value
+  }
+
+  async deleteEnv(key: string): Promise<void> {
+    await this.delete(key)
+    delete process.env[key]
   }
 }

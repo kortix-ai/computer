@@ -74,8 +74,8 @@ COPY sandbox/kortix-master/package.json /opt/kortix-master/package.json
 RUN cd /opt/kortix-master && bun install
 COPY sandbox/kortix-master/ /opt/kortix-master/
 
-# Create secrets directory with proper permissions
-RUN mkdir -p /app/secrets && chmod 700 /app/secrets
+# Create secrets directory with proper permissions (owned by abc user, UID 1000)
+RUN mkdir -p /app/secrets && chown 1000:1000 /app/secrets && chmod 700 /app/secrets
 
 # ── Workspace ───────────────────────────────────────────────────────────────
 # /workspace is the single root for all user/agent data.
