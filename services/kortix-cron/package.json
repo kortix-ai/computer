@@ -7,7 +7,11 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src/__tests__/",
+    "test:unit": "bun test src/__tests__/cron.test.ts",
+    "test:integration": "bun test src/__tests__/sandboxes.test.ts src/__tests__/triggers.test.ts src/__tests__/executions.test.ts",
+    "test:e2e": "bun test src/__tests__/e2e-lifecycle.test.ts src/__tests__/scheduler.test.ts"
   },
   "dependencies": {
     "@kortix/db": "workspace:*",

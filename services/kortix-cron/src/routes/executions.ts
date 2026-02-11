@@ -1,9 +1,16 @@
 import { Hono } from 'hono';
-import { eq, and, desc, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { executions, triggers } from '@kortix/db';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/errors';
 import type { AppEnv } from '../types';
+
+const VALID_EXECUTION_STATUSES = ['pending', 'running', 'completed', 'failed', 'timeout', 'skipped'] as const;
+type ExecutionStatus = (typeof VALID_EXECUTION_STATUSES)[number];
+
+function isValidExecutionStatus(s: string): s is ExecutionStatus {
+  return (VALID_EXECUTION_STATUSES as readonly string[]).includes(s);
+}
 
 const app = new Hono<AppEnv>();
 
@@ -19,6 +26,13 @@ app.get('/', async (c) => {
   const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
   const offset = parseInt(c.req.query('offset') || '0', 10);
 
+  // Validate status if provided
+  if (status && !isValidExecutionStatus(status)) {
+    throw new ValidationError(
+      `Invalid status '${status}'. Must be one of: ${VALID_EXECUTION_STATUSES.join(', ')}`,
+    );
+  }
+
   // We need to join with triggers to filter by account ownership
   const conditions = [eq(triggers.accountId, userId)];
 
@@ -26,8 +40,8 @@ app.get('/', async (c) => {
     conditions.push(eq(executions.triggerId, triggerId));
   }
 
-  if (status) {
-    conditions.push(eq(executions.status, status as any));
+  if (status && isValidExecutionStatus(status)) {
+    conditions.push(eq(executions.status, status));
   }
 
   if (since) {
@@ -37,6 +51,15 @@ app.get('/', async (c) => {
   if (until) {
     conditions.push(lte(executions.createdAt, new Date(until)));
   }
+
+  // Get total count for pagination
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(executions)
+    .innerJoin(triggers, eq(executions.triggerId, triggers.triggerId))
+    .where(and(...conditions));
+
+  const total = countResult?.count ?? 0;
 
   const results = await db
     .select({
@@ -56,7 +79,7 @@ app.get('/', async (c) => {
       ...r.execution,
       trigger_name: r.triggerName,
     })),
-    total: results.length,
+    total,
     limit,
     offset,
   });
@@ -91,7 +114,7 @@ app.get('/:id', async (c) => {
   });
 });
 
-// GET /v1/triggers/:triggerId/executions - List executions for a specific trigger
+// GET /v1/executions/by-trigger/:triggerId - List executions for a specific trigger
 app.get('/by-trigger/:triggerId', async (c) => {
   const userId = c.get('userId') as string;
   const triggerId = c.req.param('triggerId');
@@ -108,6 +131,14 @@ app.get('/by-trigger/:triggerId', async (c) => {
     throw new NotFoundError('Trigger', triggerId);
   }
 
+  // Get total count for this trigger
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(executions)
+    .where(eq(executions.triggerId, triggerId));
+
+  const total = countResult?.count ?? 0;
+
   const results = await db
     .select()
     .from(executions)
@@ -119,7 +150,7 @@ app.get('/by-trigger/:triggerId', async (c) => {
   return c.json({
     success: true,
     data: results,
-    total: results.length,
+    total,
     limit,
     offset,
   });
