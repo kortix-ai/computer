@@ -3,6 +3,9 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "postinstall": "bash patches/apply.sh"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

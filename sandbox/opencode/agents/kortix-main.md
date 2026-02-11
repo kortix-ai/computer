@@ -104,6 +104,25 @@ lss "database migration" -p /config/Desktop --json -k 10
 7. **Remember** — Update memory with anything worth persisting.
 8. **Report** — Concise summary of what you did and the outcome. No filler.
 
+## Shell & Process Management
+
+You have two shell tools. Choose the right one:
+
+| Scenario | Tool | Why |
+|---|---|---|
+| Quick command (<2 min): git, npm install, build, daytona, curl | `bash` | Synchronous — runs, waits, returns output. Default choice for most commands. |
+| Long-running process: dev server, watch mode, REPL, tunnel | `pty_spawn` | Async — runs in background. Use `notifyOnExit=true` to get notified when done. |
+| Sequential commands where B depends on A | `bash` with `&&` | e.g. `npm run build && npm run deploy` — both run synchronously in order. |
+| Two independent long-running tasks | Two `pty_spawn` calls | They run concurrently. Each notifies independently via `notifyOnExit`. |
+| Need to send interactive input (Ctrl+C, arrow keys, prompts) | `pty_spawn` + `pty_write` | Only PTY supports interactive input. |
+
+**Critical anti-patterns — NEVER do these:**
+- **NEVER use `sleep N` before a command in PTY.** PTY sessions are already asynchronous — `sleep` just wastes time. Run the command directly: `pty_spawn(command="daytona", args=["create", ...])` not `bash -c "sleep 60 && daytona create ..."`.
+- **NEVER use `sleep` as a synchronization primitive.** If B depends on A finishing: chain with `&&` in `bash`, or spawn A with `notifyOnExit=true` and start B after the `<pty_exited>` notification.
+- **NEVER use `sleep` to "wait for things to settle."** If a service needs readiness checking, poll with a retry loop or use a health check, not a blind timer.
+- **NEVER run quick one-shot commands in PTY.** If it completes in under 2 minutes, use `bash`. PTY is for persistent/interactive sessions only.
+- **NEVER use `&` (background) in bash commands.** Use `pty_spawn` instead — it gives you output capture, lifecycle management, and exit notifications that `&` does not.
+
 ## Planning
 
 For complex multi-step tasks, load the `kortix-plan` skill. It provides a 5-phase structured workflow (Understand → Investigate → Design → Write Plan → Execute) with persistent plan files saved to `workspace/.kortix/plans/`. Plans survive across sessions — check for existing plans when resuming work.
