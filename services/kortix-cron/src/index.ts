@@ -7,9 +7,9 @@ import { authMiddleware } from './middleware/auth';
 import { sandboxesRouter } from './routes/sandboxes';
 import { triggersRouter } from './routes/triggers';
 import { executionsRouter } from './routes/executions';
-import { startScheduler, getSchedulerStatus } from './scheduler';
+import { startScheduler, stopScheduler, getSchedulerStatus } from './scheduler';
 
-const app = new Hono();
+export const app = new Hono();
 
 // ─── Global Middleware ───────────────────────────────────────────────────────
 app.use('*', logger());
@@ -47,6 +47,16 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal server error' }, 500);
 });
 
+// ─── Graceful Shutdown ───────────────────────────────────────────────────────
+function shutdown(signal: string) {
+  console.log(`\n[${signal}] Shutting down gracefully...`);
+  stopScheduler();
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 // ─── Start Server & Scheduler ────────────────────────────────────────────────
 const port = config.PORT;
 
@@ -78,7 +88,7 @@ console.log(`
 ╠══════════════════════════════════════════════════════════════════╣
 ║  Environment: ${config.ENV_MODE.padEnd(49)}║
 ║  Port: ${port.toString().padEnd(57)}║
-║  Database: ${config.DATABASE_URL ? 'CONFIGURED' : 'NOT SET'.padEnd(53)}║
+║  Database: ${(config.DATABASE_URL ? 'CONFIGURED' : 'NOT SET').padEnd(53)}║
 ║  Supabase: ${(config.SUPABASE_URL ? 'CONFIGURED' : 'NOT SET').padEnd(53)}║
 ║  Scheduler: ${(config.SCHEDULER_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(52)}║
 ║  Tick interval: ${(config.SCHEDULER_TICK_INTERVAL_MS + 'ms').padEnd(47)}║
