@@ -5,7 +5,6 @@ import {
   useMemo,
   useEffect,
   useCallback,
-  useRef,
   type ReactNode,
   type ComponentType,
 } from 'react';
@@ -13,7 +12,6 @@ import { createTwoFilesPatch } from 'diff';
 import {
   Terminal,
   FileCode2,
-  Eye,
   Search,
   Globe,
   ListTree,
@@ -30,7 +28,6 @@ import {
   Glasses,
   SquareKanban,
   FileText,
-  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
@@ -39,9 +36,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { useRouter } from 'next/navigation';
 import { useOpenCodeMessages } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
-import { useTabStore } from '@/stores/tab-store';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
 import { QuestionPrompt } from '@/components/session/question-prompt';
 import {
@@ -128,7 +125,7 @@ function StatusIcon({ status }: { status: string }) {
     case 'completed':
       return <Check className="size-3 text-emerald-500 flex-shrink-0" />;
     case 'error':
-      return <CircleAlert className="size-3 text-destructive flex-shrink-0" />;
+      return <CircleAlert className="size-3 text-muted-foreground flex-shrink-0" />;
     case 'running':
     case 'pending':
       return <Loader2 className="size-3 animate-spin text-muted-foreground flex-shrink-0" />;
@@ -790,10 +787,10 @@ function WebFetchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 }
 ToolRegistry.register('webfetch', WebFetchTool);
 
-// --- Task (sub-agent) ---
+// --- Task (sub-agent) — Slack-thread-style inline card ---
 function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissionReply }: ToolProps) {
+  const router = useRouter();
   const input = partInput(part);
-  const metadata = partMetadata(part);
   const status = partStatus(part);
   const childSessionId = getChildSessionId(part);
   const isRunning = status === 'running' || status === 'pending';
@@ -802,8 +799,6 @@ function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissio
   const subagentType = (input.subagent_type as string) || 'task';
   const description = (input.description as string) || '';
 
-  const tabStore = useTabStore();
-
   // Fetch child session messages
   const { data: childMessages } = useOpenCodeMessages(childSessionId || '');
 
@@ -811,10 +806,7 @@ function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissio
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);
   const childPermission = useMemo(() => {
     if (!childSessionId) return undefined;
-    const perms = Object.values(allPermissions).filter(
-      (p) => p.sessionID === childSessionId,
-    );
-    return perms[0];
+    return Object.values(allPermissions).find((p) => p.sessionID === childSessionId);
   }, [allPermissions, childSessionId]);
 
   // Extract child tool parts
@@ -839,115 +831,169 @@ function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissio
 
   const hasChildPermission = !!childPermission;
 
-  // Force open when running or child has permission
-  const shouldForceOpen = forceOpen || isRunning || hasChildPermission;
-
-  // Status label + style for the badge
-  const statusBadge = useMemo(() => {
-    if (hasChildPermission) return { label: 'Needs attention', className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' };
-    if (isRunning) return { label: 'Running', className: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' };
-    if (isError) return { label: 'Error', className: 'bg-red-500/15 text-red-600 dark:text-red-400' };
-    if (isDone) return { label: 'Done', className: 'bg-muted text-muted-foreground' };
-    return null;
-  }, [hasChildPermission, isRunning, isError, isDone]);
-
-  const handleOpenSubSession = useCallback(() => {
+  const handleOpenThread = useCallback(() => {
     if (childSessionId) {
-      tabStore.openTab({
-        id: childSessionId,
-        title: `↳ ${subagentType}`,
-        type: 'session',
-        href: `/sessions/${childSessionId}`,
-        parentSessionId: sessionId,
-      });
+      router.push(`/sessions/${childSessionId}`);
     }
-  }, [childSessionId, subagentType, sessionId, tabStore]);
+  }, [childSessionId, router]);
 
-  // Custom trigger with status badge and open button on the bar
-  const triggerContent = (
-    <span className="flex items-center gap-2 min-w-0 flex-1">
-      <span className="font-medium truncate">Agent ({subagentType})</span>
-      {statusBadge && (
-        <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0', statusBadge.className)}>
-          {statusBadge.label}
-        </span>
-      )}
-      {childSessionId && (
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); handleOpenSubSession(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleOpenSubSession(); } }}
-          className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 px-1.5 py-0.5 rounded-md hover:bg-muted"
-        >
-          <ExternalLink className="size-3" />
-          <span className="hidden sm:inline">Open</span>
-        </span>
-      )}
-    </span>
+  // Permission mode — render the child tool that needs attention inline
+  if (hasChildPermission) {
+    return (
+      <div className="space-y-1.5">
+        {childPermissionToolPart ? (
+          (() => {
+            const Comp = ToolRegistry.get(childPermissionToolPart.tool);
+            return Comp ? (
+              <Comp part={childPermissionToolPart} sessionId={childSessionId} defaultOpen forceOpen locked />
+            ) : (
+              <GenericTool part={childPermissionToolPart} />
+            );
+          })()
+        ) : (
+          <TaskThreadCard
+            subagentType={subagentType}
+            description={description}
+            isRunning={true}
+            isDone={false}
+            isError={false}
+            childToolParts={childToolParts}
+            onOpen={handleOpenThread}
+            hasChild={!!childSessionId}
+          />
+        )}
+        {childPermission && (
+          <PermissionPromptInline permission={childPermission} onReply={onPermissionReply} />
+        )}
+      </div>
+    );
+  }
+
+  // Normal mode — thread card
+  return (
+    <TaskThreadCard
+      subagentType={subagentType}
+      description={description}
+      isRunning={isRunning}
+      isDone={isDone}
+      isError={isError}
+      childToolParts={childToolParts}
+      onOpen={handleOpenThread}
+      hasChild={!!childSessionId}
+    />
   );
+}
+ToolRegistry.register('task', TaskTool);
+
+// --- TaskThreadCard — clean inline sub-agent card ---
+function TaskThreadCard({
+  subagentType,
+  description,
+  isRunning,
+  isDone,
+  isError,
+  childToolParts,
+  onOpen,
+  hasChild,
+}: {
+  subagentType: string;
+  description: string;
+  isRunning: boolean;
+  isDone: boolean;
+  isError: boolean;
+  childToolParts: ToolPart[];
+  onOpen: () => void;
+  hasChild: boolean;
+}) {
+  const stepCount = childToolParts.length;
 
   return (
-    <div>
-      <BasicTool
-        icon={<SquareKanban className="size-3.5 flex-shrink-0" />}
-        trigger={triggerContent}
-        defaultOpen={defaultOpen ?? true}
-        forceOpen={shouldForceOpen}
-        locked={locked}
-      >
-        <div data-scrollable className="p-2 max-h-72 overflow-auto space-y-0.5">
-          {/* Task description */}
-          {description && (
-            <p className="text-xs text-muted-foreground pb-1.5 mb-1.5 border-b border-border/50">{description}</p>
-          )}
+    <div
+      className={cn(
+        'rounded-lg border overflow-hidden',
+        isError
+          ? 'border-destructive/25'
+          : 'border-border/50',
+      )}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-muted/20">
+        {/* Status */}
+        {isRunning ? (
+          <Loader2 className="size-3.5 animate-spin text-muted-foreground flex-shrink-0" />
+        ) : isError ? (
+          <CircleAlert className="size-3.5 text-muted-foreground flex-shrink-0" />
+        ) : isDone ? (
+          <Check className="size-3.5 text-emerald-500 flex-shrink-0" />
+        ) : (
+          <SquareKanban className="size-3.5 text-muted-foreground flex-shrink-0" />
+        )}
 
-          {/* Child tool parts summary */}
-          {childToolParts.map((childPart) => {
+        {/* Title */}
+        <span className="font-medium text-xs text-foreground capitalize flex-1 min-w-0 truncate">
+          {subagentType} Agent
+        </span>
+
+        {/* Meta */}
+        {stepCount > 0 && (
+          <span className="text-[10px] text-muted-foreground/60 tabular-nums flex-shrink-0">
+            {stepCount} {stepCount === 1 ? 'step' : 'steps'}
+          </span>
+        )}
+      </div>
+
+      {/* Description */}
+      {description && (
+        <div className="px-3 py-1.5 border-b border-border/30">
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{description}</p>
+        </div>
+      )}
+
+      {/* Scrollable tool activity list */}
+      {childToolParts.length > 0 && (
+        <div data-scrollable className="max-h-48 overflow-y-auto">
+          {childToolParts.map((childPart, i) => {
             const info = getToolInfo(childPart.tool, childPart.state.input ?? {});
             return (
               <div
                 key={childPart.id}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 text-xs',
+                  i > 0 && 'border-t border-border/20',
+                )}
               >
                 <ToolIconForName name={info.icon} />
-                <span className="font-medium text-foreground/80">{info.title}</span>
+                <span className="font-medium text-foreground/80 whitespace-nowrap">{info.title}</span>
                 {info.subtitle && (
-                  <span className="truncate font-mono text-[10px]">{info.subtitle}</span>
+                  <span className="truncate text-muted-foreground font-mono text-[10px]">{info.subtitle}</span>
                 )}
-                <span className="ml-auto">
+                <span className="ml-auto flex-shrink-0">
                   <StatusIcon status={childPart.state.status} />
                 </span>
               </div>
             );
           })}
+        </div>
+      )}
 
-          {/* Open sub-session button (bigger, visible) */}
-          {childSessionId && (
-            <button
-              onClick={handleOpenSubSession}
-              className="flex items-center justify-center gap-1.5 w-full mt-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-            >
-              <ExternalLink className="size-3" />
-              Open sub-session
-            </button>
+      {/* Footer — Open Thread */}
+      {hasChild && (
+        <button
+          onClick={onOpen}
+          className={cn(
+            'flex items-center justify-center gap-1.5 w-full px-3 py-2 text-xs font-medium',
+            'border-t border-border/30',
+            'text-muted-foreground hover:text-foreground hover:bg-muted/30',
+            'transition-colors cursor-pointer',
           )}
-        </div>
-      </BasicTool>
-
-      {/* Child permission bubbling */}
-      {hasChildPermission && childPermissionToolPart && (
-        <div className="mt-1">
-          <PermissionPromptInline
-            permission={childPermission}
-            onReply={onPermissionReply}
-          />
-        </div>
+        >
+          <ExternalLink className="size-3" />
+          Open Thread
+        </button>
       )}
     </div>
   );
 }
-ToolRegistry.register('task', TaskTool);
 
 // --- ToolIconForName: maps icon string to Lucide icon ---
 function ToolIconForName({ name }: { name: string }) {
@@ -1175,15 +1221,15 @@ export function ToolError({ error }: { error: string }) {
   const message = hasTitle ? cleaned.slice(colonIdx + 2) : cleaned;
 
   return (
-    <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20 text-xs">
-      <Ban className="size-3.5 text-destructive flex-shrink-0 mt-0.5" />
+    <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground">
+      <Ban className="size-3 flex-shrink-0 mt-0.5" />
       {title ? (
         <div className="min-w-0">
-          <span className="font-medium text-destructive">{title}: </span>
-          <span className="text-destructive/90 break-all">{message}</span>
+          <span className="font-medium text-foreground/70">{title}: </span>
+          <span className="break-all">{message}</span>
         </div>
       ) : (
-        <span className="text-destructive/90 break-all">{message}</span>
+        <span className="break-all">{message}</span>
       )}
     </div>
   );

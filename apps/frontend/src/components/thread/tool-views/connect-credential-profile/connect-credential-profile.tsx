@@ -297,14 +297,14 @@ export function ConnectCredentialProfileToolView({
                 )}
 
                 {isExpired && (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
+                  <div className="rounded-xl p-3 border border-border/40">
                     <div className="flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5" />
+                      <AlertTriangle className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
+                        <p className="text-sm font-medium text-foreground mb-1">
                           Connection Link Expired
                         </p>
-                        <p className="text-xs text-red-700 dark:text-red-300">
+                        <p className="text-xs text-muted-foreground">
                           This connection link has expired. You'll need to generate a new one to connect your account.
                         </p>
                       </div>

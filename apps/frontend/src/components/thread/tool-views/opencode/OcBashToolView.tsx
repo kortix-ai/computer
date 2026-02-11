@@ -152,7 +152,7 @@ export function OcBashToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
+            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>

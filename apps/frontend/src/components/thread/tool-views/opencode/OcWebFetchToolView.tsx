@@ -185,7 +185,7 @@ export function OcWebFetchToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
+            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
@@ -213,40 +213,26 @@ function ErrorDisplay({
   message: string;
 }) {
   return (
-    <div className="rounded-lg border border-red-200 dark:border-red-900/50 overflow-hidden bg-red-50/50 dark:bg-red-950/20">
-      {/* Error header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-red-200/60 dark:border-red-900/30">
-        <div className="flex items-center justify-center h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/40 flex-shrink-0">
-          <AlertTriangle className="h-4 w-4 text-red-500 dark:text-red-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-red-700 dark:text-red-300">
-              {statusCode ? getStatusLabel(statusCode) : 'Request Failed'}
-            </span>
-            {statusCode && (
-              <Badge variant="outline" className="h-5 py-0 text-[10px] bg-red-100/50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400">
-                {statusCode}
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-red-600/70 dark:text-red-400/60 mt-0.5 truncate">
-            {domain}
-          </p>
-        </div>
+    <div className="px-4 py-3 space-y-2 text-muted-foreground">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="text-xs font-medium">
+          {statusCode ? getStatusLabel(statusCode) : 'Request Failed'}
+        </span>
+        {statusCode && (
+          <Badge variant="outline" className="h-5 py-0 text-[10px] bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            {statusCode}
+          </Badge>
+        )}
       </div>
-
-      {/* Error details */}
-      <div className="px-4 py-3 space-y-2">
-        <p className="text-xs text-red-700/80 dark:text-red-300/70">
-          {message}
-        </p>
-        <div className="flex items-center gap-1.5 pt-1">
-          <Globe className="h-3 w-3 text-red-400/60 dark:text-red-500/40 flex-shrink-0" />
-          <span className="font-mono text-[11px] text-red-600/50 dark:text-red-400/40 truncate">
-            {url}
-          </span>
-        </div>
+      <p className="text-xs">
+        {message}
+      </p>
+      <div className="flex items-center gap-1.5">
+        <Globe className="h-3 w-3 flex-shrink-0 opacity-50" />
+        <span className="font-mono text-[11px] opacity-50 truncate">
+          {url}
+        </span>
       </div>
     </div>
   );

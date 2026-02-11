@@ -169,9 +169,9 @@ export function PdfExportToolView({
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg">
-            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-600 dark:text-red-400">
+          <div className="flex items-center gap-3 p-3">
+            <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <p className="text-sm text-muted-foreground">
               {message || 'Export failed'}
             </p>
           </div>

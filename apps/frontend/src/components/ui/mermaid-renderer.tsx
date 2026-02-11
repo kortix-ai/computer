@@ -517,11 +517,11 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
     // For other errors, show the full error UI
     return (
       <div className={cn(
-        'p-4 bg-destructive/10 border border-destructive/20 rounded-2xl',
+        'p-4 bg-muted/30 border border-border/40 rounded-2xl',
         className
       )}>
-        <div className="text-sm text-destructive font-medium mb-2">
-          ❌ Failed to render Mermaid diagram
+        <div className="text-sm text-muted-foreground font-medium mb-2">
+          Failed to render Mermaid diagram
         </div>
         <div className="text-xs text-muted-foreground font-mono bg-muted/50 p-2 rounded">
           {error}

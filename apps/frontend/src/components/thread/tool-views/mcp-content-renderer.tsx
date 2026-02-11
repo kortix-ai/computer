@@ -308,14 +308,12 @@ function UrlListRenderer({ content }: { content: string }) {
 function ErrorRenderer({ content }: { content: string }) {
   return (
     <div className="p-3">
-      <div className="flex items-center gap-2 mb-3">
-        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-        <span className="text-sm font-medium text-red-700 dark:text-red-300">
-          Error Details
-        </span>
+      <div className="flex items-center gap-2 mb-2 text-muted-foreground">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        <span className="text-xs font-medium">Error Details</span>
       </div>
-      <div className="p-3 bg-red-50/50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
-        <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap font-mono">
+      <div className="p-3 bg-muted/30 rounded border border-border/40">
+        <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
           {content}
         </pre>
       </div>

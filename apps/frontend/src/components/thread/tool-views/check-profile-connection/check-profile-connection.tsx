@@ -284,12 +284,12 @@ export function CheckProfileConnectionToolView({
               )}
 
               {!is_connected && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-center">
-                  <Link2Off className="w-8 h-8 text-red-600 dark:text-red-400 mx-auto mb-2" />
-                  <h3 className="font-medium text-red-900 dark:text-red-100 mb-1">
+                <div className="rounded-xl p-4 text-center border border-border/40">
+                  <Link2Off className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
+                  <h3 className="font-medium text-foreground mb-1">
                     Profile Not Connected
                   </h3>
-                  <p className="text-sm text-red-700 dark:text-red-300">
+                  <p className="text-sm text-muted-foreground">
                     This credential profile needs to be connected before tools become available.
                   </p>
                 </div>

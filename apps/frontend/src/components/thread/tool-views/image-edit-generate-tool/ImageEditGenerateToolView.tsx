@@ -137,8 +137,8 @@ function VideoDisplay({ filePath }: { filePath: string }) {
   if (hasError) {
     return (
       <div className="aspect-video flex flex-col items-center justify-center p-4 text-center rounded-2xl border border-neutral-200 dark:border-neutral-700/50 bg-muted/30">
-        <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
-        <p className="text-destructive font-medium text-sm">Failed to load video</p>
+        <AlertTriangle className="h-5 w-5 text-muted-foreground mb-2" />
+        <p className="text-muted-foreground font-medium text-sm">Failed to load video</p>
       </div>
     );
   }

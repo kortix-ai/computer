@@ -184,7 +184,7 @@ export function OcGenericToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
+            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
@@ -217,19 +217,10 @@ function OutputSection({ output }: { output: unknown }) {
 
 function ErrorSection({ message }: { message: string }) {
   return (
-    <div className="rounded-lg border border-red-200 dark:border-red-900/50 overflow-hidden bg-red-50/50 dark:bg-red-950/20">
-      <div className="flex items-start gap-3 px-4 py-3">
-        <div className="flex items-center justify-center h-7 w-7 rounded-full bg-red-100 dark:bg-red-900/40 flex-shrink-0 mt-0.5">
-          <AlertTriangle className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-red-700 dark:text-red-300">
-            Error
-          </span>
-          <p className="text-xs text-red-700/80 dark:text-red-300/70 mt-1 whitespace-pre-wrap break-words">
-            {message}
-          </p>
-        </div>
+    <div className="flex items-start gap-2.5 px-4 py-3 text-muted-foreground">
+      <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs whitespace-pre-wrap break-words">{message}</p>
       </div>
     </div>
   );

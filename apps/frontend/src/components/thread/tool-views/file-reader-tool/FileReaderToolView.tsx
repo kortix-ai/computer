@@ -62,15 +62,15 @@ function SingleFileView({ result }: { result: FileReadResult }) {
     return (
       <div className="flex items-center gap-4 p-4">
         <div className="relative flex-shrink-0">
-          <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center border border-red-100 dark:border-red-900/50">
-            <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400" />
+          <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center border border-border/40">
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
             {filename}
           </p>
-          <p className="text-xs text-red-500 dark:text-red-400 mt-0.5 line-clamp-2">
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
             {result.error || 'Failed to read file'}
           </p>
         </div>

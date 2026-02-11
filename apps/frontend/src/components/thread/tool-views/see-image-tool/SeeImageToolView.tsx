@@ -353,12 +353,12 @@ export function SeeImageToolView({
             <div className="text-center max-w-md">
               <div className={cn(
                 "w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4",
-                actualIsSuccess ? 'bg-gradient-to-b from-green-100 to-green-50 shadow-inner dark:from-green-800/40 dark:to-green-900/60 dark:shadow-green-950/20' : 'bg-gradient-to-b from-red-100 to-red-50 shadow-inner dark:from-red-800/40 dark:to-red-900/60 dark:shadow-red-950/20'
+                actualIsSuccess ? 'bg-gradient-to-b from-green-100 to-green-50 shadow-inner dark:from-green-800/40 dark:to-green-900/60 dark:shadow-green-950/20' : 'bg-muted'
               )}>
                 {actualIsSuccess ? (
                   <CheckCircle className="h-8 w-8 text-zinc-500 dark:text-zinc-400" />
                 ) : (
-                  <AlertTriangle className="h-8 w-8 text-red-500 dark:text-red-400" />
+                  <AlertTriangle className="h-6 w-6 text-muted-foreground" />
                 )}
               </div>
 

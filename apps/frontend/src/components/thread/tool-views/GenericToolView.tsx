@@ -230,15 +230,15 @@ export function GenericToolView({
         ) : isError ? (
           <div className="flex flex-col h-full">
             {/* Error Banner */}
-            <div className="bg-red-50 dark:bg-red-950/30 border-b border-red-200 dark:border-red-800/50 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 flex-shrink-0" />
+            <div className="border-b border-border/40 px-4 py-3">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  <p className="text-xs font-medium">
                     Tool Execution Failed
                   </p>
                   {errorMessage && (
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-0.5 truncate">
+                    <p className="text-xs mt-0.5 truncate opacity-70">
                       {errorMessage.substring(0, 200)}{errorMessage.length > 200 ? '...' : ''}
                     </p>
                   )}

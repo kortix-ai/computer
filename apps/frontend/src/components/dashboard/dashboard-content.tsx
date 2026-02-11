@@ -72,7 +72,7 @@ export function DashboardContent() {
         sessionStorage.removeItem('opencode_pending_prompt');
         sessionStorage.removeItem('opencode_pending_options');
         setIsSubmitting(false);
-        toast.error('Failed to create session');
+        toast.warning('Failed to create session');
       }
     },
     [isSubmitting, createSession, router, selectedAgent, selectedModel, selectedVariant],

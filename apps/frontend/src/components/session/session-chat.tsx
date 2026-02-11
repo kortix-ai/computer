@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   ArrowDown,
-  ArrowLeft,
   Loader2,
   Copy,
   Check,
@@ -14,7 +13,7 @@ import {
   Bug,
   FileText,
   Image as ImageIcon,
-  Bot,
+  ArrowUpLeft,
   Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -44,7 +43,6 @@ import {
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
-import { useTabStore } from '@/stores/tab-store';
 import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { useThrottledValue } from '@/hooks/use-throttled-value';
 
@@ -106,98 +104,66 @@ import { ImagePreview } from '@/components/session/image-preview';
 // Sub-Session Breadcrumb
 // ============================================================================
 
-function SubSessionBreadcrumb({ sessionId, parentID }: { sessionId: string; parentID: string }) {
+function SubSessionBar({ sessionId, parentID }: { sessionId: string; parentID: string }) {
   const { data: parentSession } = useOpenCodeSession(parentID);
-  const { data: grandparentSession } = useOpenCodeSession(
-    parentSession?.parentID || '',
-  );
-  const tabStore = useTabStore();
   const router = useRouter();
-
-  const navigateToSession = useCallback(
-    (targetId: string, title: string, parentId?: string) => {
-      tabStore.openTab({
-        id: targetId,
-        title,
-        type: 'session',
-        href: `/sessions/${targetId}`,
-        parentSessionId: parentId,
-      });
-      router.push(`/sessions/${targetId}`);
-    },
-    [tabStore, router],
-  );
 
   const handleBackToParent = useCallback(() => {
     if (parentSession) {
-      navigateToSession(
-        parentSession.id,
-        parentSession.title || 'Session',
-        parentSession.parentID,
-      );
+      router.push(`/sessions/${parentSession.id}`);
     }
-  }, [parentSession, navigateToSession]);
+  }, [parentSession, router]);
+
+  const parentTitle = parentSession?.title || 'Parent session';
 
   return (
-    <div className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 border-b border-border/40 bg-muted/30 text-xs text-muted-foreground min-h-[36px]">
-      {/* Back arrow */}
-      <button
-        onClick={handleBackToParent}
-        className="flex items-center justify-center h-6 w-6 rounded-md hover:bg-muted hover:text-foreground transition-colors cursor-pointer flex-shrink-0"
-        title="Back to parent session"
-      >
-        <ArrowLeft className="size-3.5" />
-      </button>
-
-      {/* Breadcrumb trail */}
-      <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-        {/* Grandparent (if exists) */}
-        {grandparentSession?.id && (
-          <>
-            <button
-              onClick={() =>
-                navigateToSession(
-                  grandparentSession.id,
-                  grandparentSession.title || 'Session',
-                  grandparentSession.parentID,
-                )
-              }
-              className="truncate max-w-[100px] hover:text-foreground hover:underline transition-colors cursor-pointer"
-            >
-              {grandparentSession.title || 'Session'}
-            </button>
-            <ChevronRight className="size-3 flex-shrink-0 text-muted-foreground/50" />
-          </>
-        )}
-
-        {/* Parent */}
+    <div className="flex-shrink-0">
+      {/* Thin accent stripe */}
+      <div className="h-[2px] bg-gradient-to-r from-indigo-500/80 via-violet-500/80 to-purple-500/60" />
+      {/* Bar */}
+      <div className="flex items-center h-10 px-3 gap-2 border-b border-border/50 bg-background">
         <button
           onClick={handleBackToParent}
-          className="truncate max-w-[180px] hover:text-foreground hover:underline transition-colors cursor-pointer"
+          className={cn(
+            'flex items-center gap-1.5 h-7 px-2 rounded-md',
+            'text-xs text-muted-foreground hover:text-foreground',
+            'hover:bg-muted/60 active:bg-muted/80',
+            'transition-colors cursor-pointer group',
+          )}
         >
-          {parentSession?.title || 'Parent session'}
+          <ArrowUpLeft className="size-3.5 group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          <span className="max-w-[200px] truncate">{parentTitle}</span>
         </button>
-        <ChevronRight className="size-3 flex-shrink-0 text-muted-foreground/50" />
 
-        {/* Current (not clickable) */}
-        <span className="truncate max-w-[180px] text-foreground font-medium flex items-center gap-1">
-          <Bot className="size-3 flex-shrink-0" />
-          Sub-session
-        </span>
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-muted/50">
+          <span className="h-1.5 w-1.5 rounded-full bg-violet-500 flex-shrink-0" />
+          <span className="text-[11px] font-medium text-muted-foreground">Thread</span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ============================================================================
-// Sub-Session Input Banner
-// ============================================================================
+// Sub-session indicator shown above the chat input
+function SubSessionInputBanner({ parentID }: { parentID: string }) {
+  const { data: parentSession } = useOpenCodeSession(parentID);
+  const router = useRouter();
 
-function SubSessionBanner() {
   return (
-    <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-muted-foreground bg-muted/20 border-t border-border/30">
-      <Info className="size-3 flex-shrink-0" />
-      <span>This session is managed by a parent agent. You can still send messages to intervene.</span>
+    <div className="flex items-center gap-2 px-4 py-1.5 border-t border-border/40 bg-muted/20">
+      <span className="h-1.5 w-1.5 rounded-full bg-violet-500/70 flex-shrink-0" />
+      <span className="text-[11px] text-muted-foreground truncate">
+        Replying in thread
+      </span>
+      <button
+        onClick={() => parentSession && router.push(`/sessions/${parentSession.id}`)}
+        className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors ml-auto flex items-center gap-1 cursor-pointer"
+      >
+        <ArrowUpLeft className="size-3" />
+        <span className="truncate max-w-[150px]">{parentSession?.title || 'Back'}</span>
+      </button>
     </div>
   );
 }
@@ -577,10 +543,10 @@ function SessionTurn({
     [sessionStatus, isLast],
   );
   const hasSteps = useMemo(() => turnHasSteps(allParts), [allParts]);
-  const lastTodoWriteId = useMemo(() => {
+  const lastTodoWritePart = useMemo(() => {
     for (let i = allParts.length - 1; i >= 0; i--) {
       const p = allParts[i].part;
-      if (isToolPart(p) && p.tool === 'todowrite') return p.id;
+      if (isToolPart(p) && p.tool === 'todowrite') return p as ToolPart;
     }
     return undefined;
   }, [allParts]);
@@ -715,9 +681,9 @@ function SessionTurn({
           defaultOpen
         />
         {turnError && (
-          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20 text-xs">
-            <AlertTriangle className="size-3.5 text-destructive flex-shrink-0 mt-0.5" />
-            <span className="text-destructive/90 break-all">{turnError}</span>
+          <div className="flex items-start gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground">
+            <Info className="size-3 flex-shrink-0 mt-0.5" />
+            <span className="break-all">{turnError}</span>
           </div>
         )}
       </div>
@@ -739,17 +705,27 @@ function SessionTurn({
           <button
             onClick={onToggleSteps}
             aria-expanded={stepsExpanded}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1 mt-3 cursor-pointer"
+            className={cn(
+              'flex items-center gap-2 text-xs transition-colors py-1.5 mt-2.5 cursor-pointer',
+              working
+                ? 'text-muted-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            {/* Indicator icon */}
-            <ChevronRight
-              className={cn(
-                'size-3 transition-transform flex-shrink-0 text-muted-foreground',
-                stepsExpanded && 'rotate-90',
-              )}
-            />
-            {working && (
-              <Loader2 className="size-3 animate-spin flex-shrink-0" />
+            {working ? (
+              <span className="flex items-center gap-1.5">
+                <span className="relative flex size-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/30" />
+                  <span className="relative inline-flex rounded-full size-3 bg-muted-foreground/50" />
+                </span>
+              </span>
+            ) : (
+              <ChevronRight
+                className={cn(
+                  'size-3 transition-transform flex-shrink-0',
+                  stepsExpanded && 'rotate-90',
+                )}
+              />
             )}
 
             {/* Status text / retry info / show-hide label */}
@@ -759,7 +735,7 @@ function SessionTurn({
                   ? retryInfo.message.slice(0, 60) + '...'
                   : retryInfo.message
                 : working
-                  ? throttledStatus
+                  ? (throttledStatus || 'Working...')
                   : stepsExpanded
                     ? 'Hide steps'
                     : 'Show steps'}
@@ -795,9 +771,9 @@ function SessionTurn({
         )}
       </div>
 
-      {/* Expanded steps content (outside sticky container) */}
+      {/* Expanded steps content — indented with left border (matching OpenCode SolidJS) */}
       {(working || hasSteps) && stepsExpanded && turn.assistantMessages.length > 0 && (
-        <div className="space-y-1.5 pl-0.5">
+        <div className="ml-3 pl-3 border-l border-border/60 space-y-3">
           {allParts.map(({ part, message }) => {
             // Skip the response text part (shown separately below)
             if (hideResponse && part.id === responsePartId) return null;
@@ -830,8 +806,8 @@ function SessionTurn({
             // Tool parts
             if (isToolPart(part)) {
               if (!shouldShowToolPart(part)) return null;
-              // Only show the last todowrite (it contains the latest state)
-              if (part.tool === 'todowrite' && part.id !== lastTodoWriteId) return null;
+              // Skip all todowrite parts — rendered as a single stable component below
+              if (part.tool === 'todowrite') return null;
               // Hide tool parts that have active permission/question
               if (isToolPartHidden(part, message.info.id, hidden)) return null;
 
@@ -855,11 +831,23 @@ function SessionTurn({
             return null;
           })}
 
+          {/* Stable TodoWrite — single instance with stable key to prevent remount flickering */}
+          {lastTodoWritePart && (
+            <ToolPartRenderer
+              key="todowrite-stable"
+              part={lastTodoWritePart}
+              sessionId={sessionId}
+              onPermissionReply={onPermissionReply}
+              onQuestionReply={onQuestionReply}
+              onQuestionReject={onQuestionReject}
+            />
+          )}
+
           {/* Error at bottom of steps */}
           {turnError && (
-            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20 text-xs">
-              <AlertTriangle className="size-3.5 text-destructive flex-shrink-0 mt-0.5" />
-              <span className="text-destructive/90 break-all">{turnError}</span>
+            <div className="flex items-start gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground">
+              <Info className="size-3 flex-shrink-0 mt-0.5" />
+              <span className="break-all">{turnError}</span>
             </div>
           )}
         </div>
@@ -943,9 +931,9 @@ function SessionTurn({
 
       {/* Error shown outside steps when collapsed */}
       {turnError && !stepsExpanded && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20 text-xs">
-          <AlertTriangle className="size-3.5 text-destructive flex-shrink-0 mt-0.5" />
-          <span className="text-destructive/90 break-all">{turnError}</span>
+        <div className="flex items-start gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground">
+          <Info className="size-3 flex-shrink-0 mt-0.5" />
+          <span className="break-all">{turnError}</span>
         </div>
       )}
 
@@ -1057,10 +1045,13 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         // ignore
       }
 
-      sendMessage.mutate({
+      sendMessage.mutateAsync({
         sessionId,
         parts: [{ type: 'text', text: pendingPrompt }],
         options: pendingOptions && Object.keys(pendingOptions).length > 0 ? pendingOptions as any : undefined,
+      }).catch(() => {
+        // Restore prompt to input so user can retry
+        setOptimisticPrompt(pendingPrompt);
       });
       window.history.replaceState({}, '', `/sessions/${sessionId}`);
     }
@@ -1205,12 +1196,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // ============================================================================
 
   const handleSend = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const options: Record<string, unknown> = {};
       if (selectedAgent) options.agent = selectedAgent;
       if (selectedModel) options.model = selectedModel;
       if (selectedVariant) options.variant = selectedVariant;
-      sendMessage.mutate({
+      await sendMessage.mutateAsync({
         sessionId,
         parts: [{ type: 'text', text }],
         options: Object.keys(options).length > 0 ? options as any : undefined,
@@ -1269,11 +1260,13 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // Render
   // ============================================================================
 
+  const isSubSession = !!session?.parentID;
+
   return (
     <div className="relative flex flex-col h-full bg-background">
-      {/* Sub-session breadcrumb */}
-      {session?.parentID && (
-        <SubSessionBreadcrumb sessionId={sessionId} parentID={session.parentID} />
+      {/* Sub-session top bar */}
+      {isSubSession && (
+        <SubSessionBar sessionId={sessionId} parentID={session.parentID} />
       )}
 
       {/* Debug mode toggle — floating, only visible when ?debug is in URL */}
@@ -1374,9 +1367,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
             )}
           >
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
-              className="rounded-full shadow-md h-7 text-xs"
+              className="rounded-full shadow-md h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
               onClick={scrollToBottom}
             >
               <ArrowDown className="size-3 mr-1" />
@@ -1388,8 +1381,8 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         <SessionWelcome showPrompts onPromptSelect={handleSend} />
       )}
 
-      {/* Sub-session banner */}
-      {session?.parentID && <SubSessionBanner />}
+      {/* Sub-session indicator above input */}
+      {session?.parentID && <SubSessionInputBanner parentID={session.parentID} />}
 
       {/* Input */}
       <SessionChatInput
@@ -1412,6 +1405,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         isPanelOpen={isSidePanelOpen}
         hasToolCalls={hasToolCalls}
         onFileSearch={handleFileSearch}
+        providers={providers}
       />
     </div>
   );

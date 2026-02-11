@@ -27,12 +27,15 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { VoiceRecorder } from '@/components/thread/chat-input/voice-recorder';
+import { ModelSelector } from './model-selector';
 import type {
   MessageWithParts,
   Agent,
   Command,
   ProviderListResponse,
 } from '@/hooks/opencode/use-opencode-sessions';
+
+export type { ProviderListResponse };
 
 // ============================================================================
 // Flat model list helper
@@ -44,6 +47,25 @@ export interface FlatModel {
   modelID: string;
   modelName: string;
   variants?: Record<string, Record<string, unknown>>;
+  /** Capabilities extracted from the provider API response */
+  capabilities?: {
+    reasoning?: boolean;
+    vision?: boolean;
+    toolcall?: boolean;
+  };
+  /** Context window size in tokens */
+  contextWindow?: number;
+  /** ISO date string for release date */
+  releaseDate?: string;
+  /** Model family (used for "latest" logic) */
+  family?: string;
+  /** Cost per token (input/output) */
+  cost?: {
+    input: number;
+    output: number;
+  };
+  /** Provider source (env, api, config, custom) */
+  providerSource?: string;
 }
 
 export function flattenModels(providers: ProviderListResponse | undefined): FlatModel[] {
@@ -52,12 +74,31 @@ export function flattenModels(providers: ProviderListResponse | undefined): Flat
   for (const p of providers.all) {
     if (!providers.connected.includes(p.id)) continue;
     for (const [modelID, model] of Object.entries(p.models)) {
+      const caps = (model as any).capabilities;
+      const modalities = (model as any).modalities;
       result.push({
         providerID: p.id,
         providerName: p.name,
         modelID,
-        modelName: model.name || modelID,
+        modelName: (model.name || modelID).replace('(latest)', '').trim(),
         variants: model.variants,
+        capabilities: caps ? {
+          reasoning: caps.reasoning ?? false,
+          vision: caps.input?.image ?? false,
+          toolcall: caps.toolcall ?? false,
+        } : {
+          reasoning: (model as any).reasoning ?? false,
+          vision: modalities?.input?.includes('image') ?? false,
+          toolcall: (model as any).tool_call ?? false,
+        },
+        contextWindow: (model as any).limit?.context,
+        releaseDate: (model as any).release_date,
+        family: (model as any).family,
+        cost: (model as any).cost ? {
+          input: (model as any).cost.input ?? 0,
+          output: (model as any).cost.output ?? 0,
+        } : undefined,
+        providerSource: (p as any).source,
       });
     }
   }
@@ -137,83 +178,7 @@ function AgentSelector({
   );
 }
 
-// ============================================================================
-// Model Selector
-// ============================================================================
-
-function ModelSelector({
-  models,
-  selectedModel,
-  onSelect,
-}: {
-  models: FlatModel[];
-  selectedModel: { providerID: string; modelID: string } | null;
-  onSelect: (model: { providerID: string; modelID: string } | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [open]);
-
-  const current = models.find(
-    (m) => m.providerID === selectedModel?.providerID && m.modelID === selectedModel?.modelID,
-  );
-  const displayName = current?.modelName || models[0]?.modelName || 'Model';
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-      >
-        <span className="truncate max-w-[120px]">{displayName}</span>
-        <ChevronDown className={cn('size-3 transition-transform', open && 'rotate-180')} />
-      </button>
-
-      {open && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[220px]">
-          <div className="max-h-64 overflow-y-auto py-1">
-            {models.map((model) => {
-              const isSelected =
-                selectedModel?.providerID === model.providerID &&
-                selectedModel?.modelID === model.modelID;
-              return (
-                <button
-                  key={`${model.providerID}/${model.modelID}`}
-                  onClick={() => {
-                    onSelect({ providerID: model.providerID, modelID: model.modelID });
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted/60 transition-colors cursor-pointer',
-                    isSelected && 'bg-muted/40',
-                  )}
-                >
-                  <div className="flex-1 min-w-0 text-left">
-                    <div className="truncate">{model.modelName}</div>
-                    <div className="text-xs text-muted-foreground/60 truncate">{model.providerName}</div>
-                  </div>
-                  {isSelected && <Check className="size-3.5 text-foreground shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// ModelSelector is now a standalone component: ./model-selector.tsx
 
 // ============================================================================
 // Variant / Thinking Mode Selector
@@ -571,7 +536,7 @@ function MentionPopover({
 // ============================================================================
 
 export interface SessionChatInputProps {
-  onSend: (text: string) => void;
+  onSend: (text: string) => void | Promise<void>;
   isBusy?: boolean;
   onStop?: () => void;
   agents?: Agent[];
@@ -599,6 +564,8 @@ export interface SessionChatInputProps {
   hasToolCalls?: boolean;
   /** Callback to search files via SDK for @ mentions */
   onFileSearch?: (query: string) => Promise<string[]>;
+  /** Full provider list response (for connect/manage provider dialogs) */
+  providers?: ProviderListResponse;
 }
 
 export function SessionChatInput({
@@ -624,6 +591,7 @@ export function SessionChatInput({
   isPanelOpen = false,
   hasToolCalls = false,
   onFileSearch,
+  providers,
 }: SessionChatInputProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -715,7 +683,7 @@ export function SessionChatInput({
     return [...agentItems, ...fileItems];
   }, [mentionQuery, agents, fileResults]);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || isBusy || disabled) return;
     // Push to prompt history
@@ -723,11 +691,7 @@ export function SessionChatInput({
     historyIndexRef.current = -1;
     draftRef.current = '';
 
-    // Send as text — the server parses @mentions from the text content
-    // and creates the appropriate FilePart/AgentPart objects with source positions.
-    // Sending non-text parts via promptAsync causes the server to silently drop the message.
-    onSend(trimmed);
-
+    // Optimistically clear input — restore on failure
     setText('');
     setSlashFilter(null);
     setMentionQuery(null);
@@ -736,6 +700,16 @@ export function SessionChatInput({
     setAttachedFiles([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+    }
+
+    // Send as text — the server parses @mentions from the text content
+    // and creates the appropriate FilePart/AgentPart objects with source positions.
+    // Sending non-text parts via promptAsync causes the server to silently drop the message.
+    try {
+      await onSend(trimmed);
+    } catch {
+      // Restore the text so the user can retry
+      setText(trimmed);
     }
   }, [text, isBusy, disabled, onSend, attachedFiles]);
 
@@ -1060,6 +1034,7 @@ export function SessionChatInput({
                       models={models}
                       selectedModel={selectedModel}
                       onSelect={onModelChange}
+                      providers={providers}
                     />
                   )}
                   {variants.length > 0 && onVariantChange && (

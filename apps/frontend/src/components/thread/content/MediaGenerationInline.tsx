@@ -188,7 +188,7 @@ function InlineVideo({ filePath, sandboxId }: { filePath: string; sandboxId?: st
       )}
       {hasError ? (
         <div className="aspect-video flex flex-col items-center justify-center p-4 text-center">
-          <p className="text-destructive font-medium text-sm">Failed to load video</p>
+          <p className="text-muted-foreground font-medium text-sm">Failed to load video</p>
         </div>
       ) : (
         <div className="relative group">

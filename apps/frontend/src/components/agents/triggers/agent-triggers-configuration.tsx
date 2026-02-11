@@ -110,13 +110,13 @@ export const AgentTriggersConfiguration: React.FC<AgentTriggersConfigurationProp
 
   if (error) {
     return (
-      <div className="rounded-xl p-6 border border-destructive/20 bg-destructive/5">
+      <div className="rounded-xl p-6 border border-border/40">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-destructive/10 rounded-lg">
-            <Zap className="h-5 w-5 text-destructive" />
+          <div className="p-2 bg-muted rounded-lg">
+            <Zap className="h-4 w-4 text-muted-foreground" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-destructive">Error Loading Triggers</h3>
+            <h3 className="text-base font-medium text-foreground">Error Loading Triggers</h3>
             <p className="text-sm text-muted-foreground">
               {error instanceof Error ? error.message : 'Failed to load triggers'}
             </p>

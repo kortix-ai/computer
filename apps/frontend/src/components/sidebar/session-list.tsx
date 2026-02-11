@@ -28,7 +28,6 @@ import {
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
-import { useTabStore } from '@/stores/tab-store';
 
 import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
@@ -416,21 +415,10 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     });
   }, [sessions, projectId, statuses, getPendingCount]);
 
-  const openTab = useTabStore((s) => s.openTab);
-
   const handleSessionClick = (e: React.MouseEvent, sessionId: string) => {
     if (e.metaKey || e.ctrlKey) return;
     e.preventDefault();
     if (isMobile) setOpenMobile(false);
-
-    const session = sessions?.find((s) => s.id === sessionId);
-    openTab({
-      id: sessionId,
-      title: session?.title || 'Untitled',
-      type: 'session',
-      href: `/sessions/${sessionId}`,
-      ...(session?.parentID ? { parentSessionId: session.parentID } : {}),
-    });
 
     startTransition(() => {
       router.push(`/sessions/${sessionId}`);
@@ -441,9 +429,6 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     setSessionToDelete({ id: sessionId, name: title });
     setIsDeleteDialogOpen(true);
   };
-
-  const closeTab = useTabStore((s) => s.closeTab);
-  const updateTabTitle = useTabStore((s) => s.updateTabTitle);
 
   const handleRenameSession = (sessionId: string, currentTitle: string) => {
     setRenameSessionId(sessionId);
@@ -457,11 +442,6 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     }
     updateSession(
       { sessionId: renameSessionId, title: renameValue.trim() },
-      {
-        onSuccess: () => {
-          updateTabTitle(renameSessionId, renameValue.trim());
-        },
-      },
     );
     setRenameSessionId(null);
   };
@@ -472,14 +452,8 @@ export function SessionList({ projectId }: SessionListProps = {}) {
       { sessionId, archived: true },
       {
         onSuccess: () => {
-          const nextTabId = closeTab(sessionId);
           if (isActive) {
-            const tabs = useTabStore.getState().tabs;
-            if (nextTabId && tabs[nextTabId]) {
-              router.push(tabs[nextTabId].href);
-            } else {
-              router.push('/dashboard');
-            }
+            router.push('/dashboard');
           }
         },
       },
@@ -492,14 +466,8 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     const isActive = pathname?.includes(sessionToDelete.id);
     deleteSession(sessionToDelete.id, {
       onSuccess: () => {
-        const nextTabId = closeTab(sessionToDelete.id);
         if (isActive) {
-          const tabs = useTabStore.getState().tabs;
-          if (nextTabId && tabs[nextTabId]) {
-            router.push(tabs[nextTabId].href);
-          } else {
-            router.push('/dashboard');
-          }
+          router.push('/dashboard');
         }
       },
     });

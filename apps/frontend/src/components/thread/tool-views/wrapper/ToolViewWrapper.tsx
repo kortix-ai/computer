@@ -74,22 +74,18 @@ export function ToolViewWrapper({
 
       {(footerContent || showStatus) && (
         <div className={cn(
-          "p-4 border-t",
-          isSuccess ? "border-zinc-200 dark:border-zinc-800" : "border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/20",
+          "p-4 border-t border-zinc-200 dark:border-zinc-800",
           footerClassName
         )}>
           <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
             {!isStreaming && showStatus && (
-              <div className={cn(
-                "flex items-center gap-2",
-                !isSuccess && "text-red-600 dark:text-red-400"
-              )}>
+              <div className="flex items-center gap-2">
                 {isSuccess ? (
                   <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                 ) : (
-                  <AlertCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
+                  <AlertCircle className="h-3.5 w-3.5" />
                 )}
-                <span className={cn(!isSuccess && "font-medium")}>
+                <span>
                   {isSuccess
                     ? customStatus?.success || "Completed successfully"
                     : customStatus?.failure || "Execution failed"}

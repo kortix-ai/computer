@@ -86,7 +86,7 @@ export function OcEditToolView({
                 </span>
               )}
               {deletions != null && (
-                <span className="flex items-center gap-0.5 text-red-500 dark:text-red-400">
+                <span className="flex items-center gap-0.5 text-muted-foreground">
                   <Minus className="h-3 w-3" />
                   {deletions}
                 </span>
@@ -111,7 +111,7 @@ export function OcEditToolView({
             ) : args.oldString && args.newString ? (
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <div className="text-xs text-red-500 font-medium">Removed</div>
+                  <div className="text-xs text-muted-foreground font-medium">Removed</div>
                   <UnifiedMarkdown
                     content={`\`\`\`${ext}\n${args.oldString}\n\`\`\``}
                     isStreaming={false}
@@ -141,7 +141,7 @@ export function OcEditToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
+            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>

@@ -30,9 +30,9 @@ const variantStyles: Record<AlertBannerVariant, {
     iconColor: 'text-amber-500',
   },
   error: {
-    iconBg: 'bg-destructive/10 dark:bg-destructive/20',
-    iconBorder: 'border-destructive/20 dark:border-destructive/30',
-    iconColor: 'text-destructive',
+    iconBg: 'bg-muted',
+    iconBorder: 'border-border/40',
+    iconColor: 'text-muted-foreground',
   },
   info: {
     iconBg: 'bg-blue-500/10 dark:bg-blue-500/20',

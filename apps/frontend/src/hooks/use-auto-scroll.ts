@@ -3,21 +3,17 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 
 /**
- * useAutoScroll — sophisticated auto-scroll hook matching SolidJS createAutoScroll.
+ * useAutoScroll — auto-scroll that respects user intent.
  *
- * Features:
- * - Detects user manual scroll (wheel up, scrollbar drag) and pauses auto-scroll
- * - ResizeObserver on content for auto-scroll on content growth
- * - overflow-anchor management to prevent layout jumps
- * - [data-scrollable] nested scroll awareness — wheel events inside nested scrollable
- *   regions don't count as user scroll
- * - 300ms settling period after `working` goes false
- * - markAuto() timing guard to distinguish auto-scroll from user scroll
- * - Exposed scrollToBottom / showScrollButton for FAB
+ * Key principles:
+ * - Wheel-up is the single source of truth for "user wants to scroll freely"
+ * - Once the user scrolls up, auto-scroll is fully paused until they explicitly
+ *   scroll back to the bottom (manually or via the FAB button)
+ * - Auto-scroll only fires during `working` or the settling period
+ * - ResizeObserver handles content growth; MutationObserver handles DOM changes
  */
 
 interface UseAutoScrollOptions {
-  /** Whether the session is actively working (busy/retry). */
   working: boolean;
 }
 
@@ -28,86 +24,69 @@ interface UseAutoScrollReturn {
   scrollToBottom: () => void;
 }
 
-const BOTTOM_THRESHOLD = 100; // px from bottom to consider "at bottom"
-const AUTO_SCROLL_GUARD_MS = 150; // time window to treat scroll as auto-initiated
-const SETTLING_MS = 300; // settling period after working stops
+const BOTTOM_THRESHOLD = 80; // px from bottom to consider "at bottom"
+const SETTLING_MS = 300;
 
 export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // Internal state refs (avoid re-renders)
+  // Internal state refs (no re-renders)
   const userScrolledRef = useRef(false);
-  const lastAutoScrollRef = useRef(0); // timestamp of last auto-scroll
+  const isAutoScrollingRef = useRef(false); // true while we're programmatically scrolling
   const settlingRef = useRef(false);
   const settlingTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // ---- Mark a scroll as auto-initiated (timing guard) ----
-  const markAuto = useCallback(() => {
-    lastAutoScrollRef.current = Date.now();
-  }, []);
-
-  const isAutoScroll = useCallback(() => {
-    return Date.now() - lastAutoScrollRef.current < AUTO_SCROLL_GUARD_MS;
-  }, []);
-
-  // ---- Core scroll-to-bottom ----
+  // ---- Core instant scroll-to-bottom ----
   const doScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    markAuto();
+    isAutoScrollingRef.current = true;
     el.scrollTop = el.scrollHeight;
-  }, [markAuto]);
+    // Reset the flag after a frame so the scroll event handler can distinguish
+    requestAnimationFrame(() => {
+      isAutoScrollingRef.current = false;
+    });
+  }, []);
 
-  // ---- Public scrollToBottom (smooth, resets user-scrolled flag) ----
+  // ---- Public scrollToBottom (smooth, resets user-scrolled) ----
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    markAuto();
+    isAutoScrollingRef.current = true;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     userScrolledRef.current = false;
     setShowScrollButton(false);
-  }, [markAuto]);
+    // Reset after the smooth scroll completes (~300ms)
+    setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, 400);
+  }, []);
 
-  // ---- Scroll event handler (detect user scroll) ----
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const handleScroll = () => {
-      // Ignore auto-initiated scrolls
-      if (isAutoScroll()) return;
-
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
-      if (atBottom) {
-        userScrolledRef.current = false;
-        setShowScrollButton(false);
-      } else {
-        userScrolledRef.current = true;
-        setShowScrollButton(true);
-      }
-    };
-
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [isAutoScroll]);
-
-  // ---- Wheel event: nested [data-scrollable] awareness ----
+  // ---- Wheel event: the primary user-intent detector ----
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // If the wheel event originated inside a [data-scrollable] child,
-      // don't count it as the user scrolling the main container.
+      // Ignore wheel events inside nested scrollable regions
       const target = e.target as HTMLElement | null;
       if (target?.closest?.('[data-scrollable]')) return;
 
-      // Scrolling up → user is exploring, mark as manually scrolled
       if (e.deltaY < 0) {
+        // Scrolling UP = user wants to read previous content
         userScrolledRef.current = true;
         setShowScrollButton(true);
+      } else if (e.deltaY > 0) {
+        // Scrolling DOWN — check if user reached the bottom
+        requestAnimationFrame(() => {
+          const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
+          if (atBottom) {
+            userScrolledRef.current = false;
+            setShowScrollButton(false);
+          }
+        });
       }
     };
 
@@ -115,38 +94,47 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     return () => el.removeEventListener('wheel', handleWheel);
   }, []);
 
-  // ---- overflow-anchor management ----
+  // ---- Scroll event: only used for showScrollButton when NOT auto-scrolling ----
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // When user has scrolled away, disable overflow-anchor so new content
-    // doesn't push the viewport. When auto-scrolling, use 'none' to prevent
-    // the browser from fighting our scroll position assignment.
-    el.style.overflowAnchor = userScrolledRef.current ? 'auto' : 'none';
-  });
 
-  // ---- ResizeObserver on content → auto-scroll on growth ----
+    const handleScroll = () => {
+      // Skip events caused by our own programmatic scrolling
+      if (isAutoScrollingRef.current) return;
+
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
+      if (atBottom) {
+        userScrolledRef.current = false;
+        setShowScrollButton(false);
+      }
+      // Don't set userScrolledRef to true here — that's the wheel handler's job
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // ---- ResizeObserver: auto-scroll on content growth (only when not user-scrolled) ----
   useEffect(() => {
     const content = contentRef.current;
     if (!content) return;
 
     const observer = new ResizeObserver(() => {
-      if (!userScrolledRef.current) {
-        doScroll();
-      }
+      if (userScrolledRef.current) return;
+      if (!working && !settlingRef.current) return;
+      doScroll();
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [doScroll]);
+  }, [doScroll, working]);
 
-  // ---- Settling period: keep auto-scrolling for 300ms after working stops ----
+  // ---- Settling period ----
   useEffect(() => {
     if (working) {
-      // Cancel any settling timer
       clearTimeout(settlingTimerRef.current);
       settlingRef.current = false;
     } else {
-      // Start settling period
       settlingRef.current = true;
       settlingTimerRef.current = setTimeout(() => {
         settlingRef.current = false;
@@ -155,8 +143,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     return () => clearTimeout(settlingTimerRef.current);
   }, [working]);
 
-  // ---- Auto-scroll tick: whenever content updates while working/settling ----
-  // We use a MutationObserver on the content for fine-grained detection
+  // ---- MutationObserver: auto-scroll on DOM changes during working ----
   useEffect(() => {
     const content = contentRef.current;
     if (!content) return;

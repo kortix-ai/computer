@@ -246,7 +246,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
       >
         {imgError ? (
           <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-            <p className="text-destructive font-medium mb-2">
+            <p className="text-muted-foreground font-medium mb-2">
               Failed to load image
             </p>
             <p className="text-sm text-muted-foreground">

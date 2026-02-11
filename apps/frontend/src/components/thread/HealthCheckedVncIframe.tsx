@@ -73,8 +73,8 @@ export function HealthCheckedVncIframe({ sandbox, className }: HealthCheckedVncI
     return (
       <div className={`overflow-hidden m-2 sm:m-4 relative ${className || ''}`}>
         <Card className="p-0 overflow-hidden border">
-          <div className='relative w-full aspect-[4/3] sm:aspect-[5/3] md:aspect-[16/11] overflow-hidden bg-destructive/10 flex flex-col items-center justify-center'>
-            <AlertCircle className="h-8 w-8 text-destructive mb-3" />
+          <div className='relative w-full aspect-[4/3] sm:aspect-[5/3] md:aspect-[16/11] overflow-hidden bg-muted/30 flex flex-col items-center justify-center'>
+            <AlertCircle className="h-6 w-6 text-muted-foreground mb-3" />
             <p className="text-sm font-medium text-center mb-2">Connection Failed</p>
             <p className="text-xs text-muted-foreground mb-4 text-center">
               Unable to connect to VNC server after 5 attempts
