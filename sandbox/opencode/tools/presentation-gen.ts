@@ -62,19 +62,29 @@ function sanitizeFilename(name: string): string {
 
 function ensurePresentationsDir(base: string): string {
   const dir = resolve(base, PRESENTATIONS_DIR);
-  mkdirSync(dir, { recursive: true });
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code;
+    if (code === "EACCES" || code === "EROFS") {
+      const fallback = resolve(process.cwd(), PRESENTATIONS_DIR);
+      mkdirSync(fallback, { recursive: true });
+      return fallback;
+    }
+    throw err;
+  }
   return dir;
 }
 
 function ensurePresentationDir(
   base: string,
   name: string,
-): { safeName: string; path: string } {
+): { safeName: string; path: string; presDir: string } {
   const safeName = sanitizeFilename(name);
   const presDir = ensurePresentationsDir(base);
   const path = join(presDir, safeName);
   mkdirSync(path, { recursive: true });
-  return { safeName, path };
+  return { safeName, path, presDir };
 }
 
 function loadMetadata(presentationPath: string): PresentationMetadata {
@@ -161,12 +171,12 @@ function doCreateSlide(
   if (!content)
     return JSON.stringify({ success: false, error: "content is required" });
 
-  const { safeName, path: presPath } = ensurePresentationDir(
+  const { safeName, path: presPath, presDir } = ensurePresentationDir(
     base,
     presentationName,
   );
 
-  mkdirSync(join(resolve(base, PRESENTATIONS_DIR), "images"), {
+  mkdirSync(join(presDir, "images"), {
     recursive: true,
   });
 
@@ -647,7 +657,8 @@ export default tool({
       .string()
       .optional()
       .describe(
-        "Base directory for presentations/ folder. Defaults to project root.",
+        "Base directory for presentations/ folder. Defaults to the current working directory. " +
+          "Usually not needed — only set if you want presentations in a specific location.",
       ),
   },
   async execute(args, _context) {
@@ -668,7 +679,10 @@ export default tool({
       return `Error: Invalid action '${action}'. Use: ${validActions.join(", ")}`;
     }
 
-    const base = args.output_dir ?? _context.worktree ?? process.cwd();
+    const worktree =
+      _context.worktree && _context.worktree !== "/" ? _context.worktree : null;
+    const base =
+      args.output_dir ?? worktree ?? _context.directory ?? process.cwd();
 
     switch (action) {
       case "create_slide":

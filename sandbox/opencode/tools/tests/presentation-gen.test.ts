@@ -32,6 +32,36 @@ const ctx = { directory: process.cwd(), worktree: process.cwd() } as Parameters<
   typeof presGen.execute
 >[1];
 
+// ── Worktree "/" Fallback Test ──
+
+await test("presentation_gen: worktree '/' falls back to directory", async () => {
+  const rootCtx = { directory: OUTPUT_DIR, worktree: "/" } as Parameters<
+    typeof presGen.execute
+  >[1];
+  const raw = await presGen.execute(
+    {
+      action: "create_slide",
+      presentation_name: "worktree_test",
+      slide_number: 1,
+      slide_title: "Test",
+      content: "<div>hello</div>",
+      presentation_title: "Worktree Test",
+    },
+    rootCtx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `should succeed with worktree '/', got: ${raw}`);
+  assert(
+    result.presentation_path === "presentations/worktree_test",
+    "path should be relative",
+  );
+  // Verify file was created under OUTPUT_DIR, not under /
+  const slidePath = join(OUTPUT_DIR, result.slide_file);
+  assert(existsSync(slidePath), `slide should exist at ${slidePath}, not at /${result.slide_file}`);
+  // Cleanup
+  rmSync(join(OUTPUT_DIR, "presentations"), { recursive: true, force: true });
+});
+
 // ── Validation Tests ──
 
 await test("presentation_gen: invalid action", async () => {
