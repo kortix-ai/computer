@@ -17,24 +17,8 @@ const SpreadsheetViewer = dynamic(
   { ssr: false, loading: () => <div className="p-4 text-muted-foreground">Loading spreadsheet...</div> }
 );
 import { useAuth } from '@/components/AuthProvider';
-import { fetchFileContent } from '@/hooks/files/use-file-queries';
+import { readFile, downloadFile } from '@/features/files';
 import { useDownloadRestriction } from '@/hooks/billing';
-
-function getFileUrl(sandboxId: string | undefined, path: string): string {
-  if (!sandboxId) return path;
-  // Handle paths that start with "workspace" (without leading /)
-  if (path === 'workspace' || path.startsWith('workspace/')) {
-    path = '/' + path;
-  } else if (!path.startsWith('/workspace')) {
-    path = `/workspace/${path.startsWith('/') ? path.substring(1) : path}`;
-  }
-  try {
-    path = path.replace(/\\u([0-9a-fA-F]{4})/g, (_, hexCode) => String.fromCharCode(parseInt(hexCode, 16)));
-  } catch {}
-  const url = new URL(`${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${sandboxId}/files/content`);
-  url.searchParams.append('path', path);
-  return url.toString();
-}
 
 function toObject(val: any): any | null {
   if (!val) return null;
@@ -120,8 +104,6 @@ export function SheetsToolView({
     return 'text-zinc-600 dark:text-zinc-400';
   }, []);
 
-  const sandboxId = project?.sandbox?.id;
-
   const handleDownload = useCallback(async (filePath: string | null, fallbackName: string) => {
     if (isDownloadRestricted) {
       openUpgradeModal();
@@ -129,25 +111,12 @@ export function SheetsToolView({
     }
     try {
       if (!filePath) return;
-      if (!sandboxId || !session?.access_token) {
-        const url = getFileUrl(sandboxId, filePath);
-        window.open(url, '_blank');
-        return;
-      }
-      const blob = (await fetchFileContent(sandboxId, filePath, 'blob', session.access_token)) as Blob;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
       const nameFromPath = filePath.split('/').pop() || fallbackName;
-      a.download = nameFromPath;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadFile(filePath, nameFromPath);
     } catch (e) {
       console.error('Download failed:', e);
     }
-  }, [sandboxId, session?.access_token, isDownloadRestricted, openUpgradeModal]);
+  }, [isDownloadRestricted, openUpgradeModal]);
 
   // Defensive check - ensure toolCall is defined (after all hooks)
   if (!toolCall) {
@@ -275,4 +244,4 @@ export function SheetsToolView({
       </CardContent>
     </Card>
   );
-} 
+}

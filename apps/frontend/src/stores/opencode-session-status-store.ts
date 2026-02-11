@@ -1,15 +1,15 @@
 'use client';
 
 import { create } from 'zustand';
-import type { OpenCodeSessionStatus } from '@/lib/api/opencode';
+import type { SessionStatus } from '@kortix/opencode-sdk/v2/client';
 
-interface OpenCodeSessionStatusState {
-  statuses: Record<string, OpenCodeSessionStatus>;
-  setStatus: (sessionId: string, status: OpenCodeSessionStatus) => void;
-  setStatuses: (statuses: Record<string, OpenCodeSessionStatus>) => void;
+interface SessionStatusState {
+  statuses: Record<string, SessionStatus>;
+  setStatus: (sessionId: string, status: SessionStatus) => void;
+  setStatuses: (statuses: Record<string, SessionStatus>) => void;
 }
 
-export const useOpenCodeSessionStatusStore = create<OpenCodeSessionStatusState>()((set) => ({
+export const useOpenCodeSessionStatusStore = create<SessionStatusState>()((set) => ({
   statuses: {},
   setStatus: (sessionId, status) =>
     set((state) => ({

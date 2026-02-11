@@ -6,7 +6,8 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { useFileContentQuery } from '@/hooks/files/use-file-queries';
+import { useFileContent } from '@/features/files';
+import type { FileContent } from '@/features/files';
 import { cn } from '@/lib/utils';
 
 export interface DocxPreviewProps {
@@ -30,15 +31,23 @@ export function DocxPreview({
     // Store fetched blob to avoid re-fetching
     const blobRef = useRef<Blob | null>(null);
 
-    // Fetch DOCX file as blob
-    const { data: blobData, isLoading, error, failureCount } = useFileContentQuery(
-        sandboxId,
-        filepath,
-        {
-            contentType: 'blob',
-            enabled: !localPreviewUrl && !!sandboxId && !!filepath,
-        }
+    // Fetch DOCX file content
+    const { data: fileContentData, isLoading, error } = useFileContent(
+        (!localPreviewUrl && !!filepath) ? filepath : null,
+        { enabled: !localPreviewUrl && !!filepath }
     );
+    const failureCount = 0;
+    // Convert base64 content to Blob
+    const blobData = React.useMemo(() => {
+        if (!fileContentData?.content) return null;
+        if (fileContentData.encoding === 'base64') {
+            const binary = atob(fileContentData.content);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return new Blob([bytes], { type: fileContentData.mimeType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        }
+        return new Blob([fileContentData.content], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    }, [fileContentData]);
 
     // Debug logging
     useEffect(() => {

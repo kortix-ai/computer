@@ -12,6 +12,7 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
+import { useFilesStore } from '@/features/files';
 
 interface ThreadLayoutProps {
   children: React.ReactNode;
@@ -144,8 +145,8 @@ export const ThreadLayout = memo(function ThreadLayout({
     }
   }, [shouldOpenPanel, isSidePanelOpen, onToggleSidePanel, clearShouldOpenPanel]);
 
-  // Get selected file path from store
-  const selectedFilePath = useKortixComputerStore((state) => state.selectedFilePath);
+  // Get selected file path from unified files store
+  const selectedFilePath = useFilesStore((state) => state.selectedFilePath);
   
   const SUITE_MODE_FILE_EXTENSIONS = [
     'kanvax', 
@@ -226,7 +227,7 @@ export const ThreadLayout = memo(function ThreadLayout({
   // Use ResizablePanelGroup for desktop, regular flex for mobile
   if (isActuallyMobile) {
     return (
-      <div className="flex flex-col h-[100dvh] w-full overflow-hidden">
+      <div className="flex flex-col h-full w-full overflow-hidden">
         <SiteHeader
           threadId={threadId}
           projectName={projectName}
@@ -277,10 +278,10 @@ export const ThreadLayout = memo(function ThreadLayout({
 
   // Desktop layout with resizable panels
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full">
       <ResizablePanelGroup
         direction="horizontal"
-        className="h-screen"
+        className="h-full"
         style={{ transition: 'none' }}
       >
         {/* Main content panel */}

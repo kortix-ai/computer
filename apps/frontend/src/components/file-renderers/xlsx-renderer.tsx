@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/AuthProvider';
-import { fetchFileContent } from '@/hooks/files/use-file-queries';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -326,33 +325,11 @@ export function XlsxRenderer({
           const resp = await fetch(xlsxPath);
           if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
           arrayBuffer = await resp.arrayBuffer();
-        } else if (resolvedSandboxId && session?.access_token) {
-          // Handle paths that start with "workspace" (without leading /)
-          let normalizedPath = xlsxPath;
-          if (xlsxPath === 'workspace' || xlsxPath.startsWith('workspace/')) {
-            normalizedPath = '/' + xlsxPath;
-          } else if (!xlsxPath.startsWith('/workspace')) {
-            normalizedPath = `/workspace/${xlsxPath.startsWith('/') ? xlsxPath.substring(1) : xlsxPath}`;
-          }
-          
-          const url = new URL(`${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${resolvedSandboxId}/files/content`);
-          url.searchParams.append('path', normalizedPath);
-          
-          const response = await fetch(url.toString(), {
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Fetch failed: ${response.status}`);
-          }
-          
-          arrayBuffer = await response.arrayBuffer();
         } else {
-          const resp = await fetch(xlsxPath);
-          if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-          arrayBuffer = await resp.arrayBuffer();
+          // Use OpenCode server to read the file
+          const { readFileAsBlob } = await import('@/features/files/api/opencode-files');
+          const blob = await readFileAsBlob(xlsxPath);
+          arrayBuffer = await blob.arrayBuffer();
         }
 
         if (!arrayBuffer || arrayBuffer.byteLength === 0) {

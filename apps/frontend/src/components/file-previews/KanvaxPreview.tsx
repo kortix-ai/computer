@@ -5,7 +5,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { useFileData } from '@/hooks/use-file-data';
+import { useFileContent } from '@/features/files';
 
 interface CanvasElement {
   id: string;
@@ -61,11 +61,22 @@ function CanvasImageElement({
     return `/workspace/${path}`;
   }, [src, needsAuth]);
 
-  const { data: blobUrl, isLoading } = useFileData(
-    needsAuth ? sandboxId : undefined,
-    needsAuth ? normalizedPath : undefined,
-    { enabled: !!needsAuth, showPreview: true }
+  const { data: fileContentData, isLoading } = useFileContent(
+    needsAuth ? normalizedPath : null,
+    { enabled: !!needsAuth }
   );
+  // Convert base64 image content to blob URL
+  const blobUrl = React.useMemo(() => {
+    if (!fileContentData?.content) return null;
+    if (fileContentData.encoding === 'base64') {
+      const binary = atob(fileContentData.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: fileContentData.mimeType || 'image/png' });
+      return URL.createObjectURL(blob);
+    }
+    return null;
+  }, [fileContentData]);
 
   let imageSrc: string | null = null;
   if (isBase64 || isExternalUrl) {
@@ -124,11 +135,12 @@ export function KanvaxPreview({
 
   const shouldFetchFromSandbox = !localPreviewUrl && !!sandboxId;
 
-  const { data: sandboxData, isLoading: sandboxLoading, error: sandboxError, retryCount } = useFileData(
-    shouldFetchFromSandbox ? sandboxId : undefined,
-    shouldFetchFromSandbox ? filepath : undefined,
-    { enabled: shouldFetchFromSandbox, showPreview: true }
+  const { data: sandboxFileContent, isLoading: sandboxLoading, error: sandboxError } = useFileContent(
+    shouldFetchFromSandbox ? filepath : null,
+    { enabled: shouldFetchFromSandbox }
   );
+  const sandboxData = sandboxFileContent?.content ?? null;
+  const retryCount = 0;
 
   const data = localData || sandboxData;
   const isLoading = localPreviewUrl ? localLoading : sandboxLoading;

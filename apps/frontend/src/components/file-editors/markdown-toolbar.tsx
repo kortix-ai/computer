@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { createClient } from '@/lib/supabase/client';
+import { uploadFile, readFile } from '@/features/files';
 import { toast } from '@/lib/toast';
 import {
   DropdownMenu,
@@ -337,76 +337,47 @@ export function MarkdownToolbar({
     }
   }, []);
 
-  const uploadImageToSandbox = useCallback(async (file: File): Promise<string | null> => {
-    if (!sandboxId) {
-      toast.error('No sandbox available for upload. Using base64 instead.');
-      return null;
-    }
-
-    const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
-    
+  const uploadImageToServer = useCallback(async (file: File): Promise<string | null> => {
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        toast.error('Authentication required for upload');
-        return null;
+      // Step 1: Upload the file via OpenCode
+      const results = await uploadFile(file, '/workspace/uploads');
+      const actualPath = results?.[0]?.path || `/workspace/uploads/${file.name}`;
+
+      // Step 2: Read back the uploaded image and create blob URL
+      const content = await readFile(actualPath);
+      if (content.encoding === 'base64' && content.content) {
+        // Decode base64 content to blob
+        const byteString = atob(content.content);
+        const bytes = new Uint8Array(byteString.length);
+        for (let i = 0; i < byteString.length; i++) {
+          bytes[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: content.mimeType || file.type });
+        return URL.createObjectURL(blob);
       }
 
-      const uploadPath = `/workspace/uploads/${file.name}`;
-      const formData = new FormData();
-      formData.append('file', file, file.name);
-      formData.append('path', uploadPath);
-
-      // Step 1: Upload the file
-      const uploadResponse = await fetch(`${API_URL}/sandboxes/${sandboxId}/files`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+      // Fallback: if content is text (SVG), create blob from it
+      if (content.content) {
+        const blob = new Blob([content.content], { type: file.type });
+        return URL.createObjectURL(blob);
       }
 
-      const responseData = await uploadResponse.json();
-      const actualPath = responseData.path || uploadPath;
-      
-      // Step 2: Fetch the uploaded image with auth and create blob URL
-      const contentUrl = `${API_URL}/sandboxes/${sandboxId}/files/content?path=${encodeURIComponent(actualPath)}`;
-      const contentResponse = await fetch(contentUrl, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!contentResponse.ok) {
-        throw new Error(`Failed to fetch uploaded image: ${contentResponse.statusText}`);
-      }
-
-      const blob = await contentResponse.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      
-      console.log('Image uploaded and blob URL created:', blobUrl);
-      return blobUrl;
+      return null;
     } catch (error) {
       console.error('Image upload error:', error);
       toast.error('Failed to upload image');
       return null;
     }
-  }, [sandboxId]);
+  }, []);
 
   const insertImage = useCallback(async () => {
-    // If user selected a file, upload it first
-    if (selectedFile && sandboxId) {
+    // If user selected a file, upload it to OpenCode server
+    if (selectedFile) {
       setIsUploading(true);
       try {
-        const uploadedPath = await uploadImageToSandbox(selectedFile);
-        if (uploadedPath) {
-          editor.chain().focus().setImage({ src: uploadedPath }).run();
+        const uploadedBlobUrl = await uploadImageToServer(selectedFile);
+        if (uploadedBlobUrl) {
+          editor.chain().focus().setImage({ src: uploadedBlobUrl }).run();
           setIsImageDialogOpen(false);
           setImageUrl('');
           setImagePreview(null);
@@ -430,15 +401,15 @@ export function MarkdownToolbar({
       setImageUrl('');
       setImagePreview(null);
       setSelectedFile(null);
-    } else if (imagePreview && !sandboxId) {
-      // No sandbox, use base64 as fallback
+    } else if (imagePreview) {
+      // Fallback to base64
       editor.chain().focus().setImage({ src: imagePreview }).run();
       setIsImageDialogOpen(false);
       setImageUrl('');
       setImagePreview(null);
       setSelectedFile(null);
     }
-  }, [editor, imageUrl, imagePreview, selectedFile, sandboxId, uploadImageToSandbox]);
+  }, [editor, imageUrl, imagePreview, selectedFile, uploadImageToServer]);
 
   const insertTable = useCallback(() => {
     editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
@@ -893,22 +864,18 @@ export function MarkdownToolbar({
                     className="max-h-40 mx-auto rounded-lg object-contain"
                   />
                   <p className="text-sm text-muted-foreground">Click to change image</p>
-                  {sandboxId && (
-                    <p className="text-xs text-green-600 dark:text-green-400">
-                      Will be uploaded to workspace
-                    </p>
-                  )}
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Will be uploaded to workspace
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
                   <p className="text-sm font-medium">Click to upload an image</p>
                   <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 50MB</p>
-                  {sandboxId && (
-                    <p className="text-xs text-green-600 dark:text-green-400">
-                      Image will be uploaded to workspace
-                    </p>
-                  )}
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Image will be uploaded to workspace
+                  </p>
                 </div>
               )}
             </div>

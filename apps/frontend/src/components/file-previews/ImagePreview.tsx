@@ -6,9 +6,7 @@ import React from 'react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { cn } from '@/lib/utils';
 import { getFilename, getFileIcon } from '@/lib/utils/file-utils';
-import { useFileData } from '@/hooks/use-file-data';
-import { useAuth } from '@/components/AuthProvider';
-import { getFileUrl } from '@/lib/utils/file-utils';
+import { useFileContent } from '@/features/files';
 
 export interface ImagePreviewProps {
     filepath: string;
@@ -31,19 +29,29 @@ export function ImagePreview({
     uploadStatus,
     isGridLayout = false,
 }: ImagePreviewProps) {
-    const { session } = useAuth();
     const filename = getFilename(filepath);
     const IconComponent = getFileIcon('image');
-    const fileUrl = sandboxId ? getFileUrl(sandboxId, filepath) : filepath;
     
-    // Skip sandbox fetch if we have a local preview
-    const needsSandboxFetch = !localPreviewUrl && !!sandboxId;
+    // Skip fetch if we have a local preview
+    const needsFetch = !localPreviewUrl && !!filepath;
     
-    const { data: imageUrl, isLoading, error, retryCount } = useFileData(
-        needsSandboxFetch ? sandboxId : undefined,
-        needsSandboxFetch ? filepath : undefined,
-        { enabled: needsSandboxFetch, showPreview: true }
+    const { data: fileContentData, isLoading, error } = useFileContent(
+        needsFetch ? filepath : null,
+        { enabled: needsFetch }
     );
+    const retryCount = 0;
+    // Convert base64 image content to blob URL
+    const imageUrl = React.useMemo(() => {
+        if (!fileContentData?.content) return null;
+        if (fileContentData.encoding === 'base64') {
+            const binary = atob(fileContentData.content);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const blob = new Blob([bytes], { type: fileContentData.mimeType || 'image/png' });
+            return URL.createObjectURL(blob);
+        }
+        return null;
+    }, [fileContentData]);
     
     const [imageLoaded, setImageLoaded] = React.useState(false);
     
@@ -56,7 +64,7 @@ export function ImagePreview({
     const hasLocalPreview = !!localPreviewUrl;
     
     const isSandboxFile = !filepath.startsWith('http://') && !filepath.startsWith('https://') && !hasLocalPreview;
-    const waitingForSandboxId = isSandboxFile && !sandboxId;
+    const waitingForSandboxId = false;
     const isStillRetrying = retryCount < 15;
     const hasError = error && !isStillRetrying;
     
@@ -113,7 +121,7 @@ export function ImagePreview({
         );
     }
     
-    const imageSrc = localPreviewUrl || (sandboxId && session?.access_token ? imageUrl : fileUrl);
+    const imageSrc = localPreviewUrl || imageUrl;
     
     // Don't render if no valid image source
     if (!imageSrc) {

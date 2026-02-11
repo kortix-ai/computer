@@ -30,7 +30,6 @@ import {
   Settings,
   Wrench,
   Server,
-  BookOpen,
   Zap,
   Download,
   Check,
@@ -61,7 +60,6 @@ import { ExpandableMarkdownEditor } from '@/components/ui/expandable-markdown-ed
 import { AgentModelSelector } from './config/model-selector';
 import { GranularToolConfiguration } from './tools/granular-tool-configuration';
 import { AgentMCPConfiguration } from './agent-mcp-configuration';
-import { AgentKnowledgeBaseManager } from './knowledge-base/agent-kb-tree';
 import { AgentTriggersConfiguration } from './triggers/agent-triggers-configuration';
 import { AgentAvatar } from '../thread/content/agent-avatar';
 import { AgentIconEditorDialog } from './config/agent-icon-editor-dialog';
@@ -71,7 +69,7 @@ interface AgentConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agentId: string;
-  initialTab?: 'instructions' | 'tools' | 'integrations' | 'knowledge' | 'triggers';
+  initialTab?: 'instructions' | 'tools' | 'integrations' | 'triggers';
   onAgentChange?: (agentId: string) => void;
 }
 
@@ -387,7 +385,6 @@ export function AgentConfigurationDialog({
     { id: 'instructions', label: 'Instructions', icon: Brain, disabled: false },
     { id: 'tools', label: 'Tools', icon: Wrench, disabled: false },
     { id: 'integrations', label: 'Integrations', icon: Server, disabled: false },
-    { id: 'knowledge', label: 'Knowledge', icon: BookOpen, disabled: false },
     { id: 'triggers', label: 'Triggers', icon: Zap, disabled: false },
   ];
 
@@ -718,43 +715,6 @@ export function AgentConfigurationDialog({
                                 <h3 className="text-lg font-semibold text-foreground mb-2">Unlock Integrations</h3>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
                                   Connect Google Drive, Slack, Notion, and 100+ apps to supercharge your AI Workers
-                                </p>
-                              </div>
-                              <Button 
-                                variant="default"
-                                className="mt-2 gap-2"
-                                onClick={(e) => { e.stopPropagation(); openPricingModal(); }}
-                              >
-                                <Sparkles className="h-4 w-4" />
-                                Upgrade to Unlock
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="knowledge" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 min-h-0 h-full relative">
-                    <AgentKnowledgeBaseManager agentId={agentId} agentName={formData.name || 'Worker'} />
-                    {isFreeTier && (
-                      <div className="absolute inset-0 z-10">
-                        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
-                        <div className="relative h-full flex flex-col items-center justify-center px-8">
-                          <div 
-                            className="max-w-md w-full rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-background to-background p-8 cursor-pointer hover:border-primary/50 transition-all group shadow-lg"
-                            onClick={() => openPricingModal()}
-                          >
-                            <div className="flex flex-col items-center text-center gap-4">
-                              <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/15 border border-primary/20 group-hover:bg-primary/20 transition-colors">
-                                <Brain className="h-7 w-7 text-primary" />
-                              </div>
-                              <div>
-                                <h3 className="text-lg font-semibold text-foreground mb-2">Unlock Knowledge Base</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                  Upload documents, PDFs, and files to give your AI Workers custom knowledge and context
                                 </p>
                               </div>
                               <Button 

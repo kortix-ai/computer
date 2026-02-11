@@ -91,7 +91,7 @@ export function ExportToolView({
     const exportData = exports?.[format];
     
     // Try direct download first if we have download_url
-    if (exportData?.download_url && project?.sandbox?.id) {
+    if (exportData?.download_url) {
       try {
         setDownloadingFormat(format);
         
@@ -99,27 +99,8 @@ export function ExportToolView({
         const rawFilename = exportData.download_url.split('/').pop() || `presentation${ext}`;
         const filename = rawFilename.trim().replace(/[\r\n]+/g, '') || `presentation${ext}`;
         
-        const headers: Record<string, string> = {};
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-        
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${project.sandbox.id}/files/content?path=${encodeURIComponent(exportData.download_url)}`,
-          { headers }
-        );
-        
-        if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        const { downloadFile } = await import('@/features/files/api/opencode-files');
+        await downloadFile(exportData.download_url, filename);
         
         toast.success(`Downloaded ${filename}`);
         return;

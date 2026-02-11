@@ -15,6 +15,7 @@ import { useAgentSelection } from '@/stores/agent-selection-store';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { handleFiles, FileUploadHandler } from './file-upload-handler';
+import { deleteFile } from '@/features/files';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,11 +27,11 @@ import { useTranslations } from 'next-intl';
 import { AttachmentGroup } from '../file-attachment';
 import { cn } from '@/lib/utils';
 import { useModelSelection } from '@/hooks/agents';
-import { useFileDelete } from '@/hooks/files';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { ToolCallInput } from './floating-tool-preview';
 import { ChatSnack } from './chat-snack';
-import { Brain, Zap, Database, ArrowDown, ArrowUp, Wrench, Clock, Send } from 'lucide-react';
+import { Brain, Zap, ArrowDown, ArrowUp, Wrench, Clock, Send } from 'lucide-react';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 import { useSunaModesStore } from '@/stores/suna-modes-store';
 import { useComposioToolkitIcon } from '@/hooks/composio/use-composio';
@@ -860,7 +861,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     const [showSnackbar, setShowSnackbar] = useState(defaultShowSnackbar);
     const [userDismissedUsage, setUserDismissedUsage] = useState(false);
     const [planModalOpen, setPlanSelectionModalOpen] = useState(false);
-    const [agentConfigDialog, setAgentConfigDialog] = useState<{ open: boolean; tab: 'instructions' | 'knowledge' | 'triggers' | 'tools' | 'integrations' }>({ open: false, tab: 'instructions' });
+    const [agentConfigDialog, setAgentConfigDialog] = useState<{ open: boolean; tab: 'instructions' | 'triggers' | 'tools' | 'integrations' }>({ open: false, tab: 'instructions' });
     const [mounted, setMounted] = useState(false);
     const [animatedPlaceholder, setAnimatedPlaceholder] = useState('');
     const [isModeDismissing, setIsModeDismissing] = useState(false);    // Kortix Agent Modes feature flag
@@ -887,7 +888,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     } = useModelSelection();
 
     const { data: accountState, isLoading: isAccountStateLoading } = useAccountState({ enabled: isLoggedIn });
-    const deleteFileMutation = useFileDelete();
     const queryClient = useQueryClient();
     
     const subscriptionData = accountState?.subscription ? (() => {
@@ -1287,20 +1287,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
         return content.includes(`[Uploaded File: ${fileToRemove.path}]`);
       });
 
-      // Only delete from server if file is not referenced in chat history
-      if (sandboxId && fileToRemove.path && !isFileUsedInChat) {
-        deleteFileMutation.mutate({
-          sandboxId,
-          filePath: fileToRemove.path,
-        }, {
-          onError: (error) => {
-            console.error('Failed to delete file from server:', error);
-          }
+      // Delete from server if file is not referenced in chat history
+      if (fileToRemove.path && !isFileUsedInChat) {
+        deleteFile(fileToRemove.path).catch((err) => {
+          console.warn('[files] Failed to delete from server:', err.message);
         });
-      } else {
-        // File exists in chat history, don't delete from server
       }
-    }, [uploadedFiles, sandboxId, pendingFiles, messages, deleteFileMutation]);
+    }, [uploadedFiles, sandboxId, pendingFiles, messages]);
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
@@ -1659,14 +1652,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                     <Brain className="h-3.5 w-3.5 flex-shrink-0" />
                     <span className="text-xs font-medium">Instructions</span>
                   </button>
-                  <button
-                    onClick={() => setAgentConfigDialog({ open: true, tab: 'knowledge' })}
-                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 px-2.5 py-1.5 rounded-2xl hover:bg-muted/50 border border-transparent hover:border-border/30 flex-shrink-0 cursor-pointer relative pointer-events-auto"
-                  >
-                    <Database className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="text-xs font-medium">Knowledge</span>
-                  </button>
-
                   <button
                     onClick={() => setAgentConfigDialog({ open: true, tab: 'triggers' })}
                     className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 px-2.5 py-1.5 rounded-2xl hover:bg-muted/50 border border-transparent hover:border-border/30 flex-shrink-0 cursor-pointer relative pointer-events-auto"

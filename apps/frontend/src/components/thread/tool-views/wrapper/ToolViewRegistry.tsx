@@ -86,6 +86,7 @@ import { RealityDefenderToolView } from '../reality-defender-tool/RealityDefende
 import { ApifyToolView } from '../apify-tool/ToolView';
 import { FileReaderToolView } from '../file-reader-tool/FileReaderToolView';
 import { InitializeToolsToolView } from '../initialize-tools/InitializeToolsToolView';
+import { ocToolViewRegistrations } from '../opencode';
 
 
 export type ToolViewComponent = React.ComponentType<ToolViewProps>;
@@ -258,6 +259,9 @@ const defaultRegistry: ToolViewRegistryType = {
   'global-kb-delete-item': KbToolView,
   'global_kb_enable_item': KbToolView,
   'global-kb-enable-item': KbToolView,
+
+  // OpenCode (oc-*) tool views for session page
+  ...ocToolViewRegistrations,
 
   'default': GenericToolView,
 

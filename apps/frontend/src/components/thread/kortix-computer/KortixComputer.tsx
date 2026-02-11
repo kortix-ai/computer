@@ -22,8 +22,7 @@ import {
   useKortixComputerPendingToolNavIndex,
   useKortixComputerClearPendingToolNav,
 } from '@/stores/kortix-computer-store';
-import { FileBrowserView } from './FileBrowserView';
-import { FileViewerView } from './FileViewerView';
+import { FileBrowser, FileViewer, useFilesStore } from '@/features/files';
 import { ToolCallData, ToolResultData } from '../tool-views/types';
 import { PanelHeader } from './components/PanelHeader';
 import { NavigationControls } from './components/NavigationControls';
@@ -32,8 +31,6 @@ import { LoadingState } from './components/LoadingState';
 import { AppDock } from './components/Dock';
 import { SandboxDesktop } from './components/Desktop';
 import { getToolNumber } from '@/hooks/messages/tool-tracking';
-import { useSandboxStatusWithAutoStart, isSandboxUsable } from '@/hooks/files/use-sandbox-details';
-import { SandboxStatusView } from './components/SandboxStatusView';
 
 export interface ToolCallInput {
   toolCall: ToolCallData;
@@ -71,6 +68,10 @@ interface KortixComputerProps {
   sandboxId?: string;
   projectId?: string;
   sidePanelRef?: React.RefObject<any>;
+  /** When true, KortixComputer skips rendering its own PanelHeader (tabs are provided externally, e.g. by SessionLayout). */
+  hideTopBar?: boolean;
+  /** Custom header rendered inside the main container, above the content. Used by SessionLayout to inject its own header row. */
+  headerSlot?: React.ReactNode;
 }
 
 interface ToolCallSnapshot {
@@ -103,6 +104,8 @@ export const KortixComputer = memo(function KortixComputer({
   sandboxId,
   projectId,
   sidePanelRef,
+  hideTopBar = false,
+  headerSlot,
 }: KortixComputerProps) {
   const t = useTranslations('thread');
   const [dots, setDots] = useState('');
@@ -121,23 +124,14 @@ export const KortixComputer = memo(function KortixComputer({
 
   const { 
     activeView, 
-    filesSubView, 
-    selectedFilePath,
     setActiveView,
-    currentPath,
-    navigateToPath,
-    openFile,
   } = useKortixComputerStore();
+  
+  const filesView = useFilesStore((s) => s.view);
+  const filesSelectedFilePath = useFilesStore((s) => s.selectedFilePath);
   
   const pendingToolNavIndex = useKortixComputerPendingToolNavIndex();
   const clearPendingToolNav = useKortixComputerClearPendingToolNav();
-
-  // Fetch unified sandbox status (combines Daytona state + service health)
-  // Auto-starts OFFLINE sandboxes when detected
-  const { data: sandboxStatus } = useSandboxStatusWithAutoStart(projectId);
-  
-  // Check if sandbox is usable (LIVE status)
-  const isSandboxLive = sandboxStatus ? isSandboxUsable(sandboxStatus.status) : false;
 
   const currentViewRef = useRef(activeView);
 
@@ -620,58 +614,19 @@ export const KortixComputer = memo(function KortixComputer({
   };
 
   const renderFilesView = () => {
-    // Show status view if sandbox is not LIVE
-    if (!isSandboxLive) {
-      return <SandboxStatusView projectId={projectId} />;
+    if (filesView === 'viewer' && filesSelectedFilePath) {
+      return <FileViewer />;
     }
 
-    if (filesSubView === 'viewer' && selectedFilePath) {
-      return (
-        <FileViewerView
-          sandboxId={effectiveSandboxId}
-          filePath={selectedFilePath}
-          project={project}
-          projectId={projectId}
-        />
-      );
-    }
-
-    return (
-      <FileBrowserView
-        sandboxId={effectiveSandboxId}
-        project={project}
-        projectId={projectId}
-        variant="inline-library"
-      />
-    );
+    return <FileBrowser />;
   };
 
   const renderFilesViewMaximized = () => {
-    // Show status view if sandbox is not LIVE
-    if (!isSandboxLive) {
-      return <SandboxStatusView projectId={projectId} />;
+    if (filesView === 'viewer' && filesSelectedFilePath) {
+      return <FileViewer />;
     }
 
-    if (filesSubView === 'viewer' && selectedFilePath) {
-      return (
-        <FileViewerView
-          sandboxId={effectiveSandboxId}
-          filePath={selectedFilePath}
-          project={project}
-          projectId={projectId}
-        />
-      );
-    }
-
-    // Use same FileBrowserView as inline view for consistency
-    return (
-      <FileBrowserView
-        sandboxId={effectiveSandboxId}
-        project={project}
-        projectId={projectId}
-        variant="library"
-      />
-    );
+    return <FileBrowser />;
   };
 
   const renderBrowserView = () => {
@@ -716,7 +671,7 @@ export const KortixComputer = memo(function KortixComputer({
   const renderContent = () => {
     return (
       <div className="flex flex-col h-full max-h-full max-w-full overflow-hidden min-w-0" style={{ contain: 'strict' }}>
-        {!isMobile && (
+        {!isMobile && !hideTopBar && (
           <PanelHeader
             agentName={agentName}
             onClose={handleClose}
@@ -728,7 +683,6 @@ export const KortixComputer = memo(function KortixComputer({
             showFilesTab={true}
             isMaximized={isMaximized}
             isSuiteMode={isSuiteMode}
-            sandboxStatus={sandboxStatus?.status}
             onToggleSuiteMode={() => {
               if (isSuiteMode) {
                 // Exit suite mode - restore previous size
@@ -788,7 +742,6 @@ export const KortixComputer = memo(function KortixComputer({
             currentView={activeView}
             onViewChange={setActiveView}
             showFilesTab={true}
-            sandboxStatus={sandboxStatus?.status}
           />
 
           <div className="flex-1 flex flex-col overflow-hidden max-w-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
@@ -1006,6 +959,7 @@ export const KortixComputer = memo(function KortixComputer({
       className="h-full w-full max-w-full max-h-full flex flex-col border rounded-3xl bg-card overflow-hidden min-w-0 min-h-0"
       style={{ contain: 'strict' }}
     >
+      {headerSlot}
       <div className="flex-1 flex flex-col overflow-hidden max-w-full max-h-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
         {renderContent()}
       </div>

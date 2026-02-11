@@ -11,12 +11,8 @@ export * from './threads';
 // Messages and streaming - centralized location
 export * from './messages';
 
-// Files - export specific hooks first, then index to avoid conflicts
-export * from './files/use-file-queries';
-export * from './files/use-file-mutations';
-export * from './files/use-sandbox-mutations';
-// Export file utilities separately to avoid conflicts
-export { useCachedFile, FileCache, getCachedFile, fetchFileContent, useVncPreloader } from './files';
+// Files — re-exports from @/features/files via the files barrel
+export * from './files';
 
 // Account State - unified billing hook
 export { useAccountState, useAccountStateWithStreaming, useCreatePortalSession, accountStateSelectors } from './billing';
@@ -26,10 +22,6 @@ export * from './dashboard/use-initiate-agent';
 
 // Usage
 export * from './usage/use-health';
-
-// Knowledge Base
-export * from './knowledge-base/use-knowledge-base-queries';
-export * from './knowledge-base/use-folders';
 
 // Triggers
 export * from './triggers';
@@ -57,7 +49,3 @@ export * from './onboarding';
 
 // Integrations
 export * from './integrations';
-
-
-
- 

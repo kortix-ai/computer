@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Paperclip } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { toast } from '@/lib/toast';
-import { createClient } from '@/lib/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { fileQueryKeys } from '@/hooks/files/use-file-queries';
+import { fileListKeys, fileContentKeys, uploadFile } from '@/features/files';
 import {
   Tooltip,
   TooltipContent,
@@ -15,7 +14,6 @@ import {
 } from '@/components/ui/tooltip';
 import { UploadedFile } from './chat-input';
 import { normalizeFilenameToNFC, normalizeMimeType } from '@agentpress/shared';
-import { backendApi } from '@/lib/api-client';
 import JSZip from 'jszip';
 import {
   UPLOAD_LIMITS,
@@ -24,8 +22,6 @@ import {
   isExtractableArchive,
   formatFileSize,
 } from '@/lib/constants/upload-limits';
-
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 const ALLOWED_EXTENSIONS_STRING = ALLOWED_EXTENSIONS.join(',');
 
@@ -173,12 +169,12 @@ const handleLocalFiles = async (
 
 const uploadFiles = async (
   files: File[],
-  sandboxId: string,
+  _sandboxId: string,
   setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>,
   setIsUploading: React.Dispatch<React.SetStateAction<boolean>>,
-  messages: any[] = [], // Add messages parameter to check for existing files
-  queryClient?: any, // Add queryClient parameter for cache invalidation
-  setPendingFiles?: React.Dispatch<React.SetStateAction<File[]>>, // Add setPendingFiles to clear pending files after upload
+  messages: any[] = [],
+  queryClient?: any,
+  setPendingFiles?: React.Dispatch<React.SetStateAction<File[]>>,
 ) => {
   try {
     setIsUploading(true);
@@ -194,59 +190,22 @@ const uploadFiles = async (
       const normalizedName = normalizeFilenameToNFC(file.name);
       const uploadPath = `/workspace/uploads/${normalizedName}`;
 
-      const formData = new FormData();
-      formData.append('file', file, normalizedName);
-      formData.append('path', uploadPath);
+      // Upload via OpenCode server (no auth needed, no sandbox dependency)
+      const uploadBlob = new window.File([file], normalizedName, { type: file.type });
+      const results = await uploadFile(uploadBlob, '/workspace/uploads');
 
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const actualPath = results?.[0]?.path || uploadPath;
+      const finalFilename = actualPath.split('/').pop() || normalizedName;
 
-      if (!session?.access_token) {
-        throw new Error('No access token available');
-      }
-
-      const response = await fetch(`${API_URL}/sandboxes/${sandboxId}/files`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        // Handle HTTP 431 - Request Header Fields Too Large
-        if (response.status === 431) {
-          throw new Error('Request is too large. Try uploading one file at a time.');
-        }
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      // Parse response to get the actual path used by the server
-      const responseData = await response.json();
-      const actualPath = responseData.path || uploadPath;
-      const finalFilename = responseData.final_filename || normalizedName;
-      const wasRenamed = responseData.renamed || false;
-
-      // Check if this filename already exists in chat messages
+      // If file was already in chat and we have queryClient, invalidate its cache
       const isFileInChat = messages.some(message => {
         const content = typeof message.content === 'string' ? message.content : '';
         return content.includes(`[Uploaded File: ${actualPath}]`);
       });
 
-      // If file was already in chat and we have queryClient, invalidate its cache
       if (isFileInChat && queryClient) {
-        // Invalidate all content types for this file
-        ['text', 'blob', 'json'].forEach(contentType => {
-          const queryKey = fileQueryKeys.content(sandboxId, actualPath, contentType);
-          queryClient.removeQueries({ queryKey });
-        });
-
-        // Also invalidate directory listing
-        queryClient.invalidateQueries({
-          queryKey: fileQueryKeys.directory(sandboxId, '/workspace/uploads'),
-        });
+        queryClient.removeQueries({ queryKey: fileContentKeys.all });
+        queryClient.invalidateQueries({ queryKey: fileListKeys.all });
       }
 
       fileUploadResults.push({
@@ -259,11 +218,7 @@ const uploadFiles = async (
         },
       });
 
-      if (wasRenamed) {
-        toast.success(`File uploaded as: ${finalFilename} (renamed to avoid conflict)`);
-      } else {
-        toast.success(`File uploaded: ${finalFilename}`);
-      }
+      toast.success(`File uploaded: ${finalFilename}`);
     }
 
     setUploadedFiles((prev) => {
@@ -279,7 +234,6 @@ const uploadFiles = async (
       return updated;
     });
 
-    // Clear pending files after successful upload
     if (setPendingFiles) {
       setPendingFiles([]);
     }
@@ -299,105 +253,13 @@ const uploadFiles = async (
 
 const uploadFilesToProject = async (
   files: File[],
-  projectId: string,
+  _projectId: string,
   setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>,
   setIsUploading: React.Dispatch<React.SetStateAction<boolean>>,
   setPendingFiles?: React.Dispatch<React.SetStateAction<File[]>>,
 ) => {
-  try {
-    setIsUploading(true);
-
-    const fileUploadResults: Array<{ originalName: string; uploadedFile: UploadedFile }> = [];
-
-    for (const file of files) {
-      if (file.size > UPLOAD_LIMITS.MAX_FILE_SIZE_BYTES) {
-        toast.error(`File size exceeds ${UPLOAD_LIMITS.MAX_FILE_SIZE_MB}MB limit: ${file.name}`);
-        continue;
-      }
-
-      const normalizedName = normalizeFilenameToNFC(file.name);
-      const uploadPath = `/workspace/uploads/${normalizedName}`;
-
-      const formData = new FormData();
-      formData.append('file', file, normalizedName);
-      formData.append('path', uploadPath);
-
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        throw new Error('No access token available');
-      }
-
-      const response = await fetch(`${API_URL}/project/${projectId}/files`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        // Handle HTTP 431 - Request Header Fields Too Large
-        if (response.status === 431) {
-          throw new Error('Request is too large. Try uploading one file at a time.');
-        }
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const responseData = await response.json();
-      const actualPath = responseData.path || uploadPath;
-      const finalFilename = responseData.final_filename || normalizedName;
-      const wasRenamed = responseData.renamed || false;
-
-      fileUploadResults.push({
-        originalName: normalizedName,
-        uploadedFile: {
-          name: finalFilename,
-          path: actualPath,
-          size: file.size,
-          type: file.type || 'application/octet-stream',
-        },
-      });
-
-      if (wasRenamed) {
-        toast.success(`File uploaded as: ${finalFilename} (renamed to avoid conflict)`);
-      } else {
-        toast.success(`File uploaded: ${finalFilename}`);
-      }
-    }
-
-    setUploadedFiles((prev) => {
-      const updated = [...prev];
-      for (const { originalName, uploadedFile } of fileUploadResults) {
-        const index = updated.findIndex(f => normalizeFilenameToNFC(f.name) === normalizeFilenameToNFC(originalName) && f.status === 'pending');
-        if (index !== -1) {
-          updated[index] = { ...updated[index], ...uploadedFile, status: 'ready' as const };
-        } else {
-          updated.push({ ...uploadedFile, status: 'ready' as const });
-        }
-      }
-      return updated;
-    });
-    
-    // Clear pending files after successful upload
-    if (setPendingFiles) {
-      setPendingFiles([]);
-    }
-  } catch (error) {
-    console.error('File upload failed:', error);
-    toast.error(
-      typeof error === 'string'
-        ? error
-        : error instanceof Error
-          ? error.message
-          : 'Failed to upload file',
-    );
-  } finally {
-    setIsUploading(false);
-  }
+  // Delegate to uploadFiles — both now go through OpenCode server
+  await uploadFiles(files, '', setUploadedFiles, setIsUploading, [], undefined, setPendingFiles);
 };
 
 const handleFiles = async (
@@ -570,87 +432,32 @@ FileUploadHandler.displayName = 'FileUploadHandler';
 
 export const uploadPendingFilesToProject = async (
   files: File[],
-  projectId: string,
+  _projectId: string,
   onProgress?: (fileIndex: number, status: 'uploading' | 'ready' | 'error', error?: string) => void,
 ): Promise<{ success: boolean; uploadedPaths: string[] }> => {
   const uploadedPaths: string[] = [];
   let allSuccess = true;
 
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    onProgress?.(i, 'uploading');
 
-  if (!session?.access_token) {
-    throw new Error('No access token available');
-  }
-
-  try {
-    await fetch(`${API_URL}/project/${projectId}/files/upload-started`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ file_count: files.length }),
-    });
-  } catch (e) {
-    console.warn('Failed to signal upload start:', e);
-  }
-
-  try {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      onProgress?.(i, 'uploading');
-
-      try {
-        if (file.size > UPLOAD_LIMITS.MAX_FILE_SIZE_BYTES) {
-          throw new Error(`File size exceeds ${UPLOAD_LIMITS.MAX_FILE_SIZE_MB}MB limit`);
-        }
-
-        const normalizedName = normalizeFilenameToNFC(file.name);
-        const uploadPath = `/workspace/uploads/${normalizedName}`;
-
-        const formData = new FormData();
-        formData.append('file', file, normalizedName);
-        formData.append('path', uploadPath);
-
-        const response = await fetch(`${API_URL}/project/${projectId}/files`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          if (response.status === 431) {
-            throw new Error('Request is too large');
-          }
-          throw new Error(`Upload failed: ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
-        const actualPath = responseData.path || uploadPath;
-        uploadedPaths.push(actualPath);
-        
-        onProgress?.(i, 'ready');
-      } catch (error) {
-        console.error(`Failed to upload file ${file.name}:`, error);
-        onProgress?.(i, 'error', error instanceof Error ? error.message : 'Upload failed');
-        allSuccess = false;
-      }
-    }
-  } finally {
     try {
-      await fetch(`${API_URL}/project/${projectId}/files/upload-completed`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-    } catch (e) {
-      console.warn('Failed to signal upload complete:', e);
+      if (file.size > UPLOAD_LIMITS.MAX_FILE_SIZE_BYTES) {
+        throw new Error(`File size exceeds ${UPLOAD_LIMITS.MAX_FILE_SIZE_MB}MB limit`);
+      }
+
+      const normalizedName = normalizeFilenameToNFC(file.name);
+      const uploadBlob = new window.File([file], normalizedName, { type: file.type });
+      const results = await uploadFile(uploadBlob, '/workspace/uploads');
+      const actualPath = results?.[0]?.path || `/workspace/uploads/${normalizedName}`;
+      uploadedPaths.push(actualPath);
+
+      onProgress?.(i, 'ready');
+    } catch (error) {
+      console.error(`Failed to upload file ${file.name}:`, error);
+      onProgress?.(i, 'error', error instanceof Error ? error.message : 'Upload failed');
+      allSuccess = false;
     }
   }
 

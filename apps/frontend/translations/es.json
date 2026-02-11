@@ -39,7 +39,6 @@
       "billing": "Facturación",
       "usage": "Uso",
       "referrals": "Referidos",
-      "knowledgeBase": "Base de Conocimientos",
       "integrations": "Integraciones",
       "envManager": "Administrador de Entorno"
     },
@@ -181,48 +180,9 @@
     "usage": {
       "title": "Uso"
     },
-    "knowledgeBase": {
-      "opening": "Abriendo Base de Conocimientos",
-      "redirecting": "Redirigiendo a la página de Base de Conocimientos..."
-    },
     "integrations": {
       "opening": "Abriendo Integraciones",
       "redirecting": "Redirigiendo a la página de Integraciones..."
-    },
-    "memory": {
-      "title": "Memoria de IA",
-      "description": "Recuerda automáticamente el contexto entre conversaciones",
-      "enabled": "Habilitada",
-      "disabled": "Deshabilitada",
-      "notAvailable": "La memoria no está disponible en tu plan actual. Actualiza a Plus o superior para habilitar la memoria automática.",
-      "usage": "Uso de Memoria",
-      "available": "{count} recuerdos disponibles",
-      "noLimit": "Ilimitado",
-      "yourMemories": "Tus Recuerdos",
-      "yourMemoriesDescription": "Ve y gestiona lo que la IA recuerda sobre ti",
-      "clearAll": "Borrar Todo",
-      "deleteAllTitle": "¿Eliminar todos los recuerdos?",
-      "deleteAllDescription": "Esto eliminará permanentemente todos los {count} recuerdos. La IA ya no recordará información de conversaciones pasadas. Esta acción no se puede deshacer.",
-      "deleteAllButton": "Eliminar Todos los Recuerdos",
-      "noMemoriesYet": "Aún no hay recuerdos",
-      "noMemoriesDescription": "Inicia una conversación y la IA recordará automáticamente información importante sobre ti",
-      "searchMemories": "Buscar recuerdos...",
-      "filterByType": "Filtrar por tipo",
-      "allTypes": "Todos los Tipos",
-      "personalFacts": "Datos Personales",
-      "preferences": "Preferencias",
-      "context": "Contexto",
-      "conversations": "Conversaciones",
-      "noMatchingMemories": "No hay recuerdos coincidentes",
-      "adjustFilters": "Intenta ajustar tus filtros o consulta de búsqueda",
-      "loadMore": "Cargar Más",
-      "loading": "Cargando recuerdos...",
-      "memoryTypes": {
-        "fact": "Dato",
-        "preference": "Preferencia",
-        "context": "Contexto",
-        "conversation_summary": "Conversación"
-      }
     }
   },
   "triggers": {
@@ -320,7 +280,6 @@
     "envManager": "Administrador de Entorno",
     "advanced": "Avanzado",
     "plan": "Plan",
-    "knowledgeBase": "Base de Conocimientos",
     "conversation": "Conversación",
     "conversations": "Conversaciones",
     "startNewChat": "Iniciar un nuevo chat",
@@ -406,7 +365,6 @@
     "scrollToBottom": "Desplazar hacia abajo",
     "tools": "Herramientas",
     "instructions": "Instrucciones",
-    "knowledge": "Conocimiento",
     "triggers": "Triggers",
     "agents": "Agentes",
     "superWorker": "Super Worker",

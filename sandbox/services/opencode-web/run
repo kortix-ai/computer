@@ -1,0 +1,15 @@
+#!/usr/bin/with-contenv bash
+# OpenCode Web UI — serves the web interface on port 3111
+#
+# Runs `opencode web` headless so it's accessible via the browser at
+# http://localhost:3111 (mapped from the container).
+
+cd /config/Desktop
+
+exec s6-setuidgid abc \
+  env HOME=/config \
+      OPENCODE_CONFIG_DIR=/opt/opencode \
+      OPENCODE_SERVER_USERNAME= \
+      OPENCODE_SERVER_PASSWORD= \
+      PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
+  opencode web --port 3111 --hostname 0.0.0.0

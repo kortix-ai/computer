@@ -13,8 +13,7 @@ import {
 import { toast } from '@/lib/toast';
 import { agentKeys } from '@/hooks/agents/keys';
 import { composioKeys } from '@/hooks/composio/keys';
-import { knowledgeBaseKeys } from '@/hooks/knowledge-base/keys';
-import { fileQueryKeys } from '@/hooks/files/use-file-queries';
+import { fileListKeys, fileContentKeys } from '@/features/files';
 import { threadKeys, projectKeys } from '@/hooks/threads/keys';
 import { usePricingModalStore } from '@/stores/pricing-modal-store';
 import { accountStateKeys } from '@/hooks/billing';
@@ -59,7 +58,7 @@ export function useAgentStream(
 ): UseAgentStreamResult {
   const queryKeys: (string | readonly string[])[] = useMemo(() => {
     const keys: (string | readonly string[])[] = [
-      fileQueryKeys.all,
+      fileListKeys.all,
       ['active-agent-runs'],
       accountStateKeys.all,
       threadKeys.messages(threadId),
@@ -85,8 +84,6 @@ export function useAgentStream(
         composioKeys.profiles.credentials(),
         ['triggers', agentId],
         ['triggers'],
-        knowledgeBaseKeys.agent(agentId),
-        knowledgeBaseKeys.all,
         ['versions'],
         ['versions', 'list'],
         ['versions', 'list', agentId],

@@ -1,24 +1,26 @@
 'use client';
 
-import { Suspense, lazy } from 'react';
-import { BackgroundAALChecker } from '@/components/auth/background-aal-checker';
-import { HeroSection as NewHeroSection } from '@/components/home/hero-section';
-
-// Lazy load components
-const MobileAppInterstitial = lazy(() =>
-  import('@/components/announcements/mobile-app-interstitial').then(mod => ({ default: mod.MobileAppInterstitial }))
-);
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function Home() {
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (user) {
+      router.replace('/dashboard');
+    } else {
+      router.replace('/auth');
+    }
+  }, [user, isLoading, router]);
+
+  // Show nothing while redirecting
   return (
-    <BackgroundAALChecker>
-      <div className="h-dvh">
-        <NewHeroSection />
-        {/* Mobile app banner - shown on mobile devices for logged-in users */}
-        <Suspense fallback={null}>
-          <MobileAppInterstitial />
-        </Suspense>
-      </div>
-    </BackgroundAALChecker>
+    <div className="h-dvh flex items-center justify-center bg-background">
+      <div className="size-5 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+    </div>
   );
 }

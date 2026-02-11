@@ -63,7 +63,7 @@ import {
 } from '@/stores/agent-selection-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/threads/keys';
-import { fileQueryKeys } from '@/hooks/files';
+import { fileListKeys, fileContentKeys } from '@/features/files';
 import { useProjectRealtime } from '@/hooks/threads';
 import { handleGoogleSlidesUpload } from './tool-views/utils/presentation-utils';
 import { useTranslations } from 'next-intl';
@@ -578,7 +578,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       const { sandboxId, projectId: eventProjectId } = customEvent.detail;
       if (eventProjectId === projectId) {
         queryClient.invalidateQueries({
-          queryKey: fileQueryKeys.contents()
+          queryKey: fileContentKeys.all
         });
       }
     };

@@ -1,0 +1,618 @@
+'use client';
+
+import { useState, useMemo, useCallback, startTransition } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import {
+  MoreHorizontal,
+  Trash2,
+  Frown,
+  MessageCircle,
+  SlidersHorizontal,
+  Pencil,
+  Archive,
+  ChevronRight,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useSidebar } from '@/components/ui/sidebar';
+import { DeleteConfirmationDialog } from '@/components/thread/DeleteConfirmationDialog';
+import {
+  useOpenCodeSessions,
+  useDeleteOpenCodeSession,
+  useUpdateOpenCodeSession,
+} from '@/hooks/opencode/use-opencode-sessions';
+import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
+import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import { useTabStore } from '@/stores/tab-store';
+
+import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
+import type { Session } from '@/hooks/opencode/use-opencode-sessions';
+import Link from 'next/link';
+
+// ============================================================================
+// Session Item (supports depth for tree rendering)
+// ============================================================================
+
+interface SessionItemProps {
+  session: Session;
+  isActive: boolean;
+  isBusy: boolean;
+  pendingCount: number;
+  depth: number;
+  hasChildren: boolean;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onClick: (e: React.MouseEvent, sessionId: string) => void;
+  onDelete: (sessionId: string, title: string) => void;
+  onRename: (sessionId: string, currentTitle: string) => void;
+  onArchive: (sessionId: string) => void;
+}
+
+function SessionItem({
+  session,
+  isActive,
+  isBusy,
+  pendingCount,
+  depth,
+  hasChildren,
+  isExpanded,
+  onToggleExpand,
+  onClick,
+  onDelete,
+  onRename,
+  onArchive,
+}: SessionItemProps) {
+  const [isHovering, setIsHovering] = useState(false);
+
+  return (
+    <Link
+      href={`/sessions/${session.id}`}
+      onClick={(e) => onClick(e, session.id)}
+      className="block"
+    >
+      <div
+        className={cn(
+          'flex items-center gap-2 py-1.5 rounded-lg text-sm transition-colors',
+          isActive ? 'bg-muted/80' : 'hover:bg-muted/40',
+          depth === 0 ? 'px-3' : 'pr-3',
+        )}
+        style={depth > 0 ? { paddingLeft: `${12 + depth * 16}px` } : undefined}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
+        {/* Expand/collapse chevron for parents, or a subtle connector for children */}
+        {hasChildren ? (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleExpand();
+            }}
+            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+          >
+            <ChevronRight
+              className={cn(
+                'h-3 w-3 transition-transform duration-150',
+                isExpanded && 'rotate-90',
+              )}
+            />
+          </button>
+        ) : depth > 0 ? (
+          <span className="flex-shrink-0 w-4 flex items-center justify-center">
+            <span className="h-1 w-1 rounded-full bg-muted-foreground/25" />
+          </span>
+        ) : (
+          <span className="flex-shrink-0 w-4" />
+        )}
+
+        {/* Status indicator */}
+        {(isBusy || pendingCount > 0) && (
+          <div className="flex-shrink-0">
+            {pendingCount > 0 ? (
+              <span className="h-2 w-2 rounded-full bg-amber-500 block" />
+            ) : (
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse block" />
+            )}
+          </div>
+        )}
+
+        {/* Title */}
+        <span
+          className={cn(
+            'flex-1 truncate',
+            depth === 0 ? 'text-foreground/90' : 'text-muted-foreground text-xs',
+          )}
+        >
+          {session.title || 'Untitled'}
+        </span>
+
+        {/* Pending badge */}
+        {pendingCount > 0 && (
+          <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
+            {pendingCount}
+          </span>
+        )}
+
+        {/* Context menu on hover */}
+        <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  'p-0.5 rounded-md hover:bg-accent transition-all text-muted-foreground',
+                  isHovering ? 'opacity-100' : 'opacity-0 pointer-events-none',
+                )}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRename(session.id, session.title || '');
+                }}
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onArchive(session.id);
+                }}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Archive
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete(session.id, session.title || 'Untitled');
+                }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ============================================================================
+// Session Tree Node (recursive)
+// ============================================================================
+
+interface SessionTreeNodeProps {
+  session: Session;
+  depth: number;
+  allSessions: Session[];
+  childMap: Map<string, string[]>;
+  expandedNodes: Record<string, boolean>;
+  onToggleExpand: (sessionId: string) => void;
+  isActiveSession: (sessionId: string) => boolean;
+  getStatus: (sessionId: string) => { isBusy: boolean; pendingCount: number };
+  onClick: (e: React.MouseEvent, sessionId: string) => void;
+  onDelete: (sessionId: string, title: string) => void;
+  onRename: (sessionId: string, currentTitle: string) => void;
+  onArchive: (sessionId: string) => void;
+}
+
+function SessionTreeNode({
+  session,
+  depth,
+  allSessions,
+  childMap,
+  expandedNodes,
+  onToggleExpand,
+  isActiveSession,
+  getStatus,
+  onClick,
+  onDelete,
+  onRename,
+  onArchive,
+}: SessionTreeNodeProps) {
+  const childIds = childMap.get(session.id);
+  const hasChildren = !!childIds && childIds.length > 0;
+  const isExpanded = expandedNodes[session.id] ?? false;
+  const { isBusy, pendingCount } = getStatus(session.id);
+
+  // Look up child session objects
+  const childSessions = useMemo(() => {
+    if (!childIds) return [];
+    return childIds
+      .map((id) => allSessions.find((s) => s.id === id))
+      .filter((s): s is Session => !!s);
+  }, [childIds, allSessions]);
+
+  return (
+    <>
+      <SessionItem
+        session={session}
+        isActive={isActiveSession(session.id)}
+        isBusy={isBusy}
+        pendingCount={pendingCount}
+        depth={depth}
+        hasChildren={hasChildren}
+        isExpanded={isExpanded}
+        onToggleExpand={() => onToggleExpand(session.id)}
+        onClick={onClick}
+        onDelete={onDelete}
+        onRename={onRename}
+        onArchive={onArchive}
+      />
+      {hasChildren && isExpanded && (
+        <div className="relative">
+          {/* Vertical tree line */}
+          {depth < 2 && (
+            <div
+              className="absolute top-0 bottom-0 border-l border-border/40"
+              style={{ left: `${20 + depth * 16}px` }}
+            />
+          )}
+          {childSessions.map((child) => (
+            <SessionTreeNode
+              key={child.id}
+              session={child}
+              depth={depth + 1}
+              allSessions={allSessions}
+              childMap={childMap}
+              expandedNodes={expandedNodes}
+              onToggleExpand={onToggleExpand}
+              isActiveSession={isActiveSession}
+              getStatus={getStatus}
+              onClick={onClick}
+              onDelete={onDelete}
+              onRename={onRename}
+              onArchive={onArchive}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================================
+// Session List
+// ============================================================================
+
+interface SessionListProps {
+  projectId?: string | null;
+}
+
+export function SessionList({ projectId }: SessionListProps = {}) {
+  const { isMobile, state, setOpenMobile } = useSidebar();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const { data: sessions, isLoading, error } = useOpenCodeSessions();
+  const { mutate: deleteSession, isPending: isDeleting } = useDeleteOpenCodeSession();
+  const { mutate: updateSession } = useUpdateOpenCodeSession();
+  const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const statuses = useOpenCodeSessionStatusStore((s) => s.statuses);
+  const permissions = useOpenCodePendingStore((s) => s.permissions);
+  const questions = useOpenCodePendingStore((s) => s.questions);
+
+  // Track which tree nodes are manually expanded/collapsed
+  const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
+
+  // Build child map for tree structure
+  const childMap = useMemo(
+    () => (sessions ? childMapByParent(sessions) : new Map<string, string[]>()),
+    [sessions],
+  );
+
+  // Count pending for a single session (not recursive)
+  const countPendingForSession = useCallback(
+    (sid: string) => {
+      const permCount = Object.values(permissions).filter((p) => p.sessionID === sid).length;
+      const qCount = Object.values(questions).filter((q) => q.sessionID === sid).length;
+      return permCount + qCount;
+    },
+    [permissions, questions],
+  );
+
+  // Aggregate pending count: session's own + all descendants
+  const getPendingCount = useCallback(
+    (sessionId: string) => {
+      let total = countPendingForSession(sessionId);
+      const descendants = allDescendantIds(childMap, sessionId);
+      for (const descId of descendants) {
+        total += countPendingForSession(descId);
+      }
+      return total;
+    },
+    [countPendingForSession, childMap],
+  );
+
+  // Check if any descendant is busy or has pending items (for auto-expand)
+  const hasActiveDescendant = useCallback(
+    (sessionId: string) => {
+      const descendants = allDescendantIds(childMap, sessionId);
+      for (const descId of descendants) {
+        if (statuses[descId]?.type === 'busy') return true;
+        if (countPendingForSession(descId) > 0) return true;
+      }
+      return false;
+    },
+    [childMap, statuses, countPendingForSession],
+  );
+
+  // Compute expanded state: manual overrides take priority, otherwise auto-expand when descendants are active
+  const expandedNodes = useMemo(() => {
+    const result: Record<string, boolean> = {};
+    if (!sessions) return result;
+    for (const session of sessions) {
+      const childIds = childMap.get(session.id);
+      if (!childIds || childIds.length === 0) continue;
+      if (session.id in manualExpanded) {
+        result[session.id] = manualExpanded[session.id];
+      } else {
+        // Auto-expand if any descendant is active
+        result[session.id] = hasActiveDescendant(session.id);
+      }
+    }
+    return result;
+  }, [sessions, childMap, manualExpanded, hasActiveDescendant]);
+
+  const handleToggleExpand = useCallback((sessionId: string) => {
+    setManualExpanded((prev) => ({
+      ...prev,
+      [sessionId]: !(prev[sessionId] ?? expandedNodes[sessionId] ?? false),
+    }));
+  }, [expandedNodes]);
+
+  // Get status for a session (busy + pending)
+  const getStatus = useCallback(
+    (sessionId: string) => {
+      const pendingCount = getPendingCount(sessionId);
+      // Matching SolidJS: permissions suppress busy indicator
+      const isBusy = pendingCount === 0 && statuses[sessionId]?.type === 'busy';
+      return { isBusy: !!isBusy, pendingCount };
+    },
+    [getPendingCount, statuses],
+  );
+
+  // Filter to root sessions only for the top-level list
+  const rootSessions = useMemo(() => {
+    if (!sessions) return [];
+    let list = sessions.filter((s) => !s.parentID && !(s.time as any).archived);
+    if (projectId !== null && projectId !== undefined) {
+      list = list.filter((s) => s.projectID === projectId);
+    }
+    // Base sort: stabilized (recent sessions pinned, older by updated time)
+    const baseSorted = [...list].sort(sortSessions(Date.now()));
+    // Priority-sort: pending first, then busy
+    return baseSorted.sort((a, b) => {
+      const aPending = getPendingCount(a.id);
+      const bPending = getPendingCount(b.id);
+      if (aPending > 0 && bPending === 0) return -1;
+      if (bPending > 0 && aPending === 0) return 1;
+      const aBusy = aPending === 0 && statuses[a.id]?.type === 'busy' ? 1 : 0;
+      const bBusy = bPending === 0 && statuses[b.id]?.type === 'busy' ? 1 : 0;
+      if (aBusy > bBusy) return -1;
+      if (bBusy > aBusy) return 1;
+      return 0;
+    });
+  }, [sessions, projectId, statuses, getPendingCount]);
+
+  const openTab = useTabStore((s) => s.openTab);
+
+  const handleSessionClick = (e: React.MouseEvent, sessionId: string) => {
+    if (e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    if (isMobile) setOpenMobile(false);
+
+    const session = sessions?.find((s) => s.id === sessionId);
+    openTab({
+      id: sessionId,
+      title: session?.title || 'Untitled',
+      type: 'session',
+      href: `/sessions/${sessionId}`,
+      ...(session?.parentID ? { parentSessionId: session.parentID } : {}),
+    });
+
+    startTransition(() => {
+      router.push(`/sessions/${sessionId}`);
+    });
+  };
+
+  const handleDeleteSession = (sessionId: string, title: string) => {
+    setSessionToDelete({ id: sessionId, name: title });
+    setIsDeleteDialogOpen(true);
+  };
+
+  const closeTab = useTabStore((s) => s.closeTab);
+  const updateTabTitle = useTabStore((s) => s.updateTabTitle);
+
+  const handleRenameSession = (sessionId: string, currentTitle: string) => {
+    setRenameSessionId(sessionId);
+    setRenameValue(currentTitle);
+  };
+
+  const confirmRename = () => {
+    if (!renameSessionId || !renameValue.trim()) {
+      setRenameSessionId(null);
+      return;
+    }
+    updateSession(
+      { sessionId: renameSessionId, title: renameValue.trim() },
+      {
+        onSuccess: () => {
+          updateTabTitle(renameSessionId, renameValue.trim());
+        },
+      },
+    );
+    setRenameSessionId(null);
+  };
+
+  const handleArchiveSession = (sessionId: string) => {
+    const isActive = pathname?.includes(sessionId);
+    updateSession(
+      { sessionId, archived: true },
+      {
+        onSuccess: () => {
+          const nextTabId = closeTab(sessionId);
+          if (isActive) {
+            const tabs = useTabStore.getState().tabs;
+            if (nextTabId && tabs[nextTabId]) {
+              router.push(tabs[nextTabId].href);
+            } else {
+              router.push('/dashboard');
+            }
+          }
+        },
+      },
+    );
+  };
+
+  const confirmDelete = () => {
+    if (!sessionToDelete) return;
+    setIsDeleteDialogOpen(false);
+    const isActive = pathname?.includes(sessionToDelete.id);
+    deleteSession(sessionToDelete.id, {
+      onSuccess: () => {
+        const nextTabId = closeTab(sessionToDelete.id);
+        if (isActive) {
+          const tabs = useTabStore.getState().tabs;
+          if (nextTabId && tabs[nextTabId]) {
+            router.push(tabs[nextTabId].href);
+          } else {
+            router.push('/dashboard');
+          }
+        }
+      },
+    });
+    setSessionToDelete(null);
+  };
+
+  const isActiveSession = (sessionId: string) =>
+    pathname?.includes(sessionId) || false;
+
+  if (state === 'collapsed' && !isMobile) return null;
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Section header */}
+      <div className="flex items-center justify-between px-3 py-2">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Sessions
+        </span>
+        <button className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Session list */}
+      <div className="flex-1 overflow-y-auto px-1 pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        {isLoading ? (
+          <div className="space-y-1 px-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2">
+                <div className="h-[18px] w-[18px] bg-muted/30 rounded animate-pulse" />
+                <div className="h-4 bg-muted/20 rounded flex-1 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+            <Frown className="h-8 w-8 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">Failed to connect</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Could not reach server</p>
+          </div>
+        ) : rootSessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+            <MessageCircle className="h-8 w-8 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">No sessions yet</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Start a new session to get going</p>
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {rootSessions.map((session) => (
+              <SessionTreeNode
+                key={session.id}
+                session={session}
+                depth={0}
+                allSessions={sessions || []}
+                childMap={childMap}
+                expandedNodes={expandedNodes}
+                onToggleExpand={handleToggleExpand}
+                isActiveSession={isActiveSession}
+                getStatus={getStatus}
+                onClick={handleSessionClick}
+                onDelete={handleDeleteSession}
+                onRename={handleRenameSession}
+                onArchive={handleArchiveSession}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {sessionToDelete && (
+        <DeleteConfirmationDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onConfirm={confirmDelete}
+          threadName={sessionToDelete.name}
+          isDeleting={isDeleting}
+        />
+      )}
+
+      {/* Rename dialog */}
+      {renameSessionId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setRenameSessionId(null)}>
+          <div className="bg-popover border border-border rounded-xl shadow-lg p-4 w-80" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-medium mb-3">Rename session</h3>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') confirmRename();
+                if (e.key === 'Escape') setRenameSessionId(null);
+              }}
+              autoFocus
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="Session title..."
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => setRenameSessionId(null)}
+                className="px-3 py-1.5 text-xs rounded-md text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRename}
+                className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

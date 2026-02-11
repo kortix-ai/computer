@@ -391,7 +391,6 @@ export const optimisticAgentStart = async (options: {
   prompt: string;
   model_name?: string;
   agent_id?: string;
-  memory_enabled?: boolean;
   mode?: string;  // Mode: slides, sheets, docs, canvas, video, research
   files?: File[];  // Files to upload with the agent start
 }): Promise<OptimisticAgentStartResponse> => {
@@ -417,10 +416,6 @@ export const optimisticAgentStart = async (options: {
     
     if (options.agent_id) {
       formData.append('agent_id', options.agent_id);
-    }
-    
-    if (options.memory_enabled !== undefined) {
-      formData.append('memory_enabled', String(options.memory_enabled));
     }
     
     if (options.mode) {

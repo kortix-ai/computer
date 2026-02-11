@@ -31,7 +31,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Toggle } from '@/components/ui/toggle';
-import { useImageContent } from '@/hooks/files';
+import { useFileContent } from '@/features/files';
 import { useDownloadRestriction } from '@/hooks/billing';
 
 interface DesignElement {
@@ -64,13 +64,21 @@ function DesignElementImage({
   const [imageError, setImageError] = useState(false);
   
   // If we have a direct URL, use it; otherwise load via hook
-  const { data: imageUrl, isLoading, error } = useImageContent(
-    element.sandboxId,
-    element.filePath,
-    { 
-      enabled: !element.directUrl && !imageError
-    }
+  const { data: fileContentData, isLoading, error } = useFileContent(
+    (!element.directUrl && !imageError) ? element.filePath : null,
+    { enabled: !element.directUrl && !imageError }
   );
+  const imageUrl = React.useMemo(() => {
+    if (!fileContentData?.content) return null;
+    if (fileContentData.encoding === 'base64') {
+      const binary = atob(fileContentData.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: fileContentData.mimeType || 'image/png' });
+      return URL.createObjectURL(blob);
+    }
+    return null;
+  }, [fileContentData]);
 
   const finalUrl = element.directUrl || imageUrl;
 
@@ -387,26 +395,36 @@ export function DesignerToolView({
     setCanvasOffset({ x: 0, y: 0 });
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (isDownloadRestricted) {
       openUpgradeModal();
       return;
     }
     const element = elements.find(el => el.id === selectedElement);
-    if (element?.directUrl || element?.filePath) {
+    if (!element) return;
+    if (element.directUrl) {
+      // Direct URL — let browser handle it
       const link = document.createElement('a');
-      link.href = element.directUrl || `/api/sandboxes/${element.sandboxId}/files?path=${encodeURIComponent(element.filePath)}`;
+      link.href = element.directUrl;
       link.download = element.name;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    } else if (element.filePath) {
+      const { downloadFile } = await import('@/features/files/api/opencode-files');
+      await downloadFile(element.filePath, element.name);
     }
   };
 
-  const handleOpenInNewTab = () => {
+  const handleOpenInNewTab = async () => {
     const element = elements.find(el => el.id === selectedElement);
-    if (element?.directUrl || element?.filePath) {
-      const url = element.directUrl || `/api/sandboxes/${element.sandboxId}/files?path=${encodeURIComponent(element.filePath)}`;
+    if (!element) return;
+    if (element.directUrl) {
+      window.open(element.directUrl, '_blank');
+    } else if (element.filePath) {
+      const { readFileAsBlob } = await import('@/features/files/api/opencode-files');
+      const blob = await readFileAsBlob(element.filePath);
+      const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
     }
   };

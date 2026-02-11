@@ -6,8 +6,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useImageContent } from '@/hooks/files';
-import { useFileContentQuery } from '@/hooks/files/use-file-queries';
+import { useFileContent } from '@/features/files';
 import { VideoRenderer } from '@/components/file-renderers/video-renderer';
 
 const BLOB_COLORS = [
@@ -58,10 +57,22 @@ function ShimmerBox({ aspectVideo = false }: { aspectVideo?: boolean }) {
   );
 }
 
-function ImageDisplay({ filePath, sandboxId }: { filePath: string; sandboxId?: string }) {
-  const { data: imageUrl, isLoading } = useImageContent(sandboxId, filePath, {
-    enabled: !!sandboxId && !!filePath,
+function ImageDisplay({ filePath }: { filePath: string }) {
+  const { data: fileContent, isLoading } = useFileContent(filePath, {
+    enabled: !!filePath,
   });
+
+  const imageUrl = React.useMemo(() => {
+    if (!fileContent?.content) return null;
+    if (fileContent.encoding === 'base64') {
+      const binary = atob(fileContent.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: fileContent.mimeType || 'image/png' });
+      return URL.createObjectURL(blob);
+    }
+    return null;
+  }, [fileContent]);
 
   if (isLoading || !imageUrl) {
     return <ShimmerBox />;
@@ -76,22 +87,26 @@ function ImageDisplay({ filePath, sandboxId }: { filePath: string; sandboxId?: s
   );
 }
 
-function VideoDisplay({ filePath, sandboxId }: { filePath: string; sandboxId?: string }) {
+function VideoDisplay({ filePath }: { filePath: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Use the same file content approach that images use - fetch blob with proper auth
-  const { data: videoBlob, isLoading: isBlobLoading } = useVideoContent(sandboxId, filePath, {
-    enabled: !!sandboxId && !!filePath,
+  // Use OpenCode file content hook
+  const { data: videoContent, isLoading: isBlobLoading } = useFileContent(filePath, {
+    enabled: !!filePath,
   });
 
-  // Create and manage blob URL
+  // Create and manage blob URL from base64 content
   React.useEffect(() => {
-    if (videoBlob instanceof Blob) {
-      const newUrl = URL.createObjectURL(videoBlob);
+    if (videoContent?.content && videoContent.encoding === 'base64') {
+      const binary = atob(videoContent.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: videoContent.mimeType || 'video/mp4' });
+      const newUrl = URL.createObjectURL(blob);
       setVideoUrl(newUrl);
 
       return () => {
@@ -101,7 +116,7 @@ function VideoDisplay({ filePath, sandboxId }: { filePath: string; sandboxId?: s
     } else {
       setVideoUrl(null);
     }
-  }, [videoBlob]);
+  }, [videoContent]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -170,55 +185,43 @@ function VideoDisplay({ filePath, sandboxId }: { filePath: string; sandboxId?: s
   );
 }
 
-// Hook for video content - similar to useImageContent but for video
-function useVideoContent(
-  sandboxId?: string,
-  filePath?: string,
-  options: { enabled?: boolean } = {}
-) {
-  const { data, isLoading, error } = useFileContentQuery(sandboxId, filePath, {
-    contentType: 'blob',
-    enabled: options.enabled,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  return { data, isLoading, error };
-}
-
 // Full featured video renderer component for tool view (Computer)
 // Uses the full VideoRenderer with all controls (slider, volume, etc.)
-function VideoRendererFull({ filePath, sandboxId }: { filePath: string; sandboxId?: string }) {
+function VideoRendererFull({ filePath }: { filePath: string }) {
   const [hasVideoError, setHasVideoError] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
-  // Fetch video blob with proper auth
-  const { data: videoBlob, isLoading, error: fetchError } = useVideoContent(sandboxId, filePath, {
-    enabled: !!sandboxId && !!filePath,
+  // Fetch video content via OpenCode
+  const { data: videoContent, isLoading, error: fetchError } = useFileContent(filePath, {
+    enabled: !!filePath,
   });
 
   // Create and manage blob URL
   React.useEffect(() => {
-    if (videoBlob instanceof Blob) {
+    if (videoContent?.content && videoContent.encoding === 'base64') {
       console.log('[VideoRendererFull] Creating blob URL for video:', {
         filePath,
-        blobSize: videoBlob.size,
-        blobType: videoBlob.type,
+        contentSize: videoContent.content.length,
       });
-      const newUrl = URL.createObjectURL(videoBlob);
+      const binary = atob(videoContent.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: videoContent.mimeType || 'video/mp4' });
+      const newUrl = URL.createObjectURL(blob);
       console.log('[VideoRendererFull] Created blob URL:', newUrl);
       setVideoUrl(newUrl);
 
-      // Cleanup function to revoke URL when blob changes or component unmounts
+      // Cleanup function to revoke URL when content changes or component unmounts
       return () => {
         console.log('[VideoRendererFull] Revoking blob URL:', newUrl);
         URL.revokeObjectURL(newUrl);
         setVideoUrl(null);
       };
     } else {
-      console.log('[VideoRendererFull] No blob available:', { videoBlob, isLoading, fetchError });
+      console.log('[VideoRendererFull] No content available:', { videoContent, isLoading, fetchError });
       setVideoUrl(null);
     }
-  }, [videoBlob, filePath, isLoading, fetchError]);
+  }, [videoContent, filePath, isLoading, fetchError]);
 
   // Show shimmer while loading
   if (isLoading) {
@@ -226,7 +229,7 @@ function VideoRendererFull({ filePath, sandboxId }: { filePath: string; sandboxI
   }
 
   // Show error if fetch failed
-  if (fetchError || (!videoBlob && !isLoading)) {
+  if (fetchError || (!videoContent && !isLoading)) {
     return (
       <div className="aspect-video flex flex-col items-center justify-center p-6 text-center rounded-2xl border border-neutral-200 dark:border-neutral-700/50 bg-muted/30">
         <AlertTriangle className="h-10 w-10 text-zinc-500 dark:text-zinc-400 mb-3" />
@@ -309,7 +312,6 @@ export function ImageEditGenerateToolView({
     return extractImageEditGenerateData(toolCall, toolResult, true);
   }, [toolCall, toolResult]);
 
-  const sandboxId = project?.sandbox?.id;
   const imagePath = generatedImagePaths[0];
   const videoPath = generatedVideoPaths[0];
   const hasMedia = imagePath || videoPath;
@@ -327,16 +329,19 @@ export function ImageEditGenerateToolView({
   const actualIsSuccess = hasMedia && !hasActualError;
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
-  // Get media blob URL for download
-  const { data: mediaBlob } = useFileContentQuery(sandboxId, videoPath || imagePath, {
-    contentType: 'blob',
-    enabled: !!sandboxId && !!(videoPath || imagePath) && actualIsSuccess && !!toolCall,
+  // Get media content for download
+  const { data: mediaContent } = useFileContent(videoPath || imagePath || null, {
+    enabled: !!(videoPath || imagePath) && actualIsSuccess && !!toolCall,
   });
 
   // Create and manage download URL
   React.useEffect(() => {
-    if (mediaBlob instanceof Blob) {
-      const newUrl = URL.createObjectURL(mediaBlob);
+    if (mediaContent?.content && mediaContent.encoding === 'base64') {
+      const binary = atob(mediaContent.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mediaContent.mimeType || 'application/octet-stream' });
+      const newUrl = URL.createObjectURL(blob);
       setDownloadUrl(newUrl);
 
       return () => {
@@ -346,7 +351,7 @@ export function ImageEditGenerateToolView({
     } else {
       setDownloadUrl(null);
     }
-  }, [mediaBlob]);
+  }, [mediaContent]);
 
   if (!toolCall) return null;
 
@@ -414,10 +419,10 @@ export function ImageEditGenerateToolView({
           </div>
         ) : videoPath ? (
           /* Success State - Show FULL video player */
-          <VideoRendererFull filePath={videoPath} sandboxId={sandboxId} />
+          <VideoRendererFull filePath={videoPath} />
         ) : imagePath ? (
           /* Success State - Show image */
-          <ImageDisplay filePath={imagePath} sandboxId={sandboxId} />
+          <ImageDisplay filePath={imagePath} />
         ) : (
           /* Fallback shimmer if no media yet */
           <ShimmerBox aspectVideo={isVideoMode} />

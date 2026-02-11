@@ -208,53 +208,19 @@ export function extractSeeImageData(
 } 
 
 
-export function constructImageUrl(filePath: string, project?: { sandbox?: { sandbox_url?: string; workspace_path?: string; id?: string } }): string {
+export function constructImageUrl(filePath: string, _project?: { sandbox?: { sandbox_url?: string; workspace_path?: string; id?: string } }): string {
   if (!filePath || filePath === 'STREAMING') {
-    // Don't log error for streaming state - it's expected
     return '';
   }
 
   const cleanPath = filePath.replace(/^['"](.*)['"]$/, '$1');
   
-  // Check if it's a URL first, before trying to construct sandbox paths
+  // If it's already a URL, return as-is
   if (cleanPath.startsWith('http')) {
     return cleanPath;
   }
   
-  // PREFER backend API (requires authentication but more reliable)
-  const sandboxId = typeof project?.sandbox === 'string' 
-    ? project.sandbox 
-    : project?.sandbox?.id;
-  
-  if (sandboxId) {
-    let normalizedPath = cleanPath;
-    // Handle paths that start with "workspace" (without leading /)
-    if (normalizedPath === 'workspace' || normalizedPath.startsWith('workspace/')) {
-      normalizedPath = '/' + normalizedPath;
-    } else if (!normalizedPath.startsWith('/workspace')) {
-      normalizedPath = `/workspace/${normalizedPath.startsWith('/') ? normalizedPath.substring(1) : normalizedPath}`;
-    }
-    
-    const apiEndpoint = `${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${sandboxId}/files/content?path=${encodeURIComponent(normalizedPath)}`;
-    return apiEndpoint;
-  }
-  
-  // Fallback to sandbox_url for direct access
-  if (project?.sandbox?.sandbox_url) {
-    const sandboxUrl = project.sandbox.sandbox_url.replace(/\/$/, '');
-    let normalizedPath = cleanPath;
-    // Handle paths that start with "workspace" (without leading /)
-    if (normalizedPath === 'workspace' || normalizedPath.startsWith('workspace/')) {
-      normalizedPath = '/' + normalizedPath;
-    } else if (!normalizedPath.startsWith('/workspace')) {
-      normalizedPath = `/workspace/${normalizedPath.startsWith('/') ? normalizedPath.substring(1) : normalizedPath}`;
-    }
-    
-    const fullUrl = `${sandboxUrl}${normalizedPath}`;
-    return fullUrl;
-  }
-  
-  // Return empty string when sandbox not ready - the component will show loading state
-  // This is expected during initial render before sandbox info is available
-  return '';
+  // Return the file path — SafeImage uses useFileContent (OpenCode) as the primary
+  // loading mechanism. This string is only used as a fallback for external URLs.
+  return cleanPath;
 }

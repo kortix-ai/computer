@@ -3,7 +3,7 @@
  */
 
 import dynamic from 'next/dynamic';
-import { useFileData } from '@/hooks/use-file-data';
+import { useFileContent } from '@/features/files';
 import { Project } from '@/lib/api/threads';
 
 const SpreadsheetViewer = dynamic(
@@ -26,13 +26,9 @@ export function SpreadsheetPreview({
 }: SpreadsheetPreviewProps) {
     const filename = filepath.split('/').pop() || '';
     
-    const { data: blobUrl, isLoading } = useFileData(
-        sandboxId,
-        filepath,
-        { showPreview: true }
-    );
+    const { data: _fileContent, isLoading } = useFileContent(filepath);
     
-    if (isLoading || !blobUrl) {
+    if (isLoading) {
         return (
             <div className={className || "h-full w-full flex items-center justify-center"}>
                 <div className="text-muted-foreground">Loading spreadsheet...</div>

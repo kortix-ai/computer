@@ -4,7 +4,7 @@
 
 import { HtmlRenderer, JsonRenderer } from '@/components/file-renderers';
 import { UnifiedMarkdown } from '@/components/markdown';
-import { useFileData } from '@/hooks/use-file-data';
+import { useFileContent } from '@/features/files';
 import { constructHtmlPreviewUrl } from '@/lib/utils/url';
 import { Project } from '@/lib/api/threads';
 import { getExtension } from '@/lib/utils/file-types';
@@ -30,11 +30,8 @@ export function DocumentPreview({
     const isJson = extension === 'json';
     const isText = extension === 'txt';
     
-    const { data: fileContent, isLoading } = useFileData(
-        sandboxId,
-        filepath,
-        { showPreview: true }
-    );
+    const { data: fileContentData, isLoading } = useFileContent(filepath);
+    const fileContent = fileContentData?.content;
     
     if (isLoading || !fileContent) {
         return (

@@ -80,6 +80,39 @@ export const FileContextMenu = memo(function FileContextMenu({
           <ContextMenuShortcut>⌘I</ContextMenuShortcut>
         </ContextMenuItem>
 
+        {onCopyPath && (
+          <ContextMenuItem 
+            onClick={onCopyPath}
+            className="focus:bg-background/10 focus:backdrop-blur-xl rounded-lg"
+          >
+            <Copy className="h-4 w-4 text-muted-foreground" />
+            Copy Path
+          </ContextMenuItem>
+        )}
+
+        {(onEdit || onDelete) && <ContextMenuSeparator />}
+
+        {onEdit && (
+          <ContextMenuItem 
+            onClick={onEdit}
+            className="focus:bg-background/10 focus:backdrop-blur-xl rounded-lg"
+          >
+            <Pencil className="h-4 w-4 text-muted-foreground" />
+            Rename
+          </ContextMenuItem>
+        )}
+
+        {onDelete && (
+          <ContextMenuItem 
+            onClick={onDelete}
+            className="focus:bg-background/10 focus:backdrop-blur-xl rounded-lg text-destructive focus:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+            <ContextMenuShortcut>⌘⌫</ContextMenuShortcut>
+          </ContextMenuItem>
+        )}
+
       </ContextMenuContent>
     </ContextMenu>
   );

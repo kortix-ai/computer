@@ -178,44 +178,15 @@ export function SpreadsheetViewer({
       return;
     }
     
-    if (!resolvedSandboxId || !resolvedFilePath || !session?.access_token) {
-      console.error('[SpreadsheetViewer] Download failed - missing:', {
-        resolvedSandboxId,
-        resolvedFilePath,
-        hasSession: !!session?.access_token
-      });
+    if (!resolvedFilePath) {
       toast.error('Unable to download file');
       return;
     }
 
-    console.log('[SpreadsheetViewer] Downloading:', {
-      sandboxId: resolvedSandboxId,
-      filePath: resolvedFilePath,
-      fileName
-    });
-
     setIsDownloading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${resolvedSandboxId}/files/content?path=${encodeURIComponent(resolvedFilePath)}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
+      const { downloadFile } = await import('@/features/files/api/opencode-files');
+      await downloadFile(resolvedFilePath, fileName);
       toast.success('File downloaded successfully');
     } catch (error) {
       console.error('[SpreadsheetViewer] Download error:', error);
@@ -223,7 +194,7 @@ export function SpreadsheetViewer({
     } finally {
       setIsDownloading(false);
     }
-  }, [resolvedSandboxId, resolvedFilePath, fileName, session, isDownloadRestricted, openUpgradeModal]);
+  }, [resolvedFilePath, fileName, isDownloadRestricted, openUpgradeModal]);
 
   useEffect(() => {
     if (onDownloadReady) {

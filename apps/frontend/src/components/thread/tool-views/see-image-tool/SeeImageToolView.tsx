@@ -18,7 +18,7 @@ import { GenericToolView } from '../GenericToolView';
 import { useAuth } from '@/components/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useImageContent } from '@/hooks/files';
+import { useFileContent } from '@/features/files';
 import { useDownloadRestriction } from '@/hooks/billing';
 
 function SafeImage({ src, alt, filePath, className, sandboxId, project }: { 
@@ -49,17 +49,30 @@ function SafeImage({ src, alt, filePath, className, sandboxId, project }: {
   
   // Use our robust retry hook instead of custom fetch
   const {
-    data: imageUrl,
+    data: fileContentData,
     isLoading,
     error,
-    failureCount,
-  } = useImageContent(
-    sandboxId,
+  } = useFileContent(
     filePath,
     {
       enabled: !!sandboxId && !!filePath,
     }
   );
+  
+  // Convert base64 file content to blob URL
+  const imageUrl = React.useMemo(() => {
+    if (!fileContentData?.content) return null;
+    if (fileContentData.encoding === 'base64') {
+      const binary = atob(fileContentData.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: fileContentData.mimeType || 'image/png' });
+      return URL.createObjectURL(blob);
+    }
+    return null;
+  }, [fileContentData]);
+  
+  const failureCount = 0; // No longer tracked by new API
   
   // Fallback to direct URL if no sandbox ID (but only for URLs)
   const finalImageUrl = imageUrl || (src.startsWith('http') ? src : undefined);
@@ -407,4 +420,4 @@ export function SeeImageToolView({
       </div>
     </Card>
   );
-} 
+}

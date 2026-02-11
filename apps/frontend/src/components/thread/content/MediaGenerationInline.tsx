@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { useImageContent, useFileContent } from '@/hooks/files';
+import { useFileContent } from '@/features/files';
 import { getToolIcon } from '@/components/thread/utils';
 import { AppIcon } from '@/components/thread/tool-views/shared/AppIcon';
 import type { Project } from '@/lib/api/threads';
@@ -103,9 +103,21 @@ function ShimmerBox({ aspectVideo = false }: { aspectVideo?: boolean }) {
 }
 
 function InlineImage({ filePath, sandboxId }: { filePath: string; sandboxId?: string }) {
-  const { data: imageUrl, isLoading } = useImageContent(sandboxId, filePath, {
-    enabled: !!sandboxId && !!filePath,
+  const { data: fileContent, isLoading } = useFileContent(filePath, {
+    enabled: !!filePath,
   });
+
+  const imageUrl = React.useMemo(() => {
+    if (!fileContent?.content) return null;
+    if (fileContent.encoding === 'base64') {
+      const binary = atob(fileContent.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: fileContent.mimeType || 'image/png' });
+      return URL.createObjectURL(blob);
+    }
+    return null;
+  }, [fileContent]);
 
   if (isLoading || !imageUrl) {
     return <ShimmerBox />;
@@ -127,15 +139,19 @@ function InlineVideo({ filePath, sandboxId }: { filePath: string; sandboxId?: st
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
-  // Use the same file content hook that images use - this handles auth and proper URL
-  const { data: videoBlob, isLoading: isBlobLoading } = useFileContent(sandboxId, filePath, {
-    enabled: !!sandboxId && !!filePath,
+  // Use the file content hook from OpenCode
+  const { data: videoContent, isLoading: isBlobLoading } = useFileContent(filePath, {
+    enabled: !!filePath,
   });
   
-  // Create and manage blob URL
+  // Create and manage blob URL from base64 content
   useEffect(() => {
-    if (videoBlob instanceof Blob) {
-      const newUrl = URL.createObjectURL(videoBlob);
+    if (videoContent?.content && videoContent.encoding === 'base64') {
+      const binary = atob(videoContent.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: videoContent.mimeType || 'video/mp4' });
+      const newUrl = URL.createObjectURL(blob);
       setVideoUrl(newUrl);
       
       return () => {
@@ -145,7 +161,7 @@ function InlineVideo({ filePath, sandboxId }: { filePath: string; sandboxId?: st
     } else {
       setVideoUrl(null);
     }
-  }, [videoBlob]);
+  }, [videoContent]);
 
   const togglePlay = () => {
     if (videoRef.current) {

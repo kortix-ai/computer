@@ -13,7 +13,7 @@ import { RefreshCw, Copy, Check, TerminalSquare } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { toast } from '@/lib/toast';
 import { backendApi } from '@/lib/api-client';
-import { fileQueryKeys } from '@/hooks/files/use-file-queries';
+import { fileListKeys } from '@/features/files';
 
 interface SSHTerminalProps {
   sandboxId: string;
@@ -99,7 +99,7 @@ export const SSHTerminal = memo(function SSHTerminal({ sandboxId, className }: S
     }
     invalidateTimeoutRef.current = setTimeout(() => {
       queryClient.invalidateQueries({
-        queryKey: fileQueryKeys.directories(),
+        queryKey: fileListKeys.all,
       });
     }, 500);
   }, [queryClient]);

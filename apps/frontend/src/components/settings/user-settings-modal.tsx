@@ -22,7 +22,6 @@ import {
     TrendingDown,
     ExternalLink,
     Info,
-    FileText,
     Plug,
     Bell,
     Mail,
@@ -32,7 +31,6 @@ import {
     Key,
     Camera,
     Upload,
-    Brain,
 } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { cn } from '@/lib/utils';
@@ -98,10 +96,7 @@ import { LanguageSwitcher } from './language-switcher';
 import { useTranslations } from 'next-intl';
 import { ReferralsTab } from '@/components/referrals/referrals-tab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MemorySettings } from '@/components/memory/MemorySettings';
-import { KnowledgeBaseSettings } from './knowledge-base-settings';
-
-type TabId = 'general' | 'plan' | 'billing' | 'usage' | 'memory' | 'env-manager' | 'knowledge-base' | 'integrations' | 'api-keys' | 'referrals';
+type TabId = 'general' | 'plan' | 'billing' | 'usage' | 'env-manager' | 'integrations' | 'api-keys' | 'referrals';
 
 interface Tab {
     id: TabId;
@@ -134,9 +129,7 @@ export function UserSettingsModal({
         { id: 'plan', label: 'Plan', icon: Zap },
         { id: 'billing', label: 'Billing', icon: CreditCard },
         { id: 'usage', label: 'Usage', icon: TrendingDown },
-        { id: 'memory', label: 'Memory', icon: Brain },
         ...(!isProduction ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
-        { id: 'knowledge-base', label: 'Knowledge Base', icon: FileText },
         { id: 'integrations', label: 'Integrations', icon: Plug },
         { id: 'api-keys', label: 'API Keys', icon: Key },
         ...(isLocal ? [{ id: 'env-manager' as TabId, label: 'Env Manager', icon: KeyRound }] : []),
@@ -149,9 +142,6 @@ export function UserSettingsModal({
     const handleTabClick = (tabId: TabId) => {
         if (tabId === 'plan') {
             setShowPlanModal(true);
-        } else if (tabId === 'knowledge-base') {
-            // Show Coming Soon tab instead of navigating
-            setActiveTab('knowledge-base');
         } else if (tabId === 'integrations') {
             onOpenChange(false);
             router.push('/settings/credentials');
@@ -227,8 +217,6 @@ export function UserSettingsModal({
                                 {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
                                 {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
                                 {activeTab === 'usage' && <UsageTab />}
-                                {activeTab === 'memory' && <MemorySettings />}
-                                {activeTab === 'knowledge-base' && <KnowledgeBaseSettings />}
                                 {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
                                 {activeTab === 'env-manager' && isLocal && <EnvManagerTab />}
                             </div>
@@ -281,8 +269,6 @@ export function UserSettingsModal({
                             {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
                             {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
                             {activeTab === 'usage' && <UsageTab />}
-                            {activeTab === 'memory' && <MemorySettings />}
-                            {activeTab === 'knowledge-base' && <KnowledgeBaseSettings />}
                             {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
                             {activeTab === 'env-manager' && isLocal && <EnvManagerTab />}
                         </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { fetchFileContent } from '@/hooks/files/use-file-queries';
+import { readFile } from '@/features/files';
 
 declare global {
   interface Window {
@@ -184,13 +184,18 @@ export function LuckysheetViewer({ xlsxPath, sandboxId, className, height }: Luc
         if (disposed) return;
 
         let ab: ArrayBuffer;
-        if (sandboxId && session?.access_token) {
-          const blob = (await fetchFileContent(
-            sandboxId,
-            xlsxPath,
-            'blob',
-            session.access_token
-          )) as Blob;
+        if (sandboxId) {
+          // Use OpenCode readFile API
+          const result = await readFile(xlsxPath);
+          let blob: Blob;
+          if (result.encoding === 'base64') {
+            const binary = atob(result.content);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            blob = new Blob([bytes], { type: result.mimeType || 'application/octet-stream' });
+          } else {
+            blob = new Blob([result.content]);
+          }
           ab = await blob.arrayBuffer();
         } else {
           const resp = await fetch(xlsxPath);
@@ -496,4 +501,4 @@ export function LuckysheetViewer({ xlsxPath, sandboxId, className, height }: Luc
       )}
     </div>
   );
-} 
+}

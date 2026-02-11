@@ -50,12 +50,7 @@ export interface UseAgentStreamCoreResult {
   agentRunId: string | null;
   retryCount: number;
   startStreaming: (runId: string) => Promise<void>;
-<<<<<<< HEAD
   stopStreaming: () => Promise<void>;
-=======
-  stopStreaming: () => Promise<void>; // Stops agent on server AND disconnects
-  disconnectStream: () => void; // Just disconnects locally, agent keeps running on server
->>>>>>> suna/feat/kortix-code
   resumeStream: () => Promise<void>; // Call when app comes back to foreground
   clearError: () => void; // Clear error state when switching threads
   setError: (error: string) => void; // Set error state (e.g., when retry fails)
@@ -112,14 +107,6 @@ export function useAgentStreamCore(
   // Not for detecting "no response" - that's the connection timeout's job
   const HEARTBEAT_TIMEOUT_MS = 10 * 60 * 1000;
   
-<<<<<<< HEAD
-=======
-  // Reasoning dedup: when the backend sends dedicated 'reasoning' events,
-  // disable extraction from 'assistant' metadata to prevent double-processing.
-  // Reset on each new stream so fallback works for backends that don't send 'reasoning' events.
-  const hasReceivedReasoningEventRef = useRef<boolean>(false);
-
->>>>>>> suna/feat/kortix-code
   // Reconnection refs for graceful handling of bad network
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -248,14 +235,8 @@ export function useAgentStreamCore(
   }, [textContent]);
 
   // Finalize stream function
-<<<<<<< HEAD
   const finalizeStream = useCallback(
     (finalStatus: string, runId: string | null = agentRunId) => {
-=======
-  // preserveRunId: if true, keeps the run ID so user can retry/reconnect (for connection errors while agent is still running)
-  const finalizeStream = useCallback(
-    (finalStatus: string, runId: string | null = agentRunId, preserveRunId: boolean = false) => {
->>>>>>> suna/feat/kortix-code
       if (!isMountedRef.current) return;
 
       if (runId && currentRunIdRef.current && currentRunIdRef.current !== runId) {
@@ -287,29 +268,14 @@ export function useAgentStreamCore(
       toolCallArgumentsRef.current.clear();
       previousToolCallStateRef.current = null;
       lastToolCallUpdateTimeRef.current = 0;
-<<<<<<< HEAD
       
-=======
-
->>>>>>> suna/feat/kortix-code
       if (config.clearToolTracking) {
         config.clearToolTracking();
       }
 
       updateStatus(finalStatus);
-<<<<<<< HEAD
       setAgentRunId(null);
       currentRunIdRef.current = null;
-=======
-
-      // Only clear run ID if not preserving it for retry
-      // When preserveRunId is true (e.g., connection error while agent still running),
-      // keep the run ID so user can retry/reconnect
-      if (!preserveRunId) {
-        setAgentRunId(null);
-        currentRunIdRef.current = null;
-      }
->>>>>>> suna/feat/kortix-code
 
       // Invalidate queries
       if (queryClient && config.queryKeys && config.queryKeys.length > 0) {
@@ -452,23 +418,12 @@ export function useAgentStreamCore(
 
     switch (message.type) {
       case 'assistant':
-<<<<<<< HEAD
         // CRITICAL: Extract reasoning content FIRST, before any other processing
         // This ensures reasoning chunks appear in frontend as soon as possible
         const reasoningChunk = extractReasoningContent(parsedContent, parsedMetadata);
         if (reasoningChunk) {
           // Update reasoning content immediately - no throttling, no delay
           setReasoningContent((prev) => prev + reasoningChunk);
-=======
-        // Extract reasoning from assistant metadata ONLY if backend doesn't send
-        // dedicated 'reasoning' events. If it does, those are authoritative and
-        // processing both would duplicate content.
-        if (!hasReceivedReasoningEventRef.current) {
-          const reasoningChunk = extractReasoningContent(parsedContent, parsedMetadata);
-          if (reasoningChunk) {
-            setReasoningContent((prev) => prev + reasoningChunk);
-          }
->>>>>>> suna/feat/kortix-code
         }
         
         if (parsedMetadata.stream_status === 'tool_call_chunk') {
@@ -559,16 +514,8 @@ export function useAgentStreamCore(
             lastToolCallUpdateTimeRef.current = 0;
             if (message.message_id) callbacksRef.current.onMessage(message);
           } else if (!parsedMetadata.stream_status) {
-<<<<<<< HEAD
             callbacksRef.current.onAssistantStart?.();
             if (message.message_id) callbacksRef.current.onMessage(message);
-=======
-            // Only fire onAssistantStart, do NOT call onMessage here.
-            // This matches frontend behavior - assistant messages without stream_status
-            // are initial markers, not messages to add to the list.
-            // Adding them would cause duplicates when the complete message arrives.
-            callbacksRef.current.onAssistantStart?.();
->>>>>>> suna/feat/kortix-code
           }
         }
         break;
@@ -624,12 +571,7 @@ export function useAgentStreamCore(
 
       case 'reasoning':
         // Handle dedicated reasoning stream events from backend
-<<<<<<< HEAD
         // This is sent as type: "reasoning" with content: {"reasoning_content": "..."}
-=======
-        // This is the authoritative source — when present, disables assistant metadata extraction
-        hasReceivedReasoningEventRef.current = true;
->>>>>>> suna/feat/kortix-code
         const reasoningFromContent = parsedContent.reasoning_content;
         if (reasoningFromContent) {
           const reasoningText = typeof reasoningFromContent === 'string'
@@ -709,7 +651,6 @@ export function useAgentStreamCore(
     const runId = currentRunIdRef.current;
     const currentStatus = status;
 
-<<<<<<< HEAD
     // If already finalized, don't show error
     if (['completed', 'stopped', 'error', 'agent_not_running'].includes(currentStatus)) {
       return;
@@ -720,23 +661,6 @@ export function useAgentStreamCore(
         finalizeStream('error');
       } else if (currentStatus !== 'idle') {
         finalizeStream('idle');
-=======
-    console.log('[useAgentStreamCore] handleStreamClose called:', { runId, currentStatus });
-
-    // If already finalized or idle, this is an expected close (e.g., user switched threads)
-    if (['completed', 'stopped', 'error', 'agent_not_running', 'idle'].includes(currentStatus)) {
-      console.log('[useAgentStreamCore] handleStreamClose: Already finalized/idle, ignoring');
-      return;
-    }
-
-    // No runId means disconnectStream was called (user navigated away) - not an error
-    if (!runId) {
-      console.log('[useAgentStreamCore] handleStreamClose: No runId, user likely switched threads');
-      // Don't call finalizeStream with 'error' - this was an intentional disconnect
-      // Just ensure we're in idle state
-      if (currentStatus !== 'idle') {
-        updateStatus('idle');
->>>>>>> suna/feat/kortix-code
       }
       return;
     }
@@ -761,28 +685,10 @@ export function useAgentStreamCore(
           }
 
           if (agentStatus.status === 'running') {
-<<<<<<< HEAD
             setError('Stream closed unexpectedly while agent was running.');
             finalizeStream('error', runId);
             if (config.showToast) {
               config.showToast('Stream disconnected. Worker might still be running.', 'warning');
-=======
-            // Agent is still running - DON'T clear run ID so user can retry/reconnect
-            // Just set error and update status, preserving the run ID for retry
-            setError('Stream closed unexpectedly while agent was running.');
-
-            // Clean up the stream connection but DON'T clear run ID
-            if (streamCleanupRef.current) {
-              streamCleanupRef.current();
-              streamCleanupRef.current = null;
-            }
-
-            // Update status to error (this triggers onClose callback)
-            updateStatus('error');
-
-            if (config.showToast) {
-              config.showToast('Stream disconnected. Tap Refresh to reconnect.', 'warning');
->>>>>>> suna/feat/kortix-code
             }
           } else if (agentStatus.status === 'stopped' && agentStatus.error) {
             const errorMessage = agentStatus.error;
@@ -820,15 +726,8 @@ export function useAgentStreamCore(
           if (isExpectedCompletion) {
             finalizeStream('agent_not_running', runId);
           } else {
-<<<<<<< HEAD
             console.error(`[useAgentStreamCore] Error checking agent status for ${runId} after stream close: ${errorMessage}`);
             finalizeStream('error', runId);
-=======
-            // Network error checking status - agent might still be running
-            // Preserve run ID so user can retry manually
-            console.error(`[useAgentStreamCore] Error checking agent status for ${runId} after stream close: ${errorMessage}`);
-            finalizeStream('error', runId, true); // preserveRunId = true
->>>>>>> suna/feat/kortix-code
           }
         });
     }, 500);
@@ -879,30 +778,18 @@ export function useAgentStreamCore(
         cleanup();
         
         // Attempt reconnect on timeout
-<<<<<<< HEAD
-=======
-        // Agent might still be running, so preserve run ID for manual retry
->>>>>>> suna/feat/kortix-code
         if (attemptReconnectRef.current) {
           const reconnected = await attemptReconnectRef.current(runId);
           if (!reconnected) {
             setError('Connection timeout - please check your internet');
             callbacksRef.current.onError?.('Connection timeout - please check your internet');
-<<<<<<< HEAD
             finalizeStream('error', runId);
-=======
-            finalizeStream('error', runId, true); // preserveRunId = true
->>>>>>> suna/feat/kortix-code
           }
           if (!resolved) { resolved = true; resolve(reconnected); }
         } else {
           setError('Connection timeout - please check your internet');
           callbacksRef.current.onError?.('Connection timeout - please check your internet');
-<<<<<<< HEAD
           finalizeStream('error', runId);
-=======
-          finalizeStream('error', runId, true); // preserveRunId = true
->>>>>>> suna/feat/kortix-code
           if (!resolved) { resolved = true; resolve(false); }
         }
       }, CONNECTION_TIMEOUT_MS);
@@ -936,24 +823,14 @@ export function useAgentStreamCore(
           if (attemptReconnectRef.current) {
             const reconnected = await attemptReconnectRef.current(runId);
             if (!reconnected) {
-<<<<<<< HEAD
               // Max retries exceeded
               handleStreamError(event);
               finalizeStream('error', runId);
-=======
-              // Max retries exceeded - preserve run ID so user can retry manually
-              handleStreamError(event);
-              finalizeStream('error', runId, true); // preserveRunId = true
->>>>>>> suna/feat/kortix-code
             }
             if (!resolved) { resolved = true; resolve(reconnected); }
           } else {
             handleStreamError(event);
-<<<<<<< HEAD
             finalizeStream('error', runId);
-=======
-            finalizeStream('error', runId, true); // preserveRunId = true
->>>>>>> suna/feat/kortix-code
             if (!resolved) { resolved = true; resolve(false); }
           }
           return;
@@ -974,30 +851,18 @@ export function useAgentStreamCore(
           }
           
           // Network error checking status - attempt reconnect anyway
-<<<<<<< HEAD
-=======
-          // Agent might still be running, so preserve run ID for retry
->>>>>>> suna/feat/kortix-code
           console.log('[useAgentStreamCore] Status check failed, attempting reconnect...');
           cleanup();
           if (attemptReconnectRef.current) {
             const reconnected = await attemptReconnectRef.current(runId);
             if (!reconnected) {
               handleStreamError(event);
-<<<<<<< HEAD
               finalizeStream('error', runId);
-=======
-              finalizeStream('error', runId, true); // preserveRunId = true - agent might still be running
->>>>>>> suna/feat/kortix-code
             }
             if (!resolved) { resolved = true; resolve(reconnected); }
           } else {
             handleStreamError(event);
-<<<<<<< HEAD
             finalizeStream('error', runId);
-=======
-            finalizeStream('error', runId, true); // preserveRunId = true - agent might still be running
->>>>>>> suna/feat/kortix-code
             if (!resolved) { resolved = true; resolve(false); }
           }
         }
@@ -1019,23 +884,12 @@ export function useAgentStreamCore(
             (globalThis as any).clearTimeout(connectionTimeoutId);
             connectionTimeoutId = null;
           }
-<<<<<<< HEAD
           
-=======
-
->>>>>>> suna/feat/kortix-code
           // Reset retry state on successful connection
           retryCountRef.current = 0;
           setRetryCount(0);
           isReconnectingRef.current = false;
-<<<<<<< HEAD
           
-=======
-
-          // Clear any previous error (e.g., from "stream closed unexpectedly")
-          setError(null);
-
->>>>>>> suna/feat/kortix-code
           updateStatus('streaming');
           lastMessageTimeRef.current = Date.now();
           
@@ -1199,14 +1053,8 @@ export function useAgentStreamCore(
     setRetryCount(0);
     isReconnectingRef.current = false;
     
-<<<<<<< HEAD
     // Clear reasoning content when starting a new stream
     setReasoningContent('');
-=======
-    // Clear reasoning content and reset dedup flag when starting a new stream
-    setReasoningContent('');
-    hasReceivedReasoningEventRef.current = false;
->>>>>>> suna/feat/kortix-code
     
     currentRunIdRef.current = runId;
     setAgentRunId(runId);
@@ -1226,48 +1074,11 @@ export function useAgentStreamCore(
     await setupEventSource(runId, false);
   }, [config, updateStatus, setupEventSource]);
 
-<<<<<<< HEAD
-=======
-  // Disconnect from stream locally WITHOUT stopping the agent on server
-  // Use this when switching threads - the agent keeps running in the background
-  const disconnectStream = useCallback(() => {
-    console.log('[useAgentStreamCore] Disconnecting stream (agent continues on server)');
-
-    // CRITICAL: Update status to 'idle' BEFORE closing the stream
-    // This prevents handleStreamClose from treating this as an error
-    // (it checks if status is 'streaming' to determine if close was unexpected)
-    updateStatus('idle');
-
-    // Clear run ID BEFORE cleanup to prevent handleStreamClose from showing error
-    currentRunIdRef.current = null;
-    setAgentRunId(null);
-
-    // Now close the stream - handleStreamClose will see status is 'idle' and runId is null
-    if (streamCleanupRef.current) {
-      streamCleanupRef.current();
-      streamCleanupRef.current = null;
-    }
-
-    // Clear local state but DON'T call server to stop
-    setTextContent([]);
-    setToolCall(null);
-    clearAccumulator(accumulatorRef.current);
-    toolCallArgumentsRef.current.clear();
-    previousToolCallStateRef.current = null;
-    lastToolCallUpdateTimeRef.current = 0;
-  }, [updateStatus]);
-
-  // Stop agent on server AND disconnect - use only when user explicitly wants to stop
->>>>>>> suna/feat/kortix-code
   const stopStreaming = useCallback(async () => {
     if (streamCleanupRef.current) {
       streamCleanupRef.current();
     }
-<<<<<<< HEAD
     
-=======
-
->>>>>>> suna/feat/kortix-code
     if (currentRunIdRef.current) {
       try {
         const runId = currentRunIdRef.current;
@@ -1279,20 +1090,12 @@ export function useAgentStreamCore(
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-<<<<<<< HEAD
         
-=======
-
->>>>>>> suna/feat/kortix-code
         await fetch(url, {
           method: 'POST',
           headers,
         });
-<<<<<<< HEAD
         
-=======
-
->>>>>>> suna/feat/kortix-code
         if (config.showToast) {
           config.showToast('Worker stopped.', 'success');
         }
@@ -1305,11 +1108,7 @@ export function useAgentStreamCore(
       }
       currentRunIdRef.current = null;
     }
-<<<<<<< HEAD
     
-=======
-
->>>>>>> suna/feat/kortix-code
     finalizeStream('stopped', agentRunId);
   }, [config, agentRunId, finalizeStream]);
 
@@ -1413,10 +1212,6 @@ export function useAgentStreamCore(
     retryCount,
     startStreaming,
     stopStreaming,
-<<<<<<< HEAD
-=======
-    disconnectStream,
->>>>>>> suna/feat/kortix-code
     resumeStream,
     clearError,
     setError: setStreamError,

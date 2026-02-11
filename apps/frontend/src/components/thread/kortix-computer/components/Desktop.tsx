@@ -6,7 +6,6 @@ import { Folder, Globe, TerminalSquare, Info, Table } from 'lucide-react';
 import { AppWindow } from './AppWindow';
 import { AppDock } from './Dock';
 import { PanelHeader } from './PanelHeader';
-import { SandboxInfoCard } from './SandboxInfoCard';
 import { ToolView } from '../../tool-views/wrapper';
 import { getUserFriendlyToolName, getToolIcon } from '@/components/thread/utils';
 import { ToolCallInput } from '../KortixComputer';
@@ -14,15 +13,11 @@ import { Project } from '@/lib/api/threads';
 import { ApiMessageType } from '@/components/thread/types';
 import { ViewType } from '@/stores/kortix-computer-store';
 import { cn } from '@/lib/utils';
-import { useSandboxDetails, useSandboxStatus } from '@/hooks/files/use-sandbox-details';
-import { useDirectoryQuery, fetchFileContent, fileQueryKeys } from '@/hooks/files/use-file-queries';
-import { useFileUpload } from '@/hooks/files/use-file-mutations';
+import { useFileList, readFile, fileListKeys, useFileUpload, useFileMkdir, useFileDelete, useFileRename, useFilesStore, FileBrowser, FileViewer } from '@/features/files';
 import { DesktopContextMenu } from './DesktopContextMenu';
 import { QuickLaunch } from './QuickLaunch';
 import { DesktopIcons } from './DesktopIcons';
 import { SSHTerminal } from './SSHTerminal';
-import { FileViewerView } from '../FileViewerView';
-import { FileBrowserView } from '../FileBrowserView';
 import { getFileIconByName } from './Icons';
 import { SystemInfoContent } from './SystemInfoContent';
 import { FileInfoContent, FileInfo } from './FileInfoContent';
@@ -36,7 +31,6 @@ const SpreadsheetApp = dynamic(
   { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-muted-foreground">Loading spreadsheet...</div> }
 );
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/components/AuthProvider';
 
 const convertToolName = (toolName: string) => {
   if (toolName.includes('_')) {
@@ -72,6 +66,30 @@ interface FolderWindowProps {
   onMinimize: () => void;
 }
 
+/**
+ * Wrapper that sets files store state before rendering the unified FileViewer.
+ * Used for Desktop individual file windows.
+ */
+const DesktopFileViewer = memo(function DesktopFileViewer({ filePath }: { filePath: string }) {
+  const openFile = useFilesStore((s) => s.openFile);
+  useEffect(() => {
+    openFile(filePath);
+  }, [filePath, openFile]);
+  return <FileViewer />;
+});
+
+/**
+ * Wrapper that sets files store state before rendering the unified FileBrowser.
+ * Used for Desktop folder windows.
+ */
+const DesktopFolderBrowser = memo(function DesktopFolderBrowser({ folderPath }: { folderPath?: string }) {
+  const navigateToPath = useFilesStore((s) => s.navigateToPath);
+  useEffect(() => {
+    navigateToPath(folderPath || '.');
+  }, [folderPath, navigateToPath]);
+  return <FileBrowser />;
+});
+
 const FolderWindow = memo(function FolderWindow({
   window,
   sandboxId,
@@ -100,10 +118,7 @@ const FolderWindow = memo(function FolderWindow({
       onMinimize={onMinimize}
       zIndex={window.zIndex}
     >
-      <FileBrowserView
-        sandboxId={sandboxId}
-        variant="default"
-      />
+      <DesktopFolderBrowser folderPath={window.filePath} />
     </AppWindow>
   );
 });
@@ -159,29 +174,24 @@ export const SandboxDesktop = memo(function SandboxDesktop({
   const [maxZIndex, setMaxZIndex] = useState(1);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
-  const [sandboxInfoOpen, setSandboxInfoOpen] = useState(false);
   const [isCreatingNewFolder, setIsCreatingNewFolder] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
-  const fileUploadMutation = useFileUpload();
-  const { session } = useAuth();
-
-  // Legacy details for backwards compat
-  const { data: sandboxDetails, isLoading: sandboxLoading, error: sandboxError } = useSandboxDetails(project_id);
-  // New unified status with health checks
-  const { data: sandboxStatus, isLoading: statusLoading } = useSandboxStatus(project_id);
 
   const sandboxId = project?.sandbox?.id;
-  const { data: workspaceFiles = [] } = useDirectoryQuery(sandboxId, '/workspace', {
-    enabled: !!sandboxId,
-    staleTime: 30000,
+  const { data: workspaceFiles = [] } = useFileList('/workspace', {
+    enabled: true,
   });
+  const uploadMutation = useFileUpload();
+  const mkdirMutation = useFileMkdir();
+  const deleteMutation = useFileDelete();
+  const renameMutation = useFileRename();
 
   const spotlightFiles = workspaceFiles.map(file => ({
     name: file.name,
     path: file.path || `/workspace/${file.name}`,
-    type: file.is_dir ? 'directory' as const : 'file' as const,
+    type: file.type === 'directory' ? 'directory' as const : 'file' as const,
     extension: file.name.includes('.') ? file.name.split('.').pop() : undefined,
   }));
 
@@ -524,10 +534,10 @@ export const SandboxDesktop = memo(function SandboxDesktop({
   const desktopFiles = workspaceFiles.map(file => ({
     name: file.name,
     path: file.path || `/workspace/${file.name}`,
-    is_dir: file.is_dir,
+    is_dir: file.type === 'directory',
     extension: file.name.includes('.') ? file.name.split('.').pop() : undefined,
-    size: file.size,
-    mod_time: file.mod_time,
+    size: undefined as number | undefined,
+    mod_time: undefined as string | undefined,
   }));
 
   const handleDesktopFileOpen = useCallback((path: string, isDirectory: boolean) => {
@@ -539,17 +549,22 @@ export const SandboxDesktop = memo(function SandboxDesktop({
   }, [openFileWindow]);
 
   const handleFileDownload = useCallback(async (filePath: string) => {
-    if (!sandboxId || !session?.access_token) {
-      toast.error('Cannot download file');
-      return;
-    }
-
     const fileName = filePath.split('/').pop() || 'download';
     
     try {
       toast.loading(`Downloading ${fileName}...`, { id: 'download' });
       
-      const blob = await fetchFileContent(sandboxId, filePath, 'blob', session.access_token);
+      // Use OpenCode readFile API
+      const result = await readFile(filePath);
+      let blob: Blob;
+      if (result.encoding === 'base64') {
+        const binary = atob(result.content);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        blob = new Blob([bytes], { type: result.mimeType || 'application/octet-stream' });
+      } else {
+        blob = new Blob([result.content], { type: 'text/plain' });
+      }
       
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -565,24 +580,25 @@ export const SandboxDesktop = memo(function SandboxDesktop({
       console.error('Download failed:', error);
       toast.error(`Failed to download ${fileName}`, { id: 'download' });
     }
-  }, [sandboxId, session?.access_token]);
+  }, []);
 
   const handleUploadFiles = useCallback((files: FileList | File[]) => {
-    if (!sandboxId) {
-      toast.error('No sandbox available');
-      return;
-    }
-    
     const fileArray = Array.from(files);
-    fileArray.forEach(file => {
-      const targetPath = `/workspace/${file.name}`;
-      fileUploadMutation.mutate({
-        sandboxId,
-        file,
-        targetPath,
-      });
-    });
-  }, [sandboxId, fileUploadMutation]);
+    for (const file of fileArray) {
+      uploadMutation.mutate(
+        { file, targetPath: '/workspace' },
+        {
+          onSuccess: () => {
+            toast.success(`Uploaded ${file.name}`);
+            queryClient.invalidateQueries({ queryKey: fileListKeys.all });
+          },
+          onError: (err) => {
+            toast.error(`Failed to upload ${file.name}: ${err.message}`);
+          },
+        },
+      );
+    }
+  }, [uploadMutation, queryClient]);
 
   const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -601,42 +617,66 @@ export const SandboxDesktop = memo(function SandboxDesktop({
   const handleCreateNewFolder = useCallback(async (folderName: string) => {
     setIsCreatingNewFolder(false);
     
-    if (!sandboxId || !session?.access_token) {
-      toast.error('Cannot create folder');
-      return;
-    }
-    
     if (workspaceFiles.some(f => f.name === folderName)) {
       toast.error(`"${folderName}" already exists`);
       return;
     }
     
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${sandboxId}/terminal/execute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+    mkdirMutation.mutate(
+      { dirPath: `/workspace/${folderName}` },
+      {
+        onSuccess: () => {
+          toast.success(`Created folder "${folderName}"`);
+          queryClient.invalidateQueries({ queryKey: fileListKeys.all });
         },
-        body: JSON.stringify({
-          command: `mkdir -p "/workspace/${folderName}"`,
-        }),
-      });
-      
-      if (response.ok) {
-        toast.success(`Created "${folderName}"`);
-        queryClient.invalidateQueries({ queryKey: fileQueryKeys.directories() });
-      } else {
-        toast.error('Failed to create folder');
-      }
-    } catch (error) {
-      toast.error('Failed to create folder');
-    }
-  }, [sandboxId, session?.access_token, workspaceFiles, queryClient]);
+        onError: (err) => {
+          toast.error(`Failed to create folder: ${err.message}`);
+        },
+      },
+    );
+  }, [workspaceFiles, mkdirMutation, queryClient]);
 
   const handleCancelNewFolder = useCallback(() => {
     setIsCreatingNewFolder(false);
   }, []);
+
+  const handleFileDelete = useCallback((filePath: string) => {
+    const fileName = filePath.split('/').pop() || filePath;
+    deleteMutation.mutate(
+      { filePath },
+      {
+        onSuccess: () => {
+          toast.success(`Deleted "${fileName}"`);
+          queryClient.invalidateQueries({ queryKey: fileListKeys.all });
+        },
+        onError: (err) => {
+          toast.error(`Failed to delete "${fileName}": ${err.message}`);
+        },
+      },
+    );
+  }, [deleteMutation, queryClient]);
+
+  const handleFileRename = useCallback((filePath: string) => {
+    const oldName = filePath.split('/').pop() || '';
+    const newName = window.prompt('Rename to:', oldName);
+    if (!newName || newName === oldName) return;
+
+    const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+    const newPath = `${parentDir}/${newName}`;
+
+    renameMutation.mutate(
+      { from: filePath, to: newPath },
+      {
+        onSuccess: () => {
+          toast.success(`Renamed to "${newName}"`);
+          queryClient.invalidateQueries({ queryKey: fileListKeys.all });
+        },
+        onError: (err) => {
+          toast.error(`Failed to rename: ${err.message}`);
+        },
+      },
+    );
+  }, [renameMutation, queryClient]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -663,12 +703,14 @@ export const SandboxDesktop = memo(function SandboxDesktop({
   const renderDesktop = () => (
     <>
       <div className="absolute inset-0">
-        {!sandboxInfoOpen && (desktopFiles.length > 0 || isCreatingNewFolder) && (
+        {(desktopFiles.length > 0 || isCreatingNewFolder) && (
           <DesktopIcons 
             files={desktopFiles}
             onFileOpen={handleDesktopFileOpen}
             onFileEdit={handleDesktopFileEdit}
             onFileDownload={handleFileDownload}
+            onFileDelete={handleFileDelete}
+            onFileRename={handleFileRename}
             onGetFileInfo={(file) => openFileInfoWindow({
               name: file.name,
               path: file.path,
@@ -684,13 +726,6 @@ export const SandboxDesktop = memo(function SandboxDesktop({
         )}
         
         <AnimatePresence>
-          {sandboxInfoOpen && (
-            <SandboxInfoCard
-              sandboxDetails={sandboxDetails}
-              sandboxStatus={sandboxStatus}
-              isLoading={sandboxLoading || statusLoading}
-            />
-          )}
           {visibleWindows.map(window => {
               if (window.type === 'tool' && window.toolIndex !== undefined) {
                 const toolCall = toolCalls[window.toolIndex];
@@ -831,12 +866,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
                     onMinimize={() => minimizeWindow(window.id)}
                     zIndex={window.zIndex}
                   >
-                    <FileViewerView
-                      sandboxId={sandboxId}
-                      filePath={window.filePath}
-                      project={project}
-                      projectId={project_id}
-                    />
+                    <DesktopFileViewer filePath={window.filePath} />
                   </AppWindow>
                 );
               }
@@ -874,11 +904,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
                     onMinimize={() => minimizeWindow(window.id)}
                     zIndex={window.zIndex}
                   >
-                    <SystemInfoContent
-                      sandboxDetails={sandboxDetails}
-                      sandboxStatus={sandboxStatus}
-                      isLoading={sandboxLoading || statusLoading}
-                    />
+                    <SystemInfoContent />
                   </AppWindow>
                 );
               }
@@ -965,7 +991,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
   return (
     <DesktopContextMenu
       onRefresh={() => {
-        queryClient.invalidateQueries({ queryKey: fileQueryKeys.directories() });
+        queryClient.invalidateQueries({ queryKey: fileListKeys.all });
         toast.success('Refreshed');
       }}
       onOpenFiles={() => handleSystemAppClick('files')}

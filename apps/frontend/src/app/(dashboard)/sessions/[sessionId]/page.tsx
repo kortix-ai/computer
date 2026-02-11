@@ -2,6 +2,7 @@
 
 import { use, Suspense } from 'react';
 import { SessionChat } from '@/components/session/session-chat';
+import { SessionLayout } from '@/components/session/session-layout';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 
 export default function SessionPage({
@@ -19,7 +20,9 @@ export default function SessionPage({
         </div>
       }
     >
-      <SessionChat sessionId={sessionId} />
+      <SessionLayout sessionId={sessionId}>
+        <SessionChat sessionId={sessionId} />
+      </SessionLayout>
     </Suspense>
   );
 }

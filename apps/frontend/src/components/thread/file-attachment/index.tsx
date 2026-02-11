@@ -15,7 +15,7 @@ import { KanvaxPreview } from '@/components/file-previews/KanvaxPreview';
 import { DocxPreview } from '@/components/file-previews/DocxPreview';
 import { FileCarousel } from '@/components/file-layouts/FileCarousel';
 import { FileGrid } from '@/components/file-layouts/FileGrid';
-import { useFileData } from '@/hooks/use-file-data';
+import { useFileContent } from '@/features/files';
 import { getFileType, getFilename } from '@/lib/utils/file-utils';
 import { isImageFile, isPdfExtension, isSpreadsheetExtension, isCsvExtension, isPreviewableFile, isKanvaxFile, isDocxExtension } from '@/lib/utils/file-types';
 import { Project } from '@/lib/api/threads';
@@ -93,17 +93,12 @@ export function FileAttachment({
     const shouldShowPreview = (isPreviewable || isImage) && showPreview && collapsed === false;
     
     // Call all hooks at the top level before any early returns
-    const { error, retryCount } = useFileData(
-        sandboxId,
-        filepath,
-        { enabled: shouldShowPreview, showPreview: shouldShowPreview }
+    const { data: fileContentData, isLoading, error } = useFileContent(
+        shouldShowPreview ? filepath : null,
+        { enabled: shouldShowPreview }
     );
-    
-    const { data, isLoading } = useFileData(
-        sandboxId,
-        filepath,
-        { enabled: shouldShowPreview, showPreview: true }
-    );
+    const retryCount = 0;
+    const data = fileContentData?.content;
     
     const isSandboxDeleted = error?.message?.includes('404') || 
                              error?.message?.includes('Sandbox not found') ||

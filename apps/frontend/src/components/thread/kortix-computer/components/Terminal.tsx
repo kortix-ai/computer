@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { backendApi } from '@/lib/api-client';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { fileQueryKeys } from '@/hooks/files/use-file-queries';
+import { fileListKeys } from '@/features/files';
 
 interface TerminalLine {
   id: string;
@@ -41,7 +41,7 @@ export const Terminal = memo(function Terminal({ sandboxId, className }: Termina
 
   const invalidateFileQueries = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: fileQueryKeys.directories(),
+      queryKey: fileListKeys.all,
     });
   }, [queryClient]);
 

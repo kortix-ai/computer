@@ -5,6 +5,11 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { useDeleteOperationEffects } from '@/stores/delete-operation-store';
 import { SubscriptionStoreSync } from '@/stores/subscription-store';
 
+// Lazy load the tab bar
+const TabBar = lazy(() =>
+  import('@/components/tabs/tab-bar').then(mod => ({ default: mod.TabBar }))
+);
+
 // Lazy load the heavy sidebar component
 const SidebarLeft = lazy(() => 
   import('@/components/sidebar/sidebar-left').then(mod => ({ default: mod.SidebarLeft }))
@@ -75,7 +80,12 @@ export function AppProviders({
         </Suspense>
       )}
       <SidebarInset>
-        {content}
+        <Suspense fallback={null}>
+          <TabBar />
+        </Suspense>
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {content}
+        </div>
       </SidebarInset>
       {sidebarSiblings}
     </SidebarProvider>

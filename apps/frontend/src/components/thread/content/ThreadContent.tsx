@@ -8,7 +8,7 @@ import {
   ParsedMetadata,
 } from "@/components/thread/types";
 import { FileAttachmentGrid } from "@/components/thread/file-attachment";
-import { useFilePreloader } from "@/hooks/files";
+
 import { useAuth } from "@/components/AuthProvider";
 import { Project } from "@/lib/api/threads";
 import {
@@ -1227,8 +1227,6 @@ export const ThreadContent: React.FC<ThreadContentProps> = memo(
     const [newGroupReasoningExpanded, setNewGroupReasoningExpanded] = useState(false);
     const { session } = useAuth();
     const t = useTranslations();
-    const { preloadFiles } = useFilePreloader();
-
     const containerClassName = isPreviewMode
       ? "flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-0"
       : "flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-0 bg-background";
@@ -1516,37 +1514,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = memo(
       return () => resizeObserver.disconnect();
     }, [displayMessages.length, streamingTextContent, agentStatus, parentRef]);
 
-    useEffect(() => {
-      if (!sandboxId || !session?.access_token) return;
 
-      const allAttachments: string[] = [];
-      displayMessages.forEach((message) => {
-        if (message.type === "user") {
-          try {
-            const content =
-              typeof message.content === "string" ? message.content : "";
-            const attachmentsMatch = content.match(/\[(?:Uploaded File|Attached|Image): (.*?)\]/g);
-            if (attachmentsMatch) {
-              attachmentsMatch.forEach((match) => {
-                const pathMatch = match.match(/\[(?:Uploaded File|Attached|Image): (.*?)\]/);
-                if (pathMatch && pathMatch[1]) {
-                  // Extract just the path, removing size info if present
-                  const fullMatch = pathMatch[1];
-                  const pathOnly = fullMatch.includes(' -> ') 
-                    ? fullMatch.split(' -> ')[1] 
-                    : fullMatch;
-                  allAttachments.push(pathOnly);
-                }
-              });
-            }
-          } catch {}
-        }
-      });
-
-      if (allAttachments.length > 0) {
-        preloadFiles(sandboxId, allAttachments).catch(() => {});
-      }
-    }, [displayMessages, sandboxId, session?.access_token, preloadFiles]);
 
     const showNewGroupLoader = useMemo(() => {
       return (

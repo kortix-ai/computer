@@ -116,23 +116,20 @@ export function getFileSize(filepath: string, type: FileType): string {
 }
 
 /**
- * Get the API URL for file content
+ * Get a normalized file path for content access.
+ * Previously constructed sandbox API URLs — now just returns the normalized path.
+ * Content is loaded via OpenCode server's readFile() / useFileContent().
  */
-export function getFileUrl(sandboxId: string | undefined, path: string): string {
-    if (!sandboxId) return path;
-
-    // Check if the path already starts with /workspace
+export function getFileUrl(_sandboxId: string | undefined, path: string): string {
     // Handle paths that start with "workspace" (without leading /)
     if (path === 'workspace' || path.startsWith('workspace/')) {
         path = '/' + path;
     } else if (!path.startsWith('/workspace')) {
-        // Prepend /workspace to the path if it doesn't already have it
         path = `/workspace/${path.startsWith('/') ? path.substring(1) : path}`;
     }
 
     // Handle any potential Unicode escape sequences
     try {
-        // Replace escaped Unicode sequences with actual characters
         path = path.replace(/\\u([0-9a-fA-F]{4})/g, (_, hexCode) => {
             return String.fromCharCode(parseInt(hexCode, 16));
         });
@@ -140,12 +137,7 @@ export function getFileUrl(sandboxId: string | undefined, path: string): string 
         console.error('Error processing Unicode escapes in path:', e);
     }
 
-    const url = new URL(`${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${sandboxId}/files/content`);
-
-    // Properly encode the path parameter for UTF-8 support
-    url.searchParams.append('path', path);
-
-    return url.toString();
+    return path;
 }
 
 /**

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useFileContent } from '@/hooks/files';
+import { useFileContent } from '@/features/files';
 import { CanvasRenderer } from '@/components/file-renderers/canvas-renderer';
 import { formatTimestamp } from '../utils';
 
@@ -131,12 +131,14 @@ export function CanvasToolView({
 
   // Load canvas file content
   const { 
-    data: canvasContent, 
+    data: canvasContentData, 
     isLoading: isLoadingContent,
     refetch: refetchContent,
-  } = useFileContent(sandboxId, resolvedCanvasPath || undefined, {
-    enabled: !!sandboxId && !!resolvedCanvasPath && !isStreaming && actualIsSuccess,
-  });
+  } = useFileContent(
+    (resolvedCanvasPath && !isStreaming && actualIsSuccess) ? resolvedCanvasPath : null,
+    { enabled: !!resolvedCanvasPath && !isStreaming && actualIsSuccess }
+  );
+  const canvasContent = canvasContentData?.content;
 
   // Get tool_call_id for tracking
   const toolCallId = toolCall?.tool_call_id;

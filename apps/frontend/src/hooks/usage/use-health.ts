@@ -2,7 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { checkApiHealth, type HealthCheckResponse } from '@/lib/api/health';
-import { healthKeys } from '../files/keys';
+// Health keys — standalone definition (legacy keys file was removed)
+const healthKeys = {
+  all: ['health'] as const,
+  api: () => ['health', 'api'] as const,
+};
 
 export const useApiHealth = (options?) => {
   return useQuery<HealthCheckResponse>({

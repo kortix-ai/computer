@@ -63,38 +63,19 @@ export function PdfExportToolView({
       return;
     }
 
-    if (!outputFile || !project?.sandbox?.id) {
-      toast.error('Unable to download - missing file or sandbox info');
+    if (!outputFile) {
+      toast.error('Unable to download - missing file info');
       return;
     }
 
     setIsDownloading(true);
     try {
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-
       const downloadPath = outputFile.startsWith('/workspace/')
         ? outputFile
         : `/workspace/${outputFile}`;
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${project.sandbox.id}/files/content?path=${encodeURIComponent(downloadPath)}`,
-        { headers }
-      );
-
-      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      const { downloadFile } = await import('@/features/files/api/opencode-files');
+      await downloadFile(downloadPath, fileName);
 
       toast.success(`Downloaded ${fileName}`);
     } catch (error) {

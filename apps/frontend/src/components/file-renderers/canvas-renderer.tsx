@@ -160,14 +160,30 @@ interface CanvasRendererProps {
   onSave?: (content: string) => Promise<void>;
 }
 
-function getSandboxFileUrl(sandboxId: string | undefined, path: string): string {
-  if (!sandboxId) return path;
-  let normalizedPath = path;
-  if (normalizedPath.startsWith('/')) normalizedPath = normalizedPath.substring(1);
-  if (normalizedPath.startsWith('workspace/')) normalizedPath = normalizedPath.substring(10);
-  normalizedPath = `/workspace/${normalizedPath}`;
-  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
-  return `${baseUrl}/sandboxes/${sandboxId}/files/content?path=${encodeURIComponent(normalizedPath)}`;
+// Fetch file via OpenCode and return an object URL (for image display)
+async function fetchFileAsObjectUrl(src: string): Promise<string> {
+  const { readFileAsBlob } = await import('@/features/files/api/opencode-files');
+  const blob = await readFileAsBlob(src);
+  return URL.createObjectURL(blob);
+}
+
+// Fetch file via OpenCode and return a base64 data URL (for AI processing)
+async function fetchFileAsBase64(src: string): Promise<string> {
+  const { readFileAsBlob } = await import('@/features/files/api/opencode-files');
+  const blob = await readFileAsBlob(src);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Fetch file via OpenCode and return text content (for JSON canvas data)
+async function fetchFileAsText(src: string): Promise<string> {
+  const { readFile } = await import('@/features/files/api/opencode-files');
+  const result = await readFile(src);
+  return result.content;
 }
 
 // AI Processing Overlay with strong diagonal shimmer waves
@@ -389,27 +405,13 @@ function CanvasImageElement({
     const maxRetries = 5;
 
     const loadImage = async () => {
-      const url = sandboxId ? getSandboxFileUrl(sandboxId, element.src) : element.src;
-      const headers: Record<string, string> = {};
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
       while (retryCount < maxRetries && !cancelled) {
         try {
           setLoading(true);
           setError(null);
-          const response = await fetch(url, { credentials: 'include', headers });
-          if (!response.ok) {
-            // Retry on 404 (image might not be ready yet) or 5xx
-            if ((response.status === 404 || response.status >= 500) && retryCount < maxRetries - 1) {
-              retryCount++;
-              await new Promise(r => setTimeout(r, 500 * retryCount)); // 500ms, 1s, 1.5s, 2s
-              continue;
-            }
-            throw new Error(`HTTP ${response.status}`);
-          }
-          const blob = await response.blob();
+          const objectUrl = await fetchFileAsObjectUrl(element.src);
           if (!cancelled) {
-            setImageSrc(URL.createObjectURL(blob));
+            setImageSrc(objectUrl);
             setLoading(false);
           }
           return; // Success, exit retry loop
@@ -1386,33 +1388,9 @@ function FloatingToolbar({
 
   // Convert image URL/path to base64
   const getImageAsBase64 = async (src: string): Promise<string> => {
-    // Already base64
-    if (src.startsWith('data:')) {
-      return src;
-    }
-
-    // Construct proper URL for sandbox files
-    const url = sandboxId ? getSandboxFileUrl(sandboxId, src) : src;
-
-    // Fetch the image and convert to base64
+    if (src.startsWith('data:')) return src;
     try {
-      const headers: Record<string, string> = {};
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-      const response = await fetch(url, {
-        headers,
-        credentials: 'include',
-      });
-
-      if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
-
-      const blob = await response.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      return await fetchFileAsBase64(src);
     } catch (err) {
       console.error('Failed to convert image to base64:', err);
       throw new Error('Could not load image for processing');
@@ -2214,21 +2192,7 @@ function MultiSelectToolbar({
   // Convert image to base64
   const getImageAsBase64 = async (src: string): Promise<string> => {
     if (src.startsWith('data:')) return src;
-
-    const url = sandboxId ? getSandboxFileUrl(sandboxId, src) : src;
-    const headers: Record<string, string> = {};
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-    const response = await fetch(url, { headers, credentials: 'include' });
-    if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
-
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    return fetchFileAsBase64(src);
   };
 
   const handleMerge = async () => {
@@ -2597,24 +2561,9 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
     lastFetchTimeRef.current = Date.now();
 
     try {
-      const baseUrl = getSandboxFileUrl(sandboxId, filePath);
-      const url = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-      console.log('[CANVAS_LIVE_DEBUG] forceFetch fetching:', url);
+      console.log('[CANVAS_LIVE_DEBUG] forceFetch fetching via OpenCode:', filePath);
 
-      const response = await fetch(url, {
-        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
-        credentials: 'include',
-        cache: 'no-store',
-      });
-
-      console.log('[CANVAS_LIVE_DEBUG] forceFetch response status:', response.status);
-
-      if (!response.ok) {
-        console.log('[CANVAS_LIVE_DEBUG] forceFetch failed - bad response');
-        return;
-      }
-
-      const newContent = await response.text();
+      const newContent = await fetchFileAsText(filePath);
       console.log('[CANVAS_LIVE_DEBUG] forceFetch content length:', newContent?.length);
 
       if (!newContent) return;
@@ -2732,21 +2681,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
       console.log('[CANVAS_LIVE_DEBUG] Polling: fetching canvas content');
 
       try {
-        // Add cache-busting to ensure fresh content from server
-        const baseUrl = getSandboxFileUrl(sandboxId, filePath);
-        const url = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-        const response = await fetch(url, {
-          headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
-          credentials: 'include',
-          cache: 'no-store', // Prevent browser caching
-        });
-
-        if (!response.ok) {
-          console.log('[CANVAS_LIVE_DEBUG] Polling: fetch failed with status', response.status);
-          return;
-        }
-
-        const newContent = await response.text();
+        const newContent = await fetchFileAsText(filePath);
         if (!newContent) return;
 
         // Parse and update if different - always parse to compare element IDs
@@ -4127,17 +4062,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
 
                     // Fetch image if it's a path
                     if (!imgSrc.startsWith('data:')) {
-                      const url = sandboxId ? getSandboxFileUrl(sandboxId, imgSrc) : imgSrc;
-                      const headers: Record<string, string> = {};
-                      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-                      const response = await fetch(url, { credentials: 'include', headers });
-                      if (!response.ok) continue;
-                      const blob = await response.blob();
-                      imgSrc = await new Promise<string>((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result as string);
-                        reader.readAsDataURL(blob);
-                      });
+                      imgSrc = await fetchFileAsBase64(imgSrc);
                     }
 
                     // Load and draw image

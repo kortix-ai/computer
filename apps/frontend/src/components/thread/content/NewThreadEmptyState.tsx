@@ -292,7 +292,7 @@ const docsCategories = [
     label: 'Internal',
     templates: [
       { id: 'guide', icon: BookOpen, label: 'Guide', description: 'How-to guide', prompt: 'Initialize the tools. Create a comprehensive how-to guide with introduction, step-by-step instructions, screenshots, troubleshooting, and FAQs.' },
-      { id: 'wiki', icon: Globe, label: 'Wiki', description: 'Knowledge base article', prompt: 'Initialize the tools. Create a knowledge base wiki article with overview, key concepts, detailed explanations, examples, and references.' },
+      { id: 'wiki', icon: Globe, label: 'Wiki', description: 'Wiki article', prompt: 'Initialize the tools. Create a wiki article with overview, key concepts, detailed explanations, examples, and references.' },
       { id: 'policy', icon: FileCheck, label: 'Policy', description: 'Policy document', prompt: 'Initialize the tools. Create a policy document with purpose, scope, policy statements, procedures, responsibilities, and compliance requirements.' },
       { id: 'meeting', icon: Users, label: 'Meeting Notes', description: 'Meeting minutes', prompt: 'Initialize the tools. Create meeting notes template with agenda, attendees, discussion points, decisions, action items, and next steps.' },
     ],

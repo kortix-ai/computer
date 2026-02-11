@@ -23,6 +23,7 @@ interface DesktopIconsProps {
   onFileEdit?: (path: string) => void;
   onFileDownload?: (path: string) => void;
   onFileDelete?: (path: string) => void;
+  onFileRename?: (path: string) => void;
   onGetFileInfo?: (file: DesktopFile) => void;
   isCreatingNewFolder?: boolean;
   onNewFolderCreate?: (name: string) => void;
@@ -49,6 +50,7 @@ export const DesktopIcons = memo(function DesktopIcons({
   onFileEdit,
   onFileDownload,
   onFileDelete,
+  onFileRename,
   onGetFileInfo,
   isCreatingNewFolder,
   onNewFolderCreate,
@@ -137,9 +139,9 @@ export const DesktopIcons = memo(function DesktopIcons({
             filePath={file.path}
             isDirectory={file.is_dir}
             onOpen={() => onFileOpen?.(file.path, file.is_dir)}
-            onEdit={() => onFileEdit?.(file.path)}
+            onEdit={onFileRename ? () => onFileRename(file.path) : undefined}
             onDownload={() => onFileDownload?.(file.path)}
-            onDelete={() => onFileDelete?.(file.path)}
+            onDelete={onFileDelete ? () => onFileDelete(file.path) : undefined}
             onCopyPath={() => handleCopyPath(file.path)}
             onGetInfo={() => onGetFileInfo?.(file)}
             onOpenChange={(open) => setActiveContextPath(open ? file.path : null)}

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SpreadsheetComponent } from '@syncfusion/ej2-react-spreadsheet';
-import { backendApi } from '@/lib/api-client';
-import { getSandboxFileContent } from '@/lib/api/sandbox';
+import { readFile, uploadFile } from '@/features/files';
 
 interface SyncState {
   status: 'idle' | 'syncing' | 'synced' | 'error' | 'offline' | 'conflict';
@@ -187,7 +186,8 @@ export function useSpreadsheetSync({
     }
 
     try {
-      const content = await getSandboxFileContent(sandboxId, filePath);
+      // Use OpenCode readFile API
+      const result = await readFile(filePath);
 
       const rawFileName = filePath.split('/').pop() || 'spreadsheet.xlsx';
       // Trim whitespace, newlines, and other control characters
@@ -204,12 +204,15 @@ export function useSpreadsheetSync({
       }
 
       let fileBlob: Blob;
-      if (content instanceof Blob) {
-        fileBlob = new Blob([content], { type: mimeType });
-      } else if (typeof content === 'string') {
-        fileBlob = new Blob([content], { type: mimeType });
+      if (result.encoding === 'base64') {
+        const binary = atob(result.content);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        fileBlob = new Blob([bytes], { type: mimeType });
+      } else if (typeof result.content === 'string') {
+        fileBlob = new Blob([result.content], { type: mimeType });
       } else {
-        fileBlob = new Blob([JSON.stringify(content)], { type: mimeType });
+        fileBlob = new Blob([JSON.stringify(result.content)], { type: mimeType });
       }
 
       const hash = await generateHash(fileBlob);
@@ -270,23 +273,15 @@ export function useSpreadsheetSync({
   }, [sandboxId, filePath, spreadsheetRef, cacheKey]);
 
   const saveToServer = useCallback(async (blob: Blob): Promise<boolean> => {
-    if (!sandboxId || !filePath) return false;
+    if (!filePath) return false;
 
     try {
       const rawFileName = filePath.split('/').pop() || 'spreadsheet.xlsx';
       const fileName = rawFileName.trim().replace(/[\r\n]+/g, '').replace(/\s+$/g, '') || 'spreadsheet.xlsx';
-      const uploadFormData = new FormData();
-      uploadFormData.append('path', filePath);
-      uploadFormData.append('file', blob, fileName);
+      const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+      const file = new window.File([blob], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
-      const response = await backendApi.uploadPut(`/sandboxes/${sandboxId}/files/binary`, uploadFormData, {
-        showErrors: false,
-        timeout: 60000,
-      });
-
-      if (response.error) {
-        throw new Error(`Upload failed: ${response.error.message}`);
-      }
+      await uploadFile(file, parentDir);
 
       const hash = await generateHash(blob);
       lastKnownHashRef.current = hash;
@@ -300,7 +295,7 @@ export function useSpreadsheetSync({
     } catch (error: any) {
       throw error;
     }
-  }, [sandboxId, filePath, cacheKey]);
+  }, [filePath, cacheKey]);
 
   const triggerBackgroundSave = useCallback(() => {
     if (!spreadsheetRef.current || !sandboxId || !filePath || !enabled) {
@@ -565,14 +560,18 @@ export function useSpreadsheetSync({
       }
 
       try {
-        const content = await getSandboxFileContent(sandboxId, filePath);
+        // Use OpenCode readFile API
+        const result = await readFile(filePath);
         let blob: Blob;
-        if (content instanceof Blob) {
-          blob = content;
-        } else if (typeof content === 'string') {
-          blob = new Blob([content]);
+        if (result.encoding === 'base64') {
+          const binary = atob(result.content);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          blob = new Blob([bytes], { type: 'application/octet-stream' });
+        } else if (typeof result.content === 'string') {
+          blob = new Blob([result.content], { type: 'application/octet-stream' });
         } else {
-          blob = new Blob([JSON.stringify(content)]);
+          blob = new Blob([JSON.stringify(result.content)], { type: 'application/octet-stream' });
         }
 
         const hash = await generateHash(blob);

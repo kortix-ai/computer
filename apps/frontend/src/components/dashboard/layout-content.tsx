@@ -74,7 +74,7 @@ const MaintenanceCountdownBanner = lazy(() =>
 // Skeleton shell that renders immediately for FCP
 function DashboardSkeleton() {
   return (
-    <div className="flex h-screen w-full bg-background">
+    <div className="flex h-full w-full bg-background">
       {/* Sidebar skeleton */}
       <div className="hidden md:flex w-[280px] flex-col border-r border-border bg-sidebar">
         <div className="p-4 space-y-4">
@@ -225,7 +225,7 @@ export default function DashboardLayoutContent({
       }
     >
       <OpenCodeEventStreamProvider />
-      <div className="relative h-full">
+      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
         {technicalIssue?.enabled && technicalIssue.message && (
           <Suspense fallback={null}>
             <TechnicalIssueBanner 
@@ -256,7 +256,7 @@ export default function DashboardLayoutContent({
         
         <Suspense fallback={null}>
           <OnboardingProvider>
-            <div className="bg-background">{children}</div>
+            <div className="bg-background flex-1 min-h-0 flex flex-col overflow-hidden">{children}</div>
           </OnboardingProvider>
         </Suspense>
         <Suspense fallback={null}>

@@ -1,0 +1,70 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Bot, Sparkles, Wrench, Terminal, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useSidebar } from '@/components/ui/sidebar';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+
+const CONFIG_ITEMS = [
+  { label: 'Agents', href: '/agents', icon: Bot },
+  { label: 'Skills', href: '/skills', icon: Sparkles },
+  { label: 'Tools', href: '/tools', icon: Wrench },
+  { label: 'Commands', href: '/commands', icon: Terminal },
+] as const;
+
+export function ConfigNav() {
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+
+  if (state === 'collapsed' && !isMobile) return null;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="px-3">
+        <CollapsibleTrigger asChild>
+          <button className="flex items-center justify-between w-full py-2 group">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Configuration
+            </span>
+            <ChevronRight className={cn(
+              'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
+              isOpen && 'rotate-90'
+            )} />
+          </button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="space-y-0.5 pb-2">
+            {CONFIG_ITEMS.map(({ label, href, icon: Icon }) => {
+              const isActive = pathname?.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => isMobile && setOpenMobile(false)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors',
+                    isActive
+                      ? 'bg-muted/80 text-foreground'
+                      : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
