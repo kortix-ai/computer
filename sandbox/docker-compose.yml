@@ -1,0 +1,52 @@
+services:
+  desktop:
+    build:
+      context: ..
+      dockerfile: sandbox/Dockerfile
+    image: heyagi/sandbox:0.1.0
+    container_name: sandbox-desktop
+    security_opt:
+      - seccomp=unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - SUBFOLDER=/
+      - TITLE=HeyAGI Sandbox
+      - OPENCODE_CONFIG_DIR=/opt/opencode
+      - DISPLAY=:1
+      - LSS_DIR=/config/.lss
+      # Kortix Master
+      - OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME:-admin}
+      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-changeme}
+      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai}
+      - KORTIX_TOKEN=${KORTIX_TOKEN:-}
+      - SANDBOX_ID=${SANDBOX_ID:-local}
+      - PROJECT_ID=${PROJECT_ID:-local}
+      - ENV_MODE=${ENV_MODE:-local}
+    env_file:
+      - .env
+    volumes:
+      - config:/config
+      - workspace:/config/workspace
+      - secrets_data:/app/secrets
+    ports:
+      - "6080:3000"   # Desktop -> http://localhost:6080
+      - "6081:3001"   # Desktop (HTTPS) -> https://localhost:6081
+      - "3111:3111"   # OpenCode Web UI -> http://localhost:3111
+      - "3210:3210"   # Presentation Viewer -> http://localhost:3210
+      - "8000:8000"   # Kortix Master (proxy entry point) -> http://localhost:8000
+      - "9223:9223"   # Agent Browser Stream -> ws://localhost:9223
+      - "9224:9224"   # Agent Browser Viewer -> http://localhost:9224
+    shm_size: "2gb"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/kortix/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  config:
+  workspace:
+  secrets_data:

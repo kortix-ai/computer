@@ -1,0 +1,23 @@
+#!/usr/bin/with-contenv bash
+# lss-sync — File-watcher daemon that keeps the semantic search index in sync.
+#
+# Uses watchdog (inotify/FSEvents) to detect file changes in real time and
+# triggers re-indexing with debounce. Changes are picked up within seconds.
+#
+# Watches:
+#   /config/Desktop           — User files
+#   /config/workspace/.kortix — Agent memory
+
+exec s6-setuidgid abc \
+  env HOME=/config \
+      OPENAI_API_KEY="${OPENAI_API_KEY}" \
+      LSS_DIR=/config/.lss \
+      PATH="/lsiopy/bin:/usr/local/bin:/usr/bin:/bin" \
+  lss-sync \
+    --watch /config/Desktop \
+    --watch /config/workspace/.kortix \
+    --exclude node_modules \
+    --exclude .git \
+    --exclude __pycache__ \
+    --startup-delay 15 \
+    --debounce 2

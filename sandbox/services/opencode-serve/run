@@ -1,0 +1,18 @@
+#!/usr/bin/with-contenv bash
+# OpenCode API Server — s6 service
+#
+# Runs `opencode serve` on port 4096 (internal only, proxied by kortix-master).
+# This is the headless API server, distinct from `opencode web` (the Web UI).
+
+# Wait a moment for filesystem to settle
+sleep 3
+
+cd /config/Desktop
+
+echo "[opencode-serve] Starting OpenCode API server on port 4096"
+
+exec s6-setuidgid abc \
+  env HOME=/config \
+      OPENCODE_CONFIG_DIR=/opt/opencode \
+      PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
+  opencode serve --port 4096 --hostname 0.0.0.0

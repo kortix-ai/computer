@@ -1,0 +1,48 @@
+#!/usr/bin/with-contenv bash
+# Agent Browser Viewer — s6 service
+#
+# Serves the browser viewer UI on port 9224.
+# - GET /           → viewer HTML
+# - GET /sessions   → JSON list of active sessions + stream ports
+
+echo "[agent-browser-viewer] Starting viewer on port 9224"
+
+exec s6-setuidgid abc \
+  node -e '
+    const http = require("http");
+    const fs = require("fs");
+    const path = require("path");
+
+    const html = fs.readFileSync("/opt/agent-browser-viewer/index.html");
+    const socketDir = process.env.AGENT_BROWSER_SOCKET_DIR || "/config/.agent-browser";
+
+    function getSessions() {
+      try {
+        const files = fs.readdirSync(socketDir);
+        const sessions = [];
+        for (const f of files) {
+          if (f.endsWith(".stream")) {
+            const name = f.replace(".stream", "");
+            const port = parseInt(fs.readFileSync(path.join(socketDir, f), "utf8").trim(), 10);
+            const hasSock = files.includes(name + ".sock");
+            if (port > 0 && hasSock) {
+              sessions.push({ name, port });
+            }
+          }
+        }
+        return sessions;
+      } catch(e) { return []; }
+    }
+
+    http.createServer((req, res) => {
+      if (req.url === "/sessions") {
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+        res.end(JSON.stringify(getSessions()));
+      } else {
+        res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
+        res.end(html);
+      }
+    }).listen(9224, "0.0.0.0", () => {
+      console.log("[agent-browser-viewer] Ready at http://0.0.0.0:9224");
+    });
+  '
