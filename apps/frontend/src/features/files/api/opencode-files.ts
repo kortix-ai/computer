@@ -1,14 +1,13 @@
 /**
  * OpenCode File API — filesystem access via the active OpenCode server.
  *
- * All calls go directly to the OpenCode server (e.g. localhost:4096).
- * No auth tokens, no sandbox IDs, no backend proxy.
+ * All calls go through the @kortix/opencode-sdk client singleton.
  *
  * Read endpoints: list, read, status, find
- * Write endpoints: upload, delete, mkdir, rename (requires kortix fork)
+ * Write endpoints: upload, delete, mkdir, rename
  */
 
-import { getActiveOpenCodeUrl } from '@/stores/server-store';
+import { getClient } from '@/lib/opencode-sdk';
 import type {
   FileNode,
   FileContent,
@@ -18,31 +17,15 @@ import type {
 } from '../types';
 
 // ---------------------------------------------------------------------------
-// Core fetch helper
+// Helper: unwrap SDK response (data / error)
 // ---------------------------------------------------------------------------
 
-async function opencodeFetch<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
-  const baseUrl = getActiveOpenCodeUrl();
-  const url = `${baseUrl}${path}`;
-
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`OpenCode ${res.status}: ${text || res.statusText}`);
+function unwrap<T>(result: { data?: T; error?: unknown }): T {
+  if (result.error) {
+    const err = result.error as any;
+    throw new Error(err?.data?.message || err?.message || 'SDK request failed');
   }
-
-  return res.json();
+  return result.data as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,24 +34,21 @@ async function opencodeFetch<T>(
 
 /**
  * List files and directories at a given path.
- * GET /file?path=<path>
  */
 export async function listFiles(dirPath: string): Promise<FileNode[]> {
-  return opencodeFetch<FileNode[]>(
-    `/file?path=${encodeURIComponent(dirPath)}`,
-  );
+  const client = getClient();
+  const result = await client.file.list({ path: dirPath });
+  return unwrap(result);
 }
 
 /**
  * Read the content of a file.
- * GET /file/content?path=<path>
- *
  * Returns text content for text files, base64-encoded content for images/binaries.
  */
 export async function readFile(filePath: string): Promise<FileContent> {
-  return opencodeFetch<FileContent>(
-    `/file/content?path=${encodeURIComponent(filePath)}`,
-  );
+  const client = getClient();
+  const result = await client.file.read({ path: filePath });
+  return unwrap(result);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +90,7 @@ export async function downloadFile(
 }
 
 // ---------------------------------------------------------------------------
-// File mutations (write operations — requires kortix opencode fork)
+// File mutations (write operations)
 // ---------------------------------------------------------------------------
 
 /** Response from the upload endpoint. */
@@ -121,7 +101,6 @@ export interface UploadResult {
 
 /**
  * Upload a file to the project.
- * POST /file/upload (multipart/form-data)
  *
  * @param file - The file or blob to upload
  * @param targetPath - Optional target directory (relative to project root)
@@ -130,59 +109,36 @@ export async function uploadFile(
   file: File | Blob,
   targetPath?: string,
 ): Promise<UploadResult[]> {
-  const baseUrl = getActiveOpenCodeUrl();
-  const formData = new FormData();
-  formData.append('file', file);
-  if (targetPath) {
-    formData.append('path', targetPath);
-  }
-
-  const res = await fetch(`${baseUrl}/file/upload`, {
-    method: 'POST',
-    body: formData,
-    // Do NOT set Content-Type — browser sets multipart boundary automatically
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`OpenCode ${res.status}: ${text || res.statusText}`);
-  }
-
-  return res.json();
+  const client = getClient();
+  const result = await client.file.upload({ file, path: targetPath });
+  return unwrap(result);
 }
 
 /**
  * Delete a file or directory (recursively).
- * DELETE /file  body: { path }
  */
 export async function deleteFile(filePath: string): Promise<boolean> {
-  return opencodeFetch<boolean>('/file', {
-    method: 'DELETE',
-    body: JSON.stringify({ path: filePath }),
-  });
+  const client = getClient();
+  const result = await client.file.delete({ path: filePath });
+  return unwrap(result);
 }
 
 /**
- * Create a directory (recursive, idempotent).
- * POST /file/mkdir  body: { path }
+ * Create a directory, including any missing parent directories.
  */
 export async function mkdirFile(dirPath: string): Promise<boolean> {
-  return opencodeFetch<boolean>('/file/mkdir', {
-    method: 'POST',
-    body: JSON.stringify({ path: dirPath }),
-  });
+  const client = getClient();
+  const result = await client.file.mkdir({ path: dirPath });
+  return unwrap(result);
 }
 
 /**
  * Rename or move a file/directory.
- * POST /file/rename  body: { from, to }
  */
 export async function renameFile(from: string, to: string): Promise<boolean> {
-  return opencodeFetch<boolean>('/file/rename', {
-    method: 'POST',
-    body: JSON.stringify({ from, to }),
-  });
+  const client = getClient();
+  const result = await client.file.rename({ from, to });
+  return unwrap(result);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,26 +147,39 @@ export async function renameFile(from: string, to: string): Promise<boolean> {
 
 /**
  * Find files and directories by name (fuzzy match).
- * GET /find/file?query=<q>&type=file|directory&limit=N
  */
 export async function findFiles(
   query: string,
   options?: { type?: 'file' | 'directory'; limit?: number },
 ): Promise<string[]> {
-  const params = new URLSearchParams({ query });
-  if (options?.type) params.set('type', options.type);
-  if (options?.limit) params.set('limit', String(options.limit));
-  return opencodeFetch<string[]>(`/find/file?${params.toString()}`);
+  const client = getClient();
+  const result = await client.find.files({
+    query,
+    type: options?.type,
+    limit: options?.limit,
+  });
+  return unwrap(result);
 }
 
 /**
  * Search for text patterns across project files (ripgrep).
- * GET /find?pattern=<pat>
  */
 export async function findText(pattern: string): Promise<FindMatch[]> {
-  return opencodeFetch<FindMatch[]>(
-    `/find?pattern=${encodeURIComponent(pattern)}`,
-  );
+  const client = getClient();
+  const result = await client.find.text({ pattern });
+  const raw = unwrap(result) as any[];
+  // SDK returns { path: { text }, lines: { text }, submatches: [{ match, start, end }] }
+  // Normalize to our FindMatch shape
+  return raw.map((m) => ({
+    path: typeof m.path === 'string' ? m.path : m.path?.text ?? '',
+    lines: typeof m.lines === 'string' ? m.lines : m.lines?.text ?? '',
+    line_number: m.line_number,
+    absolute_offset: m.absolute_offset,
+    submatches: (m.submatches ?? []).map((s: any) => ({
+      start: s.start,
+      end: s.end,
+    })),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -219,18 +188,20 @@ export async function findText(pattern: string): Promise<FindMatch[]> {
 
 /**
  * Get current project information.
- * GET /project/current
  */
 export async function getCurrentProject(): Promise<OpenCodeProjectInfo> {
-  return opencodeFetch<OpenCodeProjectInfo>('/project/current');
+  const client = getClient();
+  const result = await client.project.current();
+  return unwrap(result);
 }
 
 /**
  * Server health check.
- * GET /global/health
  */
 export async function getServerHealth(): Promise<ServerHealth> {
-  return opencodeFetch<ServerHealth>('/global/health');
+  const client = getClient();
+  const result = await client.global.health();
+  return unwrap(result);
 }
 
 /**

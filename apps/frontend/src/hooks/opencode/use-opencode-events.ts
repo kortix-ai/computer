@@ -161,6 +161,8 @@ export function useOpenCodeEventStream() {
         case 'session.deleted': {
           // For sessions, just invalidate — the list is small and needs sorting
           queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+          // Also refresh projects — a new session may belong to a new project
+          queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
           const sessionID = (event.properties as any)?.info?.id;
           if (sessionID) {
             queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionID) });
