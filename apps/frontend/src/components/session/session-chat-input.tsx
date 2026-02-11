@@ -119,7 +119,24 @@ function AgentSelector({
   onSelect: (agentName: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [flash, setFlash] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const prevAgentRef = useRef(selectedAgent);
+
+  // Flash highlight when agent changes (e.g. via Tab cycling)
+  useEffect(() => {
+    if (prevAgentRef.current !== selectedAgent && prevAgentRef.current !== null) {
+      setFlash(true);
+      const timer = setTimeout(() => setFlash(false), 400);
+      return () => clearTimeout(timer);
+    }
+    prevAgentRef.current = selectedAgent;
+  }, [selectedAgent]);
+
+  // Update ref after flash starts
+  useEffect(() => {
+    prevAgentRef.current = selectedAgent;
+  }, [selectedAgent]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -141,7 +158,10 @@ function AgentSelector({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors capitalize cursor-pointer"
+        className={cn(
+          "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-300 capitalize cursor-pointer",
+          flash && "bg-primary/15 text-foreground ring-1 ring-primary/30",
+        )}
       >
         <span className="truncate max-w-[80px]">{displayName}</span>
         <ChevronDown className={cn('size-3 transition-transform', open && 'rotate-180')} />
