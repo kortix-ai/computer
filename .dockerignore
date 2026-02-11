@@ -6,4 +6,4 @@ node_modules
 dist
 .turbo
 .nx
-sandbox
+sandbox/node_modules

@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "permission": "allow",
   "plugin": ["opencode-pty", "./plugin/worktree.ts"], // ["@tarquinen/opencode-dcp@latest"],
   "autoupdate": true,
   "default_agent": "kortix-main",
