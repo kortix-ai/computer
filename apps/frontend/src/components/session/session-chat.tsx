@@ -424,7 +424,7 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
               ref={textRef}
               className={cn(
                 'text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0',
-                !expanded && 'max-h-[80px] overflow-hidden',
+                !expanded && 'max-h-[200px] overflow-hidden',
               )}
               onClick={() => canExpand && setExpanded(!expanded)}
             >
@@ -1140,6 +1140,16 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const { scrollRef, contentRef, showScrollButton, scrollToBottom } = useAutoScroll({
     working: isBusy,
   });
+
+  // Scroll to bottom when switching between session tabs
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Use instant scroll (no smooth) so it feels like switching to a tab already at the bottom
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Pending permissions & questions ----
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);
