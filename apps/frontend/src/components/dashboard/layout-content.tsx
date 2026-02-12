@@ -86,7 +86,7 @@ function DashboardSkeleton() {
   return (
     <div className="flex h-full w-full bg-background">
       {/* Sidebar skeleton */}
-      <div className="hidden md:flex w-[280px] flex-col border-r border-border bg-sidebar">
+      <div className="hidden md:flex w-[280px] flex-col bg-sidebar">
         <div className="p-4 space-y-4">
           <div className="h-8 w-32 bg-muted/40 rounded animate-pulse" />
           <div className="space-y-2">
@@ -124,7 +124,7 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
   const showingMountedSession = activeTab?.type === 'session';
 
   return (
-    <div className="bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative">
+    <div className="bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative md:rounded-tl-2xl md:border-t md:border-l md:border-border/60">
       {/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
       {sessionTabIds.map((id) => (
         <div

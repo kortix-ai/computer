@@ -46,6 +46,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { createClient } from '@/lib/supabase/client';
+import { useTabStore } from '@/stores/tab-store';
 import { useTheme } from 'next-themes';
 import { isLocalMode, isProductionMode } from '@/lib/config';
 import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
@@ -139,15 +140,24 @@ export function UserMenu({ user }: UserMenuProps) {
     { icon: TestTube, label: 'Stress Test', href: '/admin/stress-test' },
   ];
 
+  const handleMenuNav = (href: string, label: string) => {
+    const type = href.startsWith('/settings') ? 'settings' as const : 'page' as const;
+    useTabStore.getState().openTab({
+      id: `page:${href}`,
+      title: label,
+      type,
+      href,
+    });
+    router.push(href);
+  };
+
   const renderMenuItem = (item: MenuItemConfig) => {
     const Icon = item.icon;
     if (item.href) {
       return (
-        <DropdownMenuItem key={item.label} asChild>
-          <Link href={item.href} className="gap-2 p-2">
-            <Icon className="h-4 w-4" />
-            <span>{item.label}</span>
-          </Link>
+        <DropdownMenuItem key={item.label} onClick={() => handleMenuNav(item.href!, item.label)} className="gap-2 p-2 cursor-pointer">
+          <Icon className="h-4 w-4" />
+          <span>{item.label}</span>
         </DropdownMenuItem>
       );
     }

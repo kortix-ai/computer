@@ -14,6 +14,7 @@ import {
   ArrowRightToLine,
   XCircle,
   ChevronsUpDown,
+  PanelTop,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType } from '@/stores/tab-store';
@@ -37,7 +38,80 @@ const TAB_ICONS: Record<TabType, typeof MessageCircle> = {
   file: FolderOpen,
   dashboard: LayoutDashboard,
   settings: Settings,
+  project: FolderOpen,
+  page: PanelTop,
 };
+
+/** Map a pathname to a tab config. Returns null for routes that shouldn't auto-open tabs (e.g. /auth). */
+function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
+  // Sessions are handled separately (they need session data for title/parentID)
+  if (pathname.match(/^\/sessions\/[^/]+$/)) return null;
+
+  // Static page routes
+  const ROUTE_MAP: Record<string, { title: string; type: TabType }> = {
+    '/dashboard': { title: 'Dashboard', type: 'dashboard' },
+    '/agents': { title: 'Agents', type: 'page' },
+    '/skills': { title: 'Skills', type: 'page' },
+    '/tools': { title: 'Tools', type: 'page' },
+    '/commands': { title: 'Commands', type: 'page' },
+    '/files': { title: 'Files', type: 'file' },
+    '/triggers': { title: 'Triggers', type: 'page' },
+    '/settings/credentials': { title: 'Integrations', type: 'settings' },
+    '/settings/api-keys': { title: 'API Keys', type: 'settings' },
+    '/credits-explained': { title: 'Credits', type: 'page' },
+    '/support': { title: 'Support', type: 'page' },
+    '/admin/analytics': { title: 'Analytics', type: 'page' },
+    '/admin/feedback': { title: 'Feedback', type: 'page' },
+    '/admin/notifications': { title: 'Notifications', type: 'page' },
+    '/admin/utils': { title: 'Admin Utils', type: 'page' },
+    '/admin/sandbox-pool': { title: 'Sandbox Pool', type: 'page' },
+    '/admin/stateless': { title: 'Stateless', type: 'page' },
+    '/admin/stress-test': { title: 'Stress Test', type: 'page' },
+  };
+
+  const staticMatch = ROUTE_MAP[pathname];
+  if (staticMatch) {
+    return {
+      id: `page:${pathname}`,
+      title: staticMatch.title,
+      type: staticMatch.type,
+      href: pathname,
+    };
+  }
+
+  // Dynamic routes
+  const projectMatch = pathname.match(/^\/projects\/([^/]+)$/);
+  if (projectMatch) {
+    return {
+      id: `page:${pathname}`,
+      title: 'Project',
+      type: 'project',
+      href: pathname,
+    };
+  }
+
+  const agentConfigMatch = pathname.match(/^\/agents\/config\/([^/]+)$/);
+  if (agentConfigMatch) {
+    return {
+      id: `page:${pathname}`,
+      title: 'Agent Config',
+      type: 'page',
+      href: pathname,
+    };
+  }
+
+  const agentThreadMatch = pathname.match(/^\/agents\/([^/]+)$/);
+  if (agentThreadMatch) {
+    return {
+      id: `page:${pathname}`,
+      title: 'Agent',
+      type: 'page',
+      href: pathname,
+    };
+  }
+
+  return null;
+}
 
 // ============================================================================
 // Context Menu (positioned absolutely, triggered by right-click)
@@ -334,11 +408,11 @@ function TabItem({
       onContextMenu={handleContextMenu}
       className={cn(
         'group relative flex items-center gap-1.5 h-9 px-3 text-xs select-none cursor-pointer',
-        'border-r border-border/40 transition-colors',
+        'transition-colors',
         'max-w-[180px] min-w-[100px]',
         isActive
           ? 'bg-background text-foreground'
-          : 'bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+          : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent',
       )}
     >
       {/* Drag-over indicator */}
@@ -523,17 +597,21 @@ export function TabBar() {
     if (!pathname) return;
 
     closingTabIds.current.forEach((id) => {
-      const closedHref = `/sessions/${id}`;
+      // For session tabs, id is the sessionId; for page tabs, id is "page:/path"
+      const closedHref = id.startsWith('page:') ? id.slice(5) : `/sessions/${id}`;
       if (pathname !== closedHref) {
         closingTabIds.current.delete(id);
       }
     });
 
+    // If the current URL matches an existing tab, activate it
     const matchingTab = orderedTabs.find((t) => t.href === pathname);
     if (matchingTab && matchingTab.id !== activeTabId) {
       setActiveTab(matchingTab.id);
+      return;
     }
 
+    // Auto-open session tabs (need session data for title/parent)
     const sessionMatch = pathname.match(/^\/sessions\/([^/]+)$/);
     if (sessionMatch) {
       const sessionId = sessionMatch[1];
@@ -549,6 +627,15 @@ export function TabBar() {
         });
       } else {
         setActiveTab(sessionId);
+      }
+      return;
+    }
+
+    // Auto-open tabs for all other dashboard routes
+    if (!matchingTab) {
+      const routeTab = resolveRouteTab(pathname);
+      if (routeTab && !closingTabIds.current.has(routeTab.id)) {
+        openTab(routeTab);
       }
     }
   }, [pathname, orderedTabs, activeTabId, tabs, openTab, setActiveTab, sessions]);
@@ -763,19 +850,21 @@ export function TabBar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveTab, router, handleClose]);
 
-  // Don't render if no tabs
-  if (orderedTabs.length === 0) return null;
+  // Always render the bar so the bg-sidebar strip above the content curve is consistent
+  if (orderedTabs.length === 0) {
+    return <div className="flex-shrink-0 bg-sidebar h-9 md:h-12" />;
+  }
 
   return (
     <>
       <div
-        className="flex-shrink-0 flex items-stretch bg-muted/20 border-b border-border/60 h-9 overflow-hidden"
+        className="flex-shrink-0 flex items-end bg-sidebar h-9 md:h-12 overflow-hidden"
         role="tablist"
       >
         <div
           ref={scrollRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-stretch overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+          className="flex-1 flex items-stretch overflow-x-auto md:pl-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
@@ -808,7 +897,7 @@ export function TabBar() {
           onClick={() => setShowTabList((v) => !v)}
           className={cn(
             'flex-shrink-0 flex items-center justify-center w-9 h-9 cursor-pointer',
-            'border-l border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors',
+            'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors',
           )}
           title="Open tab list"
         >
