@@ -21,9 +21,10 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY services/${SERVICE} ./services/${SERVICE}
 COPY packages/ ./packages/
 
-# Install pnpm and deps for this service only
+# Install pnpm and deps for this service + workspace packages it depends on.
+# --shamefully-hoist flattens node_modules (no symlinks) so COPY works on all Docker versions.
 RUN corepack enable pnpm && \
-    pnpm install --filter ./services/${SERVICE}...
+    pnpm install --filter ./services/${SERVICE}... --shamefully-hoist
 
 # ---- Runner Stage ----
 FROM base AS runner
