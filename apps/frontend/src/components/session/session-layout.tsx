@@ -23,10 +23,11 @@ import {
   adaptMessagesToToolCalls,
   adaptAgentStatus,
 } from '@/lib/adapters/opencode-to-kortix-computer';
-import { Activity, FolderOpen, Monitor, TerminalSquare, X, Maximize2, Minimize2 } from 'lucide-react';
+import { Activity, FolderOpen, Monitor, TerminalSquare, GitCompareArrows, X, Maximize2, Minimize2 } from 'lucide-react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useServerStore } from '@/stores/server-store';
+import { SessionDiffViewer } from '@/components/session/session-diff-viewer';
 
 // ============================================================================
 // Top bar tab switcher (Actions / Files / Desktop) — macOS title bar style
@@ -37,6 +38,7 @@ const TAB_WIDTH = 80;
 const TABS: { key: ViewType; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
   { key: 'tools', label: 'Actions', icon: Activity },
   { key: 'files', label: 'Files', icon: FolderOpen },
+  { key: 'changes', label: 'Changes', icon: GitCompareArrows },
   { key: 'terminal', label: 'Terminal', icon: TerminalSquare },
   { key: 'desktop', label: 'Desktop', icon: Monitor },
 ];
@@ -193,11 +195,11 @@ export const SessionLayout = memo(function SessionLayout({
     setIsSidePanelOpen(!isSidePanelOpen);
   }, [isSidePanelOpen, setIsSidePanelOpen]);
 
-  // When Desktop or Terminal tab is selected, always open the side panel
+  // When Desktop, Terminal, or Changes tab is selected, always open the side panel
   const handleViewChange = useCallback(
     (view: ViewType) => {
       setActiveView(view);
-      if ((view === 'desktop' || view === 'terminal') && !isSidePanelOpen) {
+      if ((view === 'desktop' || view === 'terminal' || view === 'changes') && !isSidePanelOpen) {
         setIsSidePanelOpen(true);
       }
     },
@@ -207,10 +209,11 @@ export const SessionLayout = memo(function SessionLayout({
   const mainPanelRef = useRef<ResizablePrimitive.ImperativePanelHandle>(null);
   const sidePanelRef = useRef<ResizablePrimitive.ImperativePanelHandle>(null);
 
-  // Side panel can show for tool calls, desktop view, or terminal view
-  const canOpenSidePanel = hasToolCalls || activeView === 'desktop' || activeView === 'terminal';
+  // Side panel can show for tool calls, desktop view, terminal view, or changes view
+  const canOpenSidePanel = hasToolCalls || activeView === 'desktop' || activeView === 'terminal' || activeView === 'changes';
   const shouldShowPanel = isSidePanelOpen && canOpenSidePanel;
   const showDesktop = activeView === 'desktop' && shouldShowPanel;
+  const showChanges = activeView === 'changes' && shouldShowPanel;
 
   useEffect(() => {
     if (shouldShowPanel) {
@@ -251,6 +254,19 @@ export const SessionLayout = memo(function SessionLayout({
               </button>
             </div>
             <DesktopView serverUrl={serverUrl} />
+          </div>
+        ) : showChanges ? (
+          <div className="fixed inset-0 z-50 bg-background">
+            <div className="flex items-center justify-between h-11 px-3 border-b border-border/40">
+              <span className="text-xs font-medium text-muted-foreground">Changes</span>
+              <button
+                onClick={handleSidePanelClose}
+                className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <SessionDiffViewer sessionId={sessionId} />
           </div>
         ) : (
           <KortixComputer
@@ -325,7 +341,7 @@ export const SessionLayout = memo(function SessionLayout({
               "h-full",
               isExpanded ? "p-0" : "pt-3 pb-5 pr-3 pl-1.5"
             )}>
-              {showDesktop ? (
+              {showDesktop || showChanges ? (
                 <div className={cn("h-full flex flex-col bg-card overflow-hidden", isExpanded ? "rounded-none border-0" : "border rounded-3xl")}>
                   {/* Header inside the card */}
                   <div className="flex-shrink-0 h-11 flex items-center justify-between px-4">
@@ -368,7 +384,8 @@ export const SessionLayout = memo(function SessionLayout({
                     </div>
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden">
-                    <DesktopView serverUrl={serverUrl} />
+                    {showDesktop && <DesktopView serverUrl={serverUrl} />}
+                    {showChanges && <SessionDiffViewer sessionId={sessionId} />}
                   </div>
                 </div>
               ) : (

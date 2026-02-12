@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, startTransition } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useRef } from 'react';
 import {
   MoreHorizontal,
   Trash2,
@@ -11,6 +12,8 @@ import {
   Archive,
   ChevronRight,
   GitFork,
+  Search,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -357,6 +360,8 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   const { mutate: deleteSession, isPending: isDeleting } = useDeleteOpenCodeSession();
   const { mutate: updateSession } = useUpdateOpenCodeSession();
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [renameValue, setRenameValue] = useState('');
   const statuses = useOpenCodeSessionStatusStore((s) => s.statuses);
   const permissions = useOpenCodePendingStore((s) => s.permissions);
@@ -518,6 +523,22 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     });
   }, [sessions, projectId, statuses, getPendingCount, forkIds]);
 
+  // Filter sessions by search query
+  const filteredRootSessions = useMemo(() => {
+    if (!searchQuery.trim()) return rootSessions;
+    const q = searchQuery.toLowerCase();
+    return rootSessions.filter((s) => {
+      // Match root session title
+      if ((s.title || 'Untitled').toLowerCase().includes(q)) return true;
+      // Also match if any child/descendant title matches (so the parent shows)
+      const descendants = allDescendantIds(childMap, s.id);
+      return descendants.some((descId) => {
+        const desc = sessions?.find((ds) => ds.id === descId);
+        return desc && (desc.title || 'Untitled').toLowerCase().includes(q);
+      });
+    });
+  }, [rootSessions, searchQuery, childMap, sessions]);
+
   const handleSessionClick = (e: React.MouseEvent, sessionId: string) => {
     if (e.metaKey || e.ctrlKey) return;
     e.preventDefault();
@@ -614,6 +635,31 @@ export function SessionList({ projectId }: SessionListProps = {}) {
 
   return (
     <div className="flex flex-col">
+      {/* Search */}
+      {!isLoading && !error && rootSessions.length > 0 && (
+        <div className="px-2 pb-1.5">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/40 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8 pr-7 rounded-lg bg-muted/40 border border-border/40 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-border focus:bg-muted/60 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground/40 hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Session list */}
       <div className="px-2 pb-2">
         {isLoading ? (
@@ -636,10 +682,15 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             <p className="text-sm text-muted-foreground">No sessions yet</p>
             <p className="text-xs text-muted-foreground/60 mt-1">Start a new session to get going</p>
           </div>
+        ) : filteredRootSessions.length === 0 && searchQuery ? (
+          <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
+            <Search className="h-6 w-6 text-muted-foreground/30 mb-2" />
+            <p className="text-xs text-muted-foreground">No sessions match &ldquo;{searchQuery}&rdquo;</p>
+          </div>
         ) : (
           <div className="space-y-0.5">
             {/* Pending sessions — need user input */}
-            {rootSessions.filter((s) => getPendingCount(s.id) > 0).map((session) => (
+            {filteredRootSessions.filter((s) => getPendingCount(s.id) > 0).map((session) => (
               <SessionTreeNode
                 key={session.id}
                 session={session}
@@ -659,15 +710,15 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             ))}
 
             {/* Divider between pending and other sessions */}
-            {rootSessions.some((s) => getPendingCount(s.id) > 0) &&
-              rootSessions.some((s) => getPendingCount(s.id) === 0) && (
+            {filteredRootSessions.some((s) => getPendingCount(s.id) > 0) &&
+              filteredRootSessions.some((s) => getPendingCount(s.id) === 0) && (
               <div className="flex items-center gap-2 px-3 py-1.5">
                 <div className="flex-1 h-px bg-border/20" />
               </div>
             )}
 
             {/* Remaining sessions */}
-            {rootSessions.filter((s) => getPendingCount(s.id) === 0).map((session) => (
+            {filteredRootSessions.filter((s) => getPendingCount(s.id) === 0).map((session) => (
               <SessionTreeNode
                 key={session.id}
                 session={session}
