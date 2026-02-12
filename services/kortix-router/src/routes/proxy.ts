@@ -151,10 +151,6 @@ async function tryAuthenticate(c: any): Promise<{ isKortixUser: boolean; account
   const token = authHeader.slice(7);
   if (!token) return { isKortixUser: false };
 
-  if (token === '00000') {
-    return { isKortixUser: true, accountId: 'test_account' };
-  }
-
   if (token.startsWith('sk_') && isSupabaseConfigured()) {
     try {
       const result = await validateSecretKey(token);
