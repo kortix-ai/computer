@@ -27,7 +27,7 @@ interface GranularToolConfigurationProps {
   tools: Record<string, any>;
   onToolsChange: (tools: Record<string, any>) => void;
   disabled?: boolean;
-  isSunaAgent?: boolean;
+  isDefaultAgent?: boolean;
   isLoading?: boolean;
 }
 
@@ -35,7 +35,7 @@ export const GranularToolConfiguration = ({
   tools,
   onToolsChange,
   disabled = false,
-  isSunaAgent = false,
+  isDefaultAgent = false,
   isLoading = false
 }: GranularToolConfigurationProps) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -106,7 +106,7 @@ export const GranularToolConfiguration = ({
   const handleToolGroupToggle = (toolName: string, enabled: boolean) => {
     const toolGroup = getToolGroup(toolName, toolsData);
 
-    if (disabled && isSunaAgent) {
+    if (disabled && isDefaultAgent) {
       toast.error("Tools cannot be modified", {
         description: "Kortix's default tools are managed centrally and cannot be changed.",
       });
@@ -148,7 +148,7 @@ export const GranularToolConfiguration = ({
     const toolGroup = getToolGroup(toolName, toolsData);
     const method = toolGroup?.methods.find(m => m.name === methodName);
 
-    if (disabled && isSunaAgent) {
+    if (disabled && isDefaultAgent) {
       toast.error("Methods cannot be modified", {
         description: "Kortix's default tool methods are managed centrally and cannot be changed.",
       });

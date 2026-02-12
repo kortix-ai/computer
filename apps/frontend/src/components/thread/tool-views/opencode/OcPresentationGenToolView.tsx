@@ -242,8 +242,35 @@ export function OcPresentationGenToolView({
               </div>
             )}
 
+            {/* Success: Validate Slide */}
+            {parsed?.success && action === 'validate_slide' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 font-semibold text-lg flex-shrink-0">
+                    {parsed.slide_number || slideNumber || '?'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      Slide {parsed.slide_number || slideNumber || '?'} validated
+                    </p>
+                    {parsed.message && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {parsed.message}
+                      </p>
+                    )}
+                    {(parsed.presentation_name || presentationName) && (
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        {parsed.presentation_name || presentationName}
+                      </p>
+                    )}
+                  </div>
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                </div>
+              </div>
+            )}
+
             {/* Success: Generic (list, delete, etc.) */}
-            {parsed?.success && !['create_slide', 'preview', 'export_pdf', 'export_pptx'].includes(action) && (
+            {parsed?.success && !['create_slide', 'validate_slide', 'preview', 'export_pdf', 'export_pptx'].includes(action) && (
               <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
                 <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                 <p className="text-sm text-foreground">

@@ -83,7 +83,9 @@ RUN mkdir -p /app/secrets && chown 1000:1000 /app/secrets && chmod 700 /app/secr
 # which expects HOME=/config for its s6-overlay init scripts.
 RUN mkdir -p /workspace/.kortix /workspace/.agent-browser /workspace/.browser-profile \
     /workspace/.lss /workspace/presentations \
-    /workspace/.local/share/opencode /workspace/.local/share/konsole \
+    /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
+    /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \
+    /workspace/.local/share/konsole \
     /workspace/.XDG /workspace/.config /workspace/ssl \
     && chown -R 1000:1000 /workspace \
     && rm -rf /config \
@@ -126,3 +128,9 @@ ENV TITLE="HeyAGI Sandbox"
 # Expose ports: Desktop (6080/6081), OpenCode Web (3111), Kortix Master (8000),
 # Presentation Viewer (3210), Agent Browser (9223/9224)
 EXPOSE 6080 6081 3111 3210 8000 9223 9224
+
+# ── Entrypoint ─────────────────────────────────────────────────────────────
+# Override the base image's ENTRYPOINT ["/init"] so that both Daytona and
+# plain Docker go through startup.sh, which boots s6-overlay inside a PID
+# namespace via `unshare --pid --fork /init`.
+ENTRYPOINT ["/opt/startup.sh"]

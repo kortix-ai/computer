@@ -23,6 +23,20 @@ import { AppIcon } from './shared/AppIcon';
 import { SmartJsonViewer } from './shared/SmartJsonViewer';
 import { ToolViewIconTitle } from './shared/ToolViewIconTitle';
 import { useSmoothStream } from '@/lib/streaming';
+import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+
+/** Strip XML wrapper tags like <skill_content> and detect if content looks like markdown */
+function extractMarkdownContent(text: string): { content: string; isMarkdown: boolean } {
+  let content = text;
+  // Strip <skill_content ...> ... </skill_content> wrapper
+  const skillMatch = content.match(/^<skill_content[^>]*>\s*([\s\S]*?)\s*<\/skill_content>\s*$/);
+  if (skillMatch) {
+    content = skillMatch[1];
+  }
+  // Detect markdown: headers, bold, lists, code blocks, links
+  const isMarkdown = /^#{1,6}\s|^\*\*|^\- |\n#{1,6}\s|\n\*\*|\n\- |```/.test(content);
+  return { content, isMarkdown };
+}
 
 export function GenericToolView({
   toolCall,
@@ -378,11 +392,18 @@ export function GenericToolView({
                     <div className="p-4">
                       {typeof parsedToolContent === 'object' && parsedToolContent !== null ? (
                         <SmartJsonViewer data={parsedToolContent} />
-                      ) : (
-                        <pre className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words font-mono">
-                          {formattedToolContent}
-                        </pre>
-                      )}
+                      ) : (() => {
+                        const { content, isMarkdown } = extractMarkdownContent(formattedToolContent || '');
+                        return isMarkdown ? (
+                          <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                            <UnifiedMarkdown content={content} isStreaming={false} />
+                          </div>
+                        ) : (
+                          <pre className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words font-mono">
+                            {formattedToolContent}
+                          </pre>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

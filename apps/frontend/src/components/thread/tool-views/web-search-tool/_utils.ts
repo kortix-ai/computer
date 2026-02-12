@@ -223,6 +223,12 @@ export function extractWebSearchData(
               url: result.url || '',
               snippet: result.content || result.snippet || ''
             }));
+          } else if (Array.isArray(parsed)) {
+            searchResults = parsed.map((result: any) => ({
+              title: result.title || '',
+              url: result.url || '',
+              snippet: result.content || result.snippet || ''
+            }));
           }
           answer = parsed.answer || parsed.summary || null;
           if (Array.isArray(parsed.images)) {

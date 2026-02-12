@@ -10,10 +10,14 @@ import {
   X,
   Box,
   Settings2,
+  Cloud,
+  Loader2,
 } from 'lucide-react';
 import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { initAccount } from '@/lib/platform-client';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +41,14 @@ function useConnectionStatus(url: string, enabled: boolean) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
-      await fetch(`${url}/session`, { method: 'GET', signal: controller.signal });
+
+      const headers: Record<string, string> = {};
+      const token = await getSupabaseAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      await fetch(`${url}/session`, { method: 'GET', signal: controller.signal, headers });
       clearTimeout(timeout);
       setStatus('connected');
     } catch {
@@ -76,20 +87,66 @@ const statusLabel: Record<ConnectionStatus, string> = {
 };
 
 // ============================================================================
-// Instance row (used in dropdown list AND dialog list)
+// Instance row — compact (sidebar inline list)
 // ============================================================================
 
-function InstanceRow({
+function CompactInstanceRow({
   server,
   isActive,
-  compact,
+  onSelect,
+}: {
+  server: ServerEntry;
+  isActive: boolean;
+  onSelect: () => void;
+}) {
+  const { status } = useConnectionStatus(server.url, isActive);
+  const displayUrl = server.url.replace(/^https?:\/\//, '');
+  const hasCustomLabel = server.label && server.label !== displayUrl;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={cn(
+        'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all group/row cursor-pointer',
+        isActive ? 'bg-primary/[0.06] dark:bg-primary/[0.08]' : 'hover:bg-muted/50',
+      )}
+      onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+    >
+      <StatusDot status={isActive ? status : 'unknown'} />
+      <div className="flex-1 min-w-0">
+        <div className={cn(
+          'truncate text-[11px] leading-tight',
+          isActive ? 'text-foreground font-medium' : 'text-foreground/70',
+          !hasCustomLabel && 'font-mono',
+        )}>
+          {hasCustomLabel ? server.label : displayUrl}
+        </div>
+        {hasCustomLabel && (
+          <div className="truncate text-[9px] text-muted-foreground/50 font-mono leading-tight mt-px">
+            {displayUrl}
+          </div>
+        )}
+      </div>
+      {isActive && <Check className="h-3 w-3 text-primary flex-shrink-0" />}
+    </div>
+  );
+}
+
+// ============================================================================
+// Instance row — full (dialog list). Stacked layout so URLs never cut off.
+// ============================================================================
+
+function DialogInstanceRow({
+  server,
+  isActive,
   onSelect,
   onEdit,
   onDelete,
 }: {
   server: ServerEntry;
   isActive: boolean;
-  compact?: boolean;
   onSelect: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -105,81 +162,48 @@ function InstanceRow({
     return () => clearTimeout(t);
   }, [confirmDelete]);
 
-  if (compact) {
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        className={cn(
-          'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all group/row cursor-pointer',
-          isActive ? 'bg-primary/[0.06] dark:bg-primary/[0.08]' : 'hover:bg-muted/50',
-        )}
-        onClick={onSelect}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
-      >
-        <StatusDot status={isActive ? status : 'unknown'} />
-        <div className="flex-1 min-w-0">
-          <div className={cn(
-            'truncate text-[11px] leading-tight',
-            isActive ? 'text-foreground font-medium' : 'text-foreground/70',
-            !hasCustomLabel && 'font-mono',
-          )}>
-            {hasCustomLabel ? server.label : displayUrl}
-          </div>
-          {hasCustomLabel && (
-            <div className="truncate text-[9px] text-muted-foreground/50 font-mono leading-tight mt-px">
-              {displayUrl}
-            </div>
-          )}
-        </div>
-        {isActive && <Check className="h-3 w-3 text-primary flex-shrink-0" />}
-      </div>
-    );
-  }
-
-  // Full row (dialog)
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group/row',
+        'relative rounded-xl transition-all group/row cursor-pointer',
         isActive
           ? 'bg-primary/[0.05] dark:bg-primary/[0.08] ring-1 ring-primary/15'
-          : 'hover:bg-muted/50 cursor-pointer',
+          : 'hover:bg-muted/50',
       )}
       role="button"
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
     >
-      {/* Icon */}
-      <div className={cn(
-        'flex items-center justify-center size-9 rounded-lg flex-shrink-0',
-        isActive ? 'bg-primary/10' : 'bg-muted/60',
-      )}>
-        <Box className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
+      <div className="px-3.5 py-3">
+        {/* Top line: label/name + badges + actions */}
         <div className="flex items-center gap-2">
+          <Box className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
           <span className={cn(
-            'truncate text-sm leading-tight',
+            'text-sm leading-tight flex-1 min-w-0 break-all',
             isActive ? 'text-foreground font-semibold' : 'text-foreground/80 font-medium',
+            !hasCustomLabel && 'font-mono text-[13px]',
           )}>
             {hasCustomLabel ? server.label : displayUrl}
           </span>
+
           {server.isDefault && (
             <span className="px-1.5 py-px text-[9px] font-medium text-muted-foreground/60 bg-muted/50 rounded-full uppercase tracking-wider leading-none flex-shrink-0">
               default
             </span>
           )}
+          {isActive && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {hasCustomLabel && (
-            <span className="truncate text-xs text-muted-foreground/50 font-mono">
-              {displayUrl}
-            </span>
-          )}
+
+        {/* URL line — only if there's a custom label, show full URL below */}
+        {hasCustomLabel && (
+          <p className="mt-1 ml-6 text-xs text-muted-foreground/50 font-mono break-all leading-relaxed">
+            {displayUrl}
+          </p>
+        )}
+
+        {/* Status + actions line */}
+        <div className="mt-1.5 ml-6 flex items-center gap-3">
           {isActive && status !== 'unknown' && (
             <span className={cn(
               'flex items-center gap-1 text-[10px] font-medium',
@@ -191,56 +215,55 @@ function InstanceRow({
               {statusLabel[status]}
             </span>
           )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Edit/Delete — visible on hover */}
+          {!server.isDefault && !confirmDelete && (
+            <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
+              {onEdit && (
+                <button
+                  type="button"
+                  className="p-1.5 rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                  aria-label="Edit"
+                >
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+                  aria-label="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {confirmDelete && (
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="h-6 px-2.5 text-[11px] font-medium text-destructive-foreground bg-destructive rounded-md transition-colors cursor-pointer hover:bg-destructive/90"
+                onClick={() => { onDelete?.(); setConfirmDelete(false); }}
+              >
+                Remove
+              </button>
+              <button
+                type="button"
+                className="p-1 rounded-md hover:bg-muted cursor-pointer"
+                onClick={() => setConfirmDelete(false)}
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex-shrink-0 flex items-center gap-1">
-        {isActive && <Check className="h-4 w-4 text-primary" />}
-
-        {!server.isDefault && !confirmDelete && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
-            {onEdit && (
-              <button
-                type="button"
-                className="p-1.5 rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                aria-label="Edit"
-              >
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                type="button"
-                className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
-                aria-label="Delete"
-              >
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-              </button>
-            )}
-          </div>
-        )}
-
-        {confirmDelete && (
-          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className="h-6 px-2.5 text-[11px] font-medium text-destructive-foreground bg-destructive rounded-md transition-colors cursor-pointer hover:bg-destructive/90"
-              onClick={() => { onDelete?.(); setConfirmDelete(false); }}
-            >
-              Remove
-            </button>
-            <button
-              type="button"
-              className="p-1 rounded-md hover:bg-muted cursor-pointer"
-              onClick={() => setConfirmDelete(false)}
-            >
-              <X className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -263,6 +286,8 @@ function InstanceManagerDialog({
   const [search, setSearch] = React.useState('');
   const [mode, setMode] = React.useState<'list' | 'add' | 'edit'>('list');
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [isCreatingSandbox, setIsCreatingSandbox] = React.useState(false);
+  const [sandboxError, setSandboxError] = React.useState<string | null>(null);
 
   // Form state
   const [formUrl, setFormUrl] = React.useState('');
@@ -283,6 +308,7 @@ function InstanceManagerDialog({
       setEditingId(null);
       setFormUrl('');
       setFormLabel('');
+      setSandboxError(null);
     }
   }, [open]);
 
@@ -324,6 +350,25 @@ function InstanceManagerDialog({
     }
   }
 
+  async function handleCreateSandbox() {
+    setIsCreatingSandbox(true);
+    setSandboxError(null);
+    try {
+      const { sandbox } = await initAccount();
+      const newServer = addServer(
+        sandbox.name || 'Cloud Sandbox',
+        sandbox.base_url,
+      );
+      setActiveServer(newServer.id);
+      router.push('/dashboard');
+      onOpenChange(false);
+    } catch (err: any) {
+      setSandboxError(err?.message || 'Failed to create sandbox');
+    } finally {
+      setIsCreatingSandbox(false);
+    }
+  }
+
   function handleSelect(id: string) {
     if (id === activeServerId) return;
     setActiveServer(id);
@@ -337,7 +382,7 @@ function InstanceManagerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden" aria-describedby="instance-dialog-desc">
+      <DialogContent className="p-0 gap-0 overflow-hidden" aria-describedby="instance-dialog-desc">
         <DialogHeader className="px-5 pt-5 pb-3">
           <DialogTitle className="flex items-center gap-2 text-base">
             {mode === 'list' && (
@@ -381,14 +426,14 @@ function InstanceManagerDialog({
             </div>
 
             {/* Instance list */}
-            <div className="flex flex-col gap-1 px-3 pb-4 max-h-[320px] overflow-y-auto">
+            <div className="flex flex-col gap-1.5 px-3 pb-3 max-h-[400px] overflow-y-auto">
               {filtered.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground/60">
                   {search ? `No instances match "${search}"` : 'No instances configured'}
                 </div>
               ) : (
                 filtered.map((server) => (
-                  <InstanceRow
+                  <DialogInstanceRow
                     key={server.id}
                     server={server}
                     isActive={server.id === activeServerId}
@@ -398,6 +443,31 @@ function InstanceManagerDialog({
                   />
                 ))
               )}
+            </div>
+
+            {/* New Sandbox button */}
+            <div className="border-t border-border/40 px-4 py-3">
+              {sandboxError && (
+                <p className="text-xs text-destructive mb-2">{sandboxError}</p>
+              )}
+              <button
+                type="button"
+                onClick={handleCreateSandbox}
+                disabled={isCreatingSandbox}
+                className="flex items-center justify-center gap-2 w-full h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingSandbox ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Creating sandbox...
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="h-3.5 w-3.5" />
+                    New Sandbox
+                  </>
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -474,8 +544,6 @@ export function ServerSelector() {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
-  const activeServer = servers.find((s) => s.id === activeServerId);
-
   const handleSelect = (id: string) => {
     if (id === activeServerId) return;
     setActiveServer(id);
@@ -503,11 +571,10 @@ export function ServerSelector() {
         {/* Compact instance list */}
         <div className="flex flex-col gap-px px-1 max-h-[180px] overflow-y-auto">
           {servers.map((server) => (
-            <InstanceRow
+            <CompactInstanceRow
               key={server.id}
               server={server}
               isActive={server.id === activeServerId}
-              compact
               onSelect={() => handleSelect(server.id)}
             />
           ))}

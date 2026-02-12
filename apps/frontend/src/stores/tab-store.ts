@@ -7,7 +7,7 @@ import { persist } from 'zustand/middleware';
 // Types
 // ============================================================================
 
-export type TabType = 'session' | 'file' | 'dashboard' | 'settings';
+export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' | 'page';
 
 export interface Tab {
   /** Unique identifier — for sessions this is the sessionId, for files the file path, etc. */

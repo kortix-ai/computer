@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServerStore } from '@/stores/server-store';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
+import { getSupabaseAccessToken } from '@/lib/auth-token';
 import { fileListKeys } from './use-file-list';
 import { fileContentKeys } from './use-file-content';
 
@@ -15,6 +16,9 @@ import { fileContentKeys } from './use-file-content';
  *  - file.edited       — a file was edited by the agent
  *  - file.watcher.updated — the file watcher detected a change (add/change/unlink)
  *
+ * For remote instances, the Supabase JWT is appended as a query parameter
+ * since the EventSource API doesn't support custom headers.
+ *
  * This should be mounted once, e.g., in the Files page or a global provider.
  */
 export function useFileEventInvalidation() {
@@ -23,12 +27,22 @@ export function useFileEventInvalidation() {
   const serverVersion = useServerStore((s) => s.serverVersion);
 
   useEffect(() => {
-    const eventUrl = `${getActiveOpenCodeUrl()}/event`;
     let eventSource: EventSource | null = null;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
-    function connect() {
+    async function connect() {
+      if (cancelled) return;
+
       try {
+        const baseEventUrl = `${getActiveOpenCodeUrl()}/event`;
+
+        // Attach JWT as query param (EventSource doesn't support custom headers)
+        const token = await getSupabaseAccessToken();
+        const eventUrl = token
+          ? `${baseEventUrl}${baseEventUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+          : baseEventUrl;
+
         eventSource = new EventSource(eventUrl);
 
         eventSource.onmessage = (event) => {
@@ -61,18 +75,21 @@ export function useFileEventInvalidation() {
 
         eventSource.onerror = () => {
           eventSource?.close();
-          // Reconnect after 5 seconds
-          retryTimeout = setTimeout(connect, 5000);
+          if (!cancelled) {
+            retryTimeout = setTimeout(connect, 5000);
+          }
         };
       } catch {
-        // Server not reachable — retry later
-        retryTimeout = setTimeout(connect, 5000);
+        if (!cancelled) {
+          retryTimeout = setTimeout(connect, 5000);
+        }
       }
     }
 
     connect();
 
     return () => {
+      cancelled = true;
       eventSource?.close();
       if (retryTimeout) clearTimeout(retryTimeout);
     };

@@ -2,7 +2,10 @@ export const config = {
   PORT: parseInt(process.env.PORT || '8009', 10),
   ENV_MODE: process.env.ENV_MODE || 'local',
 
-  // Supabase
+  // Database
+  DATABASE_URL: process.env.DATABASE_URL || '',
+
+  // Supabase (kept for JWT auth verification only)
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',

@@ -15,6 +15,7 @@ import type {
   ToolPart,
   FilePart,
   AgentPart,
+  CompactionPart,
   StepFinishPart,
   AssistantMessage,
   PermissionRequest,
@@ -52,6 +53,10 @@ export function isFilePart(part: Part): part is FilePart {
 
 export function isAgentPart(part: Part): part is AgentPart {
   return part.type === 'agent';
+}
+
+export function isCompactionPart(part: Part): part is CompactionPart {
+  return part.type === 'compaction';
 }
 
 /** Get the text content from any part that has a `text` field. */
@@ -184,7 +189,7 @@ export function findLastTextPart(parts: PartWithMessage[]): TextPart | undefined
 
 /** Check if a turn has tool steps. */
 export function turnHasSteps(parts: PartWithMessage[]): boolean {
-  return parts.some(({ part }) => part.type === 'tool');
+  return parts.some(({ part }) => part.type === 'tool' || part.type === 'compaction');
 }
 
 // ============================================================================

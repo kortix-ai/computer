@@ -49,12 +49,17 @@ export const useOpenCodePendingStore = create<OpenCodePendingState>()((set, get)
   getSessionPendingCount: (sessionId) => {
     const s = get();
     const permCount = Object.values(s.permissions).filter((p) => p.sessionID === sessionId).length;
-    const qCount = Object.values(s.questions).filter((q) => q.sessionID === sessionId).length;
+    const qCount = Object.values(s.questions)
+      .filter((q) => q.sessionID === sessionId)
+      .reduce((sum, q) => sum + (q.questions?.length || 1), 0);
     return permCount + qCount;
   },
 
   getTotalPendingCount: () => {
     const s = get();
-    return Object.keys(s.permissions).length + Object.keys(s.questions).length;
+    const permCount = Object.keys(s.permissions).length;
+    const qCount = Object.values(s.questions)
+      .reduce((sum, q) => sum + (q.questions?.length || 1), 0);
+    return permCount + qCount;
   },
 }));

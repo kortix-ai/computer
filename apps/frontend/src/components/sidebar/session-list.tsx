@@ -7,10 +7,10 @@ import {
   Trash2,
   Frown,
   MessageCircle,
-  SlidersHorizontal,
   Pencil,
   Archive,
   ChevronRight,
+  GitFork,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -28,6 +28,11 @@ import {
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useTabStore } from '@/stores/tab-store';
 
 import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
@@ -46,6 +51,7 @@ interface SessionItemProps {
   depth: number;
   hasChildren: boolean;
   isExpanded: boolean;
+  isFork: boolean;
   onToggleExpand: () => void;
   onClick: (e: React.MouseEvent, sessionId: string) => void;
   onDelete: (sessionId: string, title: string) => void;
@@ -61,6 +67,7 @@ function SessionItem({
   depth,
   hasChildren,
   isExpanded,
+  isFork,
   onToggleExpand,
   onClick,
   onDelete,
@@ -85,7 +92,7 @@ function SessionItem({
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
-        {/* Expand/collapse chevron for parents, or a subtle connector for children */}
+        {/* Expand/collapse chevron for parents, fork icon for forks, or a subtle connector for children */}
         {hasChildren ? (
           <button
             onClick={(e) => {
@@ -102,6 +109,15 @@ function SessionItem({
               )}
             />
           </button>
+        ) : isFork ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex-shrink-0 w-4 flex items-center justify-center">
+                <GitFork className="size-3 text-emerald-500" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">Forked session</TooltipContent>
+          </Tooltip>
         ) : depth > 0 ? (
           <span className="flex-shrink-0 w-4 flex items-center justify-center">
             <span className="h-1 w-1 rounded-full bg-muted-foreground/25" />
@@ -112,13 +128,22 @@ function SessionItem({
 
         {/* Status indicator */}
         {(isBusy || pendingCount > 0) && (
-          <div className="flex-shrink-0">
-            {pendingCount > 0 ? (
-              <span className="h-2 w-2 rounded-full bg-amber-500 block" />
-            ) : (
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse block" />
-            )}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex-shrink-0">
+                {pendingCount > 0 ? (
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse block" />
+                ) : (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse block" />
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              {pendingCount > 0
+                ? `${pendingCount} ${pendingCount === 1 ? 'question' : 'questions'} waiting for your input`
+                : 'Working on it…'}
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {/* Title */}
@@ -133,9 +158,16 @@ function SessionItem({
 
         {/* Pending badge */}
         {pendingCount > 0 && (
-          <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
-            {pendingCount}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
+                {pendingCount}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              {pendingCount} {pendingCount === 1 ? 'question' : 'questions'} waiting for your input
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {/* Context menu on hover */}
@@ -205,6 +237,7 @@ interface SessionTreeNodeProps {
   allSessions: Session[];
   childMap: Map<string, string[]>;
   expandedNodes: Record<string, boolean>;
+  forkIds: Set<string>;
   onToggleExpand: (sessionId: string) => void;
   isActiveSession: (sessionId: string) => boolean;
   getStatus: (sessionId: string) => { isBusy: boolean; pendingCount: number };
@@ -220,6 +253,7 @@ function SessionTreeNode({
   allSessions,
   childMap,
   expandedNodes,
+  forkIds,
   onToggleExpand,
   isActiveSession,
   getStatus,
@@ -252,6 +286,7 @@ function SessionTreeNode({
         depth={depth}
         hasChildren={hasChildren}
         isExpanded={isExpanded}
+        isFork={forkIds.has(session.id)}
         onToggleExpand={() => onToggleExpand(session.id)}
         onClick={onClick}
         onDelete={onDelete}
@@ -275,6 +310,7 @@ function SessionTreeNode({
               allSessions={allSessions}
               childMap={childMap}
               expandedNodes={expandedNodes}
+              forkIds={forkIds}
               onToggleExpand={onToggleExpand}
               isActiveSession={isActiveSession}
               getStatus={getStatus}
@@ -317,6 +353,18 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   // Track which tree nodes are manually expanded/collapsed
   const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
 
+  // Build a set of session IDs that are forks (stored in localStorage by the fork handler)
+  const forkIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (typeof window === 'undefined' || !sessions) return ids;
+    for (const s of sessions) {
+      if (s.parentID && localStorage.getItem(`fork_origin_${s.id}`)) {
+        ids.add(s.id);
+      }
+    }
+    return ids;
+  }, [sessions]);
+
   // Build child map for tree structure
   const childMap = useMemo(
     () => (sessions ? childMapByParent(sessions) : new Map<string, string[]>()),
@@ -324,10 +372,13 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   );
 
   // Count pending for a single session (not recursive)
+  // For questions, count the total number of individual questions across all requests
   const countPendingForSession = useCallback(
     (sid: string) => {
       const permCount = Object.values(permissions).filter((p) => p.sessionID === sid).length;
-      const qCount = Object.values(questions).filter((q) => q.sessionID === sid).length;
+      const qCount = Object.values(questions)
+        .filter((q) => q.sessionID === sid)
+        .reduce((sum, q) => sum + (q.questions?.length || 1), 0);
       return permCount + qCount;
     },
     [permissions, questions],
@@ -485,21 +536,21 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     setIsDeleteDialogOpen(false);
     const isActive = pathname?.includes(sessionToDelete.id);
 
-    // Close the tab for the deleted session
+    // Close the tab for the deleted session and navigate BEFORE the async
+    // deletion so the route-sync effect in TabBar doesn't re-open the tab
+    // (which would cause an infinite setState loop).
     const tabState = useTabStore.getState();
     if (tabState.tabs[sessionToDelete.id]) {
-      tabState.closeTab(sessionToDelete.id);
+      const nextTabId = tabState.closeTab(sessionToDelete.id);
+      if (isActive) {
+        const nextTab = nextTabId ? useTabStore.getState().tabs[nextTabId] : null;
+        router.push(nextTab?.href || '/dashboard');
+      }
+    } else if (isActive) {
+      router.push('/dashboard');
     }
 
-    deleteSession(sessionToDelete.id, {
-      onSuccess: () => {
-        if (isActive) {
-          const nextState = useTabStore.getState();
-          const nextTab = nextState.activeTabId ? nextState.tabs[nextState.activeTabId] : null;
-          router.push(nextTab?.href || '/dashboard');
-        }
-      },
-    });
+    deleteSession(sessionToDelete.id);
     setSessionToDelete(null);
   };
 
@@ -509,19 +560,9 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   if (state === 'collapsed' && !isMobile) return null;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Section header */}
-      <div className="flex items-center justify-between px-3 py-2">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Sessions
-        </span>
-        <button className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
+    <div className="flex flex-col">
       {/* Session list */}
-      <div className="flex-1 overflow-y-auto px-1 pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+      <div className="px-1 pb-2">
         {isLoading ? (
           <div className="space-y-1 px-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -545,7 +586,8 @@ export function SessionList({ projectId }: SessionListProps = {}) {
           </div>
         ) : (
           <div className="space-y-0.5">
-            {rootSessions.map((session) => (
+            {/* Pending sessions — need user input */}
+            {rootSessions.filter((s) => getPendingCount(s.id) > 0).map((session) => (
               <SessionTreeNode
                 key={session.id}
                 session={session}
@@ -553,6 +595,39 @@ export function SessionList({ projectId }: SessionListProps = {}) {
                 allSessions={sessions || []}
                 childMap={childMap}
                 expandedNodes={expandedNodes}
+                forkIds={forkIds}
+                onToggleExpand={handleToggleExpand}
+                isActiveSession={isActiveSession}
+                getStatus={getStatus}
+                onClick={handleSessionClick}
+                onDelete={handleDeleteSession}
+                onRename={handleRenameSession}
+                onArchive={handleArchiveSession}
+              />
+            ))}
+
+            {/* Divider between pending and other sessions */}
+            {rootSessions.some((s) => getPendingCount(s.id) > 0) &&
+              rootSessions.some((s) => getPendingCount(s.id) === 0) && (
+              <div className="flex items-center gap-2.5 px-3 py-2.5">
+                <div className="flex-1 h-px bg-border/40" />
+                <span className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">
+                  Other
+                </span>
+                <div className="flex-1 h-px bg-border/40" />
+              </div>
+            )}
+
+            {/* Remaining sessions */}
+            {rootSessions.filter((s) => getPendingCount(s.id) === 0).map((session) => (
+              <SessionTreeNode
+                key={session.id}
+                session={session}
+                depth={0}
+                allSessions={sessions || []}
+                childMap={childMap}
+                expandedNodes={expandedNodes}
+                forkIds={forkIds}
                 onToggleExpand={handleToggleExpand}
                 isActiveSession={isActiveSession}
                 getStatus={getStatus}

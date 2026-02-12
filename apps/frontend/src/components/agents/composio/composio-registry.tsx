@@ -553,11 +553,10 @@ export const ComposioRegistry: React.FC<ComposioRegistryProps> = ({
               </div>
               <div className="flex-shrink-0">
                 <div className="flex items-center gap-3">
-                  {/* {showAgentSelector && (
+                   {/* {showAgentSelector && (
                     <AgentSelector
                       selectedAgentId={currentAgentId}
                       onAgentSelect={handleAgentSelect}
-                      isSunaAgent={agent?.metadata?.is_suna_default}
                     />
                   )} */}
                 </div>

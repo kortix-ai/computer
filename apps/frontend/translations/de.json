@@ -897,7 +897,7 @@
     "disableAll": "Alle deaktivieren",
     "saveChanges": "Änderungen speichern"
   },
-  "suna": {
+  "modes": {
     "samplePrompts": "Beispiel-Prompts",
     "examplePrompts": "Beispiel-Prompts",
     "chooseStyle": "Wähle einen Stil",

@@ -2,21 +2,17 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { FolderOpen, Plus, ChevronDown } from 'lucide-react';
+import { FolderOpen, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
+import { useTabStore } from '@/stores/tab-store';
 import type { Project } from '@/hooks/opencode/use-opencode-sessions';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 function getProjectDisplayName(project: Project): string {
   if (project.name) return project.name;
@@ -54,14 +50,26 @@ export function ProjectSelector({
   if (state === 'collapsed' && !isMobile) return null;
   if (!projects || projects.length === 0) return null;
 
-  const handleProjectClick = (projectId: string) => {
+  const handleProjectClick = (projectId: string, projectName: string) => {
     onProjectChange(projectId);
+    useTabStore.getState().openTab({
+      id: `page:/projects/${projectId}`,
+      title: projectName,
+      type: 'project',
+      href: `/projects/${projectId}`,
+    });
     router.push(`/projects/${projectId}`);
     if (isMobile) setOpenMobile(false);
   };
 
   const handleAllProjectsClick = () => {
     onProjectChange(null);
+    useTabStore.getState().openTab({
+      id: 'page:/dashboard',
+      title: 'Dashboard',
+      type: 'dashboard',
+      href: '/dashboard',
+    });
     router.push('/dashboard');
     if (isMobile) setOpenMobile(false);
   };
@@ -74,21 +82,7 @@ export function ProjectSelector({
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Projects
             </span>
-            <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    className="p-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[200px] text-center">
-                  <p className="text-xs">Projects are auto-detected from git repos in your workspace</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
           </button>
         </CollapsibleTrigger>
 
@@ -111,7 +105,7 @@ export function ProjectSelector({
             {sortedProjects.map((project) => (
               <button
                 key={project.id}
-                onClick={() => handleProjectClick(project.id)}
+                onClick={() => handleProjectClick(project.id, getProjectDisplayName(project))}
                 className={cn(
                   'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors',
                   activeProjectId === project.id

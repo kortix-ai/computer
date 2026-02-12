@@ -20,12 +20,19 @@ import { backendApi } from '@/lib/api-client';
 import { AnnouncementDialog } from '../announcements/announcement-dialog';
 import { NovuInboxProvider } from '../notifications/novu-inbox-provider';
 import { useOpenCodeEventStream } from '@/hooks/opencode/use-opencode-events';
+import { useSandbox } from '@/hooks/platform/use-sandbox';
 import { TabBar } from '@/components/tabs/tab-bar';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 
 function OpenCodeEventStreamProvider() {
   useOpenCodeEventStream();
+  return null;
+}
+
+/** Initializes the user's sandbox on dashboard load. Renders nothing. */
+function SandboxInitProvider() {
+  useSandbox();
   return null;
 }
 
@@ -86,7 +93,7 @@ function DashboardSkeleton() {
   return (
     <div className="flex h-full w-full bg-background">
       {/* Sidebar skeleton */}
-      <div className="hidden md:flex w-[280px] flex-col border-r border-border bg-sidebar">
+      <div className="hidden md:flex w-[280px] flex-col bg-sidebar">
         <div className="p-4 space-y-4">
           <div className="h-8 w-32 bg-muted/40 rounded animate-pulse" />
           <div className="space-y-2">
@@ -124,7 +131,7 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
   const showingMountedSession = activeTab?.type === 'session';
 
   return (
-    <div className="bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative">
+    <div className="bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative md:rounded-tl-2xl md:border-t md:border-l md:border-border/60">
       {/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
       {sessionTabIds.map((id) => (
         <div
@@ -281,6 +288,7 @@ export default function DashboardLayoutContent({
         </Suspense>
       }
     >
+      <SandboxInitProvider />
       <OpenCodeEventStreamProvider />
       <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
         {technicalIssue?.enabled && technicalIssue.message && (

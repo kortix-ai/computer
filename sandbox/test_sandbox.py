@@ -1,14 +1,26 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["daytona-sdk", "supabase"]
+# ///
+
 import asyncio
 import json
 import os
 from daytona_sdk import AsyncDaytona, DaytonaConfig, CreateSandboxFromSnapshotParams
+from supabase import create_client
 
-SNAPSHOT = "kortix-sandbox-v0.3.7"
+SNAPSHOT = "kortix-sandbox-v0.4.0"
 
 # Load from environment or sandbox/.env
 DAYTONA_API_KEY = os.environ.get("DAYTONA_API_KEY", "")
-KORTIX_API_URL = os.environ.get("KORTIX_API_URL", "")
+KORTIX_API_URL = os.environ.get("KORTIX_API_URL", "https://router.kortix.com")
 KORTIX_TOKEN = os.environ.get("KORTIX_TOKEN", "")
+
+# Supabase — needed to register sandbox ownership so kortix.cloud proxy allows access
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://heprlhlltebrxydgtsjs.supabase.co")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+# The Supabase user ID to assign sandbox ownership to
+OWNER_USER_ID = os.environ.get("OWNER_USER_ID", "")
 
 
 async def main():
@@ -25,7 +37,7 @@ async def main():
 
     params = CreateSandboxFromSnapshotParams(
         snapshot=SNAPSHOT,
-        public=True,
+        public=False,
         env_vars={
             "KORTIX_API_URL": KORTIX_API_URL,
             "KORTIX_TOKEN": KORTIX_TOKEN,
@@ -37,6 +49,22 @@ async def main():
 
     sandbox = await daytona.create(params, timeout=300)
     print(f"Sandbox ID: {sandbox.id}")
+
+    # Register in Supabase so kortix.cloud proxy recognizes ownership
+    if SUPABASE_SERVICE_ROLE_KEY and OWNER_USER_ID:
+        print(f"\n--- Registering sandbox ownership for user {OWNER_USER_ID[:8]}... ---")
+        sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        result = sb.table("resources").insert({
+            "account_id": OWNER_USER_ID,
+            "type": "sandbox",
+            "external_id": sandbox.id,
+            "status": "active",
+            "config": {},
+        }).execute()
+        print(f"Resource registered: {result.data[0]['id']}")
+    else:
+        print("\nWARNING: SUPABASE_SERVICE_ROLE_KEY or OWNER_USER_ID not set — skipping ownership registration")
+        print("  kortix.cloud proxy will return 403 until a resource row is inserted")
 
     # s6-overlay starts all services automatically via unshare --pid --fork /init.
     # Wait for them to come up.
@@ -112,11 +140,14 @@ async def main():
     viewer_link = await sandbox.get_preview_link(9224)
 
     print(f"\n=== SANDBOX READY ===")
+    print(f"Sandbox ID:             {sandbox.id}")
+    print(f"Kortix Cloud (8000):    https://kortix.cloud/{sandbox.id}/8000/")
+    print(f"Kortix Cloud (6080):    https://kortix.cloud/{sandbox.id}/6080/")
+    print(f"Kortix Cloud (3111):    https://kortix.cloud/{sandbox.id}/3111/")
     print(f"Desktop (noVNC):        {desktop_link.url}")
     print(f"Kortix Master:          {master_link.url}")
     print(f"OpenCode Web UI:        {web_link.url}")
     print(f"Agent Browser Viewer:   {viewer_link.url}")
-    print(f"Sandbox ID:             {sandbox.id}")
 
 
 asyncio.run(main())
