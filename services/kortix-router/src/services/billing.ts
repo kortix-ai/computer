@@ -1,5 +1,4 @@
 import { config, getToolCost } from '../config';
-import { isSupabaseConfigured } from '../lib/supabase';
 import {
   checkCredits as checkCreditsDb,
   deductCredits as deductCreditsDb,
@@ -10,7 +9,7 @@ import type { BillingCheckResult, BillingDeductResult } from '../types';
  * Check if account has sufficient credits.
  *
  * Priority:
- * 1. Supabase configured -> direct DB query (fast)
+ * 1. DATABASE_URL configured -> direct DB query via Drizzle (fast)
  * 2. Fallback -> Python backend API (legacy)
  */
 export async function checkCredits(
@@ -18,8 +17,8 @@ export async function checkCredits(
   minimumRequired: number = 0.01,
   options?: { skipDevCheck?: boolean }
 ): Promise<BillingCheckResult> {
-  // Direct Supabase (fast path)
-  if (isSupabaseConfigured()) {
+  // Direct DB (fast path)
+  if (config.DATABASE_URL) {
     const result = await checkCreditsDb(accountId, minimumRequired);
     return {
       hasCredits: result.hasCredits,
@@ -36,7 +35,7 @@ export async function checkCredits(
  * Deduct credits for a Kortix tool call.
  *
  * Priority:
- * 1. Supabase configured -> direct DB atomic deduction (fast)
+ * 1. DATABASE_URL configured -> direct DB atomic deduction via Drizzle (fast)
  * 2. Fallback -> Python backend API (legacy)
  */
 export async function deductToolCredits(
@@ -56,8 +55,8 @@ export async function deductToolCredits(
     description ||
     `Kortix ${toolName.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`;
 
-  // Direct Supabase (fast path)
-  if (isSupabaseConfigured()) {
+  // Direct DB (fast path)
+  if (config.DATABASE_URL) {
     console.info(`[BILLING] Deducting $${cost.toFixed(4)} for ${toolName} (direct DB)`);
 
     const result = await deductCreditsDb(accountId, cost, deductDescription, sessionId);
@@ -84,7 +83,7 @@ export async function deductToolCredits(
  * Deduct credits for LLM usage.
  *
  * Priority:
- * 1. Supabase configured -> direct DB atomic deduction (fast)
+ * 1. DATABASE_URL configured -> direct DB atomic deduction via Drizzle (fast)
  * 2. Fallback -> Python backend API (legacy)
  */
 export async function deductLLMCredits(
@@ -101,8 +100,8 @@ export async function deductLLMCredits(
 
   const description = `LLM: ${model} (${inputTokens}/${outputTokens} tokens)`;
 
-  // Direct Supabase (fast path)
-  if (isSupabaseConfigured()) {
+  // Direct DB (fast path)
+  if (config.DATABASE_URL) {
     console.info(`[BILLING] Deducting $${calculatedCost.toFixed(6)} for ${model} (direct DB)`);
 
     const result = await deductCreditsDb(accountId, calculatedCost, description, sessionId);
@@ -126,7 +125,7 @@ export async function deductLLMCredits(
 }
 
 // ============================================================================
-// Legacy: Python Backend API (fallback when Supabase not configured)
+// Legacy: Python Backend API (fallback when DATABASE_URL not configured)
 // ============================================================================
 
 async function checkCreditsLegacy(

@@ -1,4 +1,6 @@
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
+import { eq, and } from 'drizzle-orm';
+import { apiKeys } from '@kortix/db';
+import { db } from '../db';
 import { hashSecretKey, isApiKeySecretConfigured } from '../lib/crypto';
 
 export interface ApiKeyValidationResult {
@@ -17,11 +19,6 @@ const lastUsedCache = new Map<string, number>();
  * Returns the account_id if valid.
  */
 export async function validateSecretKey(secretKey: string): Promise<ApiKeyValidationResult> {
-  // Check configuration
-  if (!isSupabaseConfigured()) {
-    return { isValid: false, error: 'Supabase not configured' };
-  }
-
   if (!isApiKeySecretConfigured()) {
     return { isValid: false, error: 'API_KEY_SECRET not configured' };
   }
@@ -32,37 +29,43 @@ export async function validateSecretKey(secretKey: string): Promise<ApiKeyValida
   }
 
   try {
-    // Hash the secret key
     const secretKeyHash = hashSecretKey(secretKey);
 
-    // Query database - single query to validate and get account_id
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from('api_keys')
-      .select('key_id, account_id, status, expires_at')
-      .eq('secret_key_hash', secretKeyHash)
-      .eq('status', 'active')
-      .single();
+    const [row] = await db
+      .select({
+        keyId: apiKeys.keyId,
+        accountId: apiKeys.accountId,
+        status: apiKeys.status,
+        expiresAt: apiKeys.expiresAt,
+      })
+      .from(apiKeys)
+      .where(
+        and(
+          eq(apiKeys.secretKeyHash, secretKeyHash),
+          eq(apiKeys.status, 'active'),
+        )
+      )
+      .limit(1);
 
-    if (error || !data) {
+    if (!row) {
       return { isValid: false, error: 'API key not found or invalid' };
     }
 
     // Check expiration
-    if (data.expires_at) {
-      const expiresAt = new Date(data.expires_at);
+    if (row.expiresAt) {
+      const expiresAt = new Date(row.expiresAt);
       if (expiresAt < new Date()) {
         return { isValid: false, error: 'API key expired' };
       }
     }
 
     // Fire-and-forget: update last_used_at (throttled)
-    updateLastUsedThrottled(data.key_id).catch(() => {});
+    updateLastUsedThrottled(row.keyId).catch(() => {});
 
     return {
       isValid: true,
-      accountId: data.account_id,
-      keyId: data.key_id,
+      accountId: row.accountId,
+      keyId: row.keyId,
     };
   } catch (err) {
     console.error('API key validation error:', err);
@@ -78,7 +81,7 @@ async function updateLastUsedThrottled(keyId: string): Promise<void> {
   const lastUpdate = lastUsedCache.get(keyId) || 0;
 
   if (now - lastUpdate < THROTTLE_MS) {
-    return; // Throttled
+    return;
   }
 
   lastUsedCache.set(keyId, now);
@@ -94,11 +97,10 @@ async function updateLastUsedThrottled(keyId: string): Promise<void> {
   }
 
   try {
-    const supabase = getSupabase();
-    await supabase
-      .from('api_keys')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('key_id', keyId);
+    await db
+      .update(apiKeys)
+      .set({ lastUsedAt: new Date().toISOString() })
+      .where(eq(apiKeys.keyId, keyId));
   } catch (err) {
     console.warn('Failed to update last_used_at:', err);
   }

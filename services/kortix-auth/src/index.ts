@@ -57,6 +57,7 @@ console.log(`
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Environment: ${config.ENV_MODE.padEnd(46)}║
 ║  Port: ${port.toString().padEnd(54)}║
+║  Database: ${config.DATABASE_URL ? 'CONFIGURED' : 'NOT SET'.padEnd(49)}║
 ║  Supabase: ${config.SUPABASE_URL ? 'CONFIGURED' : 'NOT SET'.padEnd(50)}║
 ║  Stripe: ${config.STRIPE_SECRET_KEY ? 'CONFIGURED' : 'NOT SET'.padEnd(52)}║
 ╚═══════════════════════════════════════════════════════════════╝

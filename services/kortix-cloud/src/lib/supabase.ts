@@ -5,7 +5,8 @@ let supabaseClient: SupabaseClient | null = null;
 
 /**
  * Get singleton Supabase client with service role key.
- * Used for JWT verification and ownership checks.
+ * Used ONLY for JWT auth verification (supabase.auth.getUser).
+ * All data access uses Drizzle via @kortix/db.
  */
 export function getSupabase(): SupabaseClient {
   if (!supabaseClient) {
@@ -29,7 +30,7 @@ export function getSupabase(): SupabaseClient {
 }
 
 /**
- * Check if Supabase is configured.
+ * Check if Supabase is configured (needed for JWT auth).
  */
 export function isSupabaseConfigured(): boolean {
   return !!(config.SUPABASE_URL && config.SUPABASE_SERVICE_ROLE_KEY);

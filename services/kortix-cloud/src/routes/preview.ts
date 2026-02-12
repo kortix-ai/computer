@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { eq, and } from 'drizzle-orm';
+import { sandboxes, accountUser } from '@kortix/db';
 import { getDaytona } from '../lib/daytona';
-import { getSupabase } from '../lib/supabase';
+import { db } from '../db';
 import type { AppContext } from '../types';
 
 const preview = new Hono<{ Variables: AppContext }>();
@@ -54,7 +56,7 @@ function setCachedPreviewLink(sandboxId: string, port: number, url: string, toke
   previewLinkCache.set(key, { url, token, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-// === Ownership verification ===
+// === Ownership verification via kortix.sandboxes ===
 
 async function verifyOwnership(sandboxId: string, userId: string): Promise<boolean> {
   // Check cache first
@@ -62,31 +64,36 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
   if (cached !== null) return cached;
 
   try {
-    const supabase = getSupabase();
+    // Find sandbox by externalId (the Daytona sandbox ID) in kortix.sandboxes
+    const [sandbox] = await db
+      .select({ accountId: sandboxes.accountId })
+      .from(sandboxes)
+      .where(
+        and(
+          eq(sandboxes.externalId, sandboxId),
+          eq(sandboxes.status, 'active'),
+        )
+      )
+      .limit(1);
 
-    // Find the resource by sandbox external_id
-    const { data: resource, error: resourceError } = await supabase
-      .from('resources')
-      .select('id, account_id')
-      .eq('external_id', sandboxId)
-      .eq('status', 'active')
-      .single();
-
-    if (resourceError || !resource) {
+    if (!sandbox) {
       setCachedOwnership(sandboxId, userId, false);
       return false;
     }
 
-    // Check if user belongs to the account that owns this resource
-    const { data: accountUser, error: accountError } = await supabase
-      .schema('basejump')
-      .from('account_user')
-      .select('account_role')
-      .eq('user_id', userId)
-      .eq('account_id', resource.account_id)
-      .single();
+    // Check if user belongs to the account that owns this sandbox
+    const [membership] = await db
+      .select({ accountRole: accountUser.accountRole })
+      .from(accountUser)
+      .where(
+        and(
+          eq(accountUser.userId, userId),
+          eq(accountUser.accountId, sandbox.accountId),
+        )
+      )
+      .limit(1);
 
-    const allowed = !accountError && !!accountUser;
+    const allowed = !!membership;
     setCachedOwnership(sandboxId, userId, allowed);
     return allowed;
   } catch (err) {
@@ -95,7 +102,7 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
   }
 }
 
-// === Preview link resolution (no state checking — let proxy detect if sandbox is down) ===
+// === Preview link resolution (no state checking -- let proxy detect if sandbox is down) ===
 
 async function resolvePreviewLink(
   sandboxId: string,
@@ -132,7 +139,7 @@ async function wakeSandbox(sandboxId: string): Promise<void> {
 //
 // Zero-overhead proxy with auto-wake:
 // - Happy path (sandbox alive): single fetch, no extra API calls
-// - Sandbox down: connection error → wake sandbox → retry up to 2 more times
+// - Sandbox down: connection error -> wake sandbox -> retry up to 2 more times
 //
 
 preview.all('/:sandboxId/:port/*', async (c) => {
@@ -194,7 +201,7 @@ preview.all('/:sandboxId/:port/*', async (c) => {
       }
 
       console.log(
-        `[PREVIEW] ${method} ${sandboxId}:${port}${remainingPath} → ${targetUrl}${attempt > 0 ? ` (retry ${attempt})` : ''}`
+        `[PREVIEW] ${method} ${sandboxId}:${port}${remainingPath} -> ${targetUrl}${attempt > 0 ? ` (retry ${attempt})` : ''}`
       );
 
       // Proxy request
@@ -220,7 +227,7 @@ preview.all('/:sandboxId/:port/*', async (c) => {
           await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
           continue;
         }
-        // Not a Daytona stopped error — pass through
+        // Not a Daytona stopped error -- pass through
         return new Response(bodyText, {
           status: upstream.status,
           statusText: upstream.statusText,
@@ -228,17 +235,17 @@ preview.all('/:sandboxId/:port/*', async (c) => {
         });
       }
 
-      // Got an HTTP response → sandbox is alive, pass it through
+      // Got an HTTP response -> sandbox is alive, pass it through
       return new Response(upstream.body, {
         status: upstream.status,
         statusText: upstream.statusText,
         headers: new Headers(upstream.headers),
       });
     } catch (err) {
-      // Re-throw our own HTTP exceptions (400, 403, etc.) — don't retry those
+      // Re-throw our own HTTP exceptions (400, 403, etc.) -- don't retry those
       if (err instanceof HTTPException) throw err;
 
-      // Connection-level failure → sandbox is likely down
+      // Connection-level failure -> sandbox is likely down
       console.warn(
         `[PREVIEW] Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for ${sandboxId}:${port}: ${(err as Error).message || err}`
       );
