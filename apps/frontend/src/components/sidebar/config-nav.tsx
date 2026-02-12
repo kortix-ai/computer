@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Bot, Sparkles, Wrench, Terminal, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
+import { useTabStore } from '@/stores/tab-store';
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,8 +23,20 @@ export function ConfigNav() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   if (state === 'collapsed' && !isMobile) return null;
+
+  const handleNavClick = (href: string, label: string) => {
+    useTabStore.getState().openTab({
+      id: `page:${href}`,
+      title: label,
+      type: 'page',
+      href,
+    });
+    router.push(href);
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -46,10 +58,9 @@ export function ConfigNav() {
             {CONFIG_ITEMS.map(({ label, href, icon: Icon }) => {
               const isActive = pathname?.startsWith(href);
               return (
-                <Link
+                <button
                   key={href}
-                  href={href}
-                  onClick={() => isMobile && setOpenMobile(false)}
+                  onClick={() => handleNavClick(href, label)}
                   className={cn(
                     'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors',
                     isActive
@@ -59,7 +70,7 @@ export function ConfigNav() {
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
                   <span className="truncate">{label}</span>
-                </Link>
+                </button>
               );
             })}
           </div>
