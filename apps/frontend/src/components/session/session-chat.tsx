@@ -94,7 +94,7 @@ import {
   hasDiffs,
 } from '@/ui';
 
-import { SessionChatInput, flattenModels } from '@/components/session/session-chat-input';
+import { SessionChatInput, flattenModels, type AttachedFile } from '@/components/session/session-chat-input';
 import { SessionWelcome } from '@/components/session/session-welcome';
 import { ToolPartRenderer } from '@/components/session/tool-renderers';
 import { QuestionPrompt } from '@/components/session/question-prompt';
@@ -1238,14 +1238,44 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // ============================================================================
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, files?: AttachedFile[]) => {
       const options: Record<string, unknown> = {};
       if (selectedAgent) options.agent = selectedAgent;
       if (selectedModel) options.model = selectedModel;
       if (selectedVariant) options.variant = selectedVariant;
+
+      // Build parts: text first, then any attached files as data URIs
+      const parts: Array<
+        | { type: 'text'; text: string }
+        | { type: 'file'; mime: string; url: string; filename?: string }
+      > = [{ type: 'text', text }];
+
+      if (files && files.length > 0) {
+        const fileResults = await Promise.all(
+          files.map(
+            (af) =>
+              new Promise<{ mime: string; url: string; filename: string }>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  resolve({
+                    mime: af.file.type || 'application/octet-stream',
+                    url: reader.result as string,
+                    filename: af.file.name,
+                  });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(af.file);
+              }),
+          ),
+        );
+        for (const f of fileResults) {
+          parts.push({ type: 'file', mime: f.mime, url: f.url, filename: f.filename });
+        }
+      }
+
       await sendMessage.mutateAsync({
         sessionId,
-        parts: [{ type: 'text', text }],
+        parts,
         options: Object.keys(options).length > 0 ? options as any : undefined,
       });
     },

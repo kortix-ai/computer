@@ -338,7 +338,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
 
   // Chat input handler — create session scoped to this project's worktree
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, _files?: unknown) => {
       if (!text.trim() || isSubmitting || !project) return;
       setIsSubmitting(true);
       try {

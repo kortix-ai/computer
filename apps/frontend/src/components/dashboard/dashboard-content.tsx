@@ -228,7 +228,7 @@ export function DashboardContent() {
   }, [projects]);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, _files?: unknown) => {
       if (!text.trim() || isSubmitting) return;
       setIsSubmitting(true);
       try {

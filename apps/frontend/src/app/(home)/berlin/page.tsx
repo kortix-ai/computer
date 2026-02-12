@@ -54,7 +54,7 @@ export default function BerlinPage() {
   }, [selectedModel, flatModels]);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, _files?: unknown) => {
       if (!text.trim() || isSubmitting) return;
 
       if (!user && !isLoading) {
