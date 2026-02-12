@@ -35,6 +35,9 @@ import {
   useExecuteOpenCodeCommand,
   useSummarizeOpenCodeSession,
   useOpenCodeProviders,
+  useForkSession,
+  useRevertSession,
+  useUnrevertSession,
   replyToPermission,
   replyToQuestion,
   rejectQuestion,
@@ -99,6 +102,8 @@ import { SessionWelcome } from '@/components/session/session-welcome';
 import { ToolPartRenderer } from '@/components/session/tool-renderers';
 import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
+import { MessageActions, RevertBanner } from '@/components/session/message-actions';
+import { useTabStore } from '@/stores/tab-store';
 
 // ============================================================================
 // Sub-Session Breadcrumb
@@ -516,6 +521,16 @@ interface SessionTurnProps {
   onQuestionReply: (requestId: string, answers: string[][]) => Promise<void>;
   onQuestionReject: (requestId: string) => Promise<void>;
   agentNames?: string[];
+  /** Whether this is the first turn in the session */
+  isFirstTurn: boolean;
+  /** Whether the session is busy */
+  isBusy: boolean;
+  /** Whether the session is in a reverted state */
+  isReverted: boolean;
+  /** Fork the session at a specific message */
+  onFork: (messageId: string) => Promise<void>;
+  /** Revert the session to before a specific message */
+  onRevert: (messageId: string) => Promise<void>;
 }
 
 function SessionTurn({
@@ -531,6 +546,11 @@ function SessionTurn({
   onQuestionReply,
   onQuestionReject,
   agentNames,
+  isFirstTurn,
+  isBusy,
+  isReverted,
+  onFork,
+  onRevert,
 }: SessionTurnProps) {
   const [copied, setCopied] = useState(false);
 
@@ -702,11 +722,23 @@ function SessionTurn({
   // ============================================================================
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 group/turn">
       <div>
         {/* User message */}
         <UserMessageRow message={turn.userMessage} agentNames={agentNames} />
 
+        {/* Fork / Revert actions — visible on hover */}
+        <div className="flex justify-end mt-1">
+          <MessageActions
+            messageId={turn.userMessage.info.id}
+            sessionId={sessionId}
+            isFirstTurn={isFirstTurn}
+            isBusy={isBusy}
+            isReverted={isReverted}
+            onFork={onFork}
+            onRevert={onRevert}
+          />
+        </div>
       </div>
 
       {/* Kortix logo header */}
@@ -921,6 +953,17 @@ function SessionTurn({
       {/* Response section (final text, shown when done) */}
       {!working && response && (
         <div className="mt-3">
+          {/* Kortix logo — shown when there are no steps (otherwise logo is already above) */}
+          {!hasSteps && (
+            <div className="flex items-center gap-2 mb-3">
+              <img
+                src="/kortix-logomark-white.svg"
+                alt="Kortix"
+                className="dark:invert-0 invert flex-shrink-0"
+                style={{ height: '14px', width: 'auto' }}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-medium text-muted-foreground">Response</span>
             <Tooltip>
@@ -1033,6 +1076,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const abortSession = useAbortOpenCodeSession();
   const executeCommand = useExecuteOpenCodeCommand();
   const summarizeSession = useSummarizeOpenCodeSession();
+  const forkSession = useForkSession();
+  const revertSession = useRevertSession();
+  const unrevertSession = useUnrevertSession();
+  const router = useRouter();
 
   // ---- URL params ----
   const searchParams = useSearchParams();
@@ -1048,7 +1095,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     return null;
   });
 
-  // Auto-send pending prompt for new sessions
+  // Hydrate options and clean up sessionStorage for new sessions
+  // The prompt is already sent by the dashboard/project page — we only use sessionStorage
+  // for optimistic display and to restore selected agent/model/variant.
   useEffect(() => {
     if (!isNewSession || pendingPromptHandled.current) return;
     const pendingPrompt = sessionStorage.getItem('opencode_pending_prompt');
@@ -1056,11 +1105,11 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       pendingPromptHandled.current = true;
       sessionStorage.removeItem('opencode_pending_prompt');
 
-      let pendingOptions: Record<string, unknown> | undefined;
+      // Restore agent/model/variant selections from the dashboard
       try {
         const raw = sessionStorage.getItem('opencode_pending_options');
         if (raw) {
-          pendingOptions = JSON.parse(raw);
+          const pendingOptions = JSON.parse(raw);
           sessionStorage.removeItem('opencode_pending_options');
           if (pendingOptions?.agent) setSelectedAgent(pendingOptions.agent as string);
           if (pendingOptions?.model) setSelectedModel(pendingOptions.model as { providerID: string; modelID: string });
@@ -1070,17 +1119,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         // ignore
       }
 
-      sendMessage.mutateAsync({
-        sessionId,
-        parts: [{ type: 'text', text: pendingPrompt }],
-        options: pendingOptions && Object.keys(pendingOptions).length > 0 ? pendingOptions as any : undefined,
-      }).catch(() => {
-        // Restore prompt to input so user can retry
-        setOptimisticPrompt(pendingPrompt);
-      });
+      // Clean up the ?new=true from URL (without navigation)
       window.history.replaceState({}, '', `/sessions/${sessionId}`);
     }
-  }, [isNewSession, sessionId, sendMessage]);
+  }, [isNewSession, sessionId]);
 
   // Clear optimistic prompt once real messages arrive
   useEffect(() => {
@@ -1227,6 +1269,47 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, []);
 
   // ============================================================================
+  // Fork / Revert / Unrevert handlers
+  // ============================================================================
+
+  const isReverted = !!session?.revert;
+
+  const handleFork = useCallback(
+    async (messageId: string) => {
+      const forkedSession = await forkSession.mutateAsync({
+        sessionId,
+        messageId,
+      });
+
+      // Open the forked session in a new tab and navigate
+      const title = forkedSession.title || 'Forked session';
+      useTabStore.getState().openTab({
+        id: forkedSession.id,
+        title,
+        type: 'session',
+        href: `/sessions/${forkedSession.id}`,
+        parentSessionId: sessionId,
+      });
+      router.push(`/sessions/${forkedSession.id}`);
+    },
+    [sessionId, forkSession, router],
+  );
+
+  const handleRevert = useCallback(
+    async (messageId: string) => {
+      await revertSession.mutateAsync({
+        sessionId,
+        messageId,
+      });
+    },
+    [sessionId, revertSession],
+  );
+
+  const handleUnrevert = useCallback(async () => {
+    await unrevertSession.mutateAsync(sessionId);
+  }, [sessionId, unrevertSession]);
+
+  // ============================================================================
   // Send / Stop / Command handlers
   // ============================================================================
 
@@ -1334,6 +1417,16 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         <SubSessionBar sessionId={sessionId} parentID={session.parentID} />
       )}
 
+      {/* Revert banner — shown when session is in reverted state */}
+      {isReverted && session?.revert?.messageID && (
+        <RevertBanner
+          sessionId={sessionId}
+          revertMessageId={session.revert.messageID}
+          loading={unrevertSession.isPending}
+          onUnrevert={handleUnrevert}
+        />
+      )}
+
       {/* Debug mode toggle — floating, only visible when ?debug is in URL */}
       {isDebugEnabled && hasMessages && (
         <button
@@ -1388,7 +1481,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 )}
 
                 {/* Turn-based message rendering */}
-                {turns.map((turn) => (
+                {turns.map((turn, turnIndex) => (
                   <SessionTurn
                     key={turn.userMessage.info.id}
                     turn={turn}
@@ -1403,6 +1496,11 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                     onQuestionReply={handleQuestionReply}
                     onQuestionReject={handleQuestionReject}
                     agentNames={agentNames}
+                    isFirstTurn={turnIndex === 0}
+                    isBusy={isBusy}
+                    isReverted={isReverted}
+                    onFork={handleFork}
+                    onRevert={handleRevert}
                   />
                 ))}
 
