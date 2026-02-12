@@ -189,7 +189,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
                 <TooltipTrigger asChild>
                   <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
                     {isBusy && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-                    {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500" />}
+                    {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />}
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
@@ -362,7 +362,7 @@ function TabItem({
                 <span className="absolute inset-0 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               )}
               {pendingCount > 0 && !isBusy && (
-                <span className="absolute inset-0 h-2 w-2 rounded-full bg-amber-500" />
+                <span className="absolute inset-0 h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
               )}
             </div>
           </TooltipTrigger>

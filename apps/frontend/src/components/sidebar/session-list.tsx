@@ -121,7 +121,7 @@ function SessionItem({
             <TooltipTrigger asChild>
               <div className="flex-shrink-0">
                 {pendingCount > 0 ? (
-                  <span className="h-2 w-2 rounded-full bg-amber-500 block" />
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse block" />
                 ) : (
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse block" />
                 )}
@@ -566,7 +566,35 @@ export function SessionList({ projectId }: SessionListProps = {}) {
           </div>
         ) : (
           <div className="space-y-0.5">
-            {rootSessions.map((session) => (
+            {/* Pending sessions — need user input */}
+            {rootSessions.filter((s) => getPendingCount(s.id) > 0).map((session) => (
+              <SessionTreeNode
+                key={session.id}
+                session={session}
+                depth={0}
+                allSessions={sessions || []}
+                childMap={childMap}
+                expandedNodes={expandedNodes}
+                onToggleExpand={handleToggleExpand}
+                isActiveSession={isActiveSession}
+                getStatus={getStatus}
+                onClick={handleSessionClick}
+                onDelete={handleDeleteSession}
+                onRename={handleRenameSession}
+                onArchive={handleArchiveSession}
+              />
+            ))}
+
+            {/* Divider between pending and other sessions */}
+            {rootSessions.some((s) => getPendingCount(s.id) > 0) &&
+              rootSessions.some((s) => getPendingCount(s.id) === 0) && (
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <div className="flex-1 h-px bg-border/60" />
+              </div>
+            )}
+
+            {/* Remaining sessions */}
+            {rootSessions.filter((s) => getPendingCount(s.id) === 0).map((session) => (
               <SessionTreeNode
                 key={session.id}
                 session={session}

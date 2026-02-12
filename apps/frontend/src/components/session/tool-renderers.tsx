@@ -1291,7 +1291,7 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
   const status = partStatus(part);
   const urls = (input.urls as string) || '';
   const firstUrl = urls.split(',')[0]?.trim() || '';
-  const domain = firstUrl ? getDomain(firstUrl) : '';
+  const domain = firstUrl ? wsDomain(firstUrl) : '';
 
   return (
     <BasicTool
