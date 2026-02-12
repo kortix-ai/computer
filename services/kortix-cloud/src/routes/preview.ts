@@ -95,41 +95,18 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
   }
 }
 
-// === Preview link resolution ===
+// === Preview link resolution (no state checking — let proxy detect if sandbox is down) ===
 
-async function getPreviewLink(
+async function resolvePreviewLink(
   sandboxId: string,
   port: number
 ): Promise<{ url: string; token: string | null }> {
-  // Check cache
   const cached = getCachedPreviewLink(sandboxId, port);
   if (cached) return { url: cached.url, token: cached.token };
 
   const daytona = getDaytona();
   const sandbox = await daytona.get(sandboxId);
 
-  // Check sandbox state
-  const state = (sandbox as any).state;
-  const stateStr = typeof state === 'string' ? state : state?.value || String(state);
-  const stateLower = stateStr.toLowerCase();
-
-  if (stateLower === 'stopped' || stateLower === 'archived' || stateLower === 'archiving') {
-    // Fire-and-forget: start the sandbox
-    (sandbox as any).start?.().catch((e: any) =>
-      console.error(`[PREVIEW] Failed to start sandbox ${sandboxId}:`, e)
-    );
-    throw new HTTPException(503, {
-      message: `Sandbox is ${stateLower}. Starting it up — retry in a few seconds.`,
-    });
-  }
-
-  if (stateLower !== 'started') {
-    throw new HTTPException(503, {
-      message: `Sandbox is ${stateLower}. Please wait.`,
-    });
-  }
-
-  // Get preview link from Daytona
   const link = await (sandbox as any).getPreviewLink(port);
   const url = link.url || String(link);
   const token = link.token || null;
@@ -138,7 +115,25 @@ async function getPreviewLink(
   return { url, token };
 }
 
+// === Wake sandbox (called only when proxy fails with connection error) ===
+
+async function wakeSandbox(sandboxId: string): Promise<void> {
+  try {
+    const daytona = getDaytona();
+    const sandbox = await daytona.get(sandboxId);
+    await (sandbox as any).start?.();
+    console.log(`[PREVIEW] Wake-up triggered for sandbox ${sandboxId}`);
+  } catch (e) {
+    console.error(`[PREVIEW] Failed to wake sandbox ${sandboxId}:`, e);
+  }
+}
+
 // === Route handler: ALL /:sandboxId/:port/* ===
+//
+// Zero-overhead proxy with auto-wake:
+// - Happy path (sandbox alive): single fetch, no extra API calls
+// - Sandbox down: connection error → wake sandbox → retry up to 2 more times
+//
 
 preview.all('/:sandboxId/:port/*', async (c) => {
   const sandboxId = c.req.param('sandboxId');
@@ -151,68 +146,98 @@ preview.all('/:sandboxId/:port/*', async (c) => {
 
   const userId = c.get('userId') as string;
 
-  // 1. Verify ownership
+  // 1. Verify ownership (cached after first check)
   const allowed = await verifyOwnership(sandboxId, userId);
   if (!allowed) {
     throw new HTTPException(403, { message: 'Not authorized to access this sandbox' });
   }
 
-  // 2. Get preview link (may throw 503 if sandbox is waking up)
-  const { url: previewUrl, token: previewToken } = await getPreviewLink(sandboxId, port);
-
-  // 3. Build target URL
-  const fullPath = new URL(c.req.url).pathname;
-  // Strip /:sandboxId/:port prefix to get remaining path
-  const prefixPattern = `/${sandboxId}/${portStr}`;
-  const remainingPath = fullPath.startsWith(prefixPattern)
-    ? fullPath.slice(prefixPattern.length) || '/'
-    : '/';
-  const queryString = new URL(c.req.url).search;
-
-  // preview URL from Daytona is the full base (e.g. https://8080-abc123.proxy.daytona.work)
-  // Append remaining path
-  const targetUrl = previewUrl.replace(/\/$/, '') + remainingPath + queryString;
-
-  // 4. Build forwarding headers
-  const headers = new Headers();
-  for (const [key, value] of c.req.raw.headers.entries()) {
-    if (key.toLowerCase() !== 'host') {
-      headers.set(key, value);
-    }
-  }
-
-  // Inject Daytona headers
-  headers.set('X-Daytona-Skip-Preview-Warning', 'true');
-  headers.set('X-Daytona-Disable-CORS', 'true');
-  if (previewToken) {
-    headers.set('X-Daytona-Preview-Token', previewToken);
-  }
-
-  // 5. Get request body
+  // 2. Read body once up front (needed across retries)
   const method = c.req.method;
   let body: ArrayBuffer | undefined;
   if (method !== 'GET' && method !== 'HEAD') {
     body = await c.req.raw.clone().arrayBuffer();
   }
 
-  console.log(`[PREVIEW] ${method} ${sandboxId}:${port}${remainingPath} → ${targetUrl}`);
+  // 3. Build path & query (invariant across retries)
+  const fullPath = new URL(c.req.url).pathname;
+  const prefixPattern = `/${sandboxId}/${portStr}`;
+  const remainingPath = fullPath.startsWith(prefixPattern)
+    ? fullPath.slice(prefixPattern.length) || '/'
+    : '/';
+  const upstreamUrl = new URL(c.req.url);
+  upstreamUrl.searchParams.delete('token');
+  const queryString = upstreamUrl.search;
 
-  // 6. Proxy to Daytona
-  const upstream = await fetch(targetUrl, {
-    method,
-    headers,
-    body,
-    // @ts-ignore - Bun supports duplex
-    duplex: 'half',
-  });
+  // 4. Proxy with auto-wake retry
+  const MAX_RETRIES = 2;
+  const RETRY_DELAYS_MS = [1000, 2000]; // 1s after first fail, 2s after second
+  let wakeTriggered = false;
 
-  // 7. Return response with 503 retry header if sandbox is waking
-  const responseHeaders = new Headers(upstream.headers);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // Resolve preview link (cached on happy path = zero overhead)
+      const { url: previewUrl, token: previewToken } = await resolvePreviewLink(sandboxId, port);
+      const targetUrl = previewUrl.replace(/\/$/, '') + remainingPath + queryString;
 
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: responseHeaders,
+      // Build forwarding headers
+      const headers = new Headers();
+      for (const [key, value] of c.req.raw.headers.entries()) {
+        const lower = key.toLowerCase();
+        if (lower === 'host' || lower === 'authorization') continue;
+        headers.set(key, value);
+      }
+      headers.set('X-Daytona-Skip-Preview-Warning', 'true');
+      headers.set('X-Daytona-Disable-CORS', 'true');
+      if (previewToken) {
+        headers.set('X-Daytona-Preview-Token', previewToken);
+      }
+
+      console.log(
+        `[PREVIEW] ${method} ${sandboxId}:${port}${remainingPath} → ${targetUrl}${attempt > 0 ? ` (retry ${attempt})` : ''}`
+      );
+
+      // Proxy request
+      const upstream = await fetch(targetUrl, {
+        method,
+        headers,
+        body,
+        // @ts-ignore - Bun supports duplex
+        duplex: 'half',
+      });
+
+      // Got an HTTP response → sandbox is alive, pass it through
+      return new Response(upstream.body, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers: new Headers(upstream.headers),
+      });
+    } catch (err) {
+      // Re-throw our own HTTP exceptions (400, 403, etc.) — don't retry those
+      if (err instanceof HTTPException) throw err;
+
+      // Connection-level failure → sandbox is likely down
+      console.warn(
+        `[PREVIEW] Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for ${sandboxId}:${port}: ${(err as Error).message || err}`
+      );
+
+      // Trigger wake once on first connection failure
+      if (!wakeTriggered) {
+        await wakeSandbox(sandboxId);
+        wakeTriggered = true;
+      }
+
+      if (attempt < MAX_RETRIES) {
+        // Clear cached preview link in case it went stale
+        previewLinkCache.delete(`${sandboxId}:${port}`);
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+      }
+    }
+  }
+
+  // All retries exhausted
+  throw new HTTPException(503, {
+    message: 'Sandbox is waking up. Please retry in a few seconds.',
   });
 });
 

@@ -23,8 +23,9 @@ import {
 } from '@/components/ui/tooltip';
 
 interface ImageResult {
-  url: string;
+  url?: string;
   imageUrl?: string;
+  image_url?: string;
   title?: string;
   width?: number;
   height?: number;
@@ -33,7 +34,7 @@ interface ImageResult {
 }
 
 const IMAGE_FALLBACK_SVG =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polylyline%3E%3C/svg%3E";
 
 function parseImages(output: unknown): ImageResult[] {
   if (!output) return [];
@@ -44,6 +45,9 @@ function parseImages(output: unknown): ImageResult[] {
   if (obj && 'images' in (obj as any) && Array.isArray((obj as any).images)) {
     return (obj as any).images;
   }
+  if (obj && 'results' in (obj as any) && Array.isArray((obj as any).results)) {
+    return (obj as any).results;
+  }
   if (Array.isArray(obj)) return obj;
 
   // String — try JSON parse
@@ -51,6 +55,7 @@ function parseImages(output: unknown): ImageResult[] {
     try {
       const parsed = JSON.parse(raw);
       if (parsed?.images && Array.isArray(parsed.images)) return parsed.images;
+      if (parsed?.results && Array.isArray(parsed.results)) return parsed.results;
       if (Array.isArray(parsed)) return parsed;
     } catch {
       const match = raw.match(/\{[\s\S]*"images"\s*:\s*\[[\s\S]*\]/);
@@ -65,6 +70,10 @@ function parseImages(output: unknown): ImageResult[] {
     }
   }
   return [];
+}
+
+function getImageUrl(img: ImageResult): string {
+  return img.url || img.imageUrl || img.image_url || '';
 }
 
 function truncate(str: string, max: number): string {
@@ -162,7 +171,8 @@ export function OcImageSearchToolView({
             {images.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {images.map((img, idx) => {
-                  const imageUrl = img.url || img.imageUrl || '';
+                  const imageUrl = getImageUrl(img);
+                  if (!imageUrl) return null;
                   const hasDimensions =
                     img.width && img.height && img.width > 0 && img.height > 0;
                   const orientation = hasDimensions
@@ -276,12 +286,12 @@ export function OcImageSearchToolView({
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
-          ) : (
+          ) : images.length > 0 ? (
             <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
               <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
-              Completed
+              {images.length} image{images.length !== 1 ? 's' : ''}
             </Badge>
-          ))}
+          ) : null)}
       </ToolViewFooter>
     </Card>
   );

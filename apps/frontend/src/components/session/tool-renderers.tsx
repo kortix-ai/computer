@@ -29,8 +29,11 @@ import {
   Glasses,
   SquareKanban,
   FileText,
+  Presentation,
   Image as ImageIcon,
   Maximize2,
+  BookOpen,
+  CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
@@ -1019,158 +1022,606 @@ function WebFetchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 }
 ToolRegistry.register('webfetch', WebFetchTool);
 
-// --- Image Search — visual grid preview ---
-interface ImageResult {
+// --- WebSearch ---
+interface WebSearchResult {
+  title: string;
   url: string;
-  imageUrl?: string;
-  title?: string;
-  width?: number;
-  height?: number;
-  description?: string;
-  source?: string;
+  author?: string;
+  publishedDate?: string;
+  text: string;
 }
 
-const IMAGE_FALLBACK_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
-
-function parseImageSearchOutput(output: string): ImageResult[] {
+function parseWebSearchOutput(output: string): WebSearchResult[] {
   if (!output) return [];
-  try {
-    const parsed = JSON.parse(output);
-    if (parsed?.images && Array.isArray(parsed.images)) return parsed.images;
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    // try to extract JSON from mixed text
-    const match = output.match(/\{[\s\S]*"images"\s*:\s*\[[\s\S]*\]/);
-    if (match) {
-      try {
-        const parsed = JSON.parse(match[0]);
-        if (parsed?.images) return parsed.images;
-      } catch { /* ignore */ }
+  // Split on "Title: " blocks — each block starts a new result
+  const blocks = output.split(/(?=^Title: )/m).filter(Boolean);
+  const results: WebSearchResult[] = [];
+
+  for (const block of blocks) {
+    const titleMatch = block.match(/^Title:\s*(.+)/m);
+    const urlMatch = block.match(/^URL:\s*(.+)/m);
+    const authorMatch = block.match(/^Author:\s*(.+)/m);
+    const dateMatch = block.match(/^Published Date:\s*(.+)/m);
+    const textMatch = block.match(/^Text:\s*([\s\S]*?)$/m);
+    if (titleMatch && urlMatch) {
+      results.push({
+        title: titleMatch[1].trim(),
+        url: urlMatch[1].trim(),
+        author: authorMatch?.[1]?.trim() || undefined,
+        publishedDate: dateMatch?.[1]?.trim() || undefined,
+        text: textMatch?.[1]?.trim() || '',
+      });
     }
   }
-  return [];
+  return results;
 }
 
+function getDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return url;
+  }
+}
+
+function getFaviconUrl(url: string): string | null {
+  try {
+    const domain = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  } catch {
+    return null;
+  }
+}
+
+function getResultType(result: { url?: string; title?: string }) {
+  const url = result.url || '';
+  const title = result.title || '';
+  const urlLower = url.toLowerCase();
+  const titleLower = title.toLowerCase();
+
+  if (urlLower.includes('news') || urlLower.includes('article') || titleLower.includes('news')) {
+    return { icon: FileText, label: 'Article' };
+  } else if (urlLower.includes('wiki')) {
+    return { icon: BookOpen, label: 'Wiki' };
+  } else if (urlLower.includes('blog')) {
+    return { icon: CalendarDays, label: 'Blog' };
+  } else {
+    return { icon: Globe, label: 'Website' };
+  }
+}
+
+function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const query = (input.query as string) || '';
+  const title = part.state.status === 'completed' ? (part.state as any).title as string : '';
+  const results = useMemo(() => parseWebSearchOutput(output), [output]);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  return (
+    <BasicTool
+      icon={<Search className="size-3.5 flex-shrink-0" />}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Web Search</span>
+          <span className="text-muted-foreground text-xs truncate font-mono">
+            {query}
+          </span>
+          {status === 'completed' && results.length > 0 && (
+            <span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap ml-auto flex-shrink-0">
+              {results.length} {results.length === 1 ? 'result' : 'results'}
+            </span>
+          )}
+        </div>
+      }
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {results.length > 0 ? (
+        <div data-scrollable className="max-h-80 overflow-auto">
+          {results.map((result, i) => {
+            const favicon = getFaviconUrl(result.url);
+            const domain = getDomain(result.url);
+            const isExpanded = expandedIdx === i;
+            const { icon: ResultTypeIcon, label: resultTypeLabel } = getResultType(result);
+
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'group',
+                  i > 0 && 'border-t border-border/20',
+                )}
+              >
+                {/* Result row */}
+                <div
+                  className="flex items-start gap-2 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => setExpandedIdx(isExpanded ? null : i)}
+                >
+                  {/* Favicon */}
+                  {favicon ? (
+                    <img
+                      src={favicon}
+                      alt=""
+                      className="size-4 rounded flex-shrink-0 mt-0.5"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <Globe className="size-3.5 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    {/* Type badge */}
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0 rounded border border-border/40 text-muted-foreground/60 font-normal leading-tight">
+                        <ResultTypeIcon className="size-2 opacity-70" />
+                        {resultTypeLabel}
+                      </span>
+                    </div>
+                    {/* Title + link */}
+                    <a
+                      href={result.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-medium text-foreground hover:text-primary hover:underline underline-offset-2 line-clamp-1 block"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {result.title}
+                    </a>
+                    {/* Domain + meta */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground/60 font-mono truncate">
+                        {domain}
+                      </span>
+                      {result.author && (
+                        <span className="text-[10px] text-muted-foreground/40 truncate">
+                          {result.author}
+                        </span>
+                      )}
+                      {result.publishedDate && (
+                        <span className="text-[9px] text-muted-foreground/40">
+                          {result.publishedDate.split('T')[0]}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expand indicator */}
+                  {result.text && (
+                    <ChevronRight
+                      className={cn(
+                        'size-3 text-muted-foreground/40 flex-shrink-0 mt-1 transition-transform',
+                        isExpanded && 'rotate-90',
+                      )}
+                    />
+                  )}
+                </div>
+
+                {/* Expanded text preview */}
+                {isExpanded && result.text && (
+                  <div className="px-3 pb-2 pl-9">
+                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed line-clamp-4">
+                      {result.text.slice(0, 500)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : output ? (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <UnifiedMarkdown content={output} isStreaming={status === 'running'} />
+        </div>
+      ) : null}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('websearch', WebSearchTool);
+ToolRegistry.register('web-search', WebSearchTool);
+ToolRegistry.register('web_search', WebSearchTool);
+
+// --- ScrapeWebpage ---
+function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const urls = (input.urls as string) || '';
+  const firstUrl = urls.split(',')[0]?.trim() || '';
+  const domain = firstUrl ? getDomain(firstUrl) : '';
+
+  return (
+    <BasicTool
+      icon={<Globe className="size-3.5 flex-shrink-0" />}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Scrape</span>
+          <span className="text-muted-foreground text-xs truncate font-mono">{domain || firstUrl}</span>
+          <ExternalLink className="size-3 text-muted-foreground/60 flex-shrink-0 ml-auto" />
+        </div>
+      }
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {output && (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <UnifiedMarkdown content={output} isStreaming={status === 'running'} />
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('scrape-webpage', ScrapeWebpageTool);
+
+// --- ImageSearch ---
 function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const input = partInput(part);
   const output = partOutput(part);
-  const query = (input.query as string) || '';
-  const numResults = input.num_results as number | undefined;
   const status = partStatus(part);
-  const images = useMemo(() => parseImageSearchOutput(output), [output]);
+  const query = (input.query as string) || '';
+
+  // Try to parse image results from JSON output
+  const imageResults = useMemo(() => {
+    if (!output) return [];
+    try {
+      const parsed = JSON.parse(output);
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed.images && Array.isArray(parsed.images)) return parsed.images;
+      if (parsed.results && Array.isArray(parsed.results)) return parsed.results;
+    } catch {
+      // Not JSON — return empty
+    }
+    return [];
+  }, [output]);
 
   return (
     <BasicTool
       icon={<ImageIcon className="size-3.5 flex-shrink-0" />}
-      trigger={{
-        title: 'image-search',
-        subtitle: query + (numResults ? ` (${numResults})` : ''),
-      }}
-      defaultOpen={defaultOpen || images.length > 0}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Image Search</span>
+          <span className="text-muted-foreground text-xs truncate font-mono">{query}</span>
+          {imageResults.length > 0 && (
+            <span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap ml-auto flex-shrink-0">
+              {imageResults.length} images
+            </span>
+          )}
+        </div>
+      }
+      defaultOpen={defaultOpen}
       forceOpen={forceOpen}
       locked={locked}
     >
-      <div className="p-2">
-        {status === 'running' && images.length === 0 && (
-          <div className="flex items-center gap-2 py-4 justify-center text-xs text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" />
-            Searching images...
+      {imageResults.length > 0 ? (
+        <div data-scrollable className="p-2 max-h-80 overflow-auto">
+          <div className="grid grid-cols-3 gap-1.5">
+            {imageResults.slice(0, 9).map((img: any, i: number) => {
+              const imgUrl = img.url || img.imageUrl || img.image_url || '';
+              const title = img.title || '';
+              return (
+                <a
+                  key={i}
+                  href={imgUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative group overflow-hidden rounded border border-border/30 bg-muted/20 aspect-square"
+                  title={title}
+                >
+                  <img
+                    src={imgUrl}
+                    alt={title}
+                    className="object-cover w-full h-full group-hover:opacity-80 transition-opacity"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/50 to-transparent flex items-end p-1">
+                    <span className="text-[9px] text-white truncate">{title}</span>
+                  </div>
+                </a>
+              );
+            })}
           </div>
-        )}
-
-        {status === 'completed' && images.length === 0 && (
-          <div className="flex flex-col items-center gap-1.5 py-4 text-muted-foreground">
-            <ImageIcon className="size-5" />
-            <span className="text-xs">No images found</span>
-          </div>
-        )}
-
-        {images.length > 0 && (
-          <>
-            <div className="text-[10px] text-muted-foreground mb-2">
-              {images.length} image{images.length !== 1 ? 's' : ''}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {images.map((img, idx) => {
-                const imageUrl = img.url || img.imageUrl || '';
-                const hasDimensions = img.width && img.height && img.width > 0 && img.height > 0;
-
-                return (
-                  <TooltipProvider key={idx}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <a
-                          href={imageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group relative overflow-hidden rounded-md border border-border/40 bg-muted/30 hover:border-primary/40 transition-colors"
-                        >
-                          <img
-                            src={imageUrl}
-                            alt={img.title || `Image ${idx + 1}`}
-                            className="object-cover w-full h-28 group-hover:opacity-90 transition-opacity"
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = IMAGE_FALLBACK_SVG;
-                              target.classList.add('p-4');
-                            }}
-                          />
-                          {/* Metadata overlay */}
-                          <div className="absolute top-0 left-0 right-0 p-1 flex justify-between items-start">
-                            <div className="flex gap-0.5">
-                              {hasDimensions && (
-                                <span className="inline-flex items-center gap-0.5 bg-black/60 text-white text-[9px] px-1 py-0 rounded">
-                                  <Maximize2 className="size-2" />
-                                  {img.width}&times;{img.height}
-                                </span>
-                              )}
-                            </div>
-                            <span className="bg-black/60 text-white p-0.5 rounded">
-                              <ExternalLink className="size-2.5" />
-                            </span>
-                          </div>
-                          {/* Title at bottom */}
-                          {(img.title || img.source) && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-1.5 pt-3">
-                              <p className="text-[9px] text-white/90 truncate leading-tight">
-                                {img.title || img.source}
-                              </p>
-                            </div>
-                          )}
-                        </a>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs">
-                        <div className="space-y-1">
-                          {img.title && (
-                            <p className="font-medium text-xs">{img.title.length > 80 ? img.title.slice(0, 80) + '...' : img.title}</p>
-                          )}
-                          {hasDimensions && (
-                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <Maximize2 className="size-2.5" />
-                              {img.width} &times; {img.height}px
-                            </p>
-                          )}
-                          {img.description && (
-                            <p className="text-[10px] text-muted-foreground">{img.description.length > 120 ? img.description.slice(0, 120) + '...' : img.description}</p>
-                          )}
-                          {img.source && (
-                            <p className="text-[10px] text-muted-foreground truncate">Source: {img.source}</p>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      ) : output ? (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <UnifiedMarkdown content={output} isStreaming={status === 'running'} />
+        </div>
+      ) : null}
     </BasicTool>
   );
 }
 ToolRegistry.register('image-search', ImageSearchTool);
+
+// --- ImageGen ---
+function ImageGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const prompt = (input.prompt as string) || '';
+  const action = (input.action as string) || 'generate';
+
+  // Try to extract image path from output
+  const imagePath = useMemo(() => {
+    if (!output) return null;
+    try {
+      const parsed = JSON.parse(output);
+      return parsed.path || parsed.image_path || parsed.output_path || null;
+    } catch {
+      // Check if output itself is a path
+      if (output.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) return output.trim();
+    }
+    return null;
+  }, [output]);
+
+  const titleMap: Record<string, string> = {
+    generate: 'Generate Image',
+    edit: 'Edit Image',
+    upscale: 'Upscale Image',
+    remove_bg: 'Remove Background',
+  };
+
+  return (
+    <BasicTool
+      icon={<ImageIcon className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: titleMap[action] || 'Image Gen', subtitle: prompt.slice(0, 60) }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {imagePath ? (
+        <div className="p-2">
+          <img
+            src={imagePath}
+            alt={prompt}
+            className="rounded border border-border/30 max-h-64 object-contain"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
+      ) : output ? (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <pre className="whitespace-pre-wrap text-[11px] text-muted-foreground font-mono">{output}</pre>
+        </div>
+      ) : null}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('image-gen', ImageGenTool);
+
+// --- VideoGen ---
+function VideoGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const prompt = (input.prompt as string) || '';
+
+  return (
+    <BasicTool
+      icon={<Cpu className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Video Gen', subtitle: prompt.slice(0, 60) }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {output && (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <pre className="whitespace-pre-wrap text-[11px] text-muted-foreground font-mono">{output}</pre>
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('video-gen', VideoGenTool);
+
+// --- PresentationGen ---
+interface PresentationOutput {
+  success: boolean;
+  action: string;
+  error?: string;
+  presentation_name?: string;
+  presentation_path?: string;
+  slide_number?: number;
+  slide_title?: string;
+  slide_file?: string;
+  total_slides?: number;
+  viewer_url?: string;
+  viewer_file?: string;
+  message?: string;
+}
+
+function parsePresentationOutput(output: string): PresentationOutput | null {
+  if (!output) return null;
+  try {
+    return JSON.parse(output) as PresentationOutput;
+  } catch {
+    // If output starts with "Error:" it's a string error
+    if (output.startsWith('Error:')) {
+      return { success: false, action: 'unknown', error: output.replace(/^Error:\s*/, '') };
+    }
+    return null;
+  }
+}
+
+function PresentationGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const action = (input.action as string) || '';
+  const presentationName = (input.presentation_name as string) || '';
+  const slideTitle = (input.slide_title as string) || '';
+  const slideNumber = input.slide_number as number | undefined;
+
+  const parsed = useMemo(() => parsePresentationOutput(output), [output]);
+  const isError = parsed ? !parsed.success : false;
+
+  // Build a nice trigger subtitle
+  const triggerSubtitle = useMemo(() => {
+    if (action === 'create_slide' && slideTitle) {
+      return `Slide ${slideNumber || '?'}: ${slideTitle}`;
+    }
+    if (action === 'preview') return presentationName;
+    if (action === 'export_pdf') return `${presentationName} → PDF`;
+    if (action === 'export_pptx') return `${presentationName} → PPTX`;
+    if (action === 'list_slides') return presentationName;
+    if (action === 'list_presentations') return 'All presentations';
+    if (action === 'delete_slide' || action === 'delete_presentation') return presentationName;
+    if (action === 'validate_slide') return `Slide ${slideNumber || '?'}`;
+    return presentationName || action;
+  }, [action, presentationName, slideTitle, slideNumber]);
+
+  // Action label
+  const actionLabel = useMemo(() => {
+    const labels: Record<string, string> = {
+      create_slide: 'Create Slide',
+      list_slides: 'List Slides',
+      delete_slide: 'Delete Slide',
+      list_presentations: 'List',
+      delete_presentation: 'Delete',
+      validate_slide: 'Validate',
+      export_pdf: 'Export PDF',
+      export_pptx: 'Export PPTX',
+      preview: 'Preview',
+    };
+    return labels[action] || action;
+  }, [action]);
+
+  return (
+    <BasicTool
+      icon={<Presentation className="size-3.5 flex-shrink-0" />}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">
+            {actionLabel}
+          </span>
+          <span className="text-muted-foreground text-xs truncate font-mono">
+            {triggerSubtitle}
+          </span>
+          {parsed?.success && action === 'create_slide' && parsed.total_slides && (
+            <span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap ml-auto flex-shrink-0">
+              {parsed.total_slides} {parsed.total_slides === 1 ? 'slide' : 'slides'}
+            </span>
+          )}
+          {parsed?.viewer_url && (
+            <a
+              href={parsed.viewer_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="size-3 text-muted-foreground/60 hover:text-foreground transition-colors" />
+            </a>
+          )}
+        </div>
+      }
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {/* Error display */}
+      {isError && parsed?.error && (
+        <div className="flex items-start gap-2 px-3 py-2 text-xs text-muted-foreground">
+          <CircleAlert className="size-3 flex-shrink-0 mt-0.5" />
+          <span>{parsed.error}</span>
+        </div>
+      )}
+
+      {/* Success: show relevant details */}
+      {parsed?.success && (
+        <div className="px-3 py-2 space-y-1.5">
+          {/* Slide creation summary */}
+          {action === 'create_slide' && (
+            <div className="flex items-center gap-2 text-xs">
+              <Check className="size-3 text-emerald-500 flex-shrink-0" />
+              <span className="text-foreground/80">
+                Created slide {parsed.slide_number}{parsed.slide_title ? `: ${parsed.slide_title}` : ''}
+              </span>
+              {parsed.total_slides && (
+                <span className="text-muted-foreground/50 ml-auto text-[10px]">
+                  ({parsed.total_slides} total)
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Preview link */}
+          {action === 'preview' && parsed.viewer_url && (
+            <a
+              href={parsed.viewer_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors"
+            >
+              <ExternalLink className="size-3 flex-shrink-0" />
+              <span>Open presentation viewer</span>
+              <span className="text-muted-foreground/50 font-mono text-[10px] truncate">
+                {parsed.viewer_url}
+              </span>
+            </a>
+          )}
+
+          {/* File paths */}
+          {parsed.slide_file && action !== 'preview' && (
+            <div className="text-[10px] text-muted-foreground/50 font-mono truncate">
+              {parsed.slide_file}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fallback for unrecognized output */}
+      {!parsed && output && (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <pre className="whitespace-pre-wrap text-[11px] text-muted-foreground font-mono">{output}</pre>
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('presentation-gen', PresentationGenTool);
+
+// --- ShowUser ---
+function ShowUserTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const title = (input.title as string) || '';
+  const description = (input.description as string) || '';
+  const type = (input.type as string) || '';
+  const path = (input.path as string) || '';
+  const url = (input.url as string) || '';
+
+  const subtitle = title || description || path || url || type;
+
+  return (
+    <BasicTool
+      icon={<ExternalLink className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Output', subtitle: subtitle.slice(0, 60) }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {(path || url) && (
+        <div className="px-3 py-2 text-xs">
+          {path && (
+            <div className="text-muted-foreground font-mono text-[10px] truncate">{path}</div>
+          )}
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground font-mono text-[10px] truncate hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <ExternalLink className="size-2.5" />
+              {url}
+            </a>
+          )}
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('show-user', ShowUserTool);
 
 // --- Task (sub-agent) — Slack-thread-style inline card ---
 function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissionReply }: ToolProps) {
@@ -1425,6 +1876,8 @@ function ToolIconForName({ name }: { name: string }) {
     case 'square-kanban':
     case 'task':
       return <SquareKanban className={cls} />;
+    case 'presentation':
+      return <Presentation className={cls} />;
     case 'image':
       return <ImageIcon className={cls} />;
     default:

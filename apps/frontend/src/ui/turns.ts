@@ -416,7 +416,22 @@ export function computeStatusFromPart(part: Part | undefined): string | undefine
       case 'glob':
         return 'Searching codebase...';
       case 'webfetch':
+      case 'scrape-webpage':
+        return 'Fetching web page...';
+      case 'websearch':
+      case 'web-search':
+      case 'web_search':
         return 'Searching web...';
+      case 'image-search':
+        return 'Searching images...';
+      case 'image-gen':
+        return 'Generating image...';
+      case 'video-gen':
+        return 'Generating video...';
+      case 'presentation-gen':
+        return 'Creating presentation...';
+      case 'show-user':
+        return 'Showing output...';
       case 'edit':
       case 'write':
       case 'morph_edit':
@@ -564,8 +579,35 @@ export function getToolInfo(tool: string, input: Record<string, any> = {}): Tool
       return { icon: 'search', title: 'Grep', subtitle: input.pattern };
     case 'webfetch':
       return { icon: 'globe', title: 'Web Fetch', subtitle: input.url };
+    case 'websearch':
+    case 'web-search':
+    case 'web_search':
+      return { icon: 'search', title: 'Web Search', subtitle: input.query };
+    case 'scrape-webpage':
+      return { icon: 'globe', title: 'Scrape', subtitle: input.urls?.split?.(',')[0] };
     case 'image-search':
       return { icon: 'image', title: 'Image Search', subtitle: input.query };
+    case 'image-gen':
+      return { icon: 'image', title: 'Image Gen', subtitle: input.prompt?.slice?.(0, 40) };
+    case 'video-gen':
+      return { icon: 'cpu', title: 'Video Gen', subtitle: input.prompt?.slice?.(0, 40) };
+    case 'presentation-gen': {
+      const action = input.action || '';
+      const labels: Record<string, string> = {
+        create_slide: 'Create Slide',
+        list_slides: 'List Slides',
+        preview: 'Preview',
+        export_pdf: 'Export PDF',
+        export_pptx: 'Export PPTX',
+      };
+      return {
+        icon: 'presentation',
+        title: labels[action] || 'Presentation',
+        subtitle: input.slide_title || input.presentation_name,
+      };
+    }
+    case 'show-user':
+      return { icon: 'globe', title: 'Output', subtitle: input.title || input.description };
     case 'task':
       return {
         icon: 'square-kanban',

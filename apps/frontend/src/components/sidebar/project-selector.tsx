@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { FolderOpen, Plus, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -33,17 +34,37 @@ export function ProjectSelector({
   selectedProjectId,
   onProjectChange,
 }: ProjectSelectorProps) {
-  const { state, isMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const [isOpen, setIsOpen] = useState(true);
   const { data: projects, isLoading } = useOpenCodeProjects();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
     return [...projects].sort((a, b) => b.time.updated - a.time.updated);
   }, [projects]);
 
+  // Derive active project from URL
+  const activeProjectId = useMemo(() => {
+    const match = pathname?.match(/^\/projects\/([^/]+)/);
+    return match ? match[1] : selectedProjectId;
+  }, [pathname, selectedProjectId]);
+
   if (state === 'collapsed' && !isMobile) return null;
   if (!projects || projects.length === 0) return null;
+
+  const handleProjectClick = (projectId: string) => {
+    onProjectChange(projectId);
+    router.push(`/projects/${projectId}`);
+    if (isMobile) setOpenMobile(false);
+  };
+
+  const handleAllProjectsClick = () => {
+    onProjectChange(null);
+    router.push('/dashboard');
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -64,7 +85,7 @@ export function ProjectSelector({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-[200px] text-center">
-                  <p className="text-xs">Projects are auto-detected from your local directories</p>
+                  <p className="text-xs">Projects are auto-detected from git repos in your workspace</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -75,10 +96,10 @@ export function ProjectSelector({
           <div className="space-y-0.5 pb-2">
             {/* All Projects */}
             <button
-              onClick={() => onProjectChange(null)}
+              onClick={handleAllProjectsClick}
               className={cn(
                 'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors',
-                selectedProjectId === null
+                activeProjectId === null
                   ? 'bg-muted/80 text-foreground'
                   : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
               )}
@@ -90,10 +111,10 @@ export function ProjectSelector({
             {sortedProjects.map((project) => (
               <button
                 key={project.id}
-                onClick={() => onProjectChange(project.id)}
+                onClick={() => handleProjectClick(project.id)}
                 className={cn(
                   'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors',
-                  selectedProjectId === project.id
+                  activeProjectId === project.id
                     ? 'bg-muted/80 text-foreground'
                     : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
                 )}
@@ -108,7 +129,7 @@ export function ProjectSelector({
 
             {sortedProjects.length === 0 && !isLoading && (
               <p className="text-xs text-muted-foreground/60 px-3 py-2">
-                No tasks yet
+                No projects detected
               </p>
             )}
           </div>

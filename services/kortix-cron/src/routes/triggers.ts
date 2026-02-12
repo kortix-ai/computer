@@ -1,48 +1,21 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { eq, and, desc } from 'drizzle-orm';
-import { Cron } from 'croner';
 import { db } from '../db';
 import { triggers, sandboxes, executions } from '@kortix/db';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { executeTrigger } from '../lib/opencode';
+import { isValidCronExpression, getNextRun } from '../scheduler/cron';
 import type { AppEnv } from '../types';
 
 const app = new Hono<AppEnv>();
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Compute the next run time from a 6-field cron expression.
- */
-function computeNextRun(cronExpr: string, timezone: string): Date | null {
-  try {
-    const cron = new Cron(cronExpr, { timezone });
-    const next = cron.nextRun();
-    return next ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Validate a cron expression without executing it.
- */
-function isValidCron(cronExpr: string): boolean {
-  try {
-    new Cron(cronExpr);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // ─── Validation Schemas ──────────────────────────────────────────────────────
 const createTriggerSchema = z.object({
   sandbox_id: z.string().uuid(),
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  cron_expr: z.string().min(1).max(100).refine(isValidCron, {
+  cron_expr: z.string().min(1).max(100).refine(isValidCronExpression, {
     message: 'Invalid cron expression. Use 6-field format: second minute hour day month weekday',
   }),
   timezone: z.string().default('UTC'),
@@ -62,7 +35,7 @@ const updateTriggerSchema = z.object({
     .string()
     .min(1)
     .max(100)
-    .refine(isValidCron, {
+    .refine(isValidCronExpression, {
       message: 'Invalid cron expression',
     })
     .optional(),
@@ -99,7 +72,7 @@ app.post('/', async (c) => {
     throw new NotFoundError('Sandbox', parsed.data.sandbox_id);
   }
 
-  const nextRun = computeNextRun(parsed.data.cron_expr, parsed.data.timezone);
+  const nextRun = getNextRun(parsed.data.cron_expr, parsed.data.timezone);
 
   const [trigger] = await db
     .insert(triggers)
@@ -208,7 +181,7 @@ app.patch('/:id', async (c) => {
   if (parsed.data.timezone !== undefined) updateData.timezone = parsed.data.timezone;
 
   if (parsed.data.cron_expr !== undefined || parsed.data.timezone !== undefined) {
-    updateData.nextRunAt = computeNextRun(cronExpr, timezone);
+    updateData.nextRunAt = getNextRun(cronExpr, timezone);
   }
 
   const [updated] = await db
@@ -270,12 +243,12 @@ app.post('/:id/resume', async (c) => {
     throw new NotFoundError('Trigger', triggerId);
   }
 
-  const nextRun = computeNextRun(current.cronExpr, current.timezone);
+  const nextRun = getNextRun(current.cronExpr, current.timezone);
 
   const [updated] = await db
     .update(triggers)
     .set({ isActive: true, nextRunAt: nextRun, updatedAt: new Date() })
-    .where(eq(triggers.triggerId, triggerId))
+    .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)))
     .returning();
 
   return c.json({ success: true, data: updated });

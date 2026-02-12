@@ -22,7 +22,7 @@ COPY services/${SERVICE} ./services/${SERVICE}
 
 # Install pnpm and deps for this service only
 RUN corepack enable pnpm && \
-    pnpm install --filter ./services/${SERVICE} --frozen-lockfile
+    pnpm install --filter ./services/${SERVICE}
 
 # ---- Runner Stage ----
 FROM base AS runner
