@@ -4,16 +4,14 @@ import { logger } from 'hono/logger';
 import { HTTPException } from 'hono/http-exception';
 
 import { config } from './config';
-import { authMiddleware } from './middleware/auth';
-import { preview } from './routes/preview';
-import { isSupabaseConfigured } from './lib/supabase';
+import { accountRouter } from './routes/account';
 import { isDaytonaConfigured } from './lib/daytona';
-import type { AppContext } from './types';
+import type { AuthVariables } from './types';
 
-const app = new Hono<{ Variables: AppContext }>();
+const app = new Hono<{ Variables: AuthVariables }>();
 
-// === Global Middleware ===
-
+// Middleware
+app.use('*', logger());
 app.use(
   '*',
   cors({
@@ -22,8 +20,6 @@ app.use(
       'https://kortix.com',
       'https://dev.kortix.com',
       'https://staging.kortix.com',
-      'https://kortix.cloud',
-      'https://www.kortix.cloud',
       ...(config.isDevelopment()
         ? ['http://localhost:3000', 'http://127.0.0.1:3000']
         : []),
@@ -34,43 +30,32 @@ app.use(
   })
 );
 
-app.use('*', logger());
-
-// === Health Check (no auth) ===
-
+// Health check
 app.get('/health', (c) => {
   return c.json({
     status: 'ok',
-    service: 'kortix-cloud',
+    service: 'kortix-platform',
     timestamp: new Date().toISOString(),
     env: config.ENV_MODE,
   });
 });
 
-// === Preview Routes (auth required) ===
+// Mount routes
+app.route('/v1/account', accountRouter);
 
-app.use('/:sandboxId/:port/*', authMiddleware);
-app.use('/:sandboxId/:port', authMiddleware);
-app.route('/', preview);
-
-// === Error Handling ===
-
+// Error handler
 app.onError((err, c) => {
   console.error(`[ERROR] ${err.message}`, err.stack);
 
   if (err instanceof HTTPException) {
-    const response: Record<string, unknown> = {
-      error: true,
-      message: err.message,
-      status: err.status,
-    };
-
-    // Add Retry-After header for 503s (sandbox waking up)
-    if (err.status === 503) {
-      c.header('Retry-After', '10');
-    }
-
-    return c.json(response, err.status);
+    return c.json(
+      {
+        error: true,
+        message: err.message,
+        status: err.status,
+      },
+      err.status
+    );
   }
 
   return c.json(
@@ -83,35 +68,33 @@ app.onError((err, c) => {
   );
 });
 
-// === 404 Handler ===
-
+// 404 handler
 app.notFound((c) => {
-  return c.json(
-    {
-      error: true,
-      message: 'Not found',
-      status: 404,
-    },
-    404
-  );
+  return c.json({ error: true, message: 'Not found', status: 404 }, 404);
 });
 
-// === Start Server ===
+// Start server
+const port = config.PORT;
 
 console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║              Kortix Cloud Starting                        ║
+║              Kortix Platform Starting                     ║
 ╠═══════════════════════════════════════════════════════════╣
-║  Port: ${config.PORT.toString().padEnd(49)}║
+║  Port: ${port.toString().padEnd(49)}║
 ║  Mode: ${config.ENV_MODE.padEnd(49)}║
 ╠═══════════════════════════════════════════════════════════╣
+║  Endpoints:                                               ║
+║    POST  /v1/account/init     Init account + sandbox      ║
+║    GET   /v1/account/sandbox  Get user's sandbox          ║
+╠═══════════════════════════════════════════════════════════╣
 ║  Database:  ${config.DATABASE_URL ? '✓ Configured'.padEnd(43) : '✗ NOT SET'.padEnd(43)}║
-║  Supabase:  ${isSupabaseConfigured() ? '✓ Configured'.padEnd(43) : '✗ NOT SET'.padEnd(43)}║
+║  Supabase:  ${config.SUPABASE_URL ? '✓ Configured'.padEnd(43) : '✗ NOT SET'.padEnd(43)}║
 ║  Daytona:   ${isDaytonaConfigured() ? '✓ Configured'.padEnd(43) : '✗ NOT SET'.padEnd(43)}║
+║  Kortix URL: ${(config.KORTIX_URL || 'NOT SET').padEnd(42)}║
 ╚═══════════════════════════════════════════════════════════╝
 `);
 
 export default {
-  port: config.PORT,
+  port,
   fetch: app.fetch,
 };

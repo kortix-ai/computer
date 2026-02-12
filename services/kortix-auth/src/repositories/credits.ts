@@ -1,4 +1,6 @@
-import { getSupabase } from '../lib/supabase';
+import { eq } from 'drizzle-orm';
+import { creditAccounts } from '@kortix/db';
+import { db } from '../db';
 
 export interface CreditBalance {
   balance: number;
@@ -12,23 +14,27 @@ export interface CreditBalance {
  * Get credit balance for an account.
  */
 export async function getCreditBalance(accountId: string): Promise<CreditBalance | null> {
-  const supabase = getSupabase();
+  const [row] = await db
+    .select({
+      balance: creditAccounts.balance,
+      expiringCredits: creditAccounts.expiringCredits,
+      nonExpiringCredits: creditAccounts.nonExpiringCredits,
+      dailyCreditsBalance: creditAccounts.dailyCreditsBalance,
+      tier: creditAccounts.tier,
+    })
+    .from(creditAccounts)
+    .where(eq(creditAccounts.accountId, accountId))
+    .limit(1);
 
-  const { data, error } = await supabase
-    .from('credit_accounts')
-    .select('balance, expiring_credits, non_expiring_credits, daily_credits_balance, tier')
-    .eq('account_id', accountId)
-    .single();
-
-  if (error || !data) {
+  if (!row) {
     return null;
   }
 
   return {
-    balance: Number(data.balance) || 0,
-    expiringCredits: Number(data.expiring_credits) || 0,
-    nonExpiringCredits: Number(data.non_expiring_credits) || 0,
-    dailyCreditsBalance: Number(data.daily_credits_balance) || 0,
-    tier: data.tier || 'none',
+    balance: Number(row.balance) || 0,
+    expiringCredits: Number(row.expiringCredits) || 0,
+    nonExpiringCredits: Number(row.nonExpiringCredits) || 0,
+    dailyCreditsBalance: Number(row.dailyCreditsBalance) || 0,
+    tier: row.tier || 'none',
   };
 }

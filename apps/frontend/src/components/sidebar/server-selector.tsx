@@ -14,6 +14,7 @@ import {
 import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { getSupabaseAccessToken } from '@/lib/auth-token';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,15 @@ function useConnectionStatus(url: string, enabled: boolean) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
-      await fetch(`${url}/session`, { method: 'GET', signal: controller.signal });
+
+      // Include JWT for remote instances that require auth
+      const headers: Record<string, string> = {};
+      const token = await getSupabaseAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      await fetch(`${url}/session`, { method: 'GET', signal: controller.signal, headers });
       clearTimeout(timeout);
       setStatus('connected');
     } catch {
