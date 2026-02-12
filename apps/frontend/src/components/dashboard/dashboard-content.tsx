@@ -7,6 +7,7 @@ import { toast } from '@/lib/toast';
 import { useSidebar } from '@/components/ui/sidebar';
 import {
   useCreateOpenCodeSession,
+  useSendOpenCodeMessage,
   useOpenCodeAgents,
   useOpenCodeProviders,
   useOpenCodeCommands,
@@ -166,6 +167,7 @@ export function DashboardContent() {
   const isMobile = useIsMobile();
   const { setOpen: setSidebarOpenState, setOpenMobile } = useSidebar();
   const createSession = useCreateOpenCodeSession();
+  const sendMessage = useSendOpenCodeMessage();
 
   // Data
   const { data: agents } = useOpenCodeAgents();
@@ -232,23 +234,39 @@ export function DashboardContent() {
       if (!text.trim() || isSubmitting) return;
       setIsSubmitting(true);
       try {
-        sessionStorage.setItem('opencode_pending_prompt', text);
-
+        // Build options from selections
         const options: Record<string, unknown> = {};
         if (selectedAgent) options.agent = selectedAgent;
         if (selectedModel) options.model = selectedModel;
         if (selectedVariant) options.variant = selectedVariant;
-        if (Object.keys(options).length > 0) {
-          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
-        }
 
+        // Step 1: Create the session
         const session = await createSession.mutateAsync();
+
+        // Step 2: Open tab and navigate immediately (optimistic)
         useTabStore.getState().openTab({
           id: session.id,
           title: 'New session',
           type: 'session',
           href: `/sessions/${session.id}`,
         });
+
+        // Store the prompt text for optimistic display on the session page
+        sessionStorage.setItem('opencode_pending_prompt', text);
+        if (Object.keys(options).length > 0) {
+          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
+        }
+
+        // Step 3: Send the prompt directly from here (don't rely on session page to do it)
+        sendMessage.mutateAsync({
+          sessionId: session.id,
+          parts: [{ type: 'text', text }],
+          options: Object.keys(options).length > 0 ? options as any : undefined,
+        }).catch(() => {
+          // If send fails, the session page will show the error via SSE events
+        });
+
+        // Step 4: Navigate to session (prompt already sent, ?new=true for optimistic display only)
         router.push(`/sessions/${session.id}?new=true`);
       } catch (error) {
         sessionStorage.removeItem('opencode_pending_prompt');
@@ -257,7 +275,7 @@ export function DashboardContent() {
         toast.warning('Failed to create session');
       }
     },
-    [isSubmitting, createSession, router, selectedAgent, selectedModel, selectedVariant],
+    [isSubmitting, createSession, sendMessage, router, selectedAgent, selectedModel, selectedVariant],
   );
 
   const handleCommand = useCallback(
