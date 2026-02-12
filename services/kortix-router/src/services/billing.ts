@@ -6,31 +6,18 @@ import {
 } from '../repositories/credits';
 import type { BillingCheckResult, BillingDeductResult } from '../types';
 
-const TEST_ACCOUNT = 'test_account';
-
 /**
  * Check if account has sufficient credits.
  *
  * Priority:
- * 1. Test account / dev mode -> skip
- * 2. Supabase configured -> direct DB query (fast)
- * 3. Fallback -> Python backend API (legacy)
+ * 1. Supabase configured -> direct DB query (fast)
+ * 2. Fallback -> Python backend API (legacy)
  */
 export async function checkCredits(
   accountId: string,
   minimumRequired: number = 0.01,
   options?: { skipDevCheck?: boolean }
 ): Promise<BillingCheckResult> {
-  // Skip billing for test account
-  if (accountId === TEST_ACCOUNT) {
-    return { hasCredits: true, message: 'Test mode', balance: 999999 };
-  }
-
-  // Skip billing in development mode (unless caller opts out, e.g. proxy routes)
-  if (!options?.skipDevCheck && config.isDevelopment()) {
-    return { hasCredits: true, message: 'Development mode', balance: 999999 };
-  }
-
   // Direct Supabase (fast path)
   if (isSupabaseConfigured()) {
     const result = await checkCreditsDb(accountId, minimumRequired);
@@ -49,9 +36,8 @@ export async function checkCredits(
  * Deduct credits for a Kortix tool call.
  *
  * Priority:
- * 1. Test account / dev mode -> skip
- * 2. Supabase configured -> direct DB atomic deduction (fast)
- * 3. Fallback -> Python backend API (legacy)
+ * 1. Supabase configured -> direct DB atomic deduction (fast)
+ * 2. Fallback -> Python backend API (legacy)
  */
 export async function deductToolCredits(
   accountId: string,
@@ -61,16 +47,6 @@ export async function deductToolCredits(
   sessionId?: string,
   options?: { skipDevCheck?: boolean }
 ): Promise<BillingDeductResult> {
-  // Skip billing for test account
-  if (accountId === TEST_ACCOUNT) {
-    return { success: true, cost: 0, newBalance: 999999, skipped: true, reason: 'test_token' };
-  }
-
-  // Skip billing in development mode (unless caller opts out, e.g. proxy routes)
-  if (!options?.skipDevCheck && config.isDevelopment()) {
-    return { success: true, cost: 0, newBalance: 999999, skipped: true, reason: 'development_mode' };
-  }
-
   const cost = getToolCost(toolName, resultCount);
   if (cost <= 0) {
     return { success: true, cost: 0, newBalance: 0 };
@@ -108,9 +84,8 @@ export async function deductToolCredits(
  * Deduct credits for LLM usage.
  *
  * Priority:
- * 1. Test account / dev mode -> skip
- * 2. Supabase configured -> direct DB atomic deduction (fast)
- * 3. Fallback -> Python backend API (legacy)
+ * 1. Supabase configured -> direct DB atomic deduction (fast)
+ * 2. Fallback -> Python backend API (legacy)
  */
 export async function deductLLMCredits(
   accountId: string,
@@ -120,16 +95,6 @@ export async function deductLLMCredits(
   calculatedCost: number,
   sessionId?: string
 ): Promise<BillingDeductResult> {
-  // Skip billing for test account
-  if (accountId === TEST_ACCOUNT) {
-    return { success: true, cost: 0, newBalance: 999999, skipped: true, reason: 'test_token' };
-  }
-
-  // Skip billing in development mode
-  if (config.isDevelopment()) {
-    return { success: true, cost: 0, newBalance: 999999, skipped: true, reason: 'development_mode' };
-  }
-
   if (calculatedCost <= 0) {
     return { success: true, cost: 0, newBalance: 0 };
   }

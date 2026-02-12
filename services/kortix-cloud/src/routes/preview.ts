@@ -170,8 +170,8 @@ preview.all('/:sandboxId/:port/*', async (c) => {
   const queryString = upstreamUrl.search;
 
   // 4. Proxy with auto-wake retry
-  const MAX_RETRIES = 2;
-  const RETRY_DELAYS_MS = [1000, 2000]; // 1s after first fail, 2s after second
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS_MS = [2000, 5000, 8000]; // progressive delays to let sandbox boot
   let wakeTriggered = false;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -205,6 +205,28 @@ preview.all('/:sandboxId/:port/*', async (c) => {
         // @ts-ignore - Bun supports duplex
         duplex: 'half',
       });
+
+      // Daytona returns 400 "no IP address found" when sandbox is stopped.
+      // Detect this and treat it like a connection failure so auto-wake kicks in.
+      if (upstream.status === 400 && !wakeTriggered && attempt < MAX_RETRIES) {
+        const bodyText = await upstream.text();
+        if (bodyText.includes('no IP address found')) {
+          console.warn(
+            `[PREVIEW] Sandbox ${sandboxId} is stopped (Daytona: no IP address), triggering wake`
+          );
+          await wakeSandbox(sandboxId);
+          wakeTriggered = true;
+          previewLinkCache.delete(`${sandboxId}:${port}`);
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
+        // Not a Daytona stopped error — pass through
+        return new Response(bodyText, {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: new Headers(upstream.headers),
+        });
+      }
 
       // Got an HTTP response → sandbox is alive, pass it through
       return new Response(upstream.body, {
