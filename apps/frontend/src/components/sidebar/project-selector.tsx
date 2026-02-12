@@ -76,67 +76,68 @@ export function ProjectSelector({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="px-3">
+      {/* Section header — px-5 aligns label with item text (px-2 outer + px-3 item) */}
+      <div className="px-5 pt-1">
         <CollapsibleTrigger asChild>
-          <button className="flex items-center justify-between w-full py-2 group cursor-pointer">
-            <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
+          <button className="flex items-center justify-between w-full py-1.5 group cursor-pointer">
+            <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
               Projects
             </span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+            <ChevronDown className="h-3 w-3 text-muted-foreground/40 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
           </button>
         </CollapsibleTrigger>
+      </div>
 
-        <CollapsibleContent>
-          <div className="space-y-0.5 pb-2">
-            {/* All Projects */}
+      <CollapsibleContent>
+        <div className="px-2 space-y-0.5 pb-1">
+          {/* All Projects */}
+          <button
+            onClick={handleAllProjectsClick}
+            className={cn(
+              'flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-sm cursor-pointer',
+              'transition-all duration-150 ease-out',
+              activeProjectId === null
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            )}
+          >
+            <FolderOpen className={cn(
+              'h-4 w-4 flex-shrink-0',
+              activeProjectId === null ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+            )} />
+            <span className="truncate">All Projects</span>
+          </button>
+
+          {sortedProjects.map((project) => (
             <button
-              onClick={handleAllProjectsClick}
+              key={project.id}
+              onClick={() => handleProjectClick(project.id, getProjectDisplayName(project))}
               className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
+                'flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-sm cursor-pointer',
                 'transition-all duration-150 ease-out',
-                activeProjectId === null
+                activeProjectId === project.id
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
               )}
             >
-              <FolderOpen className={cn(
-                'h-4 w-4 flex-shrink-0',
-                activeProjectId === null ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
-              )} />
-              <span className="truncate">All Projects</span>
-            </button>
-
-            {sortedProjects.map((project) => (
-              <button
-                key={project.id}
-                onClick={() => handleProjectClick(project.id, getProjectDisplayName(project))}
+              <FolderOpen
                 className={cn(
-                  'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
-                  'transition-all duration-150 ease-out',
-                  activeProjectId === project.id
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  'h-4 w-4 flex-shrink-0',
+                  activeProjectId === project.id ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
                 )}
-              >
-                <FolderOpen
-                  className={cn(
-                    'h-4 w-4 flex-shrink-0',
-                    activeProjectId === project.id ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
-                  )}
-                  style={project.icon?.color ? { color: project.icon.color } : undefined}
-                />
-                <span className="truncate">{getProjectDisplayName(project)}</span>
-              </button>
-            ))}
+                style={project.icon?.color ? { color: project.icon.color } : undefined}
+              />
+              <span className="truncate">{getProjectDisplayName(project)}</span>
+            </button>
+          ))}
 
-            {sortedProjects.length === 0 && !isLoading && (
-              <p className="text-xs text-muted-foreground/60 px-3 py-2">
-                No projects detected
-              </p>
-            )}
-          </div>
-        </CollapsibleContent>
-      </div>
+          {sortedProjects.length === 0 && !isLoading && (
+            <p className="text-xs text-muted-foreground/40 px-3 py-2">
+              No projects detected
+            </p>
+          )}
+        </div>
+      </CollapsibleContent>
     </Collapsible>
   );
 }

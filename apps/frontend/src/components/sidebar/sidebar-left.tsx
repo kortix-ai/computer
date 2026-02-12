@@ -565,7 +565,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           'flex flex-col h-full transition-opacity duration-150 ease-out overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
           state === 'collapsed' ? 'opacity-0 pointer-events-none delay-0' : 'opacity-100 pointer-events-auto delay-100'
         )}>
-          <div className="px-2 pt-1 pb-0.5">
+          {/* New session button */}
+          <div className="px-2 pt-1 pb-1">
             <button
               onClick={handleNewSession}
               disabled={createSession.isPending}
@@ -576,28 +577,26 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 'disabled:opacity-50 disabled:cursor-not-allowed',
               )}
             >
-              <SquarePen className="h-[18px] w-[18px] flex-shrink-0 text-muted-foreground/60" />
+              <SquarePen className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" />
               <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
             </button>
           </div>
 
           {/* Projects accordion */}
-          <div>
-            <ProjectSelector
-              selectedProjectId={selectedProjectId}
-              onProjectChange={setSelectedProjectId}
-            />
-          </div>
+          <ProjectSelector
+            selectedProjectId={selectedProjectId}
+            onProjectChange={setSelectedProjectId}
+          />
 
           {/* Sessions accordion */}
           <Collapsible defaultOpen>
-            <div className="px-3">
+            <div className="px-5 pt-1">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full py-2 group cursor-pointer">
-                  <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
+                <button className="flex items-center justify-between w-full py-1.5 group cursor-pointer">
+                  <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
                     Sessions
                   </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                  <ChevronDown className="h-3 w-3 text-muted-foreground/40 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
                 </button>
               </CollapsibleTrigger>
             </div>
@@ -609,7 +608,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       </SidebarContent>
 
       {/* ====== FOOTER ====== */}
-      <SidebarFooter className="px-4 pb-4 pt-0">
+      <SidebarFooter className="px-3 pb-3 pt-0">
         <UserProfileSection user={user} />
       </SidebarFooter>
 
