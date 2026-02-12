@@ -95,6 +95,7 @@ import {
 } from '@/ui';
 
 import { SessionChatInput, type AttachedFile } from '@/components/session/session-chat-input';
+import { uploadFile } from '@/features/files/api/opencode-files';
 import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
 import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { SessionWelcome } from '@/components/session/session-welcome';
@@ -287,6 +288,27 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
 }
 
 // ============================================================================
+// Parse <file> XML references from uploaded file text parts
+// ============================================================================
+
+interface ParsedFileRef {
+  path: string;
+  mime: string;
+  filename: string;
+}
+
+const FILE_TAG_REGEX = /<file\s+path="([^"]*?)"\s+mime="([^"]*?)"\s+filename="([^"]*?)">\s*[\s\S]*?<\/file>/g;
+
+function parseFileReferences(text: string): { cleanText: string; files: ParsedFileRef[] } {
+  const files: ParsedFileRef[] = [];
+  const cleanText = text.replace(FILE_TAG_REGEX, (_, path, mime, filename) => {
+    files.push({ path, mime, filename });
+    return '';
+  }).trim();
+  return { cleanText, files };
+}
+
+// ============================================================================
 // User Message Row
 // ============================================================================
 
@@ -297,9 +319,10 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
     [message.parts],
   );
 
-  // Extract text from sticky parts
+  // Extract text from sticky parts, parse out <file> XML references
   const textParts = stickyParts.filter(isTextPart).filter((p) => (p as TextPart).text?.trim() && !(p as TextPart).synthetic);
-  const text = textParts.map((p) => (p as TextPart).text).join('\n');
+  const rawText = textParts.map((p) => (p as TextPart).text).join('\n');
+  const { cleanText: text, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
 
   // Inline file references
   const inlineFiles = stickyParts.filter(isFilePart) as FilePart[];
@@ -420,6 +443,18 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
                     <span className="text-xs text-muted-foreground">{file.filename || 'File'}</span>
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Uploaded file references (from <file> XML tags) */}
+        {uploadedFiles.length > 0 && (
+          <div className="flex gap-2 p-3 pb-0 flex-wrap">
+            {uploadedFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                <FileText className="size-4 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
               </div>
             ))}
           </div>
@@ -1235,32 +1270,36 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       if (local.model.currentKey) options.model = local.model.currentKey;
       if (local.model.variant.current) options.variant = local.model.variant.current;
 
-      // Build parts: text first, then any attached files as data URIs
+      // Build parts: text first, then upload attached files to /workspace/uploads/
+      // and send as XML text references (agent reads from disk on demand, not loaded into context)
       const parts: Array<
         | { type: 'text'; text: string }
         | { type: 'file'; mime: string; url: string; filename?: string }
       > = [{ type: 'text', text }];
 
       if (files && files.length > 0) {
-        const fileResults = await Promise.all(
-          files.map(
-            (af) =>
-              new Promise<{ mime: string; url: string; filename: string }>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  resolve({
-                    mime: af.file.type || 'application/octet-stream',
-                    url: reader.result as string,
-                    filename: af.file.name,
-                  });
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(af.file);
-              }),
-          ),
+        const uploadResults = await Promise.all(
+          files.map(async (af) => {
+            const timestamp = Date.now();
+            const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const uniqueName = `${timestamp}-${safeName}`;
+            const uploadBlob = new File([af.file], uniqueName, { type: af.file.type });
+            const results = await uploadFile(uploadBlob, '/workspace/uploads');
+            if (!results || results.length === 0) {
+              throw new Error(`Failed to upload file: ${af.file.name}`);
+            }
+            return {
+              path: results[0].path,
+              mime: af.file.type || 'application/octet-stream',
+              filename: af.file.name,
+            };
+          }),
         );
-        for (const f of fileResults) {
-          parts.push({ type: 'file', mime: f.mime, url: f.url, filename: f.filename });
+        for (const f of uploadResults) {
+          parts.push({
+            type: 'text',
+            text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
+          });
         }
       }
 
@@ -1367,10 +1406,29 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 {showOptimistic && (
                   <>
                     <div className="flex justify-end">
-                      <div className="flex max-w-[90%] rounded-3xl rounded-br-lg bg-card border px-4 py-3 break-words overflow-hidden">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          <HighlightMentions text={optimisticPrompt || ''} agentNames={agentNames} onFileClick={openFileInComputer} />
-                        </p>
+                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+                        {(() => {
+                          const { cleanText, files } = parseFileReferences(optimisticPrompt || '');
+                          return (
+                            <>
+                              {files.length > 0 && (
+                                <div className="flex gap-2 p-3 pb-0 flex-wrap">
+                                  {files.map((f, i) => (
+                                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                                      <FileText className="size-4 text-muted-foreground shrink-0" />
+                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {cleanText && (
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
+                                  <HighlightMentions text={cleanText} agentNames={agentNames} onFileClick={openFileInComputer} />
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
