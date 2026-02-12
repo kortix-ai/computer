@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useEffect, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
-import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Terminal as XTerm, ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -14,10 +13,10 @@ import type { Pty } from '@kortix/opencode-sdk/v2/client';
 // Theme
 // ============================================================================
 
-const darkTheme: ITheme = {
-  background: 'rgba(15, 15, 20, 0.85)',
+const terminalTheme: ITheme = {
+  background: '#0f0f14',
   foreground: '#e4e4e7',
-  cursor: '#a78bfa',
+  cursor: '#e4e4e7',
   cursorAccent: '#0f0f14',
   selectionBackground: 'rgba(139, 92, 246, 0.3)',
   black: '#27272a',
@@ -35,30 +34,6 @@ const darkTheme: ITheme = {
   brightBlue: '#93c5fd',
   brightMagenta: '#d8b4fe',
   brightCyan: '#67e8f9',
-  brightWhite: '#fafafa',
-};
-
-const lightTheme: ITheme = {
-  background: 'rgba(250, 250, 252, 0.9)',
-  foreground: '#18181b',
-  cursor: '#7c3aed',
-  cursorAccent: '#fafafc',
-  selectionBackground: 'rgba(124, 58, 237, 0.15)',
-  black: '#18181b',
-  red: '#dc2626',
-  green: '#16a34a',
-  yellow: '#ca8a04',
-  blue: '#2563eb',
-  magenta: '#9333ea',
-  cyan: '#0891b2',
-  white: '#a1a1aa',
-  brightBlack: '#52525b',
-  brightRed: '#ef4444',
-  brightGreen: '#22c55e',
-  brightYellow: '#eab308',
-  brightBlue: '#3b82f6',
-  brightMagenta: '#a855f7',
-  brightCyan: '#06b6d4',
   brightWhite: '#fafafa',
 };
 
@@ -109,8 +84,6 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
   hidden,
   onStatusChange,
 }, ref) {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -177,10 +150,10 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
 
     const term = new XTerm({
       cursorBlink: true,
-      cursorStyle: 'bar',
+      cursorStyle: 'block',
       fontSize: 13,
       fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
-      theme: isDark ? darkTheme : lightTheme,
+      theme: terminalTheme,
       allowProposedApi: true,
     });
 
@@ -241,6 +214,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
         }
         console.log('[PtyTerminal] WebSocket connected');
         term.reset(); // Clear the "Connecting..." message
+        term.options.theme = terminalTheme; // Re-apply after reset
         updateStatus('connected');
 
         // Send initial terminal size so the shell renders a prompt
@@ -305,13 +279,6 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
     };
   }, [pty.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Theme updates
-  useEffect(() => {
-    if (xtermRef.current) {
-      xtermRef.current.options.theme = isDark ? darkTheme : lightTheme;
-    }
-  }, [isDark]);
-
   // Re-fit and focus when becoming visible (tab switch)
   useEffect(() => {
     if (!hidden) {
@@ -327,7 +294,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
       ref={terminalRef}
       className={cn(
         'overflow-hidden',
-        'bg-gradient-to-b from-zinc-50 to-white dark:from-[#0f0f14] dark:to-[#0a0a0d]',
+        'bg-[#0f0f14]',
         hidden && 'invisible pointer-events-none',
         className,
       )}
