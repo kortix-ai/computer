@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Terminal as XTerm, ITheme } from '@xterm/xterm';
@@ -68,9 +68,15 @@ const lightTheme: ITheme = {
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
+export interface PtyTerminalHandle {
+  focus: () => void;
+  kill: () => void;
+}
+
 interface PtyTerminalProps {
   pty: Pty;
   className?: string;
+  hidden?: boolean;
   onStatusChange?: (status: ConnectionStatus) => void;
 }
 
@@ -97,11 +103,12 @@ function safeFit(fitAddon: FitAddon | null, container: HTMLDivElement | null) {
 
 let globalPtyConnectionId = 0;
 
-export const PtyTerminal = memo(function PtyTerminal({
+export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(function PtyTerminal({
   pty,
   className,
+  hidden,
   onStatusChange,
-}: PtyTerminalProps) {
+}, ref) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -110,6 +117,7 @@ export const PtyTerminal = memo(function PtyTerminal({
   const wsRef = useRef<WebSocket | null>(null);
   const connectionIdRef = useRef<number>(0);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hadErrorRef = useRef(false);
 
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const updatePty = useUpdatePty();
@@ -118,6 +126,24 @@ export const PtyTerminal = memo(function PtyTerminal({
     setStatus(s);
     onStatusChange?.(s);
   }, [onStatusChange]);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      xtermRef.current?.focus();
+    },
+    kill: () => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        // Ctrl+C to cancel any pending input
+        wsRef.current.send('\x03');
+        // Small delay so the shell processes Ctrl+C before receiving exit
+        setTimeout(() => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send('exit\n');
+          }
+        }, 50);
+      }
+    },
+  }));
 
   // Disconnect WebSocket
   const disconnect = useCallback(() => {
@@ -142,66 +168,12 @@ export const PtyTerminal = memo(function PtyTerminal({
     }, 100);
   }, [pty.id, updatePty]);
 
-  // Connect WebSocket to PTY
-  const connectWebSocket = useCallback((term: XTerm) => {
-    if (wsRef.current) return;
-
-    globalPtyConnectionId++;
-    const myConnectionId = globalPtyConnectionId;
-    connectionIdRef.current = myConnectionId;
-
-    updateStatus('connecting');
-    term.writeln('\x1b[33mConnecting to terminal...\x1b[0m');
-
-    const wsUrl = getPtyWebSocketUrl(pty.id);
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      if (connectionIdRef.current !== myConnectionId) {
-        ws.close();
-        return;
-      }
-      updateStatus('connected');
-
-      // Send initial terminal size so the shell renders a prompt
-      const { cols, rows } = term;
-      if (cols && rows) {
-        sendResize(cols, rows);
-      }
-    };
-
-    ws.onmessage = (event) => {
-      if (connectionIdRef.current !== myConnectionId) return;
-      // PTY WebSocket sends raw terminal data
-      if (typeof event.data === 'string') {
-        term.write(event.data);
-      } else if (event.data instanceof Blob) {
-        event.data.text().then((text) => term.write(text));
-      }
-    };
-
-    ws.onerror = () => {
-      if (connectionIdRef.current !== myConnectionId) return;
-      term.writeln('\x1b[31mConnection error\x1b[0m');
-      updateStatus('error');
-    };
-
-    ws.onclose = (event) => {
-      if (connectionIdRef.current !== myConnectionId) return;
-      wsRef.current = null;
-      if (status !== 'error') {
-        term.writeln(`\x1b[33mConnection closed${event.code ? ` (${event.code})` : ''}\x1b[0m`);
-      }
-      updateStatus('disconnected');
-    };
-  }, [pty.id, updateStatus, sendResize, status]);
-
-  // Initialize xterm
+  // Initialize xterm + connect WebSocket (all in one effect to avoid stale closures)
   useEffect(() => {
     if (!terminalRef.current) return;
 
     const container = terminalRef.current;
+    hadErrorRef.current = false;
 
     const term = new XTerm({
       cursorBlink: true,
@@ -223,14 +195,6 @@ export const PtyTerminal = memo(function PtyTerminal({
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Delay initial fit to ensure the container has real dimensions
-    // This prevents the "Cannot read properties of undefined (reading 'dimensions')" error
-    const initFitTimer = setTimeout(() => {
-      safeFit(fitAddon, container);
-      // Connect WebSocket only after the terminal is properly sized
-      connectWebSocket(term);
-    }, 50);
-
     // Send user input through WebSocket
     term.onData((data) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -248,13 +212,89 @@ export const PtyTerminal = memo(function PtyTerminal({
     window.addEventListener('resize', handleResize);
 
     const resizeObserver = new ResizeObserver(() => {
-      // Use rAF to ensure layout has settled before measuring
       requestAnimationFrame(() => safeFit(fitAddonRef.current, container));
     });
     resizeObserver.observe(container);
 
+    // Delay fit + WS connect to ensure the container has real dimensions
+    const initTimer = setTimeout(() => {
+      safeFit(fitAddon, container);
+
+      // --- WebSocket connect ---
+      globalPtyConnectionId++;
+      const myConnectionId = globalPtyConnectionId;
+      connectionIdRef.current = myConnectionId;
+
+      updateStatus('connecting');
+      term.writeln('\x1b[33mConnecting to terminal...\x1b[0m');
+
+      const wsUrl = getPtyWebSocketUrl(pty.id);
+      console.log('[PtyTerminal] Connecting WebSocket:', wsUrl);
+
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        if (connectionIdRef.current !== myConnectionId) {
+          ws.close();
+          return;
+        }
+        console.log('[PtyTerminal] WebSocket connected');
+        term.reset(); // Clear the "Connecting..." message
+        updateStatus('connected');
+
+        // Send initial terminal size so the shell renders a prompt
+        const { cols, rows } = term;
+        if (cols && rows) {
+          sendResize(cols, rows);
+        }
+
+        // Set up color support in the shell — env vars + aliases, then clear
+        // the setup noise so the user gets a clean, colorized prompt.
+        const init = [
+          'export TERM=xterm-256color',
+          'export COLORTERM=truecolor',
+          'export CLICOLOR=1',
+          'export LS_COLORS="di=1;34:ln=1;36:so=1;35:pi=33:ex=1;32:bd=1;33:cd=1;33:su=37;41:sg=30;43:tw=30;42:ow=34;42"',
+          'alias ls="ls --color=auto" 2>/dev/null',
+          'alias grep="grep --color=auto"',
+          'alias diff="diff --color=auto"',
+          'clear',
+        ].join(' && ');
+        ws.send(init + '\n');
+      };
+
+      ws.onmessage = (event) => {
+        if (connectionIdRef.current !== myConnectionId) return;
+        if (typeof event.data === 'string') {
+          term.write(event.data);
+        } else if (event.data instanceof Blob) {
+          event.data.text().then((text) => term.write(text));
+        }
+      };
+
+      ws.onerror = (err) => {
+        if (connectionIdRef.current !== myConnectionId) return;
+        console.error('[PtyTerminal] WebSocket error:', err);
+        hadErrorRef.current = true;
+        term.writeln('\r\n\x1b[31mFailed to connect to terminal.\x1b[0m');
+        term.writeln('\x1b[90mURL: ' + wsUrl + '\x1b[0m');
+        updateStatus('error');
+      };
+
+      ws.onclose = (event) => {
+        if (connectionIdRef.current !== myConnectionId) return;
+        console.log('[PtyTerminal] WebSocket closed:', event.code, event.reason);
+        wsRef.current = null;
+        if (!hadErrorRef.current) {
+          term.writeln(`\r\n\x1b[33mConnection closed${event.code ? ` (${event.code})` : ''}${event.reason ? ': ' + event.reason : ''}\x1b[0m`);
+        }
+        updateStatus('disconnected');
+      };
+    }, 80);
+
     return () => {
-      clearTimeout(initFitTimer);
+      clearTimeout(initTimer);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
       if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
@@ -272,12 +312,23 @@ export const PtyTerminal = memo(function PtyTerminal({
     }
   }, [isDark]);
 
+  // Re-fit and focus when becoming visible (tab switch)
+  useEffect(() => {
+    if (!hidden) {
+      requestAnimationFrame(() => {
+        safeFit(fitAddonRef.current, terminalRef.current);
+        xtermRef.current?.focus();
+      });
+    }
+  }, [hidden]);
+
   return (
     <div
       ref={terminalRef}
       className={cn(
         'overflow-hidden',
         'bg-gradient-to-b from-zinc-50 to-white dark:from-[#0f0f14] dark:to-[#0a0a0d]',
+        hidden && 'invisible pointer-events-none',
         className,
       )}
       style={{ padding: '8px 12px' }}

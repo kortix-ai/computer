@@ -52,6 +52,7 @@ interface SessionItemProps {
   hasChildren: boolean;
   isExpanded: boolean;
   isFork: boolean;
+  parentTitle?: string;
   onToggleExpand: () => void;
   onClick: (e: React.MouseEvent, sessionId: string) => void;
   onDelete: (sessionId: string, title: string) => void;
@@ -68,6 +69,7 @@ function SessionItem({
   hasChildren,
   isExpanded,
   isFork,
+  parentTitle,
   onToggleExpand,
   onClick,
   onDelete,
@@ -113,10 +115,12 @@ function SessionItem({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="flex-shrink-0 w-4 flex items-center justify-center">
-                <GitFork className="size-3 text-emerald-500" />
+                <GitFork className="size-3 text-muted-foreground/60" />
               </span>
             </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs">Forked session</TooltipContent>
+            <TooltipContent side="right" className="text-xs">
+              Forked from {parentTitle || 'parent session'}
+            </TooltipContent>
           </Tooltip>
         ) : depth > 0 ? (
           <span className="flex-shrink-0 w-4 flex items-center justify-center">
@@ -238,6 +242,7 @@ interface SessionTreeNodeProps {
   childMap: Map<string, string[]>;
   expandedNodes: Record<string, boolean>;
   forkIds: Set<string>;
+  parentTitle?: string;
   onToggleExpand: (sessionId: string) => void;
   isActiveSession: (sessionId: string) => boolean;
   getStatus: (sessionId: string) => { isBusy: boolean; pendingCount: number };
@@ -254,6 +259,7 @@ function SessionTreeNode({
   childMap,
   expandedNodes,
   forkIds,
+  parentTitle,
   onToggleExpand,
   isActiveSession,
   getStatus,
@@ -287,6 +293,7 @@ function SessionTreeNode({
         hasChildren={hasChildren}
         isExpanded={isExpanded}
         isFork={forkIds.has(session.id)}
+        parentTitle={parentTitle}
         onToggleExpand={() => onToggleExpand(session.id)}
         onClick={onClick}
         onDelete={onDelete}
@@ -311,6 +318,7 @@ function SessionTreeNode({
               childMap={childMap}
               expandedNodes={expandedNodes}
               forkIds={forkIds}
+              parentTitle={session.title || 'Untitled'}
               onToggleExpand={onToggleExpand}
               isActiveSession={isActiveSession}
               getStatus={getStatus}
@@ -353,23 +361,50 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   // Track which tree nodes are manually expanded/collapsed
   const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
 
-  // Build a set of session IDs that are forks (stored in localStorage by the fork handler)
-  const forkIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (typeof window === 'undefined' || !sessions) return ids;
+  // Build fork origin map from localStorage: forkSessionId → parentSessionId.
+  // This is the client-side source of truth for fork relationships because the
+  // server may not set parentID on forked sessions.
+  const forkOriginMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (typeof window === 'undefined' || !sessions) return map;
     for (const s of sessions) {
-      if (s.parentID && localStorage.getItem(`fork_origin_${s.id}`)) {
-        ids.add(s.id);
+      const origin = localStorage.getItem(`fork_origin_${s.id}`);
+      if (origin) {
+        map.set(s.id, origin);
       }
     }
-    return ids;
+    return map;
   }, [sessions]);
 
-  // Build child map for tree structure
-  const childMap = useMemo(
-    () => (sessions ? childMapByParent(sessions) : new Map<string, string[]>()),
-    [sessions],
-  );
+  // Set of session IDs that are forks
+  const forkIds = useMemo(() => new Set(forkOriginMap.keys()), [forkOriginMap]);
+
+  // Build child map for tree structure.
+  // Merges server-side parentID relationships with client-side fork origin data
+  // so that forked sessions appear under their parent even if the server doesn't
+  // populate parentID.
+  const childMap = useMemo(() => {
+    if (!sessions) return new Map<string, string[]>();
+    const map = childMapByParent(sessions);
+
+    // Add fork relationships from localStorage that aren't already in the map
+    for (const [forkId, parentId] of forkOriginMap) {
+      const session = sessions.find((s) => s.id === forkId);
+      // Skip if the session already has parentID (already in the server-side map)
+      if (session?.parentID) continue;
+      // Skip if the parent session doesn't exist
+      if (!sessions.find((s) => s.id === parentId)) continue;
+
+      const existing = map.get(parentId);
+      if (existing) {
+        if (!existing.includes(forkId)) existing.push(forkId);
+      } else {
+        map.set(parentId, [forkId]);
+      }
+    }
+
+    return map;
+  }, [sessions, forkOriginMap]);
 
   // Count pending for a single session (not recursive)
   // For questions, count the total number of individual questions across all requests
@@ -410,7 +445,14 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     [childMap, statuses, countPendingForSession],
   );
 
-  // Compute expanded state: manual overrides take priority, otherwise auto-expand when descendants are active
+  // Extract the active session ID from the URL so we can auto-expand its parent
+  const activeSessionId = useMemo(() => {
+    const match = pathname?.match(/^\/sessions\/([^/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
+
+  // Compute expanded state: manual overrides take priority, otherwise auto-expand
+  // when a descendant is active (busy/pending) or when the user is viewing a child session.
   const expandedNodes = useMemo(() => {
     const result: Record<string, boolean> = {};
     if (!sessions) return result;
@@ -420,12 +462,15 @@ export function SessionList({ projectId }: SessionListProps = {}) {
       if (session.id in manualExpanded) {
         result[session.id] = manualExpanded[session.id];
       } else {
-        // Auto-expand if any descendant is active
-        result[session.id] = hasActiveDescendant(session.id);
+        // Auto-expand if any descendant is active (busy/pending)
+        // or if the user is currently viewing a descendant session
+        const descendants = allDescendantIds(childMap, session.id);
+        const viewingDescendant = !!activeSessionId && descendants.includes(activeSessionId);
+        result[session.id] = hasActiveDescendant(session.id) || viewingDescendant;
       }
     }
     return result;
-  }, [sessions, childMap, manualExpanded, hasActiveDescendant]);
+  }, [sessions, childMap, manualExpanded, hasActiveDescendant, activeSessionId]);
 
   const handleToggleExpand = useCallback((sessionId: string) => {
     setManualExpanded((prev) => ({
@@ -445,10 +490,11 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     [getPendingCount, statuses],
   );
 
-  // Filter to root sessions only for the top-level list
+  // Filter to root sessions only for the top-level list.
+  // Exclude sessions that have parentID OR are forks tracked in localStorage.
   const rootSessions = useMemo(() => {
     if (!sessions) return [];
-    let list = sessions.filter((s) => !s.parentID && !(s.time as any).archived);
+    let list = sessions.filter((s) => !s.parentID && !forkIds.has(s.id) && !(s.time as any).archived);
     if (projectId !== null && projectId !== undefined) {
       list = list.filter((s) => s.projectID === projectId);
     }
@@ -466,7 +512,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
       if (bBusy > aBusy) return 1;
       return 0;
     });
-  }, [sessions, projectId, statuses, getPendingCount]);
+  }, [sessions, projectId, statuses, getPendingCount, forkIds]);
 
   const handleSessionClick = (e: React.MouseEvent, sessionId: string) => {
     if (e.metaKey || e.ctrlKey) return;
@@ -475,11 +521,13 @@ export function SessionList({ projectId }: SessionListProps = {}) {
 
     const session = rootSessions.find(s => s.id === sessionId) ||
       sessions?.find(s => s.id === sessionId);
+    const parentId = session?.parentID || forkOriginMap.get(sessionId);
     useTabStore.getState().openTab({
       id: sessionId,
       title: session?.title || 'Session',
       type: 'session',
       href: `/sessions/${sessionId}`,
+      ...(parentId && { parentSessionId: parentId }),
     });
 
     startTransition(() => {

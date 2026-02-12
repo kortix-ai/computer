@@ -17,6 +17,7 @@ import {
   Info,
   GitFork,
   Layers,
+  Undo2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -108,7 +109,7 @@ import { SessionWelcome } from '@/components/session/session-welcome';
 import { ToolPartRenderer } from '@/components/session/tool-renderers';
 import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
-import { MessageActions, RevertBanner } from '@/components/session/message-actions';
+import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
 import { useTabStore } from '@/stores/tab-store';
 
 // ============================================================================
@@ -144,7 +145,7 @@ function SubSessionBar({
         className={cn(
           'h-[2px] bg-gradient-to-r',
           isFork
-            ? 'from-emerald-500/80 via-teal-500/80 to-cyan-500/60'
+            ? 'from-muted-foreground/30 via-muted-foreground/20 to-muted-foreground/10'
             : 'from-indigo-500/80 via-violet-500/80 to-purple-500/60',
         )}
       />
@@ -167,23 +168,13 @@ function SubSessionBar({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <div
-              className={cn(
-                'flex items-center gap-1.5 h-6 px-2 rounded-md',
-                isFork ? 'bg-emerald-500/10' : 'bg-muted/50',
-              )}
-            >
+            <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-muted/50">
               {isFork ? (
-                <GitFork className="size-3 text-emerald-500 flex-shrink-0" />
+                <GitFork className="size-3 text-muted-foreground flex-shrink-0" />
               ) : (
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-500 flex-shrink-0" />
               )}
-              <span
-                className={cn(
-                  'text-[11px] font-medium',
-                  isFork ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
-                )}
-              >
+              <span className="text-[11px] font-medium text-muted-foreground">
                 {isFork ? 'Fork' : 'Thread'}
               </span>
             </div>
@@ -204,19 +195,13 @@ function SubSessionInputBanner({ parentID, variant = 'thread' }: { parentID: str
   const isForkVariant = variant === 'fork';
 
   return (
-    <div className={cn(
-      'flex items-center gap-2 px-4 py-1.5 border-t border-border/40',
-      isForkVariant ? 'bg-emerald-500/5' : 'bg-muted/20',
-    )}>
+    <div className="flex items-center gap-2 px-4 py-1.5 border-t border-border/40 bg-muted/20">
       {isForkVariant ? (
-        <GitFork className="size-3 text-emerald-500/70 flex-shrink-0" />
+        <GitFork className="size-3 text-muted-foreground/60 flex-shrink-0" />
       ) : (
         <span className="h-1.5 w-1.5 rounded-full bg-violet-500/70 flex-shrink-0" />
       )}
-      <span className={cn(
-        'text-[11px] truncate',
-        isForkVariant ? 'text-emerald-600 dark:text-emerald-400/70' : 'text-muted-foreground',
-      )}>
+      <span className="text-[11px] text-muted-foreground truncate">
         {isForkVariant ? 'Continuing in fork' : 'Replying in thread'}
       </span>
       <button
@@ -241,18 +226,18 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
 
   return (
     <div className="flex items-center gap-3 py-2 mb-2">
-      <div className="flex-1 h-px bg-emerald-500/20" />
+      <div className="flex-1 h-px bg-border/50" />
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             onClick={() => parentSession && router.push(`/sessions/${parentSession.id}`)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors cursor-pointer group"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
           >
-            <GitFork className="size-3 text-emerald-500/70" />
-            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400/80 uppercase tracking-wider">
+            <GitFork className="size-3 text-muted-foreground/60" />
+            <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
               Forked from
             </span>
-            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 max-w-[150px] truncate">
+            <span className="text-[10px] font-medium text-muted-foreground max-w-[150px] truncate">
               {parentTitle}
             </span>
           </button>
@@ -261,7 +246,7 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
           Go to parent session: {parentTitle}
         </TooltipContent>
       </Tooltip>
-      <div className="flex-1 h-px bg-emerald-500/20" />
+      <div className="flex-1 h-px bg-border/50" />
     </div>
   );
 }
@@ -603,18 +588,6 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
               </div>
             )}
 
-            {/* Copy button (top-right, visible on hover) */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleCopy}
-                  className="absolute top-3 right-4 p-1 rounded-md opacity-0 group-hover:opacity-100 bg-card/80 backdrop-blur-sm text-muted-foreground hover:text-foreground transition-all cursor-pointer"
-                >
-                  {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="left">{copied ? 'Copied!' : 'Copy'}</TooltipContent>
-            </Tooltip>
           </div>
         )}
       </div>
@@ -680,6 +653,9 @@ function SessionTurn({
   onRevert,
 }: SessionTurnProps) {
   const [copied, setCopied] = useState(false);
+  const [userCopied, setUserCopied] = useState(false);
+  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+  const [revertLoading, setRevertLoading] = useState(false);
 
   // Derived state from shared helpers
   const allParts = useMemo(() => collectTurnParts(turn), [turn]);
@@ -757,6 +733,19 @@ function SessionTurn({
     const msgs = turn.assistantMessages;
     return msgs.length > 0 ? msgs[msgs.length - 1].info.id : undefined;
   }, [turn.assistantMessages]);
+
+  // User message text — for copy action
+  const userMessageText = useMemo(() => {
+    const textParts = turn.userMessage.parts.filter(isTextPart) as TextPart[];
+    return textParts.map((p) => p.text).join('\n').trim();
+  }, [turn.userMessage.parts]);
+
+  const handleCopyUser = async () => {
+    if (!userMessageText) return;
+    await navigator.clipboard.writeText(userMessageText);
+    setUserCopied(true);
+    setTimeout(() => setUserCopied(false), 2000);
+  };
 
   // ---- Status throttling (2.5s) ----
   const lastStatusChangeRef = useRef(Date.now());
@@ -859,19 +848,22 @@ function SessionTurn({
       <div>
         {/* User message */}
         <UserMessageRow message={turn.userMessage} agentNames={agentNames} />
-
-        {/* Fork / Revert actions — visible on hover */}
-        <div className="flex justify-end mt-1">
-          <MessageActions
-            messageId={turn.userMessage.info.id}
-            sessionId={sessionId}
-            isFirstTurn={isFirstTurn}
-            isBusy={isBusy}
-            isReverted={isReverted}
-            onFork={onFork}
-            onRevert={onRevert}
-          />
-        </div>
+        {/* User message actions */}
+        {userMessageText && (
+          <div className="flex justify-end mt-1 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleCopyUser}
+                  className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                >
+                  {userCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{userCopied ? 'Copied!' : 'Copy'}</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
       </div>
 
       {/* Kortix logo header */}
@@ -1111,35 +1103,6 @@ function SessionTurn({
               />
             </div>
           )}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-medium text-muted-foreground">Response</span>
-            <div className="ml-auto flex items-center gap-0.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={handleCopy}
-                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                  >
-                    {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{copied ? 'Copied!' : 'Copy'}</TooltipContent>
-              </Tooltip>
-              {!isBusy && !isReverted && lastAssistantMessageId && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => onFork(lastAssistantMessageId)}
-                      className="p-1 rounded-md text-muted-foreground/60 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                    >
-                      <GitFork className="size-3" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Fork from this response</TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-          </div>
           <div className="text-sm">
             <UnifiedMarkdown content={response} isStreaming={false} />
           </div>
@@ -1203,6 +1166,69 @@ function SessionTurn({
           onReply={onQuestionReply}
           onReject={onQuestionReject}
         />
+      )}
+
+      {/* Unified action bar — copy, fork, revert under the response */}
+      {!working && response && (
+        <>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleCopy}
+                  className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                >
+                  {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{copied ? 'Copied!' : 'Copy'}</TooltipContent>
+            </Tooltip>
+            {!isBusy && !isReverted && lastAssistantMessageId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onFork(lastAssistantMessageId)}
+                    className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                  >
+                    <GitFork className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Fork from here</TooltipContent>
+              </Tooltip>
+            )}
+            {!isFirstTurn && !isBusy && !isReverted && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setRevertDialogOpen(true)}
+                    className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                  >
+                    <Undo2 className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Revert to before this</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          <ConfirmDialog
+            open={revertDialogOpen}
+            onOpenChange={setRevertDialogOpen}
+            title="Revert to this point"
+            description="This will undo all messages and file changes after this point. You can restore them later by clicking the undo button in the revert banner."
+            action={async () => {
+              setRevertLoading(true);
+              try {
+                await onRevert(turn.userMessage.info.id);
+              } finally {
+                setRevertLoading(false);
+                setRevertDialogOpen(false);
+              }
+            }}
+            actionLabel="Revert"
+            variant="destructive"
+            loading={revertLoading}
+          />
+        </>
       )}
     </div>
   );
@@ -1546,18 +1572,18 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     }
   }, []);
 
-  // Detect if this session was forked (vs a task sub-session).
+  // Detect if this session was forked and resolve its parent.
   // Must be above early returns to preserve hook order.
-  // The fork origin is stored in localStorage by handleFork so it survives
-  // page refreshes and new tabs.
-  const isSubSession = !!session?.parentID;
-  const isFork = useMemo(() => {
-    if (!isSubSession) return false;
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem(`fork_origin_${sessionId}`);
-    }
-    return false;
-  }, [isSubSession, sessionId]);
+  // localStorage is the source of truth (set by handleFork). The server may
+  // or may not populate parentID on the forked session.
+  const forkParentId = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(`fork_origin_${sessionId}`);
+  }, [sessionId]);
+  const isSubSession = !!session?.parentID || !!forkParentId;
+  const isFork = !!forkParentId;
+  // The effective parent ID: prefer server parentID, fall back to localStorage
+  const effectiveParentId = session?.parentID || forkParentId;
 
   // ============================================================================
   // Loading / Not-found states
@@ -1585,10 +1611,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   return (
     <div className="relative flex flex-col h-full bg-background">
       {/* Sub-session / fork top bar */}
-      {isSubSession && (
+      {isSubSession && effectiveParentId && (
         <SubSessionBar
           sessionId={sessionId}
-          parentID={session.parentID}
+          parentID={effectiveParentId}
           variant={isFork ? 'fork' : 'thread'}
         />
       )}
@@ -1635,8 +1661,8 @@ export function SessionChat({ sessionId }: SessionChatProps) {
             >
               <div className="flex flex-col gap-12 min-w-0">
                 {/* Fork context divider — shown at the top of forked sessions */}
-                {isFork && session?.parentID && (
-                  <ForkContextDivider parentID={session.parentID} />
+                {isFork && effectiveParentId && (
+                  <ForkContextDivider parentID={effectiveParentId} />
                 )}
 
                 {/* Optimistic user message */}
@@ -1769,7 +1795,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       )}
 
       {/* Sub-session indicator above input */}
-      {session?.parentID && <SubSessionInputBanner parentID={session.parentID} variant={isFork ? 'fork' : 'thread'} />}
+      {effectiveParentId && <SubSessionInputBanner parentID={effectiveParentId} variant={isFork ? 'fork' : 'thread'} />}
 
       {/* Input */}
       <SessionChatInput

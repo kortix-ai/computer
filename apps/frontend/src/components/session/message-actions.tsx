@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { GitFork, Undo2, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Undo2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -41,8 +41,6 @@ interface MessageActionsProps {
   isBusy: boolean;
   /** Whether the session is in a reverted state */
   isReverted: boolean;
-  /** Callback to fork the session at this message */
-  onFork: (messageId: string) => Promise<void>;
   /** Callback to revert the session to this message */
   onRevert: (messageId: string) => Promise<void>;
 }
@@ -51,7 +49,7 @@ interface MessageActionsProps {
 // Confirmation Dialog
 // ============================================================================
 
-function ConfirmDialog({
+export function ConfirmDialog({
   open,
   onOpenChange,
   title,
@@ -108,23 +106,11 @@ export function MessageActions({
   isFirstTurn,
   isBusy,
   isReverted,
-  onFork,
   onRevert,
 }: MessageActionsProps) {
-  const [forkDialogOpen, setForkDialogOpen] = useState(false);
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [loading, setLoading] = useState<'fork' | 'revert' | null>(null);
+  const [loading, setLoading] = useState<'revert' | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const handleFork = useCallback(async () => {
-    setLoading('fork');
-    try {
-      await onFork(messageId);
-    } finally {
-      setLoading(null);
-      setForkDialogOpen(false);
-    }
-  }, [messageId, onFork]);
 
   const handleRevert = useCallback(async () => {
     setLoading('revert');
@@ -138,22 +124,24 @@ export function MessageActions({
 
   const disabled = isBusy || isReverted;
 
+  // Don't render anything for first turn (no revert available)
+  if (isFirstTurn) return null;
+
   return (
     <>
       {/* Actions container — visible on hover of the parent group */}
       <div
         className={cn(
           'flex items-center gap-0.5',
-          // Only show on group hover unless menu is open
           !menuOpen && 'opacity-0 group-hover/turn:opacity-100',
           'transition-opacity duration-150',
         )}
       >
-        {/* Fork button — always available */}
+        {/* Revert button */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => setForkDialogOpen(true)}
+              onClick={() => setRevertDialogOpen(true)}
               disabled={disabled}
               className={cn(
                 'p-1.5 rounded-md transition-colors cursor-pointer',
@@ -161,55 +149,18 @@ export function MessageActions({
                 'disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground/60',
               )}
             >
-              {loading === 'fork' ? (
+              {loading === 'revert' ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
-                <GitFork className="size-3.5" />
+                <Undo2 className="size-3.5" />
               )}
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
-            Fork from here
+            Revert to before this
           </TooltipContent>
         </Tooltip>
-
-        {/* Revert button — not shown on first turn */}
-        {!isFirstTurn && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setRevertDialogOpen(true)}
-                disabled={disabled}
-                className={cn(
-                  'p-1.5 rounded-md transition-colors cursor-pointer',
-                  'text-muted-foreground/60 hover:text-foreground hover:bg-muted/60',
-                  'disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground/60',
-                )}
-              >
-                {loading === 'revert' ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Undo2 className="size-3.5" />
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              Revert to before this
-            </TooltipContent>
-          </Tooltip>
-        )}
       </div>
-
-      {/* Fork confirmation dialog */}
-      <ConfirmDialog
-        open={forkDialogOpen}
-        onOpenChange={setForkDialogOpen}
-        title="Fork session"
-        description="This will create a new session branching off from this point. The current session remains unchanged. You can continue the conversation in the new fork."
-        action={handleFork}
-        actionLabel="Fork session"
-        loading={loading === 'fork'}
-      />
 
       {/* Revert confirmation dialog */}
       <ConfirmDialog

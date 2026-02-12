@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { Plus, X, Terminal, CircleDashed, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PtyTerminal } from './pty-terminal';
+import { PtyTerminal, type PtyTerminalHandle } from './pty-terminal';
 import { useOpenCodePtyList, useCreatePty, useRemovePty } from '@/hooks/opencode/use-opencode-pty';
 import type { Pty } from '@kortix/opencode-sdk/v2/client';
 
@@ -20,41 +20,49 @@ export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
   const createPty = useCreatePty();
   const removePty = useRemovePty();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const terminalRefs = useRef<Map<string, PtyTerminalHandle>>(new Map());
 
-  // Auto-select first PTY if none selected
-  const activePtys = useMemo(() => ptys?.filter((p) => p.status === 'running') ?? [], [ptys]);
-  const allPtys = ptys ?? [];
+  // Only show running PTYs — exited ones should disappear
+  const runningPtys = useMemo(() => ptys?.filter((p) => p.status === 'running') ?? [], [ptys]);
 
   const activePty = useMemo(() => {
     if (activeId) {
-      return allPtys.find((p) => p.id === activeId) ?? null;
+      return runningPtys.find((p) => p.id === activeId) ?? null;
     }
-    return activePtys[0] ?? allPtys[0] ?? null;
-  }, [activeId, activePtys, allPtys]);
+    return runningPtys[0] ?? null;
+  }, [activeId, runningPtys]);
 
   const handleCreate = useCallback(async () => {
     try {
-      const newPty = await createPty.mutateAsync({});
+      const newPty = await createPty.mutateAsync({
+        env: { TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+      });
       setActiveId(newPty.id);
     } catch (e) {
       console.error('[PtyTerminalPanel] Failed to create PTY:', e);
     }
   }, [createPty]);
 
-  const handleClose = useCallback(async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await removePty.mutateAsync(id);
-      if (activeId === id) {
-        setActiveId(null);
-      }
-    } catch (e) {
-      console.error('[PtyTerminalPanel] Failed to remove PTY:', e);
+  const handleClose = useCallback((id: string) => {
+    // Kill the shell process (Ctrl+C + exit)
+    terminalRefs.current.get(id)?.kill();
+    terminalRefs.current.delete(id);
+    if (activeId === id) {
+      setActiveId(null);
     }
-  }, [removePty, activeId]);
+    // Give the shell time to exit, then remove the PTY record from the server
+    setTimeout(async () => {
+      try {
+        await removePty.mutateAsync(id);
+      } catch {
+        // Shell already exited — just refetch to sync the list
+        refetch();
+      }
+    }, 500);
+  }, [removePty, activeId, refetch]);
 
   // Empty state - no PTY sessions
-  if (!isLoading && allPtys.length === 0) {
+  if (!isLoading && runningPtys.length === 0) {
     return (
       <div className={cn('h-full flex flex-col', className)}>
         <div className="flex-1 flex flex-col items-center justify-center p-8">
@@ -103,13 +111,16 @@ export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
     <div className={cn('h-full flex flex-col overflow-hidden', className)}>
       {/* Tab bar */}
       <div className="flex-shrink-0 flex items-center gap-0.5 px-2 py-1 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/80 overflow-x-auto">
-        {allPtys.map((p) => (
+        {runningPtys.map((p) => (
           <PtyTab
             key={p.id}
             pty={p}
             isActive={activePty?.id === p.id}
-            onClick={() => setActiveId(p.id)}
-            onClose={(e) => handleClose(p.id, e)}
+            onClick={() => {
+              setActiveId(p.id);
+              // Focus happens via the hidden effect in PtyTerminal
+            }}
+            onClose={() => handleClose(p.id)}
           />
         ))}
         <button
@@ -129,15 +140,24 @@ export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
         </button>
       </div>
 
-      {/* Terminal area */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {activePty ? (
+      {/* Terminal area — render all terminals, show/hide via CSS to preserve state */}
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        {runningPtys.map((p) => (
           <PtyTerminal
-            key={activePty.id}
-            pty={activePty}
-            className="h-full w-full"
+            key={p.id}
+            ref={(handle) => {
+              if (handle) {
+                terminalRefs.current.set(p.id, handle);
+              } else {
+                terminalRefs.current.delete(p.id);
+              }
+            }}
+            pty={p}
+            className="absolute inset-0 h-full w-full"
+            hidden={activePty?.id !== p.id}
           />
-        ) : (
+        ))}
+        {!activePty && (
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
             Select a terminal session
           </div>
@@ -160,13 +180,13 @@ function PtyTab({
   pty: Pty;
   isActive: boolean;
   onClick: () => void;
-  onClose: (e: React.MouseEvent) => void;
+  onClose: () => void;
 }) {
   const label = pty.title || pty.command || `Terminal ${pty.id.slice(0, 6)}`;
   const isRunning = pty.status === 'running';
 
   return (
-    <button
+    <div
       onClick={onClick}
       className={cn(
         'group flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer max-w-[160px]',
@@ -180,13 +200,17 @@ function PtyTab({
         isRunning ? 'bg-emerald-500' : 'bg-zinc-400',
       )} />
       <span className="truncate">{label}</span>
-      <span
-        role="button"
-        onClick={onClose}
-        className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer"
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onClose();
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex-shrink-0 p-1 -mr-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all cursor-pointer"
       >
-        <X className="w-2.5 h-2.5" />
-      </span>
-    </button>
+        <X className="w-3 h-3" />
+      </button>
+    </div>
   );
 }
