@@ -22,6 +22,11 @@ import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 import { childMapByParent } from '@/ui';
 import { getClient } from '@/lib/opencode-sdk';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // ============================================================================
 // Helpers
@@ -180,19 +185,35 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
             onClick={() => { onActivate(tab.id, tab.href); onClose(); }}
           >
             {tab.type === 'session' && (isBusy || pendingCount > 0) ? (
-              <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                {isBusy && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-                {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500" />}
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+                    {isBusy && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                    {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {pendingCount > 0
+                    ? `${pendingCount} pending ${pendingCount === 1 ? 'action' : 'actions'} — waiting for your input`
+                    : 'Working on it…'}
+                </TooltipContent>
+              </Tooltip>
             ) : (
               <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             )}
             <span className="flex-1 truncate">{tab.title || 'Untitled'}</span>
             {tab.pinned && <Pin className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground/50" />}
             {pendingCount > 0 && (
-              <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
-                {pendingCount}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
+                    {pendingCount}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {pendingCount} pending {pendingCount === 1 ? 'action' : 'actions'} — waiting for your input
+                </TooltipContent>
+              </Tooltip>
             )}
           </button>
         );
@@ -334,14 +355,23 @@ function TabItem({
           <Icon className="h-3.5 w-3.5" />
         </div>
       ) : (isBusy || pendingCount > 0) ? (
-        <div className="relative flex-shrink-0 w-2 h-2">
-          {isBusy && (
-            <span className="absolute inset-0 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          )}
-          {pendingCount > 0 && !isBusy && (
-            <span className="absolute inset-0 h-2 w-2 rounded-full bg-amber-500" />
-          )}
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative flex-shrink-0 w-2 h-2">
+              {isBusy && (
+                <span className="absolute inset-0 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              )}
+              {pendingCount > 0 && !isBusy && (
+                <span className="absolute inset-0 h-2 w-2 rounded-full bg-amber-500" />
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            {pendingCount > 0
+              ? `${pendingCount} pending ${pendingCount === 1 ? 'action' : 'actions'} — waiting for your input`
+              : 'Working on it…'}
+          </TooltipContent>
+        </Tooltip>
       ) : null}
 
       {/* Title */}
