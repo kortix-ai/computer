@@ -106,7 +106,7 @@ function SessionItem({
               e.stopPropagation();
               onToggleExpand();
             }}
-            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-sidebar-foreground transition-colors duration-150 cursor-pointer"
+            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/40 hover:text-sidebar-foreground transition-colors duration-150 cursor-pointer"
           >
             <ChevronRight
               className={cn(
@@ -128,11 +128,9 @@ function SessionItem({
           </Tooltip>
         ) : depth > 0 ? (
           <span className="flex-shrink-0 w-4 flex items-center justify-center">
-            <span className="h-1 w-1 rounded-full bg-muted-foreground/25" />
+            <span className="h-1 w-1 rounded-full bg-muted-foreground/20" />
           </span>
-        ) : (
-          <span className="flex-shrink-0 w-4" />
-        )}
+        ) : null}
 
         {/* Status indicator */}
         {(isBusy || pendingCount > 0) && (
@@ -617,13 +615,12 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   return (
     <div className="flex flex-col">
       {/* Session list */}
-      <div className="px-1 pb-2">
+      <div className="px-2 pb-2">
         {isLoading ? (
-          <div className="space-y-1 px-2">
+          <div className="space-y-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2">
-                <div className="h-[18px] w-[18px] bg-muted/30 rounded animate-pulse" />
-                <div className="h-4 bg-muted/20 rounded flex-1 animate-pulse" />
+              <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg">
+                <div className="h-3.5 w-24 bg-muted/20 rounded animate-pulse" />
               </div>
             ))}
           </div>
@@ -664,12 +661,8 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             {/* Divider between pending and other sessions */}
             {rootSessions.some((s) => getPendingCount(s.id) > 0) &&
               rootSessions.some((s) => getPendingCount(s.id) === 0) && (
-              <div className="flex items-center gap-2.5 px-3 py-2">
-                <div className="flex-1 h-px bg-border/30" />
-                <span className="text-[10px] font-medium text-muted-foreground/30 uppercase tracking-wider">
-                  Other
-                </span>
-                <div className="flex-1 h-px bg-border/30" />
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <div className="flex-1 h-px bg-border/20" />
               </div>
             )}
 
