@@ -1,11 +1,61 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Plus, X, Terminal, CircleDashed, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PtyTerminal, type PtyTerminalHandle } from './pty-terminal';
 import { useOpenCodePtyList, useCreatePty, useRemovePty } from '@/hooks/opencode/use-opencode-pty';
+import { useServerStore } from '@/stores/server-store';
 import type { Pty } from '@kortix/opencode-sdk/v2/client';
+
+// ============================================================================
+// Per-instance localStorage persistence
+// ============================================================================
+
+const ACTIVE_TAB_KEY = 'pty-active-tabs';
+const PTY_CACHE_KEY = 'pty-cached-lists';
+
+function getPersistedActiveTab(serverId: string): string | null {
+  try {
+    const data = JSON.parse(localStorage.getItem(ACTIVE_TAB_KEY) || '{}');
+    return data[serverId] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function setPersistedActiveTab(serverId: string, tabId: string | null) {
+  try {
+    const data = JSON.parse(localStorage.getItem(ACTIVE_TAB_KEY) || '{}');
+    if (tabId) {
+      data[serverId] = tabId;
+    } else {
+      delete data[serverId];
+    }
+    localStorage.setItem(ACTIVE_TAB_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function getCachedPtyList(serverId: string): Pty[] {
+  try {
+    const data = JSON.parse(localStorage.getItem(PTY_CACHE_KEY) || '{}');
+    return data[serverId] ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function setCachedPtyList(serverId: string, ptys: Pty[]) {
+  try {
+    const data = JSON.parse(localStorage.getItem(PTY_CACHE_KEY) || '{}');
+    if (ptys.length > 0) {
+      data[serverId] = ptys;
+    } else {
+      delete data[serverId];
+    }
+    localStorage.setItem(PTY_CACHE_KEY, JSON.stringify(data));
+  } catch {}
+}
 
 // ============================================================================
 // PtyTerminalPanel
@@ -13,17 +63,46 @@ import type { Pty } from '@kortix/opencode-sdk/v2/client';
 
 interface PtyTerminalPanelProps {
   className?: string;
+  /** The server this panel belongs to. */
+  serverId: string;
+  /** When true, panel stays mounted but hidden (preserves WebSocket connections). */
+  hidden?: boolean;
 }
 
-export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
-  const { data: ptys, isLoading, refetch } = useOpenCodePtyList();
+export function PtyTerminalPanel({ className, serverId, hidden }: PtyTerminalPanelProps) {
+  // Look up THIS panel's server URL (stable across instance switches)
+  const serverUrl = useServerStore((s) => {
+    const server = s.servers.find((srv) => srv.id === serverId);
+    return server?.url ?? s.getActiveServerUrl();
+  });
+  // Only fetch PTYs when this panel is visible (active server)
+  const { data: ptys, isLoading, refetch } = useOpenCodePtyList({ enabled: !hidden, serverUrl });
   const createPty = useCreatePty();
   const removePty = useRemovePty();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveIdRaw] = useState<string | null>(() => getPersistedActiveTab(serverId));
   const terminalRefs = useRef<Map<string, PtyTerminalHandle>>(new Map());
 
-  // Only show running PTYs — exited ones should disappear
-  const runningPtys = useMemo(() => ptys?.filter((p) => p.status === 'running') ?? [], [ptys]);
+  // Wrap setActiveId to also persist to localStorage
+  const setActiveId = useCallback((id: string | null) => {
+    setActiveIdRaw(id);
+    setPersistedActiveTab(serverId, id);
+  }, [serverId]);
+
+  // Only show running PTYs — exited ones should disappear.
+  // Fall back to localStorage cache so tabs survive page refresh / instance switch.
+  const cachedPtys = useMemo(() => getCachedPtyList(serverId), [serverId]);
+  const runningPtys = useMemo(() => {
+    const list = ptys?.filter((p) => p.status === 'running');
+    return list && list.length > 0 ? list : cachedPtys.filter((p) => p.status === 'running');
+  }, [ptys, cachedPtys]);
+
+  // Persist running PTYs to localStorage whenever they change
+  useEffect(() => {
+    if (ptys) {
+      const running = ptys.filter((p) => p.status === 'running');
+      setCachedPtyList(serverId, running);
+    }
+  }, [ptys, serverId]);
 
   const activePty = useMemo(() => {
     if (activeId) {
@@ -41,7 +120,7 @@ export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
     } catch (e) {
       console.error('[PtyTerminalPanel] Failed to create PTY:', e);
     }
-  }, [createPty]);
+  }, [createPty, setActiveId]);
 
   const handleClose = useCallback((id: string) => {
     // Kill the shell process (Ctrl+C + exit)
@@ -59,7 +138,28 @@ export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
         refetch();
       }
     }, 500);
-  }, [removePty, activeId, refetch]);
+  }, [removePty, activeId, refetch, setActiveId]);
+
+  // When panel is hidden (inactive server), just keep terminals alive
+  if (hidden) {
+    return (
+      <div className={cn('invisible pointer-events-none', className)}>
+        {runningPtys.map((p) => (
+          <PtyTerminal
+            key={p.id}
+            ref={(handle) => {
+              if (handle) terminalRefs.current.set(p.id, handle);
+              else terminalRefs.current.delete(p.id);
+            }}
+            pty={p}
+            serverUrl={serverUrl}
+            className="absolute inset-0 h-full w-full"
+            hidden
+          />
+        ))}
+      </div>
+    );
+  }
 
   // Empty state - no PTY sessions
   if (!isLoading && runningPtys.length === 0) {
@@ -118,7 +218,6 @@ export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
             isActive={activePty?.id === p.id}
             onClick={() => {
               setActiveId(p.id);
-              // Focus happens via the hidden effect in PtyTerminal
             }}
             onClose={() => handleClose(p.id)}
           />
@@ -153,6 +252,7 @@ export function PtyTerminalPanel({ className }: PtyTerminalPanelProps) {
               }
             }}
             pty={p}
+            serverUrl={serverUrl}
             className="absolute inset-0 h-full w-full"
             hidden={activePty?.id !== p.id}
           />

@@ -267,7 +267,7 @@ export function useOpenCodeEventStream() {
         case 'pty.updated':
         case 'pty.exited':
         case 'pty.deleted': {
-          queryClient.invalidateQueries({ queryKey: ptyKeys.list() });
+          queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix() });
           break;
         }
 

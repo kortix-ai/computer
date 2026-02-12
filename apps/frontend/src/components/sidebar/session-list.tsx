@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useTabStore } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 
 import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
@@ -533,6 +534,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
       type: 'session',
       href: `/sessions/${sessionId}`,
       ...(parentId && { parentSessionId: parentId }),
+      serverId: useServerStore.getState().activeServerId,
     });
 
     startTransition(() => {

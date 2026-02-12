@@ -111,6 +111,7 @@ import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
 import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
 import { useTabStore } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 
 // ============================================================================
 // Sub-Session / Fork Breadcrumb
@@ -1473,6 +1474,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         type: 'session',
         href: `/sessions/${forkedSession.id}`,
         parentSessionId: sessionId,
+        serverId: useServerStore.getState().activeServerId,
       });
       // Store fork origin in localStorage (survives refresh) so the forked
       // session can show the "Forked from" indicator.

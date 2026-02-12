@@ -14,6 +14,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useServerStore, type ServerEntry } from '@/stores/server-store';
+import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
@@ -340,6 +341,7 @@ function InstanceManagerDialog({
 
     if (mode === 'add') {
       const newServer = addServer(label, url);
+      useTabStore.getState().swapForServer(newServer.id, activeServerId);
       setActiveServer(newServer.id);
       router.push('/dashboard');
       onOpenChange(false);
@@ -359,6 +361,7 @@ function InstanceManagerDialog({
         sandbox.name || 'Cloud Sandbox',
         getSandboxUrl(sandbox),
       );
+      useTabStore.getState().swapForServer(newServer.id, activeServerId);
       setActiveServer(newServer.id);
       router.push('/dashboard');
       onOpenChange(false);
@@ -371,6 +374,7 @@ function InstanceManagerDialog({
 
   function handleSelect(id: string) {
     if (id === activeServerId) return;
+    useTabStore.getState().swapForServer(id, activeServerId);
     setActiveServer(id);
     router.push('/dashboard');
     onOpenChange(false);
@@ -546,6 +550,7 @@ export function ServerSelector() {
 
   const handleSelect = (id: string) => {
     if (id === activeServerId) return;
+    useTabStore.getState().swapForServer(id, activeServerId);
     setActiveServer(id);
     router.push('/dashboard');
   };

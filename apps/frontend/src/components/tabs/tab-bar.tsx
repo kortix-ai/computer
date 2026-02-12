@@ -21,6 +21,7 @@ import { useTabStore, type Tab, type TabType } from '@/stores/tab-store';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
+import { useServerStore } from '@/stores/server-store';
 import { childMapByParent } from '@/ui';
 import { getClient } from '@/lib/opencode-sdk';
 import {
@@ -533,8 +534,9 @@ export function TabBar() {
   const questions = useOpenCodePendingStore((s) => s.questions);
 
   // Sessions data
-  const { data: sessions } = useOpenCodeSessions();
+  const { data: sessions, isLoading: sessionsLoading } = useOpenCodeSessions();
   const updateTabTitle = useTabStore((s) => s.updateTabTitle);
+  const activeServerId = useServerStore((s) => s.activeServerId);
 
   // Sync session titles to tab titles
   useEffect(() => {
@@ -548,20 +550,25 @@ export function TabBar() {
   }, [sessions, tabs, updateTabTitle]);
 
   // Prune tabs for sessions that no longer exist on the server.
-  // Read tab state from the store directly (not from reactive selectors) to
-  // avoid re-triggering when the prune itself mutates tabs/tabOrder.
+  // Only prune session tabs belonging to the CURRENT server — tabs from other
+  // servers are saved/restored by swapForServer and must not be touched.
+  // Skip pruning while sessions are loading (e.g. during server switch) to
+  // avoid removing restored tabs before the new session list arrives.
   useEffect(() => {
-    if (!sessions) return;
+    if (!sessions || sessionsLoading) return;
     const sessionIds = new Set(sessions.map(s => s.id));
     const { tabs: currentTabs, tabOrder: currentOrder } = useTabStore.getState();
     const staleTabIds = currentOrder.filter(id => {
       const tab = currentTabs[id];
-      return tab?.type === 'session' && !sessionIds.has(id);
+      if (tab?.type !== 'session') return false;
+      // Only prune if the tab belongs to the current server (or has no serverId — legacy)
+      if (tab.serverId && tab.serverId !== activeServerId) return false;
+      return !sessionIds.has(id);
     });
     for (const id of staleTabIds) {
       useTabStore.getState().closeTab(id);
     }
-  }, [sessions]);
+  }, [sessions, sessionsLoading, activeServerId]);
 
   // Prefetch session + messages data for all open tabs so switching is instant
   useEffect(() => {
@@ -632,6 +639,7 @@ export function TabBar() {
           type: 'session',
           href: `/sessions/${sessionId}`,
           parentSessionId: session?.parentID,
+          serverId: activeServerId,
         });
       } else {
         setActiveTab(sessionId);

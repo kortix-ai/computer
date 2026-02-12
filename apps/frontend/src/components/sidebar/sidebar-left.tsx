@@ -55,6 +55,7 @@ import { useAccountState, accountStateSelectors } from '@/hooks/billing';
 import { getPlanIcon } from '@/components/billing/plan-utils';
 import { useCreateOpenCodeSession, useOpenCodeSessions, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { createClient } from '@/lib/supabase/client';
 
@@ -202,6 +203,7 @@ function SessionsFlyout() {
       title: session?.title || 'Session',
       type: 'session',
       href: `/sessions/${sessionId}`,
+      serverId: useServerStore.getState().activeServerId,
     });
     router.push(`/sessions/${sessionId}`);
   };
@@ -404,6 +406,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
         title: 'New session',
         type: 'session',
         href: `/sessions/${session.id}`,
+        serverId: useServerStore.getState().activeServerId,
       });
       router.push(`/sessions/${session.id}`);
       if (isMobile) setOpenMobile(false);

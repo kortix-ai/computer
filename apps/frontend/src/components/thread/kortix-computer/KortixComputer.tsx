@@ -33,6 +33,7 @@ import { AppDock } from './components/Dock';
 import { SandboxDesktop } from './components/Desktop';
 import { SSHTerminal } from './components/SSHTerminal';
 import { PtyTerminalPanel } from '@/components/session/pty-terminal-panel';
+import { useServerStore } from '@/stores/server-store';
 import { getToolNumber } from '@/hooks/messages/tool-tracking';
 
 export interface ToolCallInput {
@@ -124,6 +125,13 @@ export const KortixComputer = memo(function KortixComputer({
   const isMobile = useIsMobile();
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
   const sandbox = project?.sandbox;
+
+  // Track which servers have been visited so their terminal panels stay mounted
+  const activeServerId = useServerStore((s) => s.activeServerId);
+  const [visitedServerIds, setVisitedServerIds] = useState<string[]>(() => [activeServerId]);
+  useEffect(() => {
+    setVisitedServerIds((prev) => prev.includes(activeServerId) ? prev : [...prev, activeServerId]);
+  }, [activeServerId]);
 
   const {
     activeView,
@@ -680,8 +688,20 @@ export const KortixComputer = memo(function KortixComputer({
       return <SSHTerminal sandboxId={effectiveSandboxId} className="h-full" />;
     }
 
-    // Otherwise, show PTY terminal panel (OpenCode PTY sessions)
-    return <PtyTerminalPanel className="h-full" />;
+    // Render a PTY panel per visited server — inactive ones stay mounted but hidden
+    // so WebSocket connections survive instance switches
+    return (
+      <div className="h-full relative">
+        {visitedServerIds.map((serverId) => (
+          <PtyTerminalPanel
+            key={serverId}
+            serverId={serverId}
+            hidden={serverId !== activeServerId}
+            className="absolute inset-0 h-full w-full"
+          />
+        ))}
+      </div>
+    );
   };
 
   const renderContent = () => {

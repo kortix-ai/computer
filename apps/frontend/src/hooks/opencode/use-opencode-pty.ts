@@ -11,10 +11,13 @@ export type { Pty };
 // Query Keys
 // ============================================================================
 
+// Keys intentionally NOT under 'opencode' so they survive server-switch cache nukes.
+// Scoped by serverUrl so each instance keeps its own cached list.
 export const ptyKeys = {
-  all: ['opencode', 'pty'] as const,
-  list: () => ['opencode', 'pty', 'list'] as const,
-  detail: (id: string) => ['opencode', 'pty', id] as const,
+  all: ['pty'] as const,
+  list: (serverUrl: string) => ['pty', serverUrl, 'list'] as const,
+  listPrefix: () => ['pty'] as const,
+  detail: (id: string) => ['pty', id] as const,
 };
 
 // ============================================================================
@@ -33,17 +36,20 @@ function unwrap<T>(result: { data?: T; error?: unknown }): T {
 // Hooks
 // ============================================================================
 
-export function useOpenCodePtyList() {
+export function useOpenCodePtyList(options?: { enabled?: boolean; serverUrl?: string }) {
+  const activeUrl = getActiveOpenCodeUrl();
+  const serverUrl = options?.serverUrl ?? activeUrl;
   return useQuery<Pty[]>({
-    queryKey: ptyKeys.list(),
+    queryKey: ptyKeys.list(serverUrl),
     queryFn: async () => {
       const client = getClient();
       const result = await client.pty.list();
       return unwrap(result);
     },
     staleTime: 5 * 1000,
-    gcTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000, // Keep cached data for 5 minutes across switches
     refetchOnWindowFocus: true,
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -63,7 +69,7 @@ export function useCreatePty() {
       return unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ptyKeys.list() });
+      queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix() });
     },
   });
 }
@@ -78,7 +84,7 @@ export function useRemovePty() {
       unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ptyKeys.list() });
+      queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix() });
     },
   });
 }
@@ -105,8 +111,8 @@ export function useUpdatePty() {
 // WebSocket URL helper
 // ============================================================================
 
-export function getPtyWebSocketUrl(ptyId: string): string {
-  const baseUrl = getActiveOpenCodeUrl();
+export function getPtyWebSocketUrl(ptyId: string, serverUrl?: string): string {
+  const baseUrl = serverUrl || getActiveOpenCodeUrl();
   const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
   return `${wsUrl}/pty/${ptyId}/connect`;
 }

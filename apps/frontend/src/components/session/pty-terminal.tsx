@@ -52,6 +52,8 @@ interface PtyTerminalProps {
   pty: Pty;
   className?: string;
   hidden?: boolean;
+  /** Server URL to connect to — locks the WS to this server even after instance switch. */
+  serverUrl?: string;
   onStatusChange?: (status: ConnectionStatus) => void;
 }
 
@@ -82,6 +84,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
   pty,
   className,
   hidden,
+  serverUrl,
   onStatusChange,
 }, ref) {
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -201,7 +204,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
       updateStatus('connecting');
       term.writeln('\x1b[33mConnecting to terminal...\x1b[0m');
 
-      const wsUrl = getPtyWebSocketUrl(pty.id);
+      const wsUrl = getPtyWebSocketUrl(pty.id, serverUrl);
       console.log('[PtyTerminal] Connecting WebSocket:', wsUrl);
 
       const ws = new WebSocket(wsUrl);

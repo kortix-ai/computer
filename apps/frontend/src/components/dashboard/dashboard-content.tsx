@@ -15,6 +15,7 @@ import {
   useOpenCodeSessions,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 import { SessionChatInput } from '@/components/session/session-chat-input';
 import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
 import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
@@ -234,6 +235,7 @@ export function DashboardContent() {
           title: 'New session',
           type: 'session',
           href: `/sessions/${session.id}`,
+          serverId: useServerStore.getState().activeServerId,
         });
 
         // Store the prompt text for optimistic display on the session page

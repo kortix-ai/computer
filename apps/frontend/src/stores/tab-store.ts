@@ -26,6 +26,8 @@ export interface Tab {
   openedAt: number;
   /** For sub-session tabs: the parent session ID (enables back-to-parent navigation) */
   parentSessionId?: string;
+  /** The server instance this tab belongs to (session/file tabs are scoped per instance) */
+  serverId?: string;
 }
 
 // ============================================================================
@@ -74,6 +76,9 @@ interface TabState {
 
   /** Get ordered tab objects */
   getOrderedTabs: () => Tab[];
+
+  /** Save current server-scoped tabs and restore tabs for a different server */
+  swapForServer: (newServerId: string, currentServerId?: string) => void;
 }
 
 export const useTabStore = create<TabState>()(
@@ -247,6 +252,76 @@ export const useTabStore = create<TabState>()(
       getOrderedTabs: () => {
         const { tabs, tabOrder } = get();
         return tabOrder.map((id) => tabs[id]).filter(Boolean);
+      },
+
+      swapForServer: (newServerId: string, currentServerId?: string) => {
+        const { tabs, tabOrder, activeTabId } = get();
+
+        // Identify which tabs are server-scoped (session/file) vs global (dashboard/settings/page/project)
+        const isServerScoped = (t: Tab) => t.type === 'session' || t.type === 'file';
+
+        // Save server-scoped tabs for the OLD server into localStorage
+        const serverTabs: Tab[] = [];
+        const serverTabOrder: string[] = [];
+        const globalTabs: Record<string, Tab> = {};
+        const globalTabOrder: string[] = [];
+
+        for (const id of tabOrder) {
+          const tab = tabs[id];
+          if (!tab) continue;
+          if (isServerScoped(tab)) {
+            serverTabs.push(tab);
+            serverTabOrder.push(id);
+          } else {
+            globalTabs[id] = tab;
+            globalTabOrder.push(id);
+          }
+        }
+
+        // Determine which server we're saving FROM
+        // Use explicit currentServerId, fall back to serverId on any tab, then skip save
+        const oldServerId = currentServerId || serverTabs[0]?.serverId;
+        if (oldServerId) {
+          try {
+            const cache = JSON.parse(localStorage.getItem('kortix-tabs-per-server') || '{}');
+            cache[oldServerId] = { tabs: serverTabs, tabOrder: serverTabOrder, activeTabId };
+            localStorage.setItem('kortix-tabs-per-server', JSON.stringify(cache));
+          } catch {}
+        }
+
+        // Restore server-scoped tabs for the NEW server from localStorage
+        let restoredTabs: Record<string, Tab> = {};
+        let restoredTabOrder: string[] = [];
+        let restoredActiveTabId: string | null = null;
+        try {
+          const cache = JSON.parse(localStorage.getItem('kortix-tabs-per-server') || '{}');
+          const saved = cache[newServerId];
+          if (saved?.tabs && saved?.tabOrder) {
+            for (const tab of saved.tabs as Tab[]) {
+              restoredTabs[tab.id] = tab;
+            }
+            restoredTabOrder = saved.tabOrder;
+            restoredActiveTabId = saved.activeTabId || null;
+          }
+        } catch {}
+
+        // Merge: global tabs + restored server tabs
+        const mergedTabs = { ...globalTabs, ...restoredTabs };
+        const mergedTabOrder = [...globalTabOrder, ...restoredTabOrder];
+
+        // Pick the best active tab: restored active > first restored > current global > null
+        const nextActive =
+          (restoredActiveTabId && mergedTabs[restoredActiveTabId] ? restoredActiveTabId : null) ||
+          restoredTabOrder[0] ||
+          (activeTabId && globalTabs[activeTabId] ? activeTabId : null) ||
+          mergedTabOrder[0] ||
+          null;
+
+        set({
+          tabs: mergedTabs,
+          tabOrder: mergedTabOrder,
+          activeTabId: nextActive,
+        });
       },
     }),
     {

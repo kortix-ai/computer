@@ -20,6 +20,7 @@ export { OcApplyPatchToolView } from './OcApplyPatchToolView';
 export { OcTaskToolView } from './OcTaskToolView';
 export { OcTodoToolView } from './OcTodoToolView';
 export { OcGenericToolView } from './OcGenericToolView';
+export { OcQuestionToolView } from './OcQuestionToolView';
 
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
 import { OcBashToolView } from './OcBashToolView';
@@ -37,6 +38,7 @@ import { OcApplyPatchToolView } from './OcApplyPatchToolView';
 import { OcTaskToolView } from './OcTaskToolView';
 import { OcTodoToolView } from './OcTodoToolView';
 import { OcGenericToolView } from './OcGenericToolView';
+import { OcQuestionToolView } from './OcQuestionToolView';
 
 /**
  * Registry entries for OpenCode tools.
@@ -97,8 +99,8 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-todowrite': OcTodoToolView,
   'oc-todoread': OcTodoToolView,
 
-  // Question tool (handled via pending store, generic fallback in panel)
-  'oc-question': OcGenericToolView,
+  // Question tool — formatted Q&A display
+  'oc-question': OcQuestionToolView,
 
   // MCP tools and other unknown tools will fall through to the
   // registry's default (GenericToolView). The OcGenericToolView
