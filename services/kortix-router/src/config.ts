@@ -43,9 +43,12 @@ export const config = {
   GROQ_API_KEY: process.env.GROQ_API_KEY || '',
   AWS_BEARER_TOKEN_BEDROCK: process.env.AWS_BEARER_TOKEN_BEDROCK || '',
 
-  // Backend API for billing (legacy - being replaced with direct Supabase)
+  // Backend API (legacy Python backend)
   BACKEND_API_URL: process.env.BACKEND_API_URL || 'http://localhost:8000',
   BACKEND_API_KEY: process.env.BACKEND_API_KEY || '',
+
+  // Billing service
+  BILLING_SERVICE_URL: process.env.BILLING_SERVICE_URL || 'http://localhost:8012',
 
   // Supabase (direct DB access for fast auth + billing)
   SUPABASE_URL: process.env.SUPABASE_URL || '',
