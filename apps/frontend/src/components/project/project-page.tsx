@@ -28,7 +28,9 @@ import {
 } from '@/hooks/opencode/use-opencode-sessions';
 import type { Session, Skill, Project } from '@/hooks/opencode/use-opencode-sessions';
 import { useFileList } from '@/features/files/hooks/use-file-list';
-import { SessionChatInput, flattenModels } from '@/components/session/session-chat-input';
+import { SessionChatInput } from '@/components/session/session-chat-input';
+import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
+import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import type { Command } from '@/hooks/opencode/use-opencode-sessions';
 import Link from 'next/link';
@@ -279,9 +281,6 @@ function ProjectAgents() {
 export function ProjectPage({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<{ providerID: string; modelID: string } | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
 
   // Data hooks
   const { data: projects, isLoading: projectsLoading } = useOpenCodeProjects();
@@ -290,7 +289,11 @@ export function ProjectPage({ projectId }: { projectId: string }) {
   const { data: agents } = useOpenCodeAgents();
   const { data: providers } = useOpenCodeProviders();
   const { data: commands } = useOpenCodeCommands();
+  const { data: config } = useOpenCodeConfig();
   const createSession = useCreateOpenCodeSession();
+
+  // Unified model/agent/variant state
+  const local = useOpenCodeLocal({ agents, providers, config });
 
   // Find the current project
   const project = useMemo(
@@ -319,22 +322,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
     return files.filter((f) => f.type === 'file').length;
   }, [files]);
 
-  // Models
-  const visibleAgents = useMemo(
-    () => (agents || []).filter((a) => a.mode !== 'subagent' && !a.hidden),
-    [agents],
-  );
-  const flatModels = useMemo(() => flattenModels(providers), [providers]);
-  const currentVariants = useMemo(() => {
-    if (!selectedModel) {
-      const first = flatModels[0];
-      return first?.variants ? Object.keys(first.variants) : [];
-    }
-    const model = flatModels.find(
-      (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID,
-    );
-    return model?.variants ? Object.keys(model.variants) : [];
-  }, [selectedModel, flatModels]);
+  // (models/agents/variants handled by useOpenCodeLocal)
 
   // Chat input handler — create session scoped to this project's worktree
   const handleSend = useCallback(
@@ -345,9 +333,9 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         sessionStorage.setItem('opencode_pending_prompt', text);
 
         const options: Record<string, unknown> = {};
-        if (selectedAgent) options.agent = selectedAgent;
-        if (selectedModel) options.model = selectedModel;
-        if (selectedVariant) options.variant = selectedVariant;
+        if (local.agent.current) options.agent = local.agent.current.name;
+        if (local.model.currentKey) options.model = local.model.currentKey;
+        if (local.model.variant.current) options.variant = local.model.variant.current;
         if (Object.keys(options).length > 0) {
           sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
         }
@@ -363,7 +351,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         toast.warning('Failed to create session');
       }
     },
-    [isSubmitting, createSession, router, project, selectedAgent, selectedModel, selectedVariant],
+    [isSubmitting, createSession, router, project, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
   const handleCommand = useCallback(() => {}, []);
@@ -407,15 +395,15 @@ export function ProjectPage({ projectId }: { projectId: string }) {
             onSend={handleSend}
             disabled={isSubmitting}
             placeholder={`Start a session in ${projectName}...`}
-            agents={visibleAgents}
-            selectedAgent={selectedAgent}
-            onAgentChange={setSelectedAgent}
-            models={flatModels}
-            selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
-            variants={currentVariants}
-            selectedVariant={selectedVariant}
-            onVariantChange={setSelectedVariant}
+            agents={local.agent.list}
+            selectedAgent={local.agent.current?.name ?? null}
+            onAgentChange={local.agent.set}
+            models={local.model.list}
+            selectedModel={local.model.currentKey ?? null}
+            onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}
+            variants={local.model.variant.list}
+            selectedVariant={local.model.variant.current ?? null}
+            onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
             commands={commands || []}
             onCommand={handleCommand}
           />

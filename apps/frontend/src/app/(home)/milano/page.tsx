@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { MapPin } from 'lucide-react';
 import { AnimatedBg } from '@/components/ui/animated-bg';
 import { useIsMobile } from '@/hooks/utils';
@@ -12,9 +12,11 @@ import {
   useOpenCodeProviders,
   useOpenCodeCommands,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { SessionChatInput, flattenModels } from '@/components/session/session-chat-input';
+import { SessionChatInput } from '@/components/session/session-chat-input';
 import { toast } from '@/lib/toast';
 import type { Command } from '@/hooks/opencode/use-opencode-sessions';
+import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
+import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 
 // Mobile users are redirected at the edge by middleware (hyper-fast)
 // This page only renders for desktop users
@@ -22,9 +24,6 @@ import type { Command } from '@/hooks/opencode/use-opencode-sessions';
 export default function MilanoPage() {
   const isMobile = useIsMobile();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<{ providerID: string; modelID: string } | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
 
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -34,24 +33,10 @@ export default function MilanoPage() {
   const { data: agents } = useOpenCodeAgents();
   const { data: providers } = useOpenCodeProviders();
   const { data: commands } = useOpenCodeCommands();
+  const { data: config } = useOpenCodeConfig();
 
-  const visibleAgents = useMemo(
-    () => (agents || []).filter((a) => a.mode !== 'subagent' && !a.hidden),
-    [agents],
-  );
-
-  const flatModels = useMemo(() => flattenModels(providers), [providers]);
-
-  const currentVariants = useMemo(() => {
-    if (!selectedModel) {
-      const first = flatModels[0];
-      return first?.variants ? Object.keys(first.variants) : [];
-    }
-    const model = flatModels.find(
-      (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID,
-    );
-    return model?.variants ? Object.keys(model.variants) : [];
-  }, [selectedModel, flatModels]);
+  // Unified model/agent/variant state
+  const local = useOpenCodeLocal({ agents, providers, config });
 
   const handleSend = useCallback(
     async (text: string, _files?: unknown) => {
@@ -67,9 +52,9 @@ export default function MilanoPage() {
         sessionStorage.setItem('opencode_pending_prompt', text);
 
         const options: Record<string, unknown> = {};
-        if (selectedAgent) options.agent = selectedAgent;
-        if (selectedModel) options.model = selectedModel;
-        if (selectedVariant) options.variant = selectedVariant;
+        if (local.agent.current) options.agent = local.agent.current.name;
+        if (local.model.currentKey) options.model = local.model.currentKey;
+        if (local.model.variant.current) options.variant = local.model.variant.current;
         if (Object.keys(options).length > 0) {
           sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
         }
@@ -83,7 +68,7 @@ export default function MilanoPage() {
         toast.error('Failed to create session');
       }
     },
-    [isSubmitting, user, isLoading, createSession, router, selectedAgent, selectedModel, selectedVariant],
+    [isSubmitting, user, isLoading, createSession, router, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
   const handleCommand = useCallback((_cmd: Command) => {
@@ -126,15 +111,15 @@ export default function MilanoPage() {
                     onSend={handleSend}
                     disabled={isSubmitting}
                     placeholder="Descrivi il tuo compito..."
-                    agents={visibleAgents}
-                    selectedAgent={selectedAgent}
-                    onAgentChange={setSelectedAgent}
-                    models={flatModels}
-                    selectedModel={selectedModel}
-                    onModelChange={setSelectedModel}
-                    variants={currentVariants}
-                    selectedVariant={selectedVariant}
-                    onVariantChange={setSelectedVariant}
+                    agents={local.agent.list}
+                    selectedAgent={local.agent.current?.name ?? null}
+                    onAgentChange={local.agent.set}
+                    models={local.model.list}
+                    selectedModel={local.model.currentKey ?? null}
+                    onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}
+                    variants={local.model.variant.list}
+                    selectedVariant={local.model.variant.current ?? null}
+                    onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
                     commands={commands || []}
                     onCommand={handleCommand}
                     autoFocus={false}
