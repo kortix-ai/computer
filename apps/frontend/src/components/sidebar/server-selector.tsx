@@ -17,7 +17,7 @@ import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
-import { initAccount } from '@/lib/platform-client';
+import { initAccount, getSandboxUrl } from '@/lib/platform-client';
 import {
   Dialog,
   DialogContent,
@@ -357,7 +357,7 @@ function InstanceManagerDialog({
       const { sandbox } = await initAccount();
       const newServer = addServer(
         sandbox.name || 'Cloud Sandbox',
-        sandbox.base_url,
+        getSandboxUrl(sandbox),
       );
       setActiveServer(newServer.id);
       router.push('/dashboard');

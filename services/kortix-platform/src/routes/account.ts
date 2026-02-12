@@ -156,13 +156,19 @@ async function provisionSandbox(accountId: string, userId: string) {
 
   const daytona = getDaytona();
 
-  // Create sandbox via Daytona SDK
+  // Create sandbox via Daytona SDK using the Kortix sandbox snapshot
+  // which has OpenCode, Kortix Master (port 8000), desktop (port 6080), etc. pre-installed.
   const daytonaSandbox = await daytona.create({
+    snapshot: 'kortix-sandbox-v0.4.0',
     envVars: {
       KORTIX_URL: config.KORTIX_URL,
       KORTIX_TOKEN: authToken,
+      ENV_MODE: 'cloud',
     },
-  });
+    autoStopInterval: 15,
+    autoArchiveInterval: 30,
+    public: false,
+  }, { timeout: 300 });
 
   const externalId = daytonaSandbox.id;
 

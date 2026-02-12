@@ -12,7 +12,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { initAccount, type SandboxInfo } from '@/lib/platform-client';
+import { initAccount, getSandboxUrl, type SandboxInfo } from '@/lib/platform-client';
 import { useServerStore } from '@/stores/server-store';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useRef } from 'react';
@@ -25,13 +25,14 @@ const SANDBOX_SERVER_ID = 'cloud-sandbox';
  */
 function registerSandboxServer(sandbox: SandboxInfo) {
   const store = useServerStore.getState();
+  const url = getSandboxUrl(sandbox);
   const existing = store.servers.find((s) => s.id === SANDBOX_SERVER_ID);
 
   if (existing) {
     // Update URL if it changed (e.g. sandbox was reprovisioned)
-    if (existing.url !== sandbox.base_url) {
+    if (existing.url !== url) {
       store.updateServer(SANDBOX_SERVER_ID, {
-        url: sandbox.base_url,
+        url,
         label: sandbox.name || 'Cloud Sandbox',
       });
     }
@@ -44,7 +45,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
         {
           id: SANDBOX_SERVER_ID,
           label: sandbox.name || 'Cloud Sandbox',
-          url: sandbox.base_url,
+          url,
         },
       ],
     }));
