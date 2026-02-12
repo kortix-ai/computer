@@ -20,12 +20,19 @@ import { backendApi } from '@/lib/api-client';
 import { AnnouncementDialog } from '../announcements/announcement-dialog';
 import { NovuInboxProvider } from '../notifications/novu-inbox-provider';
 import { useOpenCodeEventStream } from '@/hooks/opencode/use-opencode-events';
+import { useSandbox } from '@/hooks/platform/use-sandbox';
 import { TabBar } from '@/components/tabs/tab-bar';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 
 function OpenCodeEventStreamProvider() {
   useOpenCodeEventStream();
+  return null;
+}
+
+/** Initializes the user's sandbox on dashboard load. Renders nothing. */
+function SandboxInitProvider() {
+  useSandbox();
   return null;
 }
 
@@ -281,6 +288,7 @@ export default function DashboardLayoutContent({
         </Suspense>
       }
     >
+      <SandboxInitProvider />
       <OpenCodeEventStreamProvider />
       <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
         {technicalIssue?.enabled && technicalIssue.message && (
