@@ -52,18 +52,23 @@ async function platformFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<PlatformResponse<T>> {
-  const token = await getSupabaseAccessToken();
-  if (!token) {
+  const isLocal = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
+  const token = isLocal ? null : await getSupabaseAccessToken();
+  if (!isLocal && !token) {
     throw new Error('Not authenticated');
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.headers as Record<string, string>,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const res = await fetch(`${PLATFORM_URL}${path}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
+    headers,
   });
 
   const body = await res.json();
