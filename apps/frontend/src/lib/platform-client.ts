@@ -33,6 +33,14 @@ export interface SandboxInfo {
   created_at: string;
 }
 
+/**
+ * Build the OpenCode server URL for a sandbox.
+ * Format: https://kortix.cloud/{externalId}/8000
+ */
+export function getSandboxUrl(sandbox: SandboxInfo): string {
+  return `https://kortix.cloud/${sandbox.external_id}/8000`;
+}
+
 interface PlatformResponse<T> {
   success: boolean;
   data?: T;
