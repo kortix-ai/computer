@@ -86,8 +86,11 @@ function SessionItem({
     >
       <div
         className={cn(
-          'flex items-center gap-2 py-1.5 rounded-lg text-sm transition-colors',
-          isActive ? 'bg-muted/80' : 'hover:bg-muted/40',
+          'flex items-center gap-2 py-1.5 rounded-lg text-sm cursor-pointer',
+          'transition-all duration-150 ease-out',
+          isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
           depth === 0 ? 'px-3' : 'pr-3',
         )}
         style={depth > 0 ? { paddingLeft: `${12 + depth * 16}px` } : undefined}
@@ -102,7 +105,7 @@ function SessionItem({
               e.stopPropagation();
               onToggleExpand();
             }}
-            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-sidebar-foreground transition-colors duration-150 cursor-pointer"
           >
             <ChevronRight
               className={cn(
@@ -154,7 +157,9 @@ function SessionItem({
         <span
           className={cn(
             'flex-1 truncate',
-            depth === 0 ? 'text-foreground/90' : 'text-muted-foreground text-xs',
+            depth === 0
+              ? isActive ? 'text-sidebar-accent-foreground font-medium' : 'text-sidebar-foreground/80'
+              : 'text-muted-foreground/70 text-xs',
           )}
         >
           {session.title || 'Untitled'}
@@ -180,7 +185,7 @@ function SessionItem({
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
-                  'p-0.5 rounded-md hover:bg-accent transition-all text-muted-foreground',
+                  'p-0.5 rounded-md hover:bg-sidebar-accent transition-all duration-150 ease-out text-muted-foreground/60 hover:text-sidebar-foreground cursor-pointer',
                   isHovering ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
                 onClick={(e) => {
@@ -657,12 +662,12 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             {/* Divider between pending and other sessions */}
             {rootSessions.some((s) => getPendingCount(s.id) > 0) &&
               rootSessions.some((s) => getPendingCount(s.id) === 0) && (
-              <div className="flex items-center gap-2.5 px-3 py-2.5">
-                <div className="flex-1 h-px bg-border/40" />
-                <span className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">
+              <div className="flex items-center gap-2.5 px-3 py-2">
+                <div className="flex-1 h-px bg-border/30" />
+                <span className="text-[10px] font-medium text-muted-foreground/30 uppercase tracking-wider">
                   Other
                 </span>
-                <div className="flex-1 h-px bg-border/40" />
+                <div className="flex-1 h-px bg-border/30" />
               </div>
             )}
 

@@ -87,6 +87,9 @@ const SessionLayout = lazy(() =>
 const SessionChat = lazy(() =>
   import('@/components/session/session-chat').then(mod => ({ default: mod.SessionChat }))
 );
+const FileTabContent = lazy(() =>
+  import('@/components/tabs/file-tab-content').then(mod => ({ default: mod.FileTabContent }))
+);
 
 // Skeleton shell that renders immediately for FCP
 function DashboardSkeleton() {
@@ -127,11 +130,17 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
 
   // Collect session tab IDs
   const sessionTabIds = tabOrder.filter((id) => tabs[id]?.type === 'session');
+  // Collect file tab IDs
+  const fileTabIds = tabOrder.filter((id) => tabs[id]?.type === 'file');
   const activeTab = activeTabId ? tabs[activeTabId] : null;
   const showingMountedSession = activeTab?.type === 'session';
+  const showingFileTab = activeTab?.type === 'file';
 
   return (
-    <div className="bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative md:rounded-tl-2xl md:border-t md:border-l md:border-border/60">
+    <div className={cn(
+      'bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative',
+      'md:rounded-tl-2xl md:rounded-tr-2xl md:border-t md:border-l md:border-r md:border-border/60',
+    )}>
       {/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
       {sessionTabIds.map((id) => (
         <div
@@ -149,12 +158,33 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
         </div>
       ))}
 
+      {/* File tabs — rendered when active */}
+      {fileTabIds.map((id) => {
+        const tab = tabs[id];
+        if (!tab) return null;
+        // Extract file path from tab id (strip "file:" prefix)
+        const filePath = id.startsWith('file:') ? id.slice(5) : id;
+        return (
+          <div
+            key={id}
+            className={cn(
+              'absolute inset-0 flex flex-col',
+              id !== activeTabId && 'hidden',
+            )}
+          >
+            <Suspense fallback={null}>
+              <FileTabContent tabId={id} filePath={filePath} />
+            </Suspense>
+          </div>
+        );
+      })}
+
       {/* Route-based children (dashboard, settings, etc.)
-          Hidden when a pre-mounted session tab is active. */}
+          Hidden when a pre-mounted session tab or file tab is active. */}
       <div
         className={cn(
           'flex-1 min-h-0 flex flex-col overflow-hidden',
-          showingMountedSession && 'hidden',
+          (showingMountedSession || showingFileTab) && 'hidden',
         )}
       >
         {children}

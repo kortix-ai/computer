@@ -2,12 +2,16 @@
 
 import React, { Suspense, lazy } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { RightSidebarProvider } from '@/components/ui/sidebar-right-provider';
 import { useDeleteOperationEffects } from '@/stores/delete-operation-store';
 import { SubscriptionStoreSync } from '@/stores/subscription-store';
 
-// Lazy load the heavy sidebar component
+// Lazy load the heavy sidebar components
 const SidebarLeft = lazy(() => 
   import('@/components/sidebar/sidebar-left').then(mod => ({ default: mod.SidebarLeft }))
+);
+const SidebarRight = lazy(() => 
+  import('@/components/sidebar/sidebar-right').then(mod => ({ default: mod.SidebarRight }))
 );
 
 // Sidebar skeleton for immediate render
@@ -75,9 +79,14 @@ export function AppProviders({
         </Suspense>
       )}
       <SidebarInset>
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {content}
-        </div>
+        <RightSidebarProvider>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {content}
+          </div>
+          <Suspense fallback={null}>
+            <SidebarRight />
+          </Suspense>
+        </RightSidebarProvider>
       </SidebarInset>
       {sidebarSiblings}
     </SidebarProvider>

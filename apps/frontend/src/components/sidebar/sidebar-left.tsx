@@ -119,8 +119,9 @@ function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center justify-center h-10 w-10 rounded-xl transition-colors cursor-pointer',
-        'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+        'flex items-center justify-center h-10 w-10 rounded-xl cursor-pointer',
+        'transition-all duration-150 ease-out',
+        'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
         disabled && 'opacity-50 cursor-not-allowed',
       )}
     >
@@ -220,20 +221,24 @@ function SessionsFlyout() {
               key={session.id}
               onClick={() => handleClick(session.id)}
               className={cn(
-                'flex items-center gap-3 w-full px-3.5 py-2.5 text-sm transition-colors cursor-pointer',
+                'flex items-center gap-3 w-full px-3.5 py-2 text-sm cursor-pointer',
+                'transition-all duration-150 ease-out',
                 isActive
-                  ? 'bg-accent/80 text-foreground'
-                  : 'text-foreground/80 hover:bg-accent/40',
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
               )}
             >
               <ThreadIcon
                 iconName={(session as any).icon}
-                className="text-muted-foreground/70 flex-shrink-0"
+                className={cn(
+                  'flex-shrink-0',
+                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+                )}
                 size={18}
               />
               <span className="flex-1 truncate text-left">{session.title || 'Untitled'}</span>
               {pendingCount > 0 && (
-                <span className="flex-shrink-0 h-[18px] min-w-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center">
+                <span className="flex-shrink-0 h-[18px] min-w-[18px] px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-semibold flex items-center justify-center">
                   {pendingCount}
                 </span>
               )}
@@ -296,14 +301,18 @@ function ProjectsFlyout() {
               key={project.id}
               onClick={() => handleClick(project.id, name)}
               className={cn(
-                'flex items-center gap-3 w-full px-3.5 py-2.5 text-sm transition-colors cursor-pointer',
+                'flex items-center gap-3 w-full px-3.5 py-2 text-sm cursor-pointer',
+                'transition-all duration-150 ease-out',
                 isActive
-                  ? 'bg-accent/80 text-foreground'
-                  : 'text-foreground/80 hover:bg-accent/40',
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
               )}
             >
               <FolderOpen
-                className="text-muted-foreground/70 flex-shrink-0"
+                className={cn(
+                  'flex-shrink-0',
+                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+                )}
                 size={18}
                 style={project.icon?.color ? { color: project.icon.color } : undefined}
               />
@@ -408,6 +417,18 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     if (isMobile) setOpenMobile(false);
   }, [pathname, searchParams, isMobile, setOpenMobile]);
 
+  // Listen for right sidebar expansion → collapse left
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.expanded && state === 'expanded') {
+        setOpen(false);
+      }
+    };
+    window.addEventListener('sidebar-right-toggled', handler);
+    return () => window.removeEventListener('sidebar-right-toggled', handler);
+  }, [state, setOpen]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isDocumentModalOpen) return;
@@ -484,7 +505,12 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             {state === 'collapsed' && (
               <button
                 className="absolute inset-0 flex items-center justify-center cursor-pointer opacity-0 scale-75 group-hover/logo:opacity-100 group-hover/logo:scale-100 transition-[opacity,transform] duration-300 ease-out transform-gpu"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpen(true);
+                  window.dispatchEvent(new CustomEvent('sidebar-left-toggled', { detail: { expanded: true } }));
+                }}
                 aria-label="Expand sidebar"
               >
                 <PanelLeftOpen className="h-[18px] w-[18px]" />
@@ -540,9 +566,14 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             <button
               onClick={handleNewSession}
               disabled={createSession.isPending}
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-foreground/80 hover:bg-muted/40 transition-colors disabled:opacity-50"
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
+                'transition-all duration-150 ease-out',
+                'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+              )}
             >
-              <SquarePen className="h-[18px] w-[18px] flex-shrink-0" />
+              <SquarePen className="h-[18px] w-[18px] flex-shrink-0 text-muted-foreground/60" />
               <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
             </button>
           </div>
@@ -559,11 +590,11 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           <Collapsible defaultOpen>
             <div className="px-3">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full py-2 group">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <button className="flex items-center justify-between w-full py-2 group cursor-pointer">
+                  <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
                     Sessions
                   </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
                 </button>
               </CollapsibleTrigger>
             </div>

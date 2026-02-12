@@ -78,11 +78,11 @@ export function ProjectSelector({
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="px-3">
         <CollapsibleTrigger asChild>
-          <button className="flex items-center justify-between w-full py-2 group">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <button className="flex items-center justify-between w-full py-2 group cursor-pointer">
+            <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
               Projects
             </span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
           </button>
         </CollapsibleTrigger>
 
@@ -92,13 +92,17 @@ export function ProjectSelector({
             <button
               onClick={handleAllProjectsClick}
               className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors',
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
+                'transition-all duration-150 ease-out',
                 activeProjectId === null
-                  ? 'bg-muted/80 text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
               )}
             >
-              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <FolderOpen className={cn(
+                'h-4 w-4 flex-shrink-0',
+                activeProjectId === null ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+              )} />
               <span className="truncate">All Projects</span>
             </button>
 
@@ -107,14 +111,18 @@ export function ProjectSelector({
                 key={project.id}
                 onClick={() => handleProjectClick(project.id, getProjectDisplayName(project))}
                 className={cn(
-                  'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors',
+                  'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
+                  'transition-all duration-150 ease-out',
                   activeProjectId === project.id
-                    ? 'bg-muted/80 text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
                 )}
               >
                 <FolderOpen
-                  className="h-4 w-4 flex-shrink-0"
+                  className={cn(
+                    'h-4 w-4 flex-shrink-0',
+                    activeProjectId === project.id ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+                  )}
                   style={project.icon?.color ? { color: project.icon.color } : undefined}
                 />
                 <span className="truncate">{getProjectDisplayName(project)}</span>

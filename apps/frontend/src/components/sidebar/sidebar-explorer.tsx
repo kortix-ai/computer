@@ -28,6 +28,7 @@ import { FileBreadcrumbs } from '@/features/files/components/file-breadcrumbs';
 import { FileSearch } from '@/features/files/components/file-search';
 import type { FileNode } from '@/features/files/types';
 import { toast } from '@/lib/toast';
+import { useTabStore } from '@/stores/tab-store';
 
 // ============================================================================
 // Panel type
@@ -79,7 +80,12 @@ export function SidebarPanelTabs({ active, onChange }: SidebarPanelTabsProps) {
 // Compact file browser for sidebar
 // ============================================================================
 
-export function SidebarFileBrowser() {
+interface SidebarFileBrowserProps {
+  /** When true, clicking a file opens it as a tab in the main content area instead of the sidebar viewer */
+  openFileAsTab?: boolean;
+}
+
+export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowserProps) {
   const currentPath = useFilesStore((s) => s.currentPath);
   const navigateToPath = useFilesStore((s) => s.navigateToPath);
   const openFileWithList = useFilesStore((s) => s.openFileWithList);
@@ -126,13 +132,24 @@ export function SidebarFileBrowser() {
     (node: FileNode) => {
       if (node.type === 'directory') {
         navigateToPath(node.path);
+      } else if (openFileAsTab) {
+        // Open as a tab in the main content area
+        const tabId = `file:${node.path}`;
+        useTabStore.getState().openTab({
+          id: tabId,
+          title: node.name,
+          type: 'file',
+          href: `/files/${encodeURIComponent(node.path)}`,
+        });
+        // Use pushState to avoid full navigation
+        window.history.pushState(null, '', `/files/${encodeURIComponent(node.path)}`);
       } else {
         const allFiles = fileItems.map((f) => f.path);
         const index = allFiles.indexOf(node.path);
         openFileWithList(node.path, allFiles, Math.max(0, index));
       }
     },
-    [fileItems, navigateToPath, openFileWithList],
+    [fileItems, navigateToPath, openFileWithList, openFileAsTab],
   );
 
   const handleNavigateUp = useCallback(() => {

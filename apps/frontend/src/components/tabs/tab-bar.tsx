@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -685,15 +686,15 @@ export function TabBar() {
     [getPendingCount, statuses],
   );
 
-  // Tab switching: update URL via history.pushState for session tabs (no re-mount),
+  // Tab switching: update URL via history.pushState for session/file tabs (no re-mount),
   // fall back to router.push for non-session tabs.
   const handleActivate = useCallback(
     (tabId: string, href: string) => {
       const tab = useTabStore.getState().tabs[tabId];
       setActiveTab(tabId);
-      if (tab?.type === 'session') {
+      if (tab?.type === 'session' || tab?.type === 'file') {
         // pushState changes the URL without triggering a Next.js navigation,
-        // so the pre-mounted session component just becomes visible instantly.
+        // so the pre-mounted session/file component just becomes visible instantly.
         window.history.pushState(null, '', href);
       } else {
         router.push(href);
