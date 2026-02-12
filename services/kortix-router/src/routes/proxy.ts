@@ -6,6 +6,7 @@ import {
   type ProxyServiceConfig,
 } from '../config/proxy-services';
 import { validateSecretKey } from '../repositories/api-keys';
+import { validateSandboxToken } from '../repositories/sandboxes';
 import { config } from '../config';
 import { checkCredits, deductToolCredits } from '../services/billing';
 
@@ -154,6 +155,17 @@ async function tryAuthenticate(c: any): Promise<{ isKortixUser: boolean; account
   if (token.startsWith('sk_') && config.DATABASE_URL) {
     try {
       const result = await validateSecretKey(token);
+      if (result.isValid && result.accountId) {
+        return { isKortixUser: true, accountId: result.accountId };
+      }
+    } catch {
+      // Not valid → passthrough
+    }
+  }
+
+  if (token.startsWith('sbt_') && config.DATABASE_URL) {
+    try {
+      const result = await validateSandboxToken(token);
       if (result.isValid && result.accountId) {
         return { isKortixUser: true, accountId: result.accountId };
       }

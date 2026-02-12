@@ -61,6 +61,7 @@ export const sandboxes = kortixSchema.table(
     index('idx_sandboxes_external_id').on(table.externalId),
     index('idx_sandboxes_status').on(table.status),
     index('idx_sandboxes_pooled_fifo').on(table.pooledAt),
+    index('idx_sandboxes_auth_token').on(table.authToken),
   ],
 );
 
