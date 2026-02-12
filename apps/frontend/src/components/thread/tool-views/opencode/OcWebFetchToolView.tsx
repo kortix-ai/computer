@@ -78,6 +78,51 @@ function tryFormatJson(text: string): string | null {
   }
 }
 
+interface ScrapeResult {
+  url: string;
+  success: boolean;
+  title?: string;
+  content?: string;
+  error?: string;
+}
+
+interface ParsedScrapeData {
+  total: number;
+  successful: number;
+  failed: number;
+  results: ScrapeResult[];
+}
+
+function parseScrapeResults(raw: any): ParsedScrapeData | null {
+  let parsed: any = null;
+  if (typeof raw === 'object' && raw !== null) {
+    parsed = raw;
+  } else if (typeof raw === 'string') {
+    try {
+      let result = JSON.parse(raw);
+      if (typeof result === 'string') { try { result = JSON.parse(result); } catch { /* keep */ } }
+      parsed = typeof result === 'object' ? result : null;
+    } catch { /* not JSON */ }
+  }
+  if (!parsed || !parsed.results || !Array.isArray(parsed.results)) return null;
+  return {
+    total: parsed.total || parsed.results.length,
+    successful: parsed.successful ?? parsed.results.filter((r: any) => r.success !== false).length,
+    failed: parsed.failed ?? parsed.results.filter((r: any) => r.success === false).length,
+    results: parsed.results.map((r: any) => ({
+      url: r.url || '',
+      success: r.success !== false,
+      title: r.title || undefined,
+      content: r.content || r.text || r.snippet || undefined,
+      error: r.error || undefined,
+    })),
+  };
+}
+
+function getFaviconUrl(url: string): string | null {
+  try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`; } catch { return null; }
+}
+
 export function OcWebFetchToolView({
   toolCall,
   toolResult,
@@ -87,28 +132,31 @@ export function OcWebFetchToolView({
   isStreaming = false,
 }: ToolViewProps) {
   const args = toolCall?.arguments || {};
-  const url = (args.url as string) || '';
+  const url = (args.url as string) || (args.urls as string) || '';
   const prompt = (args.prompt as string) || '';
   const ocState = args._oc_state as any;
   const rawOutput = toolResult?.output || (ocState?.output) || '';
-  const output = typeof rawOutput === 'string' ? rawOutput : String(rawOutput);
+  const output = typeof rawOutput === 'string' ? rawOutput : (typeof rawOutput === 'object' ? JSON.stringify(rawOutput, null, 2) : String(rawOutput));
 
-  const isError = toolResult?.success === false || !!toolResult?.error || output.startsWith('Error:');
+  const isError = toolResult?.success === false || !!toolResult?.error || (typeof output === 'string' && output.startsWith('Error:'));
 
   const domain = getDomain(url);
   const pathname = getPathname(url);
 
   const [expanded, setExpanded] = useState(!isError);
 
-  // Detect and format JSON content
+  // Try to parse as structured scrape results
+  const scrapeData = useMemo(() => parseScrapeResults(rawOutput), [rawOutput]);
+
+  // Detect and format JSON content (only if not scrape results)
   const formattedContent = useMemo(() => {
-    if (!output || isError) return null;
+    if (!output || isError || scrapeData) return null;
     if (isJsonLike(output)) {
       const formatted = tryFormatJson(output);
       if (formatted) return { type: 'json' as const, content: formatted };
     }
     return { type: 'markdown' as const, content: output };
-  }, [output, isError]);
+  }, [output, isError, scrapeData]);
 
   if (isStreaming && !toolResult) {
     return (
@@ -124,6 +172,103 @@ export function OcWebFetchToolView({
   }
 
   const errorInfo = isError ? parseError(output) : null;
+
+  // Render structured scrape results
+  if (scrapeData && scrapeData.results.length > 0) {
+    return (
+      <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
+        <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+          <div className="flex flex-row items-center justify-between">
+            <ToolViewIconTitle
+              icon={Globe}
+              title="Web Scrape"
+              subtitle={domain || url}
+            />
+            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0 ml-2">
+              <Globe className="h-3 w-3 mr-1 opacity-70" />
+              {scrapeData.successful}/{scrapeData.total} pages
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 h-full flex-1 overflow-hidden">
+          <ScrollArea className="h-full w-full">
+            <div className="p-4 space-y-1.5">
+              {scrapeData.results.map((result, idx) => {
+                const rDomain = getDomain(result.url);
+                const favicon = getFaviconUrl(result.url);
+                const snippet = result.content
+                  ? result.content.replace(/\\n/g, ' ').replace(/\s+/g, ' ').slice(0, 300)
+                  : undefined;
+
+                return (
+                  <a
+                    key={idx}
+                    href={result.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-start gap-3 p-3 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="size-6 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
+                      {favicon ? (
+                        <img
+                          src={favicon}
+                          alt=""
+                          className="size-4 rounded"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <Globe className="size-3.5 text-muted-foreground/50" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                        {result.title || rDomain || result.url}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-muted-foreground/50 font-mono truncate">
+                          {rDomain}
+                        </span>
+                      </div>
+                      {result.success && snippet && (
+                        <p className="text-xs text-muted-foreground/60 leading-relaxed line-clamp-2 mt-1.5">
+                          {snippet}
+                        </p>
+                      )}
+                      {!result.success && result.error && (
+                        <p className="text-xs text-red-500/70 leading-relaxed line-clamp-2 mt-1.5">
+                          {result.error.slice(0, 200)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 mt-1.5">
+                      {result.success ? (
+                        <CheckCircle className="size-3.5 text-emerald-500/70" />
+                      ) : (
+                        <AlertTriangle className="size-3.5 text-amber-500/70" />
+                      )}
+                      <ExternalLink className="size-3.5 text-muted-foreground/20 group-hover:text-muted-foreground/50 transition-colors" />
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </CardContent>
+        <ToolViewFooter
+          assistantTimestamp={assistantTimestamp}
+          toolTimestamp={toolTimestamp}
+          isStreaming={isStreaming}
+        >
+          {!isStreaming && (
+            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
+              <CheckCircle className="h-3 w-3 text-emerald-500/70" />
+              {scrapeData.successful}/{scrapeData.total} scraped
+            </Badge>
+          )}
+        </ToolViewFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">

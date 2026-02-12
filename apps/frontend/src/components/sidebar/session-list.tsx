@@ -129,7 +129,7 @@ function SessionItem({
             </TooltipTrigger>
             <TooltipContent side="right" className="text-xs">
               {pendingCount > 0
-                ? `${pendingCount} pending ${pendingCount === 1 ? 'action' : 'actions'} — waiting for your input`
+                ? `${pendingCount} ${pendingCount === 1 ? 'question' : 'questions'} waiting for your input`
                 : 'Working on it…'}
             </TooltipContent>
           </Tooltip>
@@ -154,7 +154,7 @@ function SessionItem({
               </span>
             </TooltipTrigger>
             <TooltipContent side="right" className="text-xs">
-              {pendingCount} pending {pendingCount === 1 ? 'action' : 'actions'} — waiting for your input
+              {pendingCount} {pendingCount === 1 ? 'question' : 'questions'} waiting for your input
             </TooltipContent>
           </Tooltip>
         )}
@@ -345,10 +345,13 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   );
 
   // Count pending for a single session (not recursive)
+  // For questions, count the total number of individual questions across all requests
   const countPendingForSession = useCallback(
     (sid: string) => {
       const permCount = Object.values(permissions).filter((p) => p.sessionID === sid).length;
-      const qCount = Object.values(questions).filter((q) => q.sessionID === sid).length;
+      const qCount = Object.values(questions)
+        .filter((q) => q.sessionID === sid)
+        .reduce((sum, q) => sum + (q.questions?.length || 1), 0);
       return permCount + qCount;
     },
     [permissions, questions],
@@ -588,8 +591,12 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             {/* Divider between pending and other sessions */}
             {rootSessions.some((s) => getPendingCount(s.id) > 0) &&
               rootSessions.some((s) => getPendingCount(s.id) === 0) && (
-              <div className="flex items-center gap-2 px-3 py-1.5">
-                <div className="flex-1 h-px bg-border/60" />
+              <div className="flex items-center gap-2.5 px-3 py-2.5">
+                <div className="flex-1 h-px bg-border/40" />
+                <span className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">
+                  Other
+                </span>
+                <div className="flex-1 h-px bg-border/40" />
               </div>
             )}
 

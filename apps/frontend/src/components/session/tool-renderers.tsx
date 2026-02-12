@@ -34,6 +34,8 @@ import {
   Maximize2,
   BookOpen,
   CalendarDays,
+  CheckCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
@@ -86,6 +88,7 @@ interface ToolProps {
   defaultOpen?: boolean;
   forceOpen?: boolean;
   locked?: boolean;
+  hasActiveQuestion?: boolean;
   onPermissionReply?: (requestId: string, reply: 'once' | 'always' | 'reject') => void;
 }
 
@@ -1347,6 +1350,61 @@ ToolRegistry.register('web-search', WebSearchTool);
 ToolRegistry.register('web_search', WebSearchTool);
 
 // --- ScrapeWebpage ---
+
+interface ScrapeResult {
+  url: string;
+  success: boolean;
+  title?: string;
+  content?: string;
+  error?: string;
+}
+
+interface ParsedScrapeOutput {
+  total: number;
+  successful: number;
+  failed: number;
+  results: ScrapeResult[];
+}
+
+function parseScrapeOutput(output: string | any): ParsedScrapeOutput | null {
+  if (!output) return null;
+  let parsed: any = null;
+  if (typeof output === 'object' && output !== null) {
+    parsed = output;
+  } else if (typeof output === 'string') {
+    try {
+      let result = JSON.parse(output);
+      if (typeof result === 'string') {
+        try { result = JSON.parse(result); } catch { /* keep */ }
+      }
+      parsed = typeof result === 'object' ? result : null;
+    } catch {
+      const trimmed = output.trim().replace(/^\uFEFF/, '');
+      if (trimmed !== output) {
+        try { parsed = JSON.parse(trimmed); } catch { /* not JSON */ }
+      }
+    }
+  }
+  if (!parsed) return null;
+
+  // Format: { total, successful, failed, results: [{url, success, title?, content?, error?}] }
+  if (parsed.results && Array.isArray(parsed.results)) {
+    return {
+      total: parsed.total || parsed.results.length,
+      successful: parsed.successful ?? parsed.results.filter((r: any) => r.success !== false).length,
+      failed: parsed.failed ?? parsed.results.filter((r: any) => r.success === false).length,
+      results: parsed.results.map((r: any) => ({
+        url: r.url || '',
+        success: r.success !== false,
+        title: r.title || undefined,
+        content: r.content || r.text || r.snippet || undefined,
+        error: r.error || undefined,
+      })),
+    };
+  }
+  return null;
+}
+
 function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const input = partInput(part);
   const output = partOutput(part);
@@ -1355,6 +1413,13 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
   const firstUrl = urls.split(',')[0]?.trim() || '';
   const domain = firstUrl ? wsDomain(firstUrl) : '';
 
+  const rawOutput = part.state.status === 'completed' ? (part.state as any).output : undefined;
+  const scrapeData = useMemo(() => parseScrapeOutput(rawOutput ?? output), [rawOutput, output]);
+
+  const triggerBadge = scrapeData
+    ? `${scrapeData.successful}/${scrapeData.total} scraped`
+    : undefined;
+
   return (
     <BasicTool
       icon={<Globe className="size-3.5 flex-shrink-0" />}
@@ -1362,18 +1427,89 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span className="font-medium text-xs text-foreground whitespace-nowrap">Scrape</span>
           <span className="text-muted-foreground text-xs truncate font-mono">{domain || firstUrl}</span>
-          <ExternalLink className="size-3 text-muted-foreground/60 flex-shrink-0 ml-auto" />
+          {triggerBadge && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium whitespace-nowrap ml-auto flex-shrink-0">
+              {triggerBadge}
+            </span>
+          )}
+          {!triggerBadge && (
+            <ExternalLink className="size-3 text-muted-foreground/60 flex-shrink-0 ml-auto" />
+          )}
         </div>
       }
-      defaultOpen={defaultOpen}
+      defaultOpen={defaultOpen || (scrapeData !== null)}
       forceOpen={forceOpen}
       locked={locked}
     >
-      {output && (
+      {scrapeData && scrapeData.results.length > 0 ? (
+        <div data-scrollable className="max-h-[400px] overflow-y-auto overflow-x-hidden p-2">
+          <div className="space-y-0.5">
+            {scrapeData.results.map((result, idx) => {
+              const favicon = result.url ? wsFavicon(result.url) : null;
+              const resultDomain = result.url ? wsDomain(result.url) : '';
+              const snippet = result.content
+                ? result.content.replace(/\\n/g, ' ').replace(/\s+/g, ' ').slice(0, 200)
+                : undefined;
+
+              return (
+                <a
+                  key={idx}
+                  href={result.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-start gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors"
+                >
+                  {/* Favicon */}
+                  <div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
+                    {favicon ? (
+                      <img
+                        src={favicon}
+                        alt=""
+                        className="size-4 rounded"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <Globe className="size-3 text-muted-foreground/50" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                      {result.title || resultDomain || result.url}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground/50 font-mono truncate">
+                        {resultDomain}
+                      </span>
+                    </div>
+                    {result.success && snippet && (
+                      <p className="text-[10px] text-muted-foreground/60 leading-relaxed line-clamp-2 mt-1 break-words">
+                        {snippet}
+                      </p>
+                    )}
+                    {!result.success && result.error && (
+                      <p className="text-[10px] text-red-500/70 leading-relaxed line-clamp-2 mt-1 break-words">
+                        {result.error.slice(0, 150)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-1">
+                    {result.success ? (
+                      <CheckCircle className="size-3 text-emerald-500/70" />
+                    ) : (
+                      <AlertTriangle className="size-3 text-amber-500/70" />
+                    )}
+                    <ExternalLink className="size-3 text-muted-foreground/20 group-hover:text-muted-foreground/50 transition-colors" />
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      ) : output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
           <UnifiedMarkdown content={output} isStreaming={status === 'running'} />
         </div>
-      )}
+      ) : null}
     </BasicTool>
   );
 }
@@ -1423,6 +1559,7 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
           <div className="grid grid-cols-3 gap-1.5">
             {imageResults.slice(0, 9).map((img: any, i: number) => {
               const imgUrl = img.url || img.imageUrl || img.image_url || '';
+              if (!imgUrl) return null;
               const title = img.title || '';
               return (
                 <a
@@ -2099,9 +2236,40 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 ToolRegistry.register('todowrite', TodoWriteTool);
 
 // --- Question ---
-function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+function QuestionSkeletonOptions() {
+  return (
+    <div className="p-3 space-y-3 animate-pulse">
+      {/* Question text skeleton */}
+      <div className="space-y-1.5">
+        <div className="h-3.5 w-3/4 bg-muted/40 rounded-md" />
+      </div>
+      {/* Option skeletons */}
+      <div className="space-y-1.5">
+        {[0.85, 0.7, 0.6, 0.75].map((w, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/20 bg-muted/10"
+          >
+            <div className="flex-1 flex items-center gap-2">
+              <div className="h-3 rounded-md bg-muted/40" style={{ width: `${w * 50}%` }} />
+              <div className="h-3 rounded-md bg-muted/20" style={{ width: `${w * 30}%` }} />
+            </div>
+            <div className="size-3.5 rounded bg-muted/20 shrink-0" />
+          </div>
+        ))}
+      </div>
+      {/* Dismiss skeleton */}
+      <div className="flex justify-end pt-2 border-t border-border/10">
+        <div className="h-5 w-14 rounded-md bg-muted/20" />
+      </div>
+    </div>
+  );
+}
+
+function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked, hasActiveQuestion }: ToolProps) {
   const input = partInput(part);
   const metadata = partMetadata(part);
+  const status = partStatus(part);
 
   const questions = useMemo(
     () => (Array.isArray(input.questions) ? input.questions : []) as Array<{ question: string; options?: { label: string; description?: string }[] }>,
@@ -2114,21 +2282,26 @@ function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProp
   );
 
   const isAnswered = answers.length > 0;
+  const isRunning = status === 'running' || status === 'pending';
+  // Show skeleton only when running AND the QuestionPrompt hasn't taken over yet
+  const showSkeleton = isRunning && !hasActiveQuestion;
   const subtitle = questions.length > 0
     ? isAnswered
       ? `${answers.length} answered`
       : `${questions.length} ${questions.length > 1 ? 'questions' : 'question'}`
-    : '';
+    : isRunning
+      ? 'Preparing...'
+      : '';
 
   return (
     <BasicTool
       icon={<MessageCircle className="size-3.5 flex-shrink-0" />}
       trigger={{ title: 'Questions', subtitle }}
-      defaultOpen={defaultOpen ?? isAnswered}
-      forceOpen={forceOpen || isAnswered}
+      defaultOpen={defaultOpen ?? isAnswered ?? showSkeleton}
+      forceOpen={forceOpen || isAnswered || showSkeleton}
       locked={locked}
     >
-      {isAnswered && (
+      {isAnswered ? (
         <div className="p-2 space-y-2">
           {questions.map((q, i) => {
             const answer = answers[i] || [];
@@ -2142,7 +2315,9 @@ function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProp
             );
           })}
         </div>
-      )}
+      ) : showSkeleton ? (
+        <QuestionSkeletonOptions />
+      ) : null}
     </BasicTool>
   );
 }
@@ -2456,6 +2631,7 @@ export function ToolPartRenderer({
       defaultOpen={defaultOpen}
       forceOpen={forceOpen}
       locked={isLocked}
+      hasActiveQuestion={!!question}
       onPermissionReply={onPermissionReply}
     />
   ) : (
