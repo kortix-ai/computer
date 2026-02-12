@@ -5,6 +5,8 @@ services:
       dockerfile: sandbox/Dockerfile
     image: heyagi/sandbox:0.1.0
     container_name: sandbox-desktop
+    cap_add:
+      - SYS_ADMIN
     security_opt:
       - seccomp=unconfined
     environment:

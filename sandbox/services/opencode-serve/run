@@ -9,6 +9,13 @@ sleep 3
 
 cd /workspace
 
+# Ensure OpenCode data dirs exist and are owned by abc (guards against
+# Daytona race conditions where /workspace ownership may shift after startup.sh)
+mkdir -p /workspace/.local/share/opencode/log \
+         /workspace/.local/share/opencode/storage \
+         /workspace/.local/share/opencode/snapshot
+chown -R abc:abc /workspace/.local/share/opencode
+
 echo "[opencode-serve] Starting OpenCode API server on port 4096"
 
 exec s6-setuidgid abc \

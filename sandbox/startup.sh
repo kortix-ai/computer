@@ -18,7 +18,9 @@ echo "[startup] Preparing Kortix sandbox..."
 
 mkdir -p /workspace/.kortix \
     /workspace/.agent-browser /workspace/.browser-profile /workspace/.lss \
-    /workspace/.local/share/opencode /workspace/.local/share/konsole \
+    /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
+    /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \
+    /workspace/.local/share/konsole \
     /workspace/.XDG /workspace/.config /workspace/ssl \
     /workspace/presentations
 

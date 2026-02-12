@@ -83,7 +83,9 @@ RUN mkdir -p /app/secrets && chown 1000:1000 /app/secrets && chmod 700 /app/secr
 # which expects HOME=/config for its s6-overlay init scripts.
 RUN mkdir -p /workspace/.kortix /workspace/.agent-browser /workspace/.browser-profile \
     /workspace/.lss /workspace/presentations \
-    /workspace/.local/share/opencode /workspace/.local/share/konsole \
+    /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
+    /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \
+    /workspace/.local/share/konsole \
     /workspace/.XDG /workspace/.config /workspace/ssl \
     && chown -R 1000:1000 /workspace \
     && rm -rf /config \
