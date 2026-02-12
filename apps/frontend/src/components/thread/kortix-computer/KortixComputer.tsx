@@ -31,6 +31,7 @@ import { EmptyState } from './components/EmptyState';
 import { LoadingState } from './components/LoadingState';
 import { AppDock } from './components/Dock';
 import { SandboxDesktop } from './components/Desktop';
+import { SSHTerminal } from './components/SSHTerminal';
 import { getToolNumber } from '@/hooks/messages/tool-tracking';
 
 export interface ToolCallInput {
@@ -672,6 +673,32 @@ export const KortixComputer = memo(function KortixComputer({
     );
   };
 
+  const renderTerminalView = () => {
+    if (!effectiveSandboxId) {
+      return (
+        <div className="h-full flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-auto flex flex-col items-center justify-center p-8 bg-zinc-50 dark:bg-zinc-900/50">
+            <div className="flex flex-col items-center space-y-4 max-w-sm text-center">
+              <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-700">
+                <CircleDashed className="h-8 w-8 text-zinc-400 dark:text-zinc-500" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  Terminal not available
+                </h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  No active sandbox session. The terminal will connect when a sandbox is running.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return <SSHTerminal sandboxId={effectiveSandboxId} className="h-full" />;
+  };
+
   const renderContent = () => {
     return (
       <div className="flex flex-col h-full max-h-full max-w-full overflow-hidden min-w-0" style={{ contain: 'strict' }}>
@@ -713,6 +740,7 @@ export const KortixComputer = memo(function KortixComputer({
           {activeView === 'tools' && renderToolsView()}
           {activeView === 'files' && renderFilesView()}
           {!HIDE_BROWSER_TAB && activeView === 'browser' && renderBrowserView()}
+          {activeView === 'terminal' && renderTerminalView()}
         </div>
       </div>
     );
@@ -754,6 +782,7 @@ export const KortixComputer = memo(function KortixComputer({
             {activeView === 'tools' && renderToolsView()}
             {activeView === 'files' && renderFilesView()}
             {!HIDE_BROWSER_TAB && activeView === 'browser' && renderBrowserView()}
+            {activeView === 'terminal' && renderTerminalView()}
           </div>
 
           {activeView === 'tools' && (displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
