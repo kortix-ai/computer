@@ -161,7 +161,7 @@ async function provisionSandbox(accountId: string, userId: string) {
   const daytonaSandbox = await daytona.create({
     snapshot: 'kortix-sandbox-v0.4.0',
     envVars: {
-      KORTIX_URL: config.KORTIX_URL,
+      KORTIX_API_URL: config.KORTIX_URL,
       KORTIX_TOKEN: authToken,
       ENV_MODE: 'cloud',
     },
