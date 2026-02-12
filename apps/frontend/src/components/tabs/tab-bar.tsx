@@ -194,7 +194,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
                   {pendingCount > 0
-                    ? `${pendingCount} pending ${pendingCount === 1 ? 'action' : 'actions'} — waiting for your input`
+                    ? `${pendingCount} ${pendingCount === 1 ? 'question' : 'questions'} waiting for your input`
                     : 'Working on it…'}
                 </TooltipContent>
               </Tooltip>
@@ -211,7 +211,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                  {pendingCount} pending {pendingCount === 1 ? 'action' : 'actions'} — waiting for your input
+                  {pendingCount} {pendingCount === 1 ? 'question' : 'questions'} waiting for your input
                 </TooltipContent>
               </Tooltip>
             )}
@@ -368,7 +368,7 @@ function TabItem({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">
             {pendingCount > 0
-              ? `${pendingCount} pending ${pendingCount === 1 ? 'action' : 'actions'} — waiting for your input`
+              ? `${pendingCount} ${pendingCount === 1 ? 'question' : 'questions'} waiting for your input`
               : 'Working on it…'}
           </TooltipContent>
         </Tooltip>
@@ -565,9 +565,9 @@ export function TabBar() {
         const permCount = Object.values(permissions).filter(
           (p) => p.sessionID === sid
         ).length;
-        const qCount = Object.values(questions).filter(
-          (q) => q.sessionID === sid
-        ).length;
+        const qCount = Object.values(questions)
+          .filter((q) => q.sessionID === sid)
+          .reduce((sum, q) => sum + (q.questions?.length || 1), 0);
         return permCount + qCount;
       };
       let total = countForSession(sessionId);

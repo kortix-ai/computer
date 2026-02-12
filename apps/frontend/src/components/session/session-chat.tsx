@@ -833,11 +833,12 @@ function SessionTurn({
               if (part.tool === 'todowrite') return null;
               // Skip task parts — rendered always-visible outside collapsed steps
               if (part.tool === 'task') return null;
-              // Hide tool parts that have active permission/question
-              if (isToolPartHidden(part, message.info.id, hidden)) return null;
 
               const perm = getPermissionForTool(permissions, part.callID);
               const question = getQuestionForTool(questions, part.callID);
+
+              // Hide tool parts that have active permission (but NOT questions — we show them with overlay)
+              if (!question && isToolPartHidden(part, message.info.id, hidden)) return null;
 
               return (
                 <ToolPartRenderer
@@ -884,9 +885,10 @@ function SessionTurn({
           {taskToolParts.map(({ part, message }) => {
             const toolPart = part as ToolPart;
             if (!shouldShowToolPart(toolPart)) return null;
-            if (isToolPartHidden(toolPart, message.info.id, hidden)) return null;
             const perm = getPermissionForTool(permissions, toolPart.callID);
             const question = getQuestionForTool(questions, toolPart.callID);
+            // Hide tool parts with active permission (but NOT questions — we show them with overlay)
+            if (!question && isToolPartHidden(toolPart, message.info.id, hidden)) return null;
             return (
               <ToolPartRenderer
                 key={part.id}
@@ -989,8 +991,8 @@ function SessionTurn({
         </div>
       )}
 
-      {/* Standalone question (no tool ref) */}
-      {nextQuestion && !nextQuestion.tool && (
+      {/* Standalone question (no tool ref) or question with tool ref when steps are collapsed */}
+      {nextQuestion && (!nextQuestion.tool || !stepsExpanded) && (
         <QuestionPrompt
           request={nextQuestion}
           onReply={onQuestionReply}
