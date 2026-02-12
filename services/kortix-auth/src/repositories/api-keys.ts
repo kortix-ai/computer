@@ -1,4 +1,6 @@
-import { getSupabase } from '../lib/supabase';
+import { eq, and, desc } from 'drizzle-orm';
+import { apiKeys } from '@kortix/db';
+import { db } from '../db';
 import { generateKeyPair, hashSecretKey } from '../lib/crypto';
 
 export interface ApiKey {
@@ -6,11 +8,11 @@ export interface ApiKey {
   publicKey: string;
   accountId: string;
   title: string;
-  description?: string;
-  status: 'active' | 'revoked' | 'expired';
-  expiresAt?: string;
-  lastUsedAt?: string;
-  createdAt: string;
+  description?: string | null;
+  status: string | null;
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  createdAt: string | null;
 }
 
 export interface CreateApiKeyResult {
@@ -18,7 +20,7 @@ export interface CreateApiKeyResult {
   publicKey: string;
   secretKey: string; // Only returned on creation
   title: string;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 /**
@@ -30,13 +32,9 @@ export async function createApiKey(
   description?: string,
   expiresInDays?: number
 ): Promise<CreateApiKeyResult> {
-  const supabase = getSupabase();
-
-  // Generate key pair
   const { publicKey, secretKey } = generateKeyPair();
   const secretKeyHash = hashSecretKey(secretKey);
 
-  // Calculate expiration
   let expiresAt: string | null = null;
   if (expiresInDays && expiresInDays > 0) {
     const expDate = new Date();
@@ -44,30 +42,30 @@ export async function createApiKey(
     expiresAt = expDate.toISOString();
   }
 
-  const { data, error } = await supabase
-    .from('api_keys')
-    .insert({
-      public_key: publicKey,
-      secret_key_hash: secretKeyHash,
-      account_id: accountId,
+  const [row] = await db
+    .insert(apiKeys)
+    .values({
+      publicKey,
+      secretKeyHash,
+      accountId,
       title,
-      description,
+      description: description ?? null,
       status: 'active',
-      expires_at: expiresAt,
+      expiresAt,
     })
-    .select('key_id, public_key, title, created_at')
-    .single();
-
-  if (error || !data) {
-    throw new Error(error?.message || 'Failed to create API key');
-  }
+    .returning({
+      keyId: apiKeys.keyId,
+      publicKey: apiKeys.publicKey,
+      title: apiKeys.title,
+      createdAt: apiKeys.createdAt,
+    });
 
   return {
-    keyId: data.key_id,
-    publicKey: data.public_key,
+    keyId: row.keyId,
+    publicKey: row.publicKey,
     secretKey, // Only returned once!
-    title: data.title,
-    createdAt: data.created_at,
+    title: row.title,
+    createdAt: row.createdAt,
   };
 }
 
@@ -75,67 +73,46 @@ export async function createApiKey(
  * List all API keys for an account.
  */
 export async function listApiKeys(accountId: string): Promise<ApiKey[]> {
-  const supabase = getSupabase();
+  const rows = await db
+    .select({
+      keyId: apiKeys.keyId,
+      publicKey: apiKeys.publicKey,
+      accountId: apiKeys.accountId,
+      title: apiKeys.title,
+      description: apiKeys.description,
+      status: apiKeys.status,
+      expiresAt: apiKeys.expiresAt,
+      lastUsedAt: apiKeys.lastUsedAt,
+      createdAt: apiKeys.createdAt,
+    })
+    .from(apiKeys)
+    .where(eq(apiKeys.accountId, accountId))
+    .orderBy(desc(apiKeys.createdAt));
 
-  const { data, error } = await supabase
-    .from('api_keys')
-    .select('key_id, public_key, account_id, title, description, status, expires_at, last_used_at, created_at')
-    .eq('account_id', accountId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data || []).map((row) => ({
-    keyId: row.key_id,
-    publicKey: row.public_key,
-    accountId: row.account_id,
-    title: row.title,
-    description: row.description,
-    status: row.status,
-    expiresAt: row.expires_at,
-    lastUsedAt: row.last_used_at,
-    createdAt: row.created_at,
-  }));
+  return rows;
 }
 
 /**
  * Revoke an API key.
  */
 export async function revokeApiKey(accountId: string, keyId: string): Promise<boolean> {
-  const supabase = getSupabase();
+  const result = await db
+    .update(apiKeys)
+    .set({ status: 'revoked' })
+    .where(and(eq(apiKeys.keyId, keyId), eq(apiKeys.accountId, accountId)))
+    .returning({ keyId: apiKeys.keyId });
 
-  const { data, error } = await supabase
-    .from('api_keys')
-    .update({ status: 'revoked' })
-    .eq('key_id', keyId)
-    .eq('account_id', accountId)
-    .select('key_id')
-    .single();
-
-  if (error || !data) {
-    return false;
-  }
-
-  return true;
+  return result.length > 0;
 }
 
 /**
  * Delete an API key permanently.
  */
 export async function deleteApiKey(accountId: string, keyId: string): Promise<boolean> {
-  const supabase = getSupabase();
+  const result = await db
+    .delete(apiKeys)
+    .where(and(eq(apiKeys.keyId, keyId), eq(apiKeys.accountId, accountId)))
+    .returning({ keyId: apiKeys.keyId });
 
-  const { error } = await supabase
-    .from('api_keys')
-    .delete()
-    .eq('key_id', keyId)
-    .eq('account_id', accountId);
-
-  if (error) {
-    return false;
-  }
-
-  return true;
+  return result.length > 0;
 }

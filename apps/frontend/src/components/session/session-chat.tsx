@@ -100,7 +100,10 @@ import {
   hasDiffs,
 } from '@/ui';
 
-import { SessionChatInput, flattenModels, type AttachedFile } from '@/components/session/session-chat-input';
+import { SessionChatInput, type AttachedFile } from '@/components/session/session-chat-input';
+import { uploadFile } from '@/features/files/api/opencode-files';
+import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
+import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { SessionWelcome } from '@/components/session/session-welcome';
 import { ToolPartRenderer } from '@/components/session/tool-renderers';
 import { QuestionPrompt } from '@/components/session/question-prompt';
@@ -380,6 +383,27 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
 }
 
 // ============================================================================
+// Parse <file> XML references from uploaded file text parts
+// ============================================================================
+
+interface ParsedFileRef {
+  path: string;
+  mime: string;
+  filename: string;
+}
+
+const FILE_TAG_REGEX = /<file\s+path="([^"]*?)"\s+mime="([^"]*?)"\s+filename="([^"]*?)">\s*[\s\S]*?<\/file>/g;
+
+function parseFileReferences(text: string): { cleanText: string; files: ParsedFileRef[] } {
+  const files: ParsedFileRef[] = [];
+  const cleanText = text.replace(FILE_TAG_REGEX, (_, path, mime, filename) => {
+    files.push({ path, mime, filename });
+    return '';
+  }).trim();
+  return { cleanText, files };
+}
+
+// ============================================================================
 // User Message Row
 // ============================================================================
 
@@ -390,9 +414,10 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
     [message.parts],
   );
 
-  // Extract text from sticky parts
+  // Extract text from sticky parts, parse out <file> XML references
   const textParts = stickyParts.filter(isTextPart).filter((p) => (p as TextPart).text?.trim() && !(p as TextPart).synthetic);
-  const text = textParts.map((p) => (p as TextPart).text).join('\n');
+  const rawText = textParts.map((p) => (p as TextPart).text).join('\n');
+  const { cleanText: text, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
 
   // Inline file references
   const inlineFiles = stickyParts.filter(isFilePart) as FilePart[];
@@ -513,6 +538,18 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
                     <span className="text-xs text-muted-foreground">{file.filename || 'File'}</span>
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Uploaded file references (from <file> XML tags) */}
+        {uploadedFiles.length > 0 && (
+          <div className="flex gap-2 p-3 pb-0 flex-wrap">
+            {uploadedFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                <FileText className="size-4 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
               </div>
             ))}
           </div>
@@ -1180,9 +1217,6 @@ interface SessionChatProps {
 }
 
 export function SessionChat({ sessionId }: SessionChatProps) {
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<{ providerID: string; modelID: string } | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(false);
 
   // ---- KortixComputer side panel ----
@@ -1197,6 +1231,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const { data: agents } = useOpenCodeAgents();
   const { data: commands } = useOpenCodeCommands();
   const { data: providers } = useOpenCodeProviders();
+  const { data: config } = useOpenCodeConfig();
   const sendMessage = useSendOpenCodeMessage();
   const abortSession = useAbortOpenCodeSession();
   const executeCommand = useExecuteOpenCodeCommand();
@@ -1205,6 +1240,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const revertSession = useRevertSession();
   const unrevertSession = useUnrevertSession();
   const router = useRouter();
+
+  // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
+  const local = useOpenCodeLocal({ agents, providers, config });
 
   // ---- URL params ----
   const searchParams = useSearchParams();
@@ -1236,9 +1274,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         if (raw) {
           const pendingOptions = JSON.parse(raw);
           sessionStorage.removeItem('opencode_pending_options');
-          if (pendingOptions?.agent) setSelectedAgent(pendingOptions.agent as string);
-          if (pendingOptions?.model) setSelectedModel(pendingOptions.model as { providerID: string; modelID: string });
-          if (pendingOptions?.variant) setSelectedVariant(pendingOptions.variant as string);
+          if (pendingOptions?.agent) local.agent.set(pendingOptions.agent as string);
+          if (pendingOptions?.model) local.model.set(pendingOptions.model as { providerID: string; modelID: string });
+          if (pendingOptions?.variant) local.model.variant.set(pendingOptions.variant as string);
         }
       } catch {
         // ignore
@@ -1256,19 +1294,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     }
   }, [optimisticPrompt, messages]);
 
-  // ---- Filter agents: exclude subagents and hidden ----
-  const visibleAgents = useMemo(
-    () => (agents || []).filter((a) => a.mode !== 'subagent' && !a.hidden),
-    [agents],
-  );
-
   const agentNames = useMemo(
-    () => visibleAgents.map((a) => a.name),
-    [visibleAgents],
+    () => local.agent.list.map((a) => a.name),
+    [local.agent.list],
   );
-
-  // ---- Flatten models from providers ----
-  const flatModels = useMemo(() => flattenModels(providers), [providers]);
 
   // ---- Check if any messages have tool calls ----
   const hasToolCalls = useMemo(() => {
@@ -1278,17 +1307,21 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     );
   }, [messages]);
 
-  // ---- Compute variants for selected model ----
-  const currentVariants = useMemo(() => {
-    if (!selectedModel) {
-      const first = flatModels[0];
-      return first?.variants ? Object.keys(first.variants) : [];
-    }
-    const model = flatModels.find(
-      (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID,
-    );
-    return model?.variants ? Object.keys(model.variants) : [];
-  }, [selectedModel, flatModels]);
+  // ---- Restore model/agent from last user message (matching SolidJS session.tsx:550-560) ----
+  const lastUserMessage = useMemo(
+    () => messages ? [...messages].reverse().find((m) => m.info.role === 'user') : undefined,
+    [messages],
+  );
+  const lastUserMsgIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!lastUserMessage) return;
+    if (lastUserMsgIdRef.current === lastUserMessage.info.id) return;
+    lastUserMsgIdRef.current = lastUserMessage.info.id;
+    const msg = lastUserMessage.info as any;
+    if (msg.agent) local.agent.set(msg.agent);
+    if (msg.model) local.model.set(msg.model); // no { recent: true } — matches SolidJS
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastUserMessage?.info.id]);
 
   // ---- Session status ----
   const sessionStatus = useOpenCodeSessionStatusStore(
@@ -1444,36 +1477,40 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const handleSend = useCallback(
     async (text: string, files?: AttachedFile[]) => {
       const options: Record<string, unknown> = {};
-      if (selectedAgent) options.agent = selectedAgent;
-      if (selectedModel) options.model = selectedModel;
-      if (selectedVariant) options.variant = selectedVariant;
+      if (local.agent.current) options.agent = local.agent.current.name;
+      if (local.model.currentKey) options.model = local.model.currentKey;
+      if (local.model.variant.current) options.variant = local.model.variant.current;
 
-      // Build parts: text first, then any attached files as data URIs
+      // Build parts: text first, then upload attached files to /workspace/uploads/
+      // and send as XML text references (agent reads from disk on demand, not loaded into context)
       const parts: Array<
         | { type: 'text'; text: string }
         | { type: 'file'; mime: string; url: string; filename?: string }
       > = [{ type: 'text', text }];
 
       if (files && files.length > 0) {
-        const fileResults = await Promise.all(
-          files.map(
-            (af) =>
-              new Promise<{ mime: string; url: string; filename: string }>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  resolve({
-                    mime: af.file.type || 'application/octet-stream',
-                    url: reader.result as string,
-                    filename: af.file.name,
-                  });
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(af.file);
-              }),
-          ),
+        const uploadResults = await Promise.all(
+          files.map(async (af) => {
+            const timestamp = Date.now();
+            const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const uniqueName = `${timestamp}-${safeName}`;
+            const uploadBlob = new File([af.file], uniqueName, { type: af.file.type });
+            const results = await uploadFile(uploadBlob, '/workspace/uploads');
+            if (!results || results.length === 0) {
+              throw new Error(`Failed to upload file: ${af.file.name}`);
+            }
+            return {
+              path: results[0].path,
+              mime: af.file.type || 'application/octet-stream',
+              filename: af.file.name,
+            };
+          }),
         );
-        for (const f of fileResults) {
-          parts.push({ type: 'file', mime: f.mime, url: f.url, filename: f.filename });
+        for (const f of uploadResults) {
+          parts.push({
+            type: 'text',
+            text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
+          });
         }
       }
 
@@ -1483,7 +1520,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         options: Object.keys(options).length > 0 ? options as any : undefined,
       });
     },
-    [sessionId, sendMessage, selectedAgent, selectedModel, selectedVariant],
+    [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
   const handleStop = useCallback(() => {
@@ -1606,10 +1643,29 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 {showOptimistic && (
                   <>
                     <div className="flex justify-end">
-                      <div className="flex max-w-[90%] rounded-3xl rounded-br-lg bg-card border px-4 py-3 break-words overflow-hidden">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          <HighlightMentions text={optimisticPrompt || ''} agentNames={agentNames} onFileClick={openFileInComputer} />
-                        </p>
+                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+                        {(() => {
+                          const { cleanText, files } = parseFileReferences(optimisticPrompt || '');
+                          return (
+                            <>
+                              {files.length > 0 && (
+                                <div className="flex gap-2 p-3 pb-0 flex-wrap">
+                                  {files.map((f, i) => (
+                                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                                      <FileText className="size-4 text-muted-foreground shrink-0" />
+                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {cleanText && (
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
+                                  <HighlightMentions text={cleanText} agentNames={agentNames} onFileClick={openFileInComputer} />
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1720,17 +1776,17 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         onSend={handleSend}
         isBusy={isBusy}
         onStop={handleStop}
-        agents={visibleAgents}
-        selectedAgent={selectedAgent}
-        onAgentChange={setSelectedAgent}
+        agents={local.agent.list}
+        selectedAgent={local.agent.current?.name ?? null}
+        onAgentChange={local.agent.set}
         commands={commands || []}
         onCommand={handleCommand}
-        models={flatModels}
-        selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
-        variants={currentVariants}
-        selectedVariant={selectedVariant}
-        onVariantChange={setSelectedVariant}
+        models={local.model.list}
+        selectedModel={local.model.currentKey ?? null}
+        onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}
+        variants={local.model.variant.list}
+        selectedVariant={local.model.variant.current ?? null}
+        onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
         messages={messages}
         onTogglePanel={handleTogglePanel}
         isPanelOpen={isSidePanelOpen}

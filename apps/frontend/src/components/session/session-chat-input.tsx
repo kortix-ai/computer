@@ -561,7 +561,7 @@ export interface SessionChatInputProps {
   onStop?: () => void;
   agents?: Agent[];
   selectedAgent?: string | null;
-  onAgentChange?: (agentName: string | null) => void;
+  onAgentChange?: (agentName: string | null | undefined) => void;
   commands?: Command[];
   onCommand?: (command: Command) => void;
   models?: FlatModel[];
@@ -569,7 +569,7 @@ export interface SessionChatInputProps {
   onModelChange?: (model: { providerID: string; modelID: string } | null) => void;
   variants?: string[];
   selectedVariant?: string | null;
-  onVariantChange?: (variant: string | null) => void;
+  onVariantChange?: (variant: string | null | undefined) => void;
   messages?: MessageWithParts[];
   /** If true, disables the input (e.g. during session creation redirect) */
   disabled?: boolean;

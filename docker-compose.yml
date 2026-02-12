@@ -54,3 +54,31 @@ services:
         required: false
     profiles: [backend, all]
     restart: unless-stopped
+
+  kortix-cron:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        SERVICE: kortix-cron
+    ports:
+      - "8011:8011"
+    env_file:
+      - path: services/kortix-cron/.env
+        required: false
+    profiles: [backend, all]
+    restart: unless-stopped
+
+  kortix-platform:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        SERVICE: kortix-platform
+    ports:
+      - "8012:8012"
+    env_file:
+      - path: services/kortix-platform/.env
+        required: false
+    profiles: [backend, all]
+    restart: unless-stopped

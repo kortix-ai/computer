@@ -33,7 +33,7 @@ import { ToolCallInput } from './floating-tool-preview';
 import { ChatSnack } from './chat-snack';
 import { Brain, Zap, ArrowDown, ArrowUp, Wrench, Clock, Send } from 'lucide-react';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
-import { useSunaModesStore } from '@/stores/suna-modes-store';
+import { useModesStore } from '@/stores/modes-store';
 import { useComposioToolkitIcon } from '@/hooks/composio/use-composio';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContextUsageIndicator } from '../ContextUsageIndicator';
@@ -414,18 +414,18 @@ function ModeButton({
   isModeDismissing,
   onDeselect,
 }: ModeButtonProps) {
-  const t = useTranslations('suna');
+  const t = useTranslations('modes');
   
   // Read ALL mode state directly from Zustand store with individual selectors
   // Each selector returns a primitive/stable reference, so no infinite loop
-  const selectedMode = useSunaModesStore((state) => state.selectedMode);
-  const selectedCharts = useSunaModesStore((state) => state.selectedCharts);
-  const selectedOutputFormat = useSunaModesStore((state) => state.selectedOutputFormat);
-  const selectedTemplate = useSunaModesStore((state) => state.selectedTemplate);
-  const selectedDocsType = useSunaModesStore((state) => state.selectedDocsType);
-  const selectedImageStyle = useSunaModesStore((state) => state.selectedImageStyle);
-  const selectedCanvasAction = useSunaModesStore((state) => state.selectedCanvasAction);
-  const selectedVideoStyle = useSunaModesStore((state) => state.selectedVideoStyle);
+  const selectedMode = useModesStore((state) => state.selectedMode);
+  const selectedCharts = useModesStore((state) => state.selectedCharts);
+  const selectedOutputFormat = useModesStore((state) => state.selectedOutputFormat);
+  const selectedTemplate = useModesStore((state) => state.selectedTemplate);
+  const selectedDocsType = useModesStore((state) => state.selectedDocsType);
+  const selectedImageStyle = useModesStore((state) => state.selectedImageStyle);
+  const selectedCanvasAction = useModesStore((state) => state.selectedCanvasAction);
+  const selectedVideoStyle = useModesStore((state) => state.selectedVideoStyle);
   
   // Generate mode-specific display text - computed directly (no useMemo to ensure fresh values)
   const getDisplayText = () => {
@@ -551,20 +551,20 @@ function ModeButton({
 }
 
 // Kortix agent modes switcher - isolated from typing state
-interface SunaAgentModeSwitcherProps {
+interface AgentModeSwitcherProps {
   enabled: boolean;
-  isSunaAgent: boolean;
-  sunaAgentModes: 'adaptive' | 'autonomous' | 'chat';
+  isDefaultAgent: boolean;
+  agentModes: 'adaptive' | 'autonomous' | 'chat';
   onModeChange: (mode: 'adaptive' | 'autonomous' | 'chat') => void;
 }
 
-const SunaAgentModeSwitcher = memo(function SunaAgentModeSwitcher({
+const AgentModeSwitcher = memo(function AgentModeSwitcher({
   enabled,
-  isSunaAgent,
-  sunaAgentModes,
+  isDefaultAgent,
+  agentModes,
   onModeChange,
-}: SunaAgentModeSwitcherProps) {
-  if (!enabled || !(isStagingMode() || isLocalMode()) || !isSunaAgent) return null;
+}: AgentModeSwitcherProps) {
+  if (!enabled || !(isStagingMode() || isLocalMode()) || !isDefaultAgent) return null;
 
   return (
     <div className="flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg">
@@ -574,7 +574,7 @@ const SunaAgentModeSwitcher = memo(function SunaAgentModeSwitcher({
             onClick={() => onModeChange('adaptive')}
             className={cn(
               "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
-              sunaAgentModes === 'adaptive'
+              agentModes === 'adaptive'
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50"
             )}
@@ -596,7 +596,7 @@ const SunaAgentModeSwitcher = memo(function SunaAgentModeSwitcher({
             onClick={() => onModeChange('autonomous')}
             className={cn(
               "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
-              sunaAgentModes === 'autonomous'
+              agentModes === 'autonomous'
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50"
             )}
@@ -618,7 +618,7 @@ const SunaAgentModeSwitcher = memo(function SunaAgentModeSwitcher({
             onClick={() => onModeChange('chat')}
             className={cn(
               "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
-              sunaAgentModes === 'chat'
+              agentModes === 'chat'
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50"
             )}
@@ -865,13 +865,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     const [mounted, setMounted] = useState(false);
     const [animatedPlaceholder, setAnimatedPlaceholder] = useState('');
     const [isModeDismissing, setIsModeDismissing] = useState(false);    // Kortix Agent Modes feature flag
-    const ENABLE_SUNA_AGENT_MODES = false;
-    const [sunaAgentModes, setSunaAgentModes] = useState<'adaptive' | 'autonomous' | 'chat'>('adaptive');
+    const ENABLE_AGENT_MODES = false;
+    const [agentModes, setAgentModes] = useState<'adaptive' | 'autonomous' | 'chat'>('adaptive');
 
     // Read mode-specific state directly from Zustand for markdown generation
-    const selectedCharts = useSunaModesStore((state) => state.selectedCharts);
-    const selectedOutputFormat = useSunaModesStore((state) => state.selectedOutputFormat);
-    const selectedTemplate = useSunaModesStore((state) => state.selectedTemplate);
+    const selectedCharts = useModesStore((state) => state.selectedCharts);
+    const selectedOutputFormat = useModesStore((state) => state.selectedOutputFormat);
+    const selectedTemplate = useModesStore((state) => state.selectedTemplate);
 
     // Voice player state for snack visibility
     const voiceState = useVoicePlayerStore((s) => s.state);
@@ -1002,10 +1002,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     // Check if selected agent is Kortix based on agent data
     // While loading, default to Kortix (assume Kortix is the default agent)
     const selectedAgent = agents.find(agent => agent.agent_id === selectedAgentId);
-    const sunaAgent = agents.find(agent => agent.metadata?.is_suna_default === true);
-    const isSunaAgent = isLoadingAgents 
-        ? true // Show Kortix modes while loading
-        : (selectedAgent?.metadata?.is_suna_default || (!selectedAgentId && sunaAgent !== undefined) || false);
+    const isDefaultAgent = !selectedAgentId;
 
     const { initializeFromAgents } = useAgentSelection();
     useImperativeHandle(ref, () => ({
@@ -1383,11 +1380,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
         />
 
         <div className="hidden sm:block">
-          <SunaAgentModeSwitcher
-            enabled={ENABLE_SUNA_AGENT_MODES}
-            isSunaAgent={isSunaAgent}
-            sunaAgentModes={sunaAgentModes}
-            onModeChange={setSunaAgentModes}
+          <AgentModeSwitcher
+            enabled={ENABLE_AGENT_MODES}
+            isDefaultAgent={isDefaultAgent}
+            agentModes={agentModes}
+            onModeChange={setAgentModes}
           />
         </div>
 
@@ -1400,7 +1397,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
           </div>
         )}
       </div>
-    ), [hideAttachments, loading, disabled, isAgentRunning, isUploading, sandboxId, projectId, messages, isLoggedIn, isFreeTier, quickIntegrations, integrationIcons, handleOpenRegistry, handleOpenPlanModal, threadId, isSunaAgent, sunaAgentModes, onModeDeselect, isModeDismissing, handleModeDeselect]);
+    ), [hideAttachments, loading, disabled, isAgentRunning, isUploading, sandboxId, projectId, messages, isLoggedIn, isFreeTier, quickIntegrations, integrationIcons, handleOpenRegistry, handleOpenPlanModal, threadId, isDefaultAgent, agentModes, onModeDeselect, isModeDismissing, handleModeDeselect]);
 
     const rightControls = useMemo(() => (
       <div className='flex items-center gap-1.5 sm:gap-2 flex-shrink-0'>

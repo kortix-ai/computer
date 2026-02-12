@@ -43,11 +43,14 @@ export const config = {
   GROQ_API_KEY: process.env.GROQ_API_KEY || '',
   AWS_BEARER_TOKEN_BEDROCK: process.env.AWS_BEARER_TOKEN_BEDROCK || '',
 
-  // Backend API for billing (legacy - being replaced with direct Supabase)
+  // Database (Drizzle ORM)
+  DATABASE_URL: process.env.DATABASE_URL || '',
+
+  // Backend API for billing (legacy fallback)
   BACKEND_API_URL: process.env.BACKEND_API_URL || 'http://localhost:8000',
   BACKEND_API_KEY: process.env.BACKEND_API_KEY || '',
 
-  // Supabase (direct DB access for fast auth + billing)
+  // Supabase (kept for reference, being migrated to DATABASE_URL)
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
 

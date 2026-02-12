@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 // localStorage keys
-const SELECTED_MODE_KEY = 'selectedSunaMode';
+const SELECTED_MODE_KEY = 'selectedMode';
 const SELECTED_CHARTS_KEY = 'selectedCharts';
 const SELECTED_OUTPUT_FORMAT_KEY = 'selectedOutputFormat';
 const SELECTED_TEMPLATE_KEY = 'selectedTemplate';
@@ -10,7 +10,7 @@ const SELECTED_IMAGE_STYLE_KEY = 'selectedImageStyle';
 const SELECTED_CANVAS_ACTION_KEY = 'selectedCanvasAction';
 const SELECTED_VIDEO_STYLE_KEY = 'selectedVideoStyle';
 
-interface SunaModesState {
+interface ModesState {
   selectedMode: string | null;
   selectedCharts: string[];
   selectedOutputFormat: string | null;
@@ -21,7 +21,7 @@ interface SunaModesState {
   selectedVideoStyle: string | null;
 }
 
-interface SunaModesActions {
+interface ModesActions {
   setSelectedMode: (mode: string | null) => void;
   setSelectedCharts: (charts: string[]) => void;
   setSelectedOutputFormat: (format: string | null) => void;
@@ -32,7 +32,7 @@ interface SunaModesActions {
   setSelectedVideoStyle: (style: string | null) => void;
 }
 
-export function useSunaModePersistence(): SunaModesState & SunaModesActions {
+export function useModePersistence(): ModesState & ModesActions {
   // Initialize mode from localStorage
   const [selectedMode, setSelectedModeState] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {

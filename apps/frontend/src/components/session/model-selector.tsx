@@ -1031,10 +1031,9 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
   const handleSelect = useCallback(
     (model: FlatModel) => {
       onSelect({ providerID: model.providerID, modelID: model.modelID });
-      modelStore.pushRecent({ providerID: model.providerID, modelID: model.modelID });
       setOpen(false);
     },
-    [onSelect, modelStore],
+    [onSelect],
   );
 
   const handleKeyDown = useCallback(

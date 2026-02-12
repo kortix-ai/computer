@@ -896,7 +896,7 @@
     "disableAll": "すべて無効化",
     "saveChanges": "変更を保存"
   },
-  "suna": {
+  "modes": {
     "samplePrompts": "サンプルプロンプト",
     "examplePrompts": "サンプルプロンプト",
     "chooseStyle": "スタイルを選択",

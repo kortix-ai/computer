@@ -1,13 +1,13 @@
 import { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { validateSecretKey } from '../repositories/api-keys';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { config } from '../config';
 
 /**
  * Validates API key from Authorization header.
  *
  * Auth Flow:
- * - Token "sk_xxx" = validate against api_keys table, get account_id
+ * - Token "sk_xxx" = validate against api_keys table via Drizzle, get account_id
  * - Other tokens = treat as account_id directly (backward compat / fallback)
  */
 export async function authMiddleware(c: Context, next: Next) {
@@ -28,7 +28,7 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   // API key validation (sk_xxx format)
-  if (token.startsWith('sk_') && isSupabaseConfigured()) {
+  if (token.startsWith('sk_') && config.DATABASE_URL) {
     const result = await validateSecretKey(token);
 
     if (!result.isValid) {
