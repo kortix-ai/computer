@@ -28,6 +28,11 @@ import {
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useTabStore } from '@/stores/tab-store';
 
 import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
@@ -112,13 +117,22 @@ function SessionItem({
 
         {/* Status indicator */}
         {(isBusy || pendingCount > 0) && (
-          <div className="flex-shrink-0">
-            {pendingCount > 0 ? (
-              <span className="h-2 w-2 rounded-full bg-amber-500 block" />
-            ) : (
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse block" />
-            )}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex-shrink-0">
+                {pendingCount > 0 ? (
+                  <span className="h-2 w-2 rounded-full bg-amber-500 block" />
+                ) : (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse block" />
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              {pendingCount > 0
+                ? `${pendingCount} pending ${pendingCount === 1 ? 'action' : 'actions'} — waiting for your input`
+                : 'Working on it…'}
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {/* Title */}
@@ -133,9 +147,16 @@ function SessionItem({
 
         {/* Pending badge */}
         {pendingCount > 0 && (
-          <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
-            {pendingCount}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
+                {pendingCount}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              {pendingCount} pending {pendingCount === 1 ? 'action' : 'actions'} — waiting for your input
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {/* Context menu on hover */}
