@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Globe, Zap, FolderOpen } from 'lucide-react';
+import { Globe, Zap, FolderOpen, TerminalSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,14 +23,15 @@ export const ViewToggle = memo(function ViewToggle({
   onViewChange, 
   showFilesTab = true 
 }: ViewToggleProps) {
-  // Hide browser tab if flag is enabled
-  const viewOptions = HIDE_BROWSER_TAB
-    ? (showFilesTab ? ['tools', 'files'] as const : ['tools'] as const)
-    : (showFilesTab ? ['tools', 'files', 'browser'] as const : ['tools', 'browser'] as const);
+  // Build view options array dynamically
+  const viewOptions: ViewType[] = ['tools'];
+  if (showFilesTab) viewOptions.push('files');
+  viewOptions.push('terminal');
+  if (!HIDE_BROWSER_TAB) viewOptions.push('browser');
   
   const getViewIndex = (view: ViewType) => {
-    if (!showFilesTab && view === 'files') return 0;
-    return viewOptions.indexOf(view as any);
+    const idx = viewOptions.indexOf(view);
+    return idx === -1 ? 0 : idx;
   };
   
   const tabWidth = 28;
@@ -90,6 +91,25 @@ export const ViewToggle = memo(function ViewToggle({
           </TooltipContent>
         </Tooltip>
       )}
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            onClick={() => onViewChange('terminal')}
+            className={`relative z-10 h-7 w-7 p-0 rounded-xl bg-transparent hover:bg-transparent shadow-none ${
+              currentView === 'terminal'
+                ? 'text-black dark:text-white'
+                : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            <TerminalSquare className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <p>Terminal</p>
+        </TooltipContent>
+      </Tooltip>
 
       {!HIDE_BROWSER_TAB && (
         <Tooltip>

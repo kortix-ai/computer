@@ -556,12 +556,12 @@ function MentionPopover({
 // ============================================================================
 
 export interface SessionChatInputProps {
-  onSend: (text: string) => void | Promise<void>;
+  onSend: (text: string, files?: AttachedFile[]) => void | Promise<void>;
   isBusy?: boolean;
   onStop?: () => void;
   agents?: Agent[];
   selectedAgent?: string | null;
-  onAgentChange?: (agentName: string | null) => void;
+  onAgentChange?: (agentName: string | null | undefined) => void;
   commands?: Command[];
   onCommand?: (command: Command) => void;
   models?: FlatModel[];
@@ -569,7 +569,7 @@ export interface SessionChatInputProps {
   onModelChange?: (model: { providerID: string; modelID: string } | null) => void;
   variants?: string[];
   selectedVariant?: string | null;
-  onVariantChange?: (variant: string | null) => void;
+  onVariantChange?: (variant: string | null | undefined) => void;
   messages?: MessageWithParts[];
   /** If true, disables the input (e.g. during session creation redirect) */
   disabled?: boolean;
@@ -711,6 +711,9 @@ export function SessionChatInput({
     historyIndexRef.current = -1;
     draftRef.current = '';
 
+    // Snapshot files before clearing
+    const filesToSend = attachedFiles.length > 0 ? [...attachedFiles] : undefined;
+
     // Optimistically clear input — restore on failure
     setText('');
     setSlashFilter(null);
@@ -722,11 +725,8 @@ export function SessionChatInput({
       textareaRef.current.style.height = 'auto';
     }
 
-    // Send as text — the server parses @mentions from the text content
-    // and creates the appropriate FilePart/AgentPart objects with source positions.
-    // Sending non-text parts via promptAsync causes the server to silently drop the message.
     try {
-      await onSend(trimmed);
+      await onSend(trimmed, filesToSend);
     } catch {
       // Restore the text so the user can retry
       setText(trimmed);

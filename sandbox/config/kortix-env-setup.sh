@@ -8,18 +8,18 @@ if [ "$ENV_MODE" = "cloud" ] || [ "$ENV_MODE" = "production" ]; then
     echo "[Kortix] Cloud mode — enabling API proxy routing"
 
     if [ -z "$KORTIX_API_URL" ]; then
-        echo "[Kortix] ERROR: KORTIX_API_URL is required in cloud mode"
-        exit 1
+        echo "[Kortix] WARNING: KORTIX_API_URL is empty — LLM calls will fail until it is set via /env API"
+        echo "[Kortix] Services will still start; set KORTIX_API_URL later to enable model routing"
+    else
+        # Write env overrides that s6 services will inherit via with-contenv
+        printf '%s' "${KORTIX_API_URL}/tavily"    > /var/run/s6/container_environment/TAVILY_API_URL
+        printf '%s' "${KORTIX_API_URL}/serper"    > /var/run/s6/container_environment/SERPER_API_URL
+        printf '%s' "${KORTIX_API_URL}/firecrawl" > /var/run/s6/container_environment/FIRECRAWL_API_URL
+        printf '%s' "${KORTIX_API_URL}/replicate" > /var/run/s6/container_environment/REPLICATE_API_URL
+        printf '%s' "${KORTIX_API_URL}/context7"  > /var/run/s6/container_environment/CONTEXT7_API_URL
+
+        echo "[Kortix] SDK URLs routed through ${KORTIX_API_URL}"
     fi
-
-    # Write env overrides that s6 services will inherit via with-contenv
-    printf '%s' "${KORTIX_API_URL}/tavily"    > /var/run/s6/container_environment/TAVILY_API_URL
-    printf '%s' "${KORTIX_API_URL}/serper"    > /var/run/s6/container_environment/SERPER_API_URL
-    printf '%s' "${KORTIX_API_URL}/firecrawl" > /var/run/s6/container_environment/FIRECRAWL_API_URL
-    printf '%s' "${KORTIX_API_URL}/replicate" > /var/run/s6/container_environment/REPLICATE_API_URL
-    printf '%s' "${KORTIX_API_URL}/context7"  > /var/run/s6/container_environment/CONTEXT7_API_URL
-
-    echo "[Kortix] SDK URLs routed through ${KORTIX_API_URL}"
 else
     echo "[Kortix] Local mode — proxy routing disabled"
 fi

@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Minimize2, FolderOpen, Activity } from 'lucide-react';
+import { Minimize2, FolderOpen, Activity, TerminalSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DrawerTitle } from '@/components/ui/drawer';
 import { ViewType } from '@/stores/kortix-computer-store';
@@ -18,16 +18,22 @@ interface ActionFilesSwitcherProps {
   size?: 'sm' | 'md';
 }
 
+const SWITCHER_TABS: { key: ViewType; label: string; icon: typeof Activity }[] = [
+  { key: 'tools', label: 'Actions', icon: Activity },
+  { key: 'files', label: 'Files', icon: FolderOpen },
+  { key: 'terminal', label: 'Terminal', icon: TerminalSquare },
+];
+
 function ActionFilesSwitcher({ currentView, onViewChange, size = 'md' }: ActionFilesSwitcherProps) {
-  const isAction = currentView === 'tools';
-  const isFiles = currentView === 'files';
+  const activeIndex = SWITCHER_TABS.findIndex((t) => t.key === currentView);
+  const resolvedIndex = activeIndex === -1 ? 0 : activeIndex;
 
   // Size variants - sm is more compact for mobile
   const config = size === 'sm'
     ? { height: 30, padding: 2, btnWidth: 64, iconSize: 12, fontSize: 11 }
     : { height: 36, padding: 3, btnWidth: 80, iconSize: 14, fontSize: 12 };
 
-  const totalWidth = config.btnWidth * 2 + config.padding * 2;
+  const totalWidth = config.btnWidth * SWITCHER_TABS.length + config.padding * 2;
 
   return (
     <div
@@ -43,35 +49,28 @@ function ActionFilesSwitcher({ currentView, onViewChange, size = 'md' }: ActionF
         className="absolute top-[3px] bottom-[3px] rounded-full bg-white dark:bg-zinc-900 shadow-sm"
         style={{ width: config.btnWidth }}
         initial={false}
-        animate={{ x: isAction ? 0 : config.btnWidth }}
+        animate={{ x: resolvedIndex * config.btnWidth }}
         transition={{ type: "spring", stiffness: 500, damping: 35 }}
       />
 
-      {/* Actions button */}
-      <button
-        onClick={() => onViewChange('tools')}
-        className={cn(
-          "relative z-10 flex items-center justify-center gap-1.5 rounded-full font-medium transition-colors cursor-pointer",
-          isAction ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"
-        )}
-        style={{ width: config.btnWidth, height: config.height - config.padding * 2, fontSize: config.fontSize }}
-      >
-        <Activity style={{ width: config.iconSize, height: config.iconSize }} strokeWidth={2.5} />
-        <span>Actions</span>
-      </button>
-
-      {/* Files button */}
-      <button
-        onClick={() => onViewChange('files')}
-        className={cn(
-          "relative z-10 flex items-center justify-center gap-1.5 rounded-full font-medium transition-colors cursor-pointer",
-          isFiles ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"
-        )}
-        style={{ width: config.btnWidth, height: config.height - config.padding * 2, fontSize: config.fontSize }}
-      >
-        <FolderOpen style={{ width: config.iconSize, height: config.iconSize }} strokeWidth={2.5} />
-        <span>Files</span>
-      </button>
+      {SWITCHER_TABS.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = tab.key === currentView;
+        return (
+          <button
+            key={tab.key}
+            onClick={() => onViewChange(tab.key)}
+            className={cn(
+              "relative z-10 flex items-center justify-center gap-1 rounded-full font-medium transition-colors cursor-pointer",
+              isActive ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"
+            )}
+            style={{ width: config.btnWidth, height: config.height - config.padding * 2, fontSize: config.fontSize }}
+          >
+            <Icon style={{ width: config.iconSize, height: config.iconSize }} strokeWidth={2.5} />
+            <span>{tab.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

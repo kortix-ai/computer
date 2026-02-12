@@ -31,6 +31,8 @@ import { EmptyState } from './components/EmptyState';
 import { LoadingState } from './components/LoadingState';
 import { AppDock } from './components/Dock';
 import { SandboxDesktop } from './components/Desktop';
+import { SSHTerminal } from './components/SSHTerminal';
+import { PtyTerminalPanel } from '@/components/session/pty-terminal-panel';
 import { getToolNumber } from '@/hooks/messages/tool-tracking';
 
 export interface ToolCallInput {
@@ -672,6 +674,16 @@ export const KortixComputer = memo(function KortixComputer({
     );
   };
 
+  const renderTerminalView = () => {
+    // If a sandbox is available, use SSHTerminal for direct sandbox access
+    if (effectiveSandboxId) {
+      return <SSHTerminal sandboxId={effectiveSandboxId} className="h-full" />;
+    }
+
+    // Otherwise, show PTY terminal panel (OpenCode PTY sessions)
+    return <PtyTerminalPanel className="h-full" />;
+  };
+
   const renderContent = () => {
     return (
       <div className="flex flex-col h-full max-h-full max-w-full overflow-hidden min-w-0" style={{ contain: 'strict' }}>
@@ -713,6 +725,7 @@ export const KortixComputer = memo(function KortixComputer({
           {activeView === 'tools' && renderToolsView()}
           {activeView === 'files' && renderFilesView()}
           {!HIDE_BROWSER_TAB && activeView === 'browser' && renderBrowserView()}
+          {activeView === 'terminal' && renderTerminalView()}
         </div>
       </div>
     );
@@ -754,6 +767,7 @@ export const KortixComputer = memo(function KortixComputer({
             {activeView === 'tools' && renderToolsView()}
             {activeView === 'files' && renderFilesView()}
             {!HIDE_BROWSER_TAB && activeView === 'browser' && renderBrowserView()}
+            {activeView === 'terminal' && renderTerminalView()}
           </div>
 
           {activeView === 'tools' && (displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (

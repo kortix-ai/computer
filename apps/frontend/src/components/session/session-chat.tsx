@@ -15,6 +15,8 @@ import {
   Image as ImageIcon,
   ArrowUpLeft,
   Info,
+  GitFork,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,9 @@ import {
   useExecuteOpenCodeCommand,
   useSummarizeOpenCodeSession,
   useOpenCodeProviders,
+  useForkSession,
+  useRevertSession,
+  useUnrevertSession,
   replyToPermission,
   replyToQuestion,
   rejectQuestion,
@@ -66,6 +71,7 @@ import {
   isReasoningPart,
   isFilePart,
   isAgentPart,
+  isCompactionPart,
   isAttachment,
   splitUserParts,
   groupMessagesIntoTurns,
@@ -94,17 +100,31 @@ import {
   hasDiffs,
 } from '@/ui';
 
-import { SessionChatInput, flattenModels } from '@/components/session/session-chat-input';
+import { SessionChatInput, type AttachedFile } from '@/components/session/session-chat-input';
+import { uploadFile } from '@/features/files/api/opencode-files';
+import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
+import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { SessionWelcome } from '@/components/session/session-welcome';
 import { ToolPartRenderer } from '@/components/session/tool-renderers';
 import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
+import { MessageActions, RevertBanner } from '@/components/session/message-actions';
+import { useTabStore } from '@/stores/tab-store';
 
 // ============================================================================
-// Sub-Session Breadcrumb
+// Sub-Session / Fork Breadcrumb
 // ============================================================================
 
-function SubSessionBar({ sessionId, parentID }: { sessionId: string; parentID: string }) {
+function SubSessionBar({
+  sessionId,
+  parentID,
+  variant = 'thread',
+}: {
+  sessionId: string;
+  parentID: string;
+  /** 'thread' for task sub-sessions, 'fork' for forked sessions */
+  variant?: 'thread' | 'fork';
+}) {
   const { data: parentSession } = useOpenCodeSession(parentID);
   const router = useRouter();
 
@@ -115,11 +135,19 @@ function SubSessionBar({ sessionId, parentID }: { sessionId: string; parentID: s
   }, [parentSession, router]);
 
   const parentTitle = parentSession?.title || 'Parent session';
+  const isFork = variant === 'fork';
 
   return (
     <div className="flex-shrink-0">
       {/* Thin accent stripe */}
-      <div className="h-[2px] bg-gradient-to-r from-indigo-500/80 via-violet-500/80 to-purple-500/60" />
+      <div
+        className={cn(
+          'h-[2px] bg-gradient-to-r',
+          isFork
+            ? 'from-emerald-500/80 via-teal-500/80 to-cyan-500/60'
+            : 'from-indigo-500/80 via-violet-500/80 to-purple-500/60',
+        )}
+      />
       {/* Bar */}
       <div className="flex items-center h-10 px-3 gap-2 border-b border-border/50 bg-background">
         <button
@@ -137,25 +165,59 @@ function SubSessionBar({ sessionId, parentID }: { sessionId: string; parentID: s
 
         <div className="flex-1" />
 
-        <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-muted/50">
-          <span className="h-1.5 w-1.5 rounded-full bg-violet-500 flex-shrink-0" />
-          <span className="text-[11px] font-medium text-muted-foreground">Thread</span>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                'flex items-center gap-1.5 h-6 px-2 rounded-md',
+                isFork ? 'bg-emerald-500/10' : 'bg-muted/50',
+              )}
+            >
+              {isFork ? (
+                <GitFork className="size-3 text-emerald-500 flex-shrink-0" />
+              ) : (
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-500 flex-shrink-0" />
+              )}
+              <span
+                className={cn(
+                  'text-[11px] font-medium',
+                  isFork ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+                )}
+              >
+                {isFork ? 'Fork' : 'Thread'}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            {isFork ? `Forked from: ${parentTitle}` : `Sub-session of: ${parentTitle}`}
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
 }
 
 // Sub-session indicator shown above the chat input
-function SubSessionInputBanner({ parentID }: { parentID: string }) {
+function SubSessionInputBanner({ parentID, variant = 'thread' }: { parentID: string; variant?: 'thread' | 'fork' }) {
   const { data: parentSession } = useOpenCodeSession(parentID);
   const router = useRouter();
+  const isForkVariant = variant === 'fork';
 
   return (
-    <div className="flex items-center gap-2 px-4 py-1.5 border-t border-border/40 bg-muted/20">
-      <span className="h-1.5 w-1.5 rounded-full bg-violet-500/70 flex-shrink-0" />
-      <span className="text-[11px] text-muted-foreground truncate">
-        Replying in thread
+    <div className={cn(
+      'flex items-center gap-2 px-4 py-1.5 border-t border-border/40',
+      isForkVariant ? 'bg-emerald-500/5' : 'bg-muted/20',
+    )}>
+      {isForkVariant ? (
+        <GitFork className="size-3 text-emerald-500/70 flex-shrink-0" />
+      ) : (
+        <span className="h-1.5 w-1.5 rounded-full bg-violet-500/70 flex-shrink-0" />
+      )}
+      <span className={cn(
+        'text-[11px] truncate',
+        isForkVariant ? 'text-emerald-600 dark:text-emerald-400/70' : 'text-muted-foreground',
+      )}>
+        {isForkVariant ? 'Continuing in fork' : 'Replying in thread'}
       </span>
       <button
         onClick={() => parentSession && router.push(`/sessions/${parentSession.id}`)}
@@ -164,6 +226,42 @@ function SubSessionInputBanner({ parentID }: { parentID: string }) {
         <ArrowUpLeft className="size-3" />
         <span className="truncate max-w-[150px]">{parentSession?.title || 'Back'}</span>
       </button>
+    </div>
+  );
+}
+
+// ============================================================================
+// Fork Context Divider — shown at the top of the message list in forked sessions
+// ============================================================================
+
+function ForkContextDivider({ parentID }: { parentID: string }) {
+  const { data: parentSession } = useOpenCodeSession(parentID);
+  const router = useRouter();
+  const parentTitle = parentSession?.title || 'Parent session';
+
+  return (
+    <div className="flex items-center gap-3 py-2 mb-2">
+      <div className="flex-1 h-px bg-emerald-500/20" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => parentSession && router.push(`/sessions/${parentSession.id}`)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors cursor-pointer group"
+          >
+            <GitFork className="size-3 text-emerald-500/70" />
+            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400/80 uppercase tracking-wider">
+              Forked from
+            </span>
+            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 max-w-[150px] truncate">
+              {parentTitle}
+            </span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs">
+          Go to parent session: {parentTitle}
+        </TooltipContent>
+      </Tooltip>
+      <div className="flex-1 h-px bg-emerald-500/20" />
     </div>
   );
 }
@@ -285,6 +383,27 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
 }
 
 // ============================================================================
+// Parse <file> XML references from uploaded file text parts
+// ============================================================================
+
+interface ParsedFileRef {
+  path: string;
+  mime: string;
+  filename: string;
+}
+
+const FILE_TAG_REGEX = /<file\s+path="([^"]*?)"\s+mime="([^"]*?)"\s+filename="([^"]*?)">\s*[\s\S]*?<\/file>/g;
+
+function parseFileReferences(text: string): { cleanText: string; files: ParsedFileRef[] } {
+  const files: ParsedFileRef[] = [];
+  const cleanText = text.replace(FILE_TAG_REGEX, (_, path, mime, filename) => {
+    files.push({ path, mime, filename });
+    return '';
+  }).trim();
+  return { cleanText, files };
+}
+
+// ============================================================================
 // User Message Row
 // ============================================================================
 
@@ -295,9 +414,10 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
     [message.parts],
   );
 
-  // Extract text from sticky parts
+  // Extract text from sticky parts, parse out <file> XML references
   const textParts = stickyParts.filter(isTextPart).filter((p) => (p as TextPart).text?.trim() && !(p as TextPart).synthetic);
-  const text = textParts.map((p) => (p as TextPart).text).join('\n');
+  const rawText = textParts.map((p) => (p as TextPart).text).join('\n');
+  const { cleanText: text, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
 
   // Inline file references
   const inlineFiles = stickyParts.filter(isFilePart) as FilePart[];
@@ -387,7 +507,13 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
 
   return (
     <div className="flex justify-end">
-      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+      <div
+        className={cn(
+          'flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden',
+          canExpand && 'cursor-pointer hover:bg-card/80 transition-colors',
+        )}
+        onClick={() => canExpand && setExpanded(!expanded)}
+      >
         {/* Attachment thumbnails (images/PDFs) */}
         {attachments.length > 0 && (
           <div className="flex gap-2 p-3 pb-0 flex-wrap">
@@ -417,6 +543,18 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
           </div>
         )}
 
+        {/* Uploaded file references (from <file> XML tags) */}
+        {uploadedFiles.length > 0 && (
+          <div className="flex gap-2 p-3 pb-0 flex-wrap">
+            {uploadedFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                <FileText className="size-4 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Text content */}
         {text && (
           <div className="relative group px-4 py-3">
@@ -426,7 +564,6 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
                 'text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0',
                 !expanded && 'max-h-[200px] overflow-hidden',
               )}
-              onClick={() => canExpand && setExpanded(!expanded)}
             >
               {segments.length > 0 ? (
                 segments.map((seg, i) =>
@@ -459,14 +596,11 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
               <div className="absolute inset-x-0 bottom-3 h-10 bg-gradient-to-t from-card to-transparent pointer-events-none" />
             )}
 
-            {/* Expand/collapse button */}
+            {/* Expand/collapse indicator */}
             {canExpand && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="absolute bottom-3 right-4 p-1 rounded-md bg-card/80 backdrop-blur-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer z-10"
-              >
+              <div className="absolute bottom-3 right-4 p-1 rounded-md bg-card/80 backdrop-blur-sm text-muted-foreground z-10">
                 <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
-              </button>
+              </div>
             )}
 
             {/* Copy button (top-right, visible on hover) */}
@@ -514,6 +648,16 @@ interface SessionTurnProps {
   onQuestionReply: (requestId: string, answers: string[][]) => Promise<void>;
   onQuestionReject: (requestId: string) => Promise<void>;
   agentNames?: string[];
+  /** Whether this is the first turn in the session */
+  isFirstTurn: boolean;
+  /** Whether the session is busy */
+  isBusy: boolean;
+  /** Whether the session is in a reverted state */
+  isReverted: boolean;
+  /** Fork the session at a specific message */
+  onFork: (messageId: string) => Promise<void>;
+  /** Revert the session to before a specific message */
+  onRevert: (messageId: string) => Promise<void>;
 }
 
 function SessionTurn({
@@ -529,6 +673,11 @@ function SessionTurn({
   onQuestionReply,
   onQuestionReject,
   agentNames,
+  isFirstTurn,
+  isBusy,
+  isReverted,
+  onFork,
+  onRevert,
 }: SessionTurnProps) {
   const [copied, setCopied] = useState(false);
 
@@ -602,6 +751,12 @@ function SessionTurn({
   const taskToolParts = useMemo(() => {
     return allParts.filter(({ part }) => isToolPart(part) && (part as ToolPart).tool === 'task');
   }, [allParts]);
+
+  // Last assistant message ID — used for "fork from response" action
+  const lastAssistantMessageId = useMemo(() => {
+    const msgs = turn.assistantMessages;
+    return msgs.length > 0 ? msgs[msgs.length - 1].info.id : undefined;
+  }, [turn.assistantMessages]);
 
   // ---- Status throttling (2.5s) ----
   const lastStatusChangeRef = useRef(Date.now());
@@ -700,81 +855,109 @@ function SessionTurn({
   // ============================================================================
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 group/turn">
       <div>
         {/* User message */}
         <UserMessageRow message={turn.userMessage} agentNames={agentNames} />
 
-        {/* Steps trigger button */}
-        {(working || hasSteps) && (
-          <button
-            onClick={onToggleSteps}
-            aria-expanded={stepsExpanded}
-            className={cn(
-              'flex items-center gap-2 text-xs transition-colors py-1.5 mt-2.5 cursor-pointer',
-              working
-                ? 'text-muted-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {working ? (
-              <span className="flex items-center gap-1.5">
-                <span className="relative flex size-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/30" />
-                  <span className="relative inline-flex rounded-full size-3 bg-muted-foreground/50" />
-                </span>
-              </span>
-            ) : (
-              <ChevronRight
-                className={cn(
-                  'size-3 transition-transform flex-shrink-0',
-                  stepsExpanded && 'rotate-90',
-                )}
-              />
-            )}
-
-            {/* Status text / retry info / show-hide label */}
-            <span>
-              {retryInfo
-                ? retryInfo.message.length > 60
-                  ? retryInfo.message.slice(0, 60) + '...'
-                  : retryInfo.message
-                : working
-                  ? (throttledStatus || 'Working...')
-                  : stepsExpanded
-                    ? 'Hide steps'
-                    : 'Show steps'}
-            </span>
-
-            {/* Retry countdown + attempt */}
-            {retryInfo && (
-              <>
-                <span className="text-muted-foreground/50">·</span>
-                <span className="text-amber-500">
-                  Retrying{retrySecondsLeft > 0 ? ` in ${retrySecondsLeft}s` : ''}
-                </span>
-                <span className="text-muted-foreground/50">(#{retryInfo.attempt})</span>
-              </>
-            )}
-
-            {/* Duration */}
-            <span className="text-muted-foreground/50">·</span>
-            <span className="text-muted-foreground/70">{duration}</span>
-
-            {/* Cost & tokens (when done) */}
-            {costInfo && !working && (
-              <>
-                <span className="text-muted-foreground/50">·</span>
-                <span className="text-muted-foreground/70">{formatCost(costInfo.cost)}</span>
-                <span className="text-muted-foreground/50">·</span>
-                <span className="text-muted-foreground/70">
-                  {formatTokens(costInfo.tokens.input + costInfo.tokens.output)}t
-                </span>
-              </>
-            )}
-          </button>
-        )}
+        {/* Fork / Revert actions — visible on hover */}
+        <div className="flex justify-end mt-1">
+          <MessageActions
+            messageId={turn.userMessage.info.id}
+            sessionId={sessionId}
+            isFirstTurn={isFirstTurn}
+            isBusy={isBusy}
+            isReverted={isReverted}
+            onFork={onFork}
+            onRevert={onRevert}
+          />
+        </div>
       </div>
+
+      {/* Kortix logo header */}
+      {(working || hasSteps) && (
+        <div className="flex items-center gap-2 mt-3">
+          <img
+            src="/kortix-logomark-white.svg"
+            alt="Kortix"
+            className={cn('dark:invert-0 invert flex-shrink-0', working && 'animate-pulse')}
+            style={{ height: '14px', width: 'auto' }}
+          />
+          {working && turn.assistantMessages.length === 0 && (
+            <KortixLoader size="small" />
+          )}
+        </div>
+      )}
+
+      {/* Steps trigger button */}
+      {(working || hasSteps) && (
+        <button
+          onClick={onToggleSteps}
+          aria-expanded={stepsExpanded}
+          className={cn(
+            'flex items-center gap-2 text-xs transition-colors py-1.5 cursor-pointer',
+            working
+              ? 'text-muted-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {working ? (
+            <span className="flex items-center gap-1.5">
+              <span className="relative flex size-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/30" />
+                <span className="relative inline-flex rounded-full size-3 bg-muted-foreground/50" />
+              </span>
+            </span>
+          ) : (
+            <ChevronRight
+              className={cn(
+                'size-3 transition-transform flex-shrink-0',
+                stepsExpanded && 'rotate-90',
+              )}
+            />
+          )}
+
+          {/* Status text / retry info / show-hide label */}
+          <span>
+            {retryInfo
+              ? retryInfo.message.length > 60
+                ? retryInfo.message.slice(0, 60) + '...'
+                : retryInfo.message
+              : working
+                ? (throttledStatus || 'Working...')
+                : stepsExpanded
+                  ? 'Hide steps'
+                  : 'Show steps'}
+          </span>
+
+          {/* Retry countdown + attempt */}
+          {retryInfo && (
+            <>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="text-amber-500">
+                Retrying{retrySecondsLeft > 0 ? ` in ${retrySecondsLeft}s` : ''}
+              </span>
+              <span className="text-muted-foreground/50">(#{retryInfo.attempt})</span>
+            </>
+          )}
+
+          {/* Duration */}
+          <span className="text-muted-foreground/50">·</span>
+          <span className="text-muted-foreground/70">{duration}</span>
+
+          {/* Cost & tokens (when done) */}
+          {costInfo && !working && (
+            <>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="text-muted-foreground/70">{formatCost(costInfo.cost)}</span>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="text-muted-foreground/70">
+                {formatTokens(costInfo.tokens.input + costInfo.tokens.output)}t
+              </span>
+            </>
+          )}
+        </button>
+      )}
 
       {/* Expanded steps content — indented with left border (matching OpenCode SolidJS) */}
       {(working || hasSteps) && stepsExpanded && turn.assistantMessages.length > 0 && (
@@ -808,6 +991,20 @@ function SessionTurn({
               );
             }
 
+            // Compaction indicator
+            if (isCompactionPart(part)) {
+              return (
+                <div key={part.id} className="flex items-center gap-2 py-1.5 -mx-1">
+                  <div className="flex-1 h-px bg-border/60" />
+                  <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1.5 px-1">
+                    <Layers className="size-3" />
+                    {(part as any).auto ? 'Auto-compacted' : 'Context compacted'}
+                  </span>
+                  <div className="flex-1 h-px bg-border/60" />
+                </div>
+              );
+            }
+
             // Tool parts
             if (isToolPart(part)) {
               if (!shouldShowToolPart(part)) return null;
@@ -815,11 +1012,12 @@ function SessionTurn({
               if (part.tool === 'todowrite') return null;
               // Skip task parts — rendered always-visible outside collapsed steps
               if (part.tool === 'task') return null;
-              // Hide tool parts that have active permission/question
-              if (isToolPartHidden(part, message.info.id, hidden)) return null;
 
               const perm = getPermissionForTool(permissions, part.callID);
               const question = getQuestionForTool(questions, part.callID);
+
+              // Hide tool parts that have active permission (but NOT questions — we show them with overlay)
+              if (!question && isToolPartHidden(part, message.info.id, hidden)) return null;
 
               return (
                 <ToolPartRenderer
@@ -866,9 +1064,10 @@ function SessionTurn({
           {taskToolParts.map(({ part, message }) => {
             const toolPart = part as ToolPart;
             if (!shouldShowToolPart(toolPart)) return null;
-            if (isToolPartHidden(toolPart, message.info.id, hidden)) return null;
             const perm = getPermissionForTool(permissions, toolPart.callID);
             const question = getQuestionForTool(questions, toolPart.callID);
+            // Hide tool parts with active permission (but NOT questions — we show them with overlay)
+            if (!question && isToolPartHidden(toolPart, message.info.id, hidden)) return null;
             return (
               <ToolPartRenderer
                 key={part.id}
@@ -898,41 +1097,48 @@ function SessionTurn({
         </div>
       )}
 
-      {/* Busy indicator when no assistant messages yet */}
-      {working && turn.assistantMessages.length === 0 && (
-        <div className="flex items-center gap-3 mt-3">
-          <img
-            src="/kortix-logomark-white.svg"
-            alt="Kortix"
-            className="dark:invert-0 invert flex-shrink-0 animate-pulse"
-            style={{ height: '14px', width: 'auto' }}
-          />
-          <KortixLoader size="small" />
-        </div>
-      )}
-
       {/* Response section (final text, shown when done) */}
       {!working && response && (
         <div className="mt-3">
+          {/* Kortix logo — shown when there are no steps (otherwise logo is already above) */}
+          {!hasSteps && (
+            <div className="flex items-center gap-2 mb-3">
+              <img
+                src="/kortix-logomark-white.svg"
+                alt="Kortix"
+                className="dark:invert-0 invert flex-shrink-0"
+                style={{ height: '14px', width: 'auto' }}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2 mb-2">
-            <img
-              src="/kortix-logomark-white.svg"
-              alt="Kortix"
-              className="dark:invert-0 invert flex-shrink-0"
-              style={{ height: '12px', width: 'auto' }}
-            />
             <span className="text-xs font-medium text-muted-foreground">Response</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleCopy}
-                  className="ml-auto p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                >
-                  {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{copied ? 'Copied!' : 'Copy'}</TooltipContent>
-            </Tooltip>
+            <div className="ml-auto flex items-center gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleCopy}
+                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{copied ? 'Copied!' : 'Copy'}</TooltipContent>
+              </Tooltip>
+              {!isBusy && !isReverted && lastAssistantMessageId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => onFork(lastAssistantMessageId)}
+                      className="p-1 rounded-md text-muted-foreground/60 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                    >
+                      <GitFork className="size-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Fork from this response</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </div>
           <div className="text-sm">
             <UnifiedMarkdown content={response} isStreaming={false} />
@@ -946,14 +1152,6 @@ function SessionTurn({
       {/* Streaming text when working and steps not expanded */}
       {working && !stepsExpanded && lastTextPart?.text?.trim() && (
         <div className="mt-3">
-          <div className="flex items-center gap-2 mb-2">
-            <img
-              src="/kortix-logomark-white.svg"
-              alt="Kortix"
-              className="dark:invert-0 invert flex-shrink-0 animate-pulse"
-              style={{ height: '12px', width: 'auto' }}
-            />
-          </div>
           <div className="text-sm">
             <ThrottledMarkdown content={lastTextPart.text} isStreaming={true} />
           </div>
@@ -998,8 +1196,8 @@ function SessionTurn({
         </div>
       )}
 
-      {/* Standalone question (no tool ref) */}
-      {nextQuestion && !nextQuestion.tool && (
+      {/* Standalone question (no tool ref) or question with tool ref when steps are collapsed */}
+      {nextQuestion && (!nextQuestion.tool || !stepsExpanded) && (
         <QuestionPrompt
           request={nextQuestion}
           onReply={onQuestionReply}
@@ -1019,9 +1217,6 @@ interface SessionChatProps {
 }
 
 export function SessionChat({ sessionId }: SessionChatProps) {
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<{ providerID: string; modelID: string } | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(false);
 
   // ---- KortixComputer side panel ----
@@ -1036,10 +1231,18 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const { data: agents } = useOpenCodeAgents();
   const { data: commands } = useOpenCodeCommands();
   const { data: providers } = useOpenCodeProviders();
+  const { data: config } = useOpenCodeConfig();
   const sendMessage = useSendOpenCodeMessage();
   const abortSession = useAbortOpenCodeSession();
   const executeCommand = useExecuteOpenCodeCommand();
   const summarizeSession = useSummarizeOpenCodeSession();
+  const forkSession = useForkSession();
+  const revertSession = useRevertSession();
+  const unrevertSession = useUnrevertSession();
+  const router = useRouter();
+
+  // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
+  const local = useOpenCodeLocal({ agents, providers, config });
 
   // ---- URL params ----
   const searchParams = useSearchParams();
@@ -1055,7 +1258,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     return null;
   });
 
-  // Auto-send pending prompt for new sessions
+  // Hydrate options and clean up sessionStorage for new sessions
+  // The prompt is already sent by the dashboard/project page — we only use sessionStorage
+  // for optimistic display and to restore selected agent/model/variant.
   useEffect(() => {
     if (!isNewSession || pendingPromptHandled.current) return;
     const pendingPrompt = sessionStorage.getItem('opencode_pending_prompt');
@@ -1063,31 +1268,24 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       pendingPromptHandled.current = true;
       sessionStorage.removeItem('opencode_pending_prompt');
 
-      let pendingOptions: Record<string, unknown> | undefined;
+      // Restore agent/model/variant selections from the dashboard
       try {
         const raw = sessionStorage.getItem('opencode_pending_options');
         if (raw) {
-          pendingOptions = JSON.parse(raw);
+          const pendingOptions = JSON.parse(raw);
           sessionStorage.removeItem('opencode_pending_options');
-          if (pendingOptions?.agent) setSelectedAgent(pendingOptions.agent as string);
-          if (pendingOptions?.model) setSelectedModel(pendingOptions.model as { providerID: string; modelID: string });
-          if (pendingOptions?.variant) setSelectedVariant(pendingOptions.variant as string);
+          if (pendingOptions?.agent) local.agent.set(pendingOptions.agent as string);
+          if (pendingOptions?.model) local.model.set(pendingOptions.model as { providerID: string; modelID: string });
+          if (pendingOptions?.variant) local.model.variant.set(pendingOptions.variant as string);
         }
       } catch {
         // ignore
       }
 
-      sendMessage.mutateAsync({
-        sessionId,
-        parts: [{ type: 'text', text: pendingPrompt }],
-        options: pendingOptions && Object.keys(pendingOptions).length > 0 ? pendingOptions as any : undefined,
-      }).catch(() => {
-        // Restore prompt to input so user can retry
-        setOptimisticPrompt(pendingPrompt);
-      });
+      // Clean up the ?new=true from URL (without navigation)
       window.history.replaceState({}, '', `/sessions/${sessionId}`);
     }
-  }, [isNewSession, sessionId, sendMessage]);
+  }, [isNewSession, sessionId]);
 
   // Clear optimistic prompt once real messages arrive
   useEffect(() => {
@@ -1096,19 +1294,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     }
   }, [optimisticPrompt, messages]);
 
-  // ---- Filter agents: exclude subagents and hidden ----
-  const visibleAgents = useMemo(
-    () => (agents || []).filter((a) => a.mode !== 'subagent' && !a.hidden),
-    [agents],
-  );
-
   const agentNames = useMemo(
-    () => visibleAgents.map((a) => a.name),
-    [visibleAgents],
+    () => local.agent.list.map((a) => a.name),
+    [local.agent.list],
   );
-
-  // ---- Flatten models from providers ----
-  const flatModels = useMemo(() => flattenModels(providers), [providers]);
 
   // ---- Check if any messages have tool calls ----
   const hasToolCalls = useMemo(() => {
@@ -1118,17 +1307,21 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     );
   }, [messages]);
 
-  // ---- Compute variants for selected model ----
-  const currentVariants = useMemo(() => {
-    if (!selectedModel) {
-      const first = flatModels[0];
-      return first?.variants ? Object.keys(first.variants) : [];
-    }
-    const model = flatModels.find(
-      (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID,
-    );
-    return model?.variants ? Object.keys(model.variants) : [];
-  }, [selectedModel, flatModels]);
+  // ---- Restore model/agent from last user message (matching SolidJS session.tsx:550-560) ----
+  const lastUserMessage = useMemo(
+    () => messages ? [...messages].reverse().find((m) => m.info.role === 'user') : undefined,
+    [messages],
+  );
+  const lastUserMsgIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!lastUserMessage) return;
+    if (lastUserMsgIdRef.current === lastUserMessage.info.id) return;
+    lastUserMsgIdRef.current = lastUserMessage.info.id;
+    const msg = lastUserMessage.info as any;
+    if (msg.agent) local.agent.set(msg.agent);
+    if (msg.model) local.model.set(msg.model); // no { recent: true } — matches SolidJS
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastUserMessage?.info.id]);
 
   // ---- Session status ----
   const sessionStatus = useOpenCodeSessionStatusStore(
@@ -1234,22 +1427,100 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, []);
 
   // ============================================================================
+  // Fork / Revert / Unrevert handlers
+  // ============================================================================
+
+  const isReverted = !!session?.revert;
+
+  const handleFork = useCallback(
+    async (messageId: string) => {
+      const forkedSession = await forkSession.mutateAsync({
+        sessionId,
+        messageId,
+      });
+
+      // Open the forked session in a new tab and navigate
+      const title = forkedSession.title || 'Forked session';
+      useTabStore.getState().openTab({
+        id: forkedSession.id,
+        title,
+        type: 'session',
+        href: `/sessions/${forkedSession.id}`,
+        parentSessionId: sessionId,
+      });
+      // Store fork origin in localStorage (survives refresh) so the forked
+      // session can show the "Forked from" indicator.
+      localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
+      router.push(`/sessions/${forkedSession.id}`);
+    },
+    [sessionId, forkSession, router],
+  );
+
+  const handleRevert = useCallback(
+    async (messageId: string) => {
+      await revertSession.mutateAsync({
+        sessionId,
+        messageId,
+      });
+    },
+    [sessionId, revertSession],
+  );
+
+  const handleUnrevert = useCallback(async () => {
+    await unrevertSession.mutateAsync(sessionId);
+  }, [sessionId, unrevertSession]);
+
+  // ============================================================================
   // Send / Stop / Command handlers
   // ============================================================================
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, files?: AttachedFile[]) => {
       const options: Record<string, unknown> = {};
-      if (selectedAgent) options.agent = selectedAgent;
-      if (selectedModel) options.model = selectedModel;
-      if (selectedVariant) options.variant = selectedVariant;
+      if (local.agent.current) options.agent = local.agent.current.name;
+      if (local.model.currentKey) options.model = local.model.currentKey;
+      if (local.model.variant.current) options.variant = local.model.variant.current;
+
+      // Build parts: text first, then upload attached files to /workspace/uploads/
+      // and send as XML text references (agent reads from disk on demand, not loaded into context)
+      const parts: Array<
+        | { type: 'text'; text: string }
+        | { type: 'file'; mime: string; url: string; filename?: string }
+      > = [{ type: 'text', text }];
+
+      if (files && files.length > 0) {
+        const uploadResults = await Promise.all(
+          files.map(async (af) => {
+            const timestamp = Date.now();
+            const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const uniqueName = `${timestamp}-${safeName}`;
+            const uploadBlob = new File([af.file], uniqueName, { type: af.file.type });
+            const results = await uploadFile(uploadBlob, '/workspace/uploads');
+            if (!results || results.length === 0) {
+              throw new Error(`Failed to upload file: ${af.file.name}`);
+            }
+            return {
+              path: results[0].path,
+              mime: af.file.type || 'application/octet-stream',
+              filename: af.file.name,
+            };
+          }),
+        );
+        for (const f of uploadResults) {
+          parts.push({
+            type: 'text',
+            text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
+          });
+        }
+      }
+
       await sendMessage.mutateAsync({
         sessionId,
-        parts: [{ type: 'text', text }],
+        parts,
         options: Object.keys(options).length > 0 ? options as any : undefined,
       });
     },
-    [sessionId, sendMessage, selectedAgent, selectedModel, selectedVariant],
+    [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
   const handleStop = useCallback(() => {
@@ -1275,6 +1546,19 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     }
   }, []);
 
+  // Detect if this session was forked (vs a task sub-session).
+  // Must be above early returns to preserve hook order.
+  // The fork origin is stored in localStorage by handleFork so it survives
+  // page refreshes and new tabs.
+  const isSubSession = !!session?.parentID;
+  const isFork = useMemo(() => {
+    if (!isSubSession) return false;
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem(`fork_origin_${sessionId}`);
+    }
+    return false;
+  }, [isSubSession, sessionId]);
+
   // ============================================================================
   // Loading / Not-found states
   // ============================================================================
@@ -1298,17 +1582,25 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const hasMessages = messages && messages.length > 0;
   const showOptimistic = !!optimisticPrompt && !hasMessages;
 
-  // ============================================================================
-  // Render
-  // ============================================================================
-
-  const isSubSession = !!session?.parentID;
-
   return (
     <div className="relative flex flex-col h-full bg-background">
-      {/* Sub-session top bar */}
+      {/* Sub-session / fork top bar */}
       {isSubSession && (
-        <SubSessionBar sessionId={sessionId} parentID={session.parentID} />
+        <SubSessionBar
+          sessionId={sessionId}
+          parentID={session.parentID}
+          variant={isFork ? 'fork' : 'thread'}
+        />
+      )}
+
+      {/* Revert banner — shown when session is in reverted state */}
+      {isReverted && session?.revert?.messageID && (
+        <RevertBanner
+          sessionId={sessionId}
+          revertMessageId={session.revert.messageID}
+          loading={unrevertSession.isPending}
+          onUnrevert={handleUnrevert}
+        />
       )}
 
       {/* Debug mode toggle — floating, only visible when ?debug is in URL */}
@@ -1342,14 +1634,38 @@ export function SessionChat({ sessionId }: SessionChatProps) {
               className="mx-auto max-w-3xl min-w-0 w-full px-3 sm:px-6"
             >
               <div className="flex flex-col gap-12 min-w-0">
+                {/* Fork context divider — shown at the top of forked sessions */}
+                {isFork && session?.parentID && (
+                  <ForkContextDivider parentID={session.parentID} />
+                )}
+
                 {/* Optimistic user message */}
                 {showOptimistic && (
                   <>
                     <div className="flex justify-end">
-                      <div className="flex max-w-[90%] rounded-3xl rounded-br-lg bg-card border px-4 py-3 break-words overflow-hidden">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          <HighlightMentions text={optimisticPrompt || ''} agentNames={agentNames} onFileClick={openFileInComputer} />
-                        </p>
+                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+                        {(() => {
+                          const { cleanText, files } = parseFileReferences(optimisticPrompt || '');
+                          return (
+                            <>
+                              {files.length > 0 && (
+                                <div className="flex gap-2 p-3 pb-0 flex-wrap">
+                                  {files.map((f, i) => (
+                                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                                      <FileText className="size-4 text-muted-foreground shrink-0" />
+                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {cleanText && (
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
+                                  <HighlightMentions text={cleanText} agentNames={agentNames} onFileClick={openFileInComputer} />
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1365,23 +1681,52 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 )}
 
                 {/* Turn-based message rendering */}
-                {turns.map((turn) => (
-                  <SessionTurn
-                    key={turn.userMessage.info.id}
-                    turn={turn}
-                    allMessages={messages!}
-                    sessionId={sessionId}
-                    sessionStatus={sessionStatus}
-                    permissions={pendingPermissions}
-                    questions={pendingQuestions}
-                    stepsExpanded={!!expanded[turn.userMessage.info.id]}
-                    onToggleSteps={() => toggleExpanded(turn.userMessage.info.id)}
-                    onPermissionReply={handlePermissionReply}
-                    onQuestionReply={handleQuestionReply}
-                    onQuestionReject={handleQuestionReject}
-                    agentNames={agentNames}
-                  />
-                ))}
+                {turns.map((turn, turnIndex) => {
+                  // Check if this turn has a compaction part
+                  const hasCompaction = turn.assistantMessages.some(
+                    (msg) => msg.parts.some((p) => p.type === 'compaction')
+                  );
+                  const compactionPart = hasCompaction
+                    ? turn.assistantMessages.flatMap((m) => m.parts).find((p) => p.type === 'compaction')
+                    : null;
+
+                  return (
+                    <div key={turn.userMessage.info.id}>
+                      {/* Compaction divider — shown before the first turn after compaction */}
+                      {hasCompaction && (
+                        <div className="flex items-center gap-3 py-2 my-2">
+                          <div className="flex-1 h-px bg-border/50" />
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40">
+                            <Layers className="size-3 text-muted-foreground/60" />
+                            <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                              {(compactionPart as any)?.auto ? 'Auto-compacted' : 'Context compacted'}
+                            </span>
+                          </div>
+                          <div className="flex-1 h-px bg-border/50" />
+                        </div>
+                      )}
+                      <SessionTurn
+                        turn={turn}
+                        allMessages={messages!}
+                        sessionId={sessionId}
+                        sessionStatus={sessionStatus}
+                        permissions={pendingPermissions}
+                        questions={pendingQuestions}
+                        stepsExpanded={!!expanded[turn.userMessage.info.id]}
+                        onToggleSteps={() => toggleExpanded(turn.userMessage.info.id)}
+                        onPermissionReply={handlePermissionReply}
+                        onQuestionReply={handleQuestionReply}
+                        onQuestionReject={handleQuestionReject}
+                        agentNames={agentNames}
+                        isFirstTurn={turnIndex === 0}
+                        isBusy={isBusy}
+                        isReverted={isReverted}
+                        onFork={handleFork}
+                        onRevert={handleRevert}
+                      />
+                    </div>
+                  );
+                })}
 
                 {/* Busy indicator when no turns yet but session is busy */}
                 {!showOptimistic && isBusy && turns.length === 0 && (
@@ -1424,24 +1769,24 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       )}
 
       {/* Sub-session indicator above input */}
-      {session?.parentID && <SubSessionInputBanner parentID={session.parentID} />}
+      {session?.parentID && <SubSessionInputBanner parentID={session.parentID} variant={isFork ? 'fork' : 'thread'} />}
 
       {/* Input */}
       <SessionChatInput
         onSend={handleSend}
         isBusy={isBusy}
         onStop={handleStop}
-        agents={visibleAgents}
-        selectedAgent={selectedAgent}
-        onAgentChange={setSelectedAgent}
+        agents={local.agent.list}
+        selectedAgent={local.agent.current?.name ?? null}
+        onAgentChange={local.agent.set}
         commands={commands || []}
         onCommand={handleCommand}
-        models={flatModels}
-        selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
-        variants={currentVariants}
-        selectedVariant={selectedVariant}
-        onVariantChange={setSelectedVariant}
+        models={local.model.list}
+        selectedModel={local.model.currentKey ?? null}
+        onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}
+        variants={local.model.variant.list}
+        selectedVariant={local.model.variant.current ?? null}
+        onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
         messages={messages}
         onTogglePanel={handleTogglePanel}
         isPanelOpen={isSidePanelOpen}

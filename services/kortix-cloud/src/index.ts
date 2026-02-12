@@ -105,6 +105,7 @@ console.log(`
 ║  Port: ${config.PORT.toString().padEnd(49)}║
 ║  Mode: ${config.ENV_MODE.padEnd(49)}║
 ╠═══════════════════════════════════════════════════════════╣
+║  Database:  ${config.DATABASE_URL ? '✓ Configured'.padEnd(43) : '✗ NOT SET'.padEnd(43)}║
 ║  Supabase:  ${isSupabaseConfigured() ? '✓ Configured'.padEnd(43) : '✗ NOT SET'.padEnd(43)}║
 ║  Daytona:   ${isDaytonaConfigured() ? '✓ Configured'.padEnd(43) : '✗ NOT SET'.padEnd(43)}║
 ╚═══════════════════════════════════════════════════════════╝

@@ -59,7 +59,7 @@ import {
   useSetSelectedAgent, 
   useInitializeFromAgents, 
   useGetCurrentAgent, 
-  useIsSunaAgentFn 
+  useIsDefaultAgentFn 
 } from '@/stores/agent-selection-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/threads/keys';
@@ -134,7 +134,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const storeSetSelectedAgent = useSetSelectedAgent();
   const storeInitializeFromAgents = useInitializeFromAgents();
   const storeGetCurrentAgent = useGetCurrentAgent();
-  const storeIsSunaAgentFn = useIsSunaAgentFn();
+  const storeIsDefaultAgentFn = useIsDefaultAgentFn();
   
   const agentsQuery = useAgents({}, { enabled: isAuthenticated && !isShared });
 
@@ -142,7 +142,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const setSelectedAgent = isShared ? (() => { }) : storeSetSelectedAgent;
   const initializeFromAgents = isShared ? (() => { }) : storeInitializeFromAgents;
   const getCurrentAgent = isShared ? (() => undefined) : storeGetCurrentAgent;
-  const isSunaAgent = isShared ? false : storeIsSunaAgentFn;
+  const isDefaultAgent = isShared ? false : storeIsDefaultAgentFn;
 
   // Memoize agents array to prevent unnecessary recalculations
   const agents = useMemo(() => {

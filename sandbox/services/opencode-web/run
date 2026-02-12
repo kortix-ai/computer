@@ -6,6 +6,12 @@
 
 cd /workspace
 
+# Ensure OpenCode data dirs exist and are owned by abc
+mkdir -p /workspace/.local/share/opencode/log \
+         /workspace/.local/share/opencode/storage \
+         /workspace/.local/share/opencode/snapshot
+chown -R abc:abc /workspace/.local/share/opencode
+
 exec s6-setuidgid abc \
   env HOME=/workspace \
       OPENCODE_CONFIG_DIR=/opt/opencode \

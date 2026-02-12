@@ -88,10 +88,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       if (!translations || typeof translations !== 'object') {
         throw new Error(`Invalid translations object for locale ${targetLocale}`);
       }
-      if (!translations.common || !translations.suna) {
+      if (!translations.common || !translations.modes) {
         console.warn(`Missing sections in ${targetLocale}:`, {
           hasCommon: !!translations.common,
-          hasSuna: !!translations.suna,
+          hasModes: !!translations.modes,
           keys: Object.keys(translations).slice(0, 10)
         });
       }

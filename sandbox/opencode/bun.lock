@@ -6,7 +6,7 @@
       "name": ".opencode",
       "dependencies": {
         "@mendable/firecrawl-js": "^4.12.0",
-        "@opencode-ai/plugin": "1.1.59",
+        "@opencode-ai/plugin": "1.1.61",
         "@opencode-ai/sdk": "^1.1.55",
         "@tavily/core": "^0.7.1",
         "agent-browser": "^0.9.1",
@@ -29,7 +29,7 @@
 
     "@mendable/firecrawl-js": ["@mendable/firecrawl-js@4.12.0", "", { "dependencies": { "axios": "^1.12.2", "typescript-event-target": "^1.1.1", "zod": "^3.23.8", "zod-to-json-schema": "^3.23.0" } }, "sha512-Jjawuumet+3htp39PwwhkZhSj2ORR8Tz/HqORoFGngrB3HadMBKoX6SSPIhayRTXwNnDkaU0PWm1SUtRvPdoPw=="],
 
-    "@opencode-ai/plugin": ["@opencode-ai/plugin@1.1.59", "", { "dependencies": { "@opencode-ai/sdk": "1.1.59", "zod": "4.1.8" } }, "sha512-2h/SoyS/OvRYxpT2L0xIil2DnLY7qP+RCnQYz5yZEZNkp4d5f1U2rHhktrpC4hbPahDo7wJRON3W564YflOJ9w=="],
+    "@opencode-ai/plugin": ["@opencode-ai/plugin@1.1.61", "", { "dependencies": { "@opencode-ai/sdk": "1.1.61", "zod": "4.1.8" } }, "sha512-NspBDob+LScGwmrBFUiG4AU/b0acBx/H68d24Zg8lUw5aH8320MK3bwg0jC3/AhT/q0nj+PuaRO1GhClFm+Olw=="],
 
     "@opencode-ai/sdk": ["@opencode-ai/sdk@1.1.55", "", {}, "sha512-erP+vjM26sJeezms+EZl8sdk6aIV2WTzC4dVJCBPjio1p1bcq5srhkRNEdu/uQbm9LkNSHy9L1xiO+vc8uYzFA=="],
 
@@ -563,7 +563,7 @@
 
     "@isaacs/cliui/string-width": ["string-width@5.1.2", "", { "dependencies": { "eastasianwidth": "^0.2.0", "emoji-regex": "^9.2.2", "strip-ansi": "^7.0.1" } }, "sha512-HnLOCR3vjcY8beoNLtcjZ5/nxn2afmME6lhrDrebokqMap+XbeW8n9TXpPDOqdGK5qcI3oT0GKTW6wC7EMiVqA=="],
 
-    "@opencode-ai/plugin/@opencode-ai/sdk": ["@opencode-ai/sdk@1.1.59", "", {}, "sha512-g+Z0UQ9qNUcZsX4m/fXG4MHIquYlp4d2wfelRsynMj+AprfZ4He6u9GxAVT0FmLxuutj2ZxTLlspSe1+256pxg=="],
+    "@opencode-ai/plugin/@opencode-ai/sdk": ["@opencode-ai/sdk@1.1.61", "", {}, "sha512-rOAX1dVzwxxZOFTtY3uMvRhBB4IrGOPiCScyxhcV/3mpaRYw6O+CqjJdoQ5lHvXIVfuW4FQZ2gsImn2xUtrE/Q=="],
 
     "@opencode-ai/plugin/zod": ["zod@4.1.8", "", {}, "sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ=="],
 

@@ -1,15 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   Menu,
-  Plus,
   PanelLeftOpen,
   PanelLeftClose,
   SquarePen,
+  FolderOpen,
+  ListTree,
+  ChevronDown,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -18,6 +20,7 @@ import { ProjectSelector } from '@/components/sidebar/project-selector';
 
 import { UserMenu } from '@/components/sidebar/user-menu';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
+import { ThreadIcon } from '@/components/sidebar/thread-icon';
 
 import {
   Sidebar,
@@ -28,6 +31,21 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from '@/components/ui/popover';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useIsMobile } from '@/hooks/utils';
 import { cn } from '@/lib/utils';
 import { useAdminRole } from '@/hooks/admin';
@@ -35,8 +53,9 @@ import { useDocumentModalStore } from '@/stores/use-document-modal-store';
 import { isLocalMode } from '@/lib/config';
 import { useAccountState, accountStateSelectors } from '@/hooks/billing';
 import { getPlanIcon } from '@/components/billing/plan-utils';
-import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
+import { useCreateOpenCodeSession, useOpenCodeSessions, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
+import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { createClient } from '@/lib/supabase/client';
 
 // ============================================================================
@@ -69,7 +88,236 @@ function FloatingMobileMenuButton() {
 }
 
 // ============================================================================
-// User Profile Section (bridges auth data to UserMenu)
+// Collapsed Icon Button with optional hover flyout
+// ============================================================================
+
+interface CollapsedIconButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  flyoutContent?: React.ReactNode;
+  disabled?: boolean;
+}
+
+function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: CollapsedIconButtonProps) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleClose = useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  }, []);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+  }, []);
+
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+
+  const buttonEl = (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'flex items-center justify-center h-10 w-10 rounded-xl transition-colors cursor-pointer',
+        'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+        disabled && 'opacity-50 cursor-not-allowed',
+      )}
+    >
+      {icon}
+    </button>
+  );
+
+  // Flyout buttons: use Radix Popover (portal-based, no overflow issues)
+  if (flyoutContent) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <div
+            onMouseEnter={() => { cancelClose(); setOpen(true); }}
+            onMouseLeave={scheduleClose}
+          >
+            {buttonEl}
+          </div>
+        </PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="start"
+          sideOffset={12}
+          className="w-[280px] max-h-[75vh] p-0 overflow-hidden"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {flyoutContent}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // Non-flyout buttons: keep tooltip
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {buttonEl}
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={12} className="text-xs">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// ============================================================================
+// Sessions Flyout
+// ============================================================================
+
+function SessionsFlyout() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { data: sessions } = useOpenCodeSessions();
+  const permissions = useOpenCodePendingStore((s) => s.permissions);
+  const questions = useOpenCodePendingStore((s) => s.questions);
+
+  const rootSessions = React.useMemo(() => {
+    if (!sessions) return [];
+    return sessions
+      .filter((s) => !s.parentID && !(s.time as any).archived)
+      .sort((a, b) => b.time.updated - a.time.updated)
+      .slice(0, 40);
+  }, [sessions]);
+
+  const getPendingCount = (sessionId: string) => {
+    const permCount = Object.values(permissions).filter((p) => p.sessionID === sessionId).length;
+    const qCount = Object.values(questions).filter((q) => q.sessionID === sessionId).length;
+    return permCount + qCount;
+  };
+
+  const handleClick = (sessionId: string) => {
+    const session = rootSessions.find((s) => s.id === sessionId);
+    useTabStore.getState().openTab({
+      id: sessionId,
+      title: session?.title || 'Session',
+      type: 'session',
+      href: `/sessions/${sessionId}`,
+    });
+    router.push(`/sessions/${sessionId}`);
+  };
+
+  return (
+    <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+      {rootSessions.length === 0 ? (
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground/60">
+          No sessions yet
+        </div>
+      ) : (
+        rootSessions.map((session) => {
+          const isActive = pathname?.includes(session.id);
+          const pendingCount = getPendingCount(session.id);
+          return (
+            <button
+              key={session.id}
+              onClick={() => handleClick(session.id)}
+              className={cn(
+                'flex items-center gap-3 w-full px-3.5 py-2.5 text-sm transition-colors cursor-pointer',
+                isActive
+                  ? 'bg-accent/80 text-foreground'
+                  : 'text-foreground/80 hover:bg-accent/40',
+              )}
+            >
+              <ThreadIcon
+                iconName={(session as any).icon}
+                className="text-muted-foreground/70 flex-shrink-0"
+                size={18}
+              />
+              <span className="flex-1 truncate text-left">{session.title || 'Untitled'}</span>
+              {pendingCount > 0 && (
+                <span className="flex-shrink-0 h-[18px] min-w-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Projects Flyout
+// ============================================================================
+
+function ProjectsFlyout() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { data: projects } = useOpenCodeProjects();
+
+  const sortedProjects = React.useMemo(() => {
+    if (!projects) return [];
+    return [...projects].sort((a, b) => b.time.updated - a.time.updated);
+  }, [projects]);
+
+  const getProjectDisplayName = (project: any): string => {
+    if (project.name) return project.name;
+    if (project.worktree === '/' || project.id === 'global') return 'Global';
+    const parts = project.worktree.split('/');
+    return parts[parts.length - 1] || project.worktree;
+  };
+
+  const handleClick = (projectId: string, name: string) => {
+    useTabStore.getState().openTab({
+      id: `page:/projects/${projectId}`,
+      title: name,
+      type: 'project',
+      href: `/projects/${projectId}`,
+    });
+    router.push(`/projects/${projectId}`);
+  };
+
+  const activeProjectId = React.useMemo(() => {
+    const match = pathname?.match(/^\/projects\/([^/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
+
+  return (
+    <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+      {sortedProjects.length === 0 ? (
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground/60">
+          No projects detected
+        </div>
+      ) : (
+        sortedProjects.map((project) => {
+          const name = getProjectDisplayName(project);
+          const isActive = activeProjectId === project.id;
+          return (
+            <button
+              key={project.id}
+              onClick={() => handleClick(project.id, name)}
+              className={cn(
+                'flex items-center gap-3 w-full px-3.5 py-2.5 text-sm transition-colors cursor-pointer',
+                isActive
+                  ? 'bg-accent/80 text-foreground'
+                  : 'text-foreground/80 hover:bg-accent/40',
+              )}
+            >
+              <FolderOpen
+                className="text-muted-foreground/70 flex-shrink-0"
+                size={18}
+                style={project.icon?.color ? { color: project.icon.color } : undefined}
+              />
+              <span className="flex-1 truncate text-left">{name}</span>
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// User Profile Section
 // ============================================================================
 
 function UserProfileSection({ user }: { user: { name: string; email: string; avatar: string; isAdmin?: boolean } }) {
@@ -92,12 +340,10 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const searchParams = useSearchParams();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-    // Derive initial project from URL if on a project page
     const match = typeof window !== 'undefined' && window.location.pathname.match(/^\/projects\/([^/]+)/);
     return match ? match[1] : null;
   });
 
-  // Sync selectedProjectId from URL when navigating to/from project pages
   useEffect(() => {
     const match = pathname?.match(/^\/projects\/([^/]+)/);
     if (match) {
@@ -107,7 +353,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
 
-  // Auth
   const { data: adminRoleData } = useAdminRole();
   const isAdmin = adminRoleData?.isAdmin ?? false;
 
@@ -139,7 +384,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     fetchUserData();
   }, [isAdmin]);
 
-  // Session creation
   const createSession = useCreateOpenCodeSession();
 
   const handleNewSession = useCallback(async () => {
@@ -160,12 +404,10 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     }
   }, [createSession, router, isMobile, setOpenMobile]);
 
-  // Close mobile sidebar on navigation
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
   }, [pathname, searchParams, isMobile, setOpenMobile]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isDocumentModalOpen) return;
@@ -199,20 +441,27 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   return (
     <Sidebar
       collapsible="icon"
-      className="border-r border-border/50 bg-background [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+      className="bg-sidebar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
       {...props}
     >
       {/* ====== HEADER: Logo + collapse/expand ====== */}
       <SidebarHeader className="pt-4 pb-0 overflow-visible">
         <div className="relative flex h-[32px] items-center px-4 justify-between">
-          {/* Logo area — symbol is always rendered & centered in collapsed rail */}
           <div className={cn(
             'relative flex items-center group/logo',
             state === 'collapsed' && 'absolute left-1/2 -translate-x-1/2'
           )}>
-            <Link href="/dashboard" onClick={() => isMobile && setOpenMobile(false)} className="flex items-center">
-              {/* Symbol: always rendered, fixed position in collapsed rail.
-                  In expanded state it's hidden behind the logomark. */}
+            <Link href="/dashboard" onClick={(e) => {
+              e.preventDefault();
+              useTabStore.getState().openTab({
+                id: 'page:/dashboard',
+                title: 'Dashboard',
+                type: 'dashboard',
+                href: '/dashboard',
+              });
+              router.push('/dashboard');
+              if (isMobile) setOpenMobile(false);
+            }} className="flex items-center">
               <KortixLogo
                 variant="symbol"
                 size={18}
@@ -223,7 +472,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                     : 'opacity-0 scale-90 absolute'
                 )}
               />
-              {/* Logomark: visible only when expanded */}
               <KortixLogo
                 variant="logomark"
                 size={16}
@@ -233,7 +481,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 )}
               />
             </Link>
-            {/* Expand button overlays the symbol on hover when collapsed */}
             {state === 'collapsed' && (
               <button
                 className="absolute inset-0 flex items-center justify-center cursor-pointer opacity-0 scale-75 group-hover/logo:opacity-100 group-hover/logo:scale-100 transition-[opacity,transform] duration-300 ease-out transform-gpu"
@@ -245,7 +492,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             )}
           </div>
 
-          {/* Collapse button (only visible when expanded) */}
           <Button
             variant="ghost"
             size="icon"
@@ -261,23 +507,35 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       </SidebarHeader>
 
       {/* ====== CONTENT ====== */}
-      <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative overflow-hidden">
-        {/* --- Collapsed layout: icon-only actions --- */}
+      <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative overflow-visible">
+        {/* --- Collapsed: 3 icon buttons — New Chat, Projects, Sessions --- */}
         <div className={cn(
-          'absolute inset-0 px-2 pt-4 space-y-2 flex flex-col items-center transition-opacity duration-150 ease-out',
+          'absolute inset-0 px-2 pt-3 space-y-0.5 flex flex-col items-center transition-opacity duration-150 ease-out overflow-visible',
           state === 'collapsed' ? 'opacity-100 pointer-events-auto delay-100' : 'opacity-0 pointer-events-none delay-0'
         )}>
-          <Button variant="outline" size="icon" className="h-10 w-10 shadow-none" onClick={handleNewSession} disabled={createSession.isPending}>
-            <Plus className="h-4 w-4" />
-          </Button>
+          <CollapsedIconButton
+            icon={<SquarePen className="h-[18px] w-[18px]" />}
+            label="New session"
+            onClick={handleNewSession}
+            disabled={createSession.isPending}
+          />
+          <CollapsedIconButton
+            icon={<FolderOpen className="h-[18px] w-[18px]" />}
+            label="Projects"
+            flyoutContent={<ProjectsFlyout />}
+          />
+          <CollapsedIconButton
+            icon={<ListTree className="h-[18px] w-[18px]" />}
+            label="Sessions"
+            flyoutContent={<SessionsFlyout />}
+          />
         </div>
 
-        {/* --- Expanded layout --- */}
+        {/* --- Expanded layout: single scrollable area --- */}
         <div className={cn(
-          'flex flex-col h-full transition-opacity duration-150 ease-out',
+          'flex flex-col h-full transition-opacity duration-150 ease-out overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
           state === 'collapsed' ? 'opacity-0 pointer-events-none delay-0' : 'opacity-100 pointer-events-auto delay-100'
         )}>
-          {/* New session button */}
           <div className="px-2 pt-1 pb-0.5">
             <button
               onClick={handleNewSession}
@@ -289,7 +547,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             </button>
           </div>
 
-          {/* Projects section */}
+          {/* Projects accordion */}
           <div>
             <ProjectSelector
               selectedProjectId={selectedProjectId}
@@ -297,10 +555,22 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             />
           </div>
 
-          {/* Sessions */}
-          <div className="flex-1 min-h-0 flex flex-col">
-            <SessionList projectId={selectedProjectId} />
-          </div>
+          {/* Sessions accordion */}
+          <Collapsible defaultOpen>
+            <div className="px-3">
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center justify-between w-full py-2 group">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Sessions
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                </button>
+              </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent>
+              <SessionList projectId={selectedProjectId} />
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </SidebarContent>
 

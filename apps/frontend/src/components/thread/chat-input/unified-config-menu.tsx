@@ -111,14 +111,13 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
 
     const agents: any[] = allAgents;
 
-    const sunaAgent = useMemo(() => {
-        return agents.find(a => a.metadata?.is_suna_default === true);
+    const defaultAgent = useMemo(() => {
+        return agents[0] || null;
     }, [agents]);
 
-    const placeholderSunaAgent = useMemo(() => ({
+    const placeholderDefaultAgent = useMemo(() => ({
         agent_id: undefined,
         name: 'Kortix',
-        metadata: { is_suna_default: true }
     }), []);
 
     useEffect(() => {
@@ -171,9 +170,9 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
             const found = agents.find(a => a.agent_id === selectedAgentId);
             if (found) return found;
         }
-        if (sunaAgent) return sunaAgent;
+        if (defaultAgent) return defaultAgent;
         return agents[0];
-    }, [agents, selectedAgentId, sunaAgent]);
+    }, [agents, selectedAgentId, defaultAgent]);
 
     const handleQuickAction = useCallback((action: 'instructions' | 'triggers' | 'tools') => {
         if (!selectedAgentId && !displayAgent?.agent_id) {
@@ -184,11 +183,11 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
     }, [selectedAgentId, displayAgent?.agent_id]);
 
     const renderAgentIcon = useCallback((agent: any, size: number = 32) => {
-        if (!agent && (isLoading || sunaAgent)) {
-            return <AgentAvatar isSunaDefault={true} agentName="Kortix" size={size} className="flex-shrink-0 !border-0" />;
+        if (!agent && (isLoading || defaultAgent)) {
+            return <AgentAvatar isDefault={true} agentName="Kortix" size={size} className="flex-shrink-0 !border-0" />;
         }
         return <AgentAvatar agent={agent} agentId={agent?.agent_id} size={size} className="flex-shrink-0 !border-0" />;
-    }, [isLoading, sunaAgent]);
+    }, [isLoading, defaultAgent]);
 
     // Shared content components
     const AgentsList = useCallback(({ compact = false }: { compact?: boolean }) => (
@@ -449,7 +448,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                                     </div>
                                 ) : (
                                     <div className="flex items-center justify-center w-10 h-10 bg-card border-[1.5px] border-border flex-shrink-0" style={{ borderRadius: '10.4px' }}>
-                                        {renderAgentIcon(isLoading && !displayAgent ? placeholderSunaAgent : displayAgent, 40)}
+                                        {renderAgentIcon(isLoading && !displayAgent ? placeholderDefaultAgent : displayAgent, 40)}
                                     </div>
                                 )}
                                 <span className="flex-1 truncate text-base font-medium text-left min-w-0">
@@ -469,7 +468,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                 )}
             </div>
         );
-    }, [mobileSection, searchQuery, onAgentSelect, displayAgent, isLoading, placeholderSunaAgent, renderAgentIcon, selectedAgentId, AgentsList, CreateWorkerButton, WorkerSettingsButtons, isKortixAgent]);
+    }, [mobileSection, searchQuery, onAgentSelect, displayAgent, isLoading, placeholderDefaultAgent, renderAgentIcon, selectedAgentId, AgentsList, CreateWorkerButton, WorkerSettingsButtons, isKortixAgent]);
 
     // Trigger button
     const TriggerButton = (
@@ -482,7 +481,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
         >
             {onAgentSelect ? (
                 <div className="flex items-center gap-2 min-w-0 max-w-[180px]">
-                    {renderAgentIcon(isLoading && !displayAgent ? placeholderSunaAgent : displayAgent, 24)}
+                    {renderAgentIcon(isLoading && !displayAgent ? placeholderDefaultAgent : displayAgent, 24)}
                     <span className="truncate text-sm font-medium">
                         {isKortixAgent ? 'Kortix' : displayAgent?.name}
                     </span>
@@ -554,7 +553,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                                             <DropdownMenuSub>
                                                 <DropdownMenuSubTrigger className="flex items-center gap-3 text-sm cursor-pointer px-1 hover:bg-transparent focus:bg-transparent data-[state=open]:bg-transparent w-full">
                                                     <div className="flex items-center gap-3">
-                                                        {renderAgentIcon(isLoading && !displayAgent ? placeholderSunaAgent : displayAgent)}
+                                                        {renderAgentIcon(isLoading && !displayAgent ? placeholderDefaultAgent : displayAgent)}
                                                         <span className="flex-1 truncate font-medium text-left">
                                                             {isKortixAgent ? 'Kortix' : displayAgent?.name}
                                                         </span>

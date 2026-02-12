@@ -1,4 +1,7 @@
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
+import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
+import { creditAccounts } from '@kortix/db';
+import { db } from '../db';
 
 export interface CreditBalance {
   balance: number;
@@ -23,31 +26,30 @@ export interface CreditDeductResult {
 
 /**
  * Get credit balance for an account.
- * Fast single query - no HTTP call to Python backend.
+ * Fast single query.
  */
 export async function getCreditBalance(accountId: string): Promise<CreditBalance | null> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
   try {
-    const supabase = getSupabase();
+    const [row] = await db
+      .select({
+        balance: creditAccounts.balance,
+        expiringCredits: creditAccounts.expiringCredits,
+        nonExpiringCredits: creditAccounts.nonExpiringCredits,
+        dailyCreditsBalance: creditAccounts.dailyCreditsBalance,
+      })
+      .from(creditAccounts)
+      .where(eq(creditAccounts.accountId, accountId))
+      .limit(1);
 
-    const { data, error } = await supabase
-      .from('credit_accounts')
-      .select('balance, expiring_credits, non_expiring_credits, daily_credits_balance')
-      .eq('account_id', accountId)
-      .single();
-
-    if (error || !data) {
+    if (!row) {
       return null;
     }
 
     return {
-      balance: Number(data.balance) || 0,
-      expiringCredits: Number(data.expiring_credits) || 0,
-      nonExpiringCredits: Number(data.non_expiring_credits) || 0,
-      dailyCreditsBalance: Number(data.daily_credits_balance) || 0,
+      balance: Number(row.balance) || 0,
+      expiringCredits: Number(row.expiringCredits) || 0,
+      nonExpiringCredits: Number(row.nonExpiringCredits) || 0,
+      dailyCreditsBalance: Number(row.dailyCreditsBalance) || 0,
     };
   } catch (err) {
     console.error('getCreditBalance error:', err);
@@ -98,48 +100,36 @@ export async function deductCredits(
   threadId?: string,
   messageId?: string
 ): Promise<CreditDeductResult> {
-  if (!isSupabaseConfigured()) {
-    return { success: false, error: 'Supabase not configured' };
-  }
-
   try {
-    const supabase = getSupabase();
+    const result = await db.execute(sql`SELECT atomic_use_credits(
+      ${accountId}::uuid,
+      ${amount}::numeric,
+      ${description}::text,
+      ${threadId ?? null}::text,
+      ${messageId ?? null}::text
+    ) as result`);
 
-    // Call the existing atomic_use_credits function
-    const { data, error } = await supabase.rpc('atomic_use_credits', {
-      p_account_id: accountId,
-      p_amount: amount,
-      p_description: description,
-      p_thread_id: threadId || null,
-      p_message_id: messageId || null,
-    });
-
-    if (error) {
-      console.error('deductCredits RPC error:', error);
-      return { success: false, error: error.message };
-    }
-
-    // The function returns JSONB
-    const result = data as {
+    const row = result[0] as Record<string, unknown> | undefined;
+    const data = row?.result as {
       success: boolean;
       error?: string;
       amount_deducted?: number;
       new_total?: number;
       transaction_id?: string;
-    };
+    } | undefined;
 
-    if (!result.success) {
+    if (!data || !data.success) {
       return {
         success: false,
-        error: result.error || 'Unknown error',
+        error: data?.error || 'Unknown error',
       };
     }
 
     return {
       success: true,
-      amountDeducted: result.amount_deducted,
-      newBalance: result.new_total,
-      transactionId: result.transaction_id,
+      amountDeducted: data.amount_deducted,
+      newBalance: data.new_total,
+      transactionId: data.transaction_id,
     };
   } catch (err) {
     console.error('deductCredits error:', err);

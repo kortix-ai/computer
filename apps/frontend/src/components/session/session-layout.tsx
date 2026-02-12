@@ -23,7 +23,7 @@ import {
   adaptMessagesToToolCalls,
   adaptAgentStatus,
 } from '@/lib/adapters/opencode-to-kortix-computer';
-import { Activity, FolderOpen, Monitor, X, Maximize2, Minimize2 } from 'lucide-react';
+import { Activity, FolderOpen, Monitor, TerminalSquare, X, Maximize2, Minimize2 } from 'lucide-react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useServerStore } from '@/stores/server-store';
@@ -37,6 +37,7 @@ const TAB_WIDTH = 80;
 const TABS: { key: ViewType; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
   { key: 'tools', label: 'Actions', icon: Activity },
   { key: 'files', label: 'Files', icon: FolderOpen },
+  { key: 'terminal', label: 'Terminal', icon: TerminalSquare },
   { key: 'desktop', label: 'Desktop', icon: Monitor },
 ];
 
@@ -192,11 +193,11 @@ export const SessionLayout = memo(function SessionLayout({
     setIsSidePanelOpen(!isSidePanelOpen);
   }, [isSidePanelOpen, setIsSidePanelOpen]);
 
-  // When Desktop tab is selected, always open the side panel
+  // When Desktop or Terminal tab is selected, always open the side panel
   const handleViewChange = useCallback(
     (view: ViewType) => {
       setActiveView(view);
-      if (view === 'desktop' && !isSidePanelOpen) {
+      if ((view === 'desktop' || view === 'terminal') && !isSidePanelOpen) {
         setIsSidePanelOpen(true);
       }
     },
@@ -206,8 +207,8 @@ export const SessionLayout = memo(function SessionLayout({
   const mainPanelRef = useRef<ResizablePrimitive.ImperativePanelHandle>(null);
   const sidePanelRef = useRef<ResizablePrimitive.ImperativePanelHandle>(null);
 
-  // Side panel can show for tool calls OR desktop view
-  const canOpenSidePanel = hasToolCalls || activeView === 'desktop';
+  // Side panel can show for tool calls, desktop view, or terminal view
+  const canOpenSidePanel = hasToolCalls || activeView === 'desktop' || activeView === 'terminal';
   const shouldShowPanel = isSidePanelOpen && canOpenSidePanel;
   const showDesktop = activeView === 'desktop' && shouldShowPanel;
 

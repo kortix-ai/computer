@@ -165,6 +165,14 @@ const extractFromLegacyFormat = (content: any): {
   };
 };
 
+export interface ScrapeResultItem {
+  url: string;
+  success: boolean;
+  title?: string;
+  content?: string;
+  error?: string;
+}
+
 export function extractWebScrapeData(
   toolCall: ToolCallData,
   toolResult: ToolResultData | undefined,
@@ -178,6 +186,10 @@ export function extractWebScrapeData(
   message: string | null;
   files: string[];
   urlCount: number;
+  scrapeResults: ScrapeResultItem[];
+  totalCount: number;
+  successfulCount: number;
+  failedCount: number;
   actualIsSuccess: boolean;
   actualToolTimestamp?: string;
   actualAssistantTimestamp?: string;
@@ -205,27 +217,62 @@ export function extractWebScrapeData(
   let message: string | null = null;
   let files: string[] = [];
   let urlCount = 0;
+  let scrapeResults: ScrapeResultItem[] = [];
+  let totalCount = 0;
+  let successfulCount = 0;
+  let failedCount = 0;
 
   if (toolResult?.output) {
     const output = toolResult.output;
     success = toolResult?.success !== undefined ? toolResult.success : isSuccess;
 
-    if (typeof output === 'string') {
+    // Try to parse structured output
+    let parsed: any = null;
+    if (typeof output === 'object' && output !== null) {
+      parsed = output;
+    } else if (typeof output === 'string') {
+      try {
+        let result = JSON.parse(output);
+        if (typeof result === 'string') {
+          try { result = JSON.parse(result); } catch { /* keep */ }
+        }
+        parsed = typeof result === 'object' ? result : null;
+      } catch { /* not JSON */ }
+    }
+
+    if (parsed && parsed.results && Array.isArray(parsed.results)) {
+      // Structured format: { total, successful, failed, results: [{url, success, title, content, error}] }
+      totalCount = parsed.total || parsed.results.length;
+      successfulCount = parsed.successful ?? parsed.results.filter((r: any) => r.success !== false).length;
+      failedCount = parsed.failed ?? parsed.results.filter((r: any) => r.success === false).length;
+      scrapeResults = parsed.results.map((r: any) => ({
+        url: r.url || '',
+        success: r.success !== false,
+        title: r.title || undefined,
+        content: r.content || r.text || r.snippet || undefined,
+        error: r.error || undefined,
+      }));
+      urlCount = totalCount;
+      message = parsed.message || null;
+      if (parsed.files && Array.isArray(parsed.files)) {
+        files = parsed.files;
+      }
+    } else if (typeof output === 'string') {
       message = output;
-      
+
       const successMatch = output.match(/Successfully scraped (?:all )?(\d+) URLs?/);
       urlCount = successMatch ? parseInt(successMatch[1]) : 0;
-      
+
       const fileMatches = output.match(/- ([^\n]+\.json)/g);
       files = fileMatches ? fileMatches.map((match: string) => match.replace('- ', '')) : [];
-    } else if (typeof output === 'object' && output !== null) {
-      const outputObj = output as any;
-      message = outputObj.message || JSON.stringify(output);
-      
+    } else if (parsed) {
+      const outputObj = parsed as any;
+      message = outputObj.message || null;
+
       if (outputObj.files && Array.isArray(outputObj.files)) {
         files = outputObj.files;
       }
-      
+
       if (outputObj.url_count !== undefined) {
         urlCount = outputObj.url_count;
       } else if (outputObj.urls && Array.isArray(outputObj.urls)) {
@@ -241,6 +288,10 @@ export function extractWebScrapeData(
     message,
     files,
     urlCount,
+    scrapeResults,
+    totalCount,
+    successfulCount,
+    failedCount,
     actualIsSuccess: success,
     actualToolTimestamp: toolTimestamp,
     actualAssistantTimestamp: assistantTimestamp

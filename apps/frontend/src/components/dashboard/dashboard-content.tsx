@@ -7,6 +7,7 @@ import { toast } from '@/lib/toast';
 import { useSidebar } from '@/components/ui/sidebar';
 import {
   useCreateOpenCodeSession,
+  useSendOpenCodeMessage,
   useOpenCodeAgents,
   useOpenCodeProviders,
   useOpenCodeCommands,
@@ -14,7 +15,9 @@ import {
   useOpenCodeSessions,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
-import { SessionChatInput, flattenModels } from '@/components/session/session-chat-input';
+import { SessionChatInput } from '@/components/session/session-chat-input';
+import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
+import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { DynamicGreeting } from '@/components/ui/dynamic-greeting';
 import {
   Menu,
@@ -158,14 +161,12 @@ function RecentSessionRow({
 
 export function DashboardContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<{ providerID: string; modelID: string } | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
 
   const router = useRouter();
   const isMobile = useIsMobile();
   const { setOpen: setSidebarOpenState, setOpenMobile } = useSidebar();
   const createSession = useCreateOpenCodeSession();
+  const sendMessage = useSendOpenCodeMessage();
 
   // Data
   const { data: agents } = useOpenCodeAgents();
@@ -173,24 +174,10 @@ export function DashboardContent() {
   const { data: commands } = useOpenCodeCommands();
   const { data: projects } = useOpenCodeProjects();
   const { data: sessions } = useOpenCodeSessions();
+  const { data: config } = useOpenCodeConfig();
 
-  const visibleAgents = useMemo(
-    () => (agents || []).filter((a) => a.mode !== 'subagent' && !a.hidden),
-    [agents],
-  );
-
-  const flatModels = useMemo(() => flattenModels(providers), [providers]);
-
-  const currentVariants = useMemo(() => {
-    if (!selectedModel) {
-      const first = flatModels[0];
-      return first?.variants ? Object.keys(first.variants) : [];
-    }
-    const model = flatModels.find(
-      (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID,
-    );
-    return model?.variants ? Object.keys(model.variants) : [];
-  }, [selectedModel, flatModels]);
+  // Unified model/agent/variant state
+  const local = useOpenCodeLocal({ agents, providers, config });
 
   // Session counts per project
   const sessionCounts = useMemo(() => {
@@ -228,27 +215,43 @@ export function DashboardContent() {
   }, [projects]);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, _files?: unknown) => {
       if (!text.trim() || isSubmitting) return;
       setIsSubmitting(true);
       try {
-        sessionStorage.setItem('opencode_pending_prompt', text);
-
+        // Build options from selections
         const options: Record<string, unknown> = {};
-        if (selectedAgent) options.agent = selectedAgent;
-        if (selectedModel) options.model = selectedModel;
-        if (selectedVariant) options.variant = selectedVariant;
-        if (Object.keys(options).length > 0) {
-          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
-        }
+        if (local.agent.current) options.agent = local.agent.current.name;
+        if (local.model.currentKey) options.model = local.model.currentKey;
+        if (local.model.variant.current) options.variant = local.model.variant.current;
 
+        // Step 1: Create the session
         const session = await createSession.mutateAsync();
+
+        // Step 2: Open tab and navigate immediately (optimistic)
         useTabStore.getState().openTab({
           id: session.id,
           title: 'New session',
           type: 'session',
           href: `/sessions/${session.id}`,
         });
+
+        // Store the prompt text for optimistic display on the session page
+        sessionStorage.setItem('opencode_pending_prompt', text);
+        if (Object.keys(options).length > 0) {
+          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
+        }
+
+        // Step 3: Send the prompt directly from here (don't rely on session page to do it)
+        sendMessage.mutateAsync({
+          sessionId: session.id,
+          parts: [{ type: 'text', text }],
+          options: Object.keys(options).length > 0 ? options as any : undefined,
+        }).catch(() => {
+          // If send fails, the session page will show the error via SSE events
+        });
+
+        // Step 4: Navigate to session (prompt already sent, ?new=true for optimistic display only)
         router.push(`/sessions/${session.id}?new=true`);
       } catch (error) {
         sessionStorage.removeItem('opencode_pending_prompt');
@@ -257,7 +260,7 @@ export function DashboardContent() {
         toast.warning('Failed to create session');
       }
     },
-    [isSubmitting, createSession, router, selectedAgent, selectedModel, selectedVariant],
+    [isSubmitting, createSession, sendMessage, router, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
   const handleCommand = useCallback(
@@ -327,15 +330,15 @@ export function DashboardContent() {
                 onSend={handleSend}
                 disabled={isSubmitting}
                 placeholder="Ask anything..."
-                agents={visibleAgents}
-                selectedAgent={selectedAgent}
-                onAgentChange={setSelectedAgent}
-                models={flatModels}
-                selectedModel={selectedModel}
-                onModelChange={setSelectedModel}
-                variants={currentVariants}
-                selectedVariant={selectedVariant}
-                onVariantChange={setSelectedVariant}
+                agents={local.agent.list}
+                selectedAgent={local.agent.current?.name ?? null}
+                onAgentChange={local.agent.set}
+                models={local.model.list}
+                selectedModel={local.model.currentKey ?? null}
+                onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}
+                variants={local.model.variant.list}
+                selectedVariant={local.model.variant.current ?? null}
+                onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
                 commands={commands || []}
                 onCommand={handleCommand}
               />

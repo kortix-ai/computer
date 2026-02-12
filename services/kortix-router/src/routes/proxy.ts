@@ -6,7 +6,7 @@ import {
   type ProxyServiceConfig,
 } from '../config/proxy-services';
 import { validateSecretKey } from '../repositories/api-keys';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { config } from '../config';
 import { checkCredits, deductToolCredits } from '../services/billing';
 
 const proxy = new Hono();
@@ -151,11 +151,7 @@ async function tryAuthenticate(c: any): Promise<{ isKortixUser: boolean; account
   const token = authHeader.slice(7);
   if (!token) return { isKortixUser: false };
 
-  if (token === '00000') {
-    return { isKortixUser: true, accountId: 'test_account' };
-  }
-
-  if (token.startsWith('sk_') && isSupabaseConfigured()) {
+  if (token.startsWith('sk_') && config.DATABASE_URL) {
     try {
       const result = await validateSecretKey(token);
       if (result.isValid && result.accountId) {

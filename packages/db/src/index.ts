@@ -10,7 +10,7 @@ export {
   sandboxStatusEnum,
   executionStatusEnum,
   sessionModeEnum,
-  // Tables
+  // Kortix tables
   sandboxes,
   triggers,
   executions,
@@ -20,6 +20,13 @@ export {
   executionsRelations,
 } from './schema/kortix';
 
+// Public/basejump tables
+export {
+  apiKeys,
+  creditAccounts,
+  accountUser,
+} from './schema/public';
+
 export type {
   Sandbox,
   Trigger,
@@ -27,6 +34,10 @@ export type {
   NewSandbox,
   NewTrigger,
   NewExecution,
+  ApiKey,
+  CreditAccount,
+  AccountUser,
+  NewApiKey,
   SandboxSelect,
   TriggerSelect,
   ExecutionSelect,

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface SunaModesState {
+interface ModesState {
   selectedMode: string | null;
   selectedCharts: string[];
   selectedOutputFormat: string | null;
@@ -30,7 +30,7 @@ interface SunaModesState {
   selectVideoStyle: (styleId: string) => void;
 }
 
-export const useSunaModesStore = create<SunaModesState>()(
+export const useModesStore = create<ModesState>()(
   persist(
     (set, get) => ({
       selectedMode: null,
@@ -44,7 +44,7 @@ export const useSunaModesStore = create<SunaModesState>()(
       
       setSelectedMode: (mode: string | null) => {
         // Perform all updates in a single atomic set() call to avoid batching issues
-        const updates: Partial<SunaModesState> = { selectedMode: mode };
+        const updates: Partial<ModesState> = { selectedMode: mode };
         
         // Reset mode-specific selections when mode changes
         if (mode !== 'data') {
@@ -200,7 +200,7 @@ export const useSunaModesStore = create<SunaModesState>()(
       },
     }),
     {
-      name: 'suna-modes-storage',
+      name: 'modes-storage',
       // Version 3: Added docs, image, canvas, video state
       version: 3,
       migrate: (persistedState: any, version: number) => {
@@ -235,8 +235,8 @@ export const useSunaModesStore = create<SunaModesState>()(
 );
 
 // Convenience hook for backward compatibility
-export function useSunaModePersistence() {
-  const store = useSunaModesStore();
+export function useModePersistence() {
+  const store = useModesStore();
   
   return {
     selectedMode: store.selectedMode,

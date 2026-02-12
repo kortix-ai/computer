@@ -900,7 +900,7 @@
     "disableAll": "Disable All",
     "saveChanges": "Save Changes"
   },
-  "suna": {
+  "modes": {
     "samplePrompts": "Sample prompts",
     "examplePrompts": "Example prompts",
     "chooseStyle": "Choose a style",
