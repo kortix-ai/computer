@@ -1,5 +1,5 @@
 export const config = {
-  PORT: parseInt(process.env.PORT || '8013', 10),
+  PORT: parseInt(process.env.PORT || '8012', 10),
   ENV_MODE: process.env.ENV_MODE || 'local',
 
   // Database
