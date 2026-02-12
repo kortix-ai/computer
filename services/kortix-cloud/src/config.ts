@@ -1,5 +1,5 @@
 export const config = {
-  PORT: parseInt(process.env.PORT || '8009', 10),
+  PORT: parseInt(process.env.PORT || '8010', 10),
   ENV_MODE: process.env.ENV_MODE || 'local',
 
   // Database (Drizzle ORM - for sandbox ownership checks)
