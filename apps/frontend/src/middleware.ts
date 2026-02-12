@@ -75,6 +75,11 @@ function detectMobilePlatformFromUA(userAgent: string | null): 'ios' | 'android'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Local mode: no auth, no billing, no redirects. Just serve everything.
+  if (process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local') {
+    return NextResponse.next();
+  }
   
   // 🚀 HYPER-FAST: Mobile app store redirect for /milano, /berlin, and /app
   // This runs at the edge before ANY page rendering
