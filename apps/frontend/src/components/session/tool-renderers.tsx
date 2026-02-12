@@ -1023,20 +1023,82 @@ function WebFetchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 ToolRegistry.register('webfetch', WebFetchTool);
 
 // --- WebSearch ---
-interface WebSearchResult {
+
+/** A single source link from search results */
+interface WebSearchSource {
   title: string;
   url: string;
+  snippet?: string;
   author?: string;
   publishedDate?: string;
-  text: string;
 }
 
-function parseWebSearchOutput(output: string): WebSearchResult[] {
-  if (!output) return [];
-  // Split on "Title: " blocks — each block starts a new result
-  const blocks = output.split(/(?=^Title: )/m).filter(Boolean);
-  const results: WebSearchResult[] = [];
+/** A query block (batch mode returns multiple) */
+interface WebSearchQueryResult {
+  query: string;
+  answer?: string;
+  sources: WebSearchSource[];
+}
 
+/**
+ * Parse web search output — handles both:
+ * 1. JSON batch format: { batch_mode, results: [{ query, answer, results: [{ title, url, snippet }] }] }
+ * 2. Plain text format: Title: ...\nURL: ...\nText: ...
+ */
+function parseWebSearchOutput(output: string): WebSearchQueryResult[] {
+  if (!output) return [];
+
+  // --- Try JSON first ---
+  try {
+    const parsed = JSON.parse(output);
+
+    // Batch mode: { results: [{ query, answer, results: [...] }] }
+    if (parsed.results && Array.isArray(parsed.results)) {
+      const queryResults: WebSearchQueryResult[] = [];
+      for (const r of parsed.results) {
+        if (typeof r.query !== 'string') continue;
+        const sources: WebSearchSource[] = [];
+        if (Array.isArray(r.results)) {
+          for (const s of r.results) {
+            if (s.title && s.url) {
+              sources.push({
+                title: s.title,
+                url: s.url,
+                snippet: s.snippet || s.text || undefined,
+                author: s.author || undefined,
+                publishedDate: s.publishedDate || s.published_date || undefined,
+              });
+            }
+          }
+        }
+        queryResults.push({
+          query: r.query,
+          answer: r.answer || undefined,
+          sources,
+        });
+      }
+      if (queryResults.length > 0) return queryResults;
+    }
+
+    // Single result: { query, answer, results: [...] }
+    if (parsed.query && typeof parsed.query === 'string') {
+      const sources: WebSearchSource[] = [];
+      if (Array.isArray(parsed.results)) {
+        for (const s of parsed.results) {
+          if (s.title && s.url) {
+            sources.push({ title: s.title, url: s.url, snippet: s.snippet || s.text || undefined });
+          }
+        }
+      }
+      return [{ query: parsed.query, answer: parsed.answer || undefined, sources }];
+    }
+  } catch {
+    // Not JSON — fall through to text parsing
+  }
+
+  // --- Plain text format ---
+  const blocks = output.split(/(?=^Title: )/m).filter(Boolean);
+  const sources: WebSearchSource[] = [];
   for (const block of blocks) {
     const titleMatch = block.match(/^Title:\s*(.+)/m);
     const urlMatch = block.match(/^URL:\s*(.+)/m);
@@ -1044,50 +1106,25 @@ function parseWebSearchOutput(output: string): WebSearchResult[] {
     const dateMatch = block.match(/^Published Date:\s*(.+)/m);
     const textMatch = block.match(/^Text:\s*([\s\S]*?)$/m);
     if (titleMatch && urlMatch) {
-      results.push({
+      sources.push({
         title: titleMatch[1].trim(),
         url: urlMatch[1].trim(),
         author: authorMatch?.[1]?.trim() || undefined,
         publishedDate: dateMatch?.[1]?.trim() || undefined,
-        text: textMatch?.[1]?.trim() || '',
+        snippet: textMatch?.[1]?.trim() || undefined,
       });
     }
   }
-  return results;
+  if (sources.length > 0) return [{ query: '', sources }];
+  return [];
 }
 
-function getDomain(url: string): string {
-  try {
-    return new URL(url).hostname.replace('www.', '');
-  } catch {
-    return url;
-  }
+function wsDomain(url: string): string {
+  try { return new URL(url).hostname.replace('www.', ''); } catch { return url; }
 }
 
-function getFaviconUrl(url: string): string | null {
-  try {
-    const domain = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-  } catch {
-    return null;
-  }
-}
-
-function getResultType(result: { url?: string; title?: string }) {
-  const url = result.url || '';
-  const title = result.title || '';
-  const urlLower = url.toLowerCase();
-  const titleLower = title.toLowerCase();
-
-  if (urlLower.includes('news') || urlLower.includes('article') || titleLower.includes('news')) {
-    return { icon: FileText, label: 'Article' };
-  } else if (urlLower.includes('wiki')) {
-    return { icon: BookOpen, label: 'Wiki' };
-  } else if (urlLower.includes('blog')) {
-    return { icon: CalendarDays, label: 'Blog' };
-  } else {
-    return { icon: Globe, label: 'Website' };
-  }
+function wsFavicon(url: string): string | null {
+  try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`; } catch { return null; }
 }
 
 function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
@@ -1095,9 +1132,20 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const output = partOutput(part);
   const status = partStatus(part);
   const query = (input.query as string) || '';
-  const title = part.state.status === 'completed' ? (part.state as any).title as string : '';
-  const results = useMemo(() => parseWebSearchOutput(output), [output]);
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  const queryResults = useMemo(() => parseWebSearchOutput(output), [output]);
+  const totalSources = useMemo(() => queryResults.reduce((n, q) => n + q.sources.length, 0), [queryResults]);
+  const hasAnswers = queryResults.some((q) => q.answer);
+  const [expandedQuery, setExpandedQuery] = useState<number | null>(null);
+
+  // Compact trigger badge
+  const triggerBadge = status === 'completed' && queryResults.length > 0
+    ? queryResults.length > 1
+      ? `${queryResults.length} queries`
+      : totalSources > 0
+        ? `${totalSources} ${totalSources === 1 ? 'source' : 'sources'}`
+        : undefined
+    : undefined;
 
   return (
     <BasicTool
@@ -1105,106 +1153,119 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       trigger={
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span className="font-medium text-xs text-foreground whitespace-nowrap">Web Search</span>
-          <span className="text-muted-foreground text-xs truncate font-mono">
-            {query}
-          </span>
-          {status === 'completed' && results.length > 0 && (
-            <span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap ml-auto flex-shrink-0">
-              {results.length} {results.length === 1 ? 'result' : 'results'}
+          <span className="text-muted-foreground text-xs truncate font-mono">{query}</span>
+          {triggerBadge && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium whitespace-nowrap ml-auto flex-shrink-0">
+              {triggerBadge}
             </span>
           )}
         </div>
       }
-      defaultOpen={defaultOpen}
+      defaultOpen={defaultOpen || hasAnswers}
       forceOpen={forceOpen}
       locked={locked}
     >
-      {results.length > 0 ? (
-        <div data-scrollable className="max-h-80 overflow-auto">
-          {results.map((result, i) => {
-            const favicon = getFaviconUrl(result.url);
-            const domain = getDomain(result.url);
-            const isExpanded = expandedIdx === i;
-            const { icon: ResultTypeIcon, label: resultTypeLabel } = getResultType(result);
+      {queryResults.length > 0 ? (
+        <div data-scrollable className="max-h-[400px] overflow-auto">
+          {queryResults.map((qr, qi) => {
+            const isMulti = queryResults.length > 1;
+            const isExpanded = expandedQuery === qi;
 
             return (
-              <div
-                key={i}
-                className={cn(
-                  'group',
-                  i > 0 && 'border-t border-border/20',
+              <div key={qi} className={cn(qi > 0 && 'border-t border-border/30')}>
+                {/* Query header (only in batch mode) */}
+                {isMulti && (
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors cursor-pointer text-left"
+                    onClick={() => setExpandedQuery(isExpanded ? null : qi)}
+                  >
+                    <Search className="size-3 text-muted-foreground/50 flex-shrink-0" />
+                    <span className="text-[11px] font-medium text-foreground truncate flex-1">
+                      {qr.query}
+                    </span>
+                    {qr.sources.length > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
+                        {qr.sources.length}
+                      </span>
+                    )}
+                    <ChevronRight className={cn(
+                      'size-3 text-muted-foreground/40 flex-shrink-0 transition-transform',
+                      (isExpanded || !isMulti) && 'rotate-90',
+                    )} />
+                  </button>
                 )}
-              >
-                {/* Result row */}
-                <div
-                  className="flex items-start gap-2 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => setExpandedIdx(isExpanded ? null : i)}
-                >
-                  {/* Favicon */}
-                  {favicon ? (
-                    <img
-                      src={favicon}
-                      alt=""
-                      className="size-4 rounded flex-shrink-0 mt-0.5"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  ) : (
-                    <Globe className="size-3.5 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
-                  )}
 
-                  <div className="min-w-0 flex-1">
-                    {/* Type badge */}
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0 rounded border border-border/40 text-muted-foreground/60 font-normal leading-tight">
-                        <ResultTypeIcon className="size-2 opacity-70" />
-                        {resultTypeLabel}
-                      </span>
-                    </div>
-                    {/* Title + link */}
-                    <a
-                      href={result.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] font-medium text-foreground hover:text-primary hover:underline underline-offset-2 line-clamp-1 block"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {result.title}
-                    </a>
-                    {/* Domain + meta */}
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-muted-foreground/60 font-mono truncate">
-                        {domain}
-                      </span>
-                      {result.author && (
-                        <span className="text-[10px] text-muted-foreground/40 truncate">
-                          {result.author}
-                        </span>
-                      )}
-                      {result.publishedDate && (
-                        <span className="text-[9px] text-muted-foreground/40">
-                          {result.publishedDate.split('T')[0]}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {/* Answer + Sources (always visible in single mode, toggled in batch) */}
+                {(!isMulti || isExpanded) && (
+                  <div className="px-3 pb-2.5">
+                    {/* AI Answer */}
+                    {qr.answer && (
+                      <div className="mb-2.5 mt-1">
+                        <p className="text-[11px] leading-relaxed text-foreground/80">
+                          {qr.answer}
+                        </p>
+                      </div>
+                    )}
 
-                  {/* Expand indicator */}
-                  {result.text && (
-                    <ChevronRight
-                      className={cn(
-                        'size-3 text-muted-foreground/40 flex-shrink-0 mt-1 transition-transform',
-                        isExpanded && 'rotate-90',
-                      )}
-                    />
-                  )}
-                </div>
-
-                {/* Expanded text preview */}
-                {isExpanded && result.text && (
-                  <div className="px-3 pb-2 pl-9">
-                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed line-clamp-4">
-                      {result.text.slice(0, 500)}
-                    </p>
+                    {/* Sources */}
+                    {qr.sources.length > 0 && (
+                      <div className="space-y-1">
+                        {qr.answer && (
+                          <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5">
+                            Sources
+                          </div>
+                        )}
+                        {qr.sources.map((src, si) => {
+                          const favicon = wsFavicon(src.url);
+                          const domain = wsDomain(src.url);
+                          return (
+                            <a
+                              key={si}
+                              href={src.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group flex items-start gap-2 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
+                            >
+                              {/* Favicon */}
+                              <div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
+                                {favicon ? (
+                                  <img
+                                    src={favicon}
+                                    alt=""
+                                    className="size-4 rounded"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <Globe className="size-3 text-muted-foreground/50" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                                  {src.title}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[10px] text-muted-foreground/50 font-mono truncate">
+                                    {domain}
+                                  </span>
+                                  {src.author && (
+                                    <span className="text-[10px] text-muted-foreground/40 truncate">
+                                      {src.author}
+                                    </span>
+                                  )}
+                                </div>
+                                {src.snippet && (
+                                  <p className="text-[10px] text-muted-foreground/60 leading-relaxed line-clamp-2 mt-1">
+                                    {src.snippet.slice(0, 200)}
+                                  </p>
+                                )}
+                              </div>
+                              <ExternalLink className="size-3 text-muted-foreground/30 group-hover:text-muted-foreground/60 flex-shrink-0 mt-1 transition-colors" />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1544,6 +1605,21 @@ function PresentationGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps
             </div>
           )}
 
+          {/* Validate slide */}
+          {action === 'validate_slide' && (
+            <div className="flex items-center gap-2 text-xs">
+              <Check className="size-3 text-emerald-500 flex-shrink-0" />
+              <span className="text-foreground/80">
+                Slide {parsed.slide_number || slideNumber || '?'} validated
+              </span>
+              {parsed.message && parsed.message !== `Slide ${parsed.slide_number} validated` && (
+                <span className="text-muted-foreground/60 truncate">
+                  {parsed.message}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Preview link */}
           {action === 'preview' && parsed.viewer_url && (
             <a
@@ -1558,6 +1634,26 @@ function PresentationGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps
                 {parsed.viewer_url}
               </span>
             </a>
+          )}
+
+          {/* Export success */}
+          {(action === 'export_pdf' || action === 'export_pptx') && (
+            <div className="flex items-center gap-2 text-xs">
+              <Check className="size-3 text-emerald-500 flex-shrink-0" />
+              <span className="text-foreground/80">
+                Exported {parsed.presentation_name || presentationName} to {action === 'export_pdf' ? 'PDF' : 'PPTX'}
+              </span>
+            </div>
+          )}
+
+          {/* Generic fallback for other actions (list, delete, etc.) */}
+          {!['create_slide', 'validate_slide', 'preview', 'export_pdf', 'export_pptx'].includes(action) && (
+            <div className="flex items-center gap-2 text-xs">
+              <Check className="size-3 text-emerald-500 flex-shrink-0" />
+              <span className="text-foreground/80">
+                {parsed.message || `${actionLabel} completed`}
+              </span>
+            </div>
           )}
 
           {/* File paths */}

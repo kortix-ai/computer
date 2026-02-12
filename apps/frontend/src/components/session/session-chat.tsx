@@ -387,7 +387,13 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
 
   return (
     <div className="flex justify-end">
-      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+      <div
+        className={cn(
+          'flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden',
+          canExpand && 'cursor-pointer hover:bg-card/80 transition-colors',
+        )}
+        onClick={() => canExpand && setExpanded(!expanded)}
+      >
         {/* Attachment thumbnails (images/PDFs) */}
         {attachments.length > 0 && (
           <div className="flex gap-2 p-3 pb-0 flex-wrap">
@@ -426,7 +432,6 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
                 'text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0',
                 !expanded && 'max-h-[200px] overflow-hidden',
               )}
-              onClick={() => canExpand && setExpanded(!expanded)}
             >
               {segments.length > 0 ? (
                 segments.map((seg, i) =>
@@ -459,14 +464,11 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
               <div className="absolute inset-x-0 bottom-3 h-10 bg-gradient-to-t from-card to-transparent pointer-events-none" />
             )}
 
-            {/* Expand/collapse button */}
+            {/* Expand/collapse indicator */}
             {canExpand && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="absolute bottom-3 right-4 p-1 rounded-md bg-card/80 backdrop-blur-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer z-10"
-              >
+              <div className="absolute bottom-3 right-4 p-1 rounded-md bg-card/80 backdrop-blur-sm text-muted-foreground z-10">
                 <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
-              </button>
+              </div>
             )}
 
             {/* Copy button (top-right, visible on hover) */}
