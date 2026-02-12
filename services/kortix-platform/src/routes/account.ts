@@ -166,9 +166,9 @@ async function provisionSandbox(accountId: string, userId: string) {
 
   const externalId = daytonaSandbox.id;
 
-  // Build the base URL for the sandbox
-  // The sandbox master HTTP server typically runs on port 4000
-  const baseUrl = `${config.DAYTONA_SERVER_URL || 'https://sandbox.kortix.com'}`;
+  // Build the base URL for the sandbox.
+  // kortix.cloud proxies to the Daytona sandbox by ID, port 8000 is OpenCode's HTTP server.
+  const baseUrl = `https://kortix.cloud/${externalId}/8000`;
 
   // Insert into kortix.sandboxes
   const [sandbox] = await db
