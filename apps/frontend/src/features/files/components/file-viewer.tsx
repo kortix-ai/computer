@@ -36,6 +36,12 @@ const CsvRenderer = lazy(() =>
 const XlsxRenderer = lazy(() =>
   import('@/components/file-renderers/xlsx-renderer').then((m) => ({ default: m.XlsxRenderer })),
 );
+const PptxRenderer = lazy(() =>
+  import('@/components/file-renderers/pptx-renderer').then((m) => ({ default: m.PptxRenderer })),
+);
+const ImageRenderer = lazy(() =>
+  import('@/components/file-renderers/image-renderer').then((m) => ({ default: m.ImageRenderer })),
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -145,8 +151,8 @@ function useBinaryBlob(filePath: string | null, category: FileCategory) {
         const result = await readFileAsBlob(filePath!);
         if (cancelled) return;
 
-        // DocxRenderer takes a blob directly; others need a URL
-        if (category === 'docx') {
+        // DocxRenderer and PptxRenderer take a blob directly; others need a URL
+        if (category === 'docx' || category === 'pptx') {
           setBlob(result);
           setBlobUrl(null);
         } else {
@@ -406,13 +412,9 @@ export function FileViewer() {
 
         {/* Image content */}
         {!isLoading && !error && imageDataUrl && (
-          <div className="flex items-center justify-center p-4 h-full bg-muted/30">
-            <img
-              src={imageDataUrl}
-              alt={fileName}
-              className="max-w-full max-h-full object-contain rounded"
-            />
-          </div>
+          <Suspense fallback={<RendererFallback />}>
+            <ImageRenderer url={imageDataUrl} className="h-full" />
+          </Suspense>
         )}
 
         {/* PDF preview */}
@@ -467,18 +469,18 @@ export function FileViewer() {
           </div>
         )}
 
-        {/* PPTX — no client-side renderer available, show download */}
-        {isContentReady && fileCategory === 'pptx' && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 p-8 text-center">
-            <FileWarning className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              PowerPoint preview is not available
-            </p>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Download to view
-            </Button>
-          </div>
+        {/* PPTX preview */}
+        {isContentReady && fileCategory === 'pptx' && docxBlob && (
+          <Suspense fallback={<RendererFallback />}>
+            <PptxRenderer
+              blob={docxBlob}
+              binaryUrl={blobUrl}
+              filePath={selectedFilePath || undefined}
+              fileName={fileName}
+              className="h-full"
+              onDownload={handleDownload}
+            />
+          </Suspense>
         )}
 
         {/* Binary (non-image) content with no special renderer */}

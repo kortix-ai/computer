@@ -3,7 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { HIDE_BROWSER_TAB } from '@/components/thread/utils';
 import { useFilesStore } from '@/features/files';
 
-export type ViewType = 'tools' | 'files' | 'browser' | 'desktop' | 'terminal';
+export type ViewType = 'tools' | 'files' | 'browser' | 'desktop' | 'terminal' | 'changes';
 
 interface KortixComputerState {
   // === SANDBOX CONTEXT ===
