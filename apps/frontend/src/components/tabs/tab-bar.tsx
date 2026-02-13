@@ -53,7 +53,7 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
   const ROUTE_MAP: Record<string, { title: string; type: TabType }> = {
     '/dashboard': { title: 'Dashboard', type: 'dashboard' },
     '/agents': { title: 'Agents', type: 'page' },
-    '/skills': { title: 'Skills', type: 'page' },
+    '/skills': { title: 'Skills Browser', type: 'page' },
     '/tools': { title: 'Tools', type: 'page' },
     '/commands': { title: 'Commands', type: 'page' },
     '/files': { title: 'Files', type: 'file' },

@@ -64,7 +64,7 @@ export function DashboardPromoBanner() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute top-0 left-0 right-0 z-50 pointer-events-auto"
+        className="relative z-50 shrink-0"
       >
         <div className="relative border-b border-border/40 bg-background/95 backdrop-blur-md">
           <div className="px-4 py-2">

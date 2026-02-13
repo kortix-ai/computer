@@ -560,37 +560,40 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           />
         </div>
 
-        {/* --- Expanded layout: single scrollable area --- */}
+        {/* --- Expanded layout --- */}
         <div className={cn(
-          'flex flex-col h-full transition-opacity duration-150 ease-out overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
+          'flex flex-col h-full min-h-0 transition-opacity duration-150 ease-out',
           state === 'collapsed' ? 'opacity-0 pointer-events-none delay-0' : 'opacity-100 pointer-events-auto delay-100'
         )}>
-          {/* New session button */}
-          <div className="px-2 pt-1 pb-1">
-            <button
-              onClick={handleNewSession}
-              disabled={createSession.isPending}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
-                'transition-all duration-150 ease-out',
-                'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-              )}
-            >
-              <SquarePen className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" />
-              <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
-            </button>
+          {/* Pinned: New session + Projects (always visible) */}
+          <div className="flex-shrink-0">
+            {/* New session button */}
+            <div className="px-2 pt-1 pb-1">
+              <button
+                onClick={handleNewSession}
+                disabled={createSession.isPending}
+                className={cn(
+                  'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
+                  'transition-all duration-150 ease-out',
+                  'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                )}
+              >
+                <SquarePen className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" />
+                <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
+              </button>
+            </div>
+
+            {/* Projects accordion */}
+            <ProjectSelector
+              selectedProjectId={selectedProjectId}
+              onProjectChange={setSelectedProjectId}
+            />
           </div>
 
-          {/* Projects accordion */}
-          <ProjectSelector
-            selectedProjectId={selectedProjectId}
-            onProjectChange={setSelectedProjectId}
-          />
-
-          {/* Sessions accordion */}
-          <Collapsible defaultOpen>
-            <div className="px-5 pt-1">
+          {/* Sessions accordion (scrolls independently) */}
+          <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
+            <div className="px-5 pt-1 flex-shrink-0">
               <CollapsibleTrigger asChild>
                 <button className="flex items-center justify-between w-full py-1.5 group cursor-pointer">
                   <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
@@ -600,7 +603,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 </button>
               </CollapsibleTrigger>
             </div>
-            <CollapsibleContent>
+            <CollapsibleContent className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <SessionList projectId={selectedProjectId} />
             </CollapsibleContent>
           </Collapsible>
