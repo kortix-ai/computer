@@ -113,10 +113,10 @@ export function UpdateAgentToolView({
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <AgentAvatar
-                      iconName={displayIconName}
-                      iconColor={displayIconColor}
-                      backgroundColor={displayIconBackground}
-                      agentName={displayName}
+                      iconName={displayIconName ?? undefined}
+                      iconColor={displayIconColor ?? undefined}
+                      backgroundColor={displayIconBackground ?? undefined}
+                      agentName={displayName ?? undefined}
                       size={48}
                     />
                     <div>

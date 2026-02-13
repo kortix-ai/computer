@@ -8,7 +8,7 @@ const healthKeys = {
   api: () => ['health', 'api'] as const,
 };
 
-export const useApiHealth = (options?) => {
+export const useApiHealth = (options?: any) => {
   return useQuery<HealthCheckResponse>({
     queryKey: healthKeys.api(),
     queryFn: checkApiHealth,

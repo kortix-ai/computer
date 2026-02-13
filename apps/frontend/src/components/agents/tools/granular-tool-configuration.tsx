@@ -206,10 +206,10 @@ export const GranularToolConfiguration = ({
       if (!searchQuery) return true;
       const query = searchQuery.toLowerCase();
       return (
-        group.displayName.toLowerCase().includes(query) ||
+        (group.displayName ?? '').toLowerCase().includes(query) ||
         group.description.toLowerCase().includes(query) ||
         group.methods.some(method =>
-          method.displayName.toLowerCase().includes(query) ||
+          (method.displayName ?? '').toLowerCase().includes(query) ||
           method.description.toLowerCase().includes(query)
         )
       );

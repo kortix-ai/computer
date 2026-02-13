@@ -435,7 +435,8 @@ export const KortixComputer = memo(function KortixComputer({
     internalNavigate(latestIndex, 'user_explicit');
   }, [latestIndex, internalNavigate]);
 
-  const handleSliderChange = useCallback(([newValue]: [number]) => {
+  const handleSliderChange = useCallback((value: number[]) => {
+    const [newValue] = value;
     const bounded = Math.max(0, Math.min(newValue, latestIndex));
     setNavigationMode(bounded === latestIndex ? 'live' : 'manual');
     internalNavigate(bounded, 'user_explicit');
@@ -748,7 +749,7 @@ export const KortixComputer = memo(function KortixComputer({
             currentView={activeView}
             onViewChange={setActiveView}
             isStreaming={isStreaming}
-            project_id={projectId}
+            project_id={projectId ?? ''}
           />
         </div>,
         document.body
@@ -847,7 +848,7 @@ export const KortixComputer = memo(function KortixComputer({
           currentView={activeView}
           onViewChange={setActiveView}
           isStreaming={isStreaming}
-          project_id={projectId}
+          project_id={projectId ?? ''}
         />
       </div>,
       document.body

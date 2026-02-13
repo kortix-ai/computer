@@ -7,7 +7,6 @@ import { detectBestLocaleFromHeaders } from '@/lib/utils/geo-detection-server';
 // Marketing pages that support locale routing for SEO (/de, /it, etc.)
 const MARKETING_ROUTES = [
   '/',
-  '/suna',
   '/legal',
   '/support',
   '/templates',
@@ -28,7 +27,6 @@ const PUBLIC_ROUTES = [
   '/master-login', // Master password admin login
   '/checkout', // Public checkout wrapper for Apple compliance
   '/support', // Support page should be public
-  '/suna', // Kortix rebrand page should be public for SEO
   '/help', // Help center and documentation should be public
   '/credits-explained', // Credits explained page should be public
   '/agents-101',
@@ -138,7 +136,7 @@ export async function middleware(request: NextRequest) {
   const pathSegments = pathname.split('/').filter(Boolean);
   const firstSegment = pathSegments[0];
   
-  // Check if first segment is a locale (e.g., /de, /it, /de/suna)
+  // Check if first segment is a locale (e.g., /de, /it)
   if (firstSegment && locales.includes(firstSegment as Locale)) {
     const locale = firstSegment as Locale;
     const remainingPath = '/' + pathSegments.slice(1).join('/') || '/';
@@ -152,7 +150,7 @@ export async function middleware(request: NextRequest) {
     });
     
     if (isRemainingPathMarketing) {
-      // Rewrite /de to /, /de/suna to /suna, etc.
+      // Rewrite /de to /, etc.
       const response = NextResponse.rewrite(new URL(remainingPath, request.url));
       response.cookies.set('locale', locale, {
         path: '/',

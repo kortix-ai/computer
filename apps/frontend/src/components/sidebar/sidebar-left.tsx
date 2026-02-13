@@ -343,7 +343,7 @@ function UserProfileSection({ user }: { user: { name: string; email: string; ava
   const isLocal = isLocalMode();
   const planName = accountStateSelectors.planName(accountState);
 
-  return <UserMenu user={{ ...user, planName, planIcon: getPlanIcon(planName, isLocal) }} />;
+  return <UserMenu user={{ ...user, planName, planIcon: getPlanIcon(planName, isLocal) ?? undefined }} />;
 }
 
 // ============================================================================

@@ -14,7 +14,7 @@ import { KortixLoader } from '@/components/ui/kortix-loader';
 import JSZip from 'jszip';
 
 // ---------------------------------------------------------------------------
-// Optional: keep the public-URL path for suna-style rendering
+// Optional: keep the public-URL path for document rendering
 // ---------------------------------------------------------------------------
 let DocViewer: React.ComponentType<any> | null = null;
 let DocViewerRenderers: any[] | null = null;

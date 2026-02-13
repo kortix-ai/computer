@@ -104,7 +104,7 @@ export function FileAttachment({
                              error?.message?.includes('Sandbox not found') ||
                              error?.message?.includes('no project owns this sandbox');
     const isStillRetrying = retryCount < 15;
-    const hasError = error && !isStillRetrying;
+    const hasError = !!(error && !isStillRetrying);
     const hasContent = data || localPreviewUrl;
     // For images, we have content if we have localPreviewUrl
     const waitingForSandbox = (isPdf || isSpreadsheet || isPreviewable) && !sandboxId && !localPreviewUrl;
@@ -128,8 +128,8 @@ export function FileAttachment({
                     onFullScreenClick={(slideNum) => {
                         openPresentation(
                             presentationName,
-                            project.sandbox.sandbox_url,
-                            slideNum || slideNumber || 1
+                    project.sandbox.sandbox_url!,
+                    slideNum || slideNumber || 1
                         );
                     }}
                     className={className}
@@ -217,7 +217,7 @@ export function FileAttachment({
                 uploadStatus={uploadStatus}
                 isLoading={shouldShowLoading}
                 hasError={hasError}
-                isSandboxDeleted={isSandboxDeleted}
+                isSandboxDeleted={isSandboxDeleted ?? undefined}
                 alignRight={alignRight}
             />
         );
@@ -240,7 +240,7 @@ export function FileAttachment({
                 uploadStatus={uploadStatus}
                 isLoading={shouldShowLoading}
                 hasError={hasError}
-                isSandboxDeleted={isSandboxDeleted}
+                isSandboxDeleted={isSandboxDeleted ?? undefined}
                 alignRight={alignRight}
             />
         );

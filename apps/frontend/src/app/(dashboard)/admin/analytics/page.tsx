@@ -130,7 +130,7 @@ export default function AdminAnalyticsPage() {
   const { data: taskPerformance, isLoading: taskLoading, isFetching: taskFetching } = useTaskPerformance(dateFromString, dateToString);
   const { data: profitability, isLoading: profitabilityLoading, isFetching: profitabilityFetching } = useProfitability(dateFromString, dateToString);
 
-  const { data: churnData, isLoading: churnLoading } = useChurnByDate(dateFromString, dateToString);
+  const { data: churnData, isLoading: churnLoading } = useChurnByDate(dateFromString ?? '', dateToString ?? '');
 
   const isOverviewFetching = engagementFetching || taskFetching || profitabilityFetching;
 
@@ -418,7 +418,7 @@ export default function AdminAnalyticsPage() {
                               )}
                               title={includeStuckTasks ? "Click to exclude stuck tasks" : "Click to include stuck tasks"}
                             >
-                              {taskPerformance.stuck_task_count} stuck {includeStuckTasks ? '(included)' : '(excluded)'}
+                              {taskPerformance?.stuck_task_count} stuck {includeStuckTasks ? '(included)' : '(excluded)'}
                             </button>
                           )}
                         </div>

@@ -41,7 +41,7 @@ const helpData = {
       items: [
         {
           title: "GitHub Repository",
-          url: "https://github.com/kortix-ai/suna",
+          url: "https://github.com/kortix-ai/kortix",
           external: true,
         },
         {
@@ -106,7 +106,7 @@ export function HelpSidebar({ onSearchClick, ...props }: HelpSidebarProps) {
                           active ? "bg-muted" : "bg-transparent"
                         )}
                       >
-                        {item.external ? (
+                        {'external' in item && item.external ? (
                           <a 
                             href={item.url} 
                             target="_blank" 

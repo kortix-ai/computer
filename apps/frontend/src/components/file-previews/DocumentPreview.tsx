@@ -50,7 +50,7 @@ export function DocumentPreview({
         return (
             <HtmlRenderer
                 content={fileContent}
-                previewUrl={htmlPreviewUrl}
+                previewUrl={htmlPreviewUrl ?? ''}
                 className={className || "h-full w-full"}
                 project={project}
             />

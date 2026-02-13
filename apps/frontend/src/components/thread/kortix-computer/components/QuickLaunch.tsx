@@ -74,7 +74,7 @@ export const QuickLaunch = memo(function QuickLaunch({
 
   const allResults = [
     ...filteredActions.map(a => ({ type: 'action' as const, ...a })),
-    ...filteredFiles.map(f => ({ type: 'file' as const, ...f })),
+    ...filteredFiles.map(f => ({ ...f, type: 'file' as const })),
   ];
 
   const totalResults = allResults.length;

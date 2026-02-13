@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 
-export async function generateMetadata({ params }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ shareId: string }> }): Promise<Metadata> {
   const { shareId } = await params;
   return {
     title: 'Shared Session | Kortix',

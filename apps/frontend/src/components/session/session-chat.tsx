@@ -1807,7 +1807,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         onStop={handleStop}
         agents={local.agent.list}
         selectedAgent={local.agent.current?.name ?? null}
-        onAgentChange={local.agent.set}
+        onAgentChange={(name) => local.agent.set(name ?? undefined)}
         commands={commands || []}
         onCommand={handleCommand}
         models={local.model.list}

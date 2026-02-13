@@ -26,7 +26,7 @@ async function fetchTierConfigurations(): Promise<TierConfigurationsResponse> {
   const response = await backendApi.get<TierConfigurationsResponse>(
     '/billing/tier-configurations'
   );
-  return response.data;
+  return response.data!;
 }
 
 export function useTierConfigurations() {

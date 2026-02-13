@@ -156,10 +156,10 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
     for (const preset of PRESETS) {
       const presetRange = getPresetRange(preset.name)
 
-      const normalizedRangeFrom = new Date(range.from);
+      const normalizedRangeFrom = new Date(range.from!);
       normalizedRangeFrom.setHours(0, 0, 0, 0);
       const normalizedPresetFrom = new Date(
-        presetRange.from.setHours(0, 0, 0, 0)
+        presetRange.from!.setHours(0, 0, 0, 0)
       )
 
       const normalizedRangeTo = new Date(range.to ?? 0);
@@ -219,7 +219,7 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
         <Button size={'default'} variant="outline">
           <div className="text-right">
             <div className="py-1">
-              <div className="text-sm">{`${formatDate(range.from, locale)}${
+              <div className="text-sm">{`${formatDate(range.from!, locale)}${
                 range.to != null ? ' - ' + formatDate(range.to, locale) : ''
               }`}</div>
             </div>

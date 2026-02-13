@@ -861,8 +861,8 @@ export function FileOperationToolView({
               project={project}
               onFullScreenClick={(slideNum) => {
                 openPresentation(
-                  presentationName,
-                  project.sandbox.sandbox_url,
+                  presentationName!,
+                  project.sandbox.sandbox_url!,
                   slideNum
                 );
               }}
@@ -933,9 +933,9 @@ export function FileOperationToolView({
       return (
         <div className="w-full h-full overflow-hidden">
           <SpreadsheetViewer
-            filePath={filePath}
+            filePath={filePath ?? undefined}
             fileName={fileName}
-            sandboxId={project?.sandbox?.id}
+            sandboxId={project?.sandbox?.id ?? undefined}
             project={project}
             className="w-full h-full"
           />
@@ -1109,8 +1109,8 @@ export function FileOperationToolView({
                         size="sm"
                         onClick={() => {
                           openPresentation(
-                            presentationName,
-                            project.sandbox.sandbox_url,
+                            presentationName!,
+                            project.sandbox.sandbox_url!,
                             slideNumber || 1
                           );
                         }}

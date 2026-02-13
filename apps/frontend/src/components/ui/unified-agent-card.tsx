@@ -399,7 +399,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   } = state;
   
   const isDefaultAgent = false;
-  const isOwner = currentUserId && data.creator_id === currentUserId;
+  const isOwner = !!(currentUserId && data.creator_id === currentUserId);
   
   // Handle delete confirmation
   const handleDeleteClick = (e: React.MouseEvent) => {

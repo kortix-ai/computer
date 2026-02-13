@@ -3,7 +3,7 @@ import { toast } from '@/lib/toast';
 import { versionKeys } from './keys';
 import { getAgentVersions, getAgentVersion, createAgentVersion, activateAgentVersion, updateAgentVersionDetails, AgentVersion, AgentVersionCreateRequest } from './utils';
 
-export const useAgentVersions = (agentId: string, options?) => {
+export const useAgentVersions = (agentId: string, options?: any) => {
   return useQuery<AgentVersion[]>({
     queryKey: versionKeys.list(agentId),
     queryFn: () => getAgentVersions(agentId).then(versions => versions.sort((a, b) => b.version_number - a.version_number)),
@@ -15,7 +15,7 @@ export const useAgentVersions = (agentId: string, options?) => {
   });
 };
 
-export const useAgentVersion = (agentId: string, versionId: string | null | undefined, options?) => {
+export const useAgentVersion = (agentId: string, versionId: string | null | undefined, options?: any) => {
   return useQuery<AgentVersion>({
     queryKey: versionKeys.detail(agentId, versionId!),
     queryFn: () => getAgentVersion(agentId, versionId!),

@@ -8,8 +8,6 @@ export const clearUserLocalStorage = () => {
     localStorage.removeItem('auth-tracking-storage');
     localStorage.removeItem('pendingAgentPrompt');
     // Clean up legacy keys
-    localStorage.removeItem('suna-model-selection-v2');
-    localStorage.removeItem('suna_upgrade_dialog_displayed');
     localStorage.removeItem('opencode-model-store-v1');
     Object.keys(localStorage).forEach(key => {
       if (key.startsWith('maintenance-dismissed-')) {

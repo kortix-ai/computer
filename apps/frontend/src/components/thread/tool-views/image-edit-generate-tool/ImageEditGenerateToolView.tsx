@@ -326,7 +326,7 @@ export function ImageEditGenerateToolView({
     !hasMedia &&
     (!!error || (batchResults.length > 0 && !batchResults[0].success));
 
-  const actualIsSuccess = hasMedia && !hasActualError;
+  const actualIsSuccess = !!(hasMedia && !hasActualError);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   // Get media content for download

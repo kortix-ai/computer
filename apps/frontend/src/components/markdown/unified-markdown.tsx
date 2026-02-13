@@ -318,7 +318,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
               return (
                 <a
                   href={href}
-                  onClick={(e) => handleHashClick(e, href)}
+                  onClick={(e) => handleHashClick(e, href ?? '')}
                   className={linkClassName}
                 >
                   {children}

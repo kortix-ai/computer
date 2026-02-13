@@ -33,7 +33,7 @@ export function DashboardPromoBanner() {
 
   // Update the store whenever visibility changes
   useEffect(() => {
-    setIsVisible(shouldShow);
+    setIsVisible(shouldShow ?? false);
     return () => setIsVisible(false);
   }, [shouldShow, setIsVisible]);
 

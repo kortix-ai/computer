@@ -140,23 +140,23 @@ export function extractWebSearchData(
             : [],
           answer: batchItem.answer || '',
           images: Array.isArray(batchItem.images) 
-            ? batchItem.images.map(normalizeImage).filter((img): img is EnrichedImage => img !== null)
+            ? batchItem.images.map(normalizeImage).filter((img: any): img is EnrichedImage => img !== null)
             : []
         }));
 
         // Flatten for combined display
-        const allResults = batchResults.flatMap(br => br.results);
-        const allImages = batchResults.flatMap(br => br.images);
-        const allQueries = batchResults.map(br => br.query).filter(Boolean);
+        const allResults = batchResults!.flatMap(br => br.results);
+        const allImages = batchResults!.flatMap(br => br.images);
+        const allQueries = batchResults!.map(br => br.query).filter(Boolean);
         const combinedQuery = allQueries.length > 1 
           ? `${allQueries.length} queries: ${allQueries.join(', ')}` 
           : allQueries[0] || query;
-        const allSuccessful = batchResults.every(br => br.success);
+        const allSuccessful = batchResults!.every(br => br.success);
 
         return {
           query: combinedQuery || query,
           searchResults: allResults,
-          answer: batchResults.map(br => br.answer).filter(Boolean).join('\n\n') || null,
+          answer: batchResults!.map(br => br.answer).filter(Boolean).join('\n\n') || null,
           images: allImages,
           actualIsSuccess: allSuccessful,
           actualToolTimestamp,
@@ -187,7 +187,7 @@ export function extractWebSearchData(
 
       // Extract images (for single result mode)
       if (Array.isArray(output.images)) {
-        images = output.images.map(normalizeImage).filter((img): img is EnrichedImage => img !== null);
+        images = output.images.map(normalizeImage).filter((img: any): img is EnrichedImage => img !== null);
       }
     } else if (typeof output === 'string') {
       // Handle string output - try to parse as JSON
@@ -209,7 +209,7 @@ export function extractWebSearchData(
           }
           answer = parsed.answer || parsed.summary || null;
           if (Array.isArray(parsed.images)) {
-            images = parsed.images.map(normalizeImage).filter((img): img is EnrichedImage => img !== null);
+            images = parsed.images.map(normalizeImage).filter((img: any): img is EnrichedImage => img !== null);
           }
         }
       } catch (e) {

@@ -101,7 +101,7 @@ export function CanvasToolView({
   const lastRefreshRef = useRef<number>(0);
   
   const extractedData = toolCall ? extractCanvasData(
-    toolCall, toolResult, isSuccess, toolTimestamp, assistantTimestamp
+    toolCall, toolResult!, isSuccess, toolTimestamp, assistantTimestamp
   ) : null;
 
   const {

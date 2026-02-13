@@ -113,7 +113,7 @@ export default function BerlinPage() {
                     placeholder="Beschreibe deine Aufgabe..."
                     agents={local.agent.list}
                     selectedAgent={local.agent.current?.name ?? null}
-                    onAgentChange={local.agent.set}
+                    onAgentChange={(name) => local.agent.set(name ?? undefined)}
                     models={local.model.list}
                     selectedModel={local.model.currentKey ?? null}
                     onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}

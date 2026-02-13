@@ -232,7 +232,7 @@ export const ComposioToolsSelector: React.FC<ComposioToolsSelectorProps> = ({
   const allTags = useMemo(() => {
     const tags = new Set<string>();
     availableTools.forEach(tool => {
-      tool.tags?.forEach(tag => tags.add(tag));
+      tool.tags?.forEach((tag: string) => tags.add(tag));
     });
     return Array.from(tags).sort((a, b) => {
       // Put "important" first, then alphabetical
@@ -270,7 +270,7 @@ export const ComposioToolsSelector: React.FC<ComposioToolsSelectorProps> = ({
     // Filter by tags if any are selected
     if (selectedTagFilters.size > 0) {
       tools = tools.filter(tool =>
-        tool.tags?.some(tag => selectedTagFilters.has(tag)) ||
+        tool.tags?.some((tag: string) => selectedTagFilters.has(tag)) ||
         (selectedTagFilters.has('untagged') && (!tool.tags || tool.tags.length === 0))
       );
     }

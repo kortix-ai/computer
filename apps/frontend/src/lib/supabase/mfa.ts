@@ -330,18 +330,18 @@ export const supabaseMFAService = {
       }
 
       const phoneVerificationRequired = isNewUser && isPhoneVerificationMandatory();
-      verificationRequired = isNewUser && verificationRequired && isPhoneVerificationMandatory();
+      verificationRequired = !!(isNewUser && verificationRequired && isPhoneVerificationMandatory());
 
       return {
-        current_level: current,
-        next_level: nextLevel,
-        current_authentication_methods: aalResponse.data?.currentAuthenticationMethods?.map(m => m.method) || [],
+        current_level: current ?? undefined,
+        next_level: nextLevel ?? undefined,
+        current_authentication_methods: aalResponse.data?.currentAuthenticationMethods?.map((m: any) => m.method) || [],
         action_required: actionRequired,
         message: message,
-        phone_verification_required: phoneVerificationRequired,
+        phone_verification_required: phoneVerificationRequired ?? false,
         user_created_at: userCreatedAt?.toISOString(),
         cutoff_date: PHONE_VERIFICATION_CUTOFF_DATE.toISOString(),
-        verification_required: verificationRequired,
+        verification_required: verificationRequired ?? undefined,
         is_verified: hasVerifiedPhone,
         factors: factors,
       };

@@ -202,7 +202,7 @@ export default function RootLayout({
               description: siteMetadata.description,
               foundingDate: '2024',
               sameAs: [
-                'https://github.com/Kortix-ai/Suna',
+                'https://github.com/kortix-ai/kortix',
                 'https://x.com/kortix',
                 'https://linkedin.com/company/kortix',
               ],
