@@ -21,6 +21,7 @@ import {
   MessageCircle,
   FileCode,
   Folder,
+  TerminalSquare,
 } from 'lucide-react';
 
 import {
@@ -39,6 +40,7 @@ import { useFileSearch } from '@/features/files';
 import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
+import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 
 // ============================================================================
 // Helpers
@@ -226,6 +228,13 @@ export function CommandPalette() {
     close();
   }, [toggleSidebar, close]);
 
+  const handleOpenTerminal = useCallback(() => {
+    const store = useKortixComputerStore.getState();
+    store.setActiveView('terminal');
+    store.openSidePanel();
+    close();
+  }, [close]);
+
   const themeLabel = useMemo(() => {
     if (theme === 'light') return 'Switch to Dark';
     if (theme === 'dark') return 'Switch to System';
@@ -324,6 +333,10 @@ export function CommandPalette() {
                   <Plus className="mr-2 h-4 w-4" />
                 )}
                 <span>New Session</span>
+              </CommandItem>
+              <CommandItem onSelect={handleOpenTerminal}>
+                <TerminalSquare className="mr-2 h-4 w-4" />
+                <span>Open Terminal</span>
               </CommandItem>
             </CommandGroup>
 
