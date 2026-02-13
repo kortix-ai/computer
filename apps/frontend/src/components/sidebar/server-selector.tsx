@@ -602,7 +602,7 @@ export function InstanceManagerDialog({
                 </label>
                 <input
                   ref={urlInputRef}
-                  placeholder="http://localhost:3111"
+                  placeholder="http://localhost:4096"
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
                   className="w-full h-9 px-3 text-sm font-mono rounded-lg bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
