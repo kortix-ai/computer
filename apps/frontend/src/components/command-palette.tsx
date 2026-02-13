@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { useQueryClient } from '@tanstack/react-query';
+
 import {
   Plus,
   LayoutDashboard,
@@ -22,6 +22,8 @@ import {
   FileCode,
   Folder,
   TerminalSquare,
+  Sparkles,
+  Search,
 } from 'lucide-react';
 
 import {
@@ -34,9 +36,10 @@ import {
   CommandShortcut,
   CommandSeparator,
 } from '@/components/ui/command';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
-import { useFileSearch } from '@/features/files';
+import { useFileSearch, useLssSearch } from '@/features/files';
 import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
@@ -60,8 +63,6 @@ function formatRelativeTime(timestamp: number): string {
 
 function getFileIcon(filePath: string) {
   const ext = filePath.split('.').pop()?.toLowerCase();
-  const dirParts = filePath.split('/');
-  // If it ends with / or has no extension and might be a directory
   if (filePath.endsWith('/')) return Folder;
 
   switch (ext) {
@@ -84,6 +85,65 @@ function getFileIcon(filePath: string) {
   }
 }
 
+/**
+ * Strip the /workspace prefix from an absolute file path returned by LSS.
+ */
+function stripWorkspacePrefix(filePath: string): string {
+  return filePath.replace(/^\/workspace\/?/, '');
+}
+
+/**
+ * Format a relevance score as a human-readable percentage.
+ */
+function formatRelevance(score: number): string {
+  const pct = Math.min(Math.round(score * 100), 100);
+  if (pct > 0) return `${pct}%`;
+  return score.toFixed(3);
+}
+
+/**
+ * Clean a snippet from LSS for display in the palette.
+ */
+function cleanSnippet(snippet: string): string {
+  return snippet
+    .replace(/\n+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
+// ============================================================================
+// Skeleton components for loading states
+// ============================================================================
+
+/** Skeleton row mimicking a semantic search result with icon, filename, snippet, and path. */
+function ContentResultSkeleton() {
+  return (
+    <div className="flex items-start gap-2 px-2 py-2.5">
+      <Skeleton className="h-4 w-4 rounded flex-shrink-0 mt-0.5" />
+      <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-3.5 w-24 rounded" />
+          <Skeleton className="h-3 w-8 rounded" />
+        </div>
+        <Skeleton className="h-3 w-full rounded" />
+        <Skeleton className="h-3 w-32 rounded" />
+      </div>
+    </div>
+  );
+}
+
+/** Multiple skeleton rows for the semantic search loading state. */
+function ContentSearchSkeletons({ count = 3 }: { count?: number }) {
+  return (
+    <div className="space-y-0.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <ContentResultSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
 // ============================================================================
 // Command Palette
 // ============================================================================
@@ -92,23 +152,33 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [lssDebouncedQuery, setLssDebouncedQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
-  const queryClient = useQueryClient();
   const createSession = useCreateOpenCodeSession();
 
   // Fetch all sessions
   const { data: sessions } = useOpenCodeSessions();
 
-  // Debounce the query for file search API calls
+  // Debounce the query for file search API calls (300ms — fast)
   useEffect(() => {
     if (query.length < 2) {
       setDebouncedQuery('');
       return;
     }
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Separate debounce for LSS search (500ms — heavier operation)
+  useEffect(() => {
+    if (query.length < 2) {
+      setLssDebouncedQuery('');
+      return;
+    }
+    const timer = setTimeout(() => setLssDebouncedQuery(query), 500);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -119,6 +189,15 @@ export function CommandPalette() {
   } = useFileSearch(debouncedQuery, {
     limit: 10,
     enabled: debouncedQuery.length >= 2,
+  });
+
+  // Semantic search (LSS — BM25 + embeddings)
+  const {
+    data: lssResults = [],
+    isFetching: isLssSearching,
+  } = useLssSearch(lssDebouncedQuery, {
+    limit: 8,
+    enabled: lssDebouncedQuery.length >= 2,
   });
 
   // Global keyboard shortcut
@@ -138,6 +217,7 @@ export function CommandPalette() {
     if (!open) {
       setQuery('');
       setDebouncedQuery('');
+      setLssDebouncedQuery('');
     }
   }, [open]);
 
@@ -156,12 +236,44 @@ export function CommandPalette() {
       .slice(0, 8);
   }, [sessions, query]);
 
+  // Deduplicate LSS results against file results (prefer file results for name matches)
+  const filteredLssResults = useMemo(() => {
+    if (lssResults.length === 0) return [];
+    const filePathSet = new Set(fileResults);
+    return lssResults.filter(
+      (hit) => !filePathSet.has(stripWorkspacePrefix(hit.file_path)),
+    );
+  }, [lssResults, fileResults]);
+
   const hasQuery = query.trim().length > 0;
-  const isSearching = hasQuery && debouncedQuery.length >= 2 && isFileSearching;
+  const queryLongEnough = query.trim().length >= 2;
+
+  // LSS is "pending" if user typed >=2 chars but debounced query hasn't caught up yet
+  // or the query is running
+  const isLssDebouncing =
+    queryLongEnough && query !== lssDebouncedQuery;
+  const isLssPending = isLssDebouncing || isLssSearching;
+
+  const isFileDebouncing =
+    queryLongEnough && query !== debouncedQuery;
+  const isFilePending = isFileDebouncing || isFileSearching;
+
   const hasSessionResults = filteredSessions.length > 0;
   const hasFileResults = fileResults.length > 0;
-  const hasAnyResults = hasSessionResults || hasFileResults;
+  const hasLssResults = filteredLssResults.length > 0;
+  const hasAnyResults = hasSessionResults || hasFileResults || hasLssResults;
+
+  // Show the semantic search section (results or skeletons) whenever query >= 2
+  const showLssSection = hasQuery && queryLongEnough;
+  // Show skeletons when pending and no results yet
+  const showLssSkeletons = showLssSection && isLssPending && !hasLssResults;
+
   const showQuickActions = !hasQuery;
+
+  // Overall: show the global "searching" empty only when nothing at all is visible
+  const isAnyPending = isLssPending || isFilePending;
+  const showGlobalLoading =
+    hasQuery && queryLongEnough && isAnyPending && !hasAnyResults && !showLssSkeletons;
 
   const handleNewSession = useCallback(async () => {
     if (isCreating) return;
@@ -217,8 +329,17 @@ export function CommandPalette() {
     [close],
   );
 
+  const handleSelectLssResult = useCallback(
+    (absolutePath: string) => {
+      const relativePath = stripWorkspacePrefix(absolutePath);
+      handleSelectFile(relativePath);
+    },
+    [handleSelectFile],
+  );
+
   const handleToggleTheme = useCallback(() => {
-    const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+    const next =
+      theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
     setTheme(next);
     close();
   }, [theme, setTheme, close]);
@@ -241,30 +362,50 @@ export function CommandPalette() {
     return 'Switch to Light';
   }, [theme]);
 
-  const ThemeIcon = theme === 'light' ? Moon : theme === 'dark' ? Monitor : Sun;
+  const ThemeIcon =
+    theme === 'light' ? Moon : theme === 'dark' ? Monitor : Sun;
+
+  // Shared heading for the semantic search group
+  const lssHeading = (
+    <span className="inline-flex items-center gap-1.5">
+      <Sparkles className="h-3 w-3" />
+      Semantic Search
+      {isLssPending && hasLssResults && (
+        <Loader2 className="h-3 w-3 animate-spin ml-0.5 text-muted-foreground" />
+      )}
+    </span>
+  );
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search sessions, files, or type a command..."
+        placeholder="Search sessions, content, files, or type a command..."
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
-        {/* Loading state */}
-        {hasQuery && isSearching && !hasAnyResults && (
+        {/* Global loading — only when absolutely nothing else is visible */}
+        {showGlobalLoading && (
           <CommandEmpty>
-            <div className="flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Searching...</span>
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-muted-foreground">Searching...</span>
             </div>
           </CommandEmpty>
         )}
 
-        {/* No results */}
-        {hasQuery && !isSearching && !hasAnyResults && debouncedQuery.length >= 2 && (
-          <CommandEmpty>No sessions or files found.</CommandEmpty>
-        )}
+        {/* No results — all searches done, nothing found */}
+        {hasQuery &&
+          queryLongEnough &&
+          !isAnyPending &&
+          !hasAnyResults && (
+            <CommandEmpty>
+              <div className="flex flex-col items-center gap-1.5 py-4">
+                <Search className="h-5 w-5 text-muted-foreground/50" />
+                <span className="text-muted-foreground">No results found.</span>
+              </div>
+            </CommandEmpty>
+          )}
 
         {/* Session search results */}
         {hasQuery && hasSessionResults && (
@@ -284,13 +425,66 @@ export function CommandPalette() {
                     {formatRelativeTime(session.time.updated)}
                     {session.summary && session.summary.files > 0 && (
                       <span className="ml-1.5">
-                        · {session.summary.files} file{session.summary.files !== 1 ? 's' : ''} changed
+                        · {session.summary.files} file
+                        {session.summary.files !== 1 ? 's' : ''} changed
                       </span>
                     )}
                   </span>
                 </div>
               </CommandItem>
             ))}
+          </CommandGroup>
+        )}
+
+        {/* Semantic search results (LSS) — with skeletons during loading */}
+        {showLssSection && (hasLssResults || showLssSkeletons) && (
+          <CommandGroup heading={lssHeading}>
+            {/* Actual results */}
+            {hasLssResults &&
+              filteredLssResults.map((hit) => {
+                const relativePath = stripWorkspacePrefix(hit.file_path);
+                const FileIcon = getFileIcon(relativePath);
+                const fileName =
+                  relativePath.split('/').pop() || relativePath;
+                const dirPath = relativePath
+                  .split('/')
+                  .slice(0, -1)
+                  .join('/');
+                const snippet = cleanSnippet(hit.snippet);
+
+                return (
+                  <CommandItem
+                    key={`lss-${hit.file_path}-${hit.score}`}
+                    value={`lss-${relativePath}-${snippet.slice(0, 30)}`}
+                    onSelect={() => handleSelectLssResult(hit.file_path)}
+                  >
+                    <FileIcon className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-medium text-sm">
+                          {fileName}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 tabular-nums">
+                          {formatRelevance(hit.score)}
+                        </span>
+                      </div>
+                      {snippet && (
+                        <span className="text-xs text-muted-foreground/80 line-clamp-1 leading-relaxed">
+                          {snippet}
+                        </span>
+                      )}
+                      {dirPath && (
+                        <span className="text-[11px] text-muted-foreground/50 truncate">
+                          {dirPath}
+                        </span>
+                      )}
+                    </div>
+                  </CommandItem>
+                );
+              })}
+
+            {/* Skeleton loading rows */}
+            {showLssSkeletons && <ContentSearchSkeletons count={3} />}
           </CommandGroup>
         )}
 
@@ -381,7 +575,9 @@ export function CommandPalette() {
                 ) : (
                   <PanelLeftIcon className="mr-2 h-4 w-4" />
                 )}
-                <span>{sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}</span>
+                <span>
+                  {sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+                </span>
                 <CommandShortcut>⌘B</CommandShortcut>
               </CommandItem>
             </CommandGroup>

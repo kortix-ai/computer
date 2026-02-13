@@ -4,6 +4,7 @@ import { logger } from 'hono/logger'
 import { proxyToOpenCode } from './services/proxy'
 import { SecretStore } from './services/secret-store'
 import envRouter from './routes/env'
+import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
 import { config } from './config'
 
@@ -22,6 +23,9 @@ app.get('/kortix/health', (c) => c.json({ status: 'ok' }))
 
 // ENV management routes
 app.route('/env', envRouter)
+
+// LSS semantic search — /lss/search?q=<query> runs local semantic search
+app.route('/lss', lssRouter)
 
 // Dynamic port proxy — /proxy/:port/* forwards to localhost:{port} inside the sandbox
 app.route('/proxy', proxyRouter)

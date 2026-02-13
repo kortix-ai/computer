@@ -12,6 +12,8 @@ export type {
   FilePatch,
   FilePatchHunk,
   FindMatch,
+  LssHit,
+  LssSearchResult,
   OpenCodeProjectInfo,
   ServerHealth,
 } from './types';
@@ -36,6 +38,9 @@ export {
   type UploadResult,
 } from './api/opencode-files';
 
+// API — semantic search (LSS)
+export { searchLss } from './api/lss-search';
+
 // Hooks
 export {
   useFileList,
@@ -44,6 +49,7 @@ export {
   useInvalidateFileContent,
   useFileSearch,
   useTextSearch,
+  useLssSearch,
   useServerHealth,
   useCurrentProject,
   useFileEventInvalidation,
@@ -54,6 +60,7 @@ export {
   fileListKeys,
   fileContentKeys,
   fileSearchKeys,
+  lssSearchKeys,
 } from './hooks';
 
 // Store

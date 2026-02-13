@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Bot, Sparkles, Wrench, Terminal, ChevronRight } from 'lucide-react';
+import { Bot, Sparkles, Wrench, Terminal, Settings, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useTabStore } from '@/stores/tab-store';
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/collapsible';
 
 const CONFIG_ITEMS = [
+  { label: 'Settings', href: '/configuration', icon: Settings },
   { label: 'Agents', href: '/agents', icon: Bot },
   { label: 'Skills', href: '/skills', icon: Sparkles },
   { label: 'Tools', href: '/tools', icon: Wrench },

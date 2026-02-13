@@ -23,6 +23,9 @@ export {
   fileSearchKeys,
 } from './use-file-search';
 
+// Semantic search (LSS)
+export { useLssSearch, lssSearchKeys } from './use-lss-search';
+
 // Server health & project info
 export { useServerHealth, useCurrentProject } from './use-server-health';
 

@@ -47,6 +47,21 @@ export interface FindMatch {
   submatches: Array<{ start: number; end: number }>;
 }
 
+/** LSS semantic search hit (from /lss/search endpoint) */
+export interface LssHit {
+  file_path: string;
+  score: number;
+  snippet: string;
+  rank_stage?: string;
+  indexed_at?: number;
+}
+
+/** LSS search response item (one per query) */
+export interface LssSearchResult {
+  query: string;
+  hits: LssHit[];
+}
+
 /** GET /project/current response */
 export interface OpenCodeProjectInfo {
   id: string;

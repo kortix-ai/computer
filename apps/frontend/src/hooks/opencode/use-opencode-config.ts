@@ -1,12 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
 import type { Config } from '@kortix/opencode-sdk/v2/client';
 
 export type { Config };
 
-const configKeys = {
+export const configKeys = {
   all: ['opencode', 'config'] as const,
 };
 
@@ -28,5 +28,20 @@ export function useOpenCodeConfig() {
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useUpdateOpenCodeConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (config: Partial<Config>) => {
+      const client = getClient();
+      const result = await client.config.update({ config } as any);
+      return unwrap(result) as Config;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: configKeys.all });
+    },
   });
 }
