@@ -34,7 +34,10 @@ RUN pip3 install --break-system-packages --timeout=120 --retries=3 \
         greenlet pyee typing-extensions \
         pypdf2==3.0.1 python-pptx==1.0.2 \
     && SITE=$(python3 -c "import site; print(site.getsitepackages()[0])") \
-    && pip3 install --platform manylinux_2_17_aarch64 --only-binary :all: \
+    && ARCH=$(uname -m) \
+    && if [ "$ARCH" = "x86_64" ]; then PW_PLAT=manylinux1_x86_64; \
+       else PW_PLAT=manylinux_2_17_aarch64; fi \
+    && pip3 install --platform "$PW_PLAT" --only-binary :all: \
         --no-deps --target /tmp/pw playwright==1.58.0 \
     && cp -r /tmp/pw/playwright* "$SITE/" \
     && rm -rf /tmp/pw \
@@ -72,10 +75,18 @@ COPY sandbox/assets/browser-viewer/ /opt/agent-browser-viewer/
 # npm installs the glibc binary by default; force-install the musl variant
 # and symlink it over the glibc one so the wrapper script finds it.
 RUN npm install -g @kortix/opencode-ai@0.2.0 \
-    && npm install -g @kortix/opencode-ai-linux-arm64-musl@0.2.0 \
-    && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-arm64-musl/bin/opencode \
-    && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-arm64/bin/opencode \
-    && ln -sf "$MUSL_BIN" "$GLIBC_BIN" \
+    && ARCH=$(uname -m) \
+    && if [ "$ARCH" = "x86_64" ]; then \
+         npm install -g @kortix/opencode-ai-linux-x64-musl@0.2.0 --force \
+         && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-x64-musl/bin/opencode \
+         && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-x64/bin/opencode \
+         && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
+       else \
+         npm install -g @kortix/opencode-ai-linux-arm64-musl@0.2.0 --force \
+         && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-arm64-musl/bin/opencode \
+         && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-arm64/bin/opencode \
+         && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
+       fi \
     && opencode --version
 
 # ── OpenCode (agents, tools, skills) ────────────────────────────────────────
