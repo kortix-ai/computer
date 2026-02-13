@@ -4,6 +4,7 @@ import { devtools } from 'zustand/middleware';
 import { AccountState } from '@/lib/api/billing';
 import { useAccountState } from '@/hooks/billing';
 import { useAuth } from '@/components/AuthProvider';
+import { dollarsToCredits } from '@agentpress/shared';
 import React from 'react';
 
 interface SubscriptionStore {
@@ -108,11 +109,11 @@ export function useSubscriptionContext() {
       } : null,
       tier: {
         name: store.accountState.subscription.tier_key,
-        credits: store.accountState.tier?.monthly_credits ?? 0,
+        credits: dollarsToCredits(store.accountState.tier?.monthly_credits ?? 0),
       },
       credits: {
-        balance: store.accountState.credits?.total ?? 0,
-        tier_credits: store.accountState.tier?.monthly_credits ?? 0,
+        balance: dollarsToCredits(store.accountState.credits?.total ?? 0),
+        tier_credits: dollarsToCredits(store.accountState.tier?.monthly_credits ?? 0),
         lifetime_granted: 0,
         lifetime_purchased: 0,
         lifetime_used: 0,
@@ -120,9 +121,9 @@ export function useSubscriptionContext() {
       },
     } : null,
     creditBalance: store.accountState?.subscription ? {
-      balance: store.accountState.credits?.total ?? 0,
-      expiring_credits: (store.accountState.credits?.daily ?? 0) + (store.accountState.credits?.monthly ?? 0),
-      non_expiring_credits: store.accountState.credits?.extra ?? 0,
+      balance: dollarsToCredits(store.accountState.credits?.total ?? 0),
+      expiring_credits: dollarsToCredits((store.accountState.credits?.daily ?? 0) + (store.accountState.credits?.monthly ?? 0)),
+      non_expiring_credits: dollarsToCredits(store.accountState.credits?.extra ?? 0),
       tier: store.accountState.subscription.tier_key,
       can_purchase_credits: store.accountState.subscription.can_purchase_credits,
     } : null,
@@ -179,12 +180,12 @@ export function useSubscriptionData() {
       } : null,
       tier: {
         name: state.subscription.tier_key,
-        credits: state.tier?.monthly_credits ?? 0,
+        credits: dollarsToCredits(state.tier?.monthly_credits ?? 0),
         display_name: state.subscription.tier_display_name,
       },
       credits: {
-        balance: state.credits?.total ?? 0,
-        tier_credits: state.tier?.monthly_credits ?? 0,
+        balance: dollarsToCredits(state.credits?.total ?? 0),
+        tier_credits: dollarsToCredits(state.tier?.monthly_credits ?? 0),
         lifetime_granted: 0,
         lifetime_purchased: 0,
         lifetime_used: 0,
@@ -198,12 +199,12 @@ export function useSubscriptionData() {
         if (isFreeTier && state.credits?.daily_refresh?.enabled) {
           const dailyAmount = state.credits.daily_refresh.daily_amount || 0;
           const dailyRemaining = state.credits?.daily || 0;
-          return Math.max(0, dailyAmount - dailyRemaining);
+          return dollarsToCredits(Math.max(0, dailyAmount - dailyRemaining));
         }
         
         const monthlyCreditsGranted = state.tier?.monthly_credits || 0;
         const monthlyCreditsRemaining = state.credits?.monthly || 0;
-        return Math.max(0, monthlyCreditsGranted - monthlyCreditsRemaining);
+        return dollarsToCredits(Math.max(0, monthlyCreditsGranted - monthlyCreditsRemaining));
       })(),
       cost_limit: (() => {
         const isFreeTier = state.subscription.tier_key === 'free' || 
@@ -211,12 +212,12 @@ export function useSubscriptionData() {
                           (state.tier?.monthly_credits ?? 0) === 0;
         
         if (isFreeTier && state.credits?.daily_refresh?.enabled) {
-          return state.credits.daily_refresh.daily_amount || 0;
+          return dollarsToCredits(state.credits.daily_refresh.daily_amount || 0);
         }
         
-        return state.tier?.monthly_credits || 0;
+        return dollarsToCredits(state.tier?.monthly_credits || 0);
       })(),
-      credit_balance: state.credits?.total ?? 0,
+      credit_balance: dollarsToCredits(state.credits?.total ?? 0),
       can_purchase_credits: state.subscription.can_purchase_credits,
       is_trial: state.subscription.is_trial,
       trial_status: state.subscription.trial_status,

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { backendApi } from '@/lib/api-client';
 import { accountStateKeys } from './use-account-state';
+import { dollarsToCredits } from '@agentpress/shared';
 
 export interface CreditTransaction {
   id: string;
@@ -71,7 +72,22 @@ export function useTransactions(
       if (response.error) {
         throw new Error(response.error.message);
       }
-      return response.data;
+
+      const data = response.data as TransactionsResponse;
+      return {
+        ...data,
+        transactions: data.transactions.map(tx => ({
+          ...tx,
+          amount: dollarsToCredits(tx.amount),
+          balance_after: dollarsToCredits(tx.balance_after),
+        })),
+        current_balance: {
+          ...data.current_balance,
+          total: dollarsToCredits(data.current_balance.total),
+          expiring: dollarsToCredits(data.current_balance.expiring),
+          non_expiring: dollarsToCredits(data.current_balance.non_expiring),
+        },
+      };
     },
     staleTime: 30000,
   });
@@ -85,8 +101,26 @@ export function useTransactionsSummary(days: number = 30) {
       if (response.error) {
         throw new Error(response.error.message);
       }
-      return response.data;
+      
+      const data = response.data as TransactionsSummary;
+      return {
+        ...data,
+        current_balance: {
+          ...data.current_balance,
+          total: dollarsToCredits(data.current_balance.total),
+          expiring: dollarsToCredits(data.current_balance.expiring),
+          non_expiring: dollarsToCredits(data.current_balance.non_expiring),
+        },
+        summary: {
+          ...data.summary,
+          total_added: dollarsToCredits(data.summary.total_added),
+          total_used: dollarsToCredits(data.summary.total_used),
+          total_refunded: dollarsToCredits(data.summary.total_refunded),
+          total_expired: dollarsToCredits(data.summary.total_expired),
+          net_change: dollarsToCredits(data.summary.net_change),
+        },
+      };
     },
-    staleTime: 60000, // 1 minute
+    staleTime: 60000,
   });
 } 

@@ -2,7 +2,9 @@
   "name": "kortix",
   "private": true,
   "scripts": {
-    "dev": "nx run-many --target=dev --projects=frontend,kortix-router --parallel",
+    "env": "./scripts/setup-env.sh",
+    "dev": "nx run-many --target=dev --projects=frontend,kortix-router,kortix-billing,kortix-cron,kortix-platform --parallel=10",
+    "dev:services": "nx run-many --target=dev --projects=kortix-router,kortix-billing,kortix-cron,kortix-platform --parallel=10",
     "dev:frontend": "nx run frontend:dev",
     "dev:computer-frontend": "pnpm --filter Kortix-Computer-Frontend dev",
     "dev:mobile": "nx run mobile:dev",
@@ -12,6 +14,7 @@
     "build": "nx run-many --target=build --parallel",
     "build:frontend": "nx run frontend:build",
     "typecheck": "nx run-many --target=typecheck --parallel",
+    "stripe": "stripe listen --forward-to http://localhost:8013/webhooks/stripe",
     "docker:build": "docker compose --profile all build",
     "docker:up": "docker compose --profile all up -d",
     "docker:up:backend": "docker compose --profile backend up -d",
