@@ -11,6 +11,7 @@ import {
   Key,
   LogOut,
   Settings,
+  SlidersHorizontal,
   Sun,
   Moon,
   KeyRound,
@@ -127,6 +128,7 @@ export function UserMenu({ user }: UserMenuProps) {
     { icon: Plug, label: 'Integrations', href: '/settings/credentials' },
     { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
     { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
+    { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
     { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
   ];
 
