@@ -15,6 +15,7 @@ export const config = {
   DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || '',
   DAYTONA_SERVER_URL: process.env.DAYTONA_SERVER_URL || '',
   DAYTONA_TARGET: process.env.DAYTONA_TARGET || '',
+  DAYTONA_SNAPSHOT: process.env.DAYTONA_SNAPSHOT || '',
 
   // Kortix Router URL (injected into sandbox as KORTIX_URL env var)
   KORTIX_URL: process.env.KORTIX_URL || '',

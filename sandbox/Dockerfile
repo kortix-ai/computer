@@ -93,6 +93,15 @@ COPY sandbox/kortix-master/package.json /opt/kortix-master/package.json
 RUN cd /opt/kortix-master && bun install
 COPY sandbox/kortix-master/ /opt/kortix-master/
 
+# ── Version (for live update system) ─────────────────────────────────────────
+# Read version from sandbox/package.json (single source of truth) and write .version
+COPY sandbox/package.json /tmp/sandbox-pkg.json
+RUN mkdir -p /opt/kortix \
+    && PKG_VERSION=$(node -e "console.log(require('/tmp/sandbox-pkg.json').version)") \
+    && echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /opt/kortix/.version \
+    && rm /tmp/sandbox-pkg.json \
+    && chown -R 1000:1000 /opt/kortix
+
 # Create secrets directory (init-adduser will chown /app to abc at runtime)
 RUN mkdir -p /app/secrets && chmod 700 /app/secrets
 

@@ -5,6 +5,7 @@ import { proxyToOpenCode } from './services/proxy'
 import { SecretStore } from './services/secret-store'
 import envRouter from './routes/env'
 import proxyRouter from './routes/proxy'
+import updateRouter from './routes/update'
 import { config } from './config'
 
 const app = new Hono()
@@ -17,8 +18,21 @@ await secretStore.loadIntoProcessEnv()
 app.use('*', logger())
 app.use('*', cors())
 
-// Health check
-app.get('/kortix/health', (c) => c.json({ status: 'ok' }))
+// Health check — includes current sandbox version
+app.get('/kortix/health', async (c) => {
+  let version = '0.0.0'
+  try {
+    const file = Bun.file('/opt/kortix/.version')
+    if (await file.exists()) {
+      const data = await file.json()
+      version = data.version || '0.0.0'
+    }
+  } catch {}
+  return c.json({ status: 'ok', version })
+})
+
+// Update check — /kortix/update and /kortix/update/status
+app.route('/kortix/update', updateRouter)
 
 // ENV management routes
 app.route('/env', envRouter)

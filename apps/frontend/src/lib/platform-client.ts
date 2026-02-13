@@ -209,3 +209,70 @@ export async function removeSandbox(sandboxId: string): Promise<void> {
     throw new Error(result.error || 'Failed to remove sandbox');
   }
 }
+
+// ─── Sandbox Update API ─────────────────────────────────────────────────────
+
+export interface SandboxVersionInfo {
+  version: string;
+  package: string;
+}
+
+export interface SandboxUpdateStatus {
+  currentVersion: string;
+  latestVersion: string;
+  updateAvailable: boolean;
+  updatedAt: string;
+  updateInProgress: boolean;
+}
+
+export interface SandboxUpdateResult {
+  success?: boolean;
+  upToDate?: boolean;
+  previousVersion?: string;
+  currentVersion: string;
+  latestVersion: string;
+  output?: string;
+  error?: string;
+}
+
+/**
+ * Get the latest available sandbox version from the platform.
+ * Platform checks npm registry (cached 5min).
+ */
+export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
+  const res = await fetch(`${PLATFORM_URL}/v1/sandbox/version`, {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Get the current update status from a running sandbox.
+ * Calls the sandbox directly (via cloud proxy).
+ */
+export async function getSandboxUpdateStatus(sandbox: SandboxInfo): Promise<SandboxUpdateStatus> {
+  const url = getSandboxUrl(sandbox);
+  const res = await fetch(`${url}/kortix/update/status`, {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Trigger an update on a running sandbox.
+ * Calls POST /kortix/update on the sandbox directly (via cloud proxy).
+ */
+export async function triggerSandboxUpdate(sandbox: SandboxInfo): Promise<SandboxUpdateResult> {
+  const url = getSandboxUrl(sandbox);
+  const res = await fetch(`${url}/kortix/update`, {
+    method: 'POST',
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Update failed: ${res.status}`);
+  }
+  return res.json();
+}

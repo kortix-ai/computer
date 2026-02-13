@@ -6,6 +6,7 @@ import { HTTPException } from 'hono/http-exception';
 import { config } from './config';
 import { accountRouter } from './routes/account';
 import { getAvailableProviders } from './providers';
+import { versionRouter } from './routes/version';
 import type { AuthVariables } from './types';
 
 const app = new Hono<{ Variables: AuthVariables }>();
@@ -43,6 +44,7 @@ app.get('/health', (c) => {
 
 // Mount routes
 app.route('/v1/account', accountRouter);
+app.route('/v1/sandbox/version', versionRouter);
 
 // Error handler
 app.onError((err, c) => {
@@ -93,6 +95,7 @@ console.log(`
 ║    POST  /v1/account/sandbox/:id/start  Start sandbox      ║
 ║    POST  /v1/account/sandbox/:id/stop   Stop sandbox       ║
 ║    DELETE /v1/account/sandbox/:id       Remove sandbox     ║
+║    GET   /v1/sandbox/version         Sandbox version       ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
 ║  Supabase:   ${config.SUPABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║

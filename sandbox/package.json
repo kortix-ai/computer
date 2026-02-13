@@ -1,0 +1,36 @@
+{
+  "name": "@kortix/sandbox",
+  "version": "0.4.1",
+  "description": "Kortix sandbox runtime — kortix-master, opencode config/agents/skills, and dependencies",
+  "private": false,
+  "scripts": {
+    "postinstall": "bash postinstall.sh"
+  },
+  "files": [
+    "kortix-master/src/",
+    "kortix-master/package.json",
+    "kortix-master/tsconfig.json",
+    "opencode/opencode.jsonc",
+    "opencode/ocx.jsonc",
+    "opencode/package.json",
+    "opencode/tsconfig.json",
+    "opencode/agents/",
+    "opencode/commands/",
+    "opencode/tools/",
+    "opencode/skills/",
+    "opencode/plugin/",
+    "opencode/patches/",
+    "opencode/memory.json",
+    "services/",
+    "config/",
+    "postinstall.sh",
+    "patch-agent-browser.js"
+  ],
+  "dependencies": {
+    "@kortix/opencode-ai": "0.2.0"
+  },
+  "peerDependencies": {},
+  "publishConfig": {
+    "access": "public"
+  }
+}

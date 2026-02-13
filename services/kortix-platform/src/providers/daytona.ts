@@ -16,18 +16,21 @@ import type {
   SandboxStatus,
 } from './index';
 
-const DAYTONA_SNAPSHOT = 'kortix-sandbox-v0.4.0';
-
 export class DaytonaProvider implements SandboxProvider {
   readonly name: ProviderName = 'daytona';
 
   async create(opts: CreateSandboxOpts): Promise<ProvisionResult> {
+    const snapshot = config.DAYTONA_SNAPSHOT;
+    if (!snapshot) {
+      throw new Error('DAYTONA_SNAPSHOT is not configured — set it to the snapshot name (e.g. kortix-sandbox-v0.4.1)');
+    }
+
     const authToken = generateSandboxToken();
     const daytona = getDaytona();
 
     const daytonaSandbox = await daytona.create(
       {
-        snapshot: DAYTONA_SNAPSHOT,
+        snapshot,
         envVars: {
           KORTIX_API_URL: config.KORTIX_URL,
           KORTIX_TOKEN: authToken,
@@ -51,7 +54,7 @@ export class DaytonaProvider implements SandboxProvider {
         provisionedBy: opts.userId,
         daytonaSandboxId: externalId,
         authToken,
-        snapshot: DAYTONA_SNAPSHOT,
+        snapshot,
       },
     };
   }

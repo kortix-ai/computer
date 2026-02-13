@@ -13,6 +13,7 @@ import {
   Cloud,
   Container,
   Loader2,
+  ArrowDownToLine,
 } from 'lucide-react';
 import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
@@ -21,6 +22,8 @@ import { useRouter } from 'next/navigation';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
 import { initAccount, getSandboxUrl, type SandboxProviderName } from '@/lib/platform-client';
 import { useProviders } from '@/hooks/platform/use-sandbox';
+import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
+import { SANDBOX_SERVER_ID } from '@/hooks/platform/use-sandbox';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +40,7 @@ type ConnectionStatus = 'unknown' | 'checking' | 'connected' | 'error';
 
 function useConnectionStatus(url: string, enabled: boolean) {
   const [status, setStatus] = React.useState<ConnectionStatus>('unknown');
+  const [version, setVersion] = React.useState<string | null>(null);
 
   const check = React.useCallback(async () => {
     if (!url) return;
@@ -54,6 +58,22 @@ function useConnectionStatus(url: string, enabled: boolean) {
       await fetch(`${url}/session`, { method: 'GET', signal: controller.signal, headers });
       clearTimeout(timeout);
       setStatus('connected');
+
+      // Try to get version from /kortix/health (cloud sandboxes)
+      try {
+        const hc = new AbortController();
+        const ht = setTimeout(() => hc.abort(), 3000);
+        const hres = await fetch(`${url}/kortix/health`, { signal: hc.signal, headers });
+        clearTimeout(ht);
+        if (hres.ok) {
+          const data = await hres.json();
+          if (data.version && data.version !== '0.0.0') {
+            setVersion(data.version);
+          }
+        }
+      } catch {
+        // Not a cloud sandbox or health endpoint unavailable — that's fine
+      }
     } catch {
       setStatus('error');
     }
@@ -63,7 +83,7 @@ function useConnectionStatus(url: string, enabled: boolean) {
     if (enabled) check();
   }, [enabled, check]);
 
-  return { status, check };
+  return { status, version, check };
 }
 
 function StatusDot({ status }: { status: ConnectionStatus }) {
@@ -141,21 +161,32 @@ function CompactInstanceRow({
 // Instance row — full (dialog list). Stacked layout so URLs never cut off.
 // ============================================================================
 
+type SandboxUpdateInfo = {
+  updateAvailable: boolean;
+  currentVersion: string | null;
+  latestVersion: string | null;
+  update: () => void;
+  isUpdating: boolean;
+  isLoading: boolean;
+};
+
 function DialogInstanceRow({
   server,
   isActive,
   onSelect,
   onEdit,
   onDelete,
+  sandboxUpdate,
 }: {
   server: ServerEntry;
   isActive: boolean;
   onSelect: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  sandboxUpdate?: SandboxUpdateInfo;
 }) {
   const [confirmDelete, setConfirmDelete] = React.useState(false);
-  const { status } = useConnectionStatus(server.url, isActive);
+  const { status, version } = useConnectionStatus(server.url, true);
   const displayUrl = server.url.replace(/^https?:\/\//, '');
   const hasCustomLabel = server.label && server.label !== displayUrl;
 
@@ -211,9 +242,9 @@ function DialogInstanceRow({
           </p>
         )}
 
-        {/* Status + actions line */}
+        {/* Status + version + actions line */}
         <div className="mt-1.5 ml-6 flex items-center gap-3">
-          {isActive && status !== 'unknown' && (
+          {status !== 'unknown' && (
             <span className={cn(
               'flex items-center gap-1 text-[10px] font-medium',
               status === 'connected' && 'text-emerald-500',
@@ -222,6 +253,33 @@ function DialogInstanceRow({
             )}>
               <StatusDot status={status} />
               {statusLabel[status]}
+            </span>
+          )}
+
+          {/* Version badge — from /kortix/health (works for any sandbox) */}
+          {version && (
+            <span className="text-[10px] font-mono text-muted-foreground/60">
+              v{version}
+            </span>
+          )}
+
+          {/* Update button */}
+          {sandboxUpdate && sandboxUpdate.updateAvailable && !sandboxUpdate.isUpdating && (
+            <button
+              type="button"
+              className="flex items-center gap-1 h-5 px-2 text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-full transition-colors cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); sandboxUpdate.update(); }}
+            >
+              <ArrowDownToLine className="h-3 w-3" />
+              Update to v{sandboxUpdate.latestVersion}
+            </button>
+          )}
+
+          {/* Updating spinner */}
+          {sandboxUpdate?.isUpdating && (
+            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Updating...
             </span>
           )}
 
@@ -297,6 +355,9 @@ function InstanceManagerDialog({
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [isCreatingSandbox, setIsCreatingSandbox] = React.useState(false);
   const [sandboxError, setSandboxError] = React.useState<string | null>(null);
+
+  // Sandbox update state — only used for the cloud sandbox row
+  const sandboxUpdate = useSandboxUpdate();
 
   // Form state
   const [formUrl, setFormUrl] = React.useState('');
@@ -465,6 +526,7 @@ function InstanceManagerDialog({
                     onSelect={() => handleSelect(server.id)}
                     onEdit={() => startEdit(server)}
                     onDelete={() => handleRemove(server.id)}
+                    sandboxUpdate={server.id === SANDBOX_SERVER_ID ? sandboxUpdate : undefined}
                   />
                 ))
               )}
