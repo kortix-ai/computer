@@ -630,6 +630,8 @@ interface SessionTurnProps {
   isBusy: boolean;
   /** Whether the session is in a reverted state */
   isReverted: boolean;
+  /** Whether this turn contains a compaction */
+  isCompaction?: boolean;
   /** Fork the session at a specific message */
   onFork: (messageId: string) => Promise<void>;
   /** Revert the session to before a specific message */
@@ -989,13 +991,15 @@ function SessionTurn({
             // Compaction indicator
             if (isCompactionPart(part)) {
               return (
-                <div key={part.id} className="flex items-center gap-2 py-1.5 -mx-1">
-                  <div className="flex-1 h-px bg-border/60" />
-                  <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1.5 px-1">
-                    <Layers className="size-3" />
-                    {(part as any).auto ? 'Auto-compacted' : 'Context compacted'}
-                  </span>
-                  <div className="flex-1 h-px bg-border/60" />
+                <div key={part.id} className="flex items-center gap-2 py-2.5 -mx-1">
+                  <div className="flex-1 h-px bg-border" />
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/80 border border-border/60">
+                    <Layers className="size-3 text-muted-foreground" />
+                    <span className="text-[10px] font-semibold text-muted-foreground tracking-wide">
+                      Compaction
+                    </span>
+                  </div>
+                  <div className="flex-1 h-px bg-border" />
                 </div>
               );
             }
@@ -1423,6 +1427,25 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     });
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Scroll to bottom once messages finish loading (initial load / session open)
+  const prevMessagesLoadingRef = useRef(messagesLoading);
+  useEffect(() => {
+    const wasLoading = prevMessagesLoadingRef.current;
+    prevMessagesLoadingRef.current = messagesLoading;
+
+    // Only scroll when loading transitions from true → false (messages just arrived)
+    if (wasLoading && !messagesLoading) {
+      const el = scrollRef.current;
+      if (!el) return;
+      // Double rAF to ensure DOM has painted the new messages before scrolling
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight;
+        });
+      });
+    }
+  }, [messagesLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---- Pending permissions & questions ----
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);
   const allQuestions = useOpenCodePendingStore((s) => s.questions);
@@ -1794,15 +1817,15 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                     <div key={turn.userMessage.info.id}>
                       {/* Compaction divider — shown before the first turn after compaction */}
                       {hasCompaction && (
-                        <div className="flex items-center gap-3 py-2 my-2">
-                          <div className="flex-1 h-px bg-border/50" />
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40">
-                            <Layers className="size-3 text-muted-foreground/60" />
-                            <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
-                              {(compactionPart as any)?.auto ? 'Auto-compacted' : 'Context compacted'}
+                        <div className="flex items-center gap-3 py-4 my-3">
+                          <div className="flex-1 h-px bg-border" />
+                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/80 border border-border/60">
+                            <Layers className="size-3.5 text-muted-foreground" />
+                            <span className="text-[11px] font-semibold text-muted-foreground tracking-wide">
+                              Compaction
                             </span>
                           </div>
-                          <div className="flex-1 h-px bg-border/50" />
+                          <div className="flex-1 h-px bg-border" />
                         </div>
                       )}
                       <SessionTurn

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Layers, Loader2 } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,10 +24,13 @@ export function CompactDialog({ sessionId, open, onOpenChange }: CompactDialogPr
   const summarize = useSummarizeOpenCodeSession();
 
   const handleCompact = useCallback(() => {
+    // Close the dialog immediately — compaction runs in the background
+    onOpenChange(false);
+    toast.info('Compacting session...');
+
     summarize.mutate({ sessionId }, {
       onSuccess: () => {
         toast.success('Session compacted successfully');
-        onOpenChange(false);
       },
       onError: (error) => {
         toast.error(error instanceof Error ? error.message : 'Failed to compact session');
@@ -61,25 +64,12 @@ export function CompactDialog({ sessionId, open, onOpenChange }: CompactDialogPr
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={summarize.isPending}
           >
             Cancel
           </Button>
-          <Button
-            onClick={handleCompact}
-            disabled={summarize.isPending}
-          >
-            {summarize.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                Compacting...
-              </>
-            ) : (
-              <>
-                <Layers className="mr-2 h-3.5 w-3.5" />
-                Compact
-              </>
-            )}
+          <Button onClick={handleCompact}>
+            <Layers className="mr-2 h-3.5 w-3.5" />
+            Compact
           </Button>
         </DialogFooter>
       </DialogContent>
