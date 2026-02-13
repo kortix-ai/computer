@@ -21,6 +21,7 @@ import { AnnouncementDialog } from '../announcements/announcement-dialog';
 import { NovuInboxProvider } from '../notifications/novu-inbox-provider';
 import { useOpenCodeEventStream } from '@/hooks/opencode/use-opencode-events';
 import { useSandbox } from '@/hooks/platform/use-sandbox';
+import { useSandboxConnection } from '@/hooks/platform/use-sandbox-connection';
 import { TabBar } from '@/components/tabs/tab-bar';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,12 @@ function OpenCodeEventStreamProvider() {
 /** Initializes the user's sandbox on dashboard load. Renders nothing. */
 function SandboxInitProvider() {
   useSandbox();
+  return null;
+}
+
+/** Monitors sandbox connection health. Renders nothing. */
+function SandboxConnectionProvider() {
+  useSandboxConnection();
   return null;
 }
 
@@ -83,6 +90,10 @@ const MaintenanceCountdownBanner = lazy(() =>
 
 const CommandPalette = lazy(() =>
   import('@/components/command-palette').then(mod => ({ default: mod.CommandPalette }))
+);
+
+const ConnectingScreen = lazy(() =>
+  import('@/components/dashboard/connecting-screen').then(mod => ({ default: mod.ConnectingScreen }))
 );
 
 const SessionLayout = lazy(() =>
@@ -365,7 +376,11 @@ export default function DashboardLayoutContent({
       }
     >
       <SandboxInitProvider />
+      <SandboxConnectionProvider />
       <OpenCodeEventStreamProvider />
+      <Suspense fallback={null}>
+        <ConnectingScreen />
+      </Suspense>
       <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
         {technicalIssue?.enabled && technicalIssue.message && (
           <Suspense fallback={null}>

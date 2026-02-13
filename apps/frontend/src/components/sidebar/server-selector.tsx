@@ -24,8 +24,6 @@ import { initAccount, getSandboxUrl, extractMappedPorts, type SandboxProviderNam
 import { useProviders } from '@/hooks/platform/use-sandbox';
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { SANDBOX_SERVER_ID } from '@/hooks/platform/use-sandbox';
-
-const IS_LOCAL = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
 import {
   Dialog,
   DialogContent,
@@ -546,49 +544,47 @@ export function InstanceManagerDialog({
               )}
             </div>
 
-            {/* New Sandbox buttons — hidden in local mode (no kortix-api) */}
-            {!IS_LOCAL && (
-              <div className="border-t border-border/40 px-4 py-3">
-                {sandboxError && (
-                  <p className="text-xs text-destructive mb-2">{sandboxError}</p>
-                )}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleCreateSandbox('daytona')}
-                    disabled={isCreatingSandbox}
-                    className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isCreatingSandbox ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Cloud className="h-3.5 w-3.5" />
-                        Cloud
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCreateSandbox('local_docker')}
-                    disabled={isCreatingSandbox}
-                    className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isCreatingSandbox ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Container className="h-3.5 w-3.5" />
-                        Local Docker
-                      </>
-                    )}
-                  </button>
-                </div>
-                <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
-                  Cloud uses Daytona. Local Docker runs on your machine.
-                </p>
+            {/* New Sandbox buttons */}
+            <div className="border-t border-border/40 px-4 py-3">
+              {sandboxError && (
+                <p className="text-xs text-destructive mb-2">{sandboxError}</p>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCreateSandbox('daytona')}
+                  disabled={isCreatingSandbox}
+                  className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingSandbox ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <Cloud className="h-3.5 w-3.5" />
+                      Cloud
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCreateSandbox('local_docker')}
+                  disabled={isCreatingSandbox}
+                  className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingSandbox ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <Container className="h-3.5 w-3.5" />
+                      Local Docker
+                    </>
+                  )}
+                </button>
               </div>
-            )}
+              <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
+                Cloud uses Daytona. Local Docker runs on your machine.
+              </p>
+            </div>
           </div>
         )}
 
