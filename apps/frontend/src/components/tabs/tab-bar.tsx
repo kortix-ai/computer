@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType } from '@/stores/tab-store';
+import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
@@ -898,34 +899,48 @@ export function TabBar() {
     setDragSide(null);
   }, []);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — respects user preference for modifier key (Cmd vs Ctrl)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || e.metaKey || e.altKey) return;
+      const { keyboard } = useUserPreferencesStore.getState().preferences;
+      const tabMod = keyboard.tabSwitchModifier;
+      const closeMod = keyboard.closeTabModifier;
 
-      const digitMatch = e.code.match(/^Digit(\d)$/);
-      if (digitMatch) {
-        const num = parseInt(digitMatch[1], 10);
-        if (num >= 1 && num <= 9) {
-          e.preventDefault();
-          const { tabOrder: order, tabs: allTabs } = useTabStore.getState();
-          const idx = num === 9 ? order.length - 1 : num - 1;
-          if (idx >= 0 && idx < order.length) {
-            const targetTab = allTabs[order[idx]];
-            if (targetTab) {
-              setActiveTab(targetTab.id);
-              if (targetTab.type === 'session') {
-                window.history.pushState(null, '', targetTab.href);
-              } else {
-                router.push(targetTab.href);
+      // Check if the correct modifier is held for tab switching
+      const tabModHeld = tabMod === 'meta' ? e.metaKey : e.ctrlKey;
+      const tabModOther = tabMod === 'meta' ? e.ctrlKey : e.metaKey;
+      // Reject if alt is held or the "other" modifier is also held
+      if (e.altKey) return;
+
+      // Tab switching: Modifier + 1-9
+      if (tabModHeld && !tabModOther) {
+        const digitMatch = e.code.match(/^Digit(\d)$/);
+        if (digitMatch) {
+          const num = parseInt(digitMatch[1], 10);
+          if (num >= 1 && num <= 9) {
+            e.preventDefault();
+            const { tabOrder: order, tabs: allTabs } = useTabStore.getState();
+            const idx = num === 9 ? order.length - 1 : num - 1;
+            if (idx >= 0 && idx < order.length) {
+              const targetTab = allTabs[order[idx]];
+              if (targetTab) {
+                setActiveTab(targetTab.id);
+                if (targetTab.type === 'session' || targetTab.type === 'file' || targetTab.type === 'preview' || targetTab.type === 'terminal') {
+                  window.history.pushState(null, '', targetTab.href);
+                } else {
+                  router.push(targetTab.href);
+                }
               }
             }
+            return;
           }
-          return;
         }
       }
 
-      if (e.code === 'KeyW') {
+      // Close tab: Modifier + W
+      const closeModHeld = closeMod === 'meta' ? e.metaKey : e.ctrlKey;
+      const closeModOther = closeMod === 'meta' ? e.ctrlKey : e.metaKey;
+      if (closeModHeld && !closeModOther && e.code === 'KeyW') {
         e.preventDefault();
         const { activeTabId: active, tabs: allTabs } = useTabStore.getState();
         if (active && allTabs[active] && !allTabs[active].pinned) {
