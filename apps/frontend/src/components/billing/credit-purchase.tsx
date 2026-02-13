@@ -15,7 +15,7 @@ import { AlertCircle } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { billingApi } from '@/lib/api/billing';
 import { toast } from '@/lib/toast';
-import { formatCredits } from '@agentpress/shared';
+import { formatCredits, dollarsToCredits } from '@agentpress/shared';
 import { useUserCurrency } from '@/hooks/use-user-currency';
 import { formatPrice, getCurrencySymbol } from '@/lib/utils/currency';
 
@@ -29,17 +29,18 @@ interface CreditPurchaseProps {
 
 interface CreditPackage {
     amount: number;
+    credits: number;
     price: number;
     popular?: boolean;
 }
 
 const CREDIT_PACKAGES: CreditPackage[] = [
-    { amount: 10, price: 10 },
-    { amount: 25, price: 25 },
-    { amount: 50, price: 50 },
-    { amount: 100, price: 100, popular: true },
-    { amount: 250, price: 250 },
-    { amount: 500, price: 500 },
+    { amount: 10, credits: 1000, price: 10 },
+    { amount: 25, credits: 2500, price: 25 },
+    { amount: 50, credits: 5000, price: 50 },
+    { amount: 100, credits: 10000, price: 100, popular: true },
+    { amount: 250, credits: 25000, price: 250 },
+    { amount: 500, credits: 50000, price: 500 },
 ];
 
 export function CreditPurchaseModal({
@@ -164,8 +165,8 @@ export function CreditPurchaseModal({
                                     onClick={() => handlePackageSelect(pkg)}
                                 >
                                     <CardContent className="p-4 text-center">
-                                        <div className="text-xl font-medium">{formatPrice(pkg.amount, currency)}</div>
-                                        <div className="text-xs text-muted-foreground mt-1">Credits</div>
+                                        <div className="text-xl font-medium">{formatCredits(pkg.credits)}</div>
+                                        <div className="text-xs text-muted-foreground mt-1">credits for {formatPrice(pkg.price, currency)}</div>
                                     </CardContent>
                                 </Card>
                             ))}

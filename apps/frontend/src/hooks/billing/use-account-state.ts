@@ -15,6 +15,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/lib/toast';
 import { siteConfig } from '@/lib/site-config';
+import { CREDITS_PER_DOLLAR, dollarsToCredits } from '@agentpress/shared';
 import {
   billingApi,
   AccountState,
@@ -397,8 +398,20 @@ export const accountStateSelectors = {
   /** Check if user can run agents (has credits) */
   canRun: (state: AccountState | undefined) => state?.credits?.can_run ?? false,
   
-  /** Get total credits */
-  totalCredits: (state: AccountState | undefined) => state?.credits?.total ?? 0,
+  /** Get total credits (converted from dollars to credits using 1$ = 100 credits) */
+  totalCredits: (state: AccountState | undefined) => dollarsToCredits(state?.credits?.total ?? 0),
+  
+  /** Get daily credits (converted from dollars to credits using 1$ = 100 credits) */
+  dailyCredits: (state: AccountState | undefined) => dollarsToCredits(state?.credits?.daily ?? 0),
+  
+  /** Get monthly credits (converted from dollars to credits using 1$ = 100 credits) */
+  monthlyCredits: (state: AccountState | undefined) => dollarsToCredits(state?.credits?.monthly ?? 0),
+  
+  /** Get extra/non-expiring credits (converted from dollars to credits using 1$ = 100 credits) */
+  extraCredits: (state: AccountState | undefined) => dollarsToCredits(state?.credits?.extra ?? 0),
+  
+  /** Get tier monthly credits limit (converted from dollars to credits using 1$ = 100 credits) */
+  tierMonthlyCredits: (state: AccountState | undefined) => dollarsToCredits(state?.tier?.monthly_credits ?? 0),
   
   /** Get tier key */
   tierKey: (state: AccountState | undefined) => state?.subscription?.tier_key ?? 'none',
@@ -446,7 +459,14 @@ export const accountStateSelectors = {
   canPurchaseCredits: (state: AccountState | undefined) => 
     state?.subscription?.can_purchase_credits ?? false,
     
-  /** Get daily credits info */
-  dailyCreditsInfo: (state: AccountState | undefined) => state?.credits?.daily_refresh,
+  /** Get daily credits info (with converted daily_amount) */
+  dailyCreditsInfo: (state: AccountState | undefined) => {
+    const dailyRefresh = state?.credits?.daily_refresh;
+    if (!dailyRefresh) return null;
+    return {
+      ...dailyRefresh,
+      daily_amount: dollarsToCredits(dailyRefresh.daily_amount),
+    };
+  },
 };
 

@@ -68,3 +68,17 @@ services:
         required: false
     profiles: [backend, all]
     restart: unless-stopped
+
+  kortix-billing:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        SERVICE: kortix-billing
+    ports:
+      - "8013:8013"
+    env_file:
+      - path: services/kortix-billing/.env
+        required: false
+    profiles: [backend, all]
+    restart: unless-stopped

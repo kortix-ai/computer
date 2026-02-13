@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { backendApi } from '@/lib/api-client';
 import { accountStateKeys } from './use-account-state';
+import { dollarsToCredits } from '@agentpress/shared';
 
 interface ThreadUsageRecord {
   thread_id: string;
@@ -62,7 +63,19 @@ export function useThreadUsage({
       if (response.error) {
         throw new Error(response.error.message);
       }
-      return response.data;
+
+      const data = response.data as ThreadUsageResponse;
+      return {
+        ...data,
+        thread_usage: data.thread_usage.map(record => ({
+          ...record,
+          credits_used: dollarsToCredits(record.credits_used),
+        })),
+        summary: {
+          ...data.summary,
+          total_credits_used: dollarsToCredits(data.summary.total_credits_used),
+        },
+      };
     },
     staleTime: 30000,
   });

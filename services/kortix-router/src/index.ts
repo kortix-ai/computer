@@ -10,6 +10,7 @@ import { webSearch } from './routes/web-search';
 import { imageSearch } from './routes/image-search';
 import { llm } from './routes/llm';
 import { proxy } from './routes/proxy';
+import { billing } from './routes/billing';
 import type { AppContext } from './types';
 
 const app = new Hono<{ Variables: AppContext }>();
@@ -53,6 +54,23 @@ app.get('/health', (c) => {
     env: config.ENV_MODE,
   });
 });
+
+app.get('/v1/health', (c) => {
+  return c.json({ status: 'ok', service: 'kortix', timestamp: new Date().toISOString() });
+});
+
+// System status (no auth — polled by frontend for maintenance banners)
+app.get('/v1/system/status', (c) => {
+  return c.json({
+    maintenanceNotice: { enabled: false },
+    technicalIssue: { enabled: false },
+    updatedAt: new Date().toISOString(),
+  });
+});
+
+// === Billing Proxy (forwarded to kortix-billing service, handles its own auth) ===
+
+app.route('/', billing);
 
 // === Protected Routes ===
 
