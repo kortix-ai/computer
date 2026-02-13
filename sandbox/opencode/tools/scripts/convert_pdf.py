@@ -134,7 +134,7 @@ async def convert(presentation_dir: str, output_path: str) -> dict:
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                executable_path="/usr/bin/chromium",
+                executable_path="/Users/markokraemer/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
                 headless=True,
                 args=[
                     "--no-sandbox",

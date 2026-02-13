@@ -143,7 +143,7 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
   return (
     <div className={cn(
       'bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative',
-      'md:rounded-tl-2xl md:rounded-tr-2xl md:border-t md:border-l md:border-r md:border-border/60',
+      'md:rounded-tl-xl md:rounded-tr-xl md:border-t md:border-l md:border-r md:border-border/50',
     )}>
       {/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
       {sessionTabIds.map((id) => (

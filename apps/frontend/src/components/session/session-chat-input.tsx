@@ -951,9 +951,9 @@ export function SessionChatInput({
 
   return (
     <div className="mx-auto w-full max-w-4xl relative shrink-0">
-      <Card className="shadow-none w-full max-w-4xl mx-auto bg-transparent border-none overflow-visible py-0 pb-5 rounded-3xl relative z-10">
+      <Card className="shadow-none w-full max-w-4xl mx-auto bg-transparent border-none overflow-visible py-0 pb-4 rounded-3xl relative z-10">
         <div className="w-full text-sm flex flex-col justify-between items-start rounded-lg overflow-visible">
-          <CardContent className="w-full p-1.5 pb-2 bg-card border rounded-[24px] overflow-visible">
+          <CardContent className="w-full p-1.5 pb-2 bg-card border border-border/50 rounded-[24px] overflow-visible shadow-sm shadow-black/[0.03] dark:shadow-white/[0.02]">
             <div className="relative flex flex-col w-full h-full gap-2 justify-between overflow-visible">
               {/* Slash command popover */}
               {slashFilter !== null && filteredCommands.length > 0 && (
