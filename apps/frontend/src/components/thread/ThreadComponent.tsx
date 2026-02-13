@@ -166,10 +166,86 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const pendingMessageRef = useRef<string | null>(null);
   const chatInputRef = useRef<ChatInputHandles>(null);
 
+  // Track whether the user has intentionally scrolled away from the bottom.
+  // In flex-col-reverse, scrollTop=0 is the bottom; negative values = scrolled up.
+  const userScrolledUpRef = useRef(false);
+  const isAutoScrollingRef = useRef(false);
+
   const hasActiveSelection = useCallback((): boolean => {
     const selection = window.getSelection();
     return selection !== null && selection.toString().trim().length > 0;
   }, []);
+
+  // Helper: check if the user is near the bottom of the scroll container (flex-col-reverse)
+  const isNearBottom = useCallback((): boolean => {
+    const el = scrollContainerRef.current;
+    if (!el) return true;
+    // flex-col-reverse: scrollTop=0 is bottom, negative = scrolled up
+    return el.scrollTop > -100;
+  }, []);
+
+  // Detect user scroll intent — listens for wheel, touch, and keyboard scroll
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Ignore events inside nested scrollable areas
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-scrollable]')) return;
+
+      if (e.deltaY > 0) {
+        // In flex-col-reverse, wheel deltaY > 0 means scrolling "up" (away from bottom)
+        userScrolledUpRef.current = true;
+      } else if (e.deltaY < 0) {
+        // Scrolling towards bottom — check if we reached it
+        requestAnimationFrame(() => {
+          if (isNearBottom()) {
+            userScrolledUpRef.current = false;
+          }
+        });
+      }
+    };
+
+    const handleScroll = () => {
+      // Ignore our own programmatic scrolls
+      if (isAutoScrollingRef.current) return;
+
+      if (isNearBottom()) {
+        userScrolledUpRef.current = false;
+      } else {
+        userScrolledUpRef.current = true;
+      }
+    };
+
+    // Touch events for mobile/trackpad
+    let touchStartY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0]?.clientY ?? 0;
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-scrollable]')) return;
+      const touchY = e.touches[0]?.clientY ?? 0;
+      const delta = touchStartY - touchY;
+      // In flex-col-reverse, swiping up (positive delta) scrolls away from bottom
+      if (delta > 10) {
+        userScrolledUpRef.current = true;
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: true });
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [isNearBottom]);
 
   const queueMessage = useMessageQueueStore((state) => state.queueMessage);
   const removeQueuedMessage = useMessageQueueStore((state) => state.removeMessage);
@@ -754,7 +830,12 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const scrollToBottom = useCallback(() => {
     if (hasActiveSelection()) return;
     if (scrollContainerRef.current) {
+      isAutoScrollingRef.current = true;
+      userScrolledUpRef.current = false;
       scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 400);
     }
   }, [hasActiveSelection]);
 
@@ -970,12 +1051,18 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         setAutoOpenedPanel(false);
       }
 
-      setTimeout(() => {
-        if (hasActiveSelection()) return;
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-      }, 100);
+      // Only auto-scroll if the user hasn't intentionally scrolled away
+      if (!userScrolledUpRef.current) {
+        setTimeout(() => {
+          if (hasActiveSelection()) return;
+          if (userScrolledUpRef.current) return;
+          if (scrollContainerRef.current) {
+            isAutoScrollingRef.current = true;
+            scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => { isAutoScrollingRef.current = false; }, 400);
+          }
+        }, 100);
+      }
     },
     [setMessages, setAutoOpenedPanel, hasActiveSelection],
   );
@@ -1024,10 +1111,14 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             setMessages((prev) => [...prev, optimisticUserMessage]);
             pendingMessageRef.current = null;
 
+            // User just sent a message, so reset scroll lock and scroll to bottom
+            userScrolledUpRef.current = false;
             setTimeout(() => {
               if (hasActiveSelection()) return;
               if (scrollContainerRef.current) {
+                isAutoScrollingRef.current = true;
                 scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(() => { isAutoScrollingRef.current = false; }, 400);
               }
             }, 100);
           }
@@ -1216,6 +1307,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
       setIsSending(true);
       pendingMessageRef.current = message;
+
+      // User sent a new message — reset scroll lock so auto-scroll works for the response
+      userScrolledUpRef.current = false;
 
       // Get pending files before sending (they'll be uploaded directly with agent start)
       const pendingFiles = chatInputRef.current?.getPendingFiles() || [];
@@ -1600,19 +1694,25 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
       if (!wasNewMessageAdded) return;
 
+      // Don't auto-scroll if user has intentionally scrolled away
+      if (userScrolledUpRef.current) return;
+
       const scrollContainer = scrollContainerRef.current;
       const scrollTop = scrollContainer.scrollTop;
       const threshold = 100;
-      const isNearBottom = scrollTop > -threshold;
+      const isAtBottom = scrollTop > -threshold;
 
-      if (isNearBottom) {
+      if (isAtBottom) {
         if (scrollTimeoutRef.current) {
           clearTimeout(scrollTimeoutRef.current);
         }
         scrollTimeoutRef.current = setTimeout(() => {
           if (hasActiveSelection()) return;
+          if (userScrolledUpRef.current) return;
           if (scrollContainerRef.current) {
+            isAutoScrollingRef.current = true;
             scrollContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
+            requestAnimationFrame(() => { isAutoScrollingRef.current = false; });
           }
         }, 100);
       }

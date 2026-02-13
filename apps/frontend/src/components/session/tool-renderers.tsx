@@ -2063,11 +2063,24 @@ function TaskThreadCard({
 }) {
   const stepCount = childToolParts.length;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const userScrolledRef = useRef(false);
 
-  // Auto-scroll tool list when new items are added
+  // Detect user scroll within the tool list
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) {
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
+      userScrolledRef.current = !atBottom;
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll tool list when new items are added (respects user scroll)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && !userScrolledRef.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, [stepCount]);
