@@ -42,6 +42,7 @@ import {
   useForkSession,
   useRevertSession,
   useUnrevertSession,
+  useSessionBusyPolling,
   replyToPermission,
   replyToQuestion,
   rejectQuestion,
@@ -52,6 +53,7 @@ import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { useThrottledValue } from '@/hooks/use-throttled-value';
+import { SessionSiteHeader } from '@/components/session/session-site-header';
 
 // Shared UI primitives (framework-agnostic, reusable on mobile)
 import {
@@ -1278,6 +1280,11 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const isDebugEnabled = searchParams.has('debug');
   const pendingPromptHandled = useRef(false);
 
+  // ---- Polling fallback & optimistic send ----
+  const [pollingActive, setPollingActive] = useState(false);
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
+  useSessionBusyPolling(sessionId, pollingActive);
+
   // ---- Optimistic prompt ----
   const [optimisticPrompt, setOptimisticPrompt] = useState<string | null>(() => {
     if (typeof window !== 'undefined' && isNewSession) {
@@ -1294,6 +1301,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     const pendingPrompt = sessionStorage.getItem('opencode_pending_prompt');
     if (pendingPrompt) {
       pendingPromptHandled.current = true;
+      setPollingActive(true);
       sessionStorage.removeItem('opencode_pending_prompt');
 
       // Restore agent/model/variant selections from the dashboard
@@ -1373,7 +1381,36 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const sessionStatus = useOpenCodeSessionStatusStore(
     (s) => s.statuses[sessionId],
   );
-  const isBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
+  const isServerBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
+  const isBusy = isServerBusy || !!pendingUserMessage;
+
+  // Stop polling when session goes idle (via SSE or polling fallback)
+  useEffect(() => {
+    if (pollingActive && sessionStatus?.type === 'idle') {
+      setPollingActive(false);
+    }
+  }, [pollingActive, sessionStatus?.type]);
+
+  // Clear pending user message when server acknowledges (status becomes busy)
+  // or when new messages arrive from the server
+  const prevMsgLenRef = useRef(messages?.length || 0);
+  useEffect(() => {
+    if (!pendingUserMessage) return;
+    // Server reported busy → it received our prompt, real messages incoming
+    if (isServerBusy) {
+      setPendingUserMessage(null);
+      return;
+    }
+    // New messages arrived from server → clear optimistic display
+    const len = messages?.length || 0;
+    if (len > prevMsgLenRef.current) {
+      setPendingUserMessage(null);
+    }
+  }, [isServerBusy, messages?.length, pendingUserMessage]);
+
+  useEffect(() => {
+    prevMsgLenRef.current = messages?.length || 0;
+  }, [messages?.length]);
 
   // ---- Auto-scroll (replaces inline scroll logic) ----
   const { scrollRef, contentRef, showScrollButton, scrollToBottom } = useAutoScroll({
@@ -1466,6 +1503,8 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // Reset on session change
   useEffect(() => {
     setExpanded({});
+    setPollingActive(false);
+    setPendingUserMessage(null);
   }, [sessionId]);
 
   const toggleExpanded = useCallback((id: string) => {
@@ -1523,6 +1562,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
   const handleSend = useCallback(
     async (text: string, files?: AttachedFile[]) => {
+      // Optimistic: show message immediately and start polling fallback
+      setPendingUserMessage(text);
+      setPollingActive(true);
+
       const options: Record<string, unknown> = {};
       if (local.agent.current) options.agent = local.agent.current.name;
       if (local.model.currentKey) options.model = local.model.currentKey;
@@ -1561,11 +1604,17 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         }
       }
 
-      await sendMessage.mutateAsync({
-        sessionId,
-        parts,
-        options: Object.keys(options).length > 0 ? options as any : undefined,
-      });
+      try {
+        await sendMessage.mutateAsync({
+          sessionId,
+          parts,
+          options: Object.keys(options).length > 0 ? options as any : undefined,
+        });
+      } catch {
+        // If send fails, clear optimistic state
+        setPendingUserMessage(null);
+        setPollingActive(false);
+      }
     },
     [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
@@ -1631,6 +1680,18 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
   return (
     <div className="relative flex flex-col h-full bg-background">
+      {/* Session header */}
+      {!isSubSession && (
+        <SessionSiteHeader
+          sessionId={sessionId}
+          sessionTitle={session?.title || 'Untitled'}
+          onToggleSidePanel={handleTogglePanel}
+          isSidePanelOpen={isSidePanelOpen}
+          canOpenSidePanel={hasMessages}
+          isCompacting={!!session?.time?.compacting}
+        />
+      )}
+
       {/* Sub-session / fork top bar */}
       {isSubSession && effectiveParentId && (
         <SubSessionBar
@@ -1775,8 +1836,30 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                   );
                 })}
 
+                {/* Optimistic user message for in-session sends */}
+                {pendingUserMessage && !showOptimistic && (
+                  <>
+                    <div className="flex justify-end">
+                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
+                          <HighlightMentions text={pendingUserMessage} agentNames={agentNames} onFileClick={openFileInComputer} />
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src="/kortix-logomark-white.svg"
+                        alt="Kortix"
+                        className="dark:invert-0 invert flex-shrink-0 animate-pulse"
+                        style={{ height: '14px', width: 'auto' }}
+                      />
+                      <KortixLoader size="small" />
+                    </div>
+                  </>
+                )}
+
                 {/* Busy indicator when no turns yet but session is busy */}
-                {!showOptimistic && isBusy && turns.length === 0 && (
+                {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
                   <div className="flex items-center gap-3">
                     <img
                       src="/kortix-logomark-white.svg"
