@@ -95,33 +95,53 @@ export function useOpenCodeEventStream() {
       flushTimer = setTimeout(flush, Math.max(0, 16 - elapsed));
     };
 
-    // Consume the stream in the background
+    // Consume the stream in the background with automatic retry
     (async () => {
-      try {
-        const result = await client.event.subscribe(undefined, {
-          signal: abortController.signal,
-          sseDefaultRetryDelay: 3000,
-          sseMaxRetryDelay: 30000,
-        } as any);
-        const { stream } = result;
-        for await (const event of stream) {
-          if (abortController.signal.aborted) break;
-          const e = event as OpenCodeEvent;
-          const ck = getCoalesceKey(e);
-          if (ck) {
-            const existing = coalesced.get(ck);
-            if (existing !== undefined) {
-              queue[existing] = undefined; // null out old entry
-            }
-            coalesced.set(ck, queue.length);
+      let retryCount = 0;
+      while (!abortController.signal.aborted) {
+        try {
+          const result = await client.event.subscribe(undefined, {
+            signal: abortController.signal,
+            sseDefaultRetryDelay: 3000,
+            sseMaxRetryDelay: 30000,
+          } as any);
+          const { stream } = result;
+
+          // On successful reconnection, refresh all data to catch up on missed events
+          if (retryCount > 0) {
+            queryClient.invalidateQueries({ queryKey: opcodeKeys.all });
           }
-          queue.push({ type: (e as any).type, event: e });
-          schedule();
+          retryCount = 0;
+
+          for await (const event of stream) {
+            if (abortController.signal.aborted) break;
+            const e = event as OpenCodeEvent;
+            const ck = getCoalesceKey(e);
+            if (ck) {
+              const existing = coalesced.get(ck);
+              if (existing !== undefined) {
+                queue[existing] = undefined; // null out old entry
+              }
+              coalesced.set(ck, queue.length);
+            }
+            queue.push({ type: (e as any).type, event: e });
+            schedule();
+          }
+        } catch {
+          if (abortController.signal.aborted) break;
+        } finally {
+          flush();
         }
-      } catch {
-        // Stream ended or aborted — expected on cleanup
-      } finally {
-        flush();
+
+        // Stream ended or errored — retry with exponential backoff
+        if (abortController.signal.aborted) break;
+        retryCount++;
+        const delay = Math.min(1000 * Math.pow(2, Math.min(retryCount, 5)), 30000);
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, delay);
+          const onAbort = () => { clearTimeout(timer); resolve(); };
+          abortController.signal.addEventListener('abort', onAbort, { once: true });
+        });
       }
     })();
 
@@ -174,6 +194,8 @@ export function useOpenCodeEventStream() {
           if (sessionID) {
             // Full refetch after compaction since messages changed significantly
             queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionID) });
+            // Also invalidate session to clear time.compacting
+            queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionID) });
           }
           break;
         }

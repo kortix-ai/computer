@@ -410,7 +410,13 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
         href: `/sessions/${session.id}`,
         serverId: useServerStore.getState().activeServerId,
       });
-      router.push(`/sessions/${session.id}`);
+      // Use pushState (like handleActivate in tab-bar) so the pre-mounted
+      // session tab becomes visible without a full Next.js navigation.
+      window.history.pushState(null, '', `/sessions/${session.id}`);
+      // Focus the textarea in the newly visible session tab
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('focus-session-textarea'));
+      });
       if (isMobile) setOpenMobile(false);
     } catch {
       router.push('/dashboard');

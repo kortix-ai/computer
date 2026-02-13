@@ -14,6 +14,7 @@ import {
   GitFork,
   Search,
   X,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useSidebar } from '@/components/ui/sidebar';
 import { DeleteConfirmationDialog } from '@/components/thread/DeleteConfirmationDialog';
+import { CompactDialog } from '@/components/session/compact-dialog';
 import {
   useOpenCodeSessions,
   useDeleteOpenCodeSession,
@@ -62,6 +64,7 @@ interface SessionItemProps {
   onDelete: (sessionId: string, title: string) => void;
   onRename: (sessionId: string, currentTitle: string) => void;
   onArchive: (sessionId: string) => void;
+  onCompact: (sessionId: string) => void;
 }
 
 function SessionItem({
@@ -79,6 +82,7 @@ function SessionItem({
   onDelete,
   onRename,
   onArchive,
+  onCompact,
 }: SessionItemProps) {
   const [isHovering, setIsHovering] = useState(false);
 
@@ -213,6 +217,16 @@ function SessionItem({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  onCompact(session.id);
+                }}
+              >
+                <Layers className="mr-2 h-4 w-4" />
+                Compact
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   onArchive(session.id);
                 }}
               >
@@ -257,6 +271,7 @@ interface SessionTreeNodeProps {
   onDelete: (sessionId: string, title: string) => void;
   onRename: (sessionId: string, currentTitle: string) => void;
   onArchive: (sessionId: string) => void;
+  onCompact: (sessionId: string) => void;
 }
 
 function SessionTreeNode({
@@ -274,6 +289,7 @@ function SessionTreeNode({
   onDelete,
   onRename,
   onArchive,
+  onCompact,
 }: SessionTreeNodeProps) {
   const childIds = childMap.get(session.id);
   const hasChildren = !!childIds && childIds.length > 0;
@@ -306,6 +322,7 @@ function SessionTreeNode({
         onDelete={onDelete}
         onRename={onRename}
         onArchive={onArchive}
+        onCompact={onCompact}
       />
       {hasChildren && isExpanded && (
         <div className="relative">
@@ -333,6 +350,7 @@ function SessionTreeNode({
               onDelete={onDelete}
               onRename={onRename}
               onArchive={onArchive}
+              onCompact={onCompact}
             />
           ))}
         </div>
@@ -360,6 +378,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   const { mutate: deleteSession, isPending: isDeleting } = useDeleteOpenCodeSession();
   const { mutate: updateSession } = useUpdateOpenCodeSession();
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
+  const [compactSessionId, setCompactSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -605,6 +624,10 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     );
   };
 
+  const handleCompactSession = (sessionId: string) => {
+    setCompactSessionId(sessionId);
+  };
+
   const confirmDelete = () => {
     if (!sessionToDelete) return;
     setIsDeleteDialogOpen(false);
@@ -706,6 +729,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
                 onDelete={handleDeleteSession}
                 onRename={handleRenameSession}
                 onArchive={handleArchiveSession}
+                onCompact={handleCompactSession}
               />
             ))}
 
@@ -734,6 +758,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
                 onDelete={handleDeleteSession}
                 onRename={handleRenameSession}
                 onArchive={handleArchiveSession}
+                onCompact={handleCompactSession}
               />
             ))}
           </div>
@@ -747,6 +772,15 @@ export function SessionList({ projectId }: SessionListProps = {}) {
           onConfirm={confirmDelete}
           threadName={sessionToDelete.name}
           isDeleting={isDeleting}
+        />
+      )}
+
+      {/* Compact dialog */}
+      {compactSessionId && (
+        <CompactDialog
+          sessionId={compactSessionId}
+          open={!!compactSessionId}
+          onOpenChange={(open) => { if (!open) setCompactSessionId(null); }}
         />
       )}
 

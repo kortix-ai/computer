@@ -1276,7 +1276,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
   // ---- URL params ----
   const searchParams = useSearchParams();
-  const isNewSession = searchParams.get('new') === 'true';
   const isDebugEnabled = searchParams.has('debug');
   const pendingPromptHandled = useRef(false);
 
@@ -1285,32 +1284,34 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   useSessionBusyPolling(sessionId, pollingActive);
 
-  // ---- Optimistic prompt ----
+  // ---- Optimistic prompt (from dashboard/project page) ----
+  // Uses session-specific sessionStorage keys so pushState navigation works
+  // (no dependency on ?new=true URL param which requires router.push).
   const [optimisticPrompt, setOptimisticPrompt] = useState<string | null>(() => {
-    if (typeof window !== 'undefined' && isNewSession) {
-      return sessionStorage.getItem('opencode_pending_prompt');
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
     }
     return null;
   });
 
-  // Hydrate options and clean up sessionStorage for new sessions
+  // Hydrate options and clean up sessionStorage for new sessions.
   // The prompt is already sent by the dashboard/project page — we only use sessionStorage
   // for optimistic display and to restore selected agent/model/variant.
   useEffect(() => {
-    if (!isNewSession || pendingPromptHandled.current) return;
-    const pendingPrompt = sessionStorage.getItem('opencode_pending_prompt');
+    if (pendingPromptHandled.current) return;
+    const pendingPrompt = sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
     if (pendingPrompt) {
       pendingPromptHandled.current = true;
       setPollingActive(true);
-      sessionStorage.removeItem('opencode_pending_prompt');
+      sessionStorage.removeItem(`opencode_pending_prompt:${sessionId}`);
 
       // Restore agent/model/variant selections from the dashboard
       let pendingOptions: Record<string, unknown> | null = null;
       try {
-        const raw = sessionStorage.getItem('opencode_pending_options');
+        const raw = sessionStorage.getItem(`opencode_pending_options:${sessionId}`);
         if (raw) {
           pendingOptions = JSON.parse(raw);
-          sessionStorage.removeItem('opencode_pending_options');
+          sessionStorage.removeItem(`opencode_pending_options:${sessionId}`);
           if (pendingOptions?.agent) local.agent.set(pendingOptions.agent as string);
           if (pendingOptions?.model) local.model.set(pendingOptions.model as { providerID: string; modelID: string });
           if (pendingOptions?.variant) local.model.variant.set(pendingOptions.variant as string);
@@ -1320,9 +1321,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       }
 
       // If the dashboard's send failed, retry it here
-      const sendFailed = sessionStorage.getItem('opencode_pending_send_failed');
+      const sendFailed = sessionStorage.getItem(`opencode_pending_send_failed:${sessionId}`);
       if (sendFailed) {
-        sessionStorage.removeItem('opencode_pending_send_failed');
+        sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
         const options: Record<string, unknown> = {};
         if (pendingOptions?.agent) options.agent = pendingOptions.agent;
         if (pendingOptions?.model) options.model = pendingOptions.model;
@@ -1335,11 +1336,8 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           // ignore — SSE will surface this now that listener is active
         });
       }
-
-      // Clean up the ?new=true from URL (without navigation)
-      window.history.replaceState({}, '', `/sessions/${sessionId}`);
     }
-  }, [isNewSession, sessionId]);
+  }, [sessionId]);
 
   // Clear optimistic prompt once real messages arrive
   useEffect(() => {
@@ -1626,7 +1624,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const handleCommand = useCallback(
     (cmd: Command) => {
       if (cmd.name === 'compact') {
-        summarizeSession.mutate(sessionId);
+        summarizeSession.mutate({ sessionId });
       } else {
         executeCommand.mutate({ sessionId, command: cmd.name });
       }

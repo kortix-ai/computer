@@ -10,8 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/utils';
-import { toast } from '@/lib/toast';
-import { Menu, PanelRightClose, PanelRightOpen, Upload, Check, Layers, Loader2 } from 'lucide-react';
+import { Menu, PanelRightClose, PanelRightOpen, Layers, Loader2 } from 'lucide-react';
 import { CompactDialog } from '@/components/session/compact-dialog';
 
 interface SessionSiteHeaderProps {
@@ -33,21 +32,9 @@ export function SessionSiteHeader({
   canOpenSidePanel = true,
   isCompacting = false,
 }: SessionSiteHeaderProps) {
-  const [copied, setCopied] = useState(false);
   const [compactOpen, setCompactOpen] = useState(false);
   const isMobile = useIsMobile() || isMobileView;
   const { setOpen: setSidebarOpen, setOpenMobile } = useSidebar();
-
-  const copyShareLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      toast.success('Share link copied to clipboard!');
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error('Failed to copy link');
-    }
-  };
 
   const handleOpenMenu = () => {
     setSidebarOpen(true);
@@ -75,7 +62,7 @@ export function SessionSiteHeader({
             </div>
           </div>
 
-          {/* Right: compact + share + panel toggle */}
+          {/* Right: compact + panel toggle */}
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <TooltipProvider delayDuration={300}>
               <Tooltip>
@@ -96,23 +83,6 @@ export function SessionSiteHeader({
                 </TooltipTrigger>
                 <TooltipContent side="bottom" sideOffset={4}>
                   <p>{isCompacting ? 'Compacting...' : 'Compact session'}</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    onClick={copyShareLink}
-                    size="sm"
-                    className="h-8 px-2.5 cursor-pointer gap-1.5 text-muted-foreground hover:text-foreground"
-                  >
-                    {copied ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-                    <span className="hidden sm:inline text-xs">{copied ? 'Copied!' : 'Share'}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={4}>
-                  <p>Copy share link</p>
                 </TooltipContent>
               </Tooltip>
 

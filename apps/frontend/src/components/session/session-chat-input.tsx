@@ -289,6 +289,11 @@ function TokenProgress({ messages }: { messages: MessageWithParts[] | undefined 
           <div>Total: {(total / 1000).toFixed(1)}k tokens</div>
           <div>Input: {(totalTokens.input / 1000).toFixed(1)}k</div>
           <div>Output: {(totalTokens.output / 1000).toFixed(1)}k</div>
+          {ratio > 0.8 && (
+            <div className="text-orange-500 font-sans pt-0.5">
+              Context getting full. Consider compacting.
+            </div>
+          )}
         </div>
       </TooltipContent>
     </Tooltip>
@@ -640,6 +645,20 @@ export function SessionChatInput({
   const [mentions, setMentions] = useState<TrackedMention[]>([]);
   const [fileResults, setFileResults] = useState<string[]>([]);
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Listen for 'focus-session-textarea' events (dispatched when a session tab
+  // is activated from the sidebar or dashboard). Only the visible textarea
+  // (inside the active, non-hidden tab) will respond.
+  useEffect(() => {
+    const handler = () => {
+      const el = textareaRef.current;
+      if (el && el.offsetParent !== null) {
+        el.focus();
+      }
+    };
+    window.addEventListener('focus-session-textarea', handler);
+    return () => window.removeEventListener('focus-session-textarea', handler);
+  }, []);
 
   // Prompt history (Up/Down arrow)
   const historyRef = useRef<string[]>([]);

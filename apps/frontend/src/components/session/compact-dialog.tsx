@@ -24,7 +24,7 @@ export function CompactDialog({ sessionId, open, onOpenChange }: CompactDialogPr
   const summarize = useSummarizeOpenCodeSession();
 
   const handleCompact = useCallback(() => {
-    summarize.mutate(sessionId, {
+    summarize.mutate({ sessionId }, {
       onSuccess: () => {
         toast.success('Session compacted successfully');
         onOpenChange(false);
@@ -57,7 +57,7 @@ export function CompactDialog({ sessionId, open, onOpenChange }: CompactDialogPr
             <li>Recent messages remain unchanged</li>
           </ul>
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

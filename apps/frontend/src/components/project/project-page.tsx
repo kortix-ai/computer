@@ -542,9 +542,9 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         });
 
         // Store prompt/options for optimistic display on the session page
-        sessionStorage.setItem('opencode_pending_prompt', text);
+        sessionStorage.setItem(`opencode_pending_prompt:${session.id}`, text);
         if (Object.keys(options).length > 0) {
-          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
+          sessionStorage.setItem(`opencode_pending_options:${session.id}`, JSON.stringify(options));
         }
 
         // Step 2: Send the prompt directly (don't rely on session page)
@@ -555,10 +555,9 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         }).catch(() => {});
 
         // Step 3: Navigate
-        router.push(`/sessions/${session.id}?new=true`);
+        router.push(`/sessions/${session.id}`);
       } catch {
-        sessionStorage.removeItem('opencode_pending_prompt');
-        sessionStorage.removeItem('opencode_pending_options');
+        // Session creation failed — nothing stored yet
         setIsSubmitting(false);
         toast.warning('Failed to create session');
       }

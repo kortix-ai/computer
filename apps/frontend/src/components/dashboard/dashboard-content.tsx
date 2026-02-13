@@ -213,6 +213,7 @@ export function DashboardContent() {
     async (text: string, _files?: unknown) => {
       if (!text.trim() || isSubmitting) return;
       setIsSubmitting(true);
+      let createdSessionId: string | null = null;
       try {
         // Build options from selections
         const options: Record<string, unknown> = {};
@@ -222,6 +223,7 @@ export function DashboardContent() {
 
         // Step 1: Create the session
         const session = await createSession.mutateAsync();
+        createdSessionId = session.id;
 
         // Step 2: Open tab and navigate immediately (optimistic)
         useTabStore.getState().openTab({
@@ -232,10 +234,11 @@ export function DashboardContent() {
           serverId: useServerStore.getState().activeServerId,
         });
 
-        // Store the prompt text for optimistic display on the session page
-        sessionStorage.setItem('opencode_pending_prompt', text);
+        // Store the prompt text for optimistic display on the session page.
+        // Use session-specific keys so multiple sessions don't conflict.
+        sessionStorage.setItem(`opencode_pending_prompt:${session.id}`, text);
         if (Object.keys(options).length > 0) {
-          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
+          sessionStorage.setItem(`opencode_pending_options:${session.id}`, JSON.stringify(options));
         }
 
         // Step 3: Send the prompt directly from here (don't rely on session page to do it)
@@ -245,19 +248,29 @@ export function DashboardContent() {
           options: Object.keys(options).length > 0 ? options as any : undefined,
         }).catch(() => {
           // Mark that the send failed so the session page can retry
-          sessionStorage.setItem('opencode_pending_send_failed', 'true');
+          sessionStorage.setItem(`opencode_pending_send_failed:${session.id}`, 'true');
         });
 
-        // Step 4: Navigate to session (prompt already sent, ?new=true for optimistic display only)
-        router.push(`/sessions/${session.id}?new=true`);
-      } catch (error) {
-        sessionStorage.removeItem('opencode_pending_prompt');
-        sessionStorage.removeItem('opencode_pending_options');
+        // Step 4: Activate the session tab via pushState (like handleActivate in tab-bar)
+        // instead of router.push to avoid a full Next.js navigation. The pre-mounted
+        // session component becomes visible instantly.
+        window.history.pushState(null, '', `/sessions/${session.id}`);
+        // Reset submitting since the dashboard stays mounted (hidden) with pushState
+        setIsSubmitting(false);
+        // Focus the textarea in the newly visible session tab
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new CustomEvent('focus-session-textarea'));
+        });
+      } catch {
+        if (createdSessionId) {
+          sessionStorage.removeItem(`opencode_pending_prompt:${createdSessionId}`);
+          sessionStorage.removeItem(`opencode_pending_options:${createdSessionId}`);
+        }
         setIsSubmitting(false);
         toast.warning('Failed to create session');
       }
     },
-    [isSubmitting, createSession, sendMessage, router, local.agent.current, local.model.currentKey, local.model.variant.current],
+    [isSubmitting, createSession, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
   const handleCommand = useCallback(

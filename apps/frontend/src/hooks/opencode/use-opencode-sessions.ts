@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
+import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import type {
   Session,
   Message,
@@ -98,10 +100,19 @@ export const opencodeKeys = {
 // Helper: unwrap SDK response (data / error)
 // ============================================================================
 
-function unwrap<T>(result: { data?: T; error?: unknown }): T {
+function unwrap<T>(result: { data?: T; error?: unknown; response?: Response }): T {
   if (result.error) {
     const err = result.error as any;
-    throw new Error(err?.data?.message || err?.message || 'SDK request failed');
+    const status = (result.response as Response | undefined)?.status;
+    // Try to extract the most specific error message from the SDK response
+    const msg =
+      err?.data?.message ||
+      err?.message ||
+      err?.error ||
+      (typeof err === 'string' ? err : null) ||
+      (typeof err === 'object' ? JSON.stringify(err) : null) ||
+      (status ? `Server returned ${status}` : 'SDK request failed');
+    throw new Error(msg);
   }
   return result.data as T;
 }
@@ -468,11 +479,42 @@ export function useExecuteOpenCodeCommand() {
 // ============================================================================
 
 export function useSummarizeOpenCodeSession() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (sessionId: string) => {
+    mutationFn: async (params: { sessionId: string; providerID?: string; modelID?: string }) => {
       const client = getClient();
-      const result = await client.session.summarize({ sessionID: sessionId });
+
+      // Resolve providerID/modelID: use explicit params, fall back to config default
+      let { providerID, modelID } = params;
+      if (!providerID || !modelID) {
+        try {
+          const configResult = await client.config.get();
+          const config = configResult.data as any;
+          if (config?.model) {
+            const parts = (config.model as string).split('/');
+            if (parts.length >= 2) {
+              providerID = providerID || parts[0];
+              modelID = modelID || parts.slice(1).join('/');
+            }
+          }
+        } catch {
+          // ignore — will try auto below
+        }
+      }
+
+      const result = await client.session.summarize({
+        sessionID: params.sessionId,
+        ...(providerID && modelID
+          ? { providerID, modelID }
+          : { providerID: 'auto', modelID: 'auto', auto: true }),
+      });
       unwrap(result);
+      return params.sessionId;
+    },
+    onSuccess: (sessionId) => {
+      // Invalidate session and messages to pick up compaction changes
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionId) });
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionId) });
     },
   });
 }
@@ -637,4 +679,59 @@ export async function rejectQuestion(requestId: string): Promise<void> {
   const client = getClient();
   const result = await client.question.reject({ requestID: requestId });
   unwrap(result);
+}
+
+// ============================================================================
+// Session Busy Polling (fallback when SSE is unavailable)
+// ============================================================================
+
+/**
+ * Polls session status and refreshes messages when enabled.
+ * Acts as a reliable fallback for when the SSE event stream is
+ * not connected or drops — ensures promptAsync responses always arrive.
+ */
+export function useSessionBusyPolling(sessionId: string, enabled: boolean) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!enabled || !sessionId) return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const client = getClient();
+        const statusResult = await client.session.status();
+        if (!cancelled && statusResult.data) {
+          const statuses = statusResult.data as Record<string, any>;
+          const status = statuses[sessionId];
+          if (status) {
+            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, status);
+          }
+        }
+      } catch {
+        // ignore polling errors
+      }
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionId) });
+      }
+    };
+
+    // Immediate first poll, then every 2s
+    poll();
+    const interval = setInterval(poll, 2000);
+
+    // Safety: stop after 5 minutes to prevent infinite polling
+    const timeout = setTimeout(() => {
+      cancelled = true;
+      clearInterval(interval);
+    }, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [enabled, sessionId, queryClient]);
 }

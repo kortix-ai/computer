@@ -49,21 +49,20 @@ export default function BerlinPage() {
 
       setIsSubmitting(true);
       try {
-        sessionStorage.setItem('opencode_pending_prompt', text);
-
         const options: Record<string, unknown> = {};
         if (local.agent.current) options.agent = local.agent.current.name;
         if (local.model.currentKey) options.model = local.model.currentKey;
         if (local.model.variant.current) options.variant = local.model.variant.current;
-        if (Object.keys(options).length > 0) {
-          sessionStorage.setItem('opencode_pending_options', JSON.stringify(options));
-        }
 
         const session = await createSession.mutateAsync();
-        router.push(`/sessions/${session.id}?new=true`);
+
+        sessionStorage.setItem(`opencode_pending_prompt:${session.id}`, text);
+        if (Object.keys(options).length > 0) {
+          sessionStorage.setItem(`opencode_pending_options:${session.id}`, JSON.stringify(options));
+        }
+
+        router.push(`/sessions/${session.id}`);
       } catch (error) {
-        sessionStorage.removeItem('opencode_pending_prompt');
-        sessionStorage.removeItem('opencode_pending_options');
         setIsSubmitting(false);
         toast.error('Failed to create session');
       }

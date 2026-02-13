@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 
 import {
@@ -26,6 +26,7 @@ import {
   Sparkles,
   Search,
   MessagesSquare,
+  Layers,
 } from 'lucide-react';
 
 import {
@@ -47,6 +48,7 @@ import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
+import { CompactDialog } from '@/components/session/compact-dialog';
 
 // ============================================================================
 // Helpers
@@ -187,7 +189,9 @@ export function CommandPalette() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [lssDebouncedQuery, setLssDebouncedQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [compactOpen, setCompactOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const createSession = useCreateOpenCodeSession();
@@ -248,10 +252,7 @@ export function CommandPalette() {
         e.preventDefault();
         setOpen((prev) => !prev);
       }
-      if (e.key === 'j' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        handleNewSession();
-      }
+      // Cmd+J is handled by sidebar-left.tsx — no duplicate handler here.
       if (e.key === '`' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         const store = useKortixComputerStore.getState();
@@ -350,15 +351,17 @@ export function CommandPalette() {
         type: 'session',
         href: `/sessions/${session.id}`,
       });
-      router.push(`/sessions/${session.id}`);
-      toast.success('New session created');
+      window.history.pushState(null, '', `/sessions/${session.id}`);
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('focus-session-textarea'));
+      });
       close();
     } catch {
       toast.error('Failed to create session');
     } finally {
       setIsCreating(false);
     }
-  }, [isCreating, createSession, router, close]);
+  }, [isCreating, createSession, close]);
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -437,6 +440,18 @@ export function CommandPalette() {
     close();
   }, [close]);
 
+  // Detect if we're on a session page and extract session ID
+  const currentSessionId = useMemo(() => {
+    const match = pathname?.match(/^\/sessions\/([^/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
+
+  const handleCompactSession = useCallback(() => {
+    if (!currentSessionId) return;
+    close();
+    setCompactOpen(true);
+  }, [currentSessionId, close]);
+
   const themeLabel = useMemo(() => {
     if (theme === 'light') return 'Switch to Dark';
     if (theme === 'dark') return 'Switch to System';
@@ -468,6 +483,7 @@ export function CommandPalette() {
   );
 
   return (
+  <>
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
         placeholder="Search sessions, conversations, files, or type a command..."
@@ -534,10 +550,10 @@ export function CommandPalette() {
           (hasThreadResults || showThreadSkeletons) && (
             <CommandGroup heading={threadHeading}>
               {hasThreadResults &&
-                threadResults.map((result) => (
+                threadResults.map((result, index) => (
                   <CommandItem
-                    key={`thread-${result.thread_id}`}
-                    value={`thread-${result.thread_id}-${result.text_preview?.slice(0, 20)}`}
+                    key={`thread-${result.thread_id}-${index}`}
+                    value={`thread-${result.thread_id}-${index}-${result.text_preview?.slice(0, 20)}`}
                     onSelect={() =>
                       handleSelectThread(
                         result.thread_id,
@@ -670,6 +686,12 @@ export function CommandPalette() {
                 <span>Open Terminal</span>
                 <CommandShortcut>⌘`</CommandShortcut>
               </CommandItem>
+              {currentSessionId && (
+                <CommandItem onSelect={handleCompactSession}>
+                  <Layers className="mr-2 h-4 w-4" />
+                  <span>Compact Session</span>
+                </CommandItem>
+              )}
             </CommandGroup>
 
             <CommandSeparator />
@@ -727,5 +749,14 @@ export function CommandPalette() {
         )}
       </CommandList>
     </CommandDialog>
+
+    {currentSessionId && (
+      <CompactDialog
+        sessionId={currentSessionId}
+        open={compactOpen}
+        onOpenChange={setCompactOpen}
+      />
+    )}
+  </>
   );
 }
