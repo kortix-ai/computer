@@ -1,0 +1,236 @@
+export type SandboxProviderType = 'daytona' | 'local_docker' | 'auto';
+
+export const config = {
+  PORT: parseInt(process.env.PORT || '8008', 10),
+  ENV_MODE: process.env.ENV_MODE || 'local',
+
+  // ─── Database ──────────────────────────────────────────────────────────────
+  DATABASE_URL: process.env.DATABASE_URL || '',
+
+  // ─── Supabase ──────────────────────────────────────────────────────────────
+  SUPABASE_URL: process.env.SUPABASE_URL || '',
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
+
+  // ─── API Key Hashing ──────────────────────────────────────────────────────
+  API_KEY_SECRET: process.env.API_KEY_SECRET || '',
+
+  // ─── Search Providers ──────────────────────────────────────────────────────
+  TAVILY_API_URL: process.env.TAVILY_API_URL || 'https://api.tavily.com',
+  TAVILY_API_KEY: process.env.TAVILY_API_KEY || '',
+
+  SERPER_API_URL: process.env.SERPER_API_URL || 'https://google.serper.dev',
+  SERPER_API_KEY: process.env.SERPER_API_KEY || '',
+
+  // ─── Proxy Providers ──────────────────────────────────────────────────────
+  FIRECRAWL_API_URL: process.env.FIRECRAWL_API_URL || 'https://api.firecrawl.dev',
+  FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || '',
+
+  REPLICATE_API_URL: process.env.REPLICATE_API_URL || 'https://api.replicate.com',
+  REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || '',
+
+  CONTEXT7_API_URL: process.env.CONTEXT7_API_URL || 'https://context7.com',
+  CONTEXT7_API_KEY: process.env.CONTEXT7_API_KEY || '',
+
+  // ─── LLM Providers ────────────────────────────────────────────────────────
+  OPENROUTER_API_URL: process.env.OPENROUTER_API_URL || 'https://openrouter.ai/api/v1',
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+
+  ANTHROPIC_API_URL: process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com/v1',
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+
+  OPENAI_API_URL: process.env.OPENAI_API_URL || 'https://api.openai.com/v1',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+
+  XAI_API_URL: process.env.XAI_API_URL || 'https://api.x.ai/v1',
+  XAI_API_KEY: process.env.XAI_API_KEY || '',
+
+  GEMINI_API_URL: process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+
+  GROQ_API_URL: process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1',
+  GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+
+  AWS_BEARER_TOKEN_BEDROCK: process.env.AWS_BEARER_TOKEN_BEDROCK || '',
+
+  // ─── Stripe (Billing) ─────────────────────────────────────────────────────
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+
+  // ─── RevenueCat (Billing) ─────────────────────────────────────────────────
+  REVENUECAT_API_KEY: process.env.REVENUECAT_API_KEY || '',
+  REVENUECAT_WEBHOOK_SECRET: process.env.REVENUECAT_WEBHOOK_SECRET || '',
+
+  // ─── Daytona (Sandbox provisioning + preview proxy) ───────────────────────
+  DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || '',
+  DAYTONA_SERVER_URL: process.env.DAYTONA_SERVER_URL || '',
+  DAYTONA_TARGET: process.env.DAYTONA_TARGET || '',
+  DAYTONA_SNAPSHOT: process.env.DAYTONA_SNAPSHOT || '',
+
+  // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
+  KORTIX_URL: process.env.KORTIX_URL || '',
+  SANDBOX_PROVIDER: (process.env.SANDBOX_PROVIDER || 'auto') as SandboxProviderType,
+  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'heyagi/sandbox:latest',
+  DOCKER_HOST: process.env.DOCKER_HOST || '',
+  SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
+
+  // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
+  SCHEDULER_TICK_INTERVAL_MS: parseInt(process.env.SCHEDULER_TICK_INTERVAL_MS || '1000', 10),
+  SCHEDULER_ENABLED: process.env.SCHEDULER_ENABLED !== 'false',
+
+  // ─── Legacy Backend (fallback) ─────────────────────────────────────────────
+  BACKEND_API_URL: process.env.BACKEND_API_URL || 'http://localhost:8000',
+  BACKEND_API_KEY: process.env.BACKEND_API_KEY || '',
+
+  // ─── Helper Methods ────────────────────────────────────────────────────────
+
+  isLocal(): boolean {
+    return this.ENV_MODE === 'local';
+  },
+
+  isDevelopment(): boolean {
+    return this.ENV_MODE === 'local' || this.ENV_MODE === 'staging';
+  },
+
+  isDaytonaEnabled(): boolean {
+    if (this.SANDBOX_PROVIDER === 'daytona') return true;
+    if (this.SANDBOX_PROVIDER === 'local_docker') return false;
+    return !!this.DAYTONA_API_KEY;
+  },
+
+  isLocalDockerEnabled(): boolean {
+    if (this.SANDBOX_PROVIDER === 'local_docker') return true;
+    if (this.SANDBOX_PROVIDER === 'daytona') return false;
+    return true;
+  },
+};
+
+// ─── Tool Pricing (Router) ──────────────────────────────────────────────────
+
+export interface ToolPricing {
+  baseCost: number;
+  perResultCost: number;
+  markupMultiplier: number;
+}
+
+export const TOOL_PRICING: Record<string, ToolPricing> = {
+  web_search_basic: {
+    baseCost: 0.005,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  web_search_advanced: {
+    baseCost: 0.025,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  image_search: {
+    baseCost: 0.001,
+    perResultCost: 0,
+    markupMultiplier: 2.0,
+  },
+  proxy_tavily: {
+    baseCost: 0.005,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_serper: {
+    baseCost: 0.001,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_firecrawl: {
+    baseCost: 0.01,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_replicate: {
+    baseCost: 0.005,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_replicate_nano_banana: {
+    baseCost: 0.01,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_replicate_gpt_image: {
+    baseCost: 0.05,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_context7: {
+    baseCost: 0.001,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+};
+
+export function getToolCost(toolName: string, resultCount: number = 0): number {
+  const pricing = TOOL_PRICING[toolName];
+  if (!pricing) {
+    return 0.01;
+  }
+
+  const base = pricing.baseCost * pricing.markupMultiplier;
+  const perResult = pricing.perResultCost * pricing.markupMultiplier * resultCount;
+  return base + perResult;
+}
+
+// ─── LLM Pricing (Router) ───────────────────────────────────────────────────
+
+export interface LLMPricing {
+  inputCostPer1M: number;
+  outputCostPer1M: number;
+  markupMultiplier: number;
+}
+
+export const LLM_PRICING: Record<string, LLMPricing> = {
+  openrouter: {
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    markupMultiplier: 1.2,
+  },
+  anthropic: {
+    inputCostPer1M: 3.0,
+    outputCostPer1M: 15.0,
+    markupMultiplier: 1.2,
+  },
+  openai: {
+    inputCostPer1M: 2.5,
+    outputCostPer1M: 10.0,
+    markupMultiplier: 1.2,
+  },
+  xai: {
+    inputCostPer1M: 2.0,
+    outputCostPer1M: 10.0,
+    markupMultiplier: 1.2,
+  },
+  groq: {
+    inputCostPer1M: 0.05,
+    outputCostPer1M: 0.08,
+    markupMultiplier: 1.2,
+  },
+  gemini: {
+    inputCostPer1M: 1.25,
+    outputCostPer1M: 5.0,
+    markupMultiplier: 1.2,
+  },
+};
+
+export function calculateLLMCost(
+  provider: string,
+  inputTokens: number,
+  outputTokens: number,
+  providerReportedCost?: number
+): number {
+  const pricing = LLM_PRICING[provider] || LLM_PRICING['openrouter'];
+
+  if (provider === 'openrouter' && providerReportedCost !== undefined) {
+    return providerReportedCost * pricing.markupMultiplier;
+  }
+
+  const inputCost = (inputTokens / 1_000_000) * pricing.inputCostPer1M;
+  const outputCost = (outputTokens / 1_000_000) * pricing.outputCostPer1M;
+  return (inputCost + outputCost) * pricing.markupMultiplier;
+}

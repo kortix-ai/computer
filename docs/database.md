@@ -14,9 +14,9 @@ PostgreSQL (Supabase)
 
 **Rule: all new tables go in the `kortix` schema. Never modify `public`, `basejump`, or `auth`.**
 
-Legacy services (kortix-router, kortix-daytona-proxy, frontend) still use `@supabase/supabase-js`
-to talk to `public`/`basejump` via PostgREST. New services use `@kortix/db` with Drizzle for direct
-Postgres access to the `kortix` schema.
+The frontend still uses `@supabase/supabase-js` to talk to `public`/`basejump` via PostgREST.
+The backend (`kortix-api`) uses `@kortix/db` with Drizzle for direct Postgres access to the `kortix` schema,
+and `@supabase/supabase-js` for auth token validation.
 
 ## Package: @kortix/db
 
@@ -268,4 +268,4 @@ bunx drizzle-kit pull --config drizzle.config.pull.ts
 | `packages/db/src/index.ts` | Barrel exports |
 | `packages/db/drizzle.config.ts` | Drizzle Kit config (targets `kortix` schema) |
 | `packages/db/drizzle.config.pull.ts` | Drizzle Kit config for legacy introspection |
-| `services/kortix-cron/src/db/index.ts` | Example: service consuming `@kortix/db` |
+| `services/kortix-api/src/db/index.ts` | Example: service consuming `@kortix/db` |

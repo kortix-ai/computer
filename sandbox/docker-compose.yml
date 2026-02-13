@@ -1,10 +1,22 @@
+# Sandbox Docker Compose — supports multiple concurrent instances.
+#
+# Usage:
+#   docker compose up -d                          # single sandbox (default)
+#   SANDBOX_NAME=dev2 docker compose up -d        # second sandbox (unique name)
+#   docker compose ps                             # see assigned ports
+#
+# Each sandbox gets Docker-assigned random host ports for all services.
+# After startup, inspect assigned ports with:
+#   docker compose port desktop 8000              # → 0.0.0.0:<random>
+#   docker compose port desktop 6080              # → 0.0.0.0:<random>
+
 services:
   desktop:
     build:
       context: ..
       dockerfile: sandbox/Dockerfile
     image: kortixmarko/sandbox:0.1.0
-    container_name: sandbox-desktop
+    # No container_name — allows multiple instances via --project-name / COMPOSE_PROJECT_NAME
     cap_add:
       - SYS_ADMIN
     security_opt:
@@ -14,7 +26,7 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
       - SUBFOLDER=/
-      - TITLE=HeyAGI Sandbox
+      - TITLE=Kortix Sandbox ${SANDBOX_NAME:-default}
       - OPENCODE_CONFIG_DIR=/opt/opencode
       - OPENCODE_PERMISSION={"*":"allow"}
       - DISPLAY=:1
@@ -34,13 +46,15 @@ services:
       - workspace:/workspace
       - secrets_data:/app/secrets
     ports:
-      - "6080:6080"   # Desktop (noVNC) -> http://localhost:6080
-      - "6081:6081"   # Desktop (HTTPS) -> https://localhost:6081
-      - "3111:3111"   # OpenCode Web UI -> http://localhost:3111
-      - "3210:3210"   # Presentation Viewer -> http://localhost:3210
-      - "8000:8000"   # Kortix Master (proxy entry point) -> http://localhost:8000
-      - "9223:9223"   # Agent Browser Stream -> ws://localhost:9223
-      - "9224:9224"   # Agent Browser Viewer -> http://localhost:9224
+      # Dynamic host port assignment — Docker picks random available ports.
+      # This allows running multiple sandbox instances simultaneously.
+      - "6080"    # Desktop (noVNC)
+      - "6081"    # Desktop (HTTPS)
+      - "3111"    # OpenCode Web UI
+      - "3210"    # Presentation Viewer
+      - "8000"    # Kortix Master (proxy entry point)
+      - "9223"    # Agent Browser Stream (WS)
+      - "9224"    # Agent Browser Viewer
     shm_size: "2gb"
     restart: unless-stopped
     healthcheck:

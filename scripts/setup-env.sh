@@ -56,7 +56,7 @@ write_env() {
 echo "Generating .env files from $ENV_FILE ..."
 echo ""
 
-write_env "services/kortix-router/.env" \
+write_env "services/kortix-api/.env" \
   "PORT=8008" \
   "$(kv ENV_MODE local)" \
   "" \
@@ -64,10 +64,24 @@ write_env "services/kortix-router/.env" \
   "" \
   "$(kv SUPABASE_URL)" \
   "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
+  "$(kv SUPABASE_JWT_SECRET)" \
   "" \
   "$(kv API_KEY_SECRET)" \
   "" \
-  "BILLING_SERVICE_URL=http://localhost:8013" \
+  "$(kv STRIPE_SECRET_KEY)" \
+  "$(kv STRIPE_WEBHOOK_SECRET)" \
+  "" \
+  "$(kv REVENUECAT_API_KEY)" \
+  "$(kv REVENUECAT_WEBHOOK_SECRET)" \
+  "" \
+  "$(kv DAYTONA_API_KEY)" \
+  "$(kv DAYTONA_SERVER_URL)" \
+  "$(kv DAYTONA_TARGET)" \
+  "$(kv DAYTONA_SNAPSHOT)" \
+  "" \
+  "KORTIX_URL=http://localhost:8008" \
+  "$(kv SANDBOX_PROVIDER auto)" \
+  "$(kv SANDBOX_IMAGE heyagi/sandbox:latest)" \
   "" \
   "$(kv OPENROUTER_API_KEY)" \
   "$(kv ANTHROPIC_API_KEY)" \
@@ -82,46 +96,6 @@ write_env "services/kortix-router/.env" \
   "$(kv REPLICATE_API_TOKEN)" \
   "$(kv CONTEXT7_API_KEY)"
 
-write_env "services/kortix-billing/.env" \
-  "PORT=8013" \
-  "$(kv ENV_MODE local)" \
-  "" \
-  "$(kv DATABASE_URL)" \
-  "" \
-  "$(kv SUPABASE_URL)" \
-  "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
-  "" \
-  "$(kv STRIPE_SECRET_KEY)" \
-  "$(kv STRIPE_WEBHOOK_SECRET)" \
-  "" \
-  "$(kv REVENUECAT_API_KEY)" \
-  "$(kv REVENUECAT_WEBHOOK_SECRET)"
-
-write_env "services/kortix-cron/.env" \
-  "PORT=8011" \
-  "$(kv ENV_MODE local)" \
-  "" \
-  "$(kv DATABASE_URL)" \
-  "" \
-  "$(kv SUPABASE_URL)" \
-  "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
-  "$(kv SUPABASE_JWT_SECRET)"
-
-write_env "services/kortix-platform/.env" \
-  "PORT=8012" \
-  "$(kv ENV_MODE local)" \
-  "" \
-  "$(kv DATABASE_URL)" \
-  "" \
-  "$(kv SUPABASE_URL)" \
-  "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
-  "" \
-  "$(kv DAYTONA_API_KEY)" \
-  "$(kv DAYTONA_SERVER_URL)" \
-  "$(kv DAYTONA_TARGET)" \
-  "" \
-  "KORTIX_URL=http://localhost:8008"
-
 write_env "apps/frontend/.env" \
   "$(kv NEXT_PUBLIC_ENV_MODE "$(e ENV_MODE local)")" \
   "" \
@@ -130,7 +104,6 @@ write_env "apps/frontend/.env" \
   "" \
   "$(kv NEXT_PUBLIC_URL http://localhost:3000)" \
   "$(kv NEXT_PUBLIC_BACKEND_URL http://localhost:8008/v1)" \
-  "$(kv NEXT_PUBLIC_PLATFORM_URL http://localhost:8012)" \
   "" \
   "$(kv NEXT_PUBLIC_GOOGLE_CLIENT_ID)" \
   "$(kv NEXT_PUBLIC_POSTHOG_KEY)" \

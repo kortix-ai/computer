@@ -9,6 +9,32 @@ import { persist } from 'zustand/middleware';
 
 export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' | 'page' | 'preview' | 'terminal';
 
+/** The permanent dashboard/home tab. Always pinned, always first. */
+export const DASHBOARD_TAB_ID = 'page:/dashboard';
+export const DASHBOARD_TAB: Omit<Tab, 'openedAt'> & { openedAt: number } = {
+  id: DASHBOARD_TAB_ID,
+  title: '',
+  type: 'dashboard',
+  href: '/dashboard',
+  pinned: true,
+  openedAt: 0,
+};
+
+/** Ensures the dashboard tab exists at position 0 in the given state. */
+function ensureDashboardTab(
+  tabs: Record<string, Tab>,
+  tabOrder: string[],
+): { tabs: Record<string, Tab>; tabOrder: string[] } {
+  const newTabs = { ...tabs };
+  if (!newTabs[DASHBOARD_TAB_ID]) {
+    newTabs[DASHBOARD_TAB_ID] = { ...DASHBOARD_TAB };
+  } else {
+    newTabs[DASHBOARD_TAB_ID] = { ...newTabs[DASHBOARD_TAB_ID], pinned: true, title: '' };
+  }
+  const orderWithout = tabOrder.filter((id) => id !== DASHBOARD_TAB_ID);
+  return { tabs: newTabs, tabOrder: [DASHBOARD_TAB_ID, ...orderWithout] };
+}
+
 export interface Tab {
   /** Unique identifier — for sessions this is the sessionId, for files the file path, etc. */
   id: string;
@@ -104,9 +130,13 @@ export const useTabStore = create<TabState>()(
           openedAt: Date.now(),
         };
 
+        const updated = ensureDashboardTab(
+          { ...tabs, [newTab.id]: newTab },
+          [...tabOrder, newTab.id],
+        );
+
         set({
-          tabs: { ...tabs, [newTab.id]: newTab },
-          tabOrder: [...tabOrder, newTab.id],
+          ...updated,
           activeTabId: newTab.id,
         });
       },
@@ -114,7 +144,8 @@ export const useTabStore = create<TabState>()(
       closeTab: (tabId) => {
         const { tabs, tabOrder, activeTabId } = get();
         const tab = tabs[tabId];
-        if (!tab || tab.pinned) return activeTabId;
+        // Prevent closing dashboard tab or any pinned tab
+        if (!tab || tab.pinned || tabId === DASHBOARD_TAB_ID) return activeTabId;
 
         const { [tabId]: _, ...remainingTabs } = tabs;
         const newOrder = tabOrder.filter((id) => id !== tabId);
@@ -197,17 +228,17 @@ export const useTabStore = create<TabState>()(
         const remainingTabs: Record<string, Tab> = {};
         const newOrder: string[] = [];
 
-        // Keep the target tab and all pinned tabs
+        // Keep the target tab, all pinned tabs, and always the dashboard
         for (const id of get().tabOrder) {
-          if (id === tabId || tabs[id]?.pinned) {
+          if (id === tabId || tabs[id]?.pinned || id === DASHBOARD_TAB_ID) {
             remainingTabs[id] = tabs[id];
             newOrder.push(id);
           }
         }
 
+        const ensured = ensureDashboardTab(remainingTabs, newOrder);
         set({
-          tabs: remainingTabs,
-          tabOrder: newOrder,
+          ...ensured,
           activeTabId: tabId,
         });
       },
@@ -218,16 +249,16 @@ export const useTabStore = create<TabState>()(
         if (index === -1) return;
 
         const newOrder = tabOrder.filter(
-          (id, i) => i <= index || tabs[id]?.pinned
+          (id, i) => i <= index || tabs[id]?.pinned || id === DASHBOARD_TAB_ID
         );
         const remainingTabs: Record<string, Tab> = {};
         for (const id of newOrder) {
           remainingTabs[id] = tabs[id];
         }
 
+        const ensured = ensureDashboardTab(remainingTabs, newOrder);
         set({
-          tabs: remainingTabs,
-          tabOrder: newOrder,
+          ...ensured,
           activeTabId: remainingTabs[activeTabId!] ? activeTabId : tabId,
         });
       },
@@ -238,16 +269,16 @@ export const useTabStore = create<TabState>()(
         const newOrder: string[] = [];
 
         for (const id of tabOrder) {
-          if (tabs[id]?.pinned) {
+          if (tabs[id]?.pinned || id === DASHBOARD_TAB_ID) {
             remainingTabs[id] = tabs[id];
             newOrder.push(id);
           }
         }
 
+        const ensured = ensureDashboardTab(remainingTabs, newOrder);
         set({
-          tabs: remainingTabs,
-          tabOrder: newOrder,
-          activeTabId: newOrder[0] || null,
+          ...ensured,
+          activeTabId: ensured.tabOrder[0] || null,
         });
       },
 
@@ -273,17 +304,18 @@ export const useTabStore = create<TabState>()(
           const cache = JSON.parse(localStorage.getItem('kortix-tabs-per-server') || '{}');
           const saved = cache[newServerId];
           if (saved?.tabs && saved?.tabOrder) {
+            const ensured = ensureDashboardTab(saved.tabs, saved.tabOrder);
             set({
-              tabs: saved.tabs,
-              tabOrder: saved.tabOrder,
-              activeTabId: saved.activeTabId || null,
+              ...ensured,
+              activeTabId: saved.activeTabId || DASHBOARD_TAB_ID,
             });
             return;
           }
         } catch {}
 
-        // No saved state for new server — clear tabs, route-sync will add Dashboard
-        set({ tabs: {}, tabOrder: [], activeTabId: null });
+        // No saved state for new server — start with just the dashboard tab
+        const ensured = ensureDashboardTab({}, []);
+        set({ ...ensured, activeTabId: DASHBOARD_TAB_ID });
       },
     }),
     {
@@ -293,6 +325,17 @@ export const useTabStore = create<TabState>()(
         tabOrder: state.tabOrder,
         activeTabId: state.activeTabId,
       }),
+      // On rehydration, ensure dashboard tab is always present
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const ensured = ensureDashboardTab(state.tabs, state.tabOrder);
+          state.tabs = ensured.tabs;
+          state.tabOrder = ensured.tabOrder;
+          if (!state.activeTabId) {
+            state.activeTabId = DASHBOARD_TAB_ID;
+          }
+        }
+      },
     }
   )
 );

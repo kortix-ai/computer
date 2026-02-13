@@ -1,7 +1,7 @@
 /**
  * Platform API client.
  *
- * Talks to kortix-platform (platform.kortix.com) for sandbox lifecycle:
+ * Routes through kortix-api (the unified backend) for sandbox lifecycle:
  *   GET  /v1/account/providers          — available sandbox providers
  *   POST /v1/account/init               — ensure user has a sandbox, provision if needed
  *   GET  /v1/account/sandbox            — get user's active sandbox
@@ -10,21 +10,29 @@
  *   POST /v1/account/sandbox/:id/stop   — stop a running sandbox
  *   DELETE /v1/account/sandbox/:id      — remove a sandbox
  *
- * Auth: Supabase JWT passed as Bearer token (same as all other services).
+ * Auth: Supabase JWT passed as Bearer token.
+ *
+ * In production: https://api.kortix.com/v1/account/*
+ * In local:      http://localhost:8008/v1/account/*
  */
 
 import { getSupabaseAccessToken } from '@/lib/auth-token';
 
+/**
+ * Get the base URL for platform API calls.
+ *
+ * Uses NEXT_PUBLIC_BACKEND_URL (e.g. "https://api.kortix.com/v1") with /v1 stripped,
+ * since the request paths already include the /v1 prefix.
+ */
 function getPlatformUrl(): string {
-  // Explicit override takes priority
-  if (process.env.NEXT_PUBLIC_PLATFORM_URL) {
-    return process.env.NEXT_PUBLIC_PLATFORM_URL;
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (backendUrl) {
+    // NEXT_PUBLIC_BACKEND_URL is e.g. "https://api.kortix.com/v1" — strip /v1
+    return backendUrl.replace(/\/v1\/?$/, '');
   }
-  // Derive from environment mode
-  const mode = process.env.NEXT_PUBLIC_ENV_MODE;
-  if (mode === 'production') return 'https://platform.kortix.com';
-  if (mode === 'staging') return 'https://platform.kortix.com';
-  return 'http://localhost:8012';
+
+  // Fallback for local dev
+  return 'http://localhost:8008';
 }
 
 const PLATFORM_URL = getPlatformUrl();
@@ -103,6 +111,55 @@ export function getSandboxUrl(sandbox: SandboxInfo): string {
     return sandbox.base_url;
   }
   return `https://kortix.cloud/${sandbox.external_id}/8000`;
+}
+
+/**
+ * Build a URL to access a specific container port on a sandbox.
+ *
+ * - Daytona: `https://kortix.cloud/{externalId}/{containerPort}`
+ * - Local Docker: reads `metadata.mappedPorts[containerPort]` →
+ *   `http://localhost:{hostPort}`. Returns null if no mapping exists.
+ * - Falls back to null if the port can't be resolved.
+ */
+export function getSandboxPortUrl(
+  sandbox: SandboxInfo,
+  containerPort: string,
+): string | null {
+  if (sandbox.provider === 'daytona') {
+    return `https://kortix.cloud/${sandbox.external_id}/${containerPort}`;
+  }
+
+  if (sandbox.provider === 'local_docker') {
+    const mappedPorts = sandbox.metadata?.mappedPorts as
+      | Record<string, string>
+      | undefined;
+    const hostPort = mappedPorts?.[containerPort];
+    if (!hostPort) return null;
+    // base_url is http://localhost:{somePort} — extract the hostname
+    try {
+      const base = new URL(sandbox.base_url);
+      return `${base.protocol}//${base.hostname}:${hostPort}`;
+    } catch {
+      return `http://localhost:${hostPort}`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract mappedPorts from sandbox metadata (convenience for storing in ServerEntry).
+ * Returns undefined if not available.
+ */
+export function extractMappedPorts(
+  sandbox: SandboxInfo,
+): Record<string, string> | undefined {
+  if (sandbox.provider !== 'local_docker') return undefined;
+  const ports = sandbox.metadata?.mappedPorts;
+  if (ports && typeof ports === 'object' && !Array.isArray(ports)) {
+    return ports as Record<string, string>;
+  }
+  return undefined;
 }
 
 /**

@@ -1,6 +1,6 @@
 # Kortix
 
-Open-source autonomous computer use agent. Monorepo with a Next.js frontend and 6 Bun/Hono backend services.
+Open-source autonomous computer use agent. Monorepo with a Next.js frontend and a unified Bun/Hono backend API.
 
 ## Architecture
 
@@ -8,13 +8,19 @@ Open-source autonomous computer use agent. Monorepo with a Next.js frontend and 
 apps/
   frontend/          Next.js 16 — dashboard UI            :3000
 services/
-  kortix-router/     API gateway, LLM routing, tools      :8008
-  kortix-auth/       Authentication, API keys              :8009
-  kortix-cloud/      Sandbox management (Daytona)          :8010
-  kortix-cron/       Scheduled tasks, triggers             :8011
-  kortix-platform/   Account init, sandbox provisioning    :8012
-  kortix-billing/    Stripe/RevenueCat billing             :8013
+  kortix-api/        Unified backend (all services)        :8008
+packages/
+  db/                Shared database layer (Drizzle ORM)
+sandbox/
+  docker-compose.yml Local Docker sandbox configuration
 ```
+
+The `kortix-api` monolith combines all backend functionality into a single service:
+- **Router** — API gateway, LLM routing, search & tool proxying
+- **Billing** — Stripe/RevenueCat subscriptions, credits, webhooks
+- **Platform** — Account init, sandbox provisioning (Daytona + Local Docker)
+- **Cron** — Scheduled triggers, execution management
+- **Daytona Proxy** — Preview proxy for cloud sandboxes
 
 ## Prerequisites
 
@@ -37,11 +43,9 @@ cp .env.example .env
 # 3. Generate per-service .env files
 pnpm run env
 
-# 4. Start everything (frontend + all services)
+# 4. Start everything (frontend + backend)
 pnpm dev
 ```
-
-That's it. One command starts all 7 processes in parallel via Nx.
 
 ## Environment Setup
 
@@ -63,15 +67,15 @@ pnpm run env                      # uses .env (default)
 
 ### Optional Variables
 
-| Variable | Used by | Description |
-|----------|---------|-------------|
-| `API_KEY_SECRET` | auth, router | Shared HMAC secret for API key hashing |
-| `STRIPE_SECRET_KEY` | auth, billing | Stripe secret key |
-| `DAYTONA_API_KEY` | cloud, platform | Daytona sandbox management |
-| `OPENROUTER_API_KEY` | router | LLM provider (fill at least one) |
-| `ANTHROPIC_API_KEY` | router | LLM provider |
-| `OPENAI_API_KEY` | router | LLM provider |
-| `TAVILY_API_KEY` | router | Web search provider |
+| Variable | Description |
+|----------|-------------|
+| `API_KEY_SECRET` | Shared HMAC secret for API key hashing |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `DAYTONA_API_KEY` | Daytona sandbox management |
+| `OPENROUTER_API_KEY` | LLM provider (fill at least one) |
+| `ANTHROPIC_API_KEY` | LLM provider |
+| `OPENAI_API_KEY` | LLM provider |
+| `TAVILY_API_KEY` | Web search provider |
 
 See `.env.example` for the full list.
 
@@ -79,14 +83,11 @@ See `.env.example` for the full list.
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Start frontend + all 6 backend services |
-| `pnpm dev:services` | Start only the 6 backend services |
+| `pnpm dev` | Start frontend + backend API |
+| `pnpm dev:services` | Start only the backend API |
 | `pnpm dev:frontend` | Start only the frontend |
-| `pnpm dev:router` | Start only kortix-router |
-| `pnpm dev:auth` | Start only kortix-auth |
-| `pnpm dev:cloud` | Start only kortix-cloud |
-| `pnpm dev:cron` | Start only kortix-cron |
-| `pnpm stripe` | Forward Stripe webhooks to kortix-billing |
+| `pnpm dev:api` | Start only kortix-api |
+| `pnpm stripe` | Forward Stripe webhooks to kortix-api |
 | `pnpm build` | Build all packages |
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm graph` | Visualize dependency graph |
@@ -99,7 +100,7 @@ To test Stripe webhooks locally:
 # Terminal 1 — start services
 pnpm dev
 
-# Terminal 2 — forward Stripe events to billing service
+# Terminal 2 — forward Stripe events to the API
 pnpm stripe
 ```
 
@@ -142,19 +143,12 @@ kubectl apply -k k8s/overlays/staging      # deploy to staging
 kubectl apply -k k8s/overlays/production   # deploy to production
 ```
 
-Each service gets a Deployment, ClusterIP Service, and HorizontalPodAutoscaler (1-5 replicas, 70% CPU target).
-
 ## Service Ports
 
 | Service | Port |
 |---------|------|
 | frontend | 3000 |
-| kortix-router | 8008 |
-| kortix-auth | 8009 |
-| kortix-cloud | 8010 |
-| kortix-cron | 8011 |
-| kortix-platform | 8012 |
-| kortix-billing | 8013 |
+| kortix-api | 8008 |
 
 ## License
 

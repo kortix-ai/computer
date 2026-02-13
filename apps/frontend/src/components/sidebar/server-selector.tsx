@@ -20,7 +20,7 @@ import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
-import { initAccount, getSandboxUrl, type SandboxProviderName } from '@/lib/platform-client';
+import { initAccount, getSandboxUrl, extractMappedPorts, type SandboxProviderName } from '@/lib/platform-client';
 import { useProviders } from '@/hooks/platform/use-sandbox';
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { SANDBOX_SERVER_ID } from '@/hooks/platform/use-sandbox';
@@ -428,7 +428,7 @@ function InstanceManagerDialog({
       const { sandbox } = await initAccount(provider ? { provider } : undefined);
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
 
-      // Use setState directly to inject provider + sandboxId metadata
+      // Use setState directly to inject provider + sandboxId + mappedPorts metadata
       const newId = `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
       useServerStore.setState((state) => ({
         servers: [
@@ -439,6 +439,7 @@ function InstanceManagerDialog({
             url: getSandboxUrl(sandbox),
             provider: sandbox.provider,
             sandboxId: sandbox.sandbox_id,
+            mappedPorts: extractMappedPorts(sandbox),
           },
         ],
       }));

@@ -96,12 +96,14 @@ export function hasLocalhostUrls(text: string): boolean {
  * @param port - The port number to proxy
  * @param path - The path to append (e.g. "/api/docs")
  * @param serverUrl - The active OpenCode server URL (e.g. "https://kortix.cloud/abc123/8000" or "http://localhost:4096")
+ * @param mappedPorts - Optional container-port → host-port map from Docker (for local_docker multi-sandbox)
  * @returns The proxied URL
  */
 export function rewriteLocalhostUrl(
   port: number,
   path: string,
   serverUrl: string,
+  mappedPorts?: Record<string, string>,
 ): string {
   // Server URL points to the OpenCode API (:4096 or via kortix-master on :8000).
   // In cloud mode: https://kortix.cloud/{sandboxId}/8000
@@ -116,15 +118,19 @@ export function rewriteLocalhostUrl(
     return `${base}/proxy/${port}${path}`;
   }
 
-  // Local mode: use localhost:8000 (kortix-master) instead of :4096 (OpenCode)
+  // Local mode: use kortix-master's proxy endpoint
+  // If mappedPorts is available, look up the host port for container port 8000
+  // (that's where kortix-master listens inside the container).
+  // Otherwise fall back to hardcoded 8000 for backwards compat (single-sandbox).
   try {
     const url = new URL(serverUrl);
-    url.port = '8000';
+    const masterHostPort = mappedPorts?.['8000'] ?? '8000';
+    url.port = masterHostPort;
     const base = url.origin;
     return `${base}/proxy/${port}${path}`;
   } catch {
-    // Fallback
-    return `http://localhost:8000/proxy/${port}${path}`;
+    const masterHostPort = mappedPorts?.['8000'] ?? '8000';
+    return `http://localhost:${masterHostPort}/proxy/${port}${path}`;
   }
 }
 
@@ -132,8 +138,12 @@ export function rewriteLocalhostUrl(
  * Build the proxy base URL for a given port (without path).
  * Used for opening preview tabs.
  */
-export function getProxyBaseUrl(port: number, serverUrl: string): string {
-  return rewriteLocalhostUrl(port, '/', serverUrl);
+export function getProxyBaseUrl(
+  port: number,
+  serverUrl: string,
+  mappedPorts?: Record<string, string>,
+): string {
+  return rewriteLocalhostUrl(port, '/', serverUrl, mappedPorts);
 }
 
 /**
