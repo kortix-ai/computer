@@ -1297,10 +1297,11 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       sessionStorage.removeItem('opencode_pending_prompt');
 
       // Restore agent/model/variant selections from the dashboard
+      let pendingOptions: Record<string, unknown> | null = null;
       try {
         const raw = sessionStorage.getItem('opencode_pending_options');
         if (raw) {
-          const pendingOptions = JSON.parse(raw);
+          pendingOptions = JSON.parse(raw);
           sessionStorage.removeItem('opencode_pending_options');
           if (pendingOptions?.agent) local.agent.set(pendingOptions.agent as string);
           if (pendingOptions?.model) local.model.set(pendingOptions.model as { providerID: string; modelID: string });
@@ -1308,6 +1309,23 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         }
       } catch {
         // ignore
+      }
+
+      // If the dashboard's send failed, retry it here
+      const sendFailed = sessionStorage.getItem('opencode_pending_send_failed');
+      if (sendFailed) {
+        sessionStorage.removeItem('opencode_pending_send_failed');
+        const options: Record<string, unknown> = {};
+        if (pendingOptions?.agent) options.agent = pendingOptions.agent;
+        if (pendingOptions?.model) options.model = pendingOptions.model;
+        if (pendingOptions?.variant) options.variant = pendingOptions.variant;
+        sendMessage.mutateAsync({
+          sessionId,
+          parts: [{ type: 'text', text: pendingPrompt }],
+          options: Object.keys(options).length > 0 ? options as any : undefined,
+        }).catch(() => {
+          // ignore — SSE will surface this now that listener is active
+        });
       }
 
       // Clean up the ?new=true from URL (without navigation)

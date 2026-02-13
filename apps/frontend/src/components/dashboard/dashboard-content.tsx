@@ -244,7 +244,8 @@ export function DashboardContent() {
           parts: [{ type: 'text', text }],
           options: Object.keys(options).length > 0 ? options as any : undefined,
         }).catch(() => {
-          // If send fails, the session page will show the error via SSE events
+          // Mark that the send failed so the session page can retry
+          sessionStorage.setItem('opencode_pending_send_failed', 'true');
         });
 
         // Step 4: Navigate to session (prompt already sent, ?new=true for optimistic display only)
