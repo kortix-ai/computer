@@ -17,6 +17,11 @@ import {
   Zap,
   Globe,
   X,
+  Unplug,
+  Loader2,
+  Brain,
+  Eye,
+  Paperclip,
 } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { Button } from '@/components/ui/button';
@@ -36,6 +41,9 @@ import { ManageModelsDialog, ConnectProviderDialog } from '@/components/session/
 import { flattenModels } from '@/components/session/session-chat-input';
 import { useModelStore } from '@/hooks/opencode/use-model-store';
 import { ModelProviderIcon } from '@/lib/model-provider-icons';
+import { getClient } from '@/lib/opencode-sdk';
+import { useQueryClient } from '@tanstack/react-query';
+import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 
 // ============================================================================
 // Types
@@ -400,6 +408,41 @@ const PROVIDER_LABELS: Record<string, string> = {
   vercel: 'Vercel',
 };
 
+function ProviderModelGrid({ models }: { models: Record<string, any> }) {
+  const entries = Object.values(models);
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-px bg-border/30 rounded-xl overflow-hidden border border-border/40">
+      {entries.map((m: any) => (
+        <div key={m.id} className="flex items-center gap-2.5 px-3 py-2 bg-card hover:bg-muted/30 transition-colors">
+          <span className="text-[13px] text-foreground/90 truncate flex-1">{m.name || m.id}</span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {m.reasoning && (
+              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-500 text-[10px] font-medium">
+                <Brain className="h-2.5 w-2.5" />
+                reasoning
+              </span>
+            )}
+            {m.attachment && (
+              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-500 text-[10px] font-medium">
+                <Paperclip className="h-2.5 w-2.5" />
+                files
+              </span>
+            )}
+            {(m as any).capabilities?.input?.image && (
+              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[10px] font-medium">
+                <Eye className="h-2.5 w-2.5" />
+                vision
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ProvidersTab({
   draft,
   config,
@@ -409,6 +452,7 @@ function ProvidersTab({
   config: Config;
   onDraft: (key: string, value: unknown) => void;
 }) {
+  const queryClient = useQueryClient();
   const { data: providers } = useOpenCodeProviders();
   const disabledProviders = (draft.disabled_providers as string[]) ?? config.disabled_providers ?? [];
   const enabledProviders = (draft.enabled_providers as string[]) ?? config.enabled_providers;
@@ -416,6 +460,7 @@ function ProvidersTab({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [connectProviderOpen, setConnectProviderOpen] = useState(false);
   const [manageModelsOpen, setManageModelsOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
   const allProviders = useMemo(() => providers?.all ?? [], [providers]);
   const connectedIds = useMemo(() => new Set(providers?.connected ?? []), [providers]);
@@ -442,54 +487,27 @@ function ProvidersTab({
     }
   };
 
-  const renderProviderCard = (p: typeof allProviders[0], showToggle: boolean) => {
-    const modelCount = Object.keys(p.models).length;
-    const isExp = expanded === p.id;
-    const isConnected = connectedIds.has(p.id);
-    return (
-      <SpotlightCard key={p.id} className="bg-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <button
-              className="flex items-center gap-2.5 text-sm font-medium text-foreground"
-              onClick={() => setExpanded(isExp ? null : p.id)}
-            >
-              <ModelProviderIcon modelId={p.id} size={20} />
-              {isExp ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              {PROVIDER_LABELS[p.id] || p.name || p.id}
-              <span className="text-xs text-muted-foreground font-normal">
-                {modelCount} model{modelCount !== 1 ? 's' : ''}
-              </span>
-              {isConnected && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  connected
-                </span>
-              )}
-            </button>
-            <div className="flex items-center gap-2">
-              {showToggle && <Toggle checked={!isDisabled(p.id)} onChange={() => toggleProvider(p.id)} />}
-            </div>
-          </div>
-          {isExp && (
-            <div className="mt-3 ml-8 space-y-1">
-              {Object.values(p.models).map((m) => (
-                <div key={m.id} className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-mono">{m.id}</span>
-                  {m.reasoning && <span className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500 text-[10px]">reasoning</span>}
-                  {m.attachment && <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 text-[10px]">attachments</span>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </SpotlightCard>
-    );
-  };
+  const handleDisconnect = useCallback(async (providerID: string) => {
+    setDisconnecting(providerID);
+    try {
+      const client = getClient();
+      await client.auth.set({
+        providerID,
+        auth: { type: 'api', key: '' },
+      } as any);
+      await client.global.dispose();
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.providers() });
+    } catch {
+      // ignore errors
+    } finally {
+      setDisconnecting(null);
+    }
+  }, [queryClient]);
 
   return (
     <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
       {/* Action buttons */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-5">
         <Button
           variant="outline"
           size="sm"
@@ -515,20 +533,74 @@ function ProvidersTab({
         Connected Providers
         <span className="ml-2 text-muted-foreground/60 font-normal normal-case">({connectedProviders.length})</span>
       </h3>
-      <div className="space-y-2 mb-6">
+      <div className="space-y-3 mb-6">
         {connectedProviders.length > 0 ? (
-          connectedProviders.map((p) => renderProviderCard(p, true))
+          connectedProviders.map((p) => {
+            const modelCount = Object.keys(p.models).length;
+            const isExp = expanded === p.id;
+            const isDisc = disconnecting === p.id;
+            return (
+              <SpotlightCard key={p.id} className="bg-card">
+                <div className="p-4 sm:p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex-shrink-0">
+                      <ModelProviderIcon modelId={p.id} size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-foreground">{PROVIDER_LABELS[p.id] || p.name || p.id}</span>
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          connected
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{modelCount} model{modelCount !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Toggle checked={!isDisabled(p.id)} onChange={() => toggleProvider(p.id)} />
+                      <button
+                        onClick={() => handleDisconnect(p.id)}
+                        disabled={isDisc}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Disconnect provider"
+                      >
+                        {isDisc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unplug className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expand/collapse models */}
+                  <button
+                    onClick={() => setExpanded(isExp ? null : p.id)}
+                    className="flex items-center gap-1 mt-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {isExp ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {isExp ? 'Hide models' : 'Show models'}
+                  </button>
+
+                  {isExp && <ProviderModelGrid models={p.models} />}
+                </div>
+              </SpotlightCard>
+            );
+          })
         ) : (
           <SpotlightCard className="bg-card">
-            <div className="p-6 text-center">
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 bg-muted/50 rounded-2xl flex items-center justify-center mb-3">
+                <Zap className="h-6 w-6 text-muted-foreground" />
+              </div>
               <p className="text-sm text-muted-foreground">No providers connected yet</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Click "Connect Provider" to get started</p>
+              <p className="text-xs text-muted-foreground/60 mt-1 mb-3">Connect a provider to start using AI models</p>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConnectProviderOpen(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                Connect Provider
+              </Button>
             </div>
           </SpotlightCard>
         )}
       </div>
 
-      {/* Disconnected / available providers */}
+      {/* Available (disconnected) providers */}
       {disconnectedProviders.length > 0 && (
         <>
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
@@ -536,7 +608,32 @@ function ProvidersTab({
             <span className="ml-2 text-muted-foreground/60 font-normal normal-case">({disconnectedProviders.length})</span>
           </h3>
           <div className="space-y-2 mb-6">
-            {disconnectedProviders.map((p) => renderProviderCard(p, false))}
+            {disconnectedProviders.map((p) => {
+              const modelCount = Object.keys(p.models).length;
+              const isExp = expanded === p.id;
+              return (
+                <SpotlightCard key={p.id} className="bg-card">
+                  <div className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted/30 flex-shrink-0 opacity-60">
+                        <ModelProviderIcon modelId={p.id} size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-foreground/70">{PROVIDER_LABELS[p.id] || p.name || p.id}</span>
+                        <span className="text-xs text-muted-foreground/50 ml-2">{modelCount} model{modelCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <button
+                        onClick={() => setExpanded(isExp ? null : p.id)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                      >
+                        {isExp ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    {isExp && <ProviderModelGrid models={p.models} />}
+                  </div>
+                </SpotlightCard>
+              );
+            })}
           </div>
         </>
       )}
