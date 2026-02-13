@@ -9,6 +9,10 @@
  *
  * The hook is idempotent — calling init multiple times returns the
  * same sandbox if one already exists.
+ *
+ * In LOCAL mode, the platform API is skipped entirely — the user's
+ * default server (NEXT_PUBLIC_OPENCODE_URL) is used directly.
+ * Instances can be added manually via the Instance Manager dialog.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +27,8 @@ import {
 import { useServerStore } from '@/stores/server-store';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useRef } from 'react';
+
+const IS_LOCAL = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
 
 const SANDBOX_SERVER_ID = 'cloud-sandbox';
 
@@ -93,7 +99,10 @@ export function useSandbox() {
       const result = await initAccount();
       return result.sandbox;
     },
-    enabled: !!user,
+    // In local mode, skip the platform API entirely.
+    // The user's default server (from NEXT_PUBLIC_OPENCODE_URL) is used directly;
+    // additional instances can be added manually via the Instance Manager.
+    enabled: !!user && !IS_LOCAL,
     staleTime: 5 * 60 * 1000, // 5 minutes — sandbox doesn't change often
     retry: 2,
     refetchOnWindowFocus: false,
@@ -123,6 +132,7 @@ export function useSandbox() {
 
 /**
  * useProviders — fetch available sandbox providers from the platform.
+ * Disabled in local mode (no kortix-api to query).
  */
 export function useProviders() {
   const { user } = useAuth();
@@ -130,7 +140,7 @@ export function useProviders() {
   return useQuery({
     queryKey: ['platform', 'providers'],
     queryFn: getProviders,
-    enabled: !!user,
+    enabled: !!user && !IS_LOCAL,
     staleTime: 10 * 60 * 1000, // 10 minutes
     retry: 1,
     refetchOnWindowFocus: false,
