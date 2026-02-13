@@ -654,6 +654,7 @@ function SessionTurn({
   isFirstTurn,
   isBusy,
   isReverted,
+  isCompaction,
   onFork,
   onRevert,
 }: SessionTurnProps) {
@@ -840,6 +841,28 @@ function SessionTurn({
             <span className="break-all">{turnError}</span>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // Compaction mode — render as a distinct card, no user bubble / logo / steps
+  // ============================================================================
+
+  if (isCompaction && !working && response) {
+    return (
+      <div className="group/turn">
+        <div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-muted/40">
+            <Layers className="size-3.5 text-muted-foreground/70" />
+            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+              Compaction
+            </span>
+          </div>
+          <div className="px-4 py-3 text-sm text-muted-foreground/90 [&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_strong]:text-foreground/90">
+            <SandboxUrlDetector content={response} isStreaming={false} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -1427,24 +1450,37 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     });
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll to bottom once messages finish loading (initial load / session open)
-  const prevMessagesLoadingRef = useRef(messagesLoading);
+  // Scroll to bottom after messages are rendered on initial session open.
+  // The loading guard (early return above) unmounts the scroll container while
+  // loading, so we cannot rely on loading-state transitions — the ref is null
+  // at that point. Instead we watch `messages` and fire once per session when
+  // content first becomes available in the DOM.
+  const initialScrollDoneRef = useRef<string | null>(null);
   useEffect(() => {
-    const wasLoading = prevMessagesLoadingRef.current;
-    prevMessagesLoadingRef.current = messagesLoading;
-
-    // Only scroll when loading transitions from true → false (messages just arrived)
-    if (wasLoading && !messagesLoading) {
-      const el = scrollRef.current;
-      if (!el) return;
-      // Double rAF to ensure DOM has painted the new messages before scrolling
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          el.scrollTop = el.scrollHeight;
-        });
-      });
+    if (initialScrollDoneRef.current !== sessionId) {
+      initialScrollDoneRef.current = null;
     }
-  }, [messagesLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (initialScrollDoneRef.current === sessionId) return;
+    if (!messages || messages.length === 0) return;
+    initialScrollDoneRef.current = sessionId;
+
+    const scrollDown = () => {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    };
+
+    // Staggered attempts: the scroll container mounts after this render,
+    // then message components (markdown, code blocks) render asynchronously.
+    requestAnimationFrame(scrollDown);
+    const t1 = setTimeout(scrollDown, 150);
+    const t2 = setTimeout(scrollDown, 500);
+    const t3 = setTimeout(scrollDown, 1000);
+
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [messages, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Pending permissions & questions ----
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);
@@ -1805,13 +1841,13 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
                 {/* Turn-based message rendering */}
                 {turns.map((turn, turnIndex) => {
-                  // Check if this turn has a compaction part
+                  // Check if this turn is a compaction summary
+                  // The server sets `summary: true` on assistant messages that are compaction summaries
                   const hasCompaction = turn.assistantMessages.some(
+                    (msg) => (msg.info as any).summary === true
+                  ) || turn.assistantMessages.some(
                     (msg) => msg.parts.some((p) => p.type === 'compaction')
                   );
-                  const compactionPart = hasCompaction
-                    ? turn.assistantMessages.flatMap((m) => m.parts).find((p) => p.type === 'compaction')
-                    : null;
 
                   return (
                     <div key={turn.userMessage.info.id}>
@@ -1844,6 +1880,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                         isFirstTurn={turnIndex === 0}
                         isBusy={isBusy}
                         isReverted={isReverted}
+                        isCompaction={hasCompaction}
                         onFork={handleFork}
                         onRevert={handleRevert}
                       />
