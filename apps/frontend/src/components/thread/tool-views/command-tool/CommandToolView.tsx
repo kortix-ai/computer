@@ -70,9 +70,24 @@ export function CommandToolView({
   // Use smooth command when streaming
   const displayCommand = isStreaming && smoothCommand ? smoothCommand : command;
   
-  // Auto-scroll to bottom when streaming output updates
+  // Track whether user has scrolled away in this tool's output area
+  const userScrolledRef = useRef(false);
+
+  // Detect user scroll within the command output
   useEffect(() => {
-    if (isOutputStreaming && scrollRef.current) {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+      userScrolledRef.current = !atBottom;
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll to bottom when streaming output updates (respects user scroll)
+  useEffect(() => {
+    if (isOutputStreaming && scrollRef.current && !userScrolledRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [streamingOutput, isOutputStreaming]);
