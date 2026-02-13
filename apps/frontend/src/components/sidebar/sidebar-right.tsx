@@ -1,15 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
   FolderTree,
   TerminalSquare,
   Monitor,
+  Globe,
   Search,
-  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -27,67 +27,7 @@ import { useFilesStore } from '@/features/files/store/files-store';
 import { useServerStore } from '@/stores/server-store';
 import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { useTabStore } from '@/stores/tab-store';
-
-// ============================================================================
-// Desktop Overlay — fullscreen noVNC iframe
-// ============================================================================
-
-function DesktopOverlay({ onClose }: { onClose: () => void }) {
-  const activeServer = useServerStore((s) => {
-    return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
-  });
-
-  const desktopUrl = useMemo(() => {
-    if (!activeServer) return 'http://localhost:6080';
-
-    // Daytona: route through cloud subdomain
-    if (activeServer.provider === 'daytona' && activeServer.sandboxId) {
-      return `https://kortix.cloud/${activeServer.sandboxId}/6080`;
-    }
-
-    // Local Docker: use the dynamic mapped port for container port 6080
-    if (activeServer.provider === 'local_docker' && activeServer.mappedPorts?.['6080']) {
-      try {
-        const base = new URL(activeServer.url);
-        return `${base.protocol}//${base.hostname}:${activeServer.mappedPorts['6080']}`;
-      } catch {
-        return `http://localhost:${activeServer.mappedPorts['6080']}`;
-      }
-    }
-
-    // Default/non-managed server: assume port 6080 on the same host
-    try {
-      const url = new URL(activeServer.url);
-      url.port = '6080';
-      return url.toString();
-    } catch {
-      return 'http://localhost:6080';
-    }
-  }, [activeServer]);
-
-  return (
-    <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
-      <div className="flex-shrink-0 h-10 flex items-center justify-between px-4 bg-zinc-900 border-b border-zinc-800">
-        <div className="flex items-center gap-2">
-          <Monitor className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="text-xs font-medium text-zinc-300">Desktop</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <iframe
-        src={desktopUrl}
-        className="flex-1 w-full h-full border-0"
-        allow="clipboard-read; clipboard-write"
-        title="Desktop"
-      />
-    </div>
-  );
-}
+import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
 
 // ============================================================================
 // Main Right Sidebar — Explorer + action buttons
@@ -103,7 +43,12 @@ export function SidebarRight() {
   } = useRightSidebar();
 
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
-  const [showDesktop, setShowDesktop] = useState(false);
+
+  const activeServer = useServerStore((s) => {
+    return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
+  });
+  const serverUrl = activeServer?.url || 'http://localhost:4096';
+  const mappedPorts = activeServer?.mappedPorts;
 
   // Create new PTY terminal → opens as a tab
   const createPty = useCreatePty();
@@ -124,21 +69,41 @@ export function SidebarRight() {
     }
   }, [createPty]);
 
-  const handleOpenDesktop = useCallback(() => {
-    setShowDesktop(true);
-  }, []);
+  /** Open a sandbox port as a preview tab using the proxy system. */
+  const openPreviewTab = useCallback(
+    (port: number, title: string) => {
+      const proxyUrl = getProxyBaseUrl(port, serverUrl, mappedPorts);
+      const tabId = `preview:${port}`;
+      const tabHref = `/preview/${port}`;
 
-  const handleCloseDesktop = useCallback(() => {
-    setShowDesktop(false);
-  }, []);
+      useTabStore.getState().openTab({
+        id: tabId,
+        title,
+        type: 'preview',
+        href: tabHref,
+        metadata: {
+          url: proxyUrl,
+          port,
+          originalUrl: `http://localhost:${port}/`,
+        },
+      });
+      window.history.pushState(null, '', tabHref);
+    },
+    [serverUrl, mappedPorts],
+  );
+
+  const handleOpenDesktop = useCallback(() => {
+    openPreviewTab(6080, 'Desktop');
+  }, [openPreviewTab]);
+
+  const handleOpenAgentBrowser = useCallback(() => {
+    openPreviewTab(9224, 'Agent Browser');
+  }, [openPreviewTab]);
 
   if (isMobile) return null;
 
   return (
     <>
-      {/* Desktop fullscreen overlay */}
-      {showDesktop && <DesktopOverlay onClose={handleCloseDesktop} />}
-
       {/* Gap element — takes space in flex layout so content area shrinks */}
       <div
         className="relative shrink-0 bg-transparent transition-[width] duration-300 ease-out will-change-[width] transform-gpu"
@@ -283,6 +248,23 @@ export function SidebarRight() {
                   Desktop
                 </TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleOpenAgentBrowser}
+                    className={cn(
+                      'flex items-center justify-center h-9 w-9 rounded-xl cursor-pointer',
+                      'transition-all duration-150 ease-out',
+                      'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+                    )}
+                  >
+                    <Globe className="h-[18px] w-[18px]" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Agent Browser
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* --- Expanded content --- */}
@@ -319,7 +301,18 @@ export function SidebarRight() {
                   )}
                 >
                   <Monitor className="w-3.5 h-3.5" />
-                  <span>Open Desktop</span>
+                  <span>Desktop</span>
+                </button>
+                <button
+                  onClick={handleOpenAgentBrowser}
+                  className={cn(
+                    'w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg',
+                    'text-xs font-medium transition-all duration-150 ease-out cursor-pointer',
+                    'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40',
+                  )}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Agent Browser</span>
                 </button>
               </div>
             </div>
