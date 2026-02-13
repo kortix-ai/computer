@@ -89,7 +89,7 @@ export function useDownloadRestriction(options?: UseDownloadRestrictionOptions):
   }, [isRestricted, showUpgradePrompt]);
 
   return {
-    isRestricted,
+    isRestricted: isRestricted ?? false,
     withRestrictionCheck,
     showUpgradePrompt,
     // Keep openUpgradeModal as alias for backward compatibility

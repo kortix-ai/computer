@@ -14,10 +14,10 @@ import {
   ThreadLimitError,
   formatTierErrorForUI
 } from '@/lib/api/errors';
-import { isTierRestrictionError } from '@agentpress/shared/errors';
+import { isTierRestrictionError } from '@kortix/shared/errors';
 // optimistic-files-store was removed with legacy thread system
 import { usePricingModalStore } from '@/stores/pricing-modal-store';
-import { normalizeFilenameToNFC } from '@agentpress/shared';
+import { normalizeFilenameToNFC } from '@kortix/shared';
 import { 
   getStreamPreconnectService, 
   storePreconnectInfo 

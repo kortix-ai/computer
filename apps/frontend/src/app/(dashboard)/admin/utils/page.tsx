@@ -128,7 +128,7 @@ export default function AdminUtilsPage() {
 
             <TechnicalIssueCard
               enabled={status?.technical_issue.enabled ?? false}
-              message={status?.technical_issue.message}
+              message={status?.technical_issue.message ?? undefined}
               onClick={() => setTechnicalIssueDialogOpen(true)}
             />
           </div>

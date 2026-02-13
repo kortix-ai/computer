@@ -38,6 +38,27 @@ export const sessionModeEnum = kortixSchema.enum('session_mode', [
   'reuse',
 ]);
 
+export const sandboxProviderEnum = kortixSchema.enum('sandbox_provider', [
+  'daytona',
+  'local_docker',
+]);
+
+export const deploymentStatusEnum = kortixSchema.enum('deployment_status', [
+  'pending',
+  'building',
+  'deploying',
+  'active',
+  'failed',
+  'stopped',
+]);
+
+export const deploymentSourceEnum = kortixSchema.enum('deployment_source', [
+  'git',
+  'code',
+  'files',
+  'tar',
+]);
+
 // ─── Sandboxes ───────────────────────────────────────────────────────────────
 export const sandboxes = kortixSchema.table(
   'sandboxes',
@@ -45,6 +66,7 @@ export const sandboxes = kortixSchema.table(
     sandboxId: uuid('sandbox_id').defaultRandom().primaryKey(),
     accountId: uuid('account_id').notNull(),
     name: varchar('name', { length: 255 }).notNull(),
+    provider: sandboxProviderEnum('provider').default('daytona').notNull(),
     externalId: text('external_id'),
     status: sandboxStatusEnum('status').default('provisioning').notNull(),
     baseUrl: text('base_url').notNull(),
@@ -127,10 +149,51 @@ export const executions = kortixSchema.table(
   ],
 );
 
+// ─── Deployments ─────────────────────────────────────────────────────────────
+export const deployments = kortixSchema.table(
+  'deployments',
+  {
+    deploymentId: uuid('deployment_id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').notNull(),
+    sandboxId: uuid('sandbox_id').references(() => sandboxes.sandboxId, { onDelete: 'set null' }),
+    freestyleId: text('freestyle_id'),
+    status: deploymentStatusEnum('status').default('pending').notNull(),
+
+    // Source
+    sourceType: deploymentSourceEnum('source_type').notNull(),
+    sourceRef: text('source_ref'),
+    sourcePath: text('source_path'),
+    framework: varchar('framework', { length: 50 }),
+
+    // Config
+    domains: jsonb('domains').default([]).$type<string[]>(),
+    liveUrl: text('live_url'),
+    envVarKeys: jsonb('env_var_keys').default([]).$type<string[]>(),
+    buildConfig: jsonb('build_config').$type<Record<string, unknown>>(),
+    entrypoint: text('entrypoint'),
+
+    // Metadata
+    error: text('error'),
+    version: integer('version').default(1).notNull(),
+    metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_deployments_account').on(table.accountId),
+    index('idx_deployments_sandbox').on(table.sandboxId),
+    index('idx_deployments_status').on(table.status),
+    index('idx_deployments_live_url').on(table.liveUrl),
+    index('idx_deployments_created').on(table.createdAt),
+  ],
+);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const sandboxesRelations = relations(sandboxes, ({ many }) => ({
   triggers: many(triggers),
   executions: many(executions),
+  deployments: many(deployments),
 }));
 
 export const triggersRelations = relations(triggers, ({ one, many }) => ({
@@ -148,6 +211,13 @@ export const executionsRelations = relations(executions, ({ one }) => ({
   }),
   sandbox: one(sandboxes, {
     fields: [executions.sandboxId],
+    references: [sandboxes.sandboxId],
+  }),
+}));
+
+export const deploymentsRelations = relations(deployments, ({ one }) => ({
+  sandbox: one(sandboxes, {
+    fields: [deployments.sandboxId],
     references: [sandboxes.sandboxId],
   }),
 }));

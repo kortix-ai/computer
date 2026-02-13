@@ -1,4 +1,4 @@
-# @agentpress/shared
+# @kortix/shared
 
 Shared TypeScript code for AgentPress frontend (Next.js) and mobile (React Native) applications.
 
@@ -18,7 +18,7 @@ This package uses workspace dependencies. In the consuming app's `package.json`:
 ```json
 {
   "dependencies": {
-    "@agentpress/shared": "workspace:*"
+    "@kortix/shared": "workspace:*"
   }
 }
 ```
@@ -33,7 +33,7 @@ import type {
   ParsedContent, 
   ParsedMetadata,
   MessageGroup 
-} from '@agentpress/shared/types';
+} from '@kortix/shared/types';
 ```
 
 ### Streaming Utilities
@@ -45,7 +45,7 @@ import {
   isAskOrCompleteTool,
   findAskOrCompleteTool,
   extractStreamingAskCompleteContent 
-} from '@agentpress/shared/streaming';
+} from '@kortix/shared/streaming';
 
 // Extract text from partial JSON during streaming
 const text = extractTextFromPartialJson('{"text": "Hello wor');
@@ -65,7 +65,7 @@ import {
   getToolIconKey,
   TOOL_DISPLAY_NAMES,
   HIDE_STREAMING_XML_TAGS 
-} from '@agentpress/shared/tools';
+} from '@kortix/shared/tools';
 
 // Get display name
 const name = getUserFriendlyToolName('execute-command');
@@ -82,7 +82,7 @@ The shared package provides icon **keys** (strings), not actual icon components.
 
 **Frontend (lucide-react):**
 ```typescript
-import { getToolIconKey } from '@agentpress/shared/tools';
+import { getToolIconKey } from '@kortix/shared/tools';
 import { Globe, FileEdit, Terminal, Wrench } from 'lucide-react';
 
 const ICON_MAP = {
@@ -100,7 +100,7 @@ export function getToolIcon(toolName: string) {
 
 **Mobile (lucide-react-native):**
 ```typescript
-import { getToolIconKey } from '@agentpress/shared/tools';
+import { getToolIconKey } from '@kortix/shared/tools';
 import { Globe, FileEdit, Terminal, Wrench } from 'lucide-react-native';
 
 const ICON_MAP = {
@@ -124,7 +124,7 @@ import {
   groupMessages,
   getFirstMessage,
   getLastMessage 
-} from '@agentpress/shared/utils';
+} from '@kortix/shared/utils';
 
 // Parse JSON safely
 const data = safeJsonParse(jsonString, { default: 'value' });

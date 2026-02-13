@@ -298,7 +298,7 @@ export const ToolsManager: React.FC<ToolsManagerProps> = (props) => {
         <DialogFooter>
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
-              {!data?.has_mcp_config && data?.tools?.length > 0 && saveMode === 'direct' && (
+              {!data?.has_mcp_config && (data?.tools?.length ?? 0) > 0 && saveMode === 'direct' && (
                 <Alert className="p-2">
                   <Info className="h-3 w-3" />
                   <AlertDescription className="text-xs">

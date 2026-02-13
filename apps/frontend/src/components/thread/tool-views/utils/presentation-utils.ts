@@ -276,7 +276,7 @@ export const handleGoogleSlidesUpload = async (sandboxUrl: string, presentationP
       sandbox_url: sandboxUrl,
     }, {
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${session!.access_token}`,
       },
       timeout: 180000, // 3 minutes timeout for PPTX generation (longer than backend's 2 minute timeout)
     });

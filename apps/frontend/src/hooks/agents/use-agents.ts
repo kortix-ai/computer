@@ -114,7 +114,7 @@ export const useAgents = (
   });
 };
 
-export const useAgent = (agentId: string, options?) => {
+export const useAgent = (agentId: string, options?: any) => {
   return useQuery<Agent>({
     queryKey: agentKeys.detail(agentId),
     queryFn: () => getAgent(agentId),
@@ -131,7 +131,7 @@ export const useCreateAgent = () => {
   const queryClient = useQueryClient();
   
   return useMutation<Agent, Error, AgentUpdateRequest>({
-    mutationFn: createAgent,
+    mutationFn: createAgent as any,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: agentKeys.lists() });
       queryClient.setQueryData(agentKeys.detail(data.agent_id), data);

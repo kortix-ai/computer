@@ -105,8 +105,8 @@ export function CreateNewAgentToolView({
                   <div className="flex items-center gap-3">
                     <AgentAvatar
                       iconName={icon_name}
-                      iconColor={icon_color}
-                      backgroundColor={icon_background}
+                      iconColor={icon_color ?? undefined}
+                      backgroundColor={icon_background ?? undefined}
                       agentName={agentName}
                       size={48}
                     />

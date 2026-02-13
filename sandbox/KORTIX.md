@@ -6,7 +6,7 @@ This is a **Kortix Instance** — a self-contained, autonomous AI operating syst
 
 A Kortix Instance is the complete runtime environment for an autonomous AI agent. It is not a chatbot. It is not an assistant. It is a fully autonomous digital worker with its own identity, memory, tools, skills, and persistent state.
 
-Everything the agent needs to operate lives inside this sandbox — a Docker container running a full Ubuntu + KDE desktop environment with all services, tools, and runtimes pre-installed.
+Everything the agent needs to operate lives inside this sandbox — a Docker container running an Alpine Linux + XFCE desktop environment with all services, tools, and runtimes pre-installed.
 
 ---
 
@@ -45,9 +45,9 @@ Everything the agent needs to operate lives inside this sandbox — a Docker con
 ├── .browser-profile/                    ← Chromium profile data
 ├── .show-user/                          ← Show-user tool queue (queue.jsonl)
 │
-├── .config/                             ← KDE/app configuration (XDG_CONFIG_HOME)
+├── .config/                             ← XFCE/app configuration (XDG_CONFIG_HOME)
 ├── .local/                              ← XDG data and state
-├── Desktop/                             ← KDE desktop folder (symlinked presentations)
+├── Desktop/                             ← Desktop folder (symlinked presentations)
 └── ssl/                                 ← SSL certificates
 ```
 
@@ -66,7 +66,7 @@ Everything the agent needs to operate lives inside this sandbox — a Docker con
 
 ### Backward Compatibility
 
-The base Docker image (`linuxserver/webtop:ubuntu-kde`) historically used `/config` as the home directory. A symlink `/config → /workspace` exists for backward compatibility with any base image init scripts. **All new code should use `/workspace` directly.**
+The base Docker image (`linuxserver/webtop:latest` — Alpine XFCE) uses `/config` as the home directory. A symlink `/config → /workspace` exists for backward compatibility with any base image init scripts. **All new code should use `/workspace` directly.**
 
 ---
 
@@ -279,15 +279,15 @@ lss-sync (background)
 
 ### Base Image
 
-`linuxserver/webtop:ubuntu-kde` — provides a full Ubuntu desktop environment with:
-- KDE Plasma desktop
-- noVNC / Selkies for remote desktop access (port 6080)
-- s6-overlay for service management
-- Non-root user `abc` (UID 1000)
+`linuxserver/webtop:latest` — Alpine Linux XFCE providing:
+- XFCE desktop environment (lightweight, full-featured)
+- Selkies for remote desktop access (port 6080)
+- s6-overlay v3 for service management (s6-rc.d)
+- Non-root user `abc` (UID 911)
 
 ### Docker Layers
 
-1. **Base image** — Ubuntu + KDE + s6-overlay
+1. **Base image** — Alpine Linux + XFCE + s6-overlay v3
 2. **System runtimes** — Python 3, Node.js, Bun, uv, Playwright
 3. **LSS** — Local Semantic Search (pip package)
 4. **Agent Browser** — Headless browser automation (npm global + chromium patch)
@@ -295,7 +295,7 @@ lss-sync (background)
 6. **OpenCode config** — Agents, tools, skills, commands → `/opt/opencode/`
 7. **Kortix Master** — Reverse proxy → `/opt/kortix-master/`
 8. **Workspace setup** — Directory structure, permissions, `/config` symlink
-9. **Services** — s6 service definitions → `/etc/services.d/`
+9. **Services** — s6-rc.d longrun definitions → `/etc/s6-overlay/s6-rc.d/`
 10. **Init scripts** — Container init → `/custom-cont-init.d/`
 
 ### Volumes
@@ -307,7 +307,7 @@ lss-sync (background)
 
 ### Backward Compatibility Note
 
-The base image internally references `/config` as the home directory. A symlink `/config → /workspace` is created during the Docker build. This allows the base image's s6-overlay init scripts, KDE session management, and other LinuxServer.io conventions to continue working without modification. **All Kortix code uses `/workspace` directly.**
+The base image internally references `/config` as the home directory. A symlink `/config → /workspace` is created during the Docker build. This allows the base image's s6-overlay init scripts and other LinuxServer.io conventions to continue working without modification. **All Kortix code uses `/workspace` directly.**
 
 ### Cloud Deployment (Daytona)
 
@@ -337,10 +337,10 @@ In cloud mode, the container runs inside a Daytona sandbox:
 
 ### Resource Boundaries
 
-- The agent runs as user `abc` (UID 1000) but has `sudo` access
+- The agent runs as user `abc` (UID 911) but has `sudo` access
 - `/workspace` is fully writable — the agent can create any files or directories
 - `/opt/opencode/` is writable — plugins can install at runtime
-- System packages can be installed via `apt-get`
+- System packages can be installed via `apk add`
 - The agent has full network access
 
 ---
@@ -358,7 +358,7 @@ Secrets are never committed to git. They are injected via environment variables 
 
 ## How It All Fits Together
 
-1. **Container boots** → s6-overlay starts, KDE desktop launches, all background services come up.
+1. **Container boots** → s6-overlay starts, XFCE desktop launches, all background services come up.
 2. **User opens OpenCode** → Web UI at `:3111` or terminal CLI. Agent framework loads config from `/opt/opencode/`.
 3. **Projects detected** → OpenCode scans `/workspace` for git repos. Each repo becomes a project.
 4. **Agent activates** → `@kortix-main` loads. Bootstrap instructions tell it to read core memory files (`identity.md`, `human.md`, `project.md`, `scratchpad.md`).

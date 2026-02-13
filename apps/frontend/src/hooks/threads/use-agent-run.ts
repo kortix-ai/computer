@@ -4,7 +4,7 @@ import { getAgentRuns, unifiedAgentStart, stopAgent, type AgentRun } from "@/lib
 import { AgentRunLimitError, BillingError } from "@/lib/api/errors";
 import { useQueryClient } from "@tanstack/react-query";
 
-export const useAgentRunsQuery = (threadId: string, options?) => {
+export const useAgentRunsQuery = (threadId: string, options?: any) => {
   return useQuery<AgentRun[]>({
     queryKey: threadKeys.agentRuns(threadId),
     queryFn: () => getAgentRuns(threadId),

@@ -3,19 +3,32 @@
  *
  * On mount (when user is authenticated):
  *   1. Calls POST /v1/account/init on the platform service
- *   2. Gets back the sandbox info (base_url, external_id, etc.)
+ *   2. Gets back the sandbox info (base_url, external_id, provider, etc.)
  *   3. Registers the sandbox as a server in the server-store
  *      so the OpenCode SDK automatically connects to it
  *
  * The hook is idempotent — calling init multiple times returns the
  * same sandbox if one already exists.
+ *
+ * In LOCAL mode, the platform API is skipped entirely — the user's
+ * default server (NEXT_PUBLIC_OPENCODE_URL) is used directly.
+ * Instances can be added manually via the Instance Manager dialog.
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { initAccount, getSandboxUrl, type SandboxInfo } from '@/lib/platform-client';
+import {
+  initAccount,
+  getProviders,
+  getSandboxUrl,
+  extractMappedPorts,
+  type SandboxInfo,
+  type SandboxProviderName,
+} from '@/lib/platform-client';
 import { useServerStore } from '@/stores/server-store';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useRef } from 'react';
+
+const IS_LOCAL = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
 
 const SANDBOX_SERVER_ID = 'cloud-sandbox';
 
@@ -26,15 +39,30 @@ const SANDBOX_SERVER_ID = 'cloud-sandbox';
 function registerSandboxServer(sandbox: SandboxInfo) {
   const store = useServerStore.getState();
   const url = getSandboxUrl(sandbox);
+  const mappedPorts = extractMappedPorts(sandbox);
   const existing = store.servers.find((s) => s.id === SANDBOX_SERVER_ID);
 
   if (existing) {
-    // Update URL if it changed (e.g. sandbox was reprovisioned)
-    if (existing.url !== url) {
-      store.updateServer(SANDBOX_SERVER_ID, {
-        url,
-        label: sandbox.name || 'Cloud Sandbox',
-      });
+    // Update URL / mappedPorts if they changed (e.g. sandbox was reprovisioned)
+    const urlChanged = existing.url !== url;
+    const portsChanged =
+      JSON.stringify(existing.mappedPorts) !== JSON.stringify(mappedPorts);
+
+    if (urlChanged || portsChanged) {
+      useServerStore.setState((state) => ({
+        servers: state.servers.map((s) =>
+          s.id === SANDBOX_SERVER_ID
+            ? {
+                ...s,
+                url: urlChanged ? url : s.url,
+                label: sandbox.name || s.label,
+                mappedPorts,
+              }
+            : s,
+        ),
+        // Bump version if the URL changed so subscribers reconnect
+        ...(urlChanged ? { serverVersion: state.serverVersion + 1 } : {}),
+      }));
     }
   } else {
     // Add new server entry for the sandbox
@@ -44,8 +72,11 @@ function registerSandboxServer(sandbox: SandboxInfo) {
         ...state.servers,
         {
           id: SANDBOX_SERVER_ID,
-          label: sandbox.name || 'Cloud Sandbox',
+          label: sandbox.name || (sandbox.provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox'),
           url,
+          provider: sandbox.provider,
+          sandboxId: sandbox.sandbox_id,
+          mappedPorts,
         },
       ],
     }));
@@ -68,7 +99,10 @@ export function useSandbox() {
       const result = await initAccount();
       return result.sandbox;
     },
-    enabled: !!user,
+    // In local mode, skip the platform API entirely.
+    // The user's default server (from NEXT_PUBLIC_OPENCODE_URL) is used directly;
+    // additional instances can be added manually via the Instance Manager.
+    enabled: !!user && !IS_LOCAL,
     staleTime: 5 * 60 * 1000, // 5 minutes — sandbox doesn't change often
     retry: 2,
     refetchOnWindowFocus: false,
@@ -96,4 +130,22 @@ export function useSandbox() {
   };
 }
 
+/**
+ * useProviders — fetch available sandbox providers from the platform.
+ * Disabled in local mode (no kortix-api to query).
+ */
+export function useProviders() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['platform', 'providers'],
+    queryFn: getProviders,
+    enabled: !!user && !IS_LOCAL,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export { SANDBOX_SERVER_ID };
+export type { SandboxProviderName };

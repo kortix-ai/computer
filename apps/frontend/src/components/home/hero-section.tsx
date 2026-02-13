@@ -48,7 +48,7 @@ export function HeroSection() {
                   Get Started
                 </Link>
                 <a
-                  href="https://github.com/kortix-ai/suna"
+                  href="https://github.com/kortix-ai/kortix"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-full border border-input bg-background px-8 py-3 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-all"

@@ -1349,7 +1349,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     domain={[0, Math.max(targetARR * 1.1, (finalMonth?.arr || 0) * 1.2)]}
                   />
                   <Tooltip 
-                    formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                    formatter={((value: number, name: string) => [formatCurrency(value), name]) as any}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--background))', 
@@ -1410,7 +1410,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     tickFormatter={(value) => formatNumber(value)}
                   />
                   <Tooltip 
-                    formatter={(value: number, name: string) => [formatNumber(value), name]}
+                    formatter={((value: number, name: string) => [formatNumber(value), name]) as any}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--background))', 
@@ -1464,7 +1464,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`}
                   />
                   <Tooltip 
-                    formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                    formatter={((value: number, name: string) => [formatCurrency(value), name]) as any}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--background))', 
@@ -1518,10 +1518,10 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     tickFormatter={(value) => formatNumber(Math.abs(value))}
                   />
                   <Tooltip 
-                    formatter={(value: number, name: string) => [
+                    formatter={((value: number, name: string) => [
                       formatNumber(Math.abs(value)), 
                       name
-                    ]}
+                    ]) as any}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--background))', 
@@ -1913,7 +1913,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="week" tick={{ fontSize: 10 }} interval={3} />
                     <YAxis tickFormatter={(v) => `$${v.toLocaleString()}`} tick={{ fontSize: 9 }} width={80} />
-                    <Tooltip formatter={(v: number) => [`$${v.toLocaleString()}`, '']} />
+                    <Tooltip formatter={((v: number) => [`$${v.toLocaleString()}`, '']) as any} />
                     <Legend />
                     <Line type="monotone" dataKey="goalARR" name="Goal" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="5 5" />
                     <Line type="monotone" dataKey="actualARR" name="Actual" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4, fill: '#fff', stroke: '#000', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#fff', stroke: 'hsl(var(--primary))', strokeWidth: 2 }} />
@@ -1935,7 +1935,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="week" tick={{ fontSize: 10 }} interval={3} />
                     <YAxis tickFormatter={(v) => v.toLocaleString()} tick={{ fontSize: 9 }} width={60} />
-                    <Tooltip formatter={(v: number) => [v.toLocaleString(), '']} />
+                    <Tooltip formatter={((v: number) => [v.toLocaleString(), '']) as any} />
                     <Legend />
                     <Line type="monotone" dataKey="goalSubs" name="Goal" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="5 5" />
                     <Line type="monotone" dataKey="actualSubs" name="Actual" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3 }} />
@@ -1957,7 +1957,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="week" tick={{ fontSize: 10 }} interval={3} />
                     <YAxis tickFormatter={(v) => `$${v.toLocaleString()}`} tick={{ fontSize: 9 }} width={70} />
-                    <Tooltip formatter={(v: number) => [`$${v.toLocaleString()}`, '']} />
+                    <Tooltip formatter={((v: number) => [`$${v.toLocaleString()}`, '']) as any} />
                     <Legend />
                     <Line type="monotone" dataKey="goalMRR" name="Goal" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="5 5" />
                     <Line type="monotone" dataKey="actualMRR" name="Actual" stroke="#f59e0b" strokeWidth={3} dot={{ r: 3 }} />
@@ -1979,7 +1979,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="week" tick={{ fontSize: 10 }} interval={3} />
                     <YAxis tickFormatter={(v) => v.toLocaleString()} tick={{ fontSize: 9 }} />
-                    <Tooltip formatter={(v: number) => [v.toLocaleString(), '']} />
+                    <Tooltip formatter={((v: number) => [v.toLocaleString(), '']) as any} />
                     <Legend />
                     <Bar dataKey="goalNewPaid" name="Goal" fill="#10b981" opacity={0.3} />
                     <Bar dataKey="actualNewPaid" name="Actual" fill="#10b981" />
@@ -2112,7 +2112,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                     // Churn override check
                     const churnOverridden = isFieldOverridden(week.week, platform, 'churn');
                     const autoChurn = platform === 'web' ? (churnByWeek[week.week] || 0) : 0;
-                    const effectiveChurn = churnOverridden ? (actual.churn || 0) : autoChurn;
+                    const effectiveChurn = churnOverridden ? (actual?.churn || 0) : autoChurn;
                     
                     // Use overridden value if locked, otherwise use auto-fetched data
                     // For app platform, always use overridden value (no auto-sync)

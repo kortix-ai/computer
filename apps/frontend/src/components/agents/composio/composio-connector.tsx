@@ -1208,8 +1208,8 @@ export const ComposioConnector: React.FC<ComposioConnectorProps> = ({
 
                       {!isLoadingToolkitDetails &&
                         toolkitDetails?.toolkit
-                          .connected_account_initiation_fields?.required
-                          ?.length > 0 && (
+                          ?.connected_account_initiation_fields?.required
+                          ?.length != null && toolkitDetails.toolkit.connected_account_initiation_fields!.required!.length > 0 && (
                           <div className="space-y-2">
                             <div className="flex items-center gap-1.5">
                               <Settings className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1217,7 +1217,7 @@ export const ComposioConnector: React.FC<ComposioConnectorProps> = ({
                                 Connection Details
                               </Label>
                             </div>
-                            {toolkitDetails.toolkit.connected_account_initiation_fields.required.map(
+                            {toolkitDetails!.toolkit.connected_account_initiation_fields!.required!.map(
                               (field) => {
                                 const fieldType =
                                   field.type?.toLowerCase() || 'string';

@@ -265,7 +265,14 @@ function ProjectsFlyout() {
 
   const sortedProjects = React.useMemo(() => {
     if (!projects) return [];
-    return [...projects].sort((a, b) => b.time.updated - a.time.updated);
+    return [...projects].sort((a: any, b: any) => {
+      // Global project always first
+      const aIsGlobal = a.id === 'global' || a.worktree === '/';
+      const bIsGlobal = b.id === 'global' || b.worktree === '/';
+      if (aIsGlobal && !bIsGlobal) return -1;
+      if (!aIsGlobal && bIsGlobal) return 1;
+      return b.time.updated - a.time.updated;
+    });
   }, [projects]);
 
   const getProjectDisplayName = (project: any): string => {
@@ -338,7 +345,7 @@ function UserProfileSection({ user }: { user: { name: string; email: string; ava
   const isLocal = isLocalMode();
   const planName = accountStateSelectors.planName(accountState);
 
-  return <UserMenu user={{ ...user, planName, planIcon: getPlanIcon(planName, isLocal) }} />;
+  return <UserMenu user={{ ...user, planName, planIcon: getPlanIcon(planName, isLocal) ?? undefined }} />;
 }
 
 // ============================================================================

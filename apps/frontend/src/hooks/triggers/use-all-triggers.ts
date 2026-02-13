@@ -29,7 +29,7 @@ const fetchAllTriggers = async (): Promise<TriggerWithAgent[]> => {
     const error = response.error?.message || 'Failed to fetch triggers';
     throw new Error(error || 'Failed to fetch triggers');
   }
-  return response.data;
+  return response.data!;
 };
 
 export const useAllTriggers = () => {

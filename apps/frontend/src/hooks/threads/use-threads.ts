@@ -4,7 +4,7 @@ import { Thread, updateThread, toggleThreadPublicStatus, deleteThread, getThread
 import { getThreadsPaginated, type ThreadsResponse } from "@/lib/api/threads";
 import { useMemo } from "react";
 
-export const useThreadQuery = (threadId: string, options?) => {
+export const useThreadQuery = (threadId: string, options?: any) => {
   return useQuery<Thread>({
     queryKey: threadKeys.details(threadId),
     queryFn: () => getThread(threadId),
@@ -86,7 +86,7 @@ export const useDeleteThreadMutation = () => {
   });
 };
 
-export const useThreadsForProject = (projectId: string, options?) => {
+export const useThreadsForProject = (projectId: string, options?: any) => {
   // Use paginated API and filter client-side for project-specific threads
   const threadsQuery = useThreads({
     page: 1,

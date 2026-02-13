@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 export const runtime = 'edge'; // Use edge runtime for better performance
 export const revalidate = 3600; // Cache for 1 hour
 
-export async function GET(request) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const title = searchParams.get('title');
 

@@ -1,8 +1,13 @@
 import { useQuery, UseQueryOptions } from '@tanstack/react-query';
-import { backendApi } from '@/lib/api-client';
+import { createClient } from '@/lib/supabase/client';
 import { GetAccountsResponse } from '@usebasejump/shared';
+import { backendApi } from '@/lib/api-client';
 
-export const useAccounts = (options?: Partial<UseQueryOptions<GetAccountsResponse>> & { enabled?: boolean }) => {
+export const useAccounts = (
+  options?: Partial<UseQueryOptions<GetAccountsResponse>> & {
+    enabled?: boolean;
+  },
+) => {
   return useQuery<GetAccountsResponse>({
     queryKey: ['accounts'],
     queryFn: async () => {
@@ -17,7 +22,8 @@ export const useAccounts = (options?: Partial<UseQueryOptions<GetAccountsRespons
       const data = response.data;
       // The API may return an array directly or wrap it in an object
       if (Array.isArray(data)) return data;
-      if (data && typeof data === 'object' && Array.isArray((data as any).data)) return (data as any).data;
+      if (data && typeof data === 'object' && Array.isArray((data as any).data))
+        return (data as any).data;
       return [];
     },
     enabled: options?.enabled !== false,

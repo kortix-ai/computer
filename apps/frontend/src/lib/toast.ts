@@ -29,7 +29,7 @@ export const toast = Object.assign(
     // Keep loading - this is useful for async operations
     loading: sonnerToast.loading,
     // Keep promise - this is useful for async operations
-    promise: sonnerToast.promise,
+    promise: sonnerToast.promise as any,
     // Keep custom - for any custom toast needs
     custom: sonnerToast.custom,
     // Keep message - basic toast

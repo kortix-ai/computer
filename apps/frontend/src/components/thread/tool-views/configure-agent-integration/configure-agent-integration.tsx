@@ -34,8 +34,8 @@ export function ConfigureAgentIntegrationToolView({
   // All hooks must be called unconditionally at the top
   // Extract data safely - handle undefined toolCall
   const extractedData = toolCall ? extractConfigureAgentIntegrationData(
-    null, // assistantContent - legacy format
-    toolResult?.output || null, // toolContent - extract from toolResult
+    undefined, // assistantContent - legacy format
+    toolResult?.output || undefined, // toolContent - extract from toolResult
     isSuccess,
     toolTimestamp,
     assistantTimestamp

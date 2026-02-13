@@ -38,7 +38,14 @@ export function ProjectSelector({
 
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
-    return [...projects].sort((a, b) => b.time.updated - a.time.updated);
+    return [...projects].sort((a, b) => {
+      // Global project always first
+      const aIsGlobal = a.id === 'global' || a.worktree === '/';
+      const bIsGlobal = b.id === 'global' || b.worktree === '/';
+      if (aIsGlobal && !bIsGlobal) return -1;
+      if (!aIsGlobal && bIsGlobal) return 1;
+      return b.time.updated - a.time.updated;
+    });
   }, [projects]);
 
   // Derive active project from URL
@@ -62,18 +69,6 @@ export function ProjectSelector({
     if (isMobile) setOpenMobile(false);
   };
 
-  const handleAllProjectsClick = () => {
-    onProjectChange(null);
-    useTabStore.getState().openTab({
-      id: 'page:/dashboard',
-      title: 'Dashboard',
-      type: 'dashboard',
-      href: '/dashboard',
-    });
-    router.push('/dashboard');
-    if (isMobile) setOpenMobile(false);
-  };
-
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       {/* Section header — px-5 aligns label with item text (px-2 outer + px-3 item) */}
@@ -90,24 +85,6 @@ export function ProjectSelector({
 
       <CollapsibleContent>
         <div className="px-2 space-y-0.5 pb-1">
-          {/* All Projects */}
-          <button
-            onClick={handleAllProjectsClick}
-            className={cn(
-              'flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-sm cursor-pointer',
-              'transition-all duration-150 ease-out',
-              activeProjectId === null
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-            )}
-          >
-            <FolderOpen className={cn(
-              'h-4 w-4 flex-shrink-0',
-              activeProjectId === null ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
-            )} />
-            <span className="truncate">All Projects</span>
-          </button>
-
           {sortedProjects.map((project) => (
             <button
               key={project.id}

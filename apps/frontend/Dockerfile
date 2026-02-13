@@ -3,7 +3,7 @@ FROM node:22-slim AS base
 
 # ---- Deps Stage ----
 # Install workspace dependencies with pnpm, including local workspace
-# packages like @agentpress/shared.
+# packages like @kortix/shared.
 FROM base AS deps
 
 WORKDIR /app

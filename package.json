@@ -2,32 +2,21 @@
   "name": "kortix",
   "private": true,
   "scripts": {
-    "dev": "nx run-many --target=dev --projects=frontend,kortix-router --parallel",
-    "dev:frontend": "nx run frontend:dev",
-    "dev:computer-frontend": "pnpm --filter Kortix-Computer-Frontend dev",
-    "dev:mobile": "nx run mobile:dev",
-    "dev:router": "nx run kortix-router:dev",
-    "dev:cloud": "nx run kortix-daytona-proxy:dev",
-    "dev:cron": "nx run kortix-cron:dev",
+    "env": "./scripts/setup-env.sh",
+    "dev": "nx run-many --target=dev --projects=Kortix-Computer-Frontend,kortix-api --parallel=10",
+    "dev:services": "nx run kortix-api:dev",
+    "dev:frontend": "nx run Kortix-Computer-Frontend:dev",
+    "dev:api": "nx run kortix-api:dev",
     "build": "nx run-many --target=build --parallel",
-    "build:frontend": "nx run frontend:build",
+    "build:frontend": "nx run Kortix-Computer-Frontend:build",
     "typecheck": "nx run-many --target=typecheck --parallel",
+    "stripe": "stripe listen --forward-to http://localhost:8008/webhooks/stripe",
     "docker:build": "docker compose --profile all build",
     "docker:up": "docker compose --profile all up -d",
     "docker:up:backend": "docker compose --profile backend up -d",
     "docker:up:frontend": "docker compose --profile frontend up -d",
     "docker:down": "docker compose --profile all down",
     "graph": "nx graph"
-  },
-  "pnpm": {
-    "overrides": {
-      "@types/react": "^19.2.7",
-      "@types/react-dom": "^19.1.7"
-    }
-  },
-  "dependencies": {
-    "@babel/types": "^7.28.6",
-    "next": "^16.1.4"
   },
   "devDependencies": {
     "nx": "^22.4.5"

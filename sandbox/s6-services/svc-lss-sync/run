@@ -1,0 +1,15 @@
+#!/usr/bin/with-contenv bash
+# lss-sync — File-watcher daemon for semantic search indexing
+
+exec s6-setuidgid abc \
+  env HOME=/workspace \
+      OPENAI_API_KEY="${OPENAI_API_KEY}" \
+      LSS_DIR=/workspace/.lss \
+      PATH="/lsiopy/bin:/usr/local/bin:/usr/bin:/bin" \
+  lss-sync \
+    --watch /workspace \
+    --exclude node_modules \
+    --exclude .git \
+    --exclude __pycache__ \
+    --startup-delay 15 \
+    --debounce 2

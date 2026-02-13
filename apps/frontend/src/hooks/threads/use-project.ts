@@ -6,7 +6,7 @@ import { handleApiError } from '@/lib/error-handler';
 import { useMemo } from 'react';
 import { ThreadsResponse } from '@/lib/api/threads';
 
-export const useProjectQuery = (projectId: string | undefined, options?) => {
+export const useProjectQuery = (projectId: string | undefined, options?: any) => {
   const queryClient = useQueryClient();
   
   // Try to get project from cached threads ONLY (don't fetch threads list!)
@@ -67,7 +67,7 @@ export const useProjectQuery = (projectId: string | undefined, options?) => {
   });
 };
 
-export const useProjects = (options?) => {
+export const useProjects = (options?: any) => {
   const queryClient = useQueryClient();
   
   // Derive projects from cached threads data ONLY (no API call!)
@@ -118,7 +118,7 @@ export const useProjects = (options?) => {
   };
 };
 
-export const usePublicProjectsQuery = (options?) => {
+export const usePublicProjectsQuery = (options?: any) => {
   const queryClient = useQueryClient();
   
   // Derive public projects from cached threads data ONLY (no API call!)

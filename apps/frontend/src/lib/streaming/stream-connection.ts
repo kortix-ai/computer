@@ -89,11 +89,11 @@ export class StreamConnection {
     };
     
     this.eventHandlers.set('open', onOpen);
-    this.eventHandlers.set('message', onMessage);
+    this.eventHandlers.set('message', onMessage as EventHandler);
     this.eventHandlers.set('error', onError);
     
     this.eventSource.addEventListener('open', onOpen);
-    this.eventSource.addEventListener('message', onMessage);
+    this.eventSource.addEventListener('message', onMessage as any);
     this.eventSource.addEventListener('error', onError);
   }
   

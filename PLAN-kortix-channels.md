@@ -127,7 +127,7 @@ Channel logic lives entirely in `kortix-channels`, a standalone always-on cloud 
 |---------|------|---------------------|
 | **kortix-daytona-proxy** | Sandbox lifecycle via Daytona | Channels calls daytona-proxy's API to check sandbox status and trigger wake-up when a message arrives for an offline sandbox. |
 | **kortix-router** | LLM + API proxy | No direct interaction. Channels talks directly to sandboxes. |
-| **kortix-cron** | Scheduled triggers | Conceptually parallel — cron triggers agent by schedule, channels triggers by external message. Both use `OpenCodeClient` pattern. Could share the client code via `@agentpress/shared`. |
+| **kortix-cron** | Scheduled triggers | Conceptually parallel — cron triggers agent by schedule, channels triggers by external message. Both use `OpenCodeClient` pattern. Could share the client code via `@kortix/shared`. |
 | **voice** (existing) | VAPI proxy | **Migrated into channels** as the `voice` adapter. The Python FastAPI server is replaced by a TypeScript adapter in the channels service. |
 | **frontend** | Dashboard UI | Channels management UI added. Existing OAuth callback route (`/api/integrations/[provider]/callback`) now proxies to `kortix-channels` instead of a nonexistent backend. |
 

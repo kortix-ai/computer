@@ -183,10 +183,10 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
     );
   }, [jsonText, instanceName, profileMappings, customMcpConfigs, onSuccess, onOpenChange]); // Remove mutation from dependencies
 
-  const handleProfileSelect = useCallback((qualifiedName: string, profileId: string) => {
+  const handleProfileSelect = useCallback((qualifiedName: string, profileId: string | null) => {
     setProfileMappings(prev => ({
       ...prev,
-      [qualifiedName]: profileId
+      [qualifiedName]: profileId ?? ''
     }));
   }, []);
 

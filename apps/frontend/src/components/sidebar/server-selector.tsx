@@ -11,14 +11,21 @@ import {
   Box,
   Settings2,
   Cloud,
+  Container,
   Loader2,
+  ArrowDownToLine,
 } from 'lucide-react';
 import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
-import { initAccount, getSandboxUrl } from '@/lib/platform-client';
+import { initAccount, getSandboxUrl, extractMappedPorts, type SandboxProviderName } from '@/lib/platform-client';
+import { useProviders } from '@/hooks/platform/use-sandbox';
+import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
+import { SANDBOX_SERVER_ID } from '@/hooks/platform/use-sandbox';
+
+const IS_LOCAL = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +42,7 @@ type ConnectionStatus = 'unknown' | 'checking' | 'connected' | 'error';
 
 function useConnectionStatus(url: string, enabled: boolean) {
   const [status, setStatus] = React.useState<ConnectionStatus>('unknown');
+  const [version, setVersion] = React.useState<string | null>(null);
 
   const check = React.useCallback(async () => {
     if (!url) return;
@@ -52,6 +60,22 @@ function useConnectionStatus(url: string, enabled: boolean) {
       await fetch(`${url}/session`, { method: 'GET', signal: controller.signal, headers });
       clearTimeout(timeout);
       setStatus('connected');
+
+      // Try to get version from /kortix/health (cloud sandboxes)
+      try {
+        const hc = new AbortController();
+        const ht = setTimeout(() => hc.abort(), 3000);
+        const hres = await fetch(`${url}/kortix/health`, { signal: hc.signal, headers });
+        clearTimeout(ht);
+        if (hres.ok) {
+          const data = await hres.json();
+          if (data.version && data.version !== '0.0.0') {
+            setVersion(data.version);
+          }
+        }
+      } catch {
+        // Not a cloud sandbox or health endpoint unavailable — that's fine
+      }
     } catch {
       setStatus('error');
     }
@@ -61,7 +85,7 @@ function useConnectionStatus(url: string, enabled: boolean) {
     if (enabled) check();
   }, [enabled, check]);
 
-  return { status, check };
+  return { status, version, check };
 }
 
 function StatusDot({ status }: { status: ConnectionStatus }) {
@@ -139,21 +163,39 @@ function CompactInstanceRow({
 // Instance row — full (dialog list). Stacked layout so URLs never cut off.
 // ============================================================================
 
+type SandboxUpdateInfo = {
+  updateAvailable: boolean;
+  currentVersion: string | null;
+  latestVersion: string | null;
+  update: () => void;
+  isUpdating: boolean;
+  isLoading: boolean;
+};
+
 function DialogInstanceRow({
   server,
   isActive,
   onSelect,
   onEdit,
   onDelete,
+  sandboxUpdate,
+  onVersionDetected,
 }: {
   server: ServerEntry;
   isActive: boolean;
   onSelect: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  sandboxUpdate?: SandboxUpdateInfo;
+  onVersionDetected?: (version: string) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = React.useState(false);
-  const { status } = useConnectionStatus(server.url, isActive);
+  const { status, version } = useConnectionStatus(server.url, true);
+
+  // Report version back to parent when detected
+  React.useEffect(() => {
+    if (version && onVersionDetected) onVersionDetected(version);
+  }, [version, onVersionDetected]);
   const displayUrl = server.url.replace(/^https?:\/\//, '');
   const hasCustomLabel = server.label && server.label !== displayUrl;
 
@@ -179,7 +221,13 @@ function DialogInstanceRow({
       <div className="px-3.5 py-3">
         {/* Top line: label/name + badges + actions */}
         <div className="flex items-center gap-2">
-          <Box className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
+          {server.provider === 'local_docker' ? (
+            <Container className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
+          ) : server.provider === 'daytona' ? (
+            <Cloud className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
+          ) : (
+            <Box className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
+          )}
           <span className={cn(
             'text-sm leading-tight flex-1 min-w-0 break-all',
             isActive ? 'text-foreground font-semibold' : 'text-foreground/80 font-medium',
@@ -203,9 +251,9 @@ function DialogInstanceRow({
           </p>
         )}
 
-        {/* Status + actions line */}
+        {/* Status + version + actions line */}
         <div className="mt-1.5 ml-6 flex items-center gap-3">
-          {isActive && status !== 'unknown' && (
+          {status !== 'unknown' && (
             <span className={cn(
               'flex items-center gap-1 text-[10px] font-medium',
               status === 'connected' && 'text-emerald-500',
@@ -214,6 +262,33 @@ function DialogInstanceRow({
             )}>
               <StatusDot status={status} />
               {statusLabel[status]}
+            </span>
+          )}
+
+          {/* Version badge — from /kortix/health (works for any sandbox) */}
+          {version && (
+            <span className="text-[10px] font-mono text-muted-foreground/60">
+              v{version}
+            </span>
+          )}
+
+          {/* Update button */}
+          {sandboxUpdate && sandboxUpdate.updateAvailable && !sandboxUpdate.isUpdating && (
+            <button
+              type="button"
+              className="flex items-center gap-1 h-5 px-2 text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-full transition-colors cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); sandboxUpdate.update(); }}
+            >
+              <ArrowDownToLine className="h-3 w-3" />
+              Update to v{sandboxUpdate.latestVersion}
+            </button>
+          )}
+
+          {/* Updating spinner */}
+          {sandboxUpdate?.isUpdating && (
+            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Updating...
             </span>
           )}
 
@@ -274,7 +349,7 @@ function DialogInstanceRow({
 // Instance Manager Dialog
 // ============================================================================
 
-function InstanceManagerDialog({
+export function InstanceManagerDialog({
   open,
   onOpenChange,
 }: {
@@ -289,6 +364,12 @@ function InstanceManagerDialog({
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [isCreatingSandbox, setIsCreatingSandbox] = React.useState(false);
   const [sandboxError, setSandboxError] = React.useState<string | null>(null);
+
+  // Track the cloud sandbox's current version (from /kortix/health, fetched by DialogInstanceRow)
+  const [sandboxVersion, setSandboxVersion] = React.useState<string | null>(null);
+
+  // Sandbox update state — only used for the cloud sandbox row
+  const sandboxUpdate = useSandboxUpdate(sandboxVersion);
 
   // Form state
   const [formUrl, setFormUrl] = React.useState('');
@@ -352,17 +433,31 @@ function InstanceManagerDialog({
     }
   }
 
-  async function handleCreateSandbox() {
+  async function handleCreateSandbox(provider?: SandboxProviderName) {
     setIsCreatingSandbox(true);
     setSandboxError(null);
     try {
-      const { sandbox } = await initAccount();
-      const newServer = addServer(
-        sandbox.name || 'Cloud Sandbox',
-        getSandboxUrl(sandbox),
-      );
-      useTabStore.getState().swapForServer(newServer.id, activeServerId);
-      setActiveServer(newServer.id);
+      const { sandbox } = await initAccount(provider ? { provider } : undefined);
+      const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
+
+      // Use setState directly to inject provider + sandboxId + mappedPorts metadata
+      const newId = `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      useServerStore.setState((state) => ({
+        servers: [
+          ...state.servers,
+          {
+            id: newId,
+            label,
+            url: getSandboxUrl(sandbox),
+            provider: sandbox.provider,
+            sandboxId: sandbox.sandbox_id,
+            mappedPorts: extractMappedPorts(sandbox),
+          },
+        ],
+      }));
+
+      useTabStore.getState().swapForServer(newId, activeServerId);
+      setActiveServer(newId);
       router.push('/dashboard');
       onOpenChange(false);
     } catch (err: any) {
@@ -444,35 +539,56 @@ function InstanceManagerDialog({
                     onSelect={() => handleSelect(server.id)}
                     onEdit={() => startEdit(server)}
                     onDelete={() => handleRemove(server.id)}
+                    sandboxUpdate={server.id === SANDBOX_SERVER_ID ? sandboxUpdate : undefined}
+                    onVersionDetected={server.id === SANDBOX_SERVER_ID ? setSandboxVersion : undefined}
                   />
                 ))
               )}
             </div>
 
-            {/* New Sandbox button */}
-            <div className="border-t border-border/40 px-4 py-3">
-              {sandboxError && (
-                <p className="text-xs text-destructive mb-2">{sandboxError}</p>
-              )}
-              <button
-                type="button"
-                onClick={handleCreateSandbox}
-                disabled={isCreatingSandbox}
-                className="flex items-center justify-center gap-2 w-full h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCreatingSandbox ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Creating sandbox...
-                  </>
-                ) : (
-                  <>
-                    <Cloud className="h-3.5 w-3.5" />
-                    New Sandbox
-                  </>
+            {/* New Sandbox buttons — hidden in local mode (no kortix-api) */}
+            {!IS_LOCAL && (
+              <div className="border-t border-border/40 px-4 py-3">
+                {sandboxError && (
+                  <p className="text-xs text-destructive mb-2">{sandboxError}</p>
                 )}
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSandbox('daytona')}
+                    disabled={isCreatingSandbox}
+                    className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCreatingSandbox ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <Cloud className="h-3.5 w-3.5" />
+                        Cloud
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSandbox('local_docker')}
+                    disabled={isCreatingSandbox}
+                    className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCreatingSandbox ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <Container className="h-3.5 w-3.5" />
+                        Local Docker
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
+                  Cloud uses Daytona. Local Docker runs on your machine.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

@@ -399,10 +399,10 @@ export function SimplifiedTriggerDetailPanel({ trigger, onClose }: SimplifiedTri
             </div>
           </div>
 
-          {trigger.config.agent_prompt && (
+          {trigger.config?.agent_prompt && (
             <div className="mt-4 p-4 rounded-lg bg-muted border">
               <p className="text-sm font-mono text-foreground whitespace-pre-wrap leading-relaxed">
-                {trigger.config.agent_prompt}
+                {trigger.config?.agent_prompt}
               </p>
             </div>
           )}

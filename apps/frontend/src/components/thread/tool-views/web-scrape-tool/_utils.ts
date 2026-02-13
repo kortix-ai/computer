@@ -208,7 +208,7 @@ export function extractWebScrapeData(
       url = urls?.[0] || null;
     }
   } else if (args.url) {
-    url = args.url;
+    url = args.url as string;
     urls = [url];
   }
 

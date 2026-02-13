@@ -11,60 +11,16 @@ services:
     profiles: [frontend, all]
     restart: unless-stopped
 
-  kortix-router:
+  kortix-api:
     build:
       context: .
       dockerfile: services/Dockerfile
       args:
-        SERVICE: kortix-router
+        SERVICE: kortix-api
     ports:
       - "8008:8008"
     env_file:
-      - path: services/kortix-router/.env
-        required: false
-    profiles: [backend, all]
-    restart: unless-stopped
-
-  kortix-daytona-proxy:
-    build:
-      context: .
-      dockerfile: services/Dockerfile
-      args:
-        SERVICE: kortix-daytona-proxy
-    ports:
-      - "8010:8010"
-    environment:
-      - PORT=8010
-    env_file:
-      - path: services/kortix-daytona-proxy/.env
-        required: false
-    profiles: [backend, all]
-    restart: unless-stopped
-
-  kortix-cron:
-    build:
-      context: .
-      dockerfile: services/Dockerfile
-      args:
-        SERVICE: kortix-cron
-    ports:
-      - "8011:8011"
-    env_file:
-      - path: services/kortix-cron/.env
-        required: false
-    profiles: [backend, all]
-    restart: unless-stopped
-
-  kortix-platform:
-    build:
-      context: .
-      dockerfile: services/Dockerfile
-      args:
-        SERVICE: kortix-platform
-    ports:
-      - "8012:8012"
-    env_file:
-      - path: services/kortix-platform/.env
+      - path: services/kortix-api/.env
         required: false
     profiles: [backend, all]
     restart: unless-stopped

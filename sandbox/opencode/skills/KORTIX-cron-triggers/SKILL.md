@@ -9,8 +9,8 @@ The Kortix Cron service runs outside the sandbox as a platform service. It manag
 
 ## Architecture
 
-- **Service**: `kortix-cron` (Bun + Hono) running at port 8011
-- **Database**: `kortix_cron` schema in Supabase PostgreSQL (Drizzle ORM)
+- **Service**: `kortix-api` (Bun + Hono) running at port 8008
+- **Database**: `kortix` schema in Supabase PostgreSQL (Drizzle ORM)
 - **Scheduler**: Polling loop (1s tick) that checks for due triggers
 - **Executor**: Calls OpenCode API inside sandbox to create sessions and send prompts
 
@@ -44,7 +44,7 @@ The Kortix Cron service runs outside the sandbox as a platform service. It manag
 
 ## API Reference
 
-Base URL: `http://localhost:8011` (local) or the deployed service URL.
+Base URL: `http://localhost:8008` (local) or the deployed service URL.
 
 All `/v1/*` endpoints require `Authorization: Bearer <supabase-jwt>`.
 
@@ -52,7 +52,7 @@ All `/v1/*` endpoints require `Authorization: Bearer <supabase-jwt>`.
 
 ```bash
 # Register a sandbox
-curl -X POST http://localhost:8011/v1/sandboxes \
+curl -X POST http://localhost:8008/v1/sandboxes \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -62,11 +62,11 @@ curl -X POST http://localhost:8011/v1/sandboxes \
   }'
 
 # List sandboxes
-curl http://localhost:8011/v1/sandboxes \
+curl http://localhost:8008/v1/sandboxes \
   -H "Authorization: Bearer $TOKEN"
 
 # Check sandbox health
-curl -X POST http://localhost:8011/v1/sandboxes/{id}/health \
+curl -X POST http://localhost:8008/v1/sandboxes/{id}/health \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -74,7 +74,7 @@ curl -X POST http://localhost:8011/v1/sandboxes/{id}/health \
 
 ```bash
 # Create a trigger - daily report at 9 AM UTC
-curl -X POST http://localhost:8011/v1/triggers \
+curl -X POST http://localhost:8008/v1/triggers \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -88,7 +88,7 @@ curl -X POST http://localhost:8011/v1/triggers \
   }'
 
 # Create a trigger - every 5 minutes health check
-curl -X POST http://localhost:8011/v1/triggers \
+curl -X POST http://localhost:8008/v1/triggers \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -101,23 +101,23 @@ curl -X POST http://localhost:8011/v1/triggers \
   }'
 
 # List triggers
-curl http://localhost:8011/v1/triggers \
+curl http://localhost:8008/v1/triggers \
   -H "Authorization: Bearer $TOKEN"
 
 # Pause a trigger
-curl -X POST http://localhost:8011/v1/triggers/{id}/pause \
+curl -X POST http://localhost:8008/v1/triggers/{id}/pause \
   -H "Authorization: Bearer $TOKEN"
 
 # Resume a trigger
-curl -X POST http://localhost:8011/v1/triggers/{id}/resume \
+curl -X POST http://localhost:8008/v1/triggers/{id}/resume \
   -H "Authorization: Bearer $TOKEN"
 
 # Fire a trigger immediately (manual run)
-curl -X POST http://localhost:8011/v1/triggers/{id}/run \
+curl -X POST http://localhost:8008/v1/triggers/{id}/run \
   -H "Authorization: Bearer $TOKEN"
 
 # Delete a trigger
-curl -X DELETE http://localhost:8011/v1/triggers/{id} \
+curl -X DELETE http://localhost:8008/v1/triggers/{id} \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -125,30 +125,30 @@ curl -X DELETE http://localhost:8011/v1/triggers/{id} \
 
 ```bash
 # List all executions
-curl "http://localhost:8011/v1/executions?limit=20" \
+curl "http://localhost:8008/v1/executions?limit=20" \
   -H "Authorization: Bearer $TOKEN"
 
 # Filter by status
-curl "http://localhost:8011/v1/executions?status=failed" \
+curl "http://localhost:8008/v1/executions?status=failed" \
   -H "Authorization: Bearer $TOKEN"
 
 # Filter by date range
-curl "http://localhost:8011/v1/executions?since=2026-02-01T00:00:00Z&until=2026-02-11T00:00:00Z" \
+curl "http://localhost:8008/v1/executions?since=2026-02-01T00:00:00Z&until=2026-02-11T00:00:00Z" \
   -H "Authorization: Bearer $TOKEN"
 
 # Executions for a specific trigger
-curl http://localhost:8011/v1/executions/by-trigger/{triggerId} \
+curl http://localhost:8008/v1/executions/by-trigger/{triggerId} \
   -H "Authorization: Bearer $TOKEN"
 
 # Get execution details
-curl http://localhost:8011/v1/executions/{id} \
+curl http://localhost:8008/v1/executions/{id} \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Health Check (no auth)
 
 ```bash
-curl http://localhost:8011/health
+curl http://localhost:8008/health
 # Returns: { status, service, timestamp, scheduler: { running, tickCount, lastTick } }
 ```
 

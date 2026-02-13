@@ -1,6 +1,6 @@
 /**
  * Thread utilities for rendering tool calls and messages
- * Re-exports from @agentpress/shared plus frontend-specific utilities
+ * Re-exports from @kortix/shared plus frontend-specific utilities
  */
 
 // Re-export shared utilities
@@ -10,7 +10,7 @@ export {
   getCompletedToolName,
   extractAppSlugFromToolCall,
   HIDE_STREAMING_XML_TAGS,
-} from '@agentpress/shared';
+} from '@kortix/shared';
 
 // Re-export getToolIcon from frontend icon resolver
 export { getToolIcon } from '@/lib/icons/tool-icons';

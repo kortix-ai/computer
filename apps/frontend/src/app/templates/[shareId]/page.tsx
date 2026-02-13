@@ -366,8 +366,8 @@ export default function TemplateSharePage() {
     return (
       <AgentAvatar
         iconName={template.icon_name}
-        iconColor={template.icon_color}
-        backgroundColor={template.icon_background}
+        iconColor={template.icon_color ?? undefined}
+        backgroundColor={template.icon_background ?? undefined}
         agentName={template.name}
         size={28}
       />
@@ -464,8 +464,8 @@ export default function TemplateSharePage() {
                   <div className="w-full h-full flex items-center justify-center">
                     <AgentAvatar
                       iconName={template.icon_name}
-                      iconColor={template.icon_color}
-                      backgroundColor={template.icon_background}
+                      iconColor={template.icon_color ?? undefined}
+                      backgroundColor={template.icon_background ?? undefined}
                       agentName={template.name}
                       size={120}
                     />

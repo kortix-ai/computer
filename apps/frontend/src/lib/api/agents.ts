@@ -526,11 +526,11 @@ export const optimisticAgentStart = async (options: {
     // Log error with more detail for debugging
     console.error('[API] Failed to start agent optimistically:', {
       error,
-      errorName: error?.name,
-      errorMessage: error?.message,
-      errorStatus: error?.status,
-      errorDetail: error?.detail,
-      errorCode: error?.code || error?.detail?.error_code,
+      errorName: (error as any)?.name,
+      errorMessage: (error as any)?.message,
+      errorStatus: (error as any)?.status,
+      errorDetail: (error as any)?.detail,
+      errorCode: (error as any)?.code || (error as any)?.detail?.error_code,
       isThreadLimitError: error instanceof ThreadLimitError,
       isBillingError: error instanceof BillingError,
     });

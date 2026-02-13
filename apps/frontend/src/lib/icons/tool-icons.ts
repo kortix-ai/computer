@@ -4,8 +4,8 @@
  */
 
 import type { ElementType } from 'react';
-import { getToolIconKey } from '@agentpress/shared';
-import type { ToolIconKey } from '@agentpress/shared';
+import { getToolIconKey } from '@kortix/shared';
+import type { ToolIconKey } from '@kortix/shared';
 import {
   Globe,
   FileEdit,

@@ -377,8 +377,8 @@ export function SeeImageToolView({
             <div className="relative w-full overflow-hidden p-6 flex items-center justify-center">
               <SafeImage
                 src={imageUrl}
-                alt={description || filename}
-                filePath={filePath}
+                alt={description || filename || ''}
+                filePath={filePath ?? ''}
                 sandboxId={project?.sandbox?.id}
                 project={project}
                 className="max-w-full max-h-[500px] object-contain"

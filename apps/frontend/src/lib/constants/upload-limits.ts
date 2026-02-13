@@ -1,6 +1,6 @@
 /**
  * Re-export from shared package for backward compatibility
- * @deprecated Import from '@agentpress/shared' instead
+ * @deprecated Import from '@kortix/shared' instead
  */
 export {
   UPLOAD_LIMITS,
@@ -10,4 +10,4 @@ export {
   formatFileSize,
   isAllowedFile,
   isExtractableArchive,
-} from '@agentpress/shared';
+} from '@kortix/shared';

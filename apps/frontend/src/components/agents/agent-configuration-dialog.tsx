@@ -807,9 +807,9 @@ export function AgentConfigurationDialog({
           console.log('Icon editor dialog closing');
           setIsIconEditorOpen(false);
         }}
-        currentIconName={formData.icon_name}
-        currentIconColor={formData.icon_color}
-        currentBackgroundColor={formData.icon_background}
+        currentIconName={formData.icon_name ?? undefined}
+        currentIconColor={formData.icon_color ?? undefined}
+        currentBackgroundColor={formData.icon_background ?? undefined}
         agentName={formData.name}
         agentDescription={agent?.description}
         onIconUpdate={handleIconChange}

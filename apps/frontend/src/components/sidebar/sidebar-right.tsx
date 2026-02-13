@@ -33,20 +33,37 @@ import { useTabStore } from '@/stores/tab-store';
 // ============================================================================
 
 function DesktopOverlay({ onClose }: { onClose: () => void }) {
-  const serverUrl = useServerStore((s) => {
-    const active = s.servers.find((srv) => srv.id === s.activeServerId);
-    return active?.url || 'http://localhost:4096';
+  const activeServer = useServerStore((s) => {
+    return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
   });
 
   const desktopUrl = useMemo(() => {
+    if (!activeServer) return 'http://localhost:6080';
+
+    // Daytona: route through cloud subdomain
+    if (activeServer.provider === 'daytona' && activeServer.sandboxId) {
+      return `https://kortix.cloud/${activeServer.sandboxId}/6080`;
+    }
+
+    // Local Docker: use the dynamic mapped port for container port 6080
+    if (activeServer.provider === 'local_docker' && activeServer.mappedPorts?.['6080']) {
+      try {
+        const base = new URL(activeServer.url);
+        return `${base.protocol}//${base.hostname}:${activeServer.mappedPorts['6080']}`;
+      } catch {
+        return `http://localhost:${activeServer.mappedPorts['6080']}`;
+      }
+    }
+
+    // Default/non-managed server: assume port 6080 on the same host
     try {
-      const url = new URL(serverUrl);
+      const url = new URL(activeServer.url);
       url.port = '6080';
       return url.toString();
     } catch {
-      return `http://localhost:6080`;
+      return 'http://localhost:6080';
     }
-  }, [serverUrl]);
+  }, [activeServer]);
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black flex flex-col">

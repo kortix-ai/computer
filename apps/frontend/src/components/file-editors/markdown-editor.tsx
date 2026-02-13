@@ -60,8 +60,8 @@ turndownService.use(gfm);
 
 // Custom rule for code blocks to preserve language
 turndownService.addRule('fencedCodeBlock', {
-  filter: (node) => {
-    return (
+  filter: (node: HTMLElement) => {
+    return !!(
       node.nodeName === 'PRE' &&
       node.firstChild &&
       node.firstChild.nodeName === 'CODE'

@@ -1,5 +1,5 @@
 /**
- * @agentpress/shared/errors
+ * @kortix/shared/errors
  * 
  * Shared error classes and utilities for handling tier restriction errors,
  * billing errors, and other API errors across frontend and mobile.

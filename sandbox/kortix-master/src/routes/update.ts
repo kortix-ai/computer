@@ -1,0 +1,142 @@
+import { Hono } from 'hono';
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const VERSION_FILE = '/opt/kortix/.version';
+
+/**
+ * Services to restart after update. Order matters:
+ * - opencode first (depends on /opt/opencode/)
+ * - then other services
+ * - kortix-master LAST (deferred — it's us)
+ */
+const SERVICES_TO_RESTART = [
+  'opencode-serve',
+  'opencode-web',
+  'lss-sync',
+  'agent-browser-viewer',
+  'KORTIX-presentation-viewer',
+];
+
+// ─── State ──────────────────────────────────────────────────────────────────
+
+let updateInProgress = false;
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+async function readLocalVersion(): Promise<string> {
+  try {
+    const file = Bun.file(VERSION_FILE);
+    if (await file.exists()) {
+      const data = await file.json();
+      return data.version || '0.0.0';
+    }
+  } catch (e) {
+    console.error('[Update] Failed to read version file:', e);
+  }
+  return '0.0.0';
+}
+
+async function run(cmd: string): Promise<{ ok: boolean; output: string }> {
+  try {
+    const proc = Bun.spawn(['bash', '-c', cmd], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, HOME: '/workspace' },
+    });
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    return { ok: exitCode === 0, output: (stdout + '\n' + stderr).trim() };
+  } catch (e) {
+    return { ok: false, output: String(e) };
+  }
+}
+
+async function restartService(name: string): Promise<void> {
+  await run(`s6-svc -r /var/run/s6/services/${name} 2>/dev/null || s6-svc -r /etc/services.d/${name} 2>/dev/null || true`);
+}
+
+async function performUpdate(targetVersion: string): Promise<{
+  success: boolean;
+  output: string;
+}> {
+  console.log(`[Update] Installing @kortix/sandbox@${targetVersion}...`);
+
+  const result = await run(`npm install -g @kortix/sandbox@${targetVersion} 2>&1`);
+
+  if (!result.ok) {
+    console.error('[Update] npm install failed:', result.output);
+    return { success: false, output: result.output.slice(0, 1000) };
+  }
+
+  console.log('[Update] Install complete, restarting services...');
+
+  for (const svc of SERVICES_TO_RESTART) {
+    console.log(`[Update] Restarting: ${svc}`);
+    await restartService(svc);
+  }
+
+  // Self-restart deferred so the HTTP response completes
+  console.log('[Update] Scheduling kortix-master restart in 2s...');
+  setTimeout(() => restartService('kortix-master'), 2000);
+
+  return { success: true, output: result.output.slice(0, 1000) };
+}
+
+// ─── Routes ─────────────────────────────────────────────────────────────────
+
+const updateRouter = new Hono();
+
+/**
+ * POST /kortix/update
+ *
+ * User-triggered update. Frontend passes the target version.
+ * Installs the package, restarts services.
+ * Only runs when explicitly called.
+ *
+ * Body: { "version": "0.4.3" }
+ */
+updateRouter.post('/', async (c) => {
+  if (updateInProgress) {
+    return c.json({ error: 'Update already in progress' }, 409);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const targetVersion = body.version;
+
+  if (!targetVersion || typeof targetVersion !== 'string') {
+    return c.json({ error: 'Missing "version" in request body' }, 400);
+  }
+
+  updateInProgress = true;
+  try {
+    const currentVersion = await readLocalVersion();
+
+    if (currentVersion === targetVersion) {
+      return c.json({
+        upToDate: true,
+        currentVersion,
+      });
+    }
+
+    console.log(`[Update] User triggered: ${currentVersion} -> ${targetVersion}`);
+    const update = await performUpdate(targetVersion);
+
+    return c.json({
+      success: update.success,
+      previousVersion: currentVersion,
+      currentVersion: update.success ? targetVersion : currentVersion,
+      output: update.output,
+    });
+  } catch (e) {
+    console.error('[Update] Error:', e);
+    return c.json({ error: 'Update failed', details: String(e) }, 500);
+  } finally {
+    updateInProgress = false;
+  }
+});
+
+export default updateRouter;

@@ -33,7 +33,7 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { useCreditUsage } from '@/hooks/billing/use-credit-usage';
-import { formatCredits } from '@agentpress/shared';
+import { formatCredits } from '@kortix/shared';
 
 export default function CreditUsage() {
   const [offset, setOffset] = useState(0);

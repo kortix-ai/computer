@@ -8,4 +8,4 @@ export {
   useSmoothAnimation, 
   type SmoothAnimationConfig,
   type SmoothToolConfig,
-} from '@agentpress/shared/animations';
+} from '@kortix/shared/animations';

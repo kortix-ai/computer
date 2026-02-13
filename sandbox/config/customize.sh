@@ -14,130 +14,117 @@ if [ -f "$MARKER" ]; then
     exit 0
 fi
 
-echo "[heyagi] Applying desktop customization..."
-mkdir -p "$CONFIG_DIR/.config/autostart"
-mkdir -p "$CONFIG_DIR/.local/share/konsole"
+echo "[heyagi] Applying XFCE desktop customization (Alpine)..."
 
 # ── Symlink presentations into Desktop for easy access ─────────────────────
 mkdir -p "$CONFIG_DIR/presentations"
-# Create a Desktop directory for KDE and symlink presentations into it
 mkdir -p "$CONFIG_DIR/Desktop"
 ln -sfn "$CONFIG_DIR/presentations" "$CONFIG_DIR/Desktop/presentations"
 
-# ── KDE Global: Breeze Dark ────────────────────────────────────────────────
-cat > "$CONFIG_DIR/.config/kdeglobals" << 'EOF'
-[General]
-ColorScheme=BreezeDark
-Name=Breeze Dark
-widgetStyle=Breeze
-
-[Icons]
-Theme=breeze-dark
-
-[KDE]
-LookAndFeelPackage=org.kde.breezedark.desktop
-widgetStyle=breeze
+# ── XFCE: Wallpaper ───────────────────────────────────────────────────────
+mkdir -p "$CONFIG_DIR/.config/xfce4/xfconf/xfce-perchannel-xml"
+cat > "$CONFIG_DIR/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-desktop" version="1.0">
+  <property name="backdrop" type="empty">
+    <property name="screen0" type="empty">
+      <property name="monitorVNC-0" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="last-image" type="string" value="/usr/share/wallpapers/heyagi/wallpaper.png"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="color-style" type="int" value="0"/>
+          <property name="rgba1" type="array">
+            <value type="double" value="0.10196"/>
+            <value type="double" value="0.10588"/>
+            <value type="double" value="0.14902"/>
+            <value type="double" value="1.0"/>
+          </property>
+        </property>
+      </property>
+      <property name="monitorscreen" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="last-image" type="string" value="/usr/share/wallpapers/heyagi/wallpaper.png"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="color-style" type="int" value="0"/>
+          <property name="rgba1" type="array">
+            <value type="double" value="0.10196"/>
+            <value type="double" value="0.10588"/>
+            <value type="double" value="0.14902"/>
+            <value type="double" value="1.0"/>
+          </property>
+        </property>
+      </property>
+    </property>
+  </property>
+</channel>
 EOF
 
-# ── KWin ────────────────────────────────────────────────────────────────────
-cat > "$CONFIG_DIR/.config/kwinrc" << 'EOF'
-[org.kde.kdecoration2]
-theme=Breeze
-library=org.kde.breeze
-
-[Windows]
-Placement=Centered
-
-[Desktops]
-Number=1
-Rows=1
+# ── XFCE: Dark theme (adw-gtk3-dark — Alpine's equivalent of Adwaita-dark)
+cat > "$CONFIG_DIR/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xsettings" version="1.0">
+  <property name="Net" type="empty">
+    <property name="ThemeName" type="string" value="adw-gtk3-dark"/>
+    <property name="IconThemeName" type="string" value="Adwaita"/>
+    <property name="CursorThemeName" type="string" value="Breeze_Light"/>
+  </property>
+  <property name="Gtk" type="empty">
+    <property name="FontName" type="string" value="Sans 10"/>
+    <property name="CursorThemeSize" type="int" value="24"/>
+  </property>
+</channel>
 EOF
 
-# ── Plasma theme ────────────────────────────────────────────────────────────
-cat > "$CONFIG_DIR/.config/plasmarc" << 'EOF'
-[Theme]
-name=breeze-dark
+# ── XFCE: Window Manager dark theme (Daloa — only xfwm4 theme on Alpine)
+cat > "$CONFIG_DIR/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="theme" type="string" value="Daloa"/>
+    <property name="title_font" type="string" value="Sans Bold 9"/>
+    <property name="placement_ratio" type="int" value="50"/>
+    <property name="cycle_tabwin_mode" type="int" value="0"/>
+  </property>
+</channel>
 EOF
 
-# ── Konsole dark profile ───────────────────────────────────────────────────
-cat > "$CONFIG_DIR/.local/share/konsole/HeyAGI.profile" << 'EOF'
-[Appearance]
-ColorScheme=Breeze
-Font=Monospace,11,-1,5,50,0,0,0,0,0
-
-[General]
-Name=HeyAGI
-Parent=FALLBACK/
-
-[Scrolling]
-HistoryMode=2
+# ── XFCE: Terminal dark profile ──────────────────────────────────────────
+mkdir -p "$CONFIG_DIR/.config/xfce4/terminal"
+cat > "$CONFIG_DIR/.config/xfce4/terminal/terminalrc" << 'EOF'
+[Configuration]
+BackgroundMode=TERMINAL_BACKGROUND_TRANSPARENT
+BackgroundDarkness=0.90
+ColorForeground=#c0caf5
+ColorBackground=#1a1b26
+ColorCursor=#c0caf5
+ColorPalette=#15161e;#f7768e;#9ece6a;#e0af68;#7aa2f7;#bb9af7;#7dcfff;#a9b1d6;#414868;#f7768e;#9ece6a;#e0af68;#7aa2f7;#bb9af7;#7dcfff;#c0caf5
+FontName=Monospace 11
+MiscAlwaysShowTabs=FALSE
+MiscBordersDefault=TRUE
+MiscShowUnsafePasteDialog=FALSE
+ScrollingUnlimited=TRUE
 EOF
 
-cat > "$CONFIG_DIR/.config/konsolerc" << 'EOF'
-[Desktop Entry]
-DefaultProfile=HeyAGI.profile
-
-[MainWindow]
-MenuBar=Disabled
-ToolBarsMovable=Disabled
+# ── GTK dark theme (fallback for GTK2 apps) ───────────────────────────────
+cat > "$CONFIG_DIR/.gtkrc-2.0" << 'EOF'
+gtk-theme-name="adw-gtk3-dark"
+gtk-icon-theme-name="Adwaita"
+gtk-font-name="Sans 10"
+gtk-cursor-theme-name="Breeze_Light"
 EOF
 
-# ── Autostart: apply wallpaper + launcher icon after KDE session loads ──────
-cat > "$CONFIG_DIR/.config/autostart/heyagi-desktop.desktop" << 'EOF'
-[Desktop Entry]
-Type=Application
-Name=HeyAGI Desktop Setup
-Exec=/usr/share/wallpapers/heyagi/apply-desktop.sh
-X-KDE-autostart-phase=2
+mkdir -p "$CONFIG_DIR/.config/gtk-3.0"
+cat > "$CONFIG_DIR/.config/gtk-3.0/settings.ini" << 'EOF'
+[Settings]
+gtk-theme-name=adw-gtk3-dark
+gtk-icon-theme-name=Adwaita
+gtk-font-name=Sans 10
+gtk-application-prefer-dark-theme=true
+gtk-cursor-theme-name=Breeze_Light
 EOF
-
-cat > /usr/share/wallpapers/heyagi/apply-desktop.sh << 'SCRIPT'
-#!/bin/bash
-sleep 5
-
-plasma-apply-wallpaperimage /usr/share/wallpapers/heyagi/wallpaper.png
-
-PLASMA_RC="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
-ICON_PATH="/usr/share/icons/heyagi/kortix-symbol-white.svg"
-
-if [ -f "$PLASMA_RC" ]; then
-    # Find the kickoff applet's [Configuration][General] section and inject icon
-    # Get the containment/applet IDs for kickoff
-    KICKOFF_SECTION=$(grep -B3 "plugin=org.kde.plasma.kickoff" "$PLASMA_RC" | grep "^\[Containments\]" | tail -1)
-    
-    if [ -n "$KICKOFF_SECTION" ]; then
-        # Build the [Configuration][General] section name
-        GENERAL_SECTION="${KICKOFF_SECTION%]}][Configuration][General]"
-        
-        if grep -q "$(echo "$GENERAL_SECTION" | sed 's/\[/\\[/g; s/\]/\\]/g')" "$PLASMA_RC"; then
-            # Section exists -- replace or add icon line
-            ESCAPED=$(echo "$GENERAL_SECTION" | sed 's/\[/\\[/g; s/\]/\\]/g')
-            if grep -A10 "$ESCAPED" "$PLASMA_RC" | grep -q "^icon="; then
-                sed -i "/$ESCAPED/,/^\[/{s|^icon=.*|icon=$ICON_PATH|}" "$PLASMA_RC"
-            else
-                sed -i "/$ESCAPED/a icon=$ICON_PATH" "$PLASMA_RC"
-            fi
-        else
-            # Section doesn't exist -- create it
-            CONF_SECTION="${KICKOFF_SECTION%]}][Configuration]"
-            ESCAPED_CONF=$(echo "$CONF_SECTION" | sed 's/\[/\\[/g; s/\]/\\]/g')
-            sed -i "/$ESCAPED_CONF/,/^\[/{/^\[.*\]/!b;i\\${GENERAL_SECTION}\nicon=$ICON_PATH
-            }" "$PLASMA_RC"
-        fi
-    fi
-    
-    # Restart plasmashell to pick up icon change
-    kquitapp5 plasmashell 2>/dev/null
-    sleep 2
-    kstart5 plasmashell 2>/dev/null &
-fi
-SCRIPT
-chmod +x /usr/share/wallpapers/heyagi/apply-desktop.sh
 
 # ── Fix ownership ──────────────────────────────────────────────────────────
-# Give abc full ownership of everything under /workspace so opencode and its
-# agents can freely create directories and files (presentations, output, etc.)
 chown -R abc:abc "$CONFIG_DIR" 2>/dev/null
 
 touch "$MARKER"
-echo "[heyagi] Customization complete."
+echo "[heyagi] XFCE customization complete."

@@ -1,9 +1,16 @@
 const fs = require('fs');
+const { execSync } = require('child_process');
+
+// Auto-detect npm global modules directory
+const npmGlobalRoot = execSync('npm root -g').toString().trim();
+console.log('npm global root:', npmGlobalRoot);
+
+const agentBrowserDir = npmGlobalRoot + '/agent-browser/dist';
 
 // ── Patch 1: handleLaunch env var fallbacks ─────────────────────────────────
 // The Rust CLI sends a launch command to the Node.js daemon but doesn't
 // include executablePath/args/profile in the JSON. We inject env var fallbacks.
-const actionsFile = '/usr/lib/node_modules/agent-browser/dist/actions.js';
+const actionsFile = agentBrowserDir + '/actions.js';
 let actions = fs.readFileSync(actionsFile, 'utf8');
 
 const oldLaunch = [
@@ -44,7 +51,7 @@ console.log('PATCH 2 SKIPPED - upstream already allows localhost origins');
 // When AGENT_BROWSER_STREAM_PORT is set globally, ALL sessions try to bind
 // that port. Named sessions crash with EADDRINUSE. Fix: only the default
 // session uses the env var port; named sessions use the hash-based port.
-const daemonFile = '/usr/lib/node_modules/agent-browser/dist/daemon.js';
+const daemonFile = agentBrowserDir + '/daemon.js';
 let daemon = fs.readFileSync(daemonFile, 'utf8');
 
 const oldStreamPort = `const streamPort = options?.streamPort ??
@@ -85,7 +92,7 @@ console.log('PATCH 4 OK - auto-launch profile only for default session');
 // When using launchPersistentContext (profile mode), this.browser is null.
 // newTab() checks `!this.browser` and throws "Browser not launched".
 // Fix: also check this.contexts.length > 0 as an alternative.
-const browserFile = '/usr/lib/node_modules/agent-browser/dist/browser.js';
+const browserFile = agentBrowserDir + '/browser.js';
 let browser = fs.readFileSync(browserFile, 'utf8');
 
 const oldNewTabCheck = "if (!this.browser || this.contexts.length === 0) {\n            throw new Error('Browser not launched');\n        }\n        // Invalidate CDP session since we're switching to a new page";

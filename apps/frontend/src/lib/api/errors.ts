@@ -1,5 +1,5 @@
 /**
- * Re-export error classes and utilities from @agentpress/shared
+ * Re-export error classes and utilities from @kortix/shared
  * This ensures consistency between frontend and mobile error handling.
  */
 export {
@@ -24,10 +24,10 @@ export {
   // UI formatting utilities
   formatTierLimitErrorForUI,
   formatTierErrorForUI,
-} from '@agentpress/shared/errors';
+} from '@kortix/shared/errors';
 
 export type {
   TierErrorType,
   TierLimitErrorState,
   TierLimitErrorUI,
-} from '@agentpress/shared/errors';
+} from '@kortix/shared/errors';

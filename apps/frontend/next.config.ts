@@ -36,7 +36,7 @@ const nextConfig = (): NextConfig => ({
   output: (process.env.NEXT_OUTPUT as 'standalone') || undefined,
 
   // Transpile shared package
-  transpilePackages: ['@agentpress/shared'],
+  transpilePackages: ['@kortix/shared'],
 
   // Set environment variables
   env: {

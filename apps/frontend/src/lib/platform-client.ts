@@ -1,44 +1,61 @@
 /**
  * Platform API client.
  *
- * Talks to kortix-platform (platform.kortix.com) for sandbox lifecycle:
- *   POST /v1/account/init   — ensure user has a sandbox, provision if needed
- *   GET  /v1/account/sandbox — get user's active sandbox
+ * Routes through kortix-api (the unified backend) for sandbox lifecycle:
+ *   GET  /v1/account/providers          — available sandbox providers
+ *   POST /v1/account/init               — ensure user has a sandbox, provision if needed
+ *   GET  /v1/account/sandbox            — get user's active sandbox
+ *   GET  /v1/account/sandboxes          — list all sandboxes
+ *   POST /v1/account/sandbox/:id/start  — start a stopped sandbox
+ *   POST /v1/account/sandbox/:id/stop   — stop a running sandbox
+ *   DELETE /v1/account/sandbox/:id      — remove a sandbox
  *
- * Auth: Supabase JWT passed as Bearer token (same as all other services).
+ * Auth: Supabase JWT passed as Bearer token.
+ *
+ * In production: https://api.kortix.com/v1/account/*
+ * In local:      http://localhost:8008/v1/account/*
  */
 
 import { getSupabaseAccessToken } from '@/lib/auth-token';
 
+/**
+ * Get the base URL for platform API calls.
+ *
+ * Uses NEXT_PUBLIC_BACKEND_URL (e.g. "https://api.kortix.com/v1") with /v1 stripped,
+ * since the request paths already include the /v1 prefix.
+ */
 function getPlatformUrl(): string {
-  // Explicit override takes priority
-  if (process.env.NEXT_PUBLIC_PLATFORM_URL) {
-    return process.env.NEXT_PUBLIC_PLATFORM_URL;
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (backendUrl) {
+    // NEXT_PUBLIC_BACKEND_URL is e.g. "https://api.kortix.com/v1" — strip /v1
+    return backendUrl.replace(/\/v1\/?$/, '');
   }
-  // Derive from environment mode
-  const mode = process.env.NEXT_PUBLIC_ENV_MODE;
-  if (mode === 'production') return 'https://platform.kortix.com';
-  if (mode === 'staging') return 'https://platform.kortix.com';
-  return 'http://localhost:8012';
+
+  // Fallback for local dev
+  return 'http://localhost:8008';
 }
 
 const PLATFORM_URL = getPlatformUrl();
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type SandboxProviderName = 'daytona' | 'local_docker';
 
 export interface SandboxInfo {
   sandbox_id: string;
   external_id: string;
   name: string;
+  provider: SandboxProviderName;
   base_url: string;
   status: string;
+  metadata?: Record<string, unknown>;
   created_at: string;
+  updated_at: string;
 }
 
-/**
- * Build the OpenCode server URL for a sandbox.
- * Format: https://kortix.cloud/{externalId}/8000
- */
-export function getSandboxUrl(sandbox: SandboxInfo): string {
-  return `https://kortix.cloud/${sandbox.external_id}/8000`;
+export interface ProvidersInfo {
+  providers: SandboxProviderName[];
+  default: SandboxProviderName;
 }
 
 interface PlatformResponse<T> {
@@ -47,6 +64,8 @@ interface PlatformResponse<T> {
   error?: string;
   created?: boolean;
 }
+
+// ─── Fetch helper ────────────────────────────────────────────────────────────
 
 async function platformFetch<T>(
   path: string,
@@ -80,14 +99,91 @@ async function platformFetch<T>(
   return body as PlatformResponse<T>;
 }
 
+// ─── API methods ─────────────────────────────────────────────────────────────
+
+/**
+ * Build the OpenCode server URL for a sandbox.
+ * - Daytona: https://kortix.cloud/{externalId}/8000
+ * - Local Docker: uses the base_url directly (http://localhost:{port})
+ */
+export function getSandboxUrl(sandbox: SandboxInfo): string {
+  if (sandbox.provider === 'local_docker') {
+    return sandbox.base_url;
+  }
+  return `https://kortix.cloud/${sandbox.external_id}/8000`;
+}
+
+/**
+ * Build a URL to access a specific container port on a sandbox.
+ *
+ * - Daytona: `https://kortix.cloud/{externalId}/{containerPort}`
+ * - Local Docker: reads `metadata.mappedPorts[containerPort]` →
+ *   `http://localhost:{hostPort}`. Returns null if no mapping exists.
+ * - Falls back to null if the port can't be resolved.
+ */
+export function getSandboxPortUrl(
+  sandbox: SandboxInfo,
+  containerPort: string,
+): string | null {
+  if (sandbox.provider === 'daytona') {
+    return `https://kortix.cloud/${sandbox.external_id}/${containerPort}`;
+  }
+
+  if (sandbox.provider === 'local_docker') {
+    const mappedPorts = sandbox.metadata?.mappedPorts as
+      | Record<string, string>
+      | undefined;
+    const hostPort = mappedPorts?.[containerPort];
+    if (!hostPort) return null;
+    // base_url is http://localhost:{somePort} — extract the hostname
+    try {
+      const base = new URL(sandbox.base_url);
+      return `${base.protocol}//${base.hostname}:${hostPort}`;
+    } catch {
+      return `http://localhost:${hostPort}`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract mappedPorts from sandbox metadata (convenience for storing in ServerEntry).
+ * Returns undefined if not available.
+ */
+export function extractMappedPorts(
+  sandbox: SandboxInfo,
+): Record<string, string> | undefined {
+  if (sandbox.provider !== 'local_docker') return undefined;
+  const ports = sandbox.metadata?.mappedPorts;
+  if (ports && typeof ports === 'object' && !Array.isArray(ports)) {
+    return ports as Record<string, string>;
+  }
+  return undefined;
+}
+
+/**
+ * Get available sandbox providers from the platform service.
+ */
+export async function getProviders(): Promise<ProvidersInfo> {
+  const result = await platformFetch<ProvidersInfo>('/v1/account/providers');
+  if (!result.success || !result.data) {
+    throw new Error(result.error || 'Failed to get providers');
+  }
+  return result.data;
+}
+
 /**
  * Initialize account — ensures the user has an active sandbox.
  * Idempotent: if a sandbox already exists, returns it.
- * If none exists, provisions a new one via Daytona.
+ * If none exists, provisions a new one via the specified provider.
  */
-export async function initAccount(): Promise<{ sandbox: SandboxInfo; created: boolean }> {
+export async function initAccount(opts?: {
+  provider?: SandboxProviderName;
+}): Promise<{ sandbox: SandboxInfo; created: boolean }> {
   const result = await platformFetch<SandboxInfo>('/v1/account/init', {
     method: 'POST',
+    body: opts?.provider ? JSON.stringify({ provider: opts.provider }) : undefined,
   });
 
   if (!result.success || !result.data) {
@@ -115,4 +211,114 @@ export async function getSandbox(): Promise<SandboxInfo | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * List all sandboxes for the user's account.
+ */
+export async function listSandboxes(): Promise<SandboxInfo[]> {
+  const result = await platformFetch<SandboxInfo[]>('/v1/account/sandboxes', {
+    method: 'GET',
+  });
+
+  if (!result.success || !result.data) {
+    return [];
+  }
+
+  return result.data;
+}
+
+/**
+ * Start a stopped sandbox.
+ */
+export async function startSandbox(sandboxId: string): Promise<void> {
+  const result = await platformFetch<void>(`/v1/account/sandbox/${sandboxId}/start`, {
+    method: 'POST',
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to start sandbox');
+  }
+}
+
+/**
+ * Stop a running sandbox.
+ */
+export async function stopSandbox(sandboxId: string): Promise<void> {
+  const result = await platformFetch<void>(`/v1/account/sandbox/${sandboxId}/stop`, {
+    method: 'POST',
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to stop sandbox');
+  }
+}
+
+/**
+ * Remove (archive) a sandbox.
+ */
+export async function removeSandbox(sandboxId: string): Promise<void> {
+  const result = await platformFetch<void>(`/v1/account/sandbox/${sandboxId}`, {
+    method: 'DELETE',
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to remove sandbox');
+  }
+}
+
+// ─── Sandbox Update API ─────────────────────────────────────────────────────
+
+export interface SandboxVersionInfo {
+  version: string;
+  package: string;
+}
+
+export interface SandboxUpdateResult {
+  success?: boolean;
+  upToDate?: boolean;
+  previousVersion?: string;
+  currentVersion: string;
+  output?: string;
+  error?: string;
+}
+
+/**
+ * Get the latest available sandbox version from the platform.
+ * Platform checks npm registry (cached 5min).
+ */
+export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
+  const res = await fetch(`${PLATFORM_URL}/v1/sandbox/version`, {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Trigger an update on a running sandbox.
+ * Frontend passes the target version — sandbox doesn't need to fetch it.
+ */
+export async function triggerSandboxUpdate(
+  sandbox: SandboxInfo,
+  version: string,
+): Promise<SandboxUpdateResult> {
+  const url = getSandboxUrl(sandbox);
+  const token = await getSupabaseAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${url}/kortix/update`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ version }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Update failed: ${res.status}`);
+  }
+  return res.json();
 }

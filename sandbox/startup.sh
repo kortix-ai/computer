@@ -6,7 +6,7 @@
 # /init (s6-overlay) becomes PID 1. This gives 100% parity with local Docker.
 #
 # Everything below this point runs BEFORE s6 takes over.
-# s6 cont-init.d scripts and services.d run as normal after /init starts.
+# s6 cont-init.d scripts and s6-rc.d services run as normal after /init starts.
 
 set -e
 
@@ -20,7 +20,6 @@ mkdir -p /workspace/.kortix \
     /workspace/.agent-browser /workspace/.browser-profile /workspace/.lss \
     /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
     /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \
-    /workspace/.local/share/konsole \
     /workspace/.XDG /workspace/.config /workspace/ssl \
     /workspace/presentations
 
@@ -34,6 +33,6 @@ chown -R abc:abc /workspace 2>/dev/null || true
 echo "[startup] Starting s6-overlay via PID namespace..."
 
 # Boot s6-overlay in a new PID namespace where it becomes PID 1.
-# This runs the full webtop stack (Xvfb, KDE, nginx, selkies/noVNC)
+# This runs the full webtop stack (Xvfb, XFCE, nginx, selkies/noVNC)
 # plus all our custom services in /etc/services.d/.
 exec unshare --pid --fork /init

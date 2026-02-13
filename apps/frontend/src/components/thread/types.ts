@@ -7,7 +7,7 @@ export type {
   ParsedContent,
   ParsedMetadata,
   AgentStatus,
-} from '@agentpress/shared';
+} from '@kortix/shared';
 
 // Re-export streaming types from shared
 export type {
@@ -22,9 +22,9 @@ export type {
   LlmResponseStartMessage,
   StreamingToolCall,
   StreamingMetadata,
-} from '@agentpress/shared';
+} from '@kortix/shared';
 
-export { StreamMessageType, validateStreamMessage } from '@agentpress/shared';
+export { StreamMessageType, validateStreamMessage } from '@kortix/shared';
 
 // Define a type for the params to make React.use() work properly
 export type ThreadParams = {

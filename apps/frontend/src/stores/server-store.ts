@@ -1,11 +1,23 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type SandboxProvider = 'daytona' | 'local_docker';
+
 export interface ServerEntry {
   id: string;
   label: string;
   url: string;
   isDefault?: boolean;
+  /** Sandbox provider type, if this server was provisioned via platform API */
+  provider?: SandboxProvider;
+  /** Platform sandbox ID, if this server is a managed sandbox */
+  sandboxId?: string;
+  /**
+   * Container-port → host-port map from Docker (local_docker provider).
+   * e.g. { "6080": "32001", "8000": "32005", "9223": "32007" }
+   * For Daytona, ports are accessed via subdomain routing, so this is unused.
+   */
+  mappedPorts?: Record<string, string>;
 }
 
 interface ServerStore {
@@ -134,4 +146,22 @@ export const useServerStore = create<ServerStore>()(
  */
 export function getActiveOpenCodeUrl(): string {
   return useServerStore.getState().getActiveServerUrl();
+}
+
+/**
+ * Get the full active ServerEntry (including mappedPorts, provider, etc.).
+ * Returns null if the active server can't be found (shouldn't happen).
+ */
+export function getActiveServer(): ServerEntry | null {
+  const state = useServerStore.getState();
+  return state.servers.find((s) => s.id === state.activeServerId) ?? null;
+}
+
+/**
+ * Get the host port for a given container port on the active server.
+ * Returns null if no mapping exists (e.g. Daytona, default server, or unknown port).
+ */
+export function getActiveServerMappedPort(containerPort: string): string | null {
+  const server = getActiveServer();
+  return server?.mappedPorts?.[containerPort] ?? null;
 }

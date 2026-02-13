@@ -53,7 +53,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
   // Priority 3: If locale is provided in the URL path (e.g., /de, /it), use it for marketing pages
   // This allows SEO-friendly URLs like /de, /it for marketing content
   // Only used if user hasn't set an explicit preference
-  const urlLocale = requestLocale || headersList.get('x-locale');
+  const urlLocale = (await requestLocale) || headersList.get('x-locale');
   if (urlLocale && locales.includes(urlLocale as Locale)) {
     locale = urlLocale as Locale;
     return {

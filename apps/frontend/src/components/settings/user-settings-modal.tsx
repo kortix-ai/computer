@@ -91,7 +91,7 @@ import { TierBadge } from '../billing/tier-badge';
 import { siteConfig } from '@/lib/site-config';
 import ThreadUsage from '@/components/billing/thread-usage';
 import { UsageLimitsCard } from '@/components/billing/usage-limits-card';
-import { formatCredits } from '@agentpress/shared';
+import { formatCredits } from '@kortix/shared';
 import { LanguageSwitcher } from './language-switcher';
 import { useTranslations } from 'next-intl';
 import { ReferralsTab } from '@/components/referrals/referrals-tab';
@@ -968,13 +968,12 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
     };
 
     const hoursUntilDailyRefresh = getHoursUntilDailyRefresh();
-    const dailyCreditsInfo = accountState?.credits.daily_refresh;
+    const dailyCreditsInfo = accountStateSelectors.dailyCreditsInfo(accountState);
     
-    // Use the clean credits breakdown from API
-    const dailyCredits = accountState?.credits.daily ?? 0;
-    const monthlyCredits = accountState?.credits.monthly ?? 0;
-    const nonExpiringCredits = accountState?.credits.extra ?? 0;
-    const totalCredits = accountState?.credits.total ?? 0;
+    const dailyCredits = accountStateSelectors.dailyCredits(accountState);
+    const monthlyCredits = accountStateSelectors.monthlyCredits(accountState);
+    const nonExpiringCredits = accountStateSelectors.extraCredits(accountState);
+    const totalCredits = accountStateSelectors.totalCredits(accountState);
     
     console.log('[BillingTab] Credit breakdown:', { 
         accountState: accountState?.credits,
@@ -1380,7 +1379,7 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
             <CreditPurchaseModal
                 open={showCreditPurchaseModal}
                 onOpenChange={setShowCreditPurchaseModal}
-                currentBalance={totalCredits / 100}
+                currentBalance={totalCredits}
                 canPurchase={canPurchaseCredits}
                 onPurchaseComplete={() => {
                     refetchSubscription();
