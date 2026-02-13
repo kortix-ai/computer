@@ -40,6 +40,30 @@ import {
 } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 
+/**
+ * Rewrite the share URL returned by the OpenCode server (e.g. https://opncd.ai/share/XYZ)
+ * to use our own domain so that the public link points to our app.
+ */
+function toOurShareUrl(serverUrl: string): string {
+  try {
+    const parsed = new URL(serverUrl);
+    // Extract the share ID from the path (last segment of /share/{id})
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    const shareIdx = segments.indexOf('share');
+    const shareId = shareIdx !== -1 && segments[shareIdx + 1]
+      ? segments[shareIdx + 1]
+      : segments[segments.length - 1];
+    const appBase = (typeof window !== 'undefined' ? window.location.origin : '')
+      || process.env.NEXT_PUBLIC_URL
+      || process.env.NEXT_PUBLIC_APP_URL
+      || 'https://www.kortix.com';
+    return `${appBase}/share/${shareId}`;
+  } catch {
+    // If the URL can't be parsed, return as-is
+    return serverUrl;
+  }
+}
+
 interface SessionSiteHeaderProps {
   sessionId: string;
   sessionTitle: string;
@@ -81,7 +105,8 @@ export function SessionSiteHeader({
     try {
       const updated = await shareSession.mutateAsync(sessionId);
       if (updated.share?.url) {
-        await navigator.clipboard.writeText(updated.share.url);
+        const ourUrl = toOurShareUrl(updated.share.url);
+        await navigator.clipboard.writeText(ourUrl);
         toast.success('Share link copied to clipboard');
       } else {
         toast.success('Session shared');
@@ -103,7 +128,8 @@ export function SessionSiteHeader({
   const handleCopyShareLink = useCallback(async () => {
     if (!session?.share?.url) return;
     try {
-      await navigator.clipboard.writeText(session.share.url);
+      const ourUrl = toOurShareUrl(session.share.url);
+      await navigator.clipboard.writeText(ourUrl);
       setLinkCopied(true);
       toast.success('Share link copied');
       setTimeout(() => setLinkCopied(false), 2000);

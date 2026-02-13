@@ -484,8 +484,9 @@ export function useSummarizeOpenCodeSession() {
     mutationFn: async (params: { sessionId: string; providerID?: string; modelID?: string }) => {
       const client = getClient();
 
-      // Resolve providerID/modelID: use explicit params, fall back to config default
       let { providerID, modelID } = params;
+
+      // 1. Try config default model
       if (!providerID || !modelID) {
         try {
           const configResult = await client.config.get();
@@ -498,21 +499,64 @@ export function useSummarizeOpenCodeSession() {
             }
           }
         } catch {
-          // ignore — will try auto below
+          // ignore
         }
+      }
+
+      // 2. Try to get model from the session's latest assistant message
+      if (!providerID || !modelID) {
+        try {
+          const msgs = await client.session.messages({ sessionID: params.sessionId });
+          const allMsgs = (msgs.data ?? []) as Array<{ info: { role: string; providerID?: string; modelID?: string } }>;
+          for (let i = allMsgs.length - 1; i >= 0; i--) {
+            const m = allMsgs[i].info;
+            if (m.role === 'assistant' && m.providerID && m.modelID) {
+              providerID = providerID || m.providerID;
+              modelID = modelID || m.modelID;
+              break;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // 3. Try first available provider/model from provider list
+      if (!providerID || !modelID) {
+        try {
+          const providerResult = await client.provider.list();
+          const providers = providerResult.data as any;
+          if (providers && typeof providers === 'object') {
+            for (const [pid, providerInfo] of Object.entries(providers)) {
+              const models = (providerInfo as any)?.models;
+              if (models && typeof models === 'object') {
+                const firstModelId = Object.keys(models)[0];
+                if (firstModelId) {
+                  providerID = pid;
+                  modelID = firstModelId;
+                  break;
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!providerID || !modelID) {
+        throw new Error('No model available for compaction. Please configure a model in settings.');
       }
 
       const result = await client.session.summarize({
         sessionID: params.sessionId,
-        ...(providerID && modelID
-          ? { providerID, modelID }
-          : { providerID: 'auto', modelID: 'auto', auto: true }),
+        providerID,
+        modelID,
       });
       unwrap(result);
       return params.sessionId;
     },
     onSuccess: (sessionId) => {
-      // Invalidate session and messages to pick up compaction changes
       queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionId) });
       queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionId) });
     },

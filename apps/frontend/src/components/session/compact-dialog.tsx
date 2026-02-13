@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useExecuteOpenCodeCommand } from '@/hooks/opencode/use-opencode-sessions';
+import { useSummarizeOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 
 interface CompactDialogProps {
@@ -21,10 +21,10 @@ interface CompactDialogProps {
 }
 
 export function CompactDialog({ sessionId, open, onOpenChange }: CompactDialogProps) {
-  const executeCommand = useExecuteOpenCodeCommand();
+  const summarize = useSummarizeOpenCodeSession();
 
   const handleCompact = useCallback(() => {
-    executeCommand.mutate({ sessionId, command: 'compact' }, {
+    summarize.mutate({ sessionId }, {
       onSuccess: () => {
         toast.success('Session compacted successfully');
         onOpenChange(false);
@@ -33,7 +33,7 @@ export function CompactDialog({ sessionId, open, onOpenChange }: CompactDialogPr
         toast.error(error instanceof Error ? error.message : 'Failed to compact session');
       },
     });
-  }, [sessionId, executeCommand, onOpenChange]);
+  }, [sessionId, summarize, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,15 +61,15 @@ export function CompactDialog({ sessionId, open, onOpenChange }: CompactDialogPr
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={executeCommand.isPending}
+            disabled={summarize.isPending}
           >
             Cancel
           </Button>
           <Button
             onClick={handleCompact}
-            disabled={executeCommand.isPending}
+            disabled={summarize.isPending}
           >
-            {executeCommand.isPending ? (
+            {summarize.isPending ? (
               <>
                 <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                 Compacting...

@@ -1,99 +1,105 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { cn } from '@/lib/utils';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import {
   AlertTriangle,
   Copy,
   Check,
-  ExternalLink,
-  ChevronDown,
-  ChevronRight,
   Clock,
-  Coins,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/lib/toast';
-import { getActiveOpenCodeUrl } from '@/stores/server-store';
 
 // ============================================================================
-// Types matching the enterprise share data API response
+// Types
 // ============================================================================
 
-interface ShareSession {
+interface SessionInfo {
   id: string;
   title: string;
   version?: string;
-  directory?: string;
   time: { created: number; updated?: number };
+  share?: { url: string };
 }
 
-interface ShareMessage {
+interface MessagePart {
   id: string;
-  sessionID: string;
-  role: 'user' | 'assistant';
-  modelID?: string;
-  model?: { providerID: string; modelID: string };
-  time: { created: number; updated?: number };
-}
-
-interface SharePart {
-  id: string;
-  messageID: string;
   type: string;
+  text?: string;
   content?: any;
   time?: { created: number; updated?: number };
-  // Text part
-  text?: string;
-  // Tool part
-  tool?: string;
-  state?: string;
-  input?: Record<string, any>;
-  output?: string;
-  // Reasoning part
-  reasoning?: string;
-  // File part
-  file?: string;
 }
 
-interface ShareFileDiff {
-  file: string;
-  before: string;
-  after: string;
+interface MessageWithParts {
+  info: {
+    id: string;
+    sessionID: string;
+    role: 'user' | 'assistant';
+    time: { created: number; updated?: number };
+  };
+  parts: MessagePart[];
 }
 
-type ShareDataItem =
-  | { type: 'session'; data: ShareSession }
-  | { type: 'message'; data: ShareMessage }
-  | { type: 'part'; data: SharePart }
-  | { type: 'session_diff'; data: ShareFileDiff[] }
-  | { type: 'model'; data: any[] };
+interface ShareData {
+  session: SessionInfo;
+  messages: MessageWithParts[];
+}
 
 // ============================================================================
-// Data fetching
+// Data fetching — uses the standard OpenCode session & message APIs
 // ============================================================================
 
-async function fetchShareData(shareId: string): Promise<ShareDataItem[]> {
-  // Try the enterprise API at the current OpenCode server URL
-  const baseUrl = getActiveOpenCodeUrl();
-  const res = await fetch(`${baseUrl}/api/share/${shareId}/data`, {
+const OPENCODE_BASE_URL = (process.env.NEXT_PUBLIC_OPENCODE_URL || 'http://localhost:4096').replace(/\/+$/, '');
+
+/**
+ * Resolve a share ID (e.g. "t9RGzhWU") to a session, then fetch its messages.
+ *
+ * The share ID is the last 8 characters of the session ID.
+ * We list all sessions, find the one whose ID ends with the shareId
+ * and has an active share, then fetch its messages.
+ */
+async function fetchShareData(shareId: string): Promise<ShareData> {
+  // 1. List sessions to find the one matching this share ID
+  const sessionsRes = await fetch(`${OPENCODE_BASE_URL}/session`, {
     headers: { 'Accept': 'application/json' },
   });
-
-  if (!res.ok) {
-    // Fallback: try opncd.ai (the default enterprise host)
-    const fallbackRes = await fetch(`https://opncd.ai/api/share/${shareId}/data`, {
-      headers: { 'Accept': 'application/json' },
-    });
-    if (!fallbackRes.ok) {
-      throw new Error(fallbackRes.status === 404 ? 'Share not found' : `Failed to load share data (${fallbackRes.status})`);
-    }
-    return fallbackRes.json();
+  if (!sessionsRes.ok) {
+    throw new Error('Failed to load sessions');
   }
 
-  return res.json();
+  const contentType = sessionsRes.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('Unexpected response from server');
+  }
+
+  const sessions: SessionInfo[] = await sessionsRes.json();
+
+  // Find the session whose ID ends with the shareId and has sharing enabled
+  const session = sessions.find(
+    (s) => s.id.endsWith(shareId) && s.share?.url
+  );
+  if (!session) {
+    throw new Error('Share not found');
+  }
+
+  // 2. Fetch messages for this session
+  const messagesRes = await fetch(`${OPENCODE_BASE_URL}/session/${session.id}/message`, {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!messagesRes.ok) {
+    throw new Error('Failed to load messages');
+  }
+
+  const msgContentType = messagesRes.headers.get('content-type') || '';
+  if (!msgContentType.includes('application/json')) {
+    throw new Error('Unexpected response from server');
+  }
+
+  const messages: MessageWithParts[] = await messagesRes.json();
+
+  return { session, messages };
 }
 
 // ============================================================================
@@ -101,7 +107,7 @@ async function fetchShareData(shareId: string): Promise<ShareDataItem[]> {
 // ============================================================================
 
 export function ShareViewer({ shareId }: { shareId: string }) {
-  const [data, setData] = useState<ShareDataItem[] | null>(null);
+  const [data, setData] = useState<ShareData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -124,42 +130,27 @@ export function ShareViewer({ shareId }: { shareId: string }) {
     return () => { cancelled = true; };
   }, [shareId]);
 
-  // Parse the flat data array into structured data
+  // Extract only text parts from messages
   const parsed = useMemo(() => {
     if (!data) return null;
 
-    let session: ShareSession | null = null;
-    const messages: ShareMessage[] = [];
-    const parts: Record<string, SharePart[]> = {};
-    let diffs: ShareFileDiff[] = [];
+    const { session, messages } = data;
 
-    for (const item of data) {
-      switch (item.type) {
-        case 'session':
-          session = item.data;
-          break;
-        case 'message':
-          messages.push(item.data);
-          break;
-        case 'part':
-          if (!parts[item.data.messageID]) parts[item.data.messageID] = [];
-          parts[item.data.messageID].push(item.data);
-          break;
-        case 'session_diff':
-          diffs = item.data;
-          break;
+    // Sort messages by creation time
+    const sortedMessages = [...messages].sort(
+      (a, b) => a.info.time.created - b.info.time.created
+    );
+
+    // Build a parts map with only text parts
+    const textPartsByMessage: Record<string, MessagePart[]> = {};
+    for (const msg of sortedMessages) {
+      const textParts = msg.parts.filter((p) => p.type === 'text');
+      if (textParts.length > 0) {
+        textPartsByMessage[msg.info.id] = textParts;
       }
     }
 
-    // Sort messages by creation time
-    messages.sort((a, b) => a.time.created - b.time.created);
-
-    // Sort parts by creation time within each message
-    for (const msgId of Object.keys(parts)) {
-      parts[msgId].sort((a, b) => (a.time?.created ?? 0) - (b.time?.created ?? 0));
-    }
-
-    return { session, messages, parts, diffs };
+    return { session, messages: sortedMessages, textPartsByMessage };
   }, [data]);
 
   if (loading) {
@@ -193,8 +184,8 @@ export function ShareViewer({ shareId }: { shareId: string }) {
     );
   }
 
-  const { session, messages, parts, diffs } = parsed;
-  const userMessages = messages.filter((m) => m.role === 'user');
+  const { session, messages, textPartsByMessage } = parsed;
+  const userMessages = messages.filter((m) => m.info.role === 'user');
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -240,30 +231,20 @@ export function ShareViewer({ shareId }: { shareId: string }) {
             </div>
           </div>
 
-          {/* Message turns */}
+          {/* Message turns — chat content only */}
           <div className="space-y-8">
-            {messages.map((message) => (
-              <ShareMessageView
-                key={message.id}
-                message={message}
-                parts={parts[message.id] || []}
-              />
-            ))}
+            {messages.map((msg) => {
+              const parts = textPartsByMessage[msg.info.id];
+              if (!parts || parts.length === 0) return null;
+              return (
+                <ShareMessageView
+                  key={msg.info.id}
+                  role={msg.info.role}
+                  parts={parts}
+                />
+              );
+            })}
           </div>
-
-          {/* Diffs section */}
-          {diffs.length > 0 && (
-            <div className="mt-12 border-t border-border pt-8">
-              <h2 className="text-sm font-medium mb-4">
-                {diffs.length} file{diffs.length !== 1 ? 's' : ''} changed
-              </h2>
-              <div className="space-y-4">
-                {diffs.map((diff) => (
-                  <ShareDiffView key={diff.file} diff={diff} />
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Footer */}
           <div className="flex items-center justify-center pt-16 pb-8">
@@ -312,20 +293,16 @@ function CopyLinkButton() {
 }
 
 function ShareMessageView({
-  message,
+  role,
   parts,
 }: {
-  message: ShareMessage;
-  parts: SharePart[];
+  role: 'user' | 'assistant';
+  parts: MessagePart[];
 }) {
-  const isUser = message.role === 'user';
+  const text = parts.map((p) => p.text || p.content?.text || '').join('\n').trim();
+  if (!text) return null;
 
-  if (isUser) {
-    // Find text parts for user message
-    const textParts = parts.filter((p) => p.type === 'text');
-    const text = textParts.map((p) => p.text || p.content?.text || '').join('\n').trim();
-    if (!text) return null;
-
+  if (role === 'user') {
     return (
       <div className="flex justify-end">
         <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-card border px-4 py-3">
@@ -335,14 +312,7 @@ function ShareMessageView({
     );
   }
 
-  // Assistant message
-  const textParts = parts.filter((p) => p.type === 'text');
-  const toolParts = parts.filter((p) => p.type === 'tool');
-  const reasoningParts = parts.filter((p) => p.type === 'reasoning');
-
-  const hasContent = textParts.length > 0 || toolParts.length > 0;
-  if (!hasContent) return null;
-
+  // Assistant message — only text content
   return (
     <div className="flex flex-col gap-2">
       {/* Agent header */}
@@ -355,127 +325,16 @@ function ShareMessageView({
         />
       </div>
 
-      {/* Reasoning (collapsed by default) */}
-      {reasoningParts.length > 0 && (
-        <ShareReasoningSection
-          content={reasoningParts.map((p) => p.reasoning || p.text || p.content?.text || '').join('\n')}
-        />
-      )}
-
-      {/* Tool calls */}
-      {toolParts.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          {toolParts.map((part) => (
-            <ShareToolView key={part.id} part={part} />
-          ))}
-        </div>
-      )}
-
-      {/* Text content */}
-      {textParts.map((part) => {
-        const text = part.text || part.content?.text || '';
-        if (!text.trim()) return null;
+      {/* Text content only */}
+      {parts.map((part) => {
+        const partText = part.text || part.content?.text || '';
+        if (!partText.trim()) return null;
         return (
           <div key={part.id} className="break-words overflow-hidden">
-            <UnifiedMarkdown content={text} />
+            <UnifiedMarkdown content={partText} />
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function ShareReasoningSection({ content }: { content: string }) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!content.trim()) return null;
-
-  return (
-    <button
-      onClick={() => setExpanded(!expanded)}
-      className="flex items-start gap-2 text-left text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-    >
-      {expanded ? <ChevronDown className="h-3 w-3 mt-0.5 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 mt-0.5 flex-shrink-0" />}
-      <div>
-        <span className="font-medium">Reasoning</span>
-        {expanded && (
-          <pre className="mt-1 whitespace-pre-wrap text-muted-foreground/70 font-normal text-[11px] leading-relaxed max-h-64 overflow-y-auto">
-            {content}
-          </pre>
-        )}
-      </div>
-    </button>
-  );
-}
-
-function ShareToolView({ part }: { part: SharePart }) {
-  const [expanded, setExpanded] = useState(false);
-  const toolName = part.tool || 'tool';
-  const isSuccess = part.state === 'completed' || part.state === 'success';
-  const isError = part.state === 'error';
-
-  return (
-    <div className="rounded-lg border bg-card">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-xs cursor-pointer hover:bg-accent/50 transition-colors"
-      >
-        {expanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
-        <span className="font-mono text-xs truncate">{toolName}</span>
-        {part.state && (
-          <span className={cn(
-            'ml-auto px-1.5 py-0.5 rounded text-[10px]',
-            isSuccess && 'bg-green-500/10 text-green-600 dark:text-green-400',
-            isError && 'bg-red-500/10 text-red-600 dark:text-red-400',
-            !isSuccess && !isError && 'bg-muted text-muted-foreground',
-          )}>
-            {part.state}
-          </span>
-        )}
-      </button>
-      {expanded && (
-        <div className="px-3 pb-3 border-t border-border/50">
-          {part.input && Object.keys(part.input).length > 0 && (
-            <div className="mt-2">
-              <p className="text-[10px] font-medium text-muted-foreground mb-1">Input</p>
-              <pre className="text-[11px] font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto">
-                {JSON.stringify(part.input, null, 2)}
-              </pre>
-            </div>
-          )}
-          {part.output && (
-            <div className="mt-2">
-              <p className="text-[10px] font-medium text-muted-foreground mb-1">Output</p>
-              <pre className="text-[11px] font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
-                {part.output}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ShareDiffView({ diff }: { diff: ShareFileDiff }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-xs cursor-pointer hover:bg-accent/50 transition-colors"
-      >
-        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        <span className="font-mono text-xs truncate">{diff.file}</span>
-      </button>
-      {expanded && (
-        <div className="border-t border-border/50 max-h-96 overflow-y-auto">
-          <pre className="text-[11px] font-mono p-3 whitespace-pre-wrap break-words">
-            {diff.after || diff.before || '(empty)'}
-          </pre>
-        </div>
-      )}
     </div>
   );
 }
