@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ExternalLink,
   Globe,
@@ -26,10 +26,19 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Extract metadata from tab
   const previewUrl = (tab?.metadata?.url as string) || '';
   const port = (tab?.metadata?.port as number) || 0;
+
+  /** Clear any pending load timeout. */
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
@@ -38,19 +47,32 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   }, []);
 
   const handleLoad = useCallback(() => {
+    clearLoadTimeout();
     setIsLoading(false);
-  }, []);
+  }, [clearLoadTimeout]);
 
   const handleError = useCallback(() => {
+    clearLoadTimeout();
     setIsLoading(false);
     setHasError(true);
-  }, []);
+  }, [clearLoadTimeout]);
 
   const handleOpenExternal = useCallback(() => {
     if (previewUrl) {
       window.open(previewUrl, '_blank', 'noopener,noreferrer');
     }
   }, [previewUrl]);
+
+  // Fallback: if onLoad doesn't fire within 5s, dismiss the loading state.
+  // Cross-origin iframes frequently fail to fire onLoad events.
+  useEffect(() => {
+    if (!isLoading) return;
+    clearLoadTimeout();
+    loadTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false);
+    }, 5000);
+    return clearLoadTimeout;
+  }, [isLoading, refreshKey, clearLoadTimeout]);
 
   // Display URL (strip protocol for cleaner look)
   const displayUrl = useMemo(() => {
