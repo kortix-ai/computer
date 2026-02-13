@@ -1,11 +1,20 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
-import { ExternalLink, Globe, AppWindow } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ExternalLink,
+  Globe,
+  MonitorPlay,
+  Copy,
+  Check,
+  RefreshCw,
+  Maximize2,
+  Minimize2,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { UnifiedMarkdown } from '@/components/markdown';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTabStore } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import {
@@ -19,11 +28,183 @@ interface SandboxUrlDetectorProps {
   isStreaming?: boolean;
 }
 
-/**
- * Card displayed inline in chat when a localhost URL is detected.
- * Shows the port, a rewritten proxy URL, and buttons to open as
- * a preview tab or in an external browser tab.
- */
+// ---------------------------------------------------------------------------
+// Reachability probe — lightweight HEAD fetch to check if a port is alive
+// ---------------------------------------------------------------------------
+
+type ReachabilityStatus = 'checking' | 'reachable' | 'unreachable';
+
+function usePortReachability(proxyUrl: string): ReachabilityStatus {
+  const [status, setStatus] = useState<ReachabilityStatus>('checking');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function probe() {
+      try {
+        // no-cors gives an opaque response (status 0) but succeeds if the
+        // server is listening. If the port is down, fetch throws a TypeError.
+        await fetch(proxyUrl, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(4000),
+        });
+        if (!cancelled) setStatus('reachable');
+      } catch {
+        if (!cancelled) setStatus('unreachable');
+      }
+    }
+
+    probe();
+    const interval = setInterval(probe, 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [proxyUrl]);
+
+  return status;
+}
+
+// ---------------------------------------------------------------------------
+// Inline iframe preview — embedded directly in the chat thread
+// ---------------------------------------------------------------------------
+
+function InlineIframePreview({
+  proxyUrl,
+  port,
+}: {
+  proxyUrl: string;
+  port: number;
+}) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleLoad = useCallback(() => {
+    clearLoadTimeout();
+    setIsLoading(false);
+  }, [clearLoadTimeout]);
+  const handleError = useCallback(() => {
+    clearLoadTimeout();
+    setIsLoading(false);
+    setHasError(true);
+  }, [clearLoadTimeout]);
+  const handleRefresh = useCallback(() => {
+    setIsLoading(true);
+    setHasError(false);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  // Fallback: cross-origin iframes often don't fire onLoad.
+  // Dismiss loading state after 5s regardless.
+  useEffect(() => {
+    if (!isLoading) return;
+    clearLoadTimeout();
+    loadTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false);
+    }, 5000);
+    return clearLoadTimeout;
+  }, [isLoading, refreshKey, clearLoadTimeout]);
+
+  return (
+    <div
+      className={cn(
+        'mt-2 rounded-lg border border-border/50 overflow-hidden transition-all duration-200',
+        expanded ? 'h-[480px]' : 'h-[280px]',
+      )}
+    >
+      {/* Mini toolbar */}
+      <div className="flex items-center gap-1.5 h-8 px-2.5 bg-muted/40 border-b border-border/30 shrink-0">
+        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+          <Globe className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+          <span className="text-[11px] text-muted-foreground font-mono truncate">
+            localhost:{port}
+          </span>
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleRefresh}
+              className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              <RefreshCw className={cn('h-3 w-3', isLoading && 'animate-spin')} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Refresh</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              {expanded ? (
+                <Minimize2 className="h-3 w-3" />
+              ) : (
+                <Maximize2 className="h-3 w-3" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            {expanded ? 'Collapse' : 'Expand'}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
+      {/* Iframe */}
+      <div className="relative flex-1 h-[calc(100%-2rem)]">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span className="text-xs">Loading...</span>
+            </div>
+          </div>
+        )}
+        {hasError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+            <div className="text-center text-muted-foreground">
+              <p className="text-xs">Failed to load</p>
+              <button
+                onClick={handleRefresh}
+                className="text-xs text-primary hover:underline mt-1"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+        <iframe
+          key={refreshKey}
+          ref={iframeRef}
+          src={proxyUrl}
+          title={`Preview :${port}`}
+          className="w-full h-full border-0 bg-white"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
+          onLoad={handleLoad}
+          onError={handleError}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SandboxPreviewCard — the inline card shown in chat
+// ---------------------------------------------------------------------------
+
 function SandboxPreviewCard({
   detected,
   proxyUrl,
@@ -32,84 +213,205 @@ function SandboxPreviewCard({
   proxyUrl: string;
 }) {
   const openTab = useTabStore((s) => s.openTab);
+  const [copied, setCopied] = useState(false);
+  const [showInlinePreview, setShowInlinePreview] = useState(false);
+  const reachability = usePortReachability(proxyUrl);
 
-  const handleOpenPreviewTab = useCallback(() => {
-    const tabId = `preview:${detected.port}`;
+  const isReachable = reachability === 'reachable';
+  const isChecking = reachability === 'checking';
+
+  const tabId = `preview:${detected.port}`;
+  const tabHref = `/preview/${detected.port}`;
+
+  /** Open (or activate) the preview tab and navigate to it. */
+  const navigateToPreviewTab = useCallback(() => {
     openTab({
       id: tabId,
-      title: `Preview :${detected.port}`,
+      title: `localhost:${detected.port}`,
       type: 'preview',
-      href: `/preview/${detected.port}`,
+      href: tabHref,
       metadata: {
         url: proxyUrl,
         port: detected.port,
         originalUrl: detected.originalUrl,
       },
     });
-  }, [detected, proxyUrl, openTab]);
+    // pushState so the tab is actually visible — openTab sets activeTabId
+    // but doesn't change the URL, so the SessionTabsContainer won't show it.
+    window.history.pushState(null, '', tabHref);
+  }, [detected, proxyUrl, openTab, tabId, tabHref]);
 
   const handleOpenExternal = useCallback(() => {
     window.open(proxyUrl, '_blank', 'noopener,noreferrer');
   }, [proxyUrl]);
 
+  const handleCopyUrl = useCallback(() => {
+    navigator.clipboard.writeText(proxyUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [proxyUrl]);
+
+  const displayPath = detected.path !== '/' ? detected.path : '';
+
   return (
-    <Card className="my-3 p-0 border bg-muted/30 overflow-hidden">
-      <CardContent className="px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          {/* Icon */}
-          <div className="flex-shrink-0">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 border flex items-center justify-center">
-              <Globe className="w-4.5 h-4.5 text-primary" />
+    <div className="my-3">
+      <div className="group/card relative rounded-xl border border-border/50 bg-muted/20 overflow-hidden transition-all duration-200 hover:border-border/80 hover:bg-muted/30">
+        {/* Top accent gradient — color reflects reachability */}
+        <div className={cn(
+          'absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent to-transparent',
+          isReachable ? 'via-emerald-500/50' : isChecking ? 'via-amber-500/40' : 'via-red-500/40',
+        )} />
+
+        <div className="flex items-center gap-3 px-3.5 py-2.5">
+          {/* Status icon */}
+          <div className="relative flex-shrink-0">
+            <div className={cn(
+              'w-8 h-8 rounded-lg border flex items-center justify-center transition-colors',
+              isReachable
+                ? 'bg-emerald-500/8 border-emerald-500/15 group-hover/card:bg-emerald-500/12'
+                : isChecking
+                  ? 'bg-amber-500/8 border-amber-500/15'
+                  : 'bg-red-500/8 border-red-500/15',
+            )}>
+              <Globe className={cn(
+                'w-4 h-4',
+                isReachable
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : isChecking
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-red-600 dark:text-red-400',
+              )} />
             </div>
+            {/* Status dot */}
+            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+              {isReachable && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400/50" />
+              )}
+              <span className={cn(
+                'relative inline-flex rounded-full h-2.5 w-2.5 ring-[1.5px] ring-background',
+                isReachable ? 'bg-emerald-500' : isChecking ? 'bg-amber-500 animate-pulse' : 'bg-red-500',
+              )} />
+            </span>
           </div>
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground truncate">
+          {/* Clickable URL — opens the preview tab */}
+          <button
+            onClick={navigateToPreviewTab}
+            className="flex-1 min-w-0 text-left cursor-pointer group/link"
+          >
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm font-semibold text-foreground tabular-nums group-hover/link:text-primary transition-colors">
                 localhost:{detected.port}
               </span>
-              <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 font-mono shrink-0">
-                {detected.path !== '/' ? detected.path : 'http'}
-              </Badge>
+              {displayPath && (
+                <span className="text-xs text-muted-foreground font-mono truncate group-hover/link:text-primary/70 transition-colors">
+                  {displayPath}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-              Service detected on port {detected.port}
+            <p className="text-[11px] text-muted-foreground/60 leading-tight mt-0.5 group-hover/link:text-muted-foreground/80 transition-colors">
+              {isReachable ? 'Service running' : isChecking ? 'Checking port...' : 'Port not reachable'}
             </p>
-          </div>
+          </button>
 
-          {/* Actions */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          {/* Action buttons */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {/* Inline preview toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    'h-7 w-7 text-muted-foreground/50 hover:text-foreground',
+                    showInlinePreview && 'text-primary bg-primary/8',
+                  )}
+                  onClick={() => setShowInlinePreview((v) => !v)}
+                >
+                  {showInlinePreview ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {showInlinePreview ? 'Hide preview' : 'Show inline preview'}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Copy URL */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground/50 hover:text-foreground"
+                  onClick={handleCopyUrl}
+                >
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {copied ? 'Copied!' : 'Copy URL'}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Open in browser */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground/50 hover:text-foreground"
+                  onClick={handleOpenExternal}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Open in browser</TooltipContent>
+            </Tooltip>
+
+            {/* Open as tab — primary action */}
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={handleOpenPreviewTab}
+              className="h-7 text-xs gap-1.5 px-3 ml-1 rounded-lg"
+              onClick={navigateToPreviewTab}
             >
-              <AppWindow className="h-3 w-3" />
-              Open Preview
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={handleOpenExternal}
-              title="Open in browser"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <MonitorPlay className="h-3.5 w-3.5" />
+              Preview
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Inline iframe preview — toggleable */}
+        {showInlinePreview && (
+          <div className="px-3.5 pb-3">
+            <InlineIframePreview proxyUrl={proxyUrl} port={detected.port} />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// SandboxUrlDetector — wraps markdown content + appends preview cards
+// ---------------------------------------------------------------------------
+
 /**
  * Detects localhost URLs in assistant message content and renders
- * interactive preview cards alongside the markdown content.
+ * interactive preview cards after the full markdown content.
  *
- * Similar to ComposioUrlDetector but for sandbox service URLs.
+ * Renders the entire content as one markdown block (preserving code blocks,
+ * headings, etc.) then appends compact preview cards below for each
+ * detected service URL.
  */
 export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
   content,
@@ -117,7 +419,6 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
 }) => {
   const safeContent = typeof content === 'string' ? content : content ? String(content) : '';
 
-  // Get server URL for rewriting
   const serverUrl = useServerStore((s) => {
     const active = s.servers.find((srv) => srv.id === s.activeServerId);
     return active?.url || 'http://localhost:4096';
@@ -125,65 +426,25 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
 
   const detected = useMemo(() => detectLocalhostUrls(safeContent), [safeContent]);
 
-  // Build proxy URLs for each detected localhost URL
   const proxyUrls = useMemo(
-    () =>
-      detected.map((d) => rewriteLocalhostUrl(d.port, d.path, serverUrl)),
+    () => detected.map((d) => rewriteLocalhostUrl(d.port, d.path, serverUrl)),
     [detected, serverUrl],
   );
 
-  // No localhost URLs found — render as normal markdown
   if (detected.length === 0) {
     return <UnifiedMarkdown content={safeContent} isStreaming={isStreaming} />;
   }
 
-  // Split content around detected URLs and interleave preview cards
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-
-  detected.forEach((d, i) => {
-    // Text before this URL
-    if (d.startIndex > lastIndex) {
-      const textBefore = safeContent.substring(lastIndex, d.startIndex);
-      if (textBefore.trim()) {
-        parts.push(
-          <UnifiedMarkdown
-            key={`text-${i}`}
-            content={textBefore}
-            isStreaming={isStreaming}
-          />,
-        );
-      }
-    }
-
-    // The URL itself rendered as markdown (so it's still visible in text)
-    // plus the preview card
-    parts.push(
-      <React.Fragment key={`url-${i}`}>
-        <UnifiedMarkdown
-          content={safeContent.substring(d.startIndex, d.endIndex)}
-          isStreaming={false}
+  return (
+    <div>
+      <UnifiedMarkdown content={safeContent} isStreaming={isStreaming} />
+      {detected.map((d, i) => (
+        <SandboxPreviewCard
+          key={`${d.port}-${d.path}`}
+          detected={d}
+          proxyUrl={proxyUrls[i]}
         />
-        <SandboxPreviewCard detected={d} proxyUrl={proxyUrls[i]} />
-      </React.Fragment>,
-    );
-
-    lastIndex = d.endIndex;
-  });
-
-  // Remaining text after the last URL
-  if (lastIndex < safeContent.length) {
-    const remaining = safeContent.substring(lastIndex);
-    if (remaining.trim()) {
-      parts.push(
-        <UnifiedMarkdown
-          key="text-final"
-          content={remaining}
-          isStreaming={isStreaming}
-        />,
-      );
-    }
-  }
-
-  return <>{parts}</>;
+      ))}
+    </div>
+  );
 };
