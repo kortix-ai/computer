@@ -1,0 +1,37 @@
+{
+  "$schema": "Memory configuration for Kortix agent memory system",
+  "enabled": true,
+  "basePath": "/workspace/.kortix",
+  "corePath": "MEMORY.md",
+  "memoryDir": "memory",
+  "journalDir": "journal",
+  "knowledgeDir": "knowledge",
+  "sessionsDir": "sessions",
+  "search": {
+    "maxResults": 6,
+    "minScore": 0.35,
+    "maxSnippetLength": 700,
+    "sources": ["memory", "sessions"]
+  },
+  "flush": {
+    "enabled": true,
+    "softThresholdTokens": 4000,
+    "systemPrompt": "Session is nearing context compaction. Before context is lost, write any durable memories that should persist across sessions.",
+    "prompt": "Review what you have learned in this session. Write any lasting notes, decisions, lessons, or user preferences to workspace/.kortix/memory/{date}.md. Update workspace/.kortix/MEMORY.md Scratchpad with current state and pending items. Reply with NO_REPLY if there is nothing worth remembering."
+  },
+  "inject": {
+    "coreMemory": true,
+    "dailyLogs": true,
+    "dailyLogDays": 2
+  },
+  "dailyLog": {
+    "filePattern": "YYYY-MM-DD.md",
+    "appendOnly": true
+  },
+  "sessionExport": {
+    "enabled": true,
+    "deltaMessages": 50,
+    "filterRoles": ["user", "assistant"],
+    "excludeToolCalls": true
+  }
+}

@@ -5,40 +5,45 @@ agent: kortix-main
 
 # Memory Search
 
-Search the entire memory system for relevant information.
+Search the entire memory system for relevant information using the native `memory_search` tool.
 
 ## Search strategy
 
-Run BOTH exact and semantic search for comprehensive results:
+Use the `memory_search` tool for structured hybrid search (semantic + keyword):
 
-### 1. Exact keyword search (grep)
-- **Core memory** — grep `workspace/.kortix/MEMORY.md` for `$ARGUMENTS`
-- **Long-term memory** — grep across `workspace/.kortix/memory/*.md` for `$ARGUMENTS`
-- **Journal** — grep across `workspace/.kortix/journal/*.md` for `$ARGUMENTS`
-- **Knowledge** — grep across `workspace/.kortix/knowledge/*.md` for `$ARGUMENTS`
+```
+memory_search(query: "$ARGUMENTS", scope: "all")
+```
 
-### 2. Semantic search (lss)
-Run these in parallel for speed:
+This runs BOTH LSS (BM25 + embeddings) and grep in parallel, merges and deduplicates results.
+
+### If you need broader search
+
+Also search Desktop files if memory results are insufficient:
 
 ```bash
-# Search memory semantically (finds related concepts, not just exact keywords)
-lss "$ARGUMENTS" -p /workspace/.kortix/ --json -k 5
+lss "$ARGUMENTS" -p /workspace --json -k 10
 ```
 
 ## Output
 
-Combine results from both search methods. For each match, show:
-- Source (memory file, etc.)
+For each match, show:
+- Source file (relative path under .kortix/)
 - The matching content or snippet
 - Relevance score (for semantic results)
+- Source type (semantic vs keyword)
 
-Group results by source:
-1. **Memory matches** — from .kortix/ files
-2. **Grep matches** — exact keyword hits
+Group results by tier:
+1. **Core memory** — from MEMORY.md
+2. **Episodic memory** — from memory/*.md
+3. **Journal** — from journal/*.md
+4. **Knowledge** — from knowledge/*.md
+5. **Sessions** — from sessions/*.md
 
-If no results found from either method, say so clearly and suggest:
+If no results found, suggest:
 - Related terms to try
-- Whether to search Desktop files too: `lss "$ARGUMENTS" -p /workspace --json -k 10`
+- Whether to search Desktop files too
+- Whether to export past sessions: `python3 ~/.opencode/skills/KORTIX-memory/scripts/export-sessions.py`
 
 ## Search query
 
