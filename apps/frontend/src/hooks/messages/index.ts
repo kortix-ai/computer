@@ -1,8 +1,5 @@
-// Message and streaming related hooks
-export { useAgentStream, type UseAgentStreamResult, type AgentStreamCallbacks } from './useAgentStream';
-export { useThreadToolCalls } from './useThreadToolCalls';
-export { useMessagesQuery, useAddUserMessageMutation } from './useMessages';
-export { usePlaybackController, type PlaybackState } from './usePlaybackController';
+// Tool tracking - shared by KortixComputer and session system
+export { getOrAssignToolNumber, getToolNumber, clearToolTracking } from './tool-tracking';
 
 // Smooth text/streaming animation hooks - re-exported from shared package
 export { 
@@ -12,7 +9,3 @@ export {
   type SmoothAnimationConfig,
   type SmoothToolConfig,
 } from '@agentpress/shared/animations';
-
-// Message rendering utilities
-export * from './utils';
-

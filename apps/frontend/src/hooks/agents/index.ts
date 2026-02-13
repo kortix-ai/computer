@@ -3,7 +3,7 @@
  */
 export { useAgentVersionData } from './use-agent-version-data';
 export { useModelSelection, type ModelOption } from './use-model-selection';
-// Re-export from messages for backward compatibility
-export { useAgentStream, type UseAgentStreamResult, type AgentStreamCallbacks } from '../messages';
+// useAgentStream was removed with the legacy thread system
+// It lived in hooks/messages/ but was only used by ThreadComponent
 
 

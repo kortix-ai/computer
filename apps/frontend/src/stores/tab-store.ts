@@ -7,7 +7,7 @@ import { persist } from 'zustand/middleware';
 // Types
 // ============================================================================
 
-export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' | 'page';
+export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' | 'page' | 'preview' | 'terminal';
 
 export interface Tab {
   /** Unique identifier — for sessions this is the sessionId, for files the file path, etc. */
@@ -28,6 +28,8 @@ export interface Tab {
   parentSessionId?: string;
   /** The server instance this tab belongs to (session/file tabs are scoped per instance) */
   serverId?: string;
+  /** Extra data for specialized tab types (e.g. preview URL, port number) */
+  metadata?: Record<string, unknown>;
 }
 
 // ============================================================================

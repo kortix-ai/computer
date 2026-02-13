@@ -16,6 +16,8 @@ import {
   ChevronsUpDown,
   PanelTop,
   Plus,
+  Globe,
+  TerminalSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType } from '@/stores/tab-store';
@@ -43,6 +45,8 @@ const TAB_ICONS: Record<TabType, typeof MessageCircle> = {
   settings: Settings,
   project: FolderOpen,
   page: PanelTop,
+  preview: Globe,
+  terminal: TerminalSquare,
 };
 
 /** Map a pathname to a tab config. Returns null for routes that shouldn't auto-open tabs (e.g. /auth). */
@@ -769,9 +773,9 @@ export function TabBar() {
     (tabId: string, href: string) => {
       const tab = useTabStore.getState().tabs[tabId];
       setActiveTab(tabId);
-      if (tab?.type === 'session' || tab?.type === 'file') {
+      if (tab?.type === 'session' || tab?.type === 'file' || tab?.type === 'preview' || tab?.type === 'terminal') {
         // pushState changes the URL without triggering a Next.js navigation,
-        // so the pre-mounted session/file component just becomes visible instantly.
+        // so the pre-mounted session/file/preview/terminal component just becomes visible instantly.
         window.history.pushState(null, '', href);
       } else {
         router.push(href);
@@ -788,7 +792,7 @@ export function TabBar() {
       if (nextTabId) {
         const nextTab = useTabStore.getState().tabs[nextTabId];
         if (nextTab) {
-          if (nextTab.type === 'session') {
+          if (nextTab.type === 'session' || nextTab.type === 'file' || nextTab.type === 'preview' || nextTab.type === 'terminal') {
             window.history.pushState(null, '', nextTab.href);
           } else {
             router.push(nextTab.href);

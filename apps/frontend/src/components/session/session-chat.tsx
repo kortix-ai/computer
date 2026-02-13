@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { SandboxUrlDetector } from '@/components/thread/content/sandbox-url-detector';
 import {
   Tooltip,
   TooltipContent,
@@ -970,7 +971,7 @@ function SessionTurn({
               );
             }
 
-            // Text parts — render as markdown
+            // Text parts — render as markdown with sandbox URL detection
             if (isTextPart(part) && part.text?.trim()) {
               const isStreamingText = working && part.id === lastTextPart?.id;
               return (
@@ -978,7 +979,7 @@ function SessionTurn({
                   {isStreamingText ? (
                     <ThrottledMarkdown content={part.text} isStreaming={true} />
                   ) : (
-                    <UnifiedMarkdown content={part.text} isStreaming={false} />
+                    <SandboxUrlDetector content={part.text} isStreaming={false} />
                   )}
                 </div>
               );
@@ -1105,7 +1106,7 @@ function SessionTurn({
             </div>
           )}
           <div className="text-sm">
-            <UnifiedMarkdown content={response} isStreaming={false} />
+            <SandboxUrlDetector content={response} isStreaming={false} />
           </div>
           <div className="sr-only" aria-live="polite">
             {response}
@@ -1117,7 +1118,7 @@ function SessionTurn({
       {working && !stepsExpanded && lastTextPart?.text?.trim() && (
         <div className="mt-3">
           <div className="text-sm">
-            <ThrottledMarkdown content={lastTextPart.text} isStreaming={true} />
+            <SandboxUrlDetector content={lastTextPart.text} isStreaming={true} />
           </div>
         </div>
       )}

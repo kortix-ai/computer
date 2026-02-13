@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   Menu,
-  PanelLeftOpen,
-  PanelLeftClose,
+  ChevronRight,
+  ChevronLeft,
   SquarePen,
   FolderOpen,
   ListTree,
@@ -471,9 +471,43 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       {/* ====== HEADER: Logo + collapse/expand ====== */}
       <SidebarHeader className="pt-4 pb-0 overflow-visible">
         <div className="relative flex h-[32px] items-center px-4 justify-between">
+          {/* Collapsed: Kortix symbol (always visible), chevron on hover */}
+          {state === 'collapsed' && (
+            <div
+              className="group/collapsed absolute inset-0 flex items-center justify-center cursor-pointer"
+              onClick={() => {
+                setOpen(true);
+                window.dispatchEvent(new CustomEvent('sidebar-left-toggled', { detail: { expanded: true } }));
+              }}
+            >
+              {/* Symbol — hides on hover */}
+              <Link href="/dashboard" onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                useTabStore.getState().openTab({
+                  id: 'page:/dashboard',
+                  title: 'Dashboard',
+                  type: 'dashboard',
+                  href: '/dashboard',
+                });
+                router.push('/dashboard');
+                if (isMobile) setOpenMobile(false);
+              }} className="flex items-center justify-center group-hover/collapsed:hidden">
+                <KortixLogo
+                  variant="symbol"
+                  size={20}
+                  className="flex-shrink-0"
+                />
+              </Link>
+              {/* Chevron — shows on hover */}
+              <ChevronRight className="h-4 w-4 text-muted-foreground/50 hidden group-hover/collapsed:block" />
+            </div>
+          )}
+
+          {/* Expanded: Logo + collapse button */}
           <div className={cn(
-            'relative flex items-center group/logo',
-            state === 'collapsed' && 'absolute left-1/2 -translate-x-1/2'
+            'flex items-center transition-opacity duration-200',
+            state === 'collapsed' && 'opacity-0 pointer-events-none'
           )}>
             <Link href="/dashboard" onClick={(e) => {
               e.preventDefault();
@@ -487,51 +521,24 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               if (isMobile) setOpenMobile(false);
             }} className="flex items-center">
               <KortixLogo
-                variant="symbol"
-                size={18}
-                className={cn(
-                  'flex-shrink-0 transition-[transform,opacity] duration-300 ease-out transform-gpu',
-                  state === 'collapsed'
-                    ? 'opacity-100 scale-100 group-hover/logo:opacity-0 group-hover/logo:scale-90'
-                    : 'opacity-0 scale-90 absolute'
-                )}
-              />
-              <KortixLogo
                 variant="logomark"
                 size={16}
-                className={cn(
-                  'flex-shrink-0 transition-[opacity] duration-300 ease-out',
-                  state === 'collapsed' ? 'opacity-0 absolute pointer-events-none' : 'opacity-100'
-                )}
+                className="flex-shrink-0"
               />
             </Link>
-            {state === 'collapsed' && (
-              <button
-                className="absolute inset-0 flex items-center justify-center cursor-pointer opacity-0 scale-75 group-hover/logo:opacity-100 group-hover/logo:scale-100 transition-[opacity,transform] duration-300 ease-out transform-gpu"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setOpen(true);
-                  window.dispatchEvent(new CustomEvent('sidebar-left-toggled', { detail: { expanded: true } }));
-                }}
-                aria-label="Expand sidebar"
-              >
-                <PanelLeftOpen className="h-[18px] w-[18px]" />
-              </button>
-            )}
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             className={cn(
-              'h-8 w-8 transition-opacity duration-200',
+              'flex items-center justify-center h-8 w-8 rounded-lg transition-all duration-150 ease-out cursor-pointer',
+              'text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent/50',
               state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
             onClick={() => isMobile ? setOpenMobile(false) : setOpen(false)}
+            aria-label="Collapse sidebar"
           >
-            <PanelLeftClose className="!h-5 !w-5" />
-          </Button>
+            <ChevronLeft className="h-4 w-4" />
+          </button>
         </div>
       </SidebarHeader>
 

@@ -80,7 +80,9 @@ export const useKortixComputerStore = create<KortixComputerState>()(
       setActiveView: (view: ViewType) => {
         // If browser tab is hidden and trying to set browser view, default to tools
         const effectiveView = HIDE_BROWSER_TAB && view === 'browser' ? 'tools' : view;
-        set({ activeView: effectiveView });
+        // Terminal and Desktop are now in the right sidebar - redirect to tools
+        const finalView = (effectiveView === 'terminal' || effectiveView === 'desktop' || effectiveView === 'changes') ? 'tools' : effectiveView;
+        set({ activeView: finalView });
       },
       
       openFileInComputer: (filePath: string, filePathList?: string[]) => {
@@ -94,7 +96,7 @@ export const useKortixComputerStore = create<KortixComputerState>()(
         }
         
         set({
-          activeView: 'files',
+          activeView: 'tools',
           shouldOpenPanel: true,
         });
       },
@@ -104,7 +106,7 @@ export const useKortixComputerStore = create<KortixComputerState>()(
         useFilesStore.getState().navigateToPath('.');
         
         set({
-          activeView: 'files',
+          activeView: 'tools',
           shouldOpenPanel: true,
         });
       },

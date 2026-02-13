@@ -15,7 +15,6 @@ import { LoadingState } from '../shared/LoadingState';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { extractCommandData } from './_utils';
-import { useToolStreamStore } from '@/stores/tool-stream-store';
 import { useSmoothToolField } from '@/hooks/messages';
 
 export function CommandToolView({
@@ -28,9 +27,9 @@ export function CommandToolView({
 }: ToolViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  const toolCallId = toolCall?.tool_call_id || '';
-  const streamingOutput = useToolStreamStore((state) => state.streamingOutputs.get(toolCallId) || '');
-  const isOutputStreaming = useToolStreamStore((state) => state.streamingStatus.get(toolCallId) === 'streaming');
+  // Tool stream store was removed — streaming output is now handled via props/tool result
+  const streamingOutput: string = '';
+  const isOutputStreaming: boolean = false;
 
   const {
     command,
