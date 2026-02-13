@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFilesStore } from '@/features/files/store/files-store';
-import { useFileList, useServerHealth } from '@/features/files/hooks';
+import { useFileList, useServerHealth, useGitStatus, buildGitStatusMap } from '@/features/files/hooks';
 import {
   useFileUpload,
   useFileDelete,
@@ -101,6 +101,10 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
   } = useFileList(currentPath, {
     enabled: health?.healthy === true,
   });
+
+  // Git status
+  const { data: gitStatuses } = useGitStatus({ enabled: health?.healthy === true });
+  const gitStatusMap = useMemo(() => buildGitStatusMap(gitStatuses), [gitStatuses]);
 
   // Hook up SSE file events for real-time updates
   useFileEventInvalidation();
@@ -344,6 +348,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                 onClick={() => handleFileClick(node)}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                gitStatus={gitStatusMap.get(node.path)}
               />
             ))}
 
@@ -356,6 +361,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                 onDownload={handleDownload}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                gitStatus={gitStatusMap.get(node.path)}
               />
             ))}
 

@@ -12,6 +12,7 @@ import {
   FolderOpen,
   ListTree,
   ChevronDown,
+  TerminalSquare,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -57,6 +58,7 @@ import { useCreateOpenCodeSession, useOpenCodeSessions, useOpenCodeProjects } fr
 import { useTabStore } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { createClient } from '@/lib/supabase/client';
 
 // ============================================================================
@@ -574,13 +576,13 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
         )}>
           {/* Pinned: New session + Projects (always visible) */}
           <div className="flex-shrink-0">
-            {/* New session button */}
-            <div className="px-2 pt-1 pb-1">
+            {/* New session + Open terminal buttons */}
+            <div className="px-2 pt-1 pb-1 flex items-center gap-1">
               <button
                 onClick={handleNewSession}
                 disabled={createSession.isPending}
                 className={cn(
-                  'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm cursor-pointer',
+                  'flex items-center gap-3 flex-1 min-w-0 px-3 py-2 rounded-lg text-sm cursor-pointer',
                   'transition-all duration-150 ease-out',
                   'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -589,6 +591,27 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 <SquarePen className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" />
                 <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
               </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      const store = useKortixComputerStore.getState();
+                      store.setActiveView('terminal');
+                      store.openSidePanel();
+                    }}
+                    className={cn(
+                      'flex items-center justify-center h-8 w-8 flex-shrink-0 rounded-lg cursor-pointer',
+                      'transition-all duration-150 ease-out',
+                      'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                    )}
+                  >
+                    <TerminalSquare className="h-4 w-4 text-muted-foreground/60" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Open Terminal <kbd className="ml-1.5 text-[10px] text-muted-foreground">⌘`</kbd>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Projects accordion */}

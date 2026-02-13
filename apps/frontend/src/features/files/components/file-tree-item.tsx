@@ -26,6 +26,9 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 
+/** Git status for display purposes */
+export type GitStatusType = 'added' | 'deleted' | 'modified';
+
 interface FileTreeItemProps {
   node: FileNode;
   onClick: () => void;
@@ -34,6 +37,8 @@ interface FileTreeItemProps {
   onDelete?: (node: FileNode) => void;
   /** All sibling names in the current directory, for duplicate detection */
   siblingNames?: string[];
+  /** Git status for this file/directory */
+  gitStatus?: GitStatusType;
 }
 
 /** File extension to icon mapping */
@@ -75,6 +80,27 @@ function getNodeIcon(node: FileNode) {
   return <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />;
 }
 
+/** Git status → text color class */
+const gitStatusTextColor: Record<GitStatusType, string> = {
+  added: 'text-green-500 dark:text-green-400',
+  modified: 'text-yellow-500 dark:text-yellow-400',
+  deleted: 'text-red-500 dark:text-red-400',
+};
+
+/** Git status → badge label */
+const gitStatusLabel: Record<GitStatusType, string> = {
+  added: 'A',
+  modified: 'M',
+  deleted: 'D',
+};
+
+/** Git status → badge color class */
+const gitStatusBadgeColor: Record<GitStatusType, string> = {
+  added: 'text-green-500 dark:text-green-400',
+  modified: 'text-yellow-500 dark:text-yellow-400',
+  deleted: 'text-red-500 dark:text-red-400',
+};
+
 /** Get selection end index: before extension for files, full length for folders */
 function getNameSelectionEnd(name: string, isDirectory: boolean): number {
   if (isDirectory) return name.length;
@@ -82,7 +108,7 @@ function getNameSelectionEnd(name: string, isDirectory: boolean): number {
   return dotIdx > 0 ? dotIdx : name.length;
 }
 
-export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, siblingNames }: FileTreeItemProps) {
+export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, siblingNames, gitStatus }: FileTreeItemProps) {
   const hasContextMenu = onDownload || onRename || onDelete;
 
   const [isRenaming, setIsRenaming] = useState(false);
@@ -176,7 +202,14 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, si
       )}
     >
       {getNodeIcon(node)}
-      <span className="truncate flex-1">{node.name}</span>
+      <span className={cn('truncate flex-1', gitStatus && gitStatusTextColor[gitStatus])}>
+        {node.name}
+      </span>
+      {gitStatus && (
+        <span className={cn('text-[10px] font-semibold leading-none shrink-0', gitStatusBadgeColor[gitStatus])}>
+          {gitStatusLabel[gitStatus]}
+        </span>
+      )}
       {node.type === 'directory' && (
         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       )}

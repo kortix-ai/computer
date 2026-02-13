@@ -13,6 +13,7 @@ import type {
   FileContent,
   FileNode,
   FindMatch,
+  GitFileStatus,
   OpenCodeProjectInfo,
   ServerHealth,
 } from '../types';
@@ -140,6 +141,19 @@ export async function renameFile(from: string, to: string): Promise<boolean> {
   const client = getClient();
   const result = await client.file.rename({ from, to });
   return unwrap(result);
+}
+
+// ---------------------------------------------------------------------------
+// Git status
+// ---------------------------------------------------------------------------
+
+/**
+ * Get git file status — lists files with uncommitted changes.
+ */
+export async function getFileStatus(): Promise<GitFileStatus[]> {
+  const client = getClient();
+  const result = await client.file.status();
+  return unwrap(result) as GitFileStatus[];
 }
 
 // ---------------------------------------------------------------------------

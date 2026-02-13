@@ -24,6 +24,7 @@ import {
   TerminalSquare,
   Sparkles,
   Search,
+  MessagesSquare,
 } from 'lucide-react';
 
 import {
@@ -39,6 +40,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
+import { useThreadSearch } from '@/hooks/threads/use-thread-search';
 import { useFileSearch, useLssSearch } from '@/features/files';
 import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
@@ -59,6 +61,13 @@ function formatRelativeTime(timestamp: number): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(timestamp).toLocaleDateString();
+}
+
+function formatRelativeTimeFromISO(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const timestamp = new Date(dateStr).getTime();
+  if (isNaN(timestamp)) return '';
+  return formatRelativeTime(timestamp);
 }
 
 function getFileIcon(filePath: string) {
@@ -116,7 +125,7 @@ function cleanSnippet(snippet: string): string {
 // Skeleton components for loading states
 // ============================================================================
 
-/** Skeleton row mimicking a semantic search result with icon, filename, snippet, and path. */
+/** Skeleton row mimicking a semantic search result. */
 function ContentResultSkeleton() {
   return (
     <div className="flex items-start gap-2 px-2 py-2.5">
@@ -133,12 +142,35 @@ function ContentResultSkeleton() {
   );
 }
 
-/** Multiple skeleton rows for the semantic search loading state. */
-function ContentSearchSkeletons({ count = 3 }: { count?: number }) {
+/** Skeleton row mimicking a conversation search result. */
+function ConversationResultSkeleton() {
+  return (
+    <div className="flex items-start gap-2 px-2 py-2.5">
+      <Skeleton className="h-4 w-4 rounded flex-shrink-0 mt-0.5" />
+      <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+        <Skeleton className="h-3.5 w-36 rounded" />
+        <Skeleton className="h-3 w-full rounded" />
+      </div>
+    </div>
+  );
+}
+
+/** Multiple skeleton rows for a loading group. */
+function SearchSkeletons({
+  count = 3,
+  variant = 'content',
+}: {
+  count?: number;
+  variant?: 'content' | 'conversation';
+}) {
+  const Row =
+    variant === 'conversation'
+      ? ConversationResultSkeleton
+      : ContentResultSkeleton;
   return (
     <div className="space-y-0.5">
       {Array.from({ length: count }).map((_, i) => (
-        <ContentResultSkeleton key={i} />
+        <Row key={i} />
       ))}
     </div>
   );
@@ -159,8 +191,15 @@ export function CommandPalette() {
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const createSession = useCreateOpenCodeSession();
 
-  // Fetch all sessions
+  // Fetch all sessions (for client-side title filter)
   const { data: sessions } = useOpenCodeSessions();
+
+  // Thread/conversation content search (backend semantic search, 400ms internal debounce)
+  const {
+    results: threadResults,
+    isSearching: isThreadSearching,
+    isConfigured: isThreadSearchConfigured,
+  } = useThreadSearch(open ? query : '', 6);
 
   // Debounce the query for file search API calls (300ms — fast)
   useEffect(() => {
@@ -191,7 +230,7 @@ export function CommandPalette() {
     enabled: debouncedQuery.length >= 2,
   });
 
-  // Semantic search (LSS — BM25 + embeddings)
+  // Semantic search (LSS — BM25 + embeddings over workspace files)
   const {
     data: lssResults = [],
     isFetching: isLssSearching,
@@ -206,6 +245,16 @@ export function CommandPalette() {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((prev) => !prev);
+      }
+      if (e.key === 'j' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handleNewSession();
+      }
+      if (e.key === '`' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        const store = useKortixComputerStore.getState();
+        store.setActiveView('terminal');
+        store.openSidePanel();
       }
     };
     document.addEventListener('keydown', down);
@@ -248,32 +297,45 @@ export function CommandPalette() {
   const hasQuery = query.trim().length > 0;
   const queryLongEnough = query.trim().length >= 2;
 
-  // LSS is "pending" if user typed >=2 chars but debounced query hasn't caught up yet
-  // or the query is running
-  const isLssDebouncing =
-    queryLongEnough && query !== lssDebouncedQuery;
+  // Thread search pending state
+  const isThreadPending = queryLongEnough && isThreadSearching;
+  const hasThreadResults = threadResults.length > 0;
+
+  // LSS pending state (includes debounce wait)
+  const isLssDebouncing = queryLongEnough && query !== lssDebouncedQuery;
   const isLssPending = isLssDebouncing || isLssSearching;
 
-  const isFileDebouncing =
-    queryLongEnough && query !== debouncedQuery;
+  // File search pending state
+  const isFileDebouncing = queryLongEnough && query !== debouncedQuery;
   const isFilePending = isFileDebouncing || isFileSearching;
 
   const hasSessionResults = filteredSessions.length > 0;
   const hasFileResults = fileResults.length > 0;
   const hasLssResults = filteredLssResults.length > 0;
-  const hasAnyResults = hasSessionResults || hasFileResults || hasLssResults;
+  const hasAnyResults =
+    hasSessionResults || hasFileResults || hasLssResults || hasThreadResults;
 
-  // Show the semantic search section (results or skeletons) whenever query >= 2
+  // Show semantic search section (results or skeletons)
   const showLssSection = hasQuery && queryLongEnough;
-  // Show skeletons when pending and no results yet
   const showLssSkeletons = showLssSection && isLssPending && !hasLssResults;
+
+  // Show thread search section (results or skeletons)
+  const showThreadSection =
+    hasQuery && queryLongEnough && isThreadSearchConfigured;
+  const showThreadSkeletons =
+    showThreadSection && isThreadPending && !hasThreadResults;
 
   const showQuickActions = !hasQuery;
 
-  // Overall: show the global "searching" empty only when nothing at all is visible
-  const isAnyPending = isLssPending || isFilePending;
+  // Overall pending state
+  const isAnyPending = isLssPending || isFilePending || isThreadPending;
   const showGlobalLoading =
-    hasQuery && queryLongEnough && isAnyPending && !hasAnyResults && !showLssSkeletons;
+    hasQuery &&
+    queryLongEnough &&
+    isAnyPending &&
+    !hasAnyResults &&
+    !showLssSkeletons &&
+    !showThreadSkeletons;
 
   const handleNewSession = useCallback(async () => {
     if (isCreating) return;
@@ -337,6 +399,23 @@ export function CommandPalette() {
     [handleSelectFile],
   );
 
+  /**
+   * Navigate to a thread search result.
+   * Uses the project page since thread_id ≠ session.id (different systems).
+   */
+  const handleSelectThread = useCallback(
+    (threadId: string, projectId: string | null) => {
+      if (projectId) {
+        router.push(`/projects/${projectId}`);
+      } else {
+        // Fallback: navigate to dashboard if no project
+        router.push('/dashboard');
+      }
+      close();
+    },
+    [router, close],
+  );
+
   const handleToggleTheme = useCallback(() => {
     const next =
       theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
@@ -365,7 +444,7 @@ export function CommandPalette() {
   const ThemeIcon =
     theme === 'light' ? Moon : theme === 'dark' ? Monitor : Sun;
 
-  // Shared heading for the semantic search group
+  // Group headings
   const lssHeading = (
     <span className="inline-flex items-center gap-1.5">
       <Sparkles className="h-3 w-3" />
@@ -376,10 +455,20 @@ export function CommandPalette() {
     </span>
   );
 
+  const threadHeading = (
+    <span className="inline-flex items-center gap-1.5">
+      <MessagesSquare className="h-3 w-3" />
+      Conversations
+      {isThreadPending && hasThreadResults && (
+        <Loader2 className="h-3 w-3 animate-spin ml-0.5 text-muted-foreground" />
+      )}
+    </span>
+  );
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search sessions, content, files, or type a command..."
+        placeholder="Search sessions, conversations, files, or type a command..."
         value={query}
         onValueChange={setQuery}
       />
@@ -402,12 +491,14 @@ export function CommandPalette() {
             <CommandEmpty>
               <div className="flex flex-col items-center gap-1.5 py-4">
                 <Search className="h-5 w-5 text-muted-foreground/50" />
-                <span className="text-muted-foreground">No results found.</span>
+                <span className="text-muted-foreground">
+                  No results found.
+                </span>
               </div>
             </CommandEmpty>
           )}
 
-        {/* Session search results */}
+        {/* Session title matches (instant, client-side) */}
         {hasQuery && hasSessionResults && (
           <CommandGroup heading="Sessions">
             {filteredSessions.map((session) => (
@@ -436,10 +527,52 @@ export function CommandPalette() {
           </CommandGroup>
         )}
 
-        {/* Semantic search results (LSS) — with skeletons during loading */}
+        {/* Conversation content search (backend semantic search) */}
+        {showThreadSection &&
+          (hasThreadResults || showThreadSkeletons) && (
+            <CommandGroup heading={threadHeading}>
+              {hasThreadResults &&
+                threadResults.map((result) => (
+                  <CommandItem
+                    key={`thread-${result.thread_id}`}
+                    value={`thread-${result.thread_id}-${result.text_preview?.slice(0, 20)}`}
+                    onSelect={() =>
+                      handleSelectThread(
+                        result.thread_id,
+                        result.project_id,
+                      )
+                    }
+                  >
+                    <MessagesSquare className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-medium text-sm">
+                          {result.project_name || 'Untitled'}
+                        </span>
+                        {result.updated_at && (
+                          <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
+                            {formatRelativeTimeFromISO(result.updated_at)}
+                          </span>
+                        )}
+                      </div>
+                      {result.text_preview && (
+                        <span className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
+                          {result.text_preview}
+                        </span>
+                      )}
+                    </div>
+                  </CommandItem>
+                ))}
+
+              {showThreadSkeletons && (
+                <SearchSkeletons count={2} variant="conversation" />
+              )}
+            </CommandGroup>
+          )}
+
+        {/* Semantic file search (LSS — BM25 + embeddings) */}
         {showLssSection && (hasLssResults || showLssSkeletons) && (
           <CommandGroup heading={lssHeading}>
-            {/* Actual results */}
             {hasLssResults &&
               filteredLssResults.map((hit) => {
                 const relativePath = stripWorkspacePrefix(hit.file_path);
@@ -483,12 +616,13 @@ export function CommandPalette() {
                 );
               })}
 
-            {/* Skeleton loading rows */}
-            {showLssSkeletons && <ContentSearchSkeletons count={3} />}
+            {showLssSkeletons && (
+              <SearchSkeletons count={3} variant="content" />
+            )}
           </CommandGroup>
         )}
 
-        {/* File search results */}
+        {/* File name search results */}
         {hasQuery && hasFileResults && (
           <CommandGroup heading="Files">
             {fileResults.map((filePath) => {
@@ -527,10 +661,12 @@ export function CommandPalette() {
                   <Plus className="mr-2 h-4 w-4" />
                 )}
                 <span>New Session</span>
+                <CommandShortcut>⌘J</CommandShortcut>
               </CommandItem>
               <CommandItem onSelect={handleOpenTerminal}>
                 <TerminalSquare className="mr-2 h-4 w-4" />
                 <span>Open Terminal</span>
+                <CommandShortcut>⌘`</CommandShortcut>
               </CommandItem>
             </CommandGroup>
 

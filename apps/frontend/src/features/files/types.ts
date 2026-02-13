@@ -38,6 +38,14 @@ export interface FilePatchHunk {
   lines: string[];
 }
 
+/** GET /file/status response item — git file change status */
+export interface GitFileStatus {
+  path: string;
+  added: number;
+  removed: number;
+  status: 'added' | 'deleted' | 'modified';
+}
+
 /** GET /find?pattern=<pat> response item */
 export interface FindMatch {
   path: string;

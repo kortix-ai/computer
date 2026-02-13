@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useFilesStore } from '../store/files-store';
-import { useFileList, useServerHealth } from '../hooks';
+import { useFileList, useServerHealth, useGitStatus, buildGitStatusMap } from '../hooks';
 import { useFileUpload, useFileDelete, useFileMkdir, useFileRename } from '../hooks/use-file-mutations';
 import { downloadFile } from '../api/opencode-files';
 import { useServerStore } from '@/stores/server-store';
@@ -58,6 +58,10 @@ export function FileBrowser() {
   } = useFileList(currentPath, {
     enabled: health?.healthy === true,
   });
+
+  // Git status
+  const { data: gitStatuses } = useGitStatus({ enabled: health?.healthy === true });
+  const gitStatusMap = useMemo(() => buildGitStatusMap(gitStatuses), [gitStatuses]);
 
   // Mutations
   const uploadMutation = useFileUpload();
@@ -411,6 +415,7 @@ export function FileBrowser() {
                     onRename={handleRename}
                     onDelete={handleDelete}
                     siblingNames={siblingNames}
+                    gitStatus={gitStatusMap.get(node.path)}
                   />
                 ))}
 
@@ -424,6 +429,7 @@ export function FileBrowser() {
                     onRename={handleRename}
                     onDelete={handleDelete}
                     siblingNames={siblingNames}
+                    gitStatus={gitStatusMap.get(node.path)}
                   />
                 ))}
 

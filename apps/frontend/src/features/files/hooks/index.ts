@@ -37,5 +37,12 @@ export {
   useFileRename,
 } from './use-file-mutations';
 
+// Git status
+export {
+  useGitStatus,
+  buildGitStatusMap,
+  gitStatusKeys,
+} from './use-git-status';
+
 // SSE-based real-time invalidation
 export { useFileEventInvalidation } from './use-file-events';
