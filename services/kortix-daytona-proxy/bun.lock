@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "kortix-cloud",
+      "name": "kortix-daytona-proxy",
       "dependencies": {
         "@daytonaio/sdk": "^0.140.0",
         "@supabase/supabase-js": "^2.95.3",

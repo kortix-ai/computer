@@ -25,32 +25,18 @@ services:
     profiles: [backend, all]
     restart: unless-stopped
 
-  kortix-auth:
+  kortix-daytona-proxy:
     build:
       context: .
       dockerfile: services/Dockerfile
       args:
-        SERVICE: kortix-auth
-    ports:
-      - "8009:8009"
-    env_file:
-      - path: services/kortix-auth/.env
-        required: false
-    profiles: [backend, all]
-    restart: unless-stopped
-
-  kortix-cloud:
-    build:
-      context: .
-      dockerfile: services/Dockerfile
-      args:
-        SERVICE: kortix-cloud
+        SERVICE: kortix-daytona-proxy
     ports:
       - "8010:8010"
     environment:
       - PORT=8010
     env_file:
-      - path: services/kortix-cloud/.env
+      - path: services/kortix-daytona-proxy/.env
         required: false
     profiles: [backend, all]
     restart: unless-stopped

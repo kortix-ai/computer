@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile:1
 
-# Shared Dockerfile for all Bun services (kortix-router, kortix-auth, kortix-cloud)
+# Shared Dockerfile for all Bun services (kortix-router, kortix-daytona-proxy)
 # Build from repo root: docker build --build-arg SERVICE=kortix-router -f services/Dockerfile .
 
 ARG BUN_VERSION=1.2

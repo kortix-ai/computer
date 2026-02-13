@@ -41,7 +41,7 @@ app.use('*', logger());
 app.get('/health', (c) => {
   return c.json({
     status: 'ok',
-    service: 'kortix-cloud',
+    service: 'kortix-daytona-proxy',
     timestamp: new Date().toISOString(),
     env: config.ENV_MODE,
   });
@@ -100,7 +100,7 @@ app.notFound((c) => {
 
 console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║              Kortix Cloud Starting                        ║
+║          Kortix Daytona Proxy Starting                     ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Port: ${config.PORT.toString().padEnd(49)}║
 ║  Mode: ${config.ENV_MODE.padEnd(49)}║
