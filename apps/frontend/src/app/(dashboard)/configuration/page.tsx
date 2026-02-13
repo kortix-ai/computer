@@ -32,6 +32,10 @@ import {
   useOpenCodeMcpStatus,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { readFile, uploadFile } from '@/features/files/api/opencode-files';
+import { ManageModelsDialog, ConnectProviderDialog } from '@/components/session/model-selector';
+import { flattenModels } from '@/components/session/session-chat-input';
+import { useModelStore } from '@/hooks/opencode/use-model-store';
+import { ModelProviderIcon } from '@/lib/model-provider-icons';
 
 // ============================================================================
 // Types
@@ -383,6 +387,19 @@ function RulesTab({
 // Providers Tab
 // ============================================================================
 
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google',
+  xai: 'xAI',
+  opencode: 'OpenCode',
+  kortix: 'Kortix',
+  bedrock: 'AWS Bedrock',
+  openrouter: 'OpenRouter',
+  'github-copilot': 'GitHub Copilot',
+  vercel: 'Vercel',
+};
+
 function ProvidersTab({
   draft,
   config,
@@ -397,10 +414,23 @@ function ProvidersTab({
   const enabledProviders = (draft.enabled_providers as string[]) ?? config.enabled_providers;
   const customProviders = (draft.provider ?? config.provider ?? {}) as Record<string, any>;
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [connectProviderOpen, setConnectProviderOpen] = useState(false);
+  const [manageModelsOpen, setManageModelsOpen] = useState(false);
 
-  const allProviders = useMemo(() => {
-    return providers?.all ?? [];
-  }, [providers]);
+  const allProviders = useMemo(() => providers?.all ?? [], [providers]);
+  const connectedIds = useMemo(() => new Set(providers?.connected ?? []), [providers]);
+
+  const flatModels = useMemo(() => flattenModels(providers), [providers]);
+  const modelStore = useModelStore(flatModels);
+
+  const connectedProviders = useMemo(
+    () => allProviders.filter((p) => connectedIds.has(p.id)),
+    [allProviders, connectedIds],
+  );
+  const disconnectedProviders = useMemo(
+    () => allProviders.filter((p) => !connectedIds.has(p.id)),
+    [allProviders, connectedIds],
+  );
 
   const isDisabled = (id: string) => disabledProviders.includes(id);
 
@@ -412,8 +442,106 @@ function ProvidersTab({
     }
   };
 
+  const renderProviderCard = (p: typeof allProviders[0], showToggle: boolean) => {
+    const modelCount = Object.keys(p.models).length;
+    const isExp = expanded === p.id;
+    const isConnected = connectedIds.has(p.id);
+    return (
+      <SpotlightCard key={p.id} className="bg-card">
+        <div className="p-4">
+          <div className="flex items-center justify-between">
+            <button
+              className="flex items-center gap-2.5 text-sm font-medium text-foreground"
+              onClick={() => setExpanded(isExp ? null : p.id)}
+            >
+              <ModelProviderIcon modelId={p.id} size={20} />
+              {isExp ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {PROVIDER_LABELS[p.id] || p.name || p.id}
+              <span className="text-xs text-muted-foreground font-normal">
+                {modelCount} model{modelCount !== 1 ? 's' : ''}
+              </span>
+              {isConnected && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  connected
+                </span>
+              )}
+            </button>
+            <div className="flex items-center gap-2">
+              {showToggle && <Toggle checked={!isDisabled(p.id)} onChange={() => toggleProvider(p.id)} />}
+            </div>
+          </div>
+          {isExp && (
+            <div className="mt-3 ml-8 space-y-1">
+              {Object.values(p.models).map((m) => (
+                <div key={m.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-mono">{m.id}</span>
+                  {m.reasoning && <span className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500 text-[10px]">reasoning</span>}
+                  {m.attachment && <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 text-[10px]">attachments</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SpotlightCard>
+    );
+  };
+
   return (
     <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => setConnectProviderOpen(true)}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Connect Provider
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => setManageModelsOpen(true)}
+        >
+          <Settings className="h-3.5 w-3.5" />
+          Manage Models
+        </Button>
+      </div>
+
+      {/* Connected providers */}
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+        Connected Providers
+        <span className="ml-2 text-muted-foreground/60 font-normal normal-case">({connectedProviders.length})</span>
+      </h3>
+      <div className="space-y-2 mb-6">
+        {connectedProviders.length > 0 ? (
+          connectedProviders.map((p) => renderProviderCard(p, true))
+        ) : (
+          <SpotlightCard className="bg-card">
+            <div className="p-6 text-center">
+              <p className="text-sm text-muted-foreground">No providers connected yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Click "Connect Provider" to get started</p>
+            </div>
+          </SpotlightCard>
+        )}
+      </div>
+
+      {/* Disconnected / available providers */}
+      {disconnectedProviders.length > 0 && (
+        <>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            Available Providers
+            <span className="ml-2 text-muted-foreground/60 font-normal normal-case">({disconnectedProviders.length})</span>
+          </h3>
+          <div className="space-y-2 mb-6">
+            {disconnectedProviders.map((p) => renderProviderCard(p, false))}
+          </div>
+        </>
+      )}
+
+      {/* Enabled providers allowlist */}
       {enabledProviders && (
         <>
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Enabled Providers (allowlist)</h3>
@@ -429,56 +557,36 @@ function ProvidersTab({
         </>
       )}
 
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Providers</h3>
-      <div className="space-y-2">
-        {allProviders.map((p) => {
-          const modelCount = Object.keys(p.models).length;
-          const isExp = expanded === p.id;
-          return (
-            <SpotlightCard key={p.id} className="bg-card">
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <button
-                    className="flex items-center gap-2 text-sm font-medium text-foreground"
-                    onClick={() => setExpanded(isExp ? null : p.id)}
-                  >
-                    {isExp ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    {p.name || p.id}
-                    <span className="text-xs text-muted-foreground font-normal">
-                      {modelCount} model{modelCount !== 1 ? 's' : ''}
-                    </span>
-                  </button>
-                  <Toggle checked={!isDisabled(p.id)} onChange={() => toggleProvider(p.id)} />
-                </div>
-                {isExp && (
-                  <div className="mt-3 ml-5 space-y-1">
-                    {Object.values(p.models).map((m) => (
-                      <div key={m.id} className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-mono">{m.id}</span>
-                        {m.reasoning && <span className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500 text-[10px]">reasoning</span>}
-                        {m.attachment && <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 text-[10px]">attachments</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </SpotlightCard>
-          );
-        })}
-      </div>
+      {/* Custom provider overrides */}
+      {Object.keys(customProviders).length > 0 && (
+        <>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Custom Provider Overrides</h3>
+          <SpotlightCard className="bg-card">
+            <div className="p-4 sm:p-5">
+              <pre className="text-xs text-foreground/80 whitespace-pre-wrap break-words font-mono leading-relaxed">
+                {JSON.stringify(customProviders, null, 2)}
+              </pre>
+            </div>
+          </SpotlightCard>
+        </>
+      )}
 
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 mt-6">Custom Provider Overrides</h3>
-      <SpotlightCard className="bg-card">
-        <div className="p-4 sm:p-5">
-          {Object.keys(customProviders).length === 0 ? (
-            <p className="text-xs text-muted-foreground/60 italic">No custom provider overrides configured</p>
-          ) : (
-            <pre className="text-xs text-foreground/80 whitespace-pre-wrap break-words font-mono leading-relaxed">
-              {JSON.stringify(customProviders, null, 2)}
-            </pre>
-          )}
-        </div>
-      </SpotlightCard>
+      {/* Dialogs */}
+      <ConnectProviderDialog
+        open={connectProviderOpen}
+        onOpenChange={setConnectProviderOpen}
+        providers={providers}
+      />
+      <ManageModelsDialog
+        open={manageModelsOpen}
+        onOpenChange={setManageModelsOpen}
+        models={flatModels}
+        modelStore={modelStore}
+        onConnectProvider={() => {
+          setManageModelsOpen(false);
+          setConnectProviderOpen(true);
+        }}
+      />
     </div>
   );
 }

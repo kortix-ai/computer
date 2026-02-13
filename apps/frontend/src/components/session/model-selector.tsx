@@ -176,7 +176,7 @@ function ModelTooltipContent({ model, isLatest, isFree }: { model: FlatModel; is
 // Manage Models Dialog (matches reference dialog-manage-models.tsx)
 // =============================================================================
 
-function ManageModelsDialog({
+export function ManageModelsDialog({
   open,
   onOpenChange,
   models,
@@ -305,7 +305,7 @@ function ManageModelsDialog({
 // 3. Back button navigates through states
 // =============================================================================
 
-function ConnectProviderDialog({
+export function ConnectProviderDialog({
   open,
   onOpenChange,
   providers,
