@@ -1,35 +1,23 @@
 /**
  * useSandboxUpdate — checks for sandbox updates and lets the user trigger them.
  *
- * Usage in a component:
- *
- *   const { updateAvailable, currentVersion, latestVersion, update, isUpdating } = useSandboxUpdate();
- *
- *   {updateAvailable && (
- *     <button onClick={update} disabled={isUpdating}>
- *       Update to {latestVersion}
- *     </button>
- *   )}
- *
  * How it works:
- *   1. On mount, fetches latest version from platform + current version from sandbox
- *   2. Compares them → sets `updateAvailable`
- *   3. `update()` calls POST /kortix/update on the sandbox
- *   4. After update, re-checks status
+ *   - `currentVersion` is provided by the caller (from /kortix/health)
+ *   - `latestVersion` is fetched from the platform (which checks npm registry)
+ *   - Frontend compares them → `updateAvailable`
+ *   - `update()` sends POST /kortix/update with the target version
+ *   - Sandbox doesn't need to know how to reach the platform
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   getLatestSandboxVersion,
-  getSandboxUpdateStatus,
   triggerSandboxUpdate,
-  type SandboxInfo,
 } from '@/lib/platform-client';
 import { useSandbox } from './use-sandbox';
 
-export function useSandboxUpdate() {
+export function useSandboxUpdate(currentVersion: string | null) {
   const { sandbox } = useSandbox();
-  const queryClient = useQueryClient();
 
   // Check the latest available version (from platform → npm registry)
   const latestQuery = useQuery({
@@ -40,27 +28,16 @@ export function useSandboxUpdate() {
     refetchOnWindowFocus: false,
   });
 
-  // Check the sandbox's current version
-  const statusQuery = useQuery({
-    queryKey: ['sandbox', 'update-status'],
-    queryFn: () => getSandboxUpdateStatus(sandbox!),
-    enabled: !!sandbox,
-    staleTime: 60 * 1000,        // 1 min
-    refetchOnWindowFocus: false,
-  });
-
-  // Trigger the update
-  const updateMutation = useMutation({
-    mutationFn: () => triggerSandboxUpdate(sandbox!),
-    onSuccess: () => {
-      // Invalidate status so it re-fetches after update completes
-      queryClient.invalidateQueries({ queryKey: ['sandbox', 'update-status'] });
-    },
-  });
-
-  const currentVersion = statusQuery.data?.currentVersion ?? null;
   const latestVersion = latestQuery.data?.version ?? null;
   const updateAvailable = !!(currentVersion && latestVersion && currentVersion !== latestVersion);
+
+  // Trigger the update — passes target version to sandbox
+  const updateMutation = useMutation({
+    mutationFn: () => {
+      if (!sandbox || !latestVersion) throw new Error('No sandbox or version');
+      return triggerSandboxUpdate(sandbox, latestVersion);
+    },
+  });
 
   return {
     /** Whether a newer version is available */
@@ -72,17 +49,14 @@ export function useSandboxUpdate() {
     /** Trigger the update — user must explicitly call this */
     update: updateMutation.mutate,
     /** Whether an update is currently running */
-    isUpdating: updateMutation.isPending || (statusQuery.data?.updateInProgress ?? false),
+    isUpdating: updateMutation.isPending,
     /** Result of the last update attempt */
     updateResult: updateMutation.data ?? null,
     /** Error from the last update attempt */
     updateError: updateMutation.error,
     /** Whether we're still loading version info */
-    isLoading: latestQuery.isLoading || statusQuery.isLoading,
-    /** Re-check versions */
-    refetch: () => {
-      latestQuery.refetch();
-      statusQuery.refetch();
-    },
+    isLoading: latestQuery.isLoading,
+    /** Re-check latest version */
+    refetch: () => latestQuery.refetch(),
   };
 }

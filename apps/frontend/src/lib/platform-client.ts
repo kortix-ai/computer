@@ -274,20 +274,11 @@ export interface SandboxVersionInfo {
   package: string;
 }
 
-export interface SandboxUpdateStatus {
-  currentVersion: string;
-  latestVersion: string;
-  updateAvailable: boolean;
-  updatedAt: string;
-  updateInProgress: boolean;
-}
-
 export interface SandboxUpdateResult {
   success?: boolean;
   upToDate?: boolean;
   previousVersion?: string;
   currentVersion: string;
-  latestVersion: string;
   output?: string;
   error?: string;
 }
@@ -305,27 +296,25 @@ export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
 }
 
 /**
- * Get the current update status from a running sandbox.
- * Calls the sandbox directly (via cloud proxy).
- */
-export async function getSandboxUpdateStatus(sandbox: SandboxInfo): Promise<SandboxUpdateStatus> {
-  const url = getSandboxUrl(sandbox);
-  const res = await fetch(`${url}/kortix/update/status`, {
-    headers: { 'Accept': 'application/json' },
-  });
-  if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
-  return res.json();
-}
-
-/**
  * Trigger an update on a running sandbox.
- * Calls POST /kortix/update on the sandbox directly (via cloud proxy).
+ * Frontend passes the target version — sandbox doesn't need to fetch it.
  */
-export async function triggerSandboxUpdate(sandbox: SandboxInfo): Promise<SandboxUpdateResult> {
+export async function triggerSandboxUpdate(
+  sandbox: SandboxInfo,
+  version: string,
+): Promise<SandboxUpdateResult> {
   const url = getSandboxUrl(sandbox);
+  const token = await getSupabaseAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(`${url}/kortix/update`, {
     method: 'POST',
-    headers: { 'Accept': 'application/json' },
+    headers,
+    body: JSON.stringify({ version }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

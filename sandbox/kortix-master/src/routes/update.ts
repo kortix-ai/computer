@@ -1,12 +1,4 @@
 import { Hono } from 'hono';
-import { config } from '../config';
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface LocalVersion {
-  version: string;
-  updatedAt: string;
-}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -32,35 +24,17 @@ let updateInProgress = false;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-async function readLocalVersion(): Promise<LocalVersion> {
+async function readLocalVersion(): Promise<string> {
   try {
     const file = Bun.file(VERSION_FILE);
     if (await file.exists()) {
-      return await file.json();
+      const data = await file.json();
+      return data.version || '0.0.0';
     }
   } catch (e) {
     console.error('[Update] Failed to read version file:', e);
   }
-  return { version: '0.0.0', updatedAt: '' };
-}
-
-async function fetchLatestVersion(): Promise<string | null> {
-  const url = `${config.KORTIX_API_URL}/v1/sandbox/version`;
-  try {
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) {
-      console.error(`[Update] Version fetch failed: ${res.status}`);
-      return null;
-    }
-    const data = await res.json() as { version: string };
-    return data.version;
-  } catch (e) {
-    console.error('[Update] Failed to fetch version:', e);
-    return null;
-  }
+  return '0.0.0';
 }
 
 async function run(cmd: string): Promise<{ ok: boolean; output: string }> {
@@ -117,61 +91,44 @@ async function performUpdate(targetVersion: string): Promise<{
 const updateRouter = new Hono();
 
 /**
- * GET /kortix/update/status
- *
- * Returns current sandbox version + latest available version.
- * Frontend uses this to decide whether to show "Update available".
- * Read-only — does NOT trigger any update.
- */
-updateRouter.get('/status', async (c) => {
-  const local = await readLocalVersion();
-  const latest = await fetchLatestVersion();
-
-  return c.json({
-    currentVersion: local.version,
-    latestVersion: latest || 'unknown',
-    updateAvailable: latest ? local.version !== latest : false,
-    updatedAt: local.updatedAt,
-    updateInProgress,
-  });
-});
-
-/**
  * POST /kortix/update
  *
- * User-triggered update. Fetches latest version, installs the package,
- * restarts services. Only runs when explicitly called.
+ * User-triggered update. Frontend passes the target version.
+ * Installs the package, restarts services.
+ * Only runs when explicitly called.
+ *
+ * Body: { "version": "0.4.3" }
  */
 updateRouter.post('/', async (c) => {
   if (updateInProgress) {
     return c.json({ error: 'Update already in progress' }, 409);
   }
 
+  const body = await c.req.json().catch(() => ({}));
+  const targetVersion = body.version;
+
+  if (!targetVersion || typeof targetVersion !== 'string') {
+    return c.json({ error: 'Missing "version" in request body' }, 400);
+  }
+
   updateInProgress = true;
   try {
-    const local = await readLocalVersion();
-    const latestVersion = await fetchLatestVersion();
+    const currentVersion = await readLocalVersion();
 
-    if (!latestVersion) {
-      return c.json({ error: 'Could not reach version service' }, 502);
-    }
-
-    if (local.version === latestVersion) {
+    if (currentVersion === targetVersion) {
       return c.json({
         upToDate: true,
-        currentVersion: local.version,
-        latestVersion,
+        currentVersion,
       });
     }
 
-    console.log(`[Update] User triggered: ${local.version} -> ${latestVersion}`);
-    const update = await performUpdate(latestVersion);
+    console.log(`[Update] User triggered: ${currentVersion} -> ${targetVersion}`);
+    const update = await performUpdate(targetVersion);
 
     return c.json({
       success: update.success,
-      previousVersion: local.version,
-      currentVersion: update.success ? latestVersion : local.version,
-      latestVersion,
+      previousVersion: currentVersion,
+      currentVersion: update.success ? targetVersion : currentVersion,
       output: update.output,
     });
   } catch (e) {

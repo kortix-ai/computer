@@ -177,6 +177,7 @@ function DialogInstanceRow({
   onEdit,
   onDelete,
   sandboxUpdate,
+  onVersionDetected,
 }: {
   server: ServerEntry;
   isActive: boolean;
@@ -184,9 +185,15 @@ function DialogInstanceRow({
   onEdit?: () => void;
   onDelete?: () => void;
   sandboxUpdate?: SandboxUpdateInfo;
+  onVersionDetected?: (version: string) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const { status, version } = useConnectionStatus(server.url, true);
+
+  // Report version back to parent when detected
+  React.useEffect(() => {
+    if (version && onVersionDetected) onVersionDetected(version);
+  }, [version, onVersionDetected]);
   const displayUrl = server.url.replace(/^https?:\/\//, '');
   const hasCustomLabel = server.label && server.label !== displayUrl;
 
@@ -356,8 +363,11 @@ function InstanceManagerDialog({
   const [isCreatingSandbox, setIsCreatingSandbox] = React.useState(false);
   const [sandboxError, setSandboxError] = React.useState<string | null>(null);
 
+  // Track the cloud sandbox's current version (from /kortix/health, fetched by DialogInstanceRow)
+  const [sandboxVersion, setSandboxVersion] = React.useState<string | null>(null);
+
   // Sandbox update state — only used for the cloud sandbox row
-  const sandboxUpdate = useSandboxUpdate();
+  const sandboxUpdate = useSandboxUpdate(sandboxVersion);
 
   // Form state
   const [formUrl, setFormUrl] = React.useState('');
@@ -528,6 +538,7 @@ function InstanceManagerDialog({
                     onEdit={() => startEdit(server)}
                     onDelete={() => handleRemove(server.id)}
                     sandboxUpdate={server.id === SANDBOX_SERVER_ID ? sandboxUpdate : undefined}
+                    onVersionDetected={server.id === SANDBOX_SERVER_ID ? setSandboxVersion : undefined}
                   />
                 ))
               )}
