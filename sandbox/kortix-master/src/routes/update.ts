@@ -65,7 +65,7 @@ async function performUpdate(targetVersion: string): Promise<{
 }> {
   console.log(`[Update] Installing @kortix/sandbox@${targetVersion}...`);
 
-  const result = await run(`npm install -g @kortix/sandbox@${targetVersion} 2>&1`);
+  const result = await run(`sudo npm install -g @kortix/sandbox@${targetVersion} 2>&1`);
 
   if (!result.ok) {
     console.error('[Update] npm install failed:', result.output);

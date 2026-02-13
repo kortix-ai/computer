@@ -18,6 +18,12 @@ fi
 
 echo "[sandbox-postinstall] Deploying @kortix/sandbox files..."
 
+# Ensure rsync is available (Alpine base may not have it after cleanup)
+if ! command -v rsync &>/dev/null; then
+  echo "[sandbox-postinstall] Installing rsync..."
+  apk add --no-cache rsync 2>/dev/null || true
+fi
+
 # ── Kortix Master ────────────────────────────────────────────────────────────
 echo "[sandbox-postinstall] Updating kortix-master..."
 mkdir -p /opt/kortix-master
