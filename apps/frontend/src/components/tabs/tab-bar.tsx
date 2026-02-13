@@ -462,12 +462,12 @@ function TabItem({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group relative flex items-center gap-1.5 h-full px-3 text-xs select-none cursor-pointer',
-        'transition-all duration-150 ease-out',
+        'group relative flex items-center gap-1.5 h-8 md:h-9 px-3 text-xs select-none cursor-pointer',
+        'transition-colors duration-150 ease-out',
         'max-w-[200px] min-w-[110px]',
         isActive
-          ? 'bg-background text-foreground rounded-t-xl z-10'
-          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          ? 'text-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
       )}
     >
       {/* Drag-over indicator */}
@@ -498,13 +498,11 @@ function TabItem({
           </TooltipContent>
         </Tooltip>
       ) : (
-        <div className="relative flex-shrink-0 text-muted-foreground">
-          <Icon className={cn('h-3.5 w-3.5 transition-colors', isActive && 'text-foreground/70')} />
-        </div>
+        <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 transition-colors', isActive ? 'text-foreground/60' : 'text-muted-foreground')} />
       )}
 
       {/* Title */}
-      <span className={cn('flex-1 truncate', isActive && 'font-medium')}>
+      <span className="flex-1 truncate">
         {tab.title || 'Untitled'}
       </span>
 
@@ -524,9 +522,10 @@ function TabItem({
           onClick={handleCloseClick}
           className={cn(
             'flex-shrink-0 p-0.5 rounded-md transition-all duration-100 cursor-pointer',
-            'opacity-0 group-hover:opacity-100',
             'hover:bg-foreground/10 active:bg-foreground/15',
-            isActive && 'opacity-60 group-hover:opacity-100',
+            isActive
+              ? 'opacity-60 hover:opacity-100'
+              : 'opacity-0 group-hover:opacity-100',
           )}
           aria-label={`Close ${tab.title}`}
         >
@@ -534,14 +533,9 @@ function TabItem({
         </button>
       )}
 
-      {/* Active tab indicator — top accent line */}
+      {/* Active indicator — subtle bottom line */}
       {isActive && (
-        <div className="absolute top-0 left-2 right-2 h-[2px] bg-primary rounded-b-full" />
-      )}
-
-      {/* Inactive tab separator — right border */}
-      {!isActive && (
-        <div className="absolute right-0 top-[20%] bottom-[20%] w-px bg-border/40 group-last:hidden" />
+        <div className="absolute bottom-0 inset-x-0 h-[2px] bg-foreground/80" />
       )}
     </div>
   );
@@ -973,13 +967,13 @@ export function TabBar() {
         <div
           ref={scrollRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-stretch overflow-x-auto md:pl-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+          className="flex-1 flex items-end overflow-x-auto md:pl-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
             const busy = tab.type === 'session' && pending === 0 && statuses[tab.id]?.type === 'busy';
             return (
-              <div key={tab.id} data-tab-id={tab.id} className="flex items-stretch">
+              <div key={tab.id} data-tab-id={tab.id} className="flex items-end">
                 <TabItem
                   tab={tab}
                   index={index}
@@ -1002,7 +996,7 @@ export function TabBar() {
         </div>
 
         {/* Action buttons group */}
-        <div className="flex-shrink-0 flex items-center border-l border-border/20">
+        <div className="flex-shrink-0 flex items-center gap-px pr-1">
           {/* New tab button */}
           <Tooltip>
             <TooltipTrigger asChild>
