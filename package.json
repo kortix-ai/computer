@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "env": "./scripts/setup-env.sh",
-    "dev": "nx run-many --target=dev --projects=frontend,kortix-router,kortix-auth,kortix-billing,kortix-cloud,kortix-cron,kortix-platform --parallel=10",
-    "dev:services": "nx run-many --target=dev --projects=kortix-router,kortix-auth,kortix-billing,kortix-cloud,kortix-cron,kortix-platform --parallel=10",
+    "dev": "nx run-many --target=dev --projects=frontend,kortix-router,kortix-billing,kortix-cron,kortix-platform --parallel=10",
+    "dev:services": "nx run-many --target=dev --projects=kortix-router,kortix-billing,kortix-cron,kortix-platform --parallel=10",
     "dev:frontend": "nx run frontend:dev",
     "dev:computer-frontend": "pnpm --filter Kortix-Computer-Frontend dev",
     "dev:mobile": "nx run mobile:dev",

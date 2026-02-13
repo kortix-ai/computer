@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { backendApi } from '@/lib/api-client';
 import { accountStateKeys } from './use-account-state';
+import { dollarsToCredits } from '@agentpress/shared';
 
 interface UsageRecord {
   id: string;
@@ -45,7 +46,20 @@ export function useCreditUsage(
       if (response.error) {
         throw new Error(response.error.message);
       }
-      return response.data;
+      
+      const data = response.data as UsageResponse;
+      return {
+        ...data,
+        usage_records: data.usage_records.map(record => ({
+          ...record,
+          credits_used: dollarsToCredits(record.credits_used),
+          balance_after: dollarsToCredits(record.balance_after),
+        })),
+        summary: {
+          ...data.summary,
+          total_credits_used: dollarsToCredits(data.summary.total_credits_used),
+        },
+      };
     },
     staleTime: 30000,
   });

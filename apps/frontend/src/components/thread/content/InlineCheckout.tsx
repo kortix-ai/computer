@@ -13,6 +13,7 @@ import { usePromo } from '@/hooks/utils/use-promo';
 import { useAuth } from '@/components/AuthProvider';
 import { isLocalMode } from '@/lib/config';
 import { useSubscriptionStore } from '@/stores/subscription-store';
+import { dollarsToCredits } from '@agentpress/shared';
 
 type Plan = 'Plus' | 'Pro' | 'Ultra';
 type BillingPeriod = 'monthly' | 'yearly';
@@ -27,9 +28,9 @@ interface PlanConfig {
 }
 
 const PLANS: PlanConfig[] = [
-  { name: 'Plus', tierKey: 'tier_2_20', monthlyPrice: 20, yearlyPrice: 204, credits: '2,000', creditsNum: 2000 },
-  { name: 'Pro', tierKey: 'tier_6_50', monthlyPrice: 50, yearlyPrice: 510, credits: '5,000', creditsNum: 5000 },
-  { name: 'Ultra', tierKey: 'tier_25_200', monthlyPrice: 200, yearlyPrice: 2040, credits: '20,000', creditsNum: 20000 },
+  { name: 'Plus', tierKey: 'tier_2_20', monthlyPrice: 20, yearlyPrice: 204, credits: '4,000', creditsNum: 4000 },
+  { name: 'Pro', tierKey: 'tier_6_50', monthlyPrice: 50, yearlyPrice: 510, credits: '10,000', creditsNum: 10000 },
+  { name: 'Ultra', tierKey: 'tier_25_200', monthlyPrice: 200, yearlyPrice: 2040, credits: '40,000', creditsNum: 40000 },
 ];
 
 // Payment Form Component (rendered inside StripeProvider)
@@ -235,9 +236,9 @@ function PlanPicker({
   const [promoCode, setPromoCode] = useState(promo?.promoCode || '');
   const [showPromoInput, setShowPromoInput] = useState(false);
 
-  // Get current tier's credits to filter available upgrade plans
+  // Get current tier's credits to filter available upgrade plans (converted to display format: 1$ = 100 credits)
   const isAccountLoaded = accountState !== null;
-  const currentCredits = accountState?.tier?.monthly_credits ?? 0;
+  const currentCredits = dollarsToCredits(accountState?.tier?.monthly_credits ?? 0);
 
   // Only show plans that are upgrades (more credits than current tier)
   const availablePlans = PLANS.filter(plan => plan.creditsNum > currentCredits);
@@ -467,8 +468,10 @@ export function InlineCheckout({ options }: { options?: InlineCheckoutOptions })
   // Prevent multiple subscription creations (double-click, StrictMode, etc.)
   const creatingRef = useRef(false);
 
-  // Get current tier credits (null means still loading)
-  const currentCredits = accountState?.tier?.monthly_credits ?? null;
+  // Get current tier credits (null means still loading, converted to display format: 1$ = 100 credits)
+  const currentCredits = accountState?.tier?.monthly_credits !== undefined 
+    ? dollarsToCredits(accountState.tier.monthly_credits) 
+    : null;
   const isAccountLoaded = accountState !== null;
 
   // Get pre-selected plan from options (if specified by LLM)
