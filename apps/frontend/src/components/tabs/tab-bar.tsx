@@ -7,7 +7,7 @@ import {
   X,
   MessageCircle,
   FolderOpen,
-  LayoutDashboard,
+  Home,
   Settings,
   Pin,
   PinOff,
@@ -20,7 +20,7 @@ import {
   TerminalSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTabStore, type Tab, type TabType } from '@/stores/tab-store';
+import { useTabStore, type Tab, type TabType, DASHBOARD_TAB_ID } from '@/stores/tab-store';
 import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
@@ -42,7 +42,7 @@ import {
 const TAB_ICONS: Record<TabType, typeof MessageCircle> = {
   session: MessageCircle,
   file: FolderOpen,
-  dashboard: LayoutDashboard,
+  dashboard: Home,
   settings: Settings,
   project: FolderOpen,
   page: PanelTop,
@@ -55,9 +55,19 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
   // Sessions are handled separately (they need session data for title/parentID)
   if (pathname.match(/^\/sessions\/[^/]+$/)) return null;
 
+  // Dashboard is handled by the permanent tab — don't create a duplicate
+  if (pathname === '/dashboard') {
+    return {
+      id: DASHBOARD_TAB_ID,
+      title: '',
+      type: 'dashboard' as TabType,
+      href: '/dashboard',
+      pinned: true,
+    };
+  }
+
   // Static page routes
   const ROUTE_MAP: Record<string, { title: string; type: TabType }> = {
-    '/dashboard': { title: 'Dashboard', type: 'dashboard' },
     '/agents': { title: 'Agents', type: 'page' },
     '/skills': { title: 'Skills Browser', type: 'page' },
     '/tools': { title: 'Tools', type: 'page' },
@@ -394,6 +404,7 @@ function TabItem({
   dragSide,
 }: TabItemProps) {
   const Icon = TAB_ICONS[tab.type];
+  const isDashboard = tab.id === DASHBOARD_TAB_ID;
   const didDragRef = useRef(false);
 
   const handleMouseDown = useCallback(
@@ -467,9 +478,11 @@ function TabItem({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group relative flex items-center gap-1.5 h-8 md:h-9 px-3 text-xs select-none cursor-pointer',
+        'group relative flex items-center h-8 md:h-9 text-xs select-none cursor-pointer',
         'transition-colors duration-150 ease-out',
-        'max-w-[200px] min-w-[110px]',
+        isDashboard
+          ? 'w-9 md:w-10 justify-center px-0'
+          : 'gap-1.5 px-3 max-w-[200px] min-w-[110px]',
         isActive
           ? 'text-foreground'
           : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
@@ -502,27 +515,36 @@ function TabItem({
               : 'Working on it\u2026'}
           </TooltipContent>
         </Tooltip>
+      ) : isDashboard ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 transition-colors', isActive ? 'text-foreground/80' : 'text-muted-foreground')} />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Home</TooltipContent>
+        </Tooltip>
       ) : (
         <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 transition-colors', isActive ? 'text-foreground/60' : 'text-muted-foreground')} />
       )}
 
-      {/* Title */}
-      <span className="flex-1 truncate">
-        {tab.title || 'Untitled'}
-      </span>
+      {/* Title — hidden for dashboard tab */}
+      {!isDashboard && (
+        <span className="flex-1 truncate">
+          {tab.title || 'Untitled'}
+        </span>
+      )}
 
       {/* Dirty indicator */}
       {tab.dirty && (
         <span className="flex-shrink-0 h-2 w-2 rounded-full bg-amber-500 ring-1 ring-amber-500/20" />
       )}
 
-      {/* Pin indicator */}
-      {tab.pinned && (
+      {/* Pin indicator — hidden for dashboard (it's always pinned but we don't show the icon) */}
+      {tab.pinned && !isDashboard && (
         <Pin className="flex-shrink-0 h-2.5 w-2.5 text-muted-foreground/60 -rotate-[20deg]" />
       )}
 
-      {/* Close button */}
-      {!tab.pinned && (
+      {/* Close button — never shown for dashboard */}
+      {!tab.pinned && !isDashboard && (
         <button
           onClick={handleCloseClick}
           className={cn(

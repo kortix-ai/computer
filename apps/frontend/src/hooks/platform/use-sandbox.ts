@@ -16,6 +16,7 @@ import {
   initAccount,
   getProviders,
   getSandboxUrl,
+  extractMappedPorts,
   type SandboxInfo,
   type SandboxProviderName,
 } from '@/lib/platform-client';
@@ -32,15 +33,30 @@ const SANDBOX_SERVER_ID = 'cloud-sandbox';
 function registerSandboxServer(sandbox: SandboxInfo) {
   const store = useServerStore.getState();
   const url = getSandboxUrl(sandbox);
+  const mappedPorts = extractMappedPorts(sandbox);
   const existing = store.servers.find((s) => s.id === SANDBOX_SERVER_ID);
 
   if (existing) {
-    // Update URL if it changed (e.g. sandbox was reprovisioned)
-    if (existing.url !== url) {
-      store.updateServer(SANDBOX_SERVER_ID, {
-        url,
-        label: sandbox.name || 'Cloud Sandbox',
-      });
+    // Update URL / mappedPorts if they changed (e.g. sandbox was reprovisioned)
+    const urlChanged = existing.url !== url;
+    const portsChanged =
+      JSON.stringify(existing.mappedPorts) !== JSON.stringify(mappedPorts);
+
+    if (urlChanged || portsChanged) {
+      useServerStore.setState((state) => ({
+        servers: state.servers.map((s) =>
+          s.id === SANDBOX_SERVER_ID
+            ? {
+                ...s,
+                url: urlChanged ? url : s.url,
+                label: sandbox.name || s.label,
+                mappedPorts,
+              }
+            : s,
+        ),
+        // Bump version if the URL changed so subscribers reconnect
+        ...(urlChanged ? { serverVersion: state.serverVersion + 1 } : {}),
+      }));
     }
   } else {
     // Add new server entry for the sandbox
@@ -54,6 +70,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
           url,
           provider: sandbox.provider,
           sandboxId: sandbox.sandbox_id,
+          mappedPorts,
         },
       ],
     }));
