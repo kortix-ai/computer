@@ -18,6 +18,9 @@ import {
   Database,
   Zap,
   Settings,
+  MessageCircle,
+  FileCode,
+  Folder,
 } from 'lucide-react';
 
 import {
@@ -31,27 +34,90 @@ import {
   CommandSeparator,
 } from '@/components/ui/command';
 import { useSidebar } from '@/components/ui/sidebar';
-import { useProjects } from '@/hooks/sidebar/use-sidebar';
-import { useThreadSearch } from '@/hooks/threads/use-thread-search';
-import { createThreadInProject } from '@/lib/api/threads';
-import { threadKeys, projectKeys } from '@/hooks/threads/keys';
+import { useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
+import { useFileSearch } from '@/features/files';
 import { toast } from '@/lib/toast';
+import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
+import { useTabStore } from '@/stores/tab-store';
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
+function getFileIcon(filePath: string) {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  const dirParts = filePath.split('/');
+  // If it ends with / or has no extension and might be a directory
+  if (filePath.endsWith('/')) return Folder;
+
+  switch (ext) {
+    case 'ts':
+    case 'tsx':
+    case 'js':
+    case 'jsx':
+    case 'py':
+    case 'go':
+    case 'rs':
+    case 'java':
+    case 'c':
+    case 'cpp':
+    case 'rb':
+    case 'swift':
+    case 'kt':
+      return FileCode;
+    default:
+      return FileText;
+  }
+}
+
+// ============================================================================
+// Command Palette
+// ============================================================================
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const queryClient = useQueryClient();
-  const { data: projects = [] } = useProjects();
+  const createSession = useCreateOpenCodeSession();
 
+  // Fetch all sessions
+  const { data: sessions } = useOpenCodeSessions();
+
+  // Debounce the query for file search API calls
+  useEffect(() => {
+    if (query.length < 2) {
+      setDebouncedQuery('');
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // File search (API-driven, fuzzy match)
   const {
-    results: searchResults,
-    isSearching,
-    shouldSearch,
-  } = useThreadSearch(query, 10);
+    data: fileResults = [],
+    isFetching: isFileSearching,
+  } = useFileSearch(debouncedQuery, {
+    limit: 10,
+    enabled: debouncedQuery.length >= 2,
+  });
 
   // Global keyboard shortcut
   useEffect(() => {
@@ -69,27 +135,44 @@ export function CommandPalette() {
   useEffect(() => {
     if (!open) {
       setQuery('');
+      setDebouncedQuery('');
     }
   }, [open]);
 
   const close = useCallback(() => setOpen(false), []);
 
+  // Filter sessions by query (client-side fuzzy match on title/slug)
+  const filteredSessions = useMemo(() => {
+    if (!sessions || !query.trim()) return [];
+    const q = query.toLowerCase();
+    return sessions
+      .filter((s) => {
+        if (s.parentID || s.time.archived) return false;
+        const title = (s.title || s.slug || '').toLowerCase();
+        return title.includes(q);
+      })
+      .slice(0, 8);
+  }, [sessions, query]);
+
+  const hasQuery = query.trim().length > 0;
+  const isSearching = hasQuery && debouncedQuery.length >= 2 && isFileSearching;
+  const hasSessionResults = filteredSessions.length > 0;
+  const hasFileResults = fileResults.length > 0;
+  const hasAnyResults = hasSessionResults || hasFileResults;
+  const showQuickActions = !hasQuery;
+
   const handleNewSession = useCallback(async () => {
     if (isCreating) return;
-    const project = projects[0];
-    if (!project) {
-      toast.error('No project available');
-      close();
-      return;
-    }
     setIsCreating(true);
     try {
-      const result = await createThreadInProject(project.id);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: threadKeys.all }),
-        queryClient.invalidateQueries({ queryKey: projectKeys.all }),
-      ]);
-      router.push(`/projects/${project.id}/thread/${result.thread_id}`);
+      const session = await createSession.mutateAsync();
+      useTabStore.getState().openTab({
+        id: session.id,
+        title: 'New session',
+        type: 'session',
+        href: `/sessions/${session.id}`,
+      });
+      router.push(`/sessions/${session.id}`);
       toast.success('New session created');
       close();
     } catch {
@@ -97,7 +180,7 @@ export function CommandPalette() {
     } finally {
       setIsCreating(false);
     }
-  }, [isCreating, projects, queryClient, router, close]);
+  }, [isCreating, createSession, router, close]);
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -105,6 +188,31 @@ export function CommandPalette() {
       close();
     },
     [router, close],
+  );
+
+  const handleSelectSession = useCallback(
+    (sessionId: string) => {
+      router.push(`/sessions/${sessionId}`);
+      close();
+    },
+    [router, close],
+  );
+
+  const handleSelectFile = useCallback(
+    (filePath: string) => {
+      const fileName = filePath.split('/').pop() || filePath;
+      const tabId = `file:${filePath}`;
+      const href = `/files/${encodeURIComponent(filePath)}`;
+      useTabStore.getState().openTab({
+        id: tabId,
+        title: fileName,
+        type: 'file',
+        href,
+      });
+      window.history.pushState(null, '', href);
+      close();
+    },
+    [close],
   );
 
   const handleToggleTheme = useCallback(() => {
@@ -126,42 +234,16 @@ export function CommandPalette() {
 
   const ThemeIcon = theme === 'light' ? Moon : theme === 'dark' ? Monitor : Sun;
 
-  // Search result items mapped from thread search
-  const searchItems = useMemo(() => {
-    if (!shouldSearch || searchResults.length === 0) return [];
-    const seen = new Set<string>();
-    return searchResults.filter((r) => {
-      if (seen.has(r.thread_id)) return false;
-      seen.add(r.thread_id);
-      return true;
-    });
-  }, [shouldSearch, searchResults]);
-
-  const handleSelectSearchResult = useCallback(
-    (result: { thread_id: string; project_id: string | null; project_name: string }) => {
-      if (result.project_id) {
-        router.push(`/projects/${result.project_id}/thread/${result.thread_id}`);
-      }
-      close();
-    },
-    [router, close],
-  );
-
-  const showQuickActions = !shouldSearch && !query.trim();
-
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search sessions or type a command..."
+        placeholder="Search sessions, files, or type a command..."
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
-        {shouldSearch && !isSearching && searchItems.length === 0 && (
-          <CommandEmpty>No results found.</CommandEmpty>
-        )}
-
-        {isSearching && (
+        {/* Loading state */}
+        {hasQuery && isSearching && !hasAnyResults && (
           <CommandEmpty>
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -170,31 +252,71 @@ export function CommandPalette() {
           </CommandEmpty>
         )}
 
-        {shouldSearch && searchItems.length > 0 && (
+        {/* No results */}
+        {hasQuery && !isSearching && !hasAnyResults && debouncedQuery.length >= 2 && (
+          <CommandEmpty>No sessions or files found.</CommandEmpty>
+        )}
+
+        {/* Session search results */}
+        {hasQuery && hasSessionResults && (
           <CommandGroup heading="Sessions">
-            {searchItems.map((result) => (
+            {filteredSessions.map((session) => (
               <CommandItem
-                key={result.thread_id}
-                value={`${result.project_name} ${result.text_preview || ''}`}
-                onSelect={() => handleSelectSearchResult(result)}
+                key={session.id}
+                value={`session-${session.title || session.slug || session.id}`}
+                onSelect={() => handleSelectSession(session.id)}
               >
-                <FileText className="mr-2 h-4 w-4" />
-                <div className="flex flex-col overflow-hidden">
-                  <span className="truncate">{result.project_name || 'Untitled'}</span>
-                  {result.text_preview && (
-                    <span className="text-xs text-muted-foreground truncate">
-                      {result.text_preview.slice(0, 80)}
-                    </span>
-                  )}
+                <MessageCircle className="mr-2 h-4 w-4 flex-shrink-0" />
+                <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                  <span className="truncate">
+                    {session.title || session.slug || 'Untitled'}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {formatRelativeTime(session.time.updated)}
+                    {session.summary && session.summary.files > 0 && (
+                      <span className="ml-1.5">
+                        · {session.summary.files} file{session.summary.files !== 1 ? 's' : ''} changed
+                      </span>
+                    )}
+                  </span>
                 </div>
               </CommandItem>
             ))}
           </CommandGroup>
         )}
 
+        {/* File search results */}
+        {hasQuery && hasFileResults && (
+          <CommandGroup heading="Files">
+            {fileResults.map((filePath) => {
+              const FileIcon = getFileIcon(filePath);
+              const fileName = filePath.split('/').pop() || filePath;
+              const dirPath = filePath.split('/').slice(0, -1).join('/');
+              return (
+                <CommandItem
+                  key={filePath}
+                  value={`file-${filePath}`}
+                  onSelect={() => handleSelectFile(filePath)}
+                >
+                  <FileIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                    <span className="truncate">{fileName}</span>
+                    {dirPath && (
+                      <span className="text-xs text-muted-foreground truncate">
+                        {dirPath}
+                      </span>
+                    )}
+                  </div>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        )}
+
+        {/* Quick actions (when no query) */}
         {showQuickActions && (
           <>
-            <CommandGroup heading="Sessions">
+            <CommandGroup heading="Actions">
               <CommandItem onSelect={handleNewSession} disabled={isCreating}>
                 {isCreating ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
