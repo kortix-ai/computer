@@ -15,7 +15,7 @@ services:
     build:
       context: ..
       dockerfile: sandbox/Dockerfile
-    image: kortixmarko/sandbox:0.1.0
+    image: kortix-sandbox:${SANDBOX_VERSION:-0.4.1}
     # No container_name — allows multiple instances via --project-name / COMPOSE_PROJECT_NAME
     cap_add:
       - SYS_ADMIN

@@ -10,14 +10,19 @@ export {
   sandboxStatusEnum,
   executionStatusEnum,
   sessionModeEnum,
+  // Enums
+  deploymentStatusEnum,
+  deploymentSourceEnum,
   // Kortix tables
   sandboxes,
   triggers,
   executions,
+  deployments,
   // Relations
   sandboxesRelations,
   triggersRelations,
   executionsRelations,
+  deploymentsRelations,
 } from './schema/kortix';
 
 // Public/basejump tables
