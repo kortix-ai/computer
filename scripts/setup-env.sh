@@ -56,21 +56,6 @@ write_env() {
 echo "Generating .env files from $ENV_FILE ..."
 echo ""
 
-write_env "services/kortix-auth/.env" \
-  "PORT=8009" \
-  "$(kv ENV_MODE local)" \
-  "" \
-  "$(kv DATABASE_URL)" \
-  "" \
-  "$(kv SUPABASE_URL)" \
-  "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
-  "$(kv SUPABASE_JWT_SECRET)" \
-  "" \
-  "$(kv API_KEY_SECRET)" \
-  "" \
-  "$(kv STRIPE_SECRET_KEY)" \
-  "$(kv STRIPE_WEBHOOK_SECRET)"
-
 write_env "services/kortix-router/.env" \
   "PORT=8008" \
   "$(kv ENV_MODE local)" \
@@ -111,19 +96,6 @@ write_env "services/kortix-billing/.env" \
   "" \
   "$(kv REVENUECAT_API_KEY)" \
   "$(kv REVENUECAT_WEBHOOK_SECRET)"
-
-write_env "services/kortix-cloud/.env" \
-  "PORT=8010" \
-  "$(kv ENV_MODE local)" \
-  "" \
-  "$(kv DATABASE_URL)" \
-  "" \
-  "$(kv SUPABASE_URL)" \
-  "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
-  "" \
-  "$(kv DAYTONA_API_KEY)" \
-  "$(kv DAYTONA_SERVER_URL)" \
-  "$(kv DAYTONA_TARGET)"
 
 write_env "services/kortix-cron/.env" \
   "PORT=8011" \
