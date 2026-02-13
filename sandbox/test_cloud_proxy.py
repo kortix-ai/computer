@@ -264,7 +264,7 @@ def test_health_no_auth():
     status, _, body = http_get(f"{CLOUD_BASE}/health")
     if status == 200:
         data = json.loads(body)
-        if data.get("status") == "ok" and data.get("service") == "kortix-cloud":
+        if data.get("status") == "ok" and data.get("service") == "kortix-daytona-proxy":
             log_pass("GET /health", f"status={status} service={data['service']}")
         else:
             log_fail("GET /health", f"unexpected body: {body.decode()[:200]}")
@@ -756,7 +756,7 @@ def main():
     status, _, body = http_get(f"{CLOUD_BASE}/health", timeout=10)
     if status != 200:
         print(f"\n  {RED}FATAL: Cannot reach {CLOUD_BASE}/health (status={status}){RESET}")
-        print(f"  Make sure the kortix-cloud service is running.\n")
+        print(f"  Make sure the kortix-daytona-proxy service is running.\n")
         sys.exit(1)
     print(f"  {GREEN}OK{RESET} — proxy is up\n")
 

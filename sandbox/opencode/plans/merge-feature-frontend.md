@@ -2,7 +2,7 @@
 
 ## Context
 - The `main` and `feature/frontend` branches have **no common ancestor** (separate root commits)
-- `main` has 7 commits: sandbox/docker setup, services (kortix-auth, kortix-router), monorepo config
+- `main` has 7 commits: sandbox/docker setup, services (kortix-router), monorepo config
 - `feature/frontend` has 17 commits: Next.js frontend app, shared packages, UI components
 - They deal with completely different parts of the codebase, but share 5 root-level config files
 
