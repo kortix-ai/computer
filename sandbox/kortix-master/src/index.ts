@@ -29,7 +29,7 @@ app.get('/kortix/health', async (c) => {
       version = data.version || '0.0.0'
     }
   } catch {}
-  return c.json({ status: 'ok', version, build: '0.4.7-ota-verified' })
+  return c.json({ status: 'ok', version, build: '0.4.11' })
 })
 
 // Update check — /kortix/update and /kortix/update/status
