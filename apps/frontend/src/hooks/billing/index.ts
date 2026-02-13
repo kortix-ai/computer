@@ -46,8 +46,7 @@ export {
 // SPECIALIZED HOOKS - Use the unified data internally
 // =============================================================================
 
-// Thread billing (uses useAccountState internally)
-export { useThreadBilling } from './use-thread-billing';
+// Thread billing was removed with the legacy thread system
 
 // Billing modal state
 export { useBillingModal } from './use-billing-modal';

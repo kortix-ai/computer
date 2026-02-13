@@ -14,7 +14,7 @@ PostgreSQL (Supabase)
 
 **Rule: all new tables go in the `kortix` schema. Never modify `public`, `basejump`, or `auth`.**
 
-Legacy services (kortix-auth, kortix-router, kortix-cloud, frontend) still use `@supabase/supabase-js`
+Legacy services (kortix-router, kortix-daytona-proxy, frontend) still use `@supabase/supabase-js`
 to talk to `public`/`basejump` via PostgREST. New services use `@kortix/db` with Drizzle for direct
 Postgres access to the `kortix` schema.
 

@@ -125,8 +125,7 @@ Channel logic lives entirely in `kortix-channels`, a standalone always-on cloud 
 
 | Service | Role | Channels interaction |
 |---------|------|---------------------|
-| **kortix-auth** | Auth, API keys, Stripe | Channels uses Supabase auth to verify user identity. Shares `auth.users` table. |
-| **kortix-cloud** | Sandbox lifecycle via Daytona | Channels calls cloud's API to check sandbox status and trigger wake-up when a message arrives for an offline sandbox. |
+| **kortix-daytona-proxy** | Sandbox lifecycle via Daytona | Channels calls daytona-proxy's API to check sandbox status and trigger wake-up when a message arrives for an offline sandbox. |
 | **kortix-router** | LLM + API proxy | No direct interaction. Channels talks directly to sandboxes. |
 | **kortix-cron** | Scheduled triggers | Conceptually parallel — cron triggers agent by schedule, channels triggers by external message. Both use `OpenCodeClient` pattern. Could share the client code via `@agentpress/shared`. |
 | **voice** (existing) | VAPI proxy | **Migrated into channels** as the `voice` adapter. The Python FastAPI server is replaced by a TypeScript adapter in the channels service. |
@@ -326,7 +325,7 @@ export class ChannelEngine {
 
 Reuses the same pattern as `kortix-cron`'s `OpenCodeClient`, but adds:
 - **SSE consumption** for streaming responses (like voice does today)
-- **Health check + wake-up** via `kortix-cloud` API
+- **Health check + wake-up** via `kortix-daytona-proxy` API
 - **Abort** support for interruptions
 
 ```typescript
@@ -349,7 +348,7 @@ export class SandboxConnector {
   }
 
   /**
-   * Wake up an offline sandbox via kortix-cloud.
+   * Wake up an offline sandbox via kortix-daytona-proxy.
    */
   async wakeUp(sandbox: SandboxTarget): Promise<void> {
     await fetch(`${CLOUD_SERVICE_URL}/v1/sandboxes/${sandbox.daytonaId}/start`, {
@@ -1114,7 +1113,7 @@ Message arrives at webhook
   │           │
   │           ├─ Send "Waking up..." message to user (immediate)
   │           ├─ Enqueue message in MessageQueue
-  │           ├─ POST kortix-cloud /v1/sandboxes/{id}/start (wake-up)
+  │           ├─ POST kortix-daytona-proxy /v1/sandboxes/{id}/start (wake-up)
   │           ├─ Poll health every 3s for up to 90s
   │           │     │
   │           │     ├─ 200 OK → drain queue, process all messages
@@ -1637,7 +1636,7 @@ SUPABASE_JWT_SECRET=...
 # Channels service public URL (for webhook registrations)
 CHANNELS_PUBLIC_URL=https://channels.kortix.ai
 
-# kortix-cloud URL (for sandbox wake-up)
+# kortix-daytona-proxy URL (for sandbox wake-up)
 CLOUD_SERVICE_URL=http://localhost:8010
 
 # Per-adapter defaults (optional — most are per-channelConfig in DB)

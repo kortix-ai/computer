@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsListCompact, TabsTriggerCompact } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileDownloadButton } from '../shared/FileDownloadButton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -1024,31 +1024,22 @@ export function FileOperationToolView({
           <div className="flex flex-row items-center justify-between gap-3 max-w-full min-w-0">
             <div className="flex items-center gap-3 min-w-0 flex-1 max-w-full">
               <ToolViewIconTitle icon={HeaderIcon} title={displayTitle} />
-              <TabsList className="h-8 bg-muted/50 border border-border/50 p-0.5 gap-0.5 flex-shrink-0">
+              <TabsListCompact className="flex-shrink-0">
                 {hasDiffData && (
-                  <TabsTrigger
-                    value="changes"
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all [&[data-state=active]]:bg-white [&[data-state=active]]:dark:bg-primary/10 [&[data-state=active]]:text-foreground hover:bg-background/50 text-muted-foreground shadow-none"
-                  >
+                  <TabsTriggerCompact value="changes">
                     <FileDiff className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Changes</span>
-                  </TabsTrigger>
+                  </TabsTriggerCompact>
                 )}
-                <TabsTrigger
-                  value="preview"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all [&[data-state=active]]:bg-white [&[data-state=active]]:dark:bg-primary/10 [&[data-state=active]]:text-foreground hover:bg-background/50 text-muted-foreground shadow-none"
-                >
+                <TabsTriggerCompact value="preview">
                   <Eye className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Preview</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="code"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all [&[data-state=active]]:bg-white [&[data-state=active]]:dark:bg-primary/10 [&[data-state=active]]:text-foreground hover:bg-background/50 text-muted-foreground shadow-none"
-                >
+                </TabsTriggerCompact>
+                <TabsTriggerCompact value="code">
                   <Code className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Source</span>
-                </TabsTrigger>
-              </TabsList>
+                </TabsTriggerCompact>
+              </TabsListCompact>
             </div>
             <TooltipProvider delayDuration={0}>
               <div className='flex items-center gap-1.5 flex-shrink-0'>

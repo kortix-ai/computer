@@ -15,9 +15,13 @@ import {
   XCircle,
   ChevronsUpDown,
   PanelTop,
+  Plus,
+  Globe,
+  TerminalSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType } from '@/stores/tab-store';
+import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
@@ -42,6 +46,8 @@ const TAB_ICONS: Record<TabType, typeof MessageCircle> = {
   settings: Settings,
   project: FolderOpen,
   page: PanelTop,
+  preview: Globe,
+  terminal: TerminalSquare,
 };
 
 /** Map a pathname to a tab config. Returns null for routes that shouldn't auto-open tabs (e.g. /auth). */
@@ -157,10 +163,10 @@ function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) 
     }
   }, [position]);
 
-  const item = (label: string, action: string, icon: React.ReactNode, destructive?: boolean) => (
+  const item = (label: string, action: string, icon: React.ReactNode, shortcut?: string, destructive?: boolean) => (
     <button
       className={cn(
-        'flex items-center gap-2 w-full px-3 py-1.5 text-xs rounded-sm transition-colors text-left cursor-pointer',
+        'flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded-md transition-colors text-left cursor-pointer',
         destructive
           ? 'text-destructive hover:bg-destructive/10'
           : 'text-foreground hover:bg-accent'
@@ -168,26 +174,29 @@ function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) 
       onClick={() => { onAction(action, tab.id); onClose(); }}
     >
       {icon}
-      {label}
+      <span className="flex-1">{label}</span>
+      {shortcut && (
+        <span className="text-[10px] text-muted-foreground/60 ml-4">{shortcut}</span>
+      )}
     </button>
   );
 
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[180px] rounded-md border border-border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95"
+      className="fixed z-50 min-w-[200px] rounded-lg border border-border/80 bg-popover/95 backdrop-blur-sm p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
       style={{ left: position.x, top: position.y }}
     >
       {tab.pinned
-        ? item('Unpin tab', 'unpin', <PinOff className="h-3.5 w-3.5" />)
-        : item('Pin tab', 'pin', <Pin className="h-3.5 w-3.5" />)
+        ? item('Unpin tab', 'unpin', <PinOff className="h-3.5 w-3.5 text-muted-foreground" />)
+        : item('Pin tab', 'pin', <Pin className="h-3.5 w-3.5 text-muted-foreground" />)
       }
-      <div className="my-1 h-px bg-border" />
-      {!tab.pinned && item('Close', 'close', <X className="h-3.5 w-3.5" />)}
-      {item('Close others', 'closeOthers', <XCircle className="h-3.5 w-3.5" />)}
-      {item('Close to the right', 'closeRight', <ArrowRightToLine className="h-3.5 w-3.5" />)}
-      <div className="my-1 h-px bg-border" />
-      {item('Close all', 'closeAll', <XCircle className="h-3.5 w-3.5" />)}
+      <div className="my-1 h-px bg-border/60" />
+      {!tab.pinned && item('Close', 'close', <X className="h-3.5 w-3.5 text-muted-foreground" />, 'Ctrl+W')}
+      {item('Close others', 'closeOthers', <XCircle className="h-3.5 w-3.5 text-muted-foreground" />)}
+      {item('Close to the right', 'closeRight', <ArrowRightToLine className="h-3.5 w-3.5 text-muted-foreground" />)}
+      <div className="my-1 h-px bg-border/60" />
+      {item('Close all', 'closeAll', <XCircle className="h-3.5 w-3.5 text-muted-foreground" />, undefined, true)}
     </div>
   );
 }
@@ -207,6 +216,8 @@ interface TabListDropdownProps {
 
 function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, getStatus }: TabListDropdownProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -228,72 +239,119 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
     };
   }, [onClose, anchorRef]);
 
+  // Auto-focus the search input
+  useEffect(() => {
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, []);
+
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   useEffect(() => {
     if (anchorRef.current) {
       const rect = anchorRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right });
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
     }
   }, [anchorRef]);
+
+  const filteredTabs = useMemo(() => {
+    if (!searchQuery.trim()) return tabs;
+    const q = searchQuery.toLowerCase();
+    return tabs.filter((tab) => tab.title?.toLowerCase().includes(q));
+  }, [tabs, searchQuery]);
+
+  // Group tabs by type for visual clarity
+  const sessionTabs = filteredTabs.filter((t) => t.type === 'session');
+  const otherTabs = filteredTabs.filter((t) => t.type !== 'session');
+
+  const renderTabRow = (tab: Tab) => {
+    const Icon = TAB_ICONS[tab.type];
+    const isActive = tab.id === activeTabId;
+    const { isBusy, pendingCount } = tab.type === 'session' ? getStatus(tab.id) : { isBusy: false, pendingCount: 0 };
+    return (
+      <button
+        key={tab.id}
+        className={cn(
+          'flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded-md transition-colors text-left cursor-pointer',
+          isActive
+            ? 'bg-accent text-accent-foreground font-medium'
+            : 'text-foreground hover:bg-accent/50'
+        )}
+        onClick={() => { onActivate(tab.id, tab.href); onClose(); }}
+      >
+        {tab.type === 'session' && (isBusy || pendingCount > 0) ? (
+          <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+            {isBusy && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+            {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />}
+          </div>
+        ) : (
+          <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+        )}
+        <span className="flex-1 truncate">{tab.title || 'Untitled'}</span>
+        {tab.pinned && <Pin className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground/50 -rotate-[20deg]" />}
+        {tab.dirty && <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-amber-500" />}
+        {pendingCount > 0 && (
+          <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
+            {pendingCount}
+          </span>
+        )}
+        {isActive && (
+          <div className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-primary" />
+        )}
+      </button>
+    );
+  };
 
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[220px] max-w-[320px] max-h-[400px] overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95"
+      className="fixed z-50 min-w-[240px] max-w-[340px] max-h-[460px] rounded-lg border border-border/80 bg-popover/95 backdrop-blur-sm shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150 flex flex-col"
       style={{ top: pos.top, right: pos.right }}
     >
-      <div className="px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        Open tabs
+      {/* Search input */}
+      {tabs.length > 3 && (
+        <div className="px-2 pt-2 pb-1">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Filter tabs..."
+            className="w-full px-2.5 py-1.5 text-xs rounded-md bg-muted/50 border border-border/50 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+          />
+        </div>
+      )}
+
+      <div className="overflow-y-auto p-1.5 flex-1">
+        {sessionTabs.length > 0 && (
+          <>
+            {otherTabs.length > 0 && (
+              <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                Sessions
+              </div>
+            )}
+            {sessionTabs.map(renderTabRow)}
+          </>
+        )}
+        {otherTabs.length > 0 && (
+          <>
+            {sessionTabs.length > 0 && (
+              <div className="px-2 pt-2 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                Pages
+              </div>
+            )}
+            {otherTabs.map(renderTabRow)}
+          </>
+        )}
+        {filteredTabs.length === 0 && (
+          <div className="px-2 py-4 text-xs text-muted-foreground text-center">
+            No matching tabs
+          </div>
+        )}
       </div>
-      {tabs.map((tab) => {
-        const Icon = TAB_ICONS[tab.type];
-        const isActive = tab.id === activeTabId;
-        const { isBusy, pendingCount } = tab.type === 'session' ? getStatus(tab.id) : { isBusy: false, pendingCount: 0 };
-        return (
-          <button
-            key={tab.id}
-            className={cn(
-              'flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded-sm transition-colors text-left cursor-pointer',
-              isActive
-                ? 'bg-accent text-accent-foreground'
-                : 'text-foreground hover:bg-accent/50'
-            )}
-            onClick={() => { onActivate(tab.id, tab.href); onClose(); }}
-          >
-            {tab.type === 'session' && (isBusy || pendingCount > 0) ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                    {isBusy && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-                    {pendingCount > 0 && !isBusy && <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  {pendingCount > 0
-                    ? `${pendingCount} ${pendingCount === 1 ? 'question' : 'questions'} waiting for your input`
-                    : 'Working on it…'}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-            )}
-            <span className="flex-1 truncate">{tab.title || 'Untitled'}</span>
-            {tab.pinned && <Pin className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground/50" />}
-            {pendingCount > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="flex-shrink-0 h-4 min-w-4 px-1 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-medium flex items-center justify-center">
-                    {pendingCount}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  {pendingCount} {pendingCount === 1 ? 'question' : 'questions'} waiting for your input
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </button>
-        );
-      })}
+
+      {/* Tab count footer */}
+      <div className="px-2.5 py-1.5 border-t border-border/40 text-[10px] text-muted-foreground/60">
+        {tabs.length} tab{tabs.length !== 1 ? 's' : ''} open
+      </div>
     </div>
   );
 }
@@ -409,46 +467,44 @@ function TabItem({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group relative flex items-center gap-1.5 h-9 px-3 text-xs select-none cursor-pointer',
-        'transition-colors',
-        'max-w-[180px] min-w-[100px]',
+        'group relative flex items-center gap-1.5 h-8 md:h-9 px-3 text-xs select-none cursor-pointer',
+        'transition-colors duration-150 ease-out',
+        'max-w-[200px] min-w-[110px]',
         isActive
-          ? 'bg-background text-foreground'
-          : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent',
+          ? 'text-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
       )}
     >
       {/* Drag-over indicator */}
       {isDragOver && dragSide === 'left' && (
-        <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-primary rounded-full z-10" />
+        <div className="absolute left-0 top-2 bottom-2 w-[2px] bg-primary rounded-full z-10 animate-in fade-in-0 duration-150" />
       )}
       {isDragOver && dragSide === 'right' && (
-        <div className="absolute right-0 top-1 bottom-1 w-[2px] bg-primary rounded-full z-10" />
+        <div className="absolute right-0 top-2 bottom-2 w-[2px] bg-primary rounded-full z-10 animate-in fade-in-0 duration-150" />
       )}
 
       {/* Icon with status */}
-      {tab.type !== 'session' ? (
-        <div className="relative flex-shrink-0 text-muted-foreground">
-          <Icon className="h-3.5 w-3.5" />
-        </div>
-      ) : (isBusy || pendingCount > 0) ? (
+      {tab.type === 'session' && (isBusy || pendingCount > 0) ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="relative flex-shrink-0 w-2 h-2">
+            <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
               {isBusy && (
-                <span className="absolute inset-0 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               )}
               {pendingCount > 0 && !isBusy && (
-                <span className="absolute inset-0 h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
               )}
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">
             {pendingCount > 0
               ? `${pendingCount} ${pendingCount === 1 ? 'question' : 'questions'} waiting for your input`
-              : 'Working on it…'}
+              : 'Working on it\u2026'}
           </TooltipContent>
         </Tooltip>
-      ) : null}
+      ) : (
+        <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 transition-colors', isActive ? 'text-foreground/60' : 'text-muted-foreground')} />
+      )}
 
       {/* Title */}
       <span className="flex-1 truncate">
@@ -457,12 +513,12 @@ function TabItem({
 
       {/* Dirty indicator */}
       {tab.dirty && (
-        <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-amber-500" />
+        <span className="flex-shrink-0 h-2 w-2 rounded-full bg-amber-500 ring-1 ring-amber-500/20" />
       )}
 
       {/* Pin indicator */}
       {tab.pinned && (
-        <Pin className="flex-shrink-0 h-2.5 w-2.5 text-muted-foreground/50" />
+        <Pin className="flex-shrink-0 h-2.5 w-2.5 text-muted-foreground/60 -rotate-[20deg]" />
       )}
 
       {/* Close button */}
@@ -470,18 +526,21 @@ function TabItem({
         <button
           onClick={handleCloseClick}
           className={cn(
-            'flex-shrink-0 p-0.5 rounded-sm transition-colors cursor-pointer',
-            'opacity-0 group-hover:opacity-100',
-            'hover:bg-muted-foreground/20'
+            'flex-shrink-0 p-0.5 rounded-md transition-all duration-100 cursor-pointer',
+            'hover:bg-foreground/10 active:bg-foreground/15',
+            isActive
+              ? 'opacity-60 hover:opacity-100'
+              : 'opacity-0 group-hover:opacity-100',
           )}
+          aria-label={`Close ${tab.title}`}
         >
           <X className="h-3 w-3" />
         </button>
       )}
 
-      {/* Active tab indicator — bottom line */}
+      {/* Active indicator — subtle bottom line */}
       {isActive && (
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary" />
+        <div className="absolute bottom-0 inset-x-0 h-[2px] bg-foreground/80" />
       )}
     </div>
   );
@@ -715,9 +774,9 @@ export function TabBar() {
     (tabId: string, href: string) => {
       const tab = useTabStore.getState().tabs[tabId];
       setActiveTab(tabId);
-      if (tab?.type === 'session' || tab?.type === 'file') {
+      if (tab?.type === 'session' || tab?.type === 'file' || tab?.type === 'preview' || tab?.type === 'terminal') {
         // pushState changes the URL without triggering a Next.js navigation,
-        // so the pre-mounted session/file component just becomes visible instantly.
+        // so the pre-mounted session/file/preview/terminal component just becomes visible instantly.
         window.history.pushState(null, '', href);
       } else {
         router.push(href);
@@ -734,7 +793,7 @@ export function TabBar() {
       if (nextTabId) {
         const nextTab = useTabStore.getState().tabs[nextTabId];
         if (nextTab) {
-          if (nextTab.type === 'session') {
+          if (nextTab.type === 'session' || nextTab.type === 'file' || nextTab.type === 'preview' || nextTab.type === 'terminal') {
             window.history.pushState(null, '', nextTab.href);
           } else {
             router.push(nextTab.href);
@@ -840,34 +899,48 @@ export function TabBar() {
     setDragSide(null);
   }, []);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — respects user preference for modifier key (Cmd vs Ctrl)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || e.metaKey || e.altKey) return;
+      const { keyboard } = useUserPreferencesStore.getState().preferences;
+      const tabMod = keyboard.tabSwitchModifier;
+      const closeMod = keyboard.closeTabModifier;
 
-      const digitMatch = e.code.match(/^Digit(\d)$/);
-      if (digitMatch) {
-        const num = parseInt(digitMatch[1], 10);
-        if (num >= 1 && num <= 9) {
-          e.preventDefault();
-          const { tabOrder: order, tabs: allTabs } = useTabStore.getState();
-          const idx = num === 9 ? order.length - 1 : num - 1;
-          if (idx >= 0 && idx < order.length) {
-            const targetTab = allTabs[order[idx]];
-            if (targetTab) {
-              setActiveTab(targetTab.id);
-              if (targetTab.type === 'session') {
-                window.history.pushState(null, '', targetTab.href);
-              } else {
-                router.push(targetTab.href);
+      // Check if the correct modifier is held for tab switching
+      const tabModHeld = tabMod === 'meta' ? e.metaKey : e.ctrlKey;
+      const tabModOther = tabMod === 'meta' ? e.ctrlKey : e.metaKey;
+      // Reject if alt is held or the "other" modifier is also held
+      if (e.altKey) return;
+
+      // Tab switching: Modifier + 1-9
+      if (tabModHeld && !tabModOther) {
+        const digitMatch = e.code.match(/^Digit(\d)$/);
+        if (digitMatch) {
+          const num = parseInt(digitMatch[1], 10);
+          if (num >= 1 && num <= 9) {
+            e.preventDefault();
+            const { tabOrder: order, tabs: allTabs } = useTabStore.getState();
+            const idx = num === 9 ? order.length - 1 : num - 1;
+            if (idx >= 0 && idx < order.length) {
+              const targetTab = allTabs[order[idx]];
+              if (targetTab) {
+                setActiveTab(targetTab.id);
+                if (targetTab.type === 'session' || targetTab.type === 'file' || targetTab.type === 'preview' || targetTab.type === 'terminal') {
+                  window.history.pushState(null, '', targetTab.href);
+                } else {
+                  router.push(targetTab.href);
+                }
               }
             }
+            return;
           }
-          return;
         }
       }
 
-      if (e.code === 'KeyW') {
+      // Close tab: Modifier + W
+      const closeModHeld = closeMod === 'meta' ? e.metaKey : e.ctrlKey;
+      const closeModOther = closeMod === 'meta' ? e.ctrlKey : e.metaKey;
+      if (closeModHeld && !closeModOther && e.code === 'KeyW') {
         e.preventDefault();
         const { activeTabId: active, tabs: allTabs } = useTabStore.getState();
         if (active && allTabs[active] && !allTabs[active].pinned) {
@@ -881,59 +954,102 @@ export function TabBar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveTab, router, handleClose]);
 
+  // Scroll active tab into view when it changes
+  useEffect(() => {
+    if (!activeTabId || !scrollRef.current) return;
+    const container = scrollRef.current;
+    const activeEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
+    if (activeEl) {
+      const containerRect = container.getBoundingClientRect();
+      const tabRect = activeEl.getBoundingClientRect();
+      if (tabRect.left < containerRect.left || tabRect.right > containerRect.right) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    }
+  }, [activeTabId]);
+
+  const handleNewTab = useCallback(() => {
+    router.push('/dashboard');
+  }, [router]);
+
   // Always render the bar so the bg-sidebar strip above the content curve is consistent
   if (orderedTabs.length === 0) {
-    return <div className="flex-shrink-0 bg-sidebar h-9 md:h-12" />;
+    return <div className="flex-shrink-0 bg-sidebar h-9 md:h-10" />;
   }
 
   return (
     <>
       <div
-        className="flex-shrink-0 flex items-end bg-sidebar h-9 md:h-12 overflow-hidden"
+        className="flex-shrink-0 flex items-end bg-sidebar h-9 md:h-10 overflow-hidden"
         role="tablist"
       >
         <div
           ref={scrollRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-stretch overflow-x-auto md:pl-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+          className="flex-1 flex items-end overflow-x-auto md:pl-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
             const busy = tab.type === 'session' && pending === 0 && statuses[tab.id]?.type === 'busy';
             return (
-              <TabItem
-                key={tab.id}
-                tab={tab}
-                index={index}
-                isActive={tab.id === activeTabId}
-                isBusy={!!busy}
-                pendingCount={pending}
-                onActivate={handleActivate}
-                onClose={handleClose}
-                onContextMenu={handleContextMenu}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onDragEnd={handleDragEnd}
-                isDragOver={dragOverIndex === index && dragTabId !== tab.id}
-                dragSide={dragOverIndex === index && dragTabId !== tab.id ? dragSide : null}
-              />
+              <div key={tab.id} data-tab-id={tab.id} className="flex items-end">
+                <TabItem
+                  tab={tab}
+                  index={index}
+                  isActive={tab.id === activeTabId}
+                  isBusy={!!busy}
+                  pendingCount={pending}
+                  onActivate={handleActivate}
+                  onClose={handleClose}
+                  onContextMenu={handleContextMenu}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
+                  isDragOver={dragOverIndex === index && dragTabId !== tab.id}
+                  dragSide={dragOverIndex === index && dragTabId !== tab.id ? dragSide : null}
+                />
+              </div>
             );
           })}
         </div>
 
-        {/* Tab list button (VS Code-style) */}
-        <button
-          ref={tabListBtnRef}
-          onClick={() => setShowTabList((v) => !v)}
-          className={cn(
-            'flex-shrink-0 flex items-center justify-center w-9 h-9 cursor-pointer',
-            'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors',
-          )}
-          title="Open tab list"
-        >
-          <ChevronsUpDown className="h-3.5 w-3.5" />
-        </button>
+        {/* Action buttons group */}
+        <div className="flex-shrink-0 flex items-center gap-px pr-1">
+          {/* New tab button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleNewTab}
+                className={cn(
+                  'flex items-center justify-center w-8 h-9 cursor-pointer',
+                  'text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors',
+                )}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">New tab</TooltipContent>
+          </Tooltip>
+
+          {/* Tab list button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                ref={tabListBtnRef}
+                onClick={() => setShowTabList((v) => !v)}
+                className={cn(
+                  'flex items-center justify-center w-8 h-9 cursor-pointer',
+                  'text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors',
+                  showTabList && 'bg-muted/50 text-foreground',
+                )}
+              >
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Open tab list</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Tab list dropdown */}

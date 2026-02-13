@@ -13,7 +13,7 @@ import { usePresence } from '@/hooks/use-presence';
 import { featureFlags } from '@/lib/feature-flags';
 import { usePrefetchComposioIcons } from '@/hooks/composio/use-composio';
 
-import { useProjects } from '@/hooks/sidebar/use-sidebar';
+import { useProjects } from '@/hooks/threads/use-project';
 import { useIsMobile } from '@/hooks/utils';
 import { AppProviders } from '@/components/layout/app-providers';
 import { backendApi } from '@/lib/api-client';
@@ -94,6 +94,12 @@ const SessionChat = lazy(() =>
 const FileTabContent = lazy(() =>
   import('@/components/tabs/file-tab-content').then(mod => ({ default: mod.FileTabContent }))
 );
+const PreviewTabContent = lazy(() =>
+  import('@/components/tabs/preview-tab-content').then(mod => ({ default: mod.PreviewTabContent }))
+);
+const TerminalTabContent = lazy(() =>
+  import('@/components/tabs/terminal-tab-content').then(mod => ({ default: mod.TerminalTabContent }))
+);
 
 // Skeleton shell that renders immediately for FCP
 function DashboardSkeleton() {
@@ -132,18 +138,21 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
   const tabOrder = useTabStore((s) => s.tabOrder);
   const activeTabId = useTabStore((s) => s.activeTabId);
 
-  // Collect session tab IDs
+  // Collect tab IDs by type
   const sessionTabIds = tabOrder.filter((id) => tabs[id]?.type === 'session');
-  // Collect file tab IDs
   const fileTabIds = tabOrder.filter((id) => tabs[id]?.type === 'file');
+  const previewTabIds = tabOrder.filter((id) => tabs[id]?.type === 'preview');
+  const terminalTabIds = tabOrder.filter((id) => tabs[id]?.type === 'terminal');
   const activeTab = activeTabId ? tabs[activeTabId] : null;
-  const showingMountedSession = activeTab?.type === 'session';
-  const showingFileTab = activeTab?.type === 'file';
+  const showingMountedTab = activeTab?.type === 'session'
+    || activeTab?.type === 'file'
+    || activeTab?.type === 'preview'
+    || activeTab?.type === 'terminal';
 
   return (
     <div className={cn(
       'bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative',
-      'md:rounded-tl-2xl md:rounded-tr-2xl md:border-t md:border-l md:border-r md:border-border/60',
+      'md:rounded-tl-xl md:rounded-tr-xl md:border-t md:border-l md:border-r md:border-border/50',
     )}>
       {/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
       {sessionTabIds.map((id) => (
@@ -183,12 +192,45 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
         );
       })}
 
+      {/* Preview tabs — iframe previews of sandbox services */}
+      {previewTabIds.map((id) => (
+        <div
+          key={id}
+          className={cn(
+            'absolute inset-0 flex flex-col',
+            id !== activeTabId && 'hidden',
+          )}
+        >
+          <Suspense fallback={null}>
+            <PreviewTabContent tabId={id} />
+          </Suspense>
+        </div>
+      ))}
+
+      {/* Terminal tabs — 1 tab = 1 PTY */}
+      {terminalTabIds.map((id) => {
+        const ptyId = id.startsWith('terminal:') ? id.slice(9) : id;
+        return (
+          <div
+            key={id}
+            className={cn(
+              'absolute inset-0 flex flex-col',
+              id !== activeTabId && 'hidden',
+            )}
+          >
+            <Suspense fallback={null}>
+              <TerminalTabContent ptyId={ptyId} tabId={id} hidden={id !== activeTabId} />
+            </Suspense>
+          </div>
+        );
+      })}
+
       {/* Route-based children (dashboard, settings, etc.)
-          Hidden when a pre-mounted session tab or file tab is active. */}
+          Hidden when a pre-mounted tab is active. */}
       <div
         className={cn(
           'flex-1 min-h-0 flex flex-col overflow-hidden',
-          (showingMountedSession || showingFileTab) && 'hidden',
+          showingMountedTab && 'hidden',
         )}
       >
         {children}

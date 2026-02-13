@@ -28,7 +28,6 @@ import {
   GitBranch,
   ArrowRight,
   ExternalLink,
-  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Command, Project, Session } from '@/hooks/opencode/use-opencode-sessions';
@@ -72,26 +71,27 @@ function ProjectCard({
     <Link
       href={`/projects/${project.id}`}
       className={cn(
-        'group flex flex-col gap-3 p-4 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm',
-        'hover:border-border/80 hover:bg-card/80 transition-all duration-200',
+        'group flex flex-col gap-2.5 p-3.5 rounded-2xl border border-border/30',
+        'bg-card/40 hover:bg-card/70 hover:border-border/60',
+        'transition-all duration-200 ease-out',
       )}
     >
       <div className="flex items-start justify-between">
         <div
-          className="h-9 w-9 rounded-lg flex items-center justify-center bg-muted/50 flex-shrink-0"
-          style={project.icon?.color ? { backgroundColor: project.icon.color + '18', color: project.icon.color } : undefined}
+          className="h-8 w-8 rounded-lg flex items-center justify-center bg-muted/40 flex-shrink-0"
+          style={project.icon?.color ? { backgroundColor: project.icon.color + '10', color: project.icon.color } : undefined}
         >
-          <FolderOpen className="size-4" />
+          <FolderOpen className="size-3.5" />
         </div>
-        <ArrowRight className="size-3.5 text-muted-foreground/0 group-hover:text-muted-foreground/50 transition-all duration-200 group-hover:translate-x-0.5" />
+        <ArrowRight className="size-3 text-muted-foreground/0 group-hover:text-muted-foreground/40 transition-all duration-200 group-hover:translate-x-0.5" />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-medium truncate">{getProjectDisplayName(project)}</p>
-        <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground/50">
+        <p className="text-[13px] font-medium truncate">{getProjectDisplayName(project)}</p>
+        <div className="flex items-center gap-2.5 mt-0.5 text-[11px] text-muted-foreground/40">
           {sessionCount > 0 && (
             <span className="inline-flex items-center gap-1">
               <MessageCircle className="size-2.5" />
-              {sessionCount} session{sessionCount !== 1 ? 's' : ''}
+              {sessionCount}
             </span>
           )}
           {project.vcs === 'git' && (
@@ -126,16 +126,16 @@ function RecentSessionRow({
   return (
     <button
       onClick={() => router.push(`/sessions/${session.id}`)}
-      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left hover:bg-muted/30 transition-colors group cursor-pointer"
+      className="flex items-center gap-3 w-full px-3.5 py-2.5 text-left hover:bg-muted/20 transition-colors group cursor-pointer"
     >
-      <div className="h-8 w-8 rounded-lg bg-muted/40 flex items-center justify-center flex-shrink-0">
-        <MessageCircle className="size-3.5 text-muted-foreground/50" />
+      <div className="h-7 w-7 rounded-md bg-muted/30 flex items-center justify-center flex-shrink-0">
+        <MessageCircle className="size-3 text-muted-foreground/40" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm truncate">
+        <p className="text-[13px] truncate text-foreground/80 group-hover:text-foreground transition-colors">
           {session.title || session.slug || 'Untitled'}
         </p>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/40 mt-0.5">
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/35 mt-0.5">
           {project && project.id !== 'global' && (
             <>
               <span className="truncate max-w-[120px]">{getProjectDisplayName(project)}</span>
@@ -143,15 +143,9 @@ function RecentSessionRow({
             </>
           )}
           <span>{formatRelativeTime(session.time.updated)}</span>
-          {session.summary && session.summary.files > 0 && (
-            <>
-              <span>·</span>
-              <span>{session.summary.files} file{session.summary.files !== 1 ? 's' : ''}</span>
-            </>
-          )}
         </div>
       </div>
-      <ExternalLink className="size-3 text-muted-foreground/0 group-hover:text-muted-foreground/30 transition-colors flex-shrink-0" />
+      <ExternalLink className="size-3 text-muted-foreground/0 group-hover:text-muted-foreground/25 transition-colors flex-shrink-0" />
     </button>
   );
 }
@@ -294,12 +288,14 @@ export function DashboardContent() {
 
       {/* Scrollable container */}
       <div className="flex-1 overflow-y-auto">
-        {/* ====== Hero Section ====== */}
+        {/* ====== Hero Section — pushed down for direct engagement ====== */}
         <div className={cn(
-          'relative flex flex-col items-center justify-center px-4',
-          hasContent ? 'min-h-[55vh] pt-16 pb-8' : 'min-h-[70vh] pt-8 pb-8',
+          'relative flex flex-col items-center px-4',
+          hasContent
+            ? 'justify-end min-h-[50vh] pb-10 pt-20'
+            : 'justify-center min-h-[65vh] pt-8 pb-8',
         )}>
-          {/* Brandmark Background */}
+          {/* Brandmark Background — subtler */}
           <div
             className="absolute inset-0 pointer-events-none overflow-hidden"
             aria-hidden="true"
@@ -307,7 +303,7 @@ export function DashboardContent() {
             <img
               src="/kortix-brandmark-bg.svg"
               alt=""
-              className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[160vw] min-w-[1000px] md:min-w-[1200px] lg:w-[162vw] lg:min-w-[1620px] h-auto object-contain select-none invert dark:invert-0 opacity-80"
+              className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[160vw] min-w-[1000px] md:min-w-[1200px] lg:w-[162vw] lg:min-w-[1620px] h-auto object-contain select-none invert dark:invert-0 opacity-60"
               draggable={false}
             />
           </div>
@@ -315,19 +311,19 @@ export function DashboardContent() {
           {/* Centered content */}
           <div className="relative z-[1] w-full max-w-2xl mx-auto flex flex-col items-center text-center">
             {/* Greeting */}
-            <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both">
+            <div className="animate-in fade-in-0 slide-in-from-bottom-3 duration-500 fill-mode-both">
               <DynamicGreeting className="text-2xl sm:text-3xl md:text-4xl font-medium text-foreground tracking-tight" />
             </div>
 
             {/* Subtitle */}
-            <p className="mt-2 sm:mt-3 text-sm sm:text-base text-muted-foreground/60 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-75 fill-mode-both">
+            <p className="mt-2 text-sm text-muted-foreground/50 animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-75 fill-mode-both">
               {hasProjects
                 ? 'Start a session or pick a project below'
                 : 'Ask anything about your code'}
             </p>
 
             {/* Chat Input */}
-            <div className="w-full mt-6 sm:mt-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-100 fill-mode-both">
+            <div className="w-full mt-6 animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-100 fill-mode-both">
               <SessionChatInput
                 onSend={handleSend}
                 disabled={isSubmitting}
@@ -346,55 +342,46 @@ export function DashboardContent() {
               />
             </div>
           </div>
-
-          {/* Scroll hint — only when there's content below */}
-          {hasContent && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 animate-in fade-in-0 duration-700 delay-500 fill-mode-both">
-              <ChevronDown className="size-4 text-muted-foreground/30 animate-bounce" />
-            </div>
-          )}
         </div>
 
-        {/* ====== Content Section ====== */}
+        {/* ====== Content Section — flows directly below ====== */}
         {hasContent && (
-          <div className="max-w-3xl w-full mx-auto px-4 sm:px-6 pb-12 space-y-8">
-            {/* Projects */}
-            {hasProjects && (
-              <div className="animate-in fade-in-0 slide-in-from-bottom-6 duration-600 delay-200 fill-mode-both">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Projects
-                  </h3>
-                  <span className="text-[11px] text-muted-foreground/40">
-                    {sortedProjects.length} project{sortedProjects.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-                  {sortedProjects.map((project) => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      sessionCount={sessionCounts.get(project.id) || 0}
+          <div className="max-w-3xl w-full mx-auto px-4 sm:px-6 pb-16 space-y-10">
+            {/* Recent Sessions — prominent, above projects */}
+            {hasSessions && (
+              <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-150 fill-mode-both">
+                <h3 className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-widest mb-2 px-1">
+                  Recent
+                </h3>
+                <div className="rounded-2xl border border-border/20 bg-card/20 divide-y divide-border/10 overflow-hidden">
+                  {recentSessions.map((session) => (
+                    <RecentSessionRow
+                      key={session.id}
+                      session={session}
+                      project={projectMap.get(session.projectID)}
                     />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Recent Sessions */}
-            {hasSessions && (
-              <div className="animate-in fade-in-0 slide-in-from-bottom-6 duration-600 delay-300 fill-mode-both">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Recent Sessions
+            {/* Projects */}
+            {hasProjects && (
+              <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-200 fill-mode-both">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <h3 className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-widest">
+                    Projects
                   </h3>
+                  <span className="text-[11px] text-muted-foreground/30">
+                    {sortedProjects.length}
+                  </span>
                 </div>
-                <div className="rounded-xl border border-border/30 bg-card/30 divide-y divide-border/20 overflow-hidden">
-                  {recentSessions.map((session) => (
-                    <RecentSessionRow
-                      key={session.id}
-                      session={session}
-                      project={projectMap.get(session.projectID)}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {sortedProjects.map((project) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      sessionCount={sessionCounts.get(project.id) || 0}
                     />
                   ))}
                 </div>
@@ -406,8 +393,8 @@ export function DashboardContent() {
         {/* ====== Empty state ====== */}
         {!hasContent && (
           <div className="flex flex-col items-center text-center px-4 pb-16 animate-in fade-in-0 duration-500 delay-300 fill-mode-both">
-            <FolderOpen className="size-8 text-muted-foreground/15 mb-2" />
-            <p className="text-xs text-muted-foreground/40">
+            <FolderOpen className="size-7 text-muted-foreground/10 mb-2" />
+            <p className="text-xs text-muted-foreground/30">
               Create a git repo in your workspace to see it here
             </p>
           </div>

@@ -21,6 +21,7 @@ let DocViewerRenderers: any[] | null = null;
 
 try {
   // Dynamic import - only used when a public URL is available
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require('@cyntler/react-doc-viewer');
   DocViewer = mod.default;
   DocViewerRenderers = mod.DocViewerRenderers;
@@ -285,6 +286,7 @@ export function PptxRenderer({
 
   // --- Public URL path (DocViewer) ---
   if (hasPublicUrl && DocViewer && DocViewerRenderers) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { constructHtmlPreviewUrl } = require('@/lib/utils/url');
     const publicUrl = constructHtmlPreviewUrl(project!.sandbox!.sandbox_url!, filePath!);
 

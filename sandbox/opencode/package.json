@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.12.0",
-    "@opencode-ai/plugin": "1.1.61",
+    "@opencode-ai/plugin": "1.1.65",
     "@kortix/opencode-sdk": "^0.3.0",
     "@tavily/core": "^0.7.1",
     "agent-browser": "^0.9.1",

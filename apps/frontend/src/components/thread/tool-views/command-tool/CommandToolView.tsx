@@ -15,7 +15,6 @@ import { LoadingState } from '../shared/LoadingState';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { extractCommandData } from './_utils';
-import { useToolStreamStore } from '@/stores/tool-stream-store';
 import { useSmoothToolField } from '@/hooks/messages';
 
 export function CommandToolView({
@@ -28,9 +27,9 @@ export function CommandToolView({
 }: ToolViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  const toolCallId = toolCall?.tool_call_id || '';
-  const streamingOutput = useToolStreamStore((state) => state.streamingOutputs.get(toolCallId) || '');
-  const isOutputStreaming = useToolStreamStore((state) => state.streamingStatus.get(toolCallId) === 'streaming');
+  // Tool stream store was removed — streaming output is now handled via props/tool result
+  const streamingOutput: string = '';
+  const isOutputStreaming: boolean = false;
 
   const {
     command,
@@ -70,9 +69,24 @@ export function CommandToolView({
   // Use smooth command when streaming
   const displayCommand = isStreaming && smoothCommand ? smoothCommand : command;
   
-  // Auto-scroll to bottom when streaming output updates
+  // Track whether user has scrolled away in this tool's output area
+  const userScrolledRef = useRef(false);
+
+  // Detect user scroll within the command output
   useEffect(() => {
-    if (isOutputStreaming && scrollRef.current) {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+      userScrolledRef.current = !atBottom;
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll to bottom when streaming output updates (respects user scroll)
+  useEffect(() => {
+    if (isOutputStreaming && scrollRef.current && !userScrolledRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [streamingOutput, isOutputStreaming]);

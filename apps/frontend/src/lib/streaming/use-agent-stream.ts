@@ -374,13 +374,8 @@ export function useAgentStream(
         break;
       
       case 'context_usage':
-        if (processed.current_tokens !== undefined) {
-          import('@/stores/context-usage-store').then(({ useContextUsageStore }) => {
-            useContextUsageStore.getState().setUsage(threadId, {
-              current_tokens: processed.current_tokens!
-            });
-          });
-        }
+        // context-usage-store was removed with legacy thread system
+        // Context usage is now tracked by the OpenCode session system
         break;
       
       case 'error':

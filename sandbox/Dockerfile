@@ -120,10 +120,10 @@ RUN chmod +x /opt/startup.sh
 # our docker-compose and doesn't clash with app ports.
 ENV CUSTOM_PORT=6080
 ENV CUSTOM_HTTPS_PORT=6081
-# Default screen resolution (1920x1080) and window title
-ENV SELKIES_MANUAL_WIDTH=1920
-ENV SELKIES_MANUAL_HEIGHT=1080
-ENV TITLE="HeyAGI Sandbox"
+# # Default screen resolution (1920x1080) and window title
+# ENV SELKIES_MANUAL_WIDTH=1920
+# ENV SELKIES_MANUAL_HEIGHT=1080
+ENV TITLE="Kortix Computer"
 
 # Expose ports: Desktop (6080/6081), OpenCode Web (3111), Kortix Master (8000),
 # Presentation Viewer (3210), Agent Browser (9223/9224)

@@ -37,7 +37,7 @@ export function SessionWelcome({ showPrompts = false, onPromptSelect }: SessionW
         <img
           src="/kortix-brandmark-bg.svg"
           alt=""
-          className="absolute left-1/2 -translate-x-1/2 top-[-10%] sm:top-1/2 sm:-translate-y-1/2 w-[140vw] min-w-[700px] h-auto sm:w-[160vw] sm:min-w-[1000px] md:min-w-[1200px] lg:w-[162vw] lg:min-w-[1620px] object-contain select-none invert dark:invert-0"
+          className="absolute left-1/2 -translate-x-1/2 top-[-10%] sm:top-1/2 sm:-translate-y-1/2 w-[140vw] min-w-[700px] h-auto sm:w-[160vw] sm:min-w-[1000px] md:min-w-[1200px] lg:w-[162vw] lg:min-w-[1620px] object-contain select-none invert dark:invert-0 opacity-60"
           draggable={false}
         />
       </div>
@@ -51,20 +51,20 @@ export function SessionWelcome({ showPrompts = false, onPromptSelect }: SessionW
           </div>
 
           {/* Subtitle */}
-          <p className="mt-2 sm:mt-3 text-sm sm:text-base text-muted-foreground/70 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-75 fill-mode-both">
+          <p className="mt-2 sm:mt-3 text-sm sm:text-base text-muted-foreground/50 animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-75 fill-mode-both">
             Ask anything about your code
           </p>
 
           {/* Example prompts */}
           {showPrompts && onPromptSelect && (
-            <div className="w-full max-w-lg mt-8 space-y-2 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-150 fill-mode-both">
-              <p className="text-xs text-muted-foreground font-medium">Try asking:</p>
-              <div className="grid gap-2">
+            <div className="w-full max-w-lg mt-8 space-y-2.5 animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-150 fill-mode-both">
+              <p className="text-[11px] text-muted-foreground/50 font-medium uppercase tracking-wider">Try asking</p>
+              <div className="grid gap-1.5">
                 {examplePrompts.map((prompt) => (
                   <button
                     key={prompt}
                     onClick={() => onPromptSelect(prompt)}
-                    className="text-left px-4 py-3 rounded-3xl rounded-br-lg bg-card border text-sm text-muted-foreground hover:text-foreground transition-colors break-words cursor-pointer"
+                    className="text-left px-4 py-2.5 rounded-2xl bg-card/40 border border-border/30 text-[13px] text-muted-foreground/70 hover:text-foreground hover:bg-card/70 hover:border-border/50 transition-all duration-200 break-words cursor-pointer"
                   >
                     {prompt}
                   </button>

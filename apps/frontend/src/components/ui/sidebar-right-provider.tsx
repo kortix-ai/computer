@@ -6,8 +6,8 @@ import { useDocumentModalStore } from '@/stores/use-document-modal-store';
 
 const SIDEBAR_RIGHT_COOKIE_NAME = 'sidebar_right_state';
 const SIDEBAR_RIGHT_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_RIGHT_WIDTH = '288px';
-const SIDEBAR_RIGHT_WIDTH_ICON = '5.2875rem';
+const SIDEBAR_RIGHT_WIDTH = '320px';
+const SIDEBAR_RIGHT_WIDTH_ICON = '3.25rem';
 
 type RightSidebarContextProps = {
   state: 'expanded' | 'collapsed';

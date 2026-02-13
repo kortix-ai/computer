@@ -15,7 +15,7 @@ import {
   formatTierErrorForUI
 } from '@/lib/api/errors';
 import { isTierRestrictionError } from '@agentpress/shared/errors';
-import { useOptimisticFilesStore } from '@/stores/optimistic-files-store';
+// optimistic-files-store was removed with legacy thread system
 import { usePricingModalStore } from '@/stores/pricing-modal-store';
 import { normalizeFilenameToNFC } from '@agentpress/shared';
 import { 
@@ -90,7 +90,6 @@ export function useOptimisticAgentStart(
   const [agentLimitData, setAgentLimitData] = useState<AgentLimitInfo | null>(null);
   const [showAgentLimitBanner, setShowAgentLimitBanner] = useState(false);
   
-  const addOptimisticFiles = useOptimisticFilesStore((state) => state.addFiles);
   const pricingModalStore = usePricingModalStore();
 
   const clearAgentLimitData = useCallback(() => {

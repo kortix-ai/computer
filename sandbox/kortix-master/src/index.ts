@@ -4,6 +4,7 @@ import { logger } from 'hono/logger'
 import { proxyToOpenCode } from './services/proxy'
 import { SecretStore } from './services/secret-store'
 import envRouter from './routes/env'
+import proxyRouter from './routes/proxy'
 import { config } from './config'
 
 const app = new Hono()
@@ -21,6 +22,9 @@ app.get('/kortix/health', (c) => c.json({ status: 'ok' }))
 
 // ENV management routes
 app.route('/env', envRouter)
+
+// Dynamic port proxy — /proxy/:port/* forwards to localhost:{port} inside the sandbox
+app.route('/proxy', proxyRouter)
 
 // Proxy all other requests to OpenCode
 app.all('*', async (c) => {

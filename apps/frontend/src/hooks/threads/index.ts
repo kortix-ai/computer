@@ -1,5 +1,6 @@
 /**
- * Thread Hooks
+ * Thread Hooks - Retained exports only
+ * Legacy thread-specific hooks removed; project/sidebar hooks kept.
  */
 export { useThreadAgentStatuses } from './use-thread-agent-status';
 export { useProjectRealtime } from './useProjectRealtime';
@@ -16,9 +17,6 @@ export { useCreateThread, useAddUserMessage, useDeleteThread, useDeleteMultipleT
 export { useProjectQuery, useProjects, usePublicProjectsQuery } from './use-project';
 // Project mutations
 export { useUpdateProjectMutation, useUpdateProject, useDeleteProject } from './use-project';
-
-// Messages - re-export from messages folder
-export { useMessagesQuery, useAddUserMessageMutation } from '../messages';
 
 // Agent runs
 export { useAgentRunsQuery, useStartAgentMutation, useStopAgentMutation } from './use-agent-run';

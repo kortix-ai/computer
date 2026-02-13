@@ -1,20 +1,15 @@
 'use client';
 
 import { Project } from '@/lib/api/threads';
-import { getUserFriendlyToolName, HIDE_BROWSER_TAB } from '@/components/thread/utils';
+import { HIDE_BROWSER_TAB } from '@/components/thread/utils';
 import { isHiddenTool } from '@agentpress/shared/tools';
 import React, { memo, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ApiMessageType } from '@/components/thread/types';
-import { Globe, CircleDashed } from 'lucide-react';
-import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useIsMobile } from '@/hooks/utils';
 import { cn } from '@/lib/utils';
 import { ToolView } from '../tool-views/wrapper';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HealthCheckedVncIframe } from '../HealthCheckedVncIframe';
-import { BrowserHeader } from '../tool-views/BrowserToolView';
 import { useTranslations } from 'next-intl';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useDocumentModalStore } from '@/stores/use-document-modal-store';
@@ -23,7 +18,6 @@ import {
   useKortixComputerPendingToolNavIndex,
   useKortixComputerClearPendingToolNav,
 } from '@/stores/kortix-computer-store';
-import { FileBrowser, FileViewer, useFilesStore } from '@/features/files';
 import { ToolCallData, ToolResultData } from '../tool-views/types';
 import { PanelHeader } from './components/PanelHeader';
 import { NavigationControls } from './components/NavigationControls';
@@ -31,8 +25,6 @@ import { EmptyState } from './components/EmptyState';
 import { LoadingState } from './components/LoadingState';
 import { AppDock } from './components/Dock';
 import { SandboxDesktop } from './components/Desktop';
-import { SSHTerminal } from './components/SSHTerminal';
-import { PtyTerminalPanel } from '@/components/session/pty-terminal-panel';
 import { useServerStore } from '@/stores/server-store';
 import { getToolNumber } from '@/hooks/messages/tool-tracking';
 
@@ -126,22 +118,12 @@ export const KortixComputer = memo(function KortixComputer({
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
   const sandbox = project?.sandbox;
 
-  // Track which servers have been visited so their terminal panels stay mounted
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const [visitedServerIds, setVisitedServerIds] = useState<string[]>(() => [activeServerId]);
-  useEffect(() => {
-    setVisitedServerIds((prev) => prev.includes(activeServerId) ? prev : [...prev, activeServerId]);
-  }, [activeServerId]);
-
   const {
     activeView,
     setActiveView,
     isExpanded,
     toggleExpanded,
   } = useKortixComputerStore();
-  
-  const filesView = useFilesStore((s) => s.view);
-  const filesSelectedFilePath = useFilesStore((s) => s.selectedFilePath);
   
   const pendingToolNavIndex = useKortixComputerPendingToolNavIndex();
   const clearPendingToolNav = useKortixComputerClearPendingToolNav();
@@ -175,27 +157,6 @@ export const KortixComputer = memo(function KortixComputer({
     prevProjectIdRef.current = projectId || null;
     prevSandboxIdRef.current = sandboxId || null;
   }, [projectId, sandboxId]);
-
-  const handleVncRefresh = useCallback(() => {
-    setVncRefreshKey(prev => prev + 1);
-  }, []);
-
-  const persistentVncIframe = useMemo(() => {
-    if (!sandbox || !sandbox.vnc_preview || !sandbox.pass || !sandbox.id) return null;
-
-    return (
-      <div>
-        <HealthCheckedVncIframe
-          key={vncRefreshKey}
-          sandbox={{
-            id: sandbox.id,
-            vnc_preview: sandbox.vnc_preview,
-            pass: sandbox.pass
-          }}
-        />
-      </div>
-    );
-  }, [sandbox, vncRefreshKey]);
 
   const isBrowserTool = useCallback((toolName: string | undefined): boolean => {
     if (!toolName) return false;
@@ -627,83 +588,6 @@ export const KortixComputer = memo(function KortixComputer({
     );
   };
 
-  const renderFilesView = () => {
-    if (filesView === 'viewer' && filesSelectedFilePath) {
-      return <FileViewer />;
-    }
-
-    return <FileBrowser />;
-  };
-
-  const renderFilesViewMaximized = () => {
-    if (filesView === 'viewer' && filesSelectedFilePath) {
-      return <FileViewer />;
-    }
-
-    return <FileBrowser />;
-  };
-
-  const renderBrowserView = () => {
-    // If browser tab is hidden, don't render browser view
-    if (HIDE_BROWSER_TAB) {
-      return null;
-    }
-    
-    if (persistentVncIframe) {
-      return (
-        <div className="h-full flex flex-col overflow-hidden">
-          <BrowserHeader isConnected={true} onRefresh={handleVncRefresh} />
-          <div className="flex-1 overflow-hidden grid items-center">
-            {persistentVncIframe}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <BrowserHeader isConnected={false} />
-        <div className="flex-1 overflow-auto flex flex-col items-center justify-center p-8 bg-zinc-50 dark:bg-zinc-900/50">
-          <div className="flex flex-col items-center space-y-4 max-w-sm text-center">
-            <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-700">
-              <Globe className="h-8 w-8 text-zinc-400 dark:text-zinc-500" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                Browser not available
-              </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                No active browser session available. The browser will appear here when a sandbox is created and Browser tools are used.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderTerminalView = () => {
-    // If a sandbox is available, use SSHTerminal for direct sandbox access
-    if (effectiveSandboxId) {
-      return <SSHTerminal sandboxId={effectiveSandboxId} className="h-full" />;
-    }
-
-    // Render a PTY panel per visited server — inactive ones stay mounted but hidden
-    // so WebSocket connections survive instance switches
-    return (
-      <div className="h-full relative">
-        {visitedServerIds.map((serverId) => (
-          <PtyTerminalPanel
-            key={serverId}
-            serverId={serverId}
-            hidden={serverId !== activeServerId}
-            className="absolute inset-0 h-full w-full"
-          />
-        ))}
-      </div>
-    );
-  };
-
   const renderContent = () => {
     return (
       <div className="flex flex-col h-full max-h-full max-w-full overflow-hidden min-w-0" style={{ contain: 'strict' }}>
@@ -742,10 +626,7 @@ export const KortixComputer = memo(function KortixComputer({
           />
         )}
         <div className="flex-1 overflow-hidden max-w-full max-h-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
-          {activeView === 'tools' && renderToolsView()}
-          {activeView === 'files' && renderFilesView()}
-          {!HIDE_BROWSER_TAB && activeView === 'browser' && renderBrowserView()}
-          {activeView === 'terminal' && renderTerminalView()}
+          {renderToolsView()}
         </div>
       </div>
     );
@@ -784,10 +665,7 @@ export const KortixComputer = memo(function KortixComputer({
           />
 
           <div className="flex-1 flex flex-col overflow-hidden max-w-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
-            {activeView === 'tools' && renderToolsView()}
-            {activeView === 'files' && renderFilesView()}
-            {!HIDE_BROWSER_TAB && activeView === 'browser' && renderBrowserView()}
-            {activeView === 'terminal' && renderTerminalView()}
+            {renderToolsView()}
           </div>
 
           {activeView === 'tools' && (displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
@@ -869,8 +747,6 @@ export const KortixComputer = memo(function KortixComputer({
             onClose={() => setIsMaximized(false)}
             currentView={activeView}
             onViewChange={setActiveView}
-            renderFilesView={renderFilesViewMaximized}
-            renderBrowserView={renderBrowserView}
             isStreaming={isStreaming}
             project_id={projectId}
           />
@@ -970,8 +846,6 @@ export const KortixComputer = memo(function KortixComputer({
           onClose={() => setIsMaximized(false)}
           currentView={activeView}
           onViewChange={setActiveView}
-          renderFilesView={renderFilesViewMaximized}
-          renderBrowserView={renderBrowserView}
           isStreaming={isStreaming}
           project_id={projectId}
         />
