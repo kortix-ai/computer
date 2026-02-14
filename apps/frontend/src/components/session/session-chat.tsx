@@ -1845,7 +1845,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm text-muted-foreground">
-                          {isPendingConfirmation ? 'Paused - waiting for confirmation' : 'Thinking'}
+                          {(pendingQuestions.length > 0 || pendingPermissions.length > 0) ? 'Paused - waiting for confirmation' : 'Thinking'}
                         </p>
                       </div>
                     </div>
