@@ -147,7 +147,7 @@ async function checkCreditsLegacy(
 
     if (!response.ok) {
       console.error(`[BILLING] Backend check credits failed: ${response.status}`);
-      return { hasCredits: true, message: 'Credit check error', balance: null };
+      return { hasCredits: false, message: 'Credit check unavailable', balance: null };
     }
 
     const data = await response.json();
@@ -164,7 +164,7 @@ async function checkCreditsLegacy(
     return { hasCredits: true, message: `Balance: $${balance.toFixed(2)}`, balance };
   } catch (error) {
     console.error(`[BILLING] Error checking credits: ${error}`);
-    return { hasCredits: true, message: `Credit check error: ${error}`, balance: null };
+    return { hasCredits: false, message: `Credit check error: ${error}`, balance: null };
   }
 }
 

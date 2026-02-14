@@ -15,11 +15,13 @@ webhooksRouter.post('/stripe', async (c) => {
 });
 
 webhooksRouter.post('/revenuecat', async (c) => {
+  if (!config.REVENUECAT_WEBHOOK_SECRET) {
+    return c.json({ error: 'Webhook not configured' }, 500);
+  }
+
   const authHeader = c.req.header('Authorization');
-  if (config.REVENUECAT_WEBHOOK_SECRET) {
-    if (!authHeader || authHeader !== `Bearer ${config.REVENUECAT_WEBHOOK_SECRET}`) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+  if (!authHeader || authHeader !== `Bearer ${config.REVENUECAT_WEBHOOK_SECRET}`) {
+    return c.json({ error: 'Unauthorized' }, 401);
   }
 
   const body = await c.req.json();
