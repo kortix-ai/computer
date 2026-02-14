@@ -200,7 +200,7 @@ export function useUpdateOpenCodeSession() {
       const client = getClient();
       const body: { title?: string; time?: { archived?: number } } = {};
       if (title !== undefined) body.title = title;
-      if (archived) body.time = { archived: Date.now() };
+      if (archived !== undefined) body.time = { archived: archived ? Date.now() : 0 };
       const result = await client.session.update({ sessionID: sessionId, ...body });
       return unwrap(result);
     },
@@ -650,6 +650,34 @@ export function useUnrevertSession() {
       queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
       queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionId) });
       queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionId) });
+    },
+  });
+}
+
+// ============================================================================
+// Init Hook — analyze project and create AGENTS.md (via /init command)
+// ============================================================================
+
+export function useInitSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sessionId }: { sessionId: string }) => {
+      const client = getClient();
+      const result = await client.session.command({
+        sessionID: sessionId,
+        command: 'init',
+        arguments: '',
+      });
+      if (result.error) {
+        const err = result.error as any;
+        throw new Error(err?.data?.message || err?.message || 'Failed to initialize project');
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(variables.sessionId) });
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
     },
   });
 }

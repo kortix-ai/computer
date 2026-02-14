@@ -68,22 +68,15 @@ export function DashboardContent() {
           serverId: useServerStore.getState().activeServerId,
         });
 
-        // Store the prompt text for optimistic display on the session page.
-        // Use session-specific keys so multiple sessions don't conflict.
+        // Store the prompt text so the session page can send it and display it
+        // optimistically. Use session-specific keys so multiple sessions don't conflict.
+        // The session page will handle actually sending the message — this avoids a
+        // race condition where the send fires before the session page mounts its
+        // SSE listeners and polling, causing missed responses.
         sessionStorage.setItem(`opencode_pending_prompt:${session.id}`, text);
         if (Object.keys(options).length > 0) {
           sessionStorage.setItem(`opencode_pending_options:${session.id}`, JSON.stringify(options));
         }
-
-        // Step 3: Send the prompt directly from here
-        sendMessage.mutateAsync({
-          sessionId: session.id,
-          parts: [{ type: 'text', text }],
-          options: Object.keys(options).length > 0 ? options as any : undefined,
-        }).catch(() => {
-          // Mark that the send failed so the session page can retry
-          sessionStorage.setItem(`opencode_pending_send_failed:${session.id}`, 'true');
-        });
 
         // Step 4: Activate the session tab via pushState (like handleActivate in tab-bar)
         // instead of router.push to avoid a full Next.js navigation. The pre-mounted

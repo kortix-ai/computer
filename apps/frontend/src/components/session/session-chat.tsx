@@ -1336,9 +1336,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     return null;
   });
 
-  // Hydrate options and clean up sessionStorage for new sessions.
-  // The prompt is already sent by the dashboard/project page — we only use sessionStorage
-  // for optimistic display and to restore selected agent/model/variant.
+  // Hydrate options from sessionStorage and send the pending prompt for new sessions.
+  // The dashboard/project page stores the prompt in sessionStorage and navigates here.
+  // We send the message from here (not the dashboard) so that SSE listeners and polling
+  // are already active when the response starts streaming back.
   useEffect(() => {
     if (pendingPromptHandled.current) return;
     const pendingPrompt = sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
@@ -1346,38 +1347,32 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       pendingPromptHandled.current = true;
       setPollingActive(true);
       sessionStorage.removeItem(`opencode_pending_prompt:${sessionId}`);
+      sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
 
       // Restore agent/model/variant selections from the dashboard
-      let pendingOptions: Record<string, unknown> | null = null;
+      const options: Record<string, unknown> = {};
       try {
         const raw = sessionStorage.getItem(`opencode_pending_options:${sessionId}`);
         if (raw) {
-          pendingOptions = JSON.parse(raw);
+          const pendingOptions = JSON.parse(raw);
           sessionStorage.removeItem(`opencode_pending_options:${sessionId}`);
-          if (pendingOptions?.agent) local.agent.set(pendingOptions.agent as string);
-          if (pendingOptions?.model) local.model.set(pendingOptions.model as { providerID: string; modelID: string });
-          if (pendingOptions?.variant) local.model.variant.set(pendingOptions.variant as string);
+          if (pendingOptions?.agent) { options.agent = pendingOptions.agent; local.agent.set(pendingOptions.agent as string); }
+          if (pendingOptions?.model) { options.model = pendingOptions.model; local.model.set(pendingOptions.model as { providerID: string; modelID: string }); }
+          if (pendingOptions?.variant) { options.variant = pendingOptions.variant; local.model.variant.set(pendingOptions.variant as string); }
         }
       } catch {
         // ignore
       }
 
-      // If the dashboard's send failed, retry it here
-      const sendFailed = sessionStorage.getItem(`opencode_pending_send_failed:${sessionId}`);
-      if (sendFailed) {
-        sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
-        const options: Record<string, unknown> = {};
-        if (pendingOptions?.agent) options.agent = pendingOptions.agent;
-        if (pendingOptions?.model) options.model = pendingOptions.model;
-        if (pendingOptions?.variant) options.variant = pendingOptions.variant;
-        sendMessage.mutateAsync({
-          sessionId,
-          parts: [{ type: 'text', text: pendingPrompt }],
-          options: Object.keys(options).length > 0 ? options as any : undefined,
-        }).catch(() => {
-          // ignore — SSE will surface this now that listener is active
-        });
-      }
+      // Send the message now that this component is mounted and listening for events
+      sendMessage.mutateAsync({
+        sessionId,
+        parts: [{ type: 'text', text: pendingPrompt }],
+        options: Object.keys(options).length > 0 ? options as any : undefined,
+      }).catch(() => {
+        // If send fails, clear optimistic display so user can retry manually
+        setOptimisticPrompt(null);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
