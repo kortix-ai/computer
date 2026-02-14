@@ -1340,6 +1340,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // The dashboard/project page stores the prompt in sessionStorage and navigates here.
   // We send the message from here (not the dashboard) so that SSE listeners and polling
   // are already active when the response starts streaming back.
+  // Retries up to 3 times on failure (e.g. "Unable to connect" errors).
   useEffect(() => {
     if (pendingPromptHandled.current) return;
     const pendingPrompt = sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
@@ -1364,15 +1365,28 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         // ignore
       }
 
-      // Send the message now that this component is mounted and listening for events
-      sendMessage.mutateAsync({
-        sessionId,
-        parts: [{ type: 'text', text: pendingPrompt }],
-        options: Object.keys(options).length > 0 ? options as any : undefined,
-      }).catch(() => {
-        // If send fails, clear optimistic display so user can retry manually
-        setOptimisticPrompt(null);
-      });
+      // Send the message with retries
+      const sendOpts = Object.keys(options).length > 0 ? options as any : undefined;
+      const maxRetries = 3;
+      let attempt = 0;
+      const trySend = () => {
+        attempt++;
+        sendMessage.mutateAsync({
+          sessionId,
+          parts: [{ type: 'text', text: pendingPrompt }],
+          options: sendOpts,
+        }).catch(() => {
+          if (attempt < maxRetries) {
+            // Exponential backoff: 1s, 2s, 4s
+            setTimeout(trySend, 1000 * Math.pow(2, attempt - 1));
+          } else {
+            // All retries failed — clear optimistic display so user can retry manually
+            setOptimisticPrompt(null);
+            setPollingActive(false);
+          }
+        });
+      };
+      trySend();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
