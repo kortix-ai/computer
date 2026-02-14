@@ -11,7 +11,6 @@ import { useApiHealth } from '@/hooks/usage/use-health';
 import { useAdminRole } from '@/hooks/admin';
 import { usePresence } from '@/hooks/use-presence';
 import { featureFlags } from '@/lib/feature-flags';
-import { usePrefetchComposioIcons } from '@/hooks/composio/use-composio';
 
 import { useProjects } from '@/hooks/threads/use-project';
 import { useIsMobile } from '@/hooks/utils';
@@ -281,20 +280,11 @@ export default function DashboardLayoutContent({
   const { data: adminRoleData, isLoading: isCheckingAdminRole } = useAdminRole();
   const isAdmin = adminRoleData?.isAdmin ?? false;
   
-  // Prefetch popular Composio icons for faster UI
-  const { prefetchPopularIcons } = usePrefetchComposioIcons();
-
   useEffect(() => {
     if (user) {
       backendApi.post('/prewarm', undefined, { showErrors: false });
     }
   }, [user])
-  
-  useEffect(() => {
-    if (user) {
-      prefetchPopularIcons();
-    }
-  }, [user, prefetchPopularIcons]);
 
   // Log data prefetching for debugging
   useEffect(() => {

@@ -27,7 +27,6 @@ import {
 import { cn } from '@/lib/utils';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { AgentAvatar } from '@/components/thread/content/agent-avatar';
-import { useComposioToolkitIcon } from '@/hooks/composio/use-composio';
 
 // Unified agent card variants
 export type AgentCardVariant = 
@@ -251,65 +250,17 @@ const TagList: React.FC<{ tags?: string[]; maxTags?: number }> = ({ tags, maxTag
 );
 
 // Integration logo component
-const extractAppInfo = (qualifiedName: string, customType?: string) => {
-  if (qualifiedName?.startsWith('composio.')) {
-    const extractedSlug = qualifiedName.substring(9);
-    if (extractedSlug) {
-      return { type: 'composio', slug: extractedSlug };
-    }
-  }
-  
-  if (customType === 'composio') {
-    if (qualifiedName?.startsWith('composio.')) {
-      const extractedSlug = qualifiedName.substring(9);
-      if (extractedSlug) {
-        return { type: 'composio', slug: extractedSlug };
-      }
-    }
-  }
-  
-  return null;
-};
-
 const IntegrationLogo: React.FC<{ 
   qualifiedName: string; 
   displayName: string; 
   customType?: string;
   toolkitSlug?: string;
 }> = ({ qualifiedName, displayName, customType, toolkitSlug }) => {
-  let appInfo = extractAppInfo(qualifiedName, customType);
-  
-  if (!appInfo && toolkitSlug) {
-    appInfo = { type: 'composio', slug: toolkitSlug };
-  }
-  
-  const { data: composioIconData } = useComposioToolkitIcon(
-    appInfo?.type === 'composio' ? appInfo.slug : '',
-    { enabled: appInfo?.type === 'composio' }
-  );
-  
-  let logoUrl: string | undefined;
-  if (appInfo?.type === 'composio') {
-    logoUrl = composioIconData?.icon_url;
-  }
-
   const firstLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 overflow-hidden rounded-md">
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt={displayName}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.style.display = 'none';
-            target.nextElementSibling?.classList.remove('hidden');
-          }}
-        />
-      ) : null}
-      <div className={logoUrl ? "hidden" : "flex w-full h-full items-center justify-center bg-muted rounded-md text-xs font-medium text-muted-foreground"}>
+      <div className="flex w-full h-full items-center justify-center bg-muted rounded-md text-xs font-medium text-muted-foreground">
         {firstLetter}
       </div>
     </div>

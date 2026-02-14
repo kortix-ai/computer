@@ -25,7 +25,6 @@ import { LoadingState } from '../shared/LoadingState';
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { extractDiscoverMcpToolsData } from './_utils';
-import { useComposioToolkitIcon } from '@/hooks/composio/use-composio';
 
 export function DiscoverMcpToolsForAgentToolView({
   toolCall,
@@ -48,11 +47,6 @@ export function DiscoverMcpToolsForAgentToolView({
   ) : null;
 
   const toolkit_slug = extractedData?.toolkit_slug || null;
-
-  // Hook must be called unconditionally - use safe default
-  const { data: iconData } = useComposioToolkitIcon(toolkit_slug || '', {
-    enabled: !!toolkit_slug
-  });
 
   // Defensive check - ensure toolCall is defined
   if (!toolCall || !extractedData) {
@@ -129,23 +123,7 @@ export function DiscoverMcpToolsForAgentToolView({
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-muted/50 border flex items-center justify-center overflow-hidden">
-                      {iconData?.icon_url ? (
-                        <img
-                          src={iconData.icon_url}
-                          alt={`${toolkit_name} logo`}
-                          className="w-8 h-8 object-cover rounded"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent) {
-                              parent.innerHTML = `<div class="w-full h-full flex items-center justify-center"><svg class="w-6 h-6 text-zinc-600 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>`;
-                            }
-                          }}
-                        />
-                      ) : (
-                        <Package className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
-                      )}
+                      <Package className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">

@@ -17,8 +17,6 @@ import {
 import { MCPConfiguration } from './types';
 import { useCredentialProfilesForMcp } from '@/hooks/mcp/use-credential-profiles';
 
-import { useComposioToolkits } from '@/hooks/composio/use-composio';
-
 interface ConfiguredMcpListProps {
   configuredMCPs: MCPConfiguration[];
   onEdit: (index: number) => void;
@@ -26,55 +24,12 @@ interface ConfiguredMcpListProps {
   onConfigureTools?: (index: number) => void;
 }
 
-const extractAppSlug = (mcp: MCPConfiguration): { type: 'composio', slug: string } | null => {
-  if (mcp.customType === 'composio' || mcp.isComposio) {
-    const slug = mcp.toolkitSlug || (mcp as any).toolkit_slug || mcp.config?.toolkit_slug;
-    if (slug) {
-      return { type: 'composio', slug };
-    }
-
-    const qualifiedName = mcp.mcp_qualified_name || mcp.qualifiedName;
-    if (qualifiedName && qualifiedName.startsWith('composio.')) {
-      const extractedSlug = qualifiedName.substring(9);
-      if (extractedSlug) {
-        return { type: 'composio', slug: extractedSlug };
-      }
-    }
-  }
-
-  return null;
-};
-
 const MCPLogo: React.FC<{ mcp: MCPConfiguration }> = ({ mcp }) => {
-  const appInfo = extractAppSlug(mcp);
-
-  const { data: composioToolkits } = useComposioToolkits(
-    appInfo?.type === 'composio' ? appInfo.slug : undefined,
-    undefined
-  );
-
-  let logoUrl: string | undefined;
-  if (appInfo?.type === 'composio' && composioToolkits?.toolkits?.[0]) {
-    logoUrl = composioToolkits.toolkits[0].logo;
-  }
-
   const firstLetter = mcp.name.charAt(0).toUpperCase();
 
   return (
     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 overflow-hidden">
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt={mcp.name}
-          className="w-full h-full object-cover rounded"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.style.display = 'none';
-            target.nextElementSibling?.classList.remove('hidden');
-          }}
-        />
-      ) : null}
-      <div className={logoUrl ? "hidden" : "flex w-full h-full items-center justify-center bg-muted rounded-md text-sm font-medium text-muted-foreground"}>
+      <div className="flex w-full h-full items-center justify-center bg-muted rounded-md text-sm font-medium text-muted-foreground">
         {firstLetter}
       </div>
     </div>
@@ -88,9 +43,7 @@ const MCPConfigurationItem: React.FC<{
   onRemove: (index: number) => void;
   onConfigureTools?: (index: number) => void;
 }> = ({ mcp, index, onEdit, onRemove, onConfigureTools }) => {
-  const qualifiedNameForLookup = (mcp.customType === 'composio' || mcp.isComposio)
-    ? mcp.mcp_qualified_name || mcp.config?.mcp_qualified_name || mcp.qualifiedName
-    : mcp.qualifiedName;
+  const qualifiedNameForLookup = mcp.qualifiedName;
   const { data: profiles = [] } = useCredentialProfilesForMcp(qualifiedNameForLookup);
   const profileId = mcp.selectedProfileId || mcp.config?.profile_id;
   const selectedProfile = profiles.find(p => p.profile_id === profileId);

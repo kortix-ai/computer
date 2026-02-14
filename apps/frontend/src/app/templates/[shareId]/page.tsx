@@ -77,44 +77,6 @@ const IntegrationIcon: React.FC<{
   toolkitSlug?: string;
   size?: number;
 }> = ({ qualifiedName, displayName, customType, toolkitSlug, size = 20 }) => {
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  const extractedSlug = React.useMemo(() => {
-    if (toolkitSlug) return toolkitSlug;
-
-    if (qualifiedName?.startsWith('composio.')) {
-      return qualifiedName.substring(9);
-    }
-
-    if (customType === 'composio' && qualifiedName) {
-      const parts = qualifiedName.split('.');
-      return parts[parts.length - 1];
-    }
-
-    return null;
-  }, [qualifiedName, customType, toolkitSlug]);
-
-  useEffect(() => {
-    if (extractedSlug && !hasError) {
-      setIsLoading(true);
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-      fetch(`${backendUrl}/composio/toolkits/${extractedSlug}/icon`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.icon_url) {
-            setLogoUrl(data.icon_url);
-          }
-          setIsLoading(false);
-        })
-        .catch(() => {
-          setHasError(true);
-          setIsLoading(false);
-        });
-    }
-  }, [extractedSlug, hasError]);
-
   const firstLetter = displayName.charAt(0).toUpperCase();
 
   const iconMap: Record<string, React.JSX.Element> = {
@@ -126,30 +88,6 @@ const IntegrationIcon: React.FC<{
 
   const fallbackIcon = iconMap[qualifiedName.toLowerCase()] ||
     iconMap[customType?.toLowerCase() || ''];
-
-  if (isLoading) {
-    return (
-      <div
-        className="flex items-center justify-center rounded bg-muted animate-pulse"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-
-  if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt={displayName}
-        className="rounded"
-        style={{ width: size, height: size }}
-        onError={() => {
-          setLogoUrl(null);
-          setHasError(true);
-        }}
-      />
-    );
-  }
 
   if (fallbackIcon) {
     return <div className="text-muted-foreground">{fallbackIcon}</div>;
@@ -668,7 +606,7 @@ export default function TemplateSharePage() {
                           <IntegrationIcon
                             qualifiedName={trigger.qualified_name}
                             displayName={appName || trigger.qualified_name}
-                            customType={trigger.custom_type || (trigger.qualified_name?.startsWith('composio.') ? 'composio' : undefined)}
+                            customType={trigger.custom_type}
                             toolkitSlug={trigger.toolkit_slug}
                           />
                           <div className="flex-1 min-w-0">

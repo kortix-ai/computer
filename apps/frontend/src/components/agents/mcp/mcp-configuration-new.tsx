@@ -1,18 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Zap, Server, Store, Settings, Lock } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Server } from 'lucide-react';
 import { MCPConfigurationProps, MCPConfiguration as MCPConfigurationType } from './types';
 import { ConfiguredMcpList } from './configured-mcp-list';
 import { CustomMCPDialog } from './custom-mcp-dialog';
-import { ComposioRegistry } from '../composio/composio-registry';
-import { ComposioToolsManager } from '../composio/composio-tools-manager';
 import { ToolsManager } from './tools-manager';
-import { toast } from '@/lib/toast';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAccountState } from '@/hooks/billing';
-import { usePricingModalStore } from '@/stores/pricing-modal-store';
-import { isLocalMode } from '@/lib/config';
 
 export const MCPConfigurationNew: React.FC<MCPConfigurationProps> = ({
   configuredMCPs,
@@ -24,50 +16,20 @@ export const MCPConfigurationNew: React.FC<MCPConfigurationProps> = ({
   isLoading = false
 }) => {
   const [showCustomDialog, setShowCustomDialog] = useState(false);
-  const [showRegistryDialog, setShowRegistryDialog] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [showComposioToolsManager, setShowComposioToolsManager] = useState(false);
   const [showCustomToolsManager, setShowCustomToolsManager] = useState(false);
   const [selectedMCPForTools, setSelectedMCPForTools] = useState<MCPConfigurationType | null>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(agentId);
-  const queryClient = useQueryClient();
-  
-  const { data: accountState } = useAccountState();
-  const { openPricingModal } = usePricingModalStore();
-  
-  const isFreeTier = accountState && (
-    accountState.subscription?.tier_key === 'free' ||
-    accountState.tier?.name === 'free'
-  ) && !isLocalMode();
-
-  const handleAgentChange = (newAgentId: string | undefined) => {
-    setSelectedAgentId(newAgentId);
-  };
+  const [selectedAgentId] = useState<string | undefined>(agentId);
 
   const handleEditMCP = (index: number) => {
-    const mcp = configuredMCPs[index];
-    if (mcp.customType === 'composio') {
-      setEditingIndex(index);
-      setShowCustomDialog(true);
-    } else {
-      setEditingIndex(index);
-      setShowCustomDialog(true);
-    }
+    setEditingIndex(index);
+    setShowCustomDialog(true);
   };
 
   const handleConfigureTools = (index: number) => {
     const mcp = configuredMCPs[index];
     setSelectedMCPForTools(mcp);
-    if (mcp.customType === 'composio') {
-      const profileId = mcp.selectedProfileId || mcp.config?.profile_id;
-      if (profileId) {
-        setShowComposioToolsManager(true);
-      } else {
-        console.warn('Composio MCP has no profile_id:', mcp);
-      }
-    } else {
-      setShowCustomToolsManager(true);
-    }
+    setShowCustomToolsManager(true);
   };
 
   const handleRemoveMCP = (index: number) => {
@@ -88,15 +50,6 @@ export const MCPConfigurationNew: React.FC<MCPConfigurationProps> = ({
     onConfigurationChange([...configuredMCPs, mcpConfig]);
   };
 
-  const handleToolsSelected = (profileId: string, selectedTools: string[], appName: string, appSlug: string) => {
-    setShowRegistryDialog(false);
-    if (selectedAgentId) {
-      queryClient.invalidateQueries({ queryKey: ['agents', 'detail', selectedAgentId] });
-    }
-    queryClient.invalidateQueries({ queryKey: ['composio', 'profiles'] });
-    toast.success(`Connected ${appName} integration!`);
-  };
-
   const handleCustomToolsUpdate = (enabledTools: string[]) => {
     if (!selectedMCPForTools) return;
 
@@ -114,16 +67,6 @@ export const MCPConfigurationNew: React.FC<MCPConfigurationProps> = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          <Button 
-            onClick={() => setShowRegistryDialog(true)} 
-            size="sm" 
-            variant={isFreeTier ? "outline" : "default"} 
-            className={isFreeTier ? "gap-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground" : "gap-2"} 
-            type="button"
-          >
-            {isFreeTier ? <Lock className="h-4 w-4" /> : <Store className="h-4 w-4" />}
-            Browse Apps
-          </Button>
           <Button onClick={() => setShowCustomDialog(true)} size="sm" variant="outline" className="gap-2" type="button">
             <Server className="h-4 w-4" />
             Custom MCP
@@ -156,45 +99,12 @@ export const MCPConfigurationNew: React.FC<MCPConfigurationProps> = ({
         </div>
       )}
 
-      <Dialog open={showRegistryDialog} onOpenChange={setShowRegistryDialog}>
-        <DialogContent className="p-0 max-w-6xl h-[90vh] overflow-hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Select Integration</DialogTitle>
-          </DialogHeader>
-          <ComposioRegistry
-            showAgentSelector={false}
-            selectedAgentId={selectedAgentId}
-            onAgentChange={handleAgentChange}
-            onToolsSelected={handleToolsSelected}
-            onClose={() => {
-              setShowRegistryDialog(false);
-              if (selectedAgentId) {
-                queryClient.invalidateQueries({ queryKey: ['agents', 'detail', selectedAgentId] });
-              }
-            }}
-            isBlocked={isFreeTier}
-            onBlockedClick={() => openPricingModal()}
-          />
-        </DialogContent>
-      </Dialog>
       <CustomMCPDialog
         open={showCustomDialog}
         onOpenChange={setShowCustomDialog}
         onSave={handleSaveCustomMCP}
       />
-      {selectedMCPForTools && selectedMCPForTools.customType === 'composio' && (selectedMCPForTools.selectedProfileId || selectedMCPForTools.config?.profile_id) && (
-        <ComposioToolsManager
-          agentId={selectedAgentId || ''}
-          open={showComposioToolsManager}
-          onOpenChange={setShowComposioToolsManager}
-          profileId={selectedMCPForTools.selectedProfileId || selectedMCPForTools.config?.profile_id}
-          onToolsUpdate={() => {
-            setShowComposioToolsManager(false);
-            setSelectedMCPForTools(null);
-          }}
-        />
-      )}
-      {selectedMCPForTools && selectedMCPForTools.customType !== 'composio' && (
+      {selectedMCPForTools && (
         <ToolsManager
           mode="custom"
           agentId={selectedAgentId ?? ''}

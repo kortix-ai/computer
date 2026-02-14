@@ -6,9 +6,7 @@ export interface MCPConfiguration {
   enabledTools: string[];
   selectedProfileId?: string;
   isCustom?: boolean;
-  customType?: 'http' | 'sse' | 'composio';
-  isComposio?: boolean;
-  toolkitSlug?: string;
+  customType?: 'http' | 'sse';
 }
   
 export interface MCPConfigurationProps {

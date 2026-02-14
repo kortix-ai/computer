@@ -7,11 +7,10 @@ export interface SetupStep {
   id: string;
   title: string;
   description: string;
-  type: 'credential_profile' | 'composio_profile' | 'custom_server';
+  type: 'credential_profile' | 'custom_server';
   service_name: string;
   qualified_name: string;
   custom_type?: string;
   required_config?: string[];
-  app_slug?: string;
-  app_name?: string;
+
 }
