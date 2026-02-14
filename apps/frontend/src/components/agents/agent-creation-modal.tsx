@@ -64,7 +64,7 @@ export function AgentCreationModal({ open, onOpenChange, onSuccess }: AgentCreat
       createNewAgentMutation.mutate(undefined, {
         onSuccess: (newAgent) => {
           onOpenChange(false);
-          router.push(`/agents/config/${newAgent.agent_id}`);
+          router.push(`/agents`);
         },
         onError: (error) => {
           if (error instanceof AgentCountLimitError) {
@@ -98,7 +98,7 @@ export function AgentCreationModal({ open, onOpenChange, onSuccess }: AgentCreat
 
       toast.success(`Created "${result.name}"!`, { id: 'agent-setup' });
       onOpenChange(false);
-      router.push(`/agents/config/${result.agent_id}`);
+      router.push(`/agents`);
 
     } catch (error: any) {
       toast.error('Failed to create Worker', { id: 'agent-setup' });
