@@ -1,7 +1,7 @@
 /**
  * Cloud-mode sandbox router.
  *
- * DB-backed sandbox lifecycle. Mounted at /v1/sandbox in cloud mode.
+ * DB-backed sandbox lifecycle. Mounted at /v1/platform/sandbox in cloud mode.
  * Same route shape as sandbox-local.ts so the frontend has ONE interface.
  *
  * Routes:
@@ -107,7 +107,7 @@ export function createCloudSandboxRouter(
 
       if (!sandbox) {
         return c.json(
-          { success: false, error: 'No sandbox found. Call POST /v1/sandbox to create one.' },
+          { success: false, error: 'No sandbox found. Call POST /v1/platform/sandbox to create one.' },
           404,
         );
       }

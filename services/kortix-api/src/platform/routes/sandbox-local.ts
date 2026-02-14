@@ -4,7 +4,7 @@
  * Manages the SINGLE local Docker sandbox via LocalDockerProvider.
  * Fixed ports (SANDBOX_PORT_BASE..SANDBOX_PORT_BASE+6), container name always `kortix-sandbox`.
  *
- * Routes (mounted at /v1/sandbox):
+ * Routes (mounted at /v1/platform/sandbox):
  *   GET    /          → Get the sandbox (or 404 if none exists)
  *   POST   /          → Ensure sandbox is running (idempotent create-or-start)
  *   POST   /stop      → Stop the sandbox
@@ -55,7 +55,7 @@ export function createLocalSandboxRouter(): Hono<{ Variables: AuthVariables }> {
 
       if (!info) {
         return c.json(
-          { success: false, error: 'No sandbox found. Call POST /v1/sandbox to create one.' },
+          { success: false, error: 'No sandbox found. Call POST /v1/platform/sandbox to create one.' },
           404,
         );
       }
