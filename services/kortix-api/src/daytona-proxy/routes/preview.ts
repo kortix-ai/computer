@@ -68,6 +68,7 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
 
   try {
     // Find sandbox by externalId (the Daytona sandbox ID) in kortix.sandboxes
+    console.log(`[PREVIEW] Ownership check: sandboxId=${sandboxId}, userId=${userId}`);
     const [sandbox] = await db
       .select({ accountId: sandboxes.accountId })
       .from(sandboxes)
@@ -80,9 +81,12 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
       .limit(1);
 
     if (!sandbox) {
+      console.warn(`[PREVIEW] No active sandbox found for externalId=${sandboxId}`);
       setCachedOwnership(sandboxId, userId, false);
       return false;
     }
+
+    console.log(`[PREVIEW] Sandbox found: accountId=${sandbox.accountId}`);
 
     // Check if user belongs to the account that owns this sandbox
     const [membership] = await db
@@ -97,6 +101,7 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
       .limit(1);
 
     const allowed = !!membership;
+    console.log(`[PREVIEW] Membership check: allowed=${allowed}, role=${membership?.accountRole}`);
     setCachedOwnership(sandboxId, userId, allowed);
     return allowed;
   } catch (err) {
@@ -170,10 +175,13 @@ preview.all('/:sandboxId/:port/*', async (c) => {
   }
 
   // 3. Build path & query (invariant across retries)
+  // c.req.url includes the full mount prefix (e.g. /v1/preview/{sandboxId}/{port}/agent)
+  // so we use indexOf instead of startsWith to find /{sandboxId}/{port} anywhere in the path
   const fullPath = new URL(c.req.url).pathname;
   const prefixPattern = `/${sandboxId}/${portStr}`;
-  const remainingPath = fullPath.startsWith(prefixPattern)
-    ? fullPath.slice(prefixPattern.length) || '/'
+  const prefixIndex = fullPath.indexOf(prefixPattern);
+  const remainingPath = prefixIndex !== -1
+    ? fullPath.slice(prefixIndex + prefixPattern.length) || '/'
     : '/';
   const upstreamUrl = new URL(c.req.url);
   upstreamUrl.searchParams.delete('token');

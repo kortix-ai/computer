@@ -37,14 +37,14 @@ export function ProjectSelector({
   const pathname = usePathname();
 
   const sortedProjects = useMemo(() => {
-    if (!projects) return [];
+    if (!Array.isArray(projects)) return [];
     return [...projects].sort((a, b) => {
       // Global project always first
       const aIsGlobal = a.id === 'global' || a.worktree === '/';
       const bIsGlobal = b.id === 'global' || b.worktree === '/';
       if (aIsGlobal && !bIsGlobal) return -1;
       if (!aIsGlobal && bIsGlobal) return 1;
-      return b.time.updated - a.time.updated;
+      return (b.time?.updated ?? 0) - (a.time?.updated ?? 0);
     });
   }, [projects]);
 

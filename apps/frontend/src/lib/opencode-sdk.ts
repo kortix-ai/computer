@@ -5,8 +5,8 @@
  * pointed at the currently active server URL. Automatically recreates the
  * client when the server URL changes.
  *
- * For remote instances (e.g. kortix.cloud), the Supabase JWT is injected into
- * every request via a custom fetch wrapper so the preview proxy can authenticate.
+ * For remote instances (cloud sandboxes via the preview proxy), the Supabase JWT
+ * is injected into every request via a custom fetch wrapper so the proxy can authenticate.
  */
 
 import { createOpencodeClient, type OpencodeClient } from '@kortix/opencode-sdk/v2/client';
@@ -18,7 +18,7 @@ let cachedUrl: string | null = null;
 
 /**
  * Create a fetch wrapper that injects the Supabase JWT into every request.
- * Remote instances (kortix.cloud) require this for the preview proxy auth.
+ * Remote instances (cloud sandboxes) require this for the preview proxy auth.
  * Local instances will simply ignore the extra header.
  */
 function createAuthFetch(): typeof fetch {

@@ -99,9 +99,11 @@ export function useOpenCodeLocal({
   // ---- Flatten models from providers (only connected) ----
   const flatModels = useMemo<FlatModel[]>(() => {
     if (!providers) return [];
+    const all = Array.isArray(providers.all) ? providers.all : [];
+    const connected = Array.isArray(providers.connected) ? providers.connected : [];
     const result: FlatModel[] = [];
-    for (const p of providers.all) {
-      if (!providers.connected.includes(p.id)) continue;
+    for (const p of all) {
+      if (!connected.includes(p.id)) continue;
       for (const [modelID, model] of Object.entries(p.models)) {
         const caps = (model as any).capabilities;
         const modalities = (model as any).modalities;
@@ -141,10 +143,12 @@ export function useOpenCodeLocal({
   const isModelValid = useCallback(
     (model: ModelKey): boolean => {
       if (!providers) return false;
-      const provider = providers.all.find((x) => x.id === model.providerID);
+      const all = Array.isArray(providers.all) ? providers.all : [];
+      const connected = Array.isArray(providers.connected) ? providers.connected : [];
+      const provider = all.find((x) => x.id === model.providerID);
       return (
         !!provider?.models[model.modelID] &&
-        providers.connected.includes(model.providerID)
+        connected.includes(model.providerID)
       );
     },
     [providers],
@@ -172,7 +176,7 @@ export function useOpenCodeLocal({
 
   // ---- Agent state ----
   const visibleAgents = useMemo<Agent[]>(
-    () => (rawAgents || []).filter((a) => a.mode !== 'subagent' && !a.hidden),
+    () => (Array.isArray(rawAgents) ? rawAgents : []).filter((a) => a.mode !== 'subagent' && !a.hidden),
     [rawAgents],
   );
 
@@ -214,7 +218,9 @@ export function useOpenCodeLocal({
     // Priority 3: Provider defaults -> first model of first connected provider
     if (providers) {
       const defaults = providers.default || {};
-      const connected = providers.all.filter((p) => providers.connected.includes(p.id));
+      const all = Array.isArray(providers.all) ? providers.all : [];
+      const connectedIds = Array.isArray(providers.connected) ? providers.connected : [];
+      const connected = all.filter((p) => connectedIds.includes(p.id));
       for (const p of connected) {
         const configured = defaults[p.id];
         if (configured) {

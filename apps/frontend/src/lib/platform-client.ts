@@ -34,19 +34,19 @@ export const SANDBOX_PORTS = {
 } as const;
 
 /**
- * Get a direct URL to a sandbox service (no proxy).
+ * Get a direct URL to a sandbox service via the preview proxy.
  *
  * - Local Docker: resolves via `mappedPorts` → `http://localhost:{hostPort}`
- * - Daytona: `https://kortix.cloud/{externalId}/{containerPort}`
+ * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
  * - Manual/unknown: returns null (caller should fall back to proxy)
  */
 export function getDirectPortUrl(
   server: ServerEntry,
   containerPort: string,
 ): string | null {
-  // Daytona: port is embedded in the URL path
+  // Cloud: route through the preview proxy
   if (server.provider === 'daytona' && server.sandboxId) {
-    return `https://kortix.cloud/${server.sandboxId}/${containerPort}`;
+    return `${PLATFORM_URL}/preview/${server.sandboxId}/${containerPort}`;
   }
 
   // Local Docker: look up the random host port from mappedPorts
@@ -151,20 +151,20 @@ async function platformFetch<T>(
 
 /**
  * Build the OpenCode server URL for a sandbox.
- * - Daytona: https://kortix.cloud/{externalId}/8000
+ * - Daytona (cloud): {BACKEND_URL}/preview/{externalId}/8000
  * - Local Docker: uses the base_url directly (http://localhost:{port})
  */
 export function getSandboxUrl(sandbox: SandboxInfo): string {
   if (sandbox.provider === 'local_docker') {
     return sandbox.base_url;
   }
-  return `https://kortix.cloud/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
+  return `${PLATFORM_URL}/preview/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
 }
 
 /**
  * Build a URL to access a specific container port on a sandbox.
  *
- * - Daytona: `https://kortix.cloud/{externalId}/{containerPort}`
+ * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
  * - Local Docker: reads `metadata.mappedPorts[containerPort]` →
  *   `http://localhost:{hostPort}`. Returns null if no mapping exists.
  * - Falls back to null if the port can't be resolved.
@@ -174,7 +174,7 @@ export function getSandboxPortUrl(
   containerPort: string,
 ): string | null {
   if (sandbox.provider === 'daytona' || (!sandbox.provider && sandbox.external_id)) {
-    return `https://kortix.cloud/${sandbox.external_id}/${containerPort}`;
+    return `${PLATFORM_URL}/preview/${sandbox.external_id}/${containerPort}`;
   }
 
   if (sandbox.provider === 'local_docker') {
