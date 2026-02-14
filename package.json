@@ -16,6 +16,14 @@
     "docker:up:backend": "docker compose --profile backend up -d",
     "docker:up:frontend": "docker compose --profile frontend up -d",
     "docker:down": "docker compose --profile all down",
+    "local:up": "docker compose -f docker-compose.local.yml up --build",
+    "local:up:bg": "docker compose -f docker-compose.local.yml up --build -d",
+    "local:down": "docker compose -f docker-compose.local.yml down",
+    "local:logs": "docker compose -f docker-compose.local.yml logs -f",
+    "local:restart": "docker compose -f docker-compose.local.yml down && docker compose -f docker-compose.local.yml up --build -d",
+    "setup": "bash scripts/install.sh --setup-only",
+    "kortix": "bash scripts/kortix.sh",
+    "test:cli": "bash scripts/tests/run-all.sh",
     "graph": "nx graph"
   },
   "devDependencies": {
