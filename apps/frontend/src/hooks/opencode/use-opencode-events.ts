@@ -29,14 +29,23 @@ export function useOpenCodeEventStream() {
   const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
   const clearPending = useOpenCodePendingStore((s) => s.clear);
   const serverVersion = useServerStore((s) => s.serverVersion);
+  const urlVersion = useServerStore((s) => s.urlVersion);
   const abortRef = useRef<AbortController | null>(null);
+  const prevServerVersionRef = useRef(serverVersion);
 
   useEffect(() => {
-    // On every server change: nuke all opencode caches, clear session statuses, clear pending
+    // Always reset the client so it picks up the new URL
     resetClient();
-    clearStatuses({});
-    clearPending();
-    queryClient.removeQueries({ queryKey: opcodeKeys.all });
+
+    // Only nuke caches on actual server switches (not URL/port updates)
+    const isServerSwitch = prevServerVersionRef.current !== serverVersion;
+    prevServerVersionRef.current = serverVersion;
+
+    if (isServerSwitch) {
+      clearStatuses({});
+      clearPending();
+      queryClient.removeQueries({ queryKey: opcodeKeys.all });
+    }
 
     const client = getClient();
 
@@ -403,7 +412,7 @@ export function useOpenCodeEventStream() {
       abortRef.current = null;
       if (flushTimer) clearTimeout(flushTimer);
     };
-  }, [queryClient, setStatus, clearStatuses, addPermission, removePermission, addQuestion, removeQuestion, clearPending, serverVersion]);
+  }, [queryClient, setStatus, clearStatuses, addPermission, removePermission, addQuestion, removeQuestion, clearPending, serverVersion, urlVersion]);
 }
 
 // Use the correct key reference

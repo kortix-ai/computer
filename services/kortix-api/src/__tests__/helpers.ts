@@ -15,7 +15,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
-import { createDb, type Database, sandboxes, triggers, executions } from '@kortix/db';
+import { createDb, type Database, sandboxes, triggers, executions, deployments } from '@kortix/db';
 import { BillingError } from '../errors';
 import type { AuthVariables } from '../types';
 
@@ -165,6 +165,8 @@ export interface TestAppOptions {
   mountCron?: boolean;
   /** Whether to mount platform routes (requires DATABASE_URL). Default: true if DATABASE_URL set */
   mountPlatform?: boolean;
+  /** Whether to mount deployment routes (requires DATABASE_URL). Default: false */
+  mountDeployments?: boolean;
 }
 
 /**
@@ -207,7 +209,7 @@ export function createTestApp(opts: TestAppOptions = {}) {
 
   // ─── Version (no auth — does NOT import db) ────────────────────────────
   // version.ts has zero db imports, safe to require unconditionally
-  const { versionRouter } = require('../routes/version');
+  const { versionRouter } = require('../platform/routes/version');
   app.route('/v1/sandbox/version', versionRouter);
 
   // ─── Auth stub for all /v1/* routes that need it ───────────────────────
@@ -221,7 +223,7 @@ export function createTestApp(opts: TestAppOptions = {}) {
   const shouldMountPlatform = opts.mountPlatform !== false && hasDb;
   if (shouldMountPlatform) {
     try {
-      const { createAccountRouter } = require('../routes/platform');
+      const { createAccountRouter } = require('../platform/routes/account');
       const db = getTestDb();
 
       const providerMap = new Map<ProviderName, SandboxProvider>();
@@ -263,15 +265,25 @@ export function createTestApp(opts: TestAppOptions = {}) {
   // ─── Cron routes (module-level db — requires DATABASE_URL) ─────────────
   if (opts.mountCron && hasDb) {
     try {
-      const { sandboxesRouter } = require('../routes/cron-sandboxes');
-      const { triggersRouter } = require('../routes/cron-triggers');
-      const { executionsRouter } = require('../routes/cron-executions');
+      const { sandboxesRouter } = require('../cron/routes/sandboxes');
+      const { triggersRouter } = require('../cron/routes/triggers');
+      const { executionsRouter } = require('../cron/routes/executions');
 
       app.route('/v1/sandboxes', sandboxesRouter);
       app.route('/v1/triggers', triggersRouter);
       app.route('/v1/executions', executionsRouter);
     } catch (e) {
       console.warn('[test] Failed to mount cron routes:', e);
+    }
+  }
+
+  // ─── Deployment routes (module-level db — requires DATABASE_URL) ───────
+  if (opts.mountDeployments && hasDb) {
+    try {
+      const { deploymentsRouter } = require('../deployments/routes/deployments');
+      app.route('/v1/deployments', deploymentsRouter);
+    } catch (e) {
+      console.warn('[test] Failed to mount deployment routes:', e);
     }
   }
 
@@ -316,6 +328,7 @@ export function createTestApp(opts: TestAppOptions = {}) {
  */
 export async function cleanupTestData(): Promise<void> {
   const db = getTestDb();
+  await db.delete(deployments).execute();
   await db.delete(executions).execute();
   await db.delete(triggers).execute();
   await db.delete(sandboxes).execute();

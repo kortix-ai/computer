@@ -10,9 +10,9 @@
  * The hook is idempotent — calling init multiple times returns the
  * same sandbox if one already exists.
  *
- * In LOCAL mode, the platform API is skipped entirely — the user's
- * default server (NEXT_PUBLIC_OPENCODE_URL) is used directly.
- * Instances can be added manually via the Instance Manager dialog.
+ * In LOCAL mode, kortix-api runs without a database and uses Docker
+ * containers directly as the source of truth. The same platform API
+ * endpoints work — they just talk to Docker instead of Postgres.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -28,13 +28,15 @@ import { useServerStore } from '@/stores/server-store';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useRef } from 'react';
 
-const IS_LOCAL = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
-
 const SANDBOX_SERVER_ID = 'cloud-sandbox';
 
 /**
  * Register (or update) the sandbox as a server entry in the server store
  * and set it as the active server if no other server is active.
+ *
+ * Uses updateServerSilent for URL/port updates so that only the connection
+ * health monitor re-verifies — the SSE event stream is NOT disrupted and
+ * cached queries are NOT nuked.
  */
 function registerSandboxServer(sandbox: SandboxInfo) {
   const store = useServerStore.getState();
@@ -43,27 +45,13 @@ function registerSandboxServer(sandbox: SandboxInfo) {
   const existing = store.servers.find((s) => s.id === SANDBOX_SERVER_ID);
 
   if (existing) {
-    // Update URL / mappedPorts if they changed (e.g. sandbox was reprovisioned)
-    const urlChanged = existing.url !== url;
-    const portsChanged =
-      JSON.stringify(existing.mappedPorts) !== JSON.stringify(mappedPorts);
-
-    if (urlChanged || portsChanged) {
-      useServerStore.setState((state) => ({
-        servers: state.servers.map((s) =>
-          s.id === SANDBOX_SERVER_ID
-            ? {
-                ...s,
-                url: urlChanged ? url : s.url,
-                label: sandbox.name || s.label,
-                mappedPorts,
-              }
-            : s,
-        ),
-        // Bump version if the URL changed so subscribers reconnect
-        ...(urlChanged ? { serverVersion: state.serverVersion + 1 } : {}),
-      }));
-    }
+    // Silently update URL / mappedPorts — no serverVersion bump.
+    // This avoids nuking the SSE stream and query caches on port changes.
+    store.updateServerSilent(SANDBOX_SERVER_ID, {
+      url,
+      label: sandbox.name || existing.label,
+      mappedPorts,
+    });
   } else {
     // Add new server entry for the sandbox
     // We manually set the state to inject our known ID
@@ -99,10 +87,7 @@ export function useSandbox() {
       const result = await initAccount();
       return result.sandbox;
     },
-    // In local mode, skip the platform API entirely.
-    // The user's default server (from NEXT_PUBLIC_OPENCODE_URL) is used directly;
-    // additional instances can be added manually via the Instance Manager.
-    enabled: !!user && !IS_LOCAL,
+    enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes — sandbox doesn't change often
     retry: 2,
     refetchOnWindowFocus: false,
@@ -132,7 +117,6 @@ export function useSandbox() {
 
 /**
  * useProviders — fetch available sandbox providers from the platform.
- * Disabled in local mode (no kortix-api to query).
  */
 export function useProviders() {
   const { user } = useAuth();
@@ -140,7 +124,7 @@ export function useProviders() {
   return useQuery({
     queryKey: ['platform', 'providers'],
     queryFn: getProviders,
-    enabled: !!user && !IS_LOCAL,
+    enabled: !!user,
     staleTime: 10 * 60 * 1000, // 10 minutes
     retry: 1,
     refetchOnWindowFocus: false,

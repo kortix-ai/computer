@@ -79,7 +79,19 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
       }
     }
 
-    return new Response(response.body, {
+    // Check if this is a streaming response — pass body as stream
+    const contentType = responseHeaders.get('content-type') || ''
+    if (contentType.includes('text/event-stream') || contentType.includes('application/octet-stream')) {
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      })
+    }
+
+    // Buffer the response body to avoid Bun ReadableStream proxy issues
+    const body = await response.arrayBuffer()
+    return new Response(body, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,

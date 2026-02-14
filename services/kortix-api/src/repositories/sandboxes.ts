@@ -1,6 +1,6 @@
 import { eq, and } from 'drizzle-orm';
 import { sandboxes } from '@kortix/db';
-import { db } from '../db';
+import { db } from '../shared/db';
 
 export interface SandboxTokenResult {
   isValid: boolean;

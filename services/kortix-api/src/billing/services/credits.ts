@@ -1,0 +1,228 @@
+import { getSupabase } from '../../shared/supabase';
+import {
+  getCreditAccount,
+  getCreditBalance,
+  updateCreditAccount,
+} from '../repositories/credit-accounts';
+import { insertLedgerEntry } from '../repositories/transactions';
+import { InsufficientCreditsError } from '../../errors';
+import { TOKEN_PRICE_MULTIPLIER, MINIMUM_CREDIT_FOR_RUN, getDailyCreditConfig } from './tiers';
+
+export async function getBalance(accountId: string) {
+  const row = await getCreditBalance(accountId);
+  if (!row) return { balance: 0, expiring: 0, nonExpiring: 0, daily: 0 };
+
+  return {
+    balance: Number(row.balance),
+    expiring: Number(row.expiringCredits),
+    nonExpiring: Number(row.nonExpiringCredits),
+    daily: Number(row.dailyCreditsBalance),
+  };
+}
+
+export async function getCreditSummary(accountId: string) {
+  const account = await getCreditAccount(accountId);
+  if (!account) {
+    return { total: 0, daily: 0, monthly: 0, extra: 0, canRun: false };
+  }
+
+  const daily = Number(account.dailyCreditsBalance) || 0;
+  const monthly = Number(account.expiringCredits) || 0;
+  const extra = Number(account.nonExpiringCredits) || 0;
+  const total = Number(account.balance) || 0;
+
+  return {
+    total,
+    daily,
+    monthly,
+    extra,
+    canRun: total >= MINIMUM_CREDIT_FOR_RUN,
+  };
+}
+
+export async function deductCredits(
+  accountId: string,
+  amount: number,
+  description: string,
+  threadId?: string,
+  messageId?: string,
+) {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase.rpc('atomic_use_credits', {
+    p_account_id: accountId,
+    p_amount: amount,
+    p_description: description,
+    p_thread_id: threadId ?? null,
+    p_message_id: messageId ?? null,
+  });
+
+  if (error) {
+    console.error('[Credits] Deduction RPC error:', error);
+    throw new InsufficientCreditsError(0, amount);
+  }
+
+  const result = data as {
+    success: boolean;
+    error?: string;
+    amount_deducted?: number;
+    new_total?: number;
+    transaction_id?: string;
+  };
+
+  if (!result.success) {
+    throw new InsufficientCreditsError(0, amount);
+  }
+
+  return {
+    success: true,
+    cost: result.amount_deducted ?? amount,
+    newBalance: result.new_total ?? 0,
+    transactionId: result.transaction_id,
+  };
+}
+
+interface ModelPricing {
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  cachedInputPricePerMillion?: number;
+}
+
+const MODEL_PRICING: Record<string, ModelPricing> = {
+  'claude-3-5-sonnet': { inputPricePerMillion: 3, outputPricePerMillion: 15 },
+  'claude-3-5-haiku': { inputPricePerMillion: 0.25, outputPricePerMillion: 1.25 },
+  'claude-sonnet-4-5': { inputPricePerMillion: 3, outputPricePerMillion: 15 },
+  'claude-haiku-4-5': { inputPricePerMillion: 0.25, outputPricePerMillion: 1.25 },
+  'gpt-4o': { inputPricePerMillion: 2.5, outputPricePerMillion: 10 },
+  'gpt-4o-mini': { inputPricePerMillion: 0.15, outputPricePerMillion: 0.6 },
+  'o1': { inputPricePerMillion: 15, outputPricePerMillion: 60 },
+  'o1-mini': { inputPricePerMillion: 1.1, outputPricePerMillion: 4.4 },
+  'o3-mini': { inputPricePerMillion: 1.1, outputPricePerMillion: 4.4 },
+  'grok-2': { inputPricePerMillion: 2, outputPricePerMillion: 10 },
+  'gemini-2.0-flash': { inputPricePerMillion: 0.1, outputPricePerMillion: 0.4 },
+  'gemini-2.0-pro': { inputPricePerMillion: 1.25, outputPricePerMillion: 10 },
+  'deepseek-r1': { inputPricePerMillion: 3, outputPricePerMillion: 8 },
+  'deepseek-v3': { inputPricePerMillion: 0.5, outputPricePerMillion: 1.5 },
+};
+
+function getModelPricing(model: string): ModelPricing {
+  if (MODEL_PRICING[model]) return MODEL_PRICING[model];
+
+  for (const [key, pricing] of Object.entries(MODEL_PRICING)) {
+    if (model.startsWith(key) || model.includes(key)) return pricing;
+  }
+
+  return { inputPricePerMillion: 2, outputPricePerMillion: 10 };
+}
+
+export function calculateTokenCost(
+  promptTokens: number,
+  completionTokens: number,
+  model: string,
+): number {
+  const pricing = getModelPricing(model);
+  const inputCost = (promptTokens / 1_000_000) * pricing.inputPricePerMillion;
+  const outputCost = (completionTokens / 1_000_000) * pricing.outputPricePerMillion;
+  return (inputCost + outputCost) * TOKEN_PRICE_MULTIPLIER;
+}
+
+export async function grantCredits(
+  accountId: string,
+  amount: number,
+  type: string,
+  description: string,
+  isExpiring: boolean = true,
+  stripeEventId?: string,
+) {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase.rpc('atomic_add_credits', {
+    p_account_id: accountId,
+    p_amount: amount,
+    p_type: type,
+    p_description: description,
+    p_is_expiring: isExpiring,
+    p_stripe_event_id: stripeEventId ?? null,
+  });
+
+  if (error) {
+    console.error('[Credits] Grant RPC error:', error);
+
+    await insertLedgerEntry({
+      accountId,
+      amount: String(amount),
+      balanceAfter: '0',
+      type,
+      description,
+      isExpiring,
+      stripeEventId: stripeEventId ?? null,
+    });
+
+    if (isExpiring) {
+      await updateCreditAccount(accountId, {
+        balance: String(amount),
+        expiringCredits: String(amount),
+      } as any);
+    } else {
+      await updateCreditAccount(accountId, {
+        nonExpiringCredits: String(amount),
+      } as any);
+    }
+  }
+
+  return data;
+}
+
+export async function resetExpiringCredits(accountId: string, newAmount: number) {
+  const supabase = getSupabase();
+
+  const { error } = await supabase.rpc('atomic_reset_expiring_credits', {
+    p_account_id: accountId,
+    p_new_amount: newAmount,
+  });
+
+  if (error) {
+    console.error('[Credits] Reset expiring credits error:', error);
+  }
+}
+
+export async function refreshDailyCredits(accountId: string, tierName: string) {
+  const dailyConfig = getDailyCreditConfig(tierName);
+  if (!dailyConfig) return null;
+
+  const account = await getCreditAccount(accountId);
+  if (!account) return null;
+
+  const lastRefresh = account.lastDailyRefresh ? new Date(account.lastDailyRefresh) : null;
+  const now = new Date();
+
+  if (lastRefresh) {
+    const hoursSinceRefresh = (now.getTime() - lastRefresh.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceRefresh < dailyConfig.refreshIntervalHours) return null;
+  }
+
+  const currentDaily = Number(account.dailyCreditsBalance) || 0;
+  const newDaily = Math.min(currentDaily + dailyConfig.dailyAmount, dailyConfig.maxAccumulation);
+  const granted = newDaily - currentDaily;
+
+  if (granted <= 0) return null;
+
+  const currentBalance = Number(account.balance) || 0;
+
+  await updateCreditAccount(accountId, {
+    dailyCreditsBalance: String(newDaily),
+    balance: String(currentBalance + granted),
+    lastDailyRefresh: now.toISOString(),
+  } as any);
+
+  await insertLedgerEntry({
+    accountId,
+    amount: String(granted),
+    balanceAfter: String(currentBalance + granted),
+    type: 'daily_refresh',
+    description: `Daily credit refresh: +$${granted.toFixed(2)}`,
+    isExpiring: true,
+  });
+
+  return { granted, newDaily, newBalance: currentBalance + granted };
+}

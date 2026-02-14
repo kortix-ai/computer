@@ -5,38 +5,16 @@ import { prettyJSON } from 'hono/pretty-json';
 import { HTTPException } from 'hono/http-exception';
 
 import { config } from './config';
-import { apiKeyAuth, supabaseAuth, supabaseAuthWithQueryParam } from './middleware/auth';
 import { BillingError } from './errors';
-import { getSchedulerStatus } from './services/scheduler/index';
 
-// ─── Route Imports ──────────────────────────────────────────────────────────
+// ─── Sub-Service Imports ────────────────────────────────────────────────────
 
-// Search & LLM routes (apiKeyAuth)
-import { webSearch } from './routes/search-web';
-import { imageSearch } from './routes/search-image';
-import { llm } from './routes/llm';
-
-// Proxy routes (handles own auth internally)
-import { proxy } from './routes/proxy';
-
-// Billing routes (supabaseAuth)
-import { accountStateRouter } from './routes/billing/account-state';
-import { subscriptionsRouter } from './routes/billing/subscriptions';
-import { paymentsRouter } from './routes/billing/payments';
-import { creditsRouter } from './routes/billing/credits';
-import { webhooksRouter } from './routes/billing/webhooks';
-
-// Platform route (supabaseAuth handled internally by createAccountRouter)
-import { accountRouter } from './routes/platform';
-import { versionRouter } from './routes/version';
-
-// Cron routes (supabaseAuth)
-import { sandboxesRouter } from './routes/cron-sandboxes';
-import { triggersRouter } from './routes/cron-triggers';
-import { executionsRouter } from './routes/cron-executions';
-
-// Daytona preview proxy (supabaseAuthWithQueryParam)
-import { preview } from './routes/daytona-proxy';
+import { router } from './router';
+import { billingApp } from './billing';
+import { platformApp } from './platform';
+import { cronApp, startScheduler, stopScheduler, getSchedulerStatus } from './cron';
+import { daytonaProxyApp } from './daytona-proxy';
+import { deploymentsApp } from './deployments';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -70,7 +48,7 @@ if (config.isDevelopment()) {
   app.use('*', prettyJSON());
 }
 
-// === Health Check (no auth) ===
+// === Top-Level Health Check (no auth) ===
 
 app.get('/health', (c) => {
   return c.json({
@@ -82,14 +60,7 @@ app.get('/health', (c) => {
   });
 });
 
-app.get('/v1/health', (c) => {
-  return c.json({ status: 'ok', service: 'kortix', timestamp: new Date().toISOString() });
-});
-
-// Sandbox version (no auth — checks npm registry for latest @kortix/sandbox version)
-app.route('/v1/sandbox/version', versionRouter);
-
-// System status (no auth — polled by frontend for maintenance banners)
+// Also expose system status at root for backward compat with frontend
 app.get('/v1/system/status', (c) => {
   return c.json({
     maintenanceNotice: { enabled: false },
@@ -98,103 +69,14 @@ app.get('/v1/system/status', (c) => {
   });
 });
 
-// === Webhooks (no auth — handlers verify signatures internally) ===
+// ─── Mount Sub-Services ─────────────────────────────────────────────────────
 
-app.route('/webhooks', webhooksRouter);
-
-// === Billing Routes (supabaseAuth) ===
-
-app.use('/billing/*', supabaseAuth);
-app.use('/setup/*', supabaseAuth);
-
-// Setup initialize endpoint (inline from billing index.ts)
-app.post('/setup/initialize', async (c: any) => {
-  const accountId = c.get('userId') as string;
-  const email = c.get('userEmail') as string;
-  const { upsertCreditAccount, getCreditAccount } = await import('./repositories/credit-accounts');
-  const { getDailyCreditConfig, resolvePriceId } = await import('./services/billing/tiers');
-  const { getOrCreateStripeCustomer } = await import('./services/billing/subscriptions');
-
-  const existing = await getCreditAccount(accountId);
-  if (existing?.stripeSubscriptionId) {
-    return c.json({ status: 'already_initialized', tier: existing.tier });
-  }
-
-  const customerId = await getOrCreateStripeCustomer(accountId, email);
-  const { getStripe } = await import('./lib/stripe');
-  const stripe = getStripe();
-
-  const freePriceId = resolvePriceId('free', 'monthly');
-  if (!freePriceId) {
-    return c.json({ error: 'Free tier price not configured' }, 500);
-  }
-
-  const subscription = await stripe.subscriptions.create({
-    customer: customerId,
-    items: [{ price: freePriceId }],
-    payment_behavior: 'allow_incomplete',
-    payment_settings: { save_default_payment_method: 'on_subscription' },
-    metadata: { account_id: accountId, tier_key: 'free' },
-  });
-
-  const dailyConfig = getDailyCreditConfig('free');
-  await upsertCreditAccount(accountId, {
-    tier: 'free',
-    provider: 'stripe',
-    stripeSubscriptionId: subscription.id,
-    stripeSubscriptionStatus: 'active',
-    planType: 'monthly',
-    dailyCreditsBalance: String(dailyConfig?.dailyAmount ?? 3),
-    lastDailyRefresh: new Date().toISOString(),
-  });
-
-  return c.json({ status: 'initialized', tier: 'free' });
-});
-
-app.route('/billing/account-state', accountStateRouter);
-app.route('/billing', subscriptionsRouter);
-app.route('/billing', paymentsRouter);
-app.route('/billing', creditsRouter);
-
-// === Platform Routes (supabaseAuth — handled internally by accountRouter) ===
-
-app.route('/v1/account', accountRouter);
-
-// === Cron Routes (supabaseAuth) ===
-
-app.use('/v1/sandboxes/*', supabaseAuth);
-app.use('/v1/triggers/*', supabaseAuth);
-app.use('/v1/executions/*', supabaseAuth);
-
-app.route('/v1/sandboxes', sandboxesRouter);
-app.route('/v1/triggers', triggersRouter);
-app.route('/v1/executions', executionsRouter);
-
-// === Search Routes (apiKeyAuth) ===
-
-app.use('/web-search/*', apiKeyAuth);
-app.use('/image-search/*', apiKeyAuth);
-
-app.route('/web-search', webSearch);
-app.route('/image-search', imageSearch);
-
-// === LLM Routes (apiKeyAuth) ===
-
-app.use('/v1/chat/*', apiKeyAuth);
-app.use('/v1/models', apiKeyAuth);
-app.use('/v1/models/*', apiKeyAuth);
-
-app.route('/v1', llm);
-
-// === Proxy Routes (auth handled internally — dual mode) ===
-
-app.route('/', proxy);
-
-// === Daytona Preview Proxy (LAST — wildcard catch-all) ===
-
-app.use('/:sandboxId/:port/*', supabaseAuthWithQueryParam);
-app.use('/:sandboxId/:port', supabaseAuthWithQueryParam);
-app.route('/', preview);
+app.route('/router', router);        // /router/v1/*, /router/web-search/*, /router/tavily/*, etc.
+app.route('/', billingApp);           // /billing/*, /setup/*, /webhooks/*
+app.route('/', platformApp);          // /v1/account/*, /v1/sandbox/version
+app.route('/', cronApp);              // /v1/sandboxes/*, /v1/triggers/*, /v1/executions/*
+app.route('/', deploymentsApp);       // /v1/deployments/*
+app.route('/', daytonaProxyApp);      // /:sandboxId/:port/* (MUST BE LAST — wildcard catch-all)
 
 // === Error Handling ===
 
@@ -253,10 +135,11 @@ console.log(`
 ║  Mode: ${config.ENV_MODE.padEnd(49)}║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Services:                                                ║
-║    Router (search, LLM, proxy)                            ║
+║    Router /router (search, LLM, proxy)                    ║
 ║    Billing (subscriptions, credits, webhooks)              ║
 ║    Platform (sandbox lifecycle)                            ║
 ║    Cron (scheduled triggers)                               ║
+║    Deployments (deploy lifecycle)                          ║
 ║    Daytona Proxy (preview proxy)                           ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
@@ -266,8 +149,6 @@ console.log(`
 ╚═══════════════════════════════════════════════════════════╝
 `);
 
-// Start the scheduler
-import { startScheduler, stopScheduler } from './services/scheduler/index';
 startScheduler();
 
 // Graceful shutdown

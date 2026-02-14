@@ -21,7 +21,7 @@ export function useFileList(
   options?: { enabled?: boolean },
 ) {
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
-  const serverVersion = useServerStore((s) => s.serverVersion);
+  const urlVersion = useServerStore((s) => s.urlVersion);
 
   return useQuery<FileNode[]>({
     queryKey: fileListKeys.dir(serverUrl, dirPath),

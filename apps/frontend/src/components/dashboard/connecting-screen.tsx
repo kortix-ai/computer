@@ -12,20 +12,24 @@ import { WifiOff, RefreshCw, ArrowLeftRight } from 'lucide-react';
  * active sandbox is not yet reachable. Positioned absolutely within
  * the content container so the sidebar remains fully accessible.
  *
- * Includes a "Switch Instance" button so the user can open the
- * instance manager and pick a different server without needing the sidebar.
- *
- * States:
- *   - 'connecting'  : initial connection attempt — spinner
- *   - 'unreachable' : failed after retries — error + auto-retry indicator
- *   - 'connected'   : hidden (renders null)
+ * Key behaviour:
+ *   - Hidden until the first health check has completed (prevents flash
+ *     on initial page load while we're still doing the first fetch).
+ *   - Hidden when status is 'connected'.
+ *   - Shows spinner when status is 'connecting' (after first check).
+ *   - Shows error state when status is 'unreachable'.
  */
 export function ConnectingScreen() {
   const status = useSandboxConnectionStore((s) => s.status);
+  const initialCheckDone = useSandboxConnectionStore((s) => s.initialCheckDone);
   const activeServerId = useServerStore((s) => s.activeServerId);
   const servers = useServerStore((s) => s.servers);
   const activeServer = servers.find((s) => s.id === activeServerId);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Don't show anything until the first health check completes.
+  // This prevents the "Connecting..." flash on every page load.
+  if (!initialCheckDone) return null;
 
   if (status === 'connected') return null;
 

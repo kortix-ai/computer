@@ -7,6 +7,7 @@ import envRouter from './routes/env'
 import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
 import updateRouter from './routes/update'
+import deployRouter from './routes/deploy'
 import { config } from './config'
 
 const app = new Hono()
@@ -40,6 +41,9 @@ app.route('/env', envRouter)
 
 // LSS semantic search — /lss/search?q=<query> runs local semantic search
 app.route('/lss', lssRouter)
+
+// Deployment management
+app.route('/kortix/deploy', deployRouter)
 
 // Dynamic port proxy — /proxy/:port/* forwards to localhost:{port} inside the sandbox
 app.route('/proxy', proxyRouter)

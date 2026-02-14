@@ -7,42 +7,55 @@ import {
   setSandboxStatus,
   incrementSandboxFail,
   resetSandboxFail,
+  markInitialCheckDone,
 } from '@/stores/sandbox-connection-store';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
 
 /**
  * Number of consecutive failures before marking sandbox as unreachable.
  */
-const FAIL_THRESHOLD = 2;
+const FAIL_THRESHOLD = 3;
 
 /** Interval between health checks (ms) */
-const POLL_CONNECTED = 30_000; // 30s when already connected — no need to hammer
-const POLL_DISCONNECTED = 4_000; // 4s when connecting/unreachable
+const POLL_CONNECTED = 30_000; // 30s when already connected
+const POLL_DISCONNECTED = 5_000; // 5s when connecting/unreachable
 
 /** Timeout for each health check request */
-const CHECK_TIMEOUT = 5_000;
+const CHECK_TIMEOUT = 8_000;
 
 /**
  * useSandboxConnection — monitors the active server's reachability.
  *
- * Uses a single `setInterval`-style loop. All store mutations go through
- * static action functions (not Zustand selectors) so the effect never
- * re-runs due to its own state changes.
+ * Subscribes to:
+ *   - activeServerId + serverVersion — for full server switches (user picks
+ *     a different server). Resets status to 'connecting'.
+ *   - urlVersion — for silent URL/port updates (sandbox port changed). Does
+ *     NOT reset status; just re-verifies in the background.
  *
- * Renders nothing — designed to be used as a headless provider.
+ * This two-tier approach prevents the "connecting flash" that occurred
+ * when sandbox port changes triggered a full reconnect cycle.
  */
 export function useSandboxConnection() {
-  // These two selectors are the ONLY reactive deps — they change when
-  // the user switches server, which is exactly when we want to restart.
   const activeServerId = useServerStore((s) => s.activeServerId);
   const serverVersion = useServerStore((s) => s.serverVersion);
+  const urlVersion = useServerStore((s) => s.urlVersion);
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const prevServerVersionRef = useRef(serverVersion);
 
   useEffect(() => {
-    // ── Reset on every server change ──
-    setSandboxStatus('connecting');
+    const isServerSwitch = serverVersion !== prevServerVersionRef.current;
+    prevServerVersionRef.current = serverVersion;
+
+    // Only reset to 'connecting' on actual server switches — NOT on URL updates
+    // and NOT if we were already connected.
+    if (isServerSwitch) {
+      const { status } = useSandboxConnectionStore.getState();
+      if (status !== 'connected') {
+        setSandboxStatus('connecting');
+      }
+    }
     resetSandboxFail();
 
     const url = useServerStore.getState().getActiveServerUrl();
@@ -74,7 +87,7 @@ export function useSandboxConnection() {
 
         if (!alive) return;
         resetSandboxFail();
-        setSandboxStatus('connected'); // no-op if already connected
+        setSandboxStatus('connected');
       } catch {
         if (!alive) return;
         incrementSandboxFail();
@@ -83,17 +96,17 @@ export function useSandboxConnection() {
         if (failCount >= FAIL_THRESHOLD) {
           setSandboxStatus('unreachable');
         }
-        // If under threshold and currently 'connecting', it stays 'connecting'
-        // (setSandboxStatus is a no-op when status hasn't changed)
+      } finally {
+        if (alive) {
+          markInitialCheckDone();
+        }
       }
 
-      // Schedule next tick based on current status
       scheduleNext();
     }
 
     function scheduleNext() {
       if (!alive) return;
-      // Clear previous timer to avoid stacking
       if (timerRef.current) clearTimeout(timerRef.current);
 
       const { status } = useSandboxConnectionStore.getState();
@@ -109,5 +122,5 @@ export function useSandboxConnection() {
       abortRef.current?.abort();
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [activeServerId, serverVersion]);
+  }, [activeServerId, serverVersion, urlVersion]);
 }

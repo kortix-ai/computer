@@ -8,12 +8,15 @@ interface SandboxConnectionStore {
   failCount: number;
   /** When the connection was last confirmed */
   lastConnectedAt: number | null;
+  /** True once at least one health check has completed (success or fail) */
+  initialCheckDone: boolean;
 }
 
 export const useSandboxConnectionStore = create<SandboxConnectionStore>(() => ({
   status: 'connecting',
   failCount: 0,
   lastConnectedAt: null,
+  initialCheckDone: false,
 }));
 
 // ── Static actions (stable references, no re-render loops) ──
@@ -26,6 +29,10 @@ export function setSandboxStatus(next: SandboxConnectionStatus) {
     status: next,
     ...(next === 'connected' ? { lastConnectedAt: Date.now(), failCount: 0 } : {}),
   });
+}
+
+export function markInitialCheckDone() {
+  useSandboxConnectionStore.setState({ initialCheckDone: true });
 }
 
 export function incrementSandboxFail() {

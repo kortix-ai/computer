@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import { creditAccounts } from '@kortix/db';
-import { db } from '../db';
+import { db } from '../shared/db';
 
 export interface CreditBalance {
   balance: number;
