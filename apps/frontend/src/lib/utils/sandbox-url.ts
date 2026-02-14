@@ -4,7 +4,7 @@
  * Detects localhost URLs in agent output (e.g. "Website is live at http://localhost:8080")
  * and rewrites them to be accessible through the proxy layer:
  *
- * Cloud mode:  http://localhost:8080 → https://kortix.cloud/{sandboxId}/8000/proxy/8080/
+ * Cloud mode:  http://localhost:8080 → {BACKEND_URL}/preview/{sandboxId}/8000/proxy/8080/
  * Local mode:  http://localhost:8080 → {serverUrl}/proxy/8080/
  */
 
@@ -97,7 +97,7 @@ export function hasLocalhostUrls(text: string): boolean {
  *
  * @param port - The port number to proxy
  * @param path - The path to append (e.g. "/api/docs")
- * @param serverUrl - The active OpenCode server URL (e.g. "https://kortix.cloud/abc123/8000" or "http://localhost:4096")
+ * @param serverUrl - The active OpenCode server URL (e.g. "{BACKEND_URL}/preview/abc123/8000" or "http://localhost:4096")
  * @param mappedPorts - Optional container-port → host-port map from Docker (for local_docker multi-sandbox)
  * @returns The proxied URL
  */
@@ -108,13 +108,13 @@ export function rewriteLocalhostUrl(
   mappedPorts?: Record<string, string>,
 ): string {
   // Server URL points to the OpenCode API (:4096 or via kortix-master on :8000).
-  // In cloud mode: https://kortix.cloud/{sandboxId}/8000
+  // In cloud mode: {BACKEND_URL}/preview/{sandboxId}/8000
   // In local mode: http://localhost:4096 (but kortix-master is on :8000)
 
-  const isCloud = serverUrl.includes('kortix.cloud');
+  const isCloud = serverUrl.includes('/preview/');
 
   if (isCloud) {
-    // Cloud: https://kortix.cloud/{sandboxId}/8000/proxy/{port}{path}
+    // Cloud: {BACKEND_URL}/preview/{sandboxId}/8000/proxy/{port}{path}
     // serverUrl already points to /8000 (kortix-master)
     const base = serverUrl.replace(/\/+$/, '');
     return `${base}/proxy/${port}${path}`;

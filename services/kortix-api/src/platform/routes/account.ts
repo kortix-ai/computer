@@ -137,6 +137,9 @@ export function createAccountRouter(
         accountId,
         userId,
         name: `sandbox-${accountId.slice(0, 8)}`,
+        envVars: {
+          KORTIX_TOKEN: authToken,
+        },
       });
 
       const [sandbox] = await db
