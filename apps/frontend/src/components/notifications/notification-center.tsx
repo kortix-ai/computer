@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { NovuProvider, PopoverNotificationCenter, NotificationBell } from '@novu/notification-center';
 import { useAuth } from '@/components/AuthProvider';
-import { isStagingMode } from '@/lib/config';
+import { isCloudMode } from '@/lib/config';
 
 interface NotificationCenterProps {
   applicationIdentifier: string;
@@ -15,7 +15,7 @@ interface NotificationCenterProps {
 export function NotificationCenter({ applicationIdentifier }: NotificationCenterProps) {
   const { user } = useAuth();
 
-  if (!isStagingMode() || !user?.id || !applicationIdentifier) {
+  if (!isCloudMode() || !user?.id || !applicationIdentifier) {
     return null;
   }
 

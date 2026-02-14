@@ -545,9 +545,11 @@ describe('Deployment — LocalDockerProvider (mocked)', () => {
     }
   });
 
-  it('sets port mapping to random (HostPort: \'0\')', () => {
-    // The provider must use HostPort: '0' for dynamic port assignment
-    expect(providerSource).toContain("HostPort: '0'");
+  it('uses fixed port mapping derived from SANDBOX_PORT_BASE', () => {
+    expect(providerSource).toContain('SANDBOX_PORT_BASE');
+    expect(providerSource).toContain('const PORT_BASE');
+    expect(providerSource).toContain('const PORT_MAP');
+    expect(providerSource).not.toContain("HostPort: '0'");
   });
 
   it('sets container labels correctly', () => {
@@ -562,19 +564,11 @@ describe('Deployment — LocalDockerProvider (mocked)', () => {
     }
   });
 
-  it('exposes all expected ports', () => {
-    const expectedPorts = [
-      '6080/tcp',
-      '6081/tcp',
-      '3111/tcp',
-      '3210/tcp',
-      '8000/tcp',
-      '9223/tcp',
-      '9224/tcp',
-    ];
-
+  it('configures all expected container ports', () => {
+    const expectedPorts = ['6080', '6081', '3111', '3210', '8000', '9223', '9224'];
     for (const port of expectedPorts) {
-      expect(providerSource).toContain(port);
+      // PORT_MAP uses container ports as string keys
+      expect(providerSource).toContain(`'${port}':`);
     }
   });
 
@@ -589,8 +583,8 @@ describe('Deployment — LocalDockerProvider (mocked)', () => {
     expect(providerSource).toContain('2 * 1024 * 1024 * 1024');
   });
 
-  it('container name starts with kortix-sandbox- prefix', () => {
-    expect(providerSource).toContain("CONTAINER_PREFIX = 'kortix-sandbox-'");
+  it('uses fixed container name', () => {
+    expect(providerSource).toContain("CONTAINER_NAME = 'kortix-sandbox'");
   });
 });
 
@@ -732,7 +726,8 @@ describe.skipIf(!HAS_DOCKER)('Deployment — Docker Compose Validation', () => {
 
     const expectedPorts = ['6080', '6081', '3111', '3210', '8000', '9223', '9224'];
     for (const port of expectedPorts) {
-      expect(content).toContain(`"${port}"`);
+      // Fixed host:container mapping e.g. "14002:6080"
+      expect(content).toContain(`:${port}`);
     }
   });
 

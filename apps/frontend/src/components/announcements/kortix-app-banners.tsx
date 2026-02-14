@@ -99,9 +99,8 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
     setMounted(true);
     setDesktopPlatform(detectDesktopPlatform());
     
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[KortixAppBanners] flags', { disableMobileAdvertising });
-    }
+    // Debug: uncomment to inspect banner flags
+    // console.log('[KortixAppBanners] flags', { disableMobileAdvertising });
 
     const desktopDismissed = localStorage.getItem(DESKTOP_STORAGE_KEY);
     

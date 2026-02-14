@@ -222,6 +222,7 @@ export const SessionLayout = memo(function SessionLayout({
                         width={120}
                         height={14}
                         className="hidden dark:block"
+                        style={{ width: 'auto', height: 'auto' }}
                         priority
                       />
                       <Image
@@ -230,6 +231,7 @@ export const SessionLayout = memo(function SessionLayout({
                         width={120}
                         height={14}
                         className="block dark:hidden"
+                        style={{ width: 'auto', height: 'auto' }}
                         priority
                       />
                     </div>

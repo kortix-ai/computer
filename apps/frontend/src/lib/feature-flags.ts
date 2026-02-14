@@ -19,8 +19,8 @@ export const featureFlags = {
   ),
 } as const;
 
-// Helpful during development/debugging; kept out of production logs.
-if (process.env.NODE_ENV !== 'production') {
-  console.log('[featureFlags]', featureFlags);
-}
+// Debug: uncomment to inspect feature flags during development
+// if (process.env.NODE_ENV !== 'production') {
+//   console.log('[featureFlags]', featureFlags);
+// }
 
