@@ -423,7 +423,7 @@ export function SimplifiedTriggerDetailPanel({ trigger, onClose }: SimplifiedTri
               </div>
             </div>
             <Link
-              href={`/agents/config/${trigger.agent_id}`}
+              href="/agents"
               className="p-2 rounded-2xl hover:bg-muted transition-colors"
             >
               <ExternalLink className="h-4 w-4 text-muted-foreground" />

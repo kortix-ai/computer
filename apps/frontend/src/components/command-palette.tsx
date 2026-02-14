@@ -705,9 +705,9 @@ export function CommandPalette() {
                 <Bot className="mr-2 h-4 w-4" />
                 <span>Agents</span>
               </CommandItem>
-              <CommandItem onSelect={() => handleNavigate('/knowledge')}>
+              <CommandItem onSelect={() => handleNavigate('/skills')}>
                 <Database className="mr-2 h-4 w-4" />
-                <span>Knowledge</span>
+                <span>Skills</span>
               </CommandItem>
               <CommandItem onSelect={() => handleNavigate('/triggers')}>
                 <Zap className="mr-2 h-4 w-4" />
