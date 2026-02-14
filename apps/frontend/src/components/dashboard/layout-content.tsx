@@ -288,16 +288,16 @@ export default function DashboardLayoutContent({
     }
   }, [user])
 
-  // Log data prefetching for debugging
-  useEffect(() => {
-    if (isMobile) {
-      console.log('📱 Mobile Layout - Prefetched data:', {
-        projects: projects?.length || 0,
-        accounts: accounts?.length || 0,
-        user: !!user
-      });
-    }
-  }, [isMobile, projects, accounts, user]);
+  // Debug: uncomment to inspect mobile layout prefetch data
+  // useEffect(() => {
+  //   if (isMobile) {
+  //     console.log('Mobile Layout - Prefetched data:', {
+  //       projects: projects?.length || 0,
+  //       accounts: accounts?.length || 0,
+  //       user: !!user
+  //     });
+  //   }
+  // }, [isMobile, projects, accounts, user]);
 
   // API health is now managed by useApiHealth hook
   const isApiHealthy = healthData?.status === 'ok' && !healthError;

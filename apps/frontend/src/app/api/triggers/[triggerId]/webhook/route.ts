@@ -15,7 +15,7 @@ export async function POST(
     });
     
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8008/v1';
-    const targetUrl = `${backendUrl}/triggers/${triggerId}/webhook`;
+    const targetUrl = `${backendUrl}/cron/triggers/${triggerId}/webhook`;
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {

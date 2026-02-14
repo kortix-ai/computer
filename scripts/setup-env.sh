@@ -59,6 +59,7 @@ echo ""
 write_env "services/kortix-api/.env" \
   "PORT=8008" \
   "$(kv ENV_MODE local)" \
+  "$(kv STRIPE_ENV production)" \
   "" \
   "$(kv DATABASE_URL)" \
   "" \
@@ -79,9 +80,9 @@ write_env "services/kortix-api/.env" \
   "$(kv DAYTONA_TARGET)" \
   "$(kv DAYTONA_SNAPSHOT)" \
   "" \
-  "KORTIX_URL=http://localhost:8008/router" \
+  "KORTIX_URL=http://localhost:8008/v1/router" \
   "$(kv SANDBOX_PROVIDER auto)" \
-  "$(kv SANDBOX_IMAGE heyagi/sandbox:latest)" \
+  "$(kv SANDBOX_IMAGE kortixmarko/sandbox:latest)" \
   "" \
   "$(kv OPENROUTER_API_KEY)" \
   "$(kv ANTHROPIC_API_KEY)" \

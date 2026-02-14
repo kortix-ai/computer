@@ -273,7 +273,7 @@ const STRIPE_PRICES_STAGING: StripePriceConfig = {
 };
 
 function getStripePrices(): StripePriceConfig {
-  return config.ENV_MODE === 'staging' ? STRIPE_PRICES_STAGING : STRIPE_PRICES_PROD;
+  return config.STRIPE_ENV === 'staging' ? STRIPE_PRICES_STAGING : STRIPE_PRICES_PROD;
 }
 
 export function getProductId(): string {

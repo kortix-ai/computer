@@ -11,7 +11,7 @@ const fetchAgentTriggers = async (agentId: string): Promise<TriggerConfiguration
     if (!session) {
         throw new Error('You must be logged in to create a trigger');
     }
-    const response = await fetch(`${API_URL}/triggers/agents/${agentId}/triggers`, {
+    const response = await fetch(`${API_URL}/cron/triggers/agents/${agentId}/triggers`, {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
   });
   if (!response.ok) {
@@ -32,7 +32,7 @@ const createTrigger = async (data: {
     if (!session) {
         throw new Error('You must be logged in to create a trigger');
     }
-    const response = await fetch(`${API_URL}/triggers/agents/${data.agentId}/triggers`, {
+    const response = await fetch(`${API_URL}/cron/triggers/agents/${data.agentId}/triggers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
     body: JSON.stringify({
@@ -69,7 +69,7 @@ const updateTrigger = async (data: {
     if (!session) {
         throw new Error('You must be logged in to create a trigger');
     }
-    const response = await fetch(`${API_URL}/triggers/${data.triggerId}`, {
+    const response = await fetch(`${API_URL}/cron/triggers/${data.triggerId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
     body: JSON.stringify({
@@ -94,7 +94,7 @@ const deleteTrigger = async (data: { triggerId: string; agentId: string }): Prom
   if (!session) {
     throw new Error('You must be logged in to create a trigger');
   }
-  const response = await fetch(`${API_URL}/triggers/${data.triggerId}`, {
+  const response = await fetch(`${API_URL}/cron/triggers/${data.triggerId}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
   });

@@ -46,7 +46,7 @@ describe.skipIf(!HAS_DB)('Deployments — CRUD & Lifecycle', () => {
     await cleanupTestData();
 
     // Create a sandbox to deploy into (via platform routes)
-    const res = await jsonPost(app, '/v1/account/init', {});
+    const res = await jsonPost(app, '/v1/platform/init', {});
     const body = await res.json();
     sandboxId = body.data.sandbox_id;
   });

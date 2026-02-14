@@ -71,7 +71,7 @@ export async function apiKeyAuth(c: Context, next: Next) {
  * Supabase JWT auth (for billing, platform, cron routes).
  * Sets userId and userEmail in context on success.
  *
- * In local mode (ENV_MODE=local), auth is bypassed and a fixed
+ * In local mode, auth is bypassed and a fixed
  * mock user is injected — matching the frontend's AuthProvider behavior.
  */
 export async function supabaseAuth(c: Context, next: Next) {

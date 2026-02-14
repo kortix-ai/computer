@@ -1,8 +1,7 @@
-// Environment mode types
+// Environment mode types — only two modes: local (Docker) and cloud (hosted)
 export enum EnvMode {
   LOCAL = 'local',
-  STAGING = 'staging',
-  PRODUCTION = 'production',
+  CLOUD = 'cloud',
 }
 
 // Subscription tier structure - tier keys only, no price IDs
@@ -27,7 +26,7 @@ export interface SubscriptionTiers {
 interface Config {
   ENV_MODE: EnvMode;
   IS_LOCAL: boolean;
-  IS_STAGING: boolean;
+  IS_CLOUD: boolean;
   SUBSCRIPTION_TIERS: SubscriptionTiers;
 }
 
@@ -68,17 +67,12 @@ const TIERS: SubscriptionTiers = {
 } as const;
 
 function getEnvironmentMode(): EnvMode {
-  const envMode = process.env.NEXT_PUBLIC_ENV_MODE?.toUpperCase();
-  switch (envMode) {
-    case 'LOCAL':
-      return EnvMode.LOCAL;
-    case 'STAGING':
-      return EnvMode.STAGING;
-    case 'PRODUCTION':
-      return EnvMode.PRODUCTION;
-    default:
-      return EnvMode.LOCAL;
+  const envMode = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase();
+  if (envMode === 'local') {
+    return EnvMode.LOCAL;
   }
+  // Everything else (cloud, production, staging, or unset) is cloud
+  return EnvMode.CLOUD;
 }
 
 const currentEnvMode = getEnvironmentMode();
@@ -86,18 +80,16 @@ const currentEnvMode = getEnvironmentMode();
 export const config: Config = {
   ENV_MODE: currentEnvMode,
   IS_LOCAL: currentEnvMode === EnvMode.LOCAL,
-  IS_STAGING: currentEnvMode === EnvMode.STAGING,
-  SUBSCRIPTION_TIERS: TIERS,  // Same tiers for all environments
+  IS_CLOUD: currentEnvMode === EnvMode.CLOUD,
+  SUBSCRIPTION_TIERS: TIERS,
 };
 
 export const isLocalMode = (): boolean => {
   return config.IS_LOCAL;
 };
 
-export const isStagingMode = (): boolean => {
-  return config.IS_STAGING;
+export const isCloudMode = (): boolean => {
+  return config.IS_CLOUD;
 };
 
-export const isProductionMode = (): boolean => {
-  return config.ENV_MODE === EnvMode.PRODUCTION;
-};
+

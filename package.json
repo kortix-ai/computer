@@ -10,7 +10,7 @@
     "build": "nx run-many --target=build --parallel",
     "build:frontend": "nx run Kortix-Computer-Frontend:build",
     "typecheck": "nx run-many --target=typecheck --parallel",
-    "stripe": "stripe listen --forward-to http://localhost:8008/webhooks/stripe",
+    "stripe": "stripe listen --forward-to http://localhost:8008/v1/billing/webhooks/stripe",
     "docker:build": "docker compose --profile all build",
     "docker:up": "docker compose --profile all up -d",
     "docker:up:backend": "docker compose --profile backend up -d",

@@ -24,7 +24,7 @@ export const useAdminRole = (
       });
 
       if (response.error) {
-        console.error('Error fetching admin role:', response.error);
+        // Silently handle errors (e.g. 404 when backend doesn't have this endpoint)
         return { isAdmin: false, role: null };
       }
 

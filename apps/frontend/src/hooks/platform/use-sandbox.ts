@@ -2,7 +2,7 @@
  * useSandbox — manages the user's sandbox lifecycle.
  *
  * On mount (when user is authenticated):
- *   1. Calls POST /v1/account/init on the platform service
+ *   1. Calls POST /platform/init on the platform service
  *   2. Gets back the sandbox info (base_url, external_id, provider, etc.)
  *   3. Registers the sandbox as a server in the server-store
  *      so the OpenCode SDK automatically connects to it
@@ -17,7 +17,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import {
-  initAccount,
+  ensureSandbox,
   getProviders,
   getSandboxUrl,
   extractMappedPorts,
@@ -84,7 +84,7 @@ export function useSandbox() {
   const query = useQuery({
     queryKey: ['platform', 'sandbox'],
     queryFn: async () => {
-      const result = await initAccount();
+      const result = await ensureSandbox();
       return result.sandbox;
     },
     enabled: !!user,

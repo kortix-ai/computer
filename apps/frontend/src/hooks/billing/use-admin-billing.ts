@@ -23,7 +23,7 @@ export function useUserBillingSummary(userId: string | null) {
     queryKey: ['admin', 'billing', 'user', userId],
     queryFn: async () => {
       if (!userId) return null;
-      const response = await backendApi.get(`/admin/billing/user/${userId}/summary`);
+      const response = await backendApi.get(`/billing/admin/user/${userId}/summary`);
       if (response.error) {
         throw new Error(response.error.message);
       }
@@ -50,7 +50,7 @@ export function useAdminUserTransactions(params: TransactionParams) {
       if (params.page_size) searchParams.append('page_size', params.page_size.toString());
       if (params.type_filter) searchParams.append('type_filter', params.type_filter);
       
-      const response = await backendApi.get(`/admin/billing/user/${params.userId}/transactions?${searchParams.toString()}`);
+      const response = await backendApi.get(`/billing/admin/user/${params.userId}/transactions?${searchParams.toString()}`);
       if (response.error) {
         throw new Error(response.error.message);
       }
@@ -64,7 +64,7 @@ export function useAdminUserTransactions(params: TransactionParams) {
 export function useAdjustCredits() {
   return useMutation({
     mutationFn: async (request: CreditAdjustmentRequest) => {
-      const response = await backendApi.post('/admin/billing/credits/adjust', request);
+      const response = await backendApi.post('/billing/admin/credits/adjust', request);
       if (response.error) {
         throw new Error(response.error.message);
       }
@@ -76,7 +76,7 @@ export function useAdjustCredits() {
 export function useProcessRefund() {
   return useMutation({
     mutationFn: async (request: RefundRequest) => {
-      const response = await backendApi.post('/admin/billing/refund', request);
+      const response = await backendApi.post('/billing/admin/refund', request);
       if (response.error) {
         throw new Error(response.error.message);
       }

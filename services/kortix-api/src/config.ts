@@ -2,7 +2,10 @@ export type SandboxProviderType = 'daytona' | 'local_docker' | 'auto';
 
 export const config = {
   PORT: parseInt(process.env.PORT || '8008', 10),
+  // local | cloud — matches frontend's EnvMode
   ENV_MODE: process.env.ENV_MODE || 'local',
+  // staging | production — controls which Stripe price IDs to use (cloud only)
+  STRIPE_ENV: (process.env.STRIPE_ENV || 'production') as 'staging' | 'production',
 
   // ─── Database ──────────────────────────────────────────────────────────────
   DATABASE_URL: process.env.DATABASE_URL || '',
@@ -70,9 +73,14 @@ export const config = {
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: process.env.KORTIX_URL || '',
   SANDBOX_PROVIDER: (process.env.SANDBOX_PROVIDER || 'auto') as SandboxProviderType,
-  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'kortix-sandbox:0.4.2',
+  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'kortixmarko/sandbox:latest',
   DOCKER_HOST: process.env.DOCKER_HOST || '',
   SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
+  /**
+   * Base host port used for local Docker sandbox fixed port mappings.
+   * The sandbox uses 7 contiguous ports starting at this base.
+   */
+  SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
 
   // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
   SCHEDULER_TICK_INTERVAL_MS: parseInt(process.env.SCHEDULER_TICK_INTERVAL_MS || '1000', 10),
@@ -88,8 +96,8 @@ export const config = {
     return this.ENV_MODE === 'local';
   },
 
-  isDevelopment(): boolean {
-    return this.ENV_MODE === 'local' || this.ENV_MODE === 'staging';
+  isCloud(): boolean {
+    return !this.isLocal();
   },
 
   isDaytonaEnabled(): boolean {

@@ -10,7 +10,7 @@ const fetchTriggerProviders = async (): Promise<TriggerProvider[]> => {
   if (!session) {
     throw new Error('You must be logged in to create a trigger');
   }
-  const response = await fetch(`${API_URL}/triggers/providers`, {
+  const response = await fetch(`${API_URL}/cron/triggers/providers`, {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
   });
   if (!response.ok) {

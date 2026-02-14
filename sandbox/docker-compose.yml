@@ -1,22 +1,19 @@
-# Sandbox Docker Compose — supports multiple concurrent instances.
+# Sandbox Docker Compose — single instance, fixed ports.
 #
-# Usage:
-#   docker compose up -d                          # single sandbox (default)
-#   SANDBOX_NAME=dev2 docker compose up -d        # second sandbox (unique name)
-#   docker compose ps                             # see assigned ports
+# This mirrors the local Docker provider behavior in kortix-api:
+# - container name is always `kortix-sandbox`
+# - host ports are stable so the frontend never chases random mappings
 #
-# Each sandbox gets Docker-assigned random host ports for all services.
-# After startup, inspect assigned ports with:
-#   docker compose port desktop 8000              # → 0.0.0.0:<random>
-#   docker compose port desktop 6080              # → 0.0.0.0:<random>
+# Default host port range: 14000-14006
+# If you already have something running on that range, edit the mappings below.
 
 services:
   desktop:
     build:
       context: ..
       dockerfile: sandbox/Dockerfile
-    image: kortix-sandbox:${SANDBOX_VERSION:-0.4.3}
-    # No container_name — allows multiple instances via --project-name / COMPOSE_PROJECT_NAME
+    image: kortixmarko/sandbox:${SANDBOX_VERSION:-latest}
+    container_name: kortix-sandbox
     cap_add:
       - SYS_ADMIN
     security_opt:
@@ -35,7 +32,7 @@ services:
       # Kortix Master
       - OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME:-admin}
       - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-changeme}
-      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai/router}
+      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai/v1/router}
       - KORTIX_TOKEN=${KORTIX_TOKEN:-}
       - SANDBOX_ID=${SANDBOX_ID:-local}
       - PROJECT_ID=${PROJECT_ID:-local}
@@ -46,15 +43,13 @@ services:
       - workspace:/workspace
       - secrets_data:/app/secrets
     ports:
-      # Dynamic host port assignment — Docker picks random available ports.
-      # This allows running multiple sandbox instances simultaneously.
-      - "6080"    # Desktop (noVNC)
-      - "6081"    # Desktop (HTTPS)
-      - "3111"    # OpenCode Web UI
-      - "3210"    # Presentation Viewer
-      - "8000"    # Kortix Master (proxy entry point)
-      - "9223"    # Agent Browser Stream (WS)
-      - "9224"    # Agent Browser Viewer
+      - "14000:8000"  # Kortix Master (proxy entry point)
+      - "14001:3111"  # OpenCode Web UI
+      - "14002:6080"  # Desktop (noVNC)
+      - "14003:6081"  # Desktop (HTTPS)
+      - "14004:3210"  # Presentation Viewer
+      - "14005:9223"  # Agent Browser Stream (WS)
+      - "14006:9224"  # Agent Browser Viewer
     shm_size: "2gb"
     restart: unless-stopped
     healthcheck:

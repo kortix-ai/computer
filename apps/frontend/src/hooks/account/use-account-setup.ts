@@ -17,7 +17,7 @@ export function useInitializeAccount() {
       if (!session) {
         throw new Error('You must be logged in to initialize account');
       }
-      const response = await backendApi.post(`/setup/initialize`);
+      const response = await backendApi.post(`/billing/setup/initialize`);
       if (!response.success) {
         throw new Error(response.error?.message || 'Failed to initialize account');
       }
