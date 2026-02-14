@@ -59,7 +59,9 @@ export async function deductCredits(
 
   if (error) {
     console.error('[Credits] Deduction RPC error:', error);
-    throw new InsufficientCreditsError(0, amount);
+    const account = await getCreditAccount(accountId);
+    const actualBalance = account ? Number(account.balance) : 0;
+    throw new InsufficientCreditsError(actualBalance, amount);
   }
 
   const result = data as {
@@ -71,7 +73,9 @@ export async function deductCredits(
   };
 
   if (!result.success) {
-    throw new InsufficientCreditsError(0, amount);
+    const account = await getCreditAccount(accountId);
+    const actualBalance = account ? Number(account.balance) : 0;
+    throw new InsufficientCreditsError(actualBalance, amount);
   }
 
   return {
@@ -148,10 +152,14 @@ export async function grantCredits(
   if (error) {
     console.error('[Credits] Grant RPC error:', error);
 
+    const account = await getCreditAccount(accountId);
+    const currentBalance = account ? Number(account.balance) : 0;
+    const newBalance = currentBalance + amount;
+
     await insertLedgerEntry({
       accountId,
       amount: String(amount),
-      balanceAfter: '0',
+      balanceAfter: String(newBalance),
       type,
       description,
       isExpiring,
@@ -159,13 +167,16 @@ export async function grantCredits(
     });
 
     if (isExpiring) {
+      const currentExpiring = account ? Number(account.expiringCredits) : 0;
       await updateCreditAccount(accountId, {
-        balance: String(amount),
-        expiringCredits: String(amount),
+        balance: String(newBalance),
+        expiringCredits: String(currentExpiring + amount),
       } as any);
     } else {
+      const currentNonExpiring = account ? Number(account.nonExpiringCredits) : 0;
       await updateCreditAccount(accountId, {
-        nonExpiringCredits: String(amount),
+        balance: String(newBalance),
+        nonExpiringCredits: String(currentNonExpiring + amount),
       } as any);
     }
   }
@@ -173,12 +184,19 @@ export async function grantCredits(
   return data;
 }
 
-export async function resetExpiringCredits(accountId: string, newAmount: number) {
+export async function resetExpiringCredits(
+  accountId: string,
+  newCredits: number,
+  description: string,
+  stripeEventId?: string,
+) {
   const supabase = getSupabase();
 
   const { error } = await supabase.rpc('atomic_reset_expiring_credits', {
     p_account_id: accountId,
-    p_new_amount: newAmount,
+    p_description: description,
+    p_new_credits: newCredits,
+    p_stripe_event_id: stripeEventId ?? null,
   });
 
   if (error) {

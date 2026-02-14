@@ -60,6 +60,17 @@ app.get('/health', (c) => {
   });
 });
 
+// Health check under /v1 prefix (frontend uses NEXT_PUBLIC_BACKEND_URL which includes /v1)
+app.get('/v1/health', (c) => {
+  return c.json({
+    status: 'ok',
+    service: 'kortix-api',
+    timestamp: new Date().toISOString(),
+    env: config.ENV_MODE,
+    scheduler: getSchedulerStatus(),
+  });
+});
+
 // Also expose system status at root for backward compat with frontend
 app.get('/v1/system/status', (c) => {
   return c.json({

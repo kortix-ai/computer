@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, lte, ne, sql } from 'drizzle-orm';
 import { creditAccounts } from '../../shared/db-schema';
 import { db } from '../../shared/db';
 
@@ -84,6 +84,28 @@ export async function updateCreditAccount(
     .update(creditAccounts)
     .set({ ...data, updatedAt: new Date().toISOString() })
     .where(eq(creditAccounts.accountId, accountId));
+}
+
+export async function getYearlyAccountsDueForRotation() {
+  const now = new Date().toISOString();
+
+  const rows = await db
+    .select()
+    .from(creditAccounts)
+    .where(
+      and(
+        eq(creditAccounts.planType, 'yearly'),
+        ne(creditAccounts.tier, 'free'),
+        eq(creditAccounts.stripeSubscriptionStatus, 'active'),
+        ne(creditAccounts.paymentStatus, 'past_due'),
+        or(
+          isNull(creditAccounts.nextCreditGrant),
+          lte(creditAccounts.nextCreditGrant, now),
+        ),
+      ),
+    );
+
+  return rows;
 }
 
 export async function updateBalance(

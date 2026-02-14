@@ -61,6 +61,11 @@ export async function createCheckoutSession(params: {
     return scheduleDowngrade(accountId, tierKey, commitmentType);
   }
 
+  const previousFreeSubscriptionId =
+    currentTier === 'free' && account?.stripeSubscriptionId
+      ? account.stripeSubscriptionId
+      : undefined;
+
   const customerId = await getOrCreateStripeCustomer(accountId, email);
   const stripe = getStripe();
 
@@ -79,11 +84,13 @@ export async function createCheckoutSession(params: {
         account_id: accountId,
         tier_key: tierKey,
         commitment_type: commitmentType ?? 'monthly',
+        ...(previousFreeSubscriptionId ? { previous_subscription_id: previousFreeSubscriptionId } : {}),
       },
     },
     metadata: {
       account_id: accountId,
       tier_key: tierKey,
+      ...(previousFreeSubscriptionId ? { previous_subscription_id: previousFreeSubscriptionId } : {}),
     },
     ...(locale ? { locale: locale as any } : {}),
   });
@@ -109,9 +116,14 @@ export async function createInlineCheckout(params: {
   const account = await getCreditAccount(accountId);
   const currentTier = account?.tier ?? 'free';
 
-  if (account?.stripeSubscriptionId && isUpgrade(currentTier, tierKey)) {
+  if (account?.stripeSubscriptionId && currentTier !== 'free' && isUpgrade(currentTier, tierKey)) {
     return handleUpgrade(accountId, account.stripeSubscriptionId, tierKey, billingPeriod);
   }
+
+  const previousFreeSubscriptionId =
+    currentTier === 'free' && account?.stripeSubscriptionId
+      ? account.stripeSubscriptionId
+      : undefined;
 
   const customerId = await getOrCreateStripeCustomer(accountId, email);
   const stripe = getStripe();
@@ -129,6 +141,7 @@ export async function createInlineCheckout(params: {
       account_id: accountId,
       tier_key: tierKey,
       billing_period: billingPeriod,
+      ...(previousFreeSubscriptionId ? { previous_subscription_id: previousFreeSubscriptionId } : {}),
     },
   };
 
@@ -145,6 +158,9 @@ export async function createInlineCheckout(params: {
 
   if (invoice?.amount_due === 0) {
     await activateSubscription(accountId, subscription.id, tierKey, billingPeriod);
+    if (previousFreeSubscriptionId) {
+      await cancelFreeSubscriptionForUpgrade(previousFreeSubscriptionId, accountId);
+    }
     return {
       subscription_id: subscription.id,
       tier_key: tierKey,
@@ -158,6 +174,7 @@ export async function createInlineCheckout(params: {
     tier_key: tierKey,
     amount: invoice?.amount_due,
     currency: invoice?.currency,
+    ...(previousFreeSubscriptionId ? { previous_subscription_id: previousFreeSubscriptionId } : {}),
   };
 }
 
@@ -176,6 +193,11 @@ export async function confirmInlineCheckout(params: {
 
   const billingPeriod = (subscription.metadata?.billing_period ?? 'monthly') as string;
   await activateSubscription(accountId, subscriptionId, tierKey, billingPeriod);
+
+  const previousSubscriptionId = subscription.metadata?.previous_subscription_id;
+  if (previousSubscriptionId) {
+    await cancelFreeSubscriptionForUpgrade(previousSubscriptionId, accountId);
+  }
 
   return { success: true, tier: tierKey, message: 'Subscription activated' };
 }
@@ -242,11 +264,33 @@ export async function scheduleDowngrade(
 
   const stripe = getStripe();
   const subscription = await stripe.subscriptions.retrieve(account.stripeSubscriptionId);
-  const effectiveDate = new Date(subscription.current_period_end * 1000).toISOString();
+
+  let currentPeriodEnd = subscription.current_period_end;
+  if (account.commitmentType === 'yearly_commitment' && account.commitmentEndDate) {
+    const commitmentEnd = new Date(account.commitmentEndDate);
+    if (commitmentEnd > new Date()) {
+      currentPeriodEnd = Math.floor(commitmentEnd.getTime() / 1000);
+    }
+  }
+  const effectiveDate = new Date(currentPeriodEnd * 1000).toISOString();
+
+  const newPriceId = resolvePriceId(targetTierKey, commitmentType);
+  if (!newPriceId) throw new BillingError('No price configured for target tier');
+
+  await createOrUpdateSubscriptionSchedule({
+    subscriptionId: account.stripeSubscriptionId,
+    subscription,
+    targetPriceId: newPriceId,
+    currentPeriodEnd,
+    accountId,
+    currentTierName: currentTier.name,
+    targetTierKey,
+  });
 
   await updateCreditAccount(accountId, {
     scheduledTierChange: targetTierKey,
     scheduledTierChangeDate: effectiveDate,
+    scheduledPriceId: newPriceId,
   });
 
   return {
@@ -271,13 +315,180 @@ export async function scheduleDowngrade(
 }
 
 export async function cancelScheduledChange(accountId: string) {
+  const account = await getCreditAccount(accountId);
+
   await updateCreditAccount(accountId, {
     scheduledTierChange: null,
     scheduledTierChangeDate: null,
     scheduledPriceId: null,
   });
 
+  if (account?.stripeSubscriptionId) {
+    const stripe = getStripe();
+    try {
+      const subscription = await stripe.subscriptions.retrieve(account.stripeSubscriptionId);
+      const scheduleId = typeof subscription.schedule === 'string'
+        ? subscription.schedule
+        : (subscription.schedule as any)?.id;
+
+      if (scheduleId) {
+        try {
+          await stripe.subscriptionSchedules.release(scheduleId);
+          console.log(`[Billing] Released schedule ${scheduleId} for ${accountId}`);
+        } catch (releaseErr) {
+          console.warn(`[Billing] Could not release schedule ${scheduleId}:`, releaseErr);
+        }
+      }
+
+      await stripe.subscriptions.update(account.stripeSubscriptionId, {
+        metadata: {
+          ...subscription.metadata,
+          downgrade: '',
+          target_tier: '',
+          scheduled_change: '',
+        },
+      });
+    } catch (err) {
+      console.warn(`[Billing] Error clearing Stripe schedule for ${accountId}:`, err);
+    }
+  }
+
   return { success: true, message: 'Scheduled change cancelled' };
+}
+
+async function createOrUpdateSubscriptionSchedule(params: {
+  subscriptionId: string;
+  subscription: any;
+  targetPriceId: string;
+  currentPeriodEnd: number;
+  accountId: string;
+  currentTierName: string;
+  targetTierKey: string;
+}) {
+  const { subscriptionId, subscription, targetPriceId, currentPeriodEnd, accountId, currentTierName, targetTierKey } = params;
+  const stripe = getStripe();
+  const currentPriceId = subscription.items.data[0]?.price?.id;
+
+  const scheduleMetadata: Record<string, string> = {
+    account_id: accountId,
+    downgrade: 'true',
+    previous_tier: currentTierName,
+    target_tier: targetTierKey,
+    scheduled_by: 'user',
+    scheduled_at: new Date().toISOString(),
+    scheduled_price_id: targetPriceId,
+  };
+
+  const existingScheduleId = typeof subscription.schedule === 'string'
+    ? subscription.schedule
+    : (subscription.schedule as any)?.id ?? null;
+
+  if (existingScheduleId) {
+    const handled = await handleExistingSchedule(
+      existingScheduleId, subscription, targetPriceId, currentPeriodEnd, scheduleMetadata,
+    );
+    if (handled) return;
+  }
+
+  const schedule = await stripe.subscriptionSchedules.create({
+    from_subscription: subscriptionId,
+  });
+
+  await stripe.subscriptionSchedules.update(schedule.id, {
+    phases: [
+      {
+        items: [{ price: currentPriceId, quantity: 1 }],
+        start_date: subscription.current_period_start,
+        end_date: currentPeriodEnd,
+        proration_behavior: 'none',
+      },
+      {
+        items: [{ price: targetPriceId, quantity: 1 }],
+        proration_behavior: 'none',
+      },
+    ],
+    end_behavior: 'release',
+    metadata: scheduleMetadata,
+  });
+
+  console.log(`[Billing] Created subscription schedule ${schedule.id} for downgrade of ${accountId}`);
+}
+
+async function handleExistingSchedule(
+  existingScheduleId: string,
+  subscription: any,
+  targetPriceId: string,
+  currentPeriodEnd: number,
+  scheduleMetadata: Record<string, string>,
+): Promise<boolean> {
+  const stripe = getStripe();
+  const currentPriceId = subscription.items.data[0]?.price?.id;
+
+  try {
+    const existingSchedule = await stripe.subscriptionSchedules.retrieve(existingScheduleId);
+    const scheduleStatus = existingSchedule.status;
+
+    if (scheduleStatus === 'active' || scheduleStatus === 'not_started') {
+      const phases = existingSchedule.phases ?? [];
+      const now = Math.floor(Date.now() / 1000);
+      if (phases.length > 0 && phases[0].end_date && phases[0].end_date < now) {
+        console.log(`[Billing] Schedule ${existingScheduleId} phase 0 has ended, releasing`);
+        try { await stripe.subscriptionSchedules.release(existingScheduleId); } catch {}
+        await new Promise(r => setTimeout(r, 1000));
+        return false;
+      }
+
+      await stripe.subscriptionSchedules.update(existingScheduleId, {
+        phases: [
+          {
+            items: [{ price: currentPriceId, quantity: 1 }],
+            start_date: subscription.current_period_start,
+            end_date: currentPeriodEnd,
+            proration_behavior: 'none',
+          },
+          {
+            items: [{ price: targetPriceId, quantity: 1 }],
+            proration_behavior: 'none',
+          },
+        ],
+        end_behavior: 'release',
+        metadata: scheduleMetadata,
+      });
+      console.log(`[Billing] Updated existing schedule ${existingScheduleId}`);
+      return true;
+    }
+
+    try { await stripe.subscriptionSchedules.release(existingScheduleId); } catch {}
+    await new Promise(r => setTimeout(r, 1000));
+    return false;
+  } catch (err: any) {
+    if (err?.code === 'resource_missing' || err?.message?.includes('No such subscription_schedule')) {
+      return false;
+    }
+    if (err?.message?.includes('phase that has already ended')) {
+      try { await stripe.subscriptionSchedules.release(existingScheduleId); } catch {}
+      await new Promise(r => setTimeout(r, 1000));
+      return false;
+    }
+    throw err;
+  }
+}
+
+export async function releaseSubscriptionSchedule(subscriptionId: string): Promise<void> {
+  const stripe = getStripe();
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const scheduleId = typeof subscription.schedule === 'string'
+      ? subscription.schedule
+      : (subscription.schedule as any)?.id;
+
+    if (scheduleId) {
+      await stripe.subscriptionSchedules.release(scheduleId);
+      console.log(`[Billing] Released schedule ${scheduleId} before subscription update`);
+    }
+  } catch (err) {
+    console.warn(`[Billing] Could not release schedule for ${subscriptionId}:`, err);
+  }
 }
 
 export async function syncSubscription(accountId: string) {
@@ -359,13 +570,29 @@ async function handleUpgrade(
   const newPriceId = resolvePriceId(targetTierKey, commitmentType);
   if (!newPriceId) throw new BillingError('No price for target tier');
 
+  const scheduleId = typeof subscription.schedule === 'string'
+    ? subscription.schedule
+    : (subscription.schedule as any)?.id;
+  if (scheduleId) {
+    try {
+      await stripe.subscriptionSchedules.release(scheduleId);
+      console.log(`[Billing] Released schedule ${scheduleId} before upgrade for ${accountId}`);
+    } catch (err) {
+      console.warn(`[Billing] Could not release schedule ${scheduleId}:`, err);
+    }
+  }
+
   const updated = await stripe.subscriptions.update(subscriptionId, {
     items: [{ id: subscription.items.data[0].id, price: newPriceId }],
-    proration_behavior: 'create_prorations',
+    proration_behavior: 'always_invoice',
+    payment_behavior: 'pending_if_incomplete',
     metadata: {
       ...subscription.metadata,
       tier_key: targetTierKey,
       previous_tier: subscription.metadata?.tier_key ?? 'unknown',
+      downgrade: '',
+      target_tier: '',
+      scheduled_change: '',
     },
   });
 
@@ -374,7 +601,7 @@ async function handleUpgrade(
   const targetTier = getTier(targetTierKey);
   const credits = targetTier.monthlyCredits;
   if (credits > 0) {
-    await resetExpiringCredits(accountId, credits);
+    await resetExpiringCredits(accountId, credits, `Plan upgrade to ${targetTier.displayName}: ${credits} credits`);
   }
 
   return {
@@ -400,4 +627,27 @@ async function activateSubscription(
     scheduledTierChangeDate: null,
     scheduledPriceId: null,
   });
+}
+
+export async function cancelFreeSubscriptionForUpgrade(
+  oldSubscriptionId: string,
+  accountId: string,
+): Promise<void> {
+  try {
+    const stripe = getStripe();
+    const oldSub = await stripe.subscriptions.retrieve(oldSubscriptionId);
+    if (oldSub.status === 'canceled' || oldSub.status === 'incomplete_expired') {
+      console.log(`[Billing] Old free subscription ${oldSubscriptionId} already cancelled for ${accountId}`);
+      return;
+    }
+    await stripe.subscriptions.cancel(oldSubscriptionId);
+    console.log(`[Billing] Cancelled old free subscription ${oldSubscriptionId} for ${accountId}`);
+  } catch (err: any) {
+    if (err?.code === 'resource_missing' || err?.statusCode === 404) {
+      console.log(`[Billing] Old free subscription ${oldSubscriptionId} not found (already deleted) for ${accountId}`);
+      return;
+    }
+    console.error(`[Billing] Failed to cancel old free subscription ${oldSubscriptionId} for ${accountId}:`, err);
+    throw err;
+  }
 }
