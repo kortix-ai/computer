@@ -66,6 +66,12 @@ export const SessionLayout = memo(function SessionLayout({
   const hasToolCalls = toolCalls.length > 0;
   const prevHasToolCallsRef = useRef(false);
 
+  // Reset the tool-call transition tracker when switching sessions so the
+  // auto-open logic fires correctly for the new session.
+  useEffect(() => {
+    prevHasToolCallsRef.current = false;
+  }, [sessionId]);
+
   useEffect(() => {
     if (hasToolCalls && !prevHasToolCallsRef.current && !isMobile) {
       setIsSidePanelOpen(true);
@@ -100,6 +106,10 @@ export const SessionLayout = memo(function SessionLayout({
   // Side panel shows for tool calls only now (terminal/desktop moved to right sidebar)
   const shouldShowPanel = isSidePanelOpen && hasToolCalls;
 
+  // Imperatively resize panels when visibility, expand state, or session changes.
+  // Including sessionId ensures panels are correctly sized after navigating
+  // between sessions (e.g. fork → parent), since the ResizablePanelGroup may
+  // retain stale sizes from the previous session's layout.
   useEffect(() => {
     if (shouldShowPanel) {
       if (isExpanded) {
@@ -113,7 +123,7 @@ export const SessionLayout = memo(function SessionLayout({
       sidePanelRef.current?.resize(0);
       mainPanelRef.current?.resize(100);
     }
-  }, [shouldShowPanel, isExpanded]);
+  }, [shouldShowPanel, isExpanded, sessionId]);
 
   const renderAssistantMessage = useCallback(() => null, []);
   const renderToolResult = useCallback(() => null, []);

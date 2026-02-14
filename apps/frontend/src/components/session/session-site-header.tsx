@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -23,46 +23,13 @@ import {
   PanelRightOpen,
   Layers,
   Loader2,
-  Share2,
+  Upload,
   FileDown,
-  Link2,
-  Link2Off,
-  Check,
-  Copy,
   MoreHorizontal,
 } from 'lucide-react';
 import { CompactDialog } from '@/components/session/compact-dialog';
 import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
-import {
-  useOpenCodeSession,
-  useShareSession,
-  useUnshareSession,
-} from '@/hooks/opencode/use-opencode-sessions';
-import { toast } from '@/lib/toast';
-
-/**
- * Rewrite the share URL returned by the OpenCode server (e.g. https://opncd.ai/share/XYZ)
- * to use our own domain so that the public link points to our app.
- */
-function toOurShareUrl(serverUrl: string): string {
-  try {
-    const parsed = new URL(serverUrl);
-    // Extract the share ID from the path (last segment of /share/{id})
-    const segments = parsed.pathname.split('/').filter(Boolean);
-    const shareIdx = segments.indexOf('share');
-    const shareId = shareIdx !== -1 && segments[shareIdx + 1]
-      ? segments[shareIdx + 1]
-      : segments[segments.length - 1];
-    const appBase = (typeof window !== 'undefined' ? window.location.origin : '')
-      || process.env.NEXT_PUBLIC_URL
-      || process.env.NEXT_PUBLIC_APP_URL
-      || 'https://www.kortix.com';
-    return `${appBase}/share/${shareId}`;
-  } catch {
-    // If the URL can't be parsed, return as-is
-    return serverUrl;
-  }
-}
+import { SharePopover } from '@/components/session/share-popover';
 
 interface SessionSiteHeaderProps {
   sessionId: string;
@@ -85,58 +52,13 @@ export function SessionSiteHeader({
 }: SessionSiteHeaderProps) {
   const [compactOpen, setCompactOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const isMobile = useIsMobile() || isMobileView;
   const { setOpen: setSidebarOpen, setOpenMobile } = useSidebar();
-
-  const { data: session } = useOpenCodeSession(sessionId);
-  const shareSession = useShareSession();
-  const unshareSession = useUnshareSession();
-
-  const isShared = !!session?.share?.url;
-  const isSharePending = shareSession.isPending || unshareSession.isPending;
 
   const handleOpenMenu = () => {
     setSidebarOpen(true);
     setOpenMobile(true);
   };
-
-  const handleShare = useCallback(async () => {
-    try {
-      const updated = await shareSession.mutateAsync(sessionId);
-      if (updated.share?.url) {
-        const ourUrl = toOurShareUrl(updated.share.url);
-        await navigator.clipboard.writeText(ourUrl);
-        toast.success('Share link copied to clipboard');
-      } else {
-        toast.success('Session shared');
-      }
-    } catch {
-      toast.error('Failed to share session');
-    }
-  }, [sessionId, shareSession]);
-
-  const handleUnshare = useCallback(async () => {
-    try {
-      await unshareSession.mutateAsync(sessionId);
-      toast.success('Share link removed');
-    } catch {
-      toast.error('Failed to unshare session');
-    }
-  }, [sessionId, unshareSession]);
-
-  const handleCopyShareLink = useCallback(async () => {
-    if (!session?.share?.url) return;
-    try {
-      const ourUrl = toOurShareUrl(session.share.url);
-      await navigator.clipboard.writeText(ourUrl);
-      setLinkCopied(true);
-      toast.success('Share link copied');
-      setTimeout(() => setLinkCopied(false), 2000);
-    } catch {
-      toast.error('Failed to copy link');
-    }
-  }, [session?.share?.url]);
 
   return (
     <>
@@ -156,19 +78,13 @@ export function SessionSiteHeader({
 
             <div className="min-w-0 flex items-center gap-2">
               <span className="text-sm font-medium truncate">{sessionTitle}</span>
-              {isShared && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
-                  <Link2 className="h-2.5 w-2.5" />
-                  Shared
-                </span>
-              )}
             </div>
           </div>
 
           {/* Right: actions */}
-          <div className="flex items-center gap-0.5 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <TooltipProvider delayDuration={300}>
-              {/* More actions dropdown */}
+              {/* More actions dropdown (Export + Compact) */}
               <DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -176,63 +92,23 @@ export function SessionSiteHeader({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 cursor-pointer text-muted-foreground hover:text-foreground"
+                        className="h-9 w-9 cursor-pointer text-muted-foreground hover:text-foreground"
                       >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
+                        <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={4}>
-                    <p>Session actions</p>
+                    <p>More actions</p>
                   </TooltipContent>
                 </Tooltip>
 
-                <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuContent align="end" className="w-48">
                   {/* Export transcript */}
                   <DropdownMenuItem onClick={() => setExportOpen(true)}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Export transcript
                   </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  {/* Share / Unshare */}
-                  {isShared ? (
-                    <>
-                      <DropdownMenuItem onClick={handleCopyShareLink}>
-                        {linkCopied ? (
-                          <Check className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Copy className="mr-2 h-4 w-4" />
-                        )}
-                        {linkCopied ? 'Copied!' : 'Copy share link'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={handleUnshare}
-                        disabled={isSharePending}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        {isSharePending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Link2Off className="mr-2 h-4 w-4" />
-                        )}
-                        Remove share link
-                      </DropdownMenuItem>
-                    </>
-                  ) : (
-                    <DropdownMenuItem
-                      onClick={handleShare}
-                      disabled={isSharePending}
-                    >
-                      {isSharePending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Share2 className="mr-2 h-4 w-4" />
-                      )}
-                      Share session
-                    </DropdownMenuItem>
-                  )}
 
                   <DropdownMenuSeparator />
 
@@ -251,6 +127,18 @@ export function SessionSiteHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Share button with popover (matches Suna) */}
+              <SharePopover sessionId={sessionId}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 px-2.5 cursor-pointer gap-1.5"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="hidden sm:inline text-sm">Share</span>
+                </Button>
+              </SharePopover>
+
               {/* Panel toggle */}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -259,12 +147,12 @@ export function SessionSiteHeader({
                     size="icon"
                     onClick={onToggleSidePanel}
                     disabled={!canOpenSidePanel}
-                    className="h-8 w-8 cursor-pointer text-muted-foreground hover:text-foreground"
+                    className="h-9 w-9 cursor-pointer"
                   >
                     {isSidePanelOpen ? (
-                      <PanelRightClose className="h-3.5 w-3.5" />
+                      <PanelRightClose className="h-4 w-4" />
                     ) : (
-                      <PanelRightOpen className="h-3.5 w-3.5" />
+                      <PanelRightOpen className="h-4 w-4" />
                     )}
                   </Button>
                 </TooltipTrigger>

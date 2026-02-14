@@ -38,6 +38,12 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  type OutputSection,
+  normalizeToolOutput,
+  hasStructuredContent,
+  parseStructuredOutput,
+} from '@/lib/utils/structured-output';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import {
   Collapsible,
@@ -122,7 +128,12 @@ function partMetadata(part: ToolPart): Record<string, unknown> {
 
 function partOutput(part: ToolPart): string {
   if (part.state.status === 'completed') {
-    return part.state.output ?? '';
+    const raw = part.state.output ?? '';
+    // Strip <bash_metadata> and similar internal XML tags from tool output
+    return raw
+      .replace(/<bash_metadata>[\s\S]*?<\/bash_metadata>/g, '')
+      .replace(/<\/?(?:system_info|exit_code|stderr_note)>[\s\S]*?(?:<\/\w+>|$)/g, '')
+      .trim();
   }
   return '';
 }
@@ -355,6 +366,139 @@ function DiffChanges({ additions, deletions }: { additions: number; deletions: n
 }
 
 // ============================================================================
+// Structured Output — imported from shared utility
+// ============================================================================
+
+/**
+ * Render parsed structured output sections with semantic styling.
+ */
+function StructuredOutput({ sections }: { sections: OutputSection[] }) {
+  const [showTrace, setShowTrace] = useState(false);
+
+  return (
+    <div className="space-y-1.5 p-2.5">
+      {sections.map((section, i) => {
+        switch (section.type) {
+          case 'warning':
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-yellow-500/5 border border-yellow-500/15"
+              >
+                <AlertTriangle className="size-3 flex-shrink-0 mt-0.5 text-yellow-500" />
+                <p className="text-[11px] leading-relaxed text-yellow-700 dark:text-yellow-400 font-mono break-words">
+                  {section.text}
+                </p>
+              </div>
+            );
+
+          case 'error':
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-red-500/5 border border-red-500/15"
+              >
+                <Ban className="size-3 flex-shrink-0 mt-0.5 text-red-400" />
+                <div className="min-w-0 flex-1">
+                  {section.errorType && (
+                    <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider">
+                      {section.errorType}
+                    </span>
+                  )}
+                  <p className="text-[11px] leading-relaxed text-red-600 dark:text-red-400 font-mono break-words">
+                    {section.summary}
+                  </p>
+                </div>
+              </div>
+            );
+
+          case 'traceback':
+            return (
+              <div key={i}>
+                <button
+                  onClick={() => setShowTrace((v) => !v)}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
+                >
+                  <ChevronRight
+                    className={cn(
+                      'size-3 transition-transform flex-shrink-0',
+                      showTrace && 'rotate-90',
+                    )}
+                  />
+                  <span className="text-[10px] font-medium">Stack trace</span>
+                  <span className="text-[10px] text-muted-foreground/40 font-mono ml-1">
+                    {section.lines.length} lines
+                  </span>
+                </button>
+                {showTrace && (
+                  <div className="mt-1 rounded-md bg-muted/20 border border-border/30 overflow-hidden">
+                    <pre className="p-2.5 font-mono text-[10px] leading-relaxed text-muted-foreground/60 whitespace-pre-wrap break-all max-h-64 overflow-auto">
+                      {section.lines.map((line, li) => {
+                        // Highlight File "..." lines within the trace
+                        if (/^\s+File "/.test(line)) {
+                          return (
+                            <span key={li} className="text-muted-foreground/80">
+                              {line}
+                              {'\n'}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span key={li}>
+                            {line}
+                            {'\n'}
+                          </span>
+                        );
+                      })}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            );
+
+          case 'install':
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-emerald-500/5 border border-emerald-500/15"
+              >
+                <CheckCircle className="size-3 flex-shrink-0 text-emerald-500" />
+                <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono">
+                  {section.text}
+                </span>
+              </div>
+            );
+
+          case 'info':
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-2 px-2.5 py-1 text-[11px] text-muted-foreground font-mono"
+              >
+                <span className="size-1 rounded-full bg-muted-foreground/30 flex-shrink-0" />
+                <span className="break-words">{section.text}</span>
+              </div>
+            );
+
+          case 'plain':
+            return (
+              <pre
+                key={i}
+                className="px-2.5 py-1 font-mono text-[11px] leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
+              >
+                {section.text}
+              </pre>
+            );
+
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+}
+
+// ============================================================================
 // Tool Renderers — self-registering
 // ============================================================================
 
@@ -528,14 +672,22 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
     [strippedOutput],
   );
 
+  // Try to detect structured log-like output (warnings, tracebacks, etc.)
+  const structuredSections = useMemo(() => {
+    if (sessionMeta || !strippedOutput) return null;
+    const normalized = normalizeToolOutput(strippedOutput);
+    if (!hasStructuredContent(normalized)) return null;
+    return parseStructuredOutput(normalized);
+  }, [strippedOutput, sessionMeta]);
+
   const { commandBlock, outputBlock } = useMemo(() => {
     const cmd = `\`\`\`bash\n$ ${command}\n\`\`\``;
-    if (!strippedOutput || sessionMeta) return { commandBlock: cmd, outputBlock: '' };
+    if (!strippedOutput || sessionMeta || structuredSections) return { commandBlock: cmd, outputBlock: '' };
 
     const { content, lang } = formatBashOutput(strippedOutput);
     const out = `\`\`\`${lang}\n${content}\n\`\`\``;
     return { commandBlock: cmd, outputBlock: out };
-  }, [command, strippedOutput, sessionMeta]);
+  }, [command, strippedOutput, sessionMeta, structuredSections]);
 
   return (
     <BasicTool
@@ -549,6 +701,8 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         <UnifiedMarkdown content={commandBlock} isStreaming={false} />
         {sessionMeta ? (
           <SessionMetadataList sessions={sessionMeta} />
+        ) : structuredSections ? (
+          <StructuredOutput sections={structuredSections} />
         ) : outputBlock ? (
           <UnifiedMarkdown content={outputBlock} isStreaming={status === 'running'} />
         ) : null}
@@ -2771,23 +2925,93 @@ ToolRegistry.register('memory_read', MemorySearchTool);
 // ToolError
 // ============================================================================
 
-export function ToolError({ error }: { error: string }) {
+/**
+ * Parse an error string into a summary line and optional traceback/details.
+ */
+function parseErrorContent(error: string): {
+  summary: string;
+  traceback: string | null;
+  errorType: string | null;
+} {
   const cleaned = error.replace(/^Error:\s*/, '');
+
+  // Try to extract Python-style traceback
+  const tracebackIdx = cleaned.indexOf('Traceback (most recent call last):');
+  if (tracebackIdx >= 0) {
+    const before = cleaned.slice(0, tracebackIdx).trim();
+    const traceSection = cleaned.slice(tracebackIdx);
+    // Find the actual error line at the end (last line that isn't whitespace)
+    const lines = traceSection.split('\n').filter((l) => l.trim());
+    const lastLine = lines[lines.length - 1] || '';
+    // Extract error type (e.g. "playwright._impl._errors.Error")
+    const typeMatch = lastLine.match(/^([\w._]+(?:Error|Exception|Warning)):\s*/);
+    const errorType = typeMatch ? typeMatch[1].split('.').pop() || typeMatch[1] : null;
+    const summary = before || (errorType ? lastLine : lastLine.slice(0, 120));
+    return { summary, traceback: traceSection, errorType };
+  }
+
+  // Try to extract Node.js-style stack trace
+  const stackIdx = cleaned.indexOf('\n    at ');
+  if (stackIdx >= 0) {
+    const summary = cleaned.slice(0, stackIdx).trim();
+    return { summary, traceback: cleaned.slice(stackIdx), errorType: null };
+  }
+
+  // Simple "ErrorType: message" pattern
   const colonIdx = cleaned.indexOf(': ');
-  const hasTitle = colonIdx > 0 && colonIdx < 30;
-  const title = hasTitle ? cleaned.slice(0, colonIdx) : undefined;
-  const message = hasTitle ? cleaned.slice(colonIdx + 2) : cleaned;
+  if (colonIdx > 0 && colonIdx < 60) {
+    const left = cleaned.slice(0, colonIdx);
+    if (/^[\w._-]+$/.test(left)) {
+      return { summary: cleaned, traceback: null, errorType: left };
+    }
+  }
+
+  return { summary: cleaned, traceback: null, errorType: null };
+}
+
+export function ToolError({ error, toolName }: { error: string; toolName?: string }) {
+  const [showTrace, setShowTrace] = useState(false);
+  const { summary, traceback, errorType } = useMemo(() => parseErrorContent(error), [error]);
+
+  // Display name: prefer short error type, else "Error"
+  const displayType = errorType || 'Error';
 
   return (
-    <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground">
-      <Ban className="size-3 flex-shrink-0 mt-0.5" />
-      {title ? (
-        <div className="min-w-0">
-          <span className="font-medium text-foreground/70">{title}: </span>
-          <span className="break-all">{message}</span>
-        </div>
-      ) : (
-        <span className="break-all">{message}</span>
+    <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden text-xs">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-red-500/10">
+        <Ban className="size-3 flex-shrink-0 text-red-400" />
+        <span className="font-medium text-red-400">{displayType}</span>
+        {toolName && (
+          <span className="text-muted-foreground/50 font-mono text-[10px] ml-auto">{toolName}</span>
+        )}
+      </div>
+
+      {/* Summary */}
+      <div className="px-3 py-2.5">
+        <p className="text-foreground/80 leading-relaxed break-words whitespace-pre-wrap font-mono text-[11px]">
+          {summary}
+        </p>
+      </div>
+
+      {/* Stack trace toggle */}
+      {traceback && (
+        <>
+          <button
+            onClick={() => setShowTrace((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 w-full text-left border-t border-red-500/10 text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
+          >
+            <ChevronRight className={cn('size-3 transition-transform', showTrace && 'rotate-90')} />
+            <span className="text-[10px] font-medium">Stack trace</span>
+          </button>
+          {showTrace && (
+            <div className="px-3 pb-2.5 max-h-64 overflow-auto">
+              <pre className="font-mono text-[10px] leading-relaxed text-muted-foreground/60 whitespace-pre-wrap break-all">
+                {traceback}
+              </pre>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -2797,8 +3021,49 @@ export function ToolError({ error }: { error: string }) {
 // GenericTool (fallback)
 // ============================================================================
 
+/**
+ * Parse a tool name that may contain a namespace/server prefix.
+ * e.g. "marko-kraemer/validate-slide" -> { server: "marko-kraemer", name: "validate-slide", display: "Validate Slide" }
+ * e.g. "bash" -> { server: null, name: "bash", display: "Bash" }
+ */
+function parseToolName(tool: string): { server: string | null; name: string; display: string } {
+  const slashIdx = tool.lastIndexOf('/');
+  const server = slashIdx > 0 ? tool.slice(0, slashIdx) : null;
+  const name = slashIdx > 0 ? tool.slice(slashIdx + 1) : tool;
+  // Convert kebab/snake case to Title Case
+  const display = name
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return { server, name, display };
+}
+
 export function GenericTool({ part }: ToolProps) {
   const output = partOutput(part);
+  const strippedGenericOutput = output ? stripAnsi(output) : '';
+  const status = partStatus(part);
+  const input = partInput(part);
+  const { server, display } = useMemo(() => parseToolName(part.tool), [part.tool]);
+
+  // Try to detect structured log-like output (warnings, tracebacks, etc.)
+  const genericStructuredSections = useMemo(() => {
+    if (!strippedGenericOutput) return null;
+    const normalized = normalizeToolOutput(strippedGenericOutput);
+    if (!hasStructuredContent(normalized)) return null;
+    return parseStructuredOutput(normalized);
+  }, [strippedGenericOutput]);
+
+  // Build trigger title with optional server badge
+  const triggerContent = useMemo(() => {
+    // Extract a useful subtitle from input (first string value that looks like a description/arg)
+    let subtitle: string | undefined;
+    for (const [key, val] of Object.entries(input)) {
+      if (typeof val === 'string' && val.length > 0 && val.length < 120 && key !== 'tool') {
+        subtitle = val;
+        break;
+      }
+    }
+    return { title: display, subtitle, server };
+  }, [display, input, server]);
 
   const parsedXml = useMemo(() => {
     if (!output) return null;
@@ -2809,7 +3074,6 @@ export function GenericTool({ part }: ToolProps) {
     const attrStr = match[2] || '';
     const innerText = match[3].trim();
 
-    // Parse attributes
     const attrs: Record<string, string> = {};
     const attrRegex = /(\w+)="([^"]+)"/g;
     let m;
@@ -2817,7 +3081,6 @@ export function GenericTool({ part }: ToolProps) {
       attrs[m[1]] = m[2];
     }
 
-    // Detect key-value pairs
     const fields: Record<string, string> = {};
     const lines = innerText.split('\n').filter((l) => l.trim());
     let kvCount = 0;
@@ -2834,62 +3097,80 @@ export function GenericTool({ part }: ToolProps) {
     }
 
     const isStructured = kvCount >= 2 && kvCount >= lines.length * 0.5;
-
     return { tagName, attrs, innerText, fields, isStructured };
   }, [output]);
 
-  if (parsedXml) {
-    return (
-      <BasicTool
-        icon={<Cpu className="size-3.5 flex-shrink-0" />}
-        trigger={
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <span className="font-medium text-xs text-foreground whitespace-nowrap">{part.tool}</span>
-            <span className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary font-mono whitespace-nowrap">
-              {parsedXml.tagName}
+  // Build the trigger ReactNode with server badge
+  const triggerNode = (
+    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      <span className="font-medium text-xs text-foreground whitespace-nowrap">{triggerContent.title}</span>
+      {triggerContent.server && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/70 font-mono whitespace-nowrap">
+          {triggerContent.server}
+        </span>
+      )}
+      {triggerContent.subtitle && !parsedXml && (
+        <span className="text-muted-foreground text-xs truncate font-mono">
+          {triggerContent.subtitle.length > 60 ? triggerContent.subtitle.slice(0, 60) + '...' : triggerContent.subtitle}
+        </span>
+      )}
+      {parsedXml && (
+        <>
+          <span className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary font-mono whitespace-nowrap">
+            {parsedXml.tagName}
+          </span>
+          {Object.entries(parsedXml.attrs).map(([key, val]) => (
+            <span
+              key={key}
+              className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap truncate max-w-[150px]"
+              title={`${key}=${val}`}
+            >
+              {key}={val}
             </span>
-            {Object.entries(parsedXml.attrs).map(([key, val]) => (
-              <span
-                key={key}
-                className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap truncate max-w-[150px]"
-                title={`${key}=${val}`}
-              >
-                {key}={val}
-              </span>
-            ))}
-          </div>
-        }
-      >
-        <div className="p-2.5 max-h-72 overflow-auto">
-          {parsedXml.isStructured ? (
-            <div className="space-y-1">
-              {Object.entries(parsedXml.fields).map(([key, value]) => (
-                <div key={key} className="flex items-baseline gap-2 text-[11px]">
-                  <span className="text-muted-foreground font-medium min-w-[80px] flex-shrink-0">{key}</span>
-                  <span className="text-foreground/80 font-mono break-all">{value}</span>
-                </div>
-              ))}
+          ))}
+        </>
+      )}
+      {status === 'running' && (
+        <Loader2 className="size-3 animate-spin text-muted-foreground ml-auto flex-shrink-0" />
+      )}
+    </div>
+  );
+
+  const bodyContent = parsedXml ? (
+    <div className="p-2.5 max-h-72 overflow-auto">
+      {parsedXml.isStructured ? (
+        <div className="space-y-1">
+          {Object.entries(parsedXml.fields).map(([key, value]) => (
+            <div key={key} className="flex items-baseline gap-2 text-[11px]">
+              <span className="text-muted-foreground font-medium min-w-[80px] flex-shrink-0">{key}</span>
+              <span className="text-foreground/80 font-mono break-all">{value}</span>
             </div>
-          ) : (
-            <pre className="font-mono text-[11px] whitespace-pre-wrap text-foreground/80 leading-relaxed">
-              {parsedXml.innerText}
-            </pre>
-          )}
+          ))}
         </div>
-      </BasicTool>
-    );
-  }
+      ) : (
+        <pre className="font-mono text-[11px] whitespace-pre-wrap text-foreground/80 leading-relaxed">
+          {parsedXml.innerText}
+        </pre>
+      )}
+    </div>
+  ) : genericStructuredSections ? (
+    <div className="max-h-72 overflow-auto">
+      <StructuredOutput sections={genericStructuredSections} />
+    </div>
+  ) : output ? (
+    <div className="p-2.5 max-h-72 overflow-auto">
+      <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground leading-relaxed">
+        {output}
+      </pre>
+    </div>
+  ) : null;
 
   return (
     <BasicTool
       icon={<Cpu className="size-3.5 flex-shrink-0" />}
-      trigger={{ title: part.tool }}
+      trigger={triggerNode}
     >
-      {output && (
-        <div className="p-2 max-h-72 overflow-auto font-mono text-[11px]">
-          <pre className="whitespace-pre-wrap text-muted-foreground">{output}</pre>
-        </div>
-      )}
+      {bodyContent}
     </BasicTool>
   );
 }
@@ -2984,9 +3265,40 @@ export function ToolPartRenderer({
   // Skip todoread
   if (part.tool === 'todoread') return null;
 
-  // Error state
+  // Error state — show within a proper tool wrapper with the tool name
   if (part.state.status === 'error' && 'error' in part.state) {
-    return <ToolError error={(part.state as { error: string }).error} />;
+    const errorStr = (part.state as { error: string }).error;
+    const { display, server } = (() => {
+      const slashIdx = part.tool.lastIndexOf('/');
+      const s = slashIdx > 0 ? part.tool.slice(0, slashIdx) : null;
+      const n = slashIdx > 0 ? part.tool.slice(slashIdx + 1) : part.tool;
+      const d = n.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      return { display: d, server: s };
+    })();
+
+    return (
+      <BasicTool
+        icon={<CircleAlert className="size-3.5 flex-shrink-0 text-red-400" />}
+        trigger={
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="font-medium text-xs text-foreground whitespace-nowrap">{display}</span>
+            {server && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/70 font-mono whitespace-nowrap">
+                {server}
+              </span>
+            )}
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 font-medium ml-auto flex-shrink-0">
+              Error
+            </span>
+          </div>
+        }
+        defaultOpen
+      >
+        <div className="p-0">
+          <ToolError error={errorStr} toolName={part.tool} />
+        </div>
+      </BasicTool>
+    );
   }
 
   // Look up registered component
