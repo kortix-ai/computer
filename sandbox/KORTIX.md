@@ -86,7 +86,7 @@ The base Docker image (`linuxserver/webtop:latest` — Alpine XFCE) uses `/confi
 | `ENV_MODE` | `local` | `local` or `cloud` — controls API proxy routing |
 | `SANDBOX_ID` | `local` | Sandbox identifier (set by Daytona in cloud mode) |
 | `PROJECT_ID` | `local` | Project identifier (set by orchestrator in cloud mode) |
-| `KORTIX_API_URL` | `https://api.kortix.ai` | Kortix API base URL (cloud mode) |
+| `KORTIX_API_URL` | `https://api.kortix.ai/v1/router` | Kortix API base URL (cloud mode) |
 | `KORTIX_TOKEN` | — | Authentication token for Kortix API (cloud mode) |
 
 ---

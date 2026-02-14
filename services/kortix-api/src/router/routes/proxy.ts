@@ -31,8 +31,10 @@ for (const [prefix, serviceConfig] of Object.entries(services)) {
 async function handleProxy(c: any, service: ProxyServiceConfig, prefix: string) {
   const fullPath = new URL(c.req.url).pathname;
   const prefixStr = `/${prefix}`;
-  const subPath = fullPath.startsWith(prefixStr)
-    ? fullPath.slice(prefixStr.length) || '/'
+  // Find the prefix anywhere in the path (handles mount-point prefixing by Hono)
+  const prefixIdx = fullPath.indexOf(prefixStr);
+  const subPath = prefixIdx !== -1
+    ? fullPath.slice(prefixIdx + prefixStr.length) || '/'
     : '/';
   const queryString = new URL(c.req.url).search;
   const method = c.req.method;

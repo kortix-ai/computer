@@ -34,7 +34,7 @@ export async function GET(
       );
     }
     
-    const backendUrl = new URL(`/integrations/${provider}/callback`, BACKEND_URL);
+    const backendUrl = new URL(`${BACKEND_URL}/cron/integrations/${provider}/callback`);
     backendUrl.searchParams.set('code', code);
     backendUrl.searchParams.set('state', state);
     

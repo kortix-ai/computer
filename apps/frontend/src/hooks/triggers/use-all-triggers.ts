@@ -24,7 +24,7 @@ export interface TriggerWithAgent {
 }
 
 const fetchAllTriggers = async (): Promise<TriggerWithAgent[]> => {
-  const response = await backendApi.get<TriggerWithAgent[]>(`/triggers/all`);
+  const response = await backendApi.get<TriggerWithAgent[]>(`/cron/triggers/all`);
   if (!response.success) {
     const error = response.error?.message || 'Failed to fetch triggers';
     throw new Error(error || 'Failed to fetch triggers');

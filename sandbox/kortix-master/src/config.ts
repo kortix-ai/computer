@@ -9,7 +9,7 @@ export const config = {
   OPENCODE_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD || '',
 
   // Kortix backend
-  KORTIX_API_URL: process.env.KORTIX_API_URL || 'https://api.kortix.ai/router',
+  KORTIX_API_URL: process.env.KORTIX_API_URL || 'https://api.kortix.ai/v1/router',
   KORTIX_TOKEN: process.env.KORTIX_TOKEN || '',
 
   // Secret storage

@@ -32,6 +32,7 @@ app.use(
       'https://staging.kortix.com',
       'https://kortix.cloud',
       'https://www.kortix.cloud',
+      'https://new.kortix.com',
       ...(config.isDevelopment()
         ? ['http://localhost:3000', 'http://127.0.0.1:3000']
         : []),
@@ -81,17 +82,18 @@ app.get('/v1/system/status', (c) => {
 });
 
 // ─── Mount Sub-Services ─────────────────────────────────────────────────────
+// All services follow the pattern: /v1/{serviceName}/...
 
-app.route('/router', router);        // /router/v1/*, /router/web-search/*, /router/tavily/*, etc.
-app.route('/', billingApp);           // /billing/*, /setup/*, /webhooks/*
-app.route('/', platformApp);          // /v1/account/*, /v1/sandbox/version
-app.route('/', cronApp);              // /v1/sandboxes/*, /v1/triggers/*, /v1/executions/*
-app.route('/', deploymentsApp);       // /v1/deployments/*
+app.route('/v1/router', router);        // /v1/router/chat/completions, /v1/router/models, /v1/router/web-search, /v1/router/tavily/*, etc.
+app.route('/v1/billing', billingApp);   // /v1/billing/account-state, /v1/billing/webhooks/*, /v1/billing/setup/*
+app.route('/v1/platform', platformApp); // /v1/platform/providers, /v1/platform/sandbox/*, /v1/platform/sandbox/version
+app.route('/v1/cron', cronApp);         // /v1/cron/sandboxes/*, /v1/cron/triggers/*, /v1/cron/executions/*
+app.route('/v1/deployments', deploymentsApp); // /v1/deployments/*
 // Daytona Proxy is cloud-only (requires Daytona API). In local mode the catch-all
 // /:sandboxId/:port/* pattern would intercept every unmatched request and throw
-// "Invalid port" errors for paths like /v1/health, /v1/billing/*, etc.
+// "Invalid port" errors for unmatched paths.
 if (!config.isLocal()) {
-  app.route('/', daytonaProxyApp);    // /:sandboxId/:port/* (MUST BE LAST — wildcard catch-all)
+  app.route('/v1/preview', daytonaProxyApp); // /v1/preview/:sandboxId/:port/* (MUST BE LAST — wildcard catch-all)
 }
 
 // === Error Handling ===
@@ -151,12 +153,12 @@ console.log(`
 ║  Mode: ${config.ENV_MODE.padEnd(49)}║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Services:                                                ║
-║    Router /router (search, LLM, proxy)                    ║
-║    Billing (subscriptions, credits, webhooks)              ║
-║    Platform (sandbox lifecycle)                            ║
-║    Cron (scheduled triggers)                               ║
-║    Deployments (deploy lifecycle)                          ║
-║    Daytona Proxy (preview proxy)                           ║
+║    /v1/router     (search, LLM, proxy)                    ║
+║    /v1/billing    (subscriptions, credits, webhooks)       ║
+║    /v1/platform   (sandbox lifecycle)                      ║
+║    /v1/cron       (scheduled triggers)                     ║
+║    /v1/deployments (deploy lifecycle)                      ║
+║    /v1/preview    (sandbox preview proxy)                  ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
 ║  Supabase:   ${config.SUPABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║

@@ -41,7 +41,7 @@ const getAccessToken = async () => {
 
 const initiateOAuthInstall = async (request: OAuthInstallRequest): Promise<OAuthInstallResponse> => {
   const accessToken = await getAccessToken();
-  const response = await fetch(`${API_URL}/integrations/install`, {
+  const response = await fetch(`${API_URL}/cron/integrations/install`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -60,7 +60,7 @@ const initiateOAuthInstall = async (request: OAuthInstallRequest): Promise<OAuth
 
 const uninstallOAuthIntegration = async (triggerId: string): Promise<void> => {
   const accessToken = await getAccessToken();
-  const response = await fetch(`${API_URL}/integrations/uninstall/${triggerId}`, {
+  const response = await fetch(`${API_URL}/cron/integrations/uninstall/${triggerId}`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',

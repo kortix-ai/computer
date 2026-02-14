@@ -25,7 +25,7 @@ export const useTriggerExecutions = (triggerId: string, limit: number = 20) => {
   return useQuery({
     queryKey: ['trigger-executions', triggerId, limit],
     queryFn: async (): Promise<TriggerExecutionHistoryResponse> => {
-      const response = await backendApi.get(`/triggers/${triggerId}/executions?limit=${limit}`);
+      const response = await backendApi.get(`/cron/triggers/${triggerId}/executions?limit=${limit}`);
       return response.data;
     },
     enabled: !!triggerId,

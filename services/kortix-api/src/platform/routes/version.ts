@@ -74,7 +74,7 @@ async function getLatestVersion(): Promise<string> {
 const versionRouter = new Hono();
 
 /**
- * GET /v1/sandbox/version
+ * GET /v1/platform/sandbox/version
  *
  * Returns the latest published version of @kortix/sandbox from npm.
  * Called by:

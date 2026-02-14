@@ -10,13 +10,32 @@ import { accountDeletionRouter } from './routes/account-deletion';
 
 const billingApp = new Hono();
 
+// Webhooks — NO auth (handlers verify signatures internally)
 billingApp.route('/webhooks', webhooksRouter);
 
-billingApp.use('/v1/billing/*', supabaseAuth);
-billingApp.use('/v1/account/*', supabaseAuth);
-billingApp.use('/v1/setup/*', supabaseAuth);
+// Auth for all billing routes except webhooks
+billingApp.use('/account-state/*', supabaseAuth);
+billingApp.use('/account/*', supabaseAuth);
+billingApp.use('/create-*', supabaseAuth);
+billingApp.use('/confirm-*', supabaseAuth);
+billingApp.use('/cancel-*', supabaseAuth);
+billingApp.use('/reactivate-*', supabaseAuth);
+billingApp.use('/schedule-*', supabaseAuth);
+billingApp.use('/sync-*', supabaseAuth);
+billingApp.use('/proration-*', supabaseAuth);
+billingApp.use('/checkout-*', supabaseAuth);
+billingApp.use('/purchase-*', supabaseAuth);
+billingApp.use('/transactions*', supabaseAuth);
+billingApp.use('/credit-*', supabaseAuth);
+billingApp.use('/deduct', supabaseAuth);
+billingApp.use('/tier-*', supabaseAuth);
+billingApp.use('/usage-*', supabaseAuth);
+billingApp.use('/trial/*', supabaseAuth);
+billingApp.use('/setup/*', supabaseAuth);
+billingApp.use('/cron/*', supabaseAuth);
 
-billingApp.post('/v1/setup/initialize', async (c: any) => {
+// Setup initialize endpoint
+billingApp.post('/setup/initialize', async (c: any) => {
   const accountId = c.get('userId') as string;
   const email = c.get('userEmail') as string;
   const { upsertCreditAccount, getCreditAccount } = await import('./repositories/credit-accounts');
@@ -59,14 +78,17 @@ billingApp.post('/v1/setup/initialize', async (c: any) => {
   return c.json({ status: 'initialized', tier: 'free' });
 });
 
-billingApp.route('/v1/billing/account-state', accountStateRouter);
-billingApp.route('/v1/billing', subscriptionsRouter);
-billingApp.route('/v1/billing', paymentsRouter);
-billingApp.route('/v1/billing', creditsRouter);
+// Billing routes (mounted at /v1/billing, so these become /v1/billing/account-state, etc.)
+billingApp.route('/account-state', accountStateRouter);
+billingApp.route('/', subscriptionsRouter);
+billingApp.route('/', paymentsRouter);
+billingApp.route('/', creditsRouter);
 
-billingApp.route('/v1/account', accountDeletionRouter);
+// Account deletion (mounted at /v1/billing/account/*)
+billingApp.route('/account', accountDeletionRouter);
 
-billingApp.post('/v1/billing/cron/yearly-rotation', async (c: any) => {
+// Yearly credit rotation cron endpoint
+billingApp.post('/cron/yearly-rotation', async (c: any) => {
   const { processYearlyCreditRotation } = await import('./services/yearly-rotation');
   const result = await processYearlyCreditRotation();
   return c.json(result);

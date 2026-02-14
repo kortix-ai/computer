@@ -5,13 +5,13 @@
  * Requires DATABASE_URL to be set (tests touch the DB for sandbox CRUD).
  *
  * Routes tested:
- *   GET  /v1/account/providers
- *   POST /v1/sandbox             (ensure — idempotent create-or-return)
- *   GET  /v1/sandbox             (get active)
- *   GET  /v1/sandbox/list        (list all)
- *   POST /v1/sandbox/stop        (stop active)
- *   POST /v1/sandbox/restart     (restart)
- *   DELETE /v1/sandbox           (archive)
+ *   GET    /v1/platform/providers
+ *   POST   /v1/platform/init              (ensure — idempotent create-or-return)
+ *   GET    /v1/platform/sandbox           (get active)
+ *   GET    /v1/platform/sandboxes         (list all)
+ *   POST   /v1/platform/sandbox/:id/stop  (stop)
+ *   POST   /v1/platform/sandbox/:id/start (start)
+ *   DELETE /v1/platform/sandbox/:id       (archive)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import {
@@ -57,11 +57,11 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     await cleanupTestData();
   });
 
-  // ─── GET /v1/account/providers ──────────────────────────────────────────
+  // ─── GET /v1/platform/providers ──────────────────────────────────────────
 
-  describe('GET /v1/account/providers', () => {
+  describe('GET /v1/platform/providers', () => {
     it('returns available providers and default', async () => {
-      const res = await jsonGet(app, '/v1/account/providers');
+      const res = await jsonGet(app, '/v1/platform/providers');
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -72,11 +72,11 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     });
   });
 
-  // ─── POST /v1/sandbox (ensure) ─────────────────────────────────────────
+  // ─── POST /v1/platform/init ──────────────────────────────────────────────
 
-  describe('POST /v1/sandbox', () => {
+  describe('POST /v1/platform/init', () => {
     it('creates a sandbox on first call (201, created: true)', async () => {
-      const res = await jsonPost(app, '/v1/sandbox', {});
+      const res = await jsonPost(app, '/v1/platform/init', {});
       expect(res.status).toBe(201);
 
       const body = await res.json();
@@ -92,7 +92,7 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     });
 
     it('returns existing sandbox on second call (200, created: false)', async () => {
-      const res = await jsonPost(app, '/v1/sandbox', {});
+      const res = await jsonPost(app, '/v1/platform/init', {});
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -105,10 +105,13 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     });
 
     it('uses specific provider when requested', async () => {
-      // Archive the existing sandbox first so ensure creates a new one
-      await jsonDelete(app, '/v1/sandbox');
+      // Archive the existing sandbox first so init creates a new one
+      const listRes = await jsonGet(app, '/v1/platform/sandboxes');
+      const listBody = await listRes.json();
+      const sandboxId = listBody.data[0].sandbox_id;
+      await jsonDelete(app, `/v1/platform/sandbox/${sandboxId}`);
 
-      const res = await jsonPost(app, '/v1/sandbox', {
+      const res = await jsonPost(app, '/v1/platform/init', {
         provider: 'daytona',
       });
       expect(res.status).toBe(201);
@@ -121,11 +124,11 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     });
   });
 
-  // ─── GET /v1/sandbox ───────────────────────────────────────────────────
+  // ─── GET /v1/platform/sandbox ────────────────────────────────────────────
 
-  describe('GET /v1/sandbox', () => {
+  describe('GET /v1/platform/sandbox', () => {
     it('returns the active sandbox', async () => {
-      const res = await jsonGet(app, '/v1/sandbox');
+      const res = await jsonGet(app, '/v1/platform/sandbox');
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -136,7 +139,7 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
 
     it('returns 404 when no sandbox exists', async () => {
       // Other user has no sandbox
-      const res = await jsonGet(otherApp, '/v1/sandbox');
+      const res = await jsonGet(otherApp, '/v1/platform/sandbox');
       expect(res.status).toBe(404);
 
       const body = await res.json();
@@ -145,11 +148,11 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     });
   });
 
-  // ─── GET /v1/sandbox/list ──────────────────────────────────────────────
+  // ─── GET /v1/platform/sandboxes ──────────────────────────────────────────
 
-  describe('GET /v1/sandbox/list', () => {
+  describe('GET /v1/platform/sandboxes', () => {
     it('returns all sandboxes including archived', async () => {
-      const res = await jsonGet(app, '/v1/sandbox/list');
+      const res = await jsonGet(app, '/v1/platform/sandboxes');
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -160,11 +163,20 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     });
   });
 
-  // ─── POST /v1/sandbox/stop ─────────────────────────────────────────────
+  // ─── POST /v1/platform/sandbox/:id/stop ──────────────────────────────────
 
-  describe('POST /v1/sandbox/stop', () => {
-    it('stops the active sandbox', async () => {
-      const res = await jsonPost(app, '/v1/sandbox/stop', {});
+  describe('POST /v1/platform/sandbox/:id/stop', () => {
+    it('stops a running sandbox', async () => {
+      // Get the current active sandbox
+      const getRes = await jsonGet(app, '/v1/platform/sandbox');
+      const getBody = await getRes.json();
+      const sandboxId = getBody.data.sandbox_id;
+
+      const res = await jsonPost(
+        app,
+        `/v1/platform/sandbox/${sandboxId}/stop`,
+        {},
+      );
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -172,35 +184,49 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     });
   });
 
-  // ─── POST /v1/sandbox (restart via ensure) ─────────────────────────────
+  // ─── POST /v1/platform/sandbox/:id/start ─────────────────────────────────
 
-  describe('POST /v1/sandbox (re-ensure after stop)', () => {
-    it('creates a new sandbox after previous was stopped', async () => {
-      // The stopped sandbox is no longer 'active', so POST /v1/sandbox provisions a new one
-      const res = await jsonPost(app, '/v1/sandbox', {});
-      // Could be 200 (if stopped one still counts) or 201 (new)
-      expect([200, 201]).toContain(res.status);
+  describe('POST /v1/platform/sandbox/:id/start', () => {
+    it('starts a stopped sandbox', async () => {
+      // Get the sandboxes — find one that's not archived
+      const listRes = await jsonGet(app, '/v1/platform/sandboxes');
+      const listBody = await listRes.json();
+      const stopped = listBody.data.find(
+        (s: any) => s.status === 'stopped',
+      );
+      expect(stopped).toBeDefined();
+
+      const res = await jsonPost(
+        app,
+        `/v1/platform/sandbox/${stopped.sandbox_id}/start`,
+        {},
+      );
+      expect(res.status).toBe(200);
 
       const body = await res.json();
       expect(body.success).toBe(true);
     });
   });
 
-  // ─── DELETE /v1/sandbox ────────────────────────────────────────────────
+  // ─── DELETE /v1/platform/sandbox/:id ─────────────────────────────────────
 
-  describe('DELETE /v1/sandbox', () => {
+  describe('DELETE /v1/platform/sandbox/:id', () => {
     it('archives a sandbox', async () => {
-      // Ensure we have an active one
-      await jsonPost(app, '/v1/sandbox', {});
+      const getRes = await jsonGet(app, '/v1/platform/sandbox');
+      const getBody = await getRes.json();
+      const sandboxId = getBody.data.sandbox_id;
 
-      const res = await jsonDelete(app, '/v1/sandbox');
+      const res = await jsonDelete(
+        app,
+        `/v1/platform/sandbox/${sandboxId}`,
+      );
       expect(res.status).toBe(200);
 
       const body = await res.json();
       expect(body.success).toBe(true);
 
-      // Verify it's now archived — GET /v1/sandbox should 404
-      const afterRes = await jsonGet(app, '/v1/sandbox');
+      // Verify it's now archived — GET /sandbox should 404
+      const afterRes = await jsonGet(app, '/v1/platform/sandbox');
       expect(afterRes.status).toBe(404);
     });
   });
@@ -209,12 +235,38 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
 
   describe('Cross-user isolation', () => {
     it("other user cannot see first user's sandboxes", async () => {
-      const res = await jsonGet(otherApp, '/v1/sandbox/list');
+      const res = await jsonGet(otherApp, '/v1/platform/sandboxes');
       expect(res.status).toBe(200);
 
       const body = await res.json();
       // Other user should have zero sandboxes
       expect(body.data.length).toBe(0);
+    });
+
+    it("other user cannot start first user's sandbox", async () => {
+      // Get test user's sandboxes directly
+      const listRes = await jsonGet(app, '/v1/platform/sandboxes');
+      const listBody = await listRes.json();
+      const sandbox = listBody.data[0];
+
+      const res = await jsonPost(
+        otherApp,
+        `/v1/platform/sandbox/${sandbox.sandbox_id}/start`,
+        {},
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it("other user cannot delete first user's sandbox", async () => {
+      const listRes = await jsonGet(app, '/v1/platform/sandboxes');
+      const listBody = await listRes.json();
+      const sandbox = listBody.data[0];
+
+      const res = await jsonDelete(
+        otherApp,
+        `/v1/platform/sandbox/${sandbox.sandbox_id}`,
+      );
+      expect(res.status).toBe(404);
     });
   });
 });

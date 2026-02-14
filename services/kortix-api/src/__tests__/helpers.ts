@@ -210,7 +210,7 @@ export function createTestApp(opts: TestAppOptions = {}) {
   // ─── Version (no auth — does NOT import db) ────────────────────────────
   // version.ts has zero db imports, safe to require unconditionally
   const { versionRouter } = require('../platform/routes/version');
-  app.route('/v1/sandbox/version', versionRouter);
+  app.route('/v1/platform/sandbox/version', versionRouter);
 
   // ─── Auth stub for all /v1/* routes that need it ───────────────────────
   app.use('/v1/*', async (c, next) => {
@@ -256,9 +256,9 @@ export function createTestApp(opts: TestAppOptions = {}) {
       };
 
       const accountRouter = createAccountRouter(deps);
-      app.route('/v1/account', accountRouter);
+      app.route('/v1/platform', accountRouter);
 
-      // Also mount the cloud sandbox router at /v1/sandbox (unified interface)
+      // Also mount the cloud sandbox router at /v1/platform/sandbox
       const { createCloudSandboxRouter } = require('../platform/routes/sandbox-cloud');
       const sandboxRouter = createCloudSandboxRouter({
         db,
@@ -267,7 +267,7 @@ export function createTestApp(opts: TestAppOptions = {}) {
         resolveAccountId: deps.resolveAccountId,
         useAuth: false,
       });
-      app.route('/v1/sandbox', sandboxRouter);
+      app.route('/v1/platform/sandbox', sandboxRouter);
     } catch (e) {
       console.warn('[test] Failed to mount platform routes:', e);
     }
@@ -280,9 +280,9 @@ export function createTestApp(opts: TestAppOptions = {}) {
       const { triggersRouter } = require('../cron/routes/triggers');
       const { executionsRouter } = require('../cron/routes/executions');
 
-      app.route('/v1/sandboxes', sandboxesRouter);
-      app.route('/v1/triggers', triggersRouter);
-      app.route('/v1/executions', executionsRouter);
+      app.route('/v1/cron/sandboxes', sandboxesRouter);
+      app.route('/v1/cron/triggers', triggersRouter);
+      app.route('/v1/cron/executions', executionsRouter);
     } catch (e) {
       console.warn('[test] Failed to mount cron routes:', e);
     }
@@ -292,7 +292,7 @@ export function createTestApp(opts: TestAppOptions = {}) {
   if (opts.mountDeployments && hasDb) {
     try {
       const { deploymentsRouter } = require('../deployments/routes/deployments');
-      app.route('/v1/deployments', deploymentsRouter);
+      app.route('/v1/deployments/', deploymentsRouter);
     } catch (e) {
       console.warn('[test] Failed to mount deployment routes:', e);
     }

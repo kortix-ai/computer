@@ -32,7 +32,7 @@ services:
       # Kortix Master
       - OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME:-admin}
       - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-changeme}
-      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai/router}
+      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai/v1/router}
       - KORTIX_TOKEN=${KORTIX_TOKEN:-}
       - SANDBOX_ID=${SANDBOX_ID:-local}
       - PROJECT_ID=${PROJECT_ID:-local}

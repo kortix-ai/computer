@@ -9,12 +9,13 @@ export { startScheduler, stopScheduler, getSchedulerStatus } from './services/sc
 const cronApp = new Hono();
 
 // All cron routes require supabaseAuth
-cronApp.use('/v1/sandboxes/*', supabaseAuth);
-cronApp.use('/v1/triggers/*', supabaseAuth);
-cronApp.use('/v1/executions/*', supabaseAuth);
+// Full paths: /v1/cron/sandboxes/*, /v1/cron/triggers/*, /v1/cron/executions/*
+cronApp.use('/sandboxes/*', supabaseAuth);
+cronApp.use('/triggers/*', supabaseAuth);
+cronApp.use('/executions/*', supabaseAuth);
 
-cronApp.route('/v1/sandboxes', sandboxesRouter);
-cronApp.route('/v1/triggers', triggersRouter);
-cronApp.route('/v1/executions', executionsRouter);
+cronApp.route('/sandboxes', sandboxesRouter);
+cronApp.route('/triggers', triggersRouter);
+cronApp.route('/executions', executionsRouter);
 
 export { cronApp };

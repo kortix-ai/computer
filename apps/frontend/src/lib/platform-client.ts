@@ -1,23 +1,17 @@
 /**
  * Platform API client.
  *
- * Routes through kortix-api — same interface for local and cloud:
+ * Routes through kortix-api (the unified backend) for sandbox lifecycle:
+ *   GET  /platform/providers          — available sandbox providers
+ *   POST /platform/init               — ensure user has a sandbox, provision if needed
+ *   GET  /platform/sandbox            — get user's active sandbox
+ *   GET  /platform/sandboxes          — list all sandboxes
+ *   POST /platform/sandbox/:id/start  — start a stopped sandbox
+ *   POST /platform/sandbox/:id/stop   — stop a running sandbox
+ *   DELETE /platform/sandbox/:id      — remove a sandbox
  *
- *   Account:
- *     GET  /v1/account/providers    — available sandbox providers
- *
- *   Sandbox lifecycle (unified — works identically in local & cloud):
- *     GET    /v1/sandbox            — get the user's sandbox (or 404)
- *     POST   /v1/sandbox            — ensure sandbox is running (idempotent create-or-start)
- *     GET    /v1/sandbox/list       — list all sandboxes
- *     POST   /v1/sandbox/stop       — stop the sandbox
- *     POST   /v1/sandbox/restart    — restart the sandbox
- *     DELETE /v1/sandbox            — remove the sandbox
- *
- *   Version:
- *     GET    /v1/sandbox/version    — latest sandbox image version
- *
- * Auth: Supabase JWT (skipped in local mode).
+ * In production: https://api.kortix.com/v1/platform/*  (base URL includes /v1)
+ * In local:      http://localhost:8008/v1/platform/*  (base URL includes /v1)
  */
 
 import { getSupabaseAccessToken } from '@/lib/auth-token';
@@ -73,18 +67,16 @@ export function getDirectPortUrl(
 /**
  * Get the base URL for platform API calls.
  *
- * Uses NEXT_PUBLIC_BACKEND_URL (e.g. "https://api.kortix.com/v1") with /v1 stripped,
- * since the request paths already include the /v1 prefix.
+ * Uses NEXT_PUBLIC_BACKEND_URL directly (includes /v1).
  */
 function getPlatformUrl(): string {
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
   if (backendUrl) {
-    // NEXT_PUBLIC_BACKEND_URL is e.g. "https://api.kortix.com/v1" — strip /v1
-    return backendUrl.replace(/\/v1\/?$/, '');
+    return backendUrl;
   }
 
   // Fallback for local dev
-  return 'http://localhost:8008';
+  return 'http://localhost:8008/v1';
 }
 
 const PLATFORM_URL = getPlatformUrl();
@@ -222,7 +214,7 @@ export function extractMappedPorts(
  * Get available sandbox providers from the platform service.
  */
 export async function getProviders(): Promise<ProvidersInfo> {
-  const result = await platformFetch<ProvidersInfo>('/v1/account/providers');
+  const result = await platformFetch<ProvidersInfo>('/platform/providers');
   if (!result.success || !result.data) {
     throw new Error(result.error || 'Failed to get providers');
   }
@@ -234,14 +226,11 @@ export async function getProviders(): Promise<ProvidersInfo> {
  *   - Running  → return it
  *   - Stopped  → start it
  *   - Missing  → create it
- *
- * Replaces the old `initAccount()` — sandbox lifecycle is now separate
- * from account initialization.
  */
 export async function ensureSandbox(opts?: {
   provider?: SandboxProviderName;
 }): Promise<{ sandbox: SandboxInfo; created: boolean }> {
-  const result = await platformFetch<SandboxInfo>('/v1/sandbox', {
+  const result = await platformFetch<SandboxInfo>('/platform/init', {
     method: 'POST',
     body: opts?.provider ? JSON.stringify({ provider: opts.provider }) : undefined,
   });
@@ -265,7 +254,7 @@ export const initAccount = ensureSandbox;
  */
 export async function getSandbox(): Promise<SandboxInfo | null> {
   try {
-    const result = await platformFetch<SandboxInfo>('/v1/sandbox', {
+    const result = await platformFetch<SandboxInfo>('/platform/sandbox', {
       method: 'GET',
     });
 
@@ -283,7 +272,7 @@ export async function getSandbox(): Promise<SandboxInfo | null> {
  * List all sandboxes for the user's account.
  */
 export async function listSandboxes(): Promise<SandboxInfo[]> {
-  const result = await platformFetch<SandboxInfo[]>('/v1/sandbox/list', {
+  const result = await platformFetch<SandboxInfo[]>('/platform/sandboxes', {
     method: 'GET',
   });
 
@@ -295,10 +284,13 @@ export async function listSandboxes(): Promise<SandboxInfo[]> {
 }
 
 /**
- * Start a stopped sandbox (POST /v1/sandbox is idempotent — restarts if stopped).
+ * Start a stopped sandbox.
  */
-export async function startSandbox(_sandboxId?: string): Promise<void> {
-  const result = await platformFetch<void>('/v1/sandbox', { method: 'POST' });
+export async function startSandbox(sandboxId: string): Promise<void> {
+  const result = await platformFetch<void>(`/platform/sandbox/${sandboxId}/start`, {
+    method: 'POST',
+  });
+
   if (!result.success) {
     throw new Error(result.error || 'Failed to start sandbox');
   }
@@ -307,8 +299,11 @@ export async function startSandbox(_sandboxId?: string): Promise<void> {
 /**
  * Stop a running sandbox.
  */
-export async function stopSandbox(_sandboxId?: string): Promise<void> {
-  const result = await platformFetch<void>('/v1/sandbox/stop', { method: 'POST' });
+export async function stopSandbox(sandboxId: string): Promise<void> {
+  const result = await platformFetch<void>(`/platform/sandbox/${sandboxId}/stop`, {
+    method: 'POST',
+  });
+
   if (!result.success) {
     throw new Error(result.error || 'Failed to stop sandbox');
   }
@@ -317,8 +312,11 @@ export async function stopSandbox(_sandboxId?: string): Promise<void> {
 /**
  * Remove (destroy) a sandbox.
  */
-export async function removeSandbox(_sandboxId?: string): Promise<void> {
-  const result = await platformFetch<void>('/v1/sandbox', { method: 'DELETE' });
+export async function removeSandbox(sandboxId: string): Promise<void> {
+  const result = await platformFetch<void>(`/platform/sandbox/${sandboxId}`, {
+    method: 'DELETE',
+  });
+
   if (!result.success) {
     throw new Error(result.error || 'Failed to remove sandbox');
   }
@@ -345,7 +343,7 @@ export interface SandboxUpdateResult {
  * Platform checks npm registry (cached 5min).
  */
 export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
-  const res = await fetch(`${PLATFORM_URL}/v1/sandbox/version`, {
+  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version`, {
     headers: { 'Accept': 'application/json' },
   });
   if (!res.ok) throw new Error(`Version check failed: ${res.status}`);

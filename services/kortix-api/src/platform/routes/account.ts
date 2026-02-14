@@ -2,11 +2,11 @@
  * Cloud-mode account router.
  *
  * Handles user account initialization and provider listing.
- * Sandbox lifecycle has been moved to sandbox-cloud.ts (/v1/sandbox/*).
+ * Sandbox lifecycle has been moved to sandbox-cloud.ts.
  *
- * Routes (mounted at /v1/account):
- *   GET  /providers  → List available sandbox providers
- *   POST /init       → Ensure user has an account, provision sandbox if needed
+ * Routes (mounted at /v1/platform):
+ *   GET  /providers  — List available sandbox providers
+ *   POST /init       — Ensure user has an account, provision sandbox if needed
  */
 
 import { Hono } from 'hono';
@@ -97,8 +97,7 @@ export function createAccountRouter(
   });
 
   // ─── POST /init ────────────────────────────────────────────────────────
-  // Ensure user has an account + sandbox. Kept for backwards compatibility.
-  // New clients should use POST /v1/sandbox directly.
+  // Ensure user has an account + sandbox.
 
   router.post('/init', async (c) => {
     const userId = c.get('userId');

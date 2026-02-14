@@ -79,7 +79,7 @@ write_env "services/kortix-api/.env" \
   "$(kv DAYTONA_TARGET)" \
   "$(kv DAYTONA_SNAPSHOT)" \
   "" \
-  "KORTIX_URL=http://localhost:8008/router" \
+  "KORTIX_URL=http://localhost:8008/v1/router" \
   "$(kv SANDBOX_PROVIDER auto)" \
   "$(kv SANDBOX_IMAGE kortixmarko/sandbox:latest)" \
   "" \
