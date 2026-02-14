@@ -61,27 +61,32 @@ export function useSubscriptionStoreSync() {
     refetch 
   } = useAccountState({ enabled: isAuthenticated });
   
-  const setAccountState = useSubscriptionStore((state) => state.setAccountState);
-  const setLoading = useSubscriptionStore((state) => state.setLoading);
-  const setError = useSubscriptionStore((state) => state.setError);
-  const setRefetchCallback = useSubscriptionStore((state) => state.setRefetchCallback);
-  
-  // Sync data to store
+  // Sync data to store — use a single effect to batch updates and avoid
+  // cascading re-renders. Each separate useEffect was causing independent
+  // Zustand state updates, and the setRefetchCallback wrapper created a
+  // new closure on every render, risking an infinite loop.
   useEffect(() => {
-    setAccountState(accountState || null);
-  }, [accountState, setAccountState]);
+    const store = useSubscriptionStore.getState();
+    
+    // Only update if values actually changed to avoid unnecessary re-renders
+    const nextAccountState = accountState || null;
+    const nextError = (error as Error | null) ?? null;
+    
+    const updates: Partial<SubscriptionStore> = {};
+    if (store.accountState !== nextAccountState) updates.accountState = nextAccountState;
+    if (store.isLoading !== isLoading) updates.isLoading = isLoading;
+    if (store.error !== nextError) updates.error = nextError;
+    
+    if (Object.keys(updates).length > 0) {
+      useSubscriptionStore.setState(updates);
+    }
+  }, [accountState, isLoading, error]);
   
+  // Set refetch callback once — refetch from React Query is stable, so
+  // pass it directly instead of wrapping in a new closure each render.
   useEffect(() => {
-    setLoading(isLoading);
-  }, [isLoading, setLoading]);
-  
-  useEffect(() => {
-    setError(error as Error | null);
-  }, [error, setError]);
-  
-  useEffect(() => {
-    setRefetchCallback(() => refetch());
-  }, [refetch, setRefetchCallback]);
+    useSubscriptionStore.setState({ _refetchAccountState: refetch });
+  }, [refetch]);
 }
 
 // Component wrapper to sync React Query with Zustand store

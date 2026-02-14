@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
-export type SandboxConnectionStatus = 'connecting' | 'connected' | 'unreachable';
+export type SandboxConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'unreachable';
 
 interface SandboxConnectionStore {
   status: SandboxConnectionStatus;
@@ -54,6 +57,7 @@ export function setSandboxStatus(next: SandboxConnectionStatus) {
 }
 
 export function markInitialCheckDone() {
+  if (useSandboxConnectionStore.getState().initialCheckDone) return; // no-op
   useSandboxConnectionStore.setState({ initialCheckDone: true });
 }
 
@@ -65,5 +69,7 @@ export function incrementSandboxFail() {
 }
 
 export function resetSandboxFail() {
+  const { failCount } = useSandboxConnectionStore.getState();
+  if (failCount === 0) return; // no-op — avoids unnecessary re-renders
   useSandboxConnectionStore.setState({ failCount: 0 });
 }

@@ -25,7 +25,7 @@ const FAIL_THRESHOLD_RECONNECT = 1;
 
 /** Interval between health checks (ms) */
 const POLL_CONNECTED = 30_000; // 30s when healthy
-const POLL_FAILING = 3_000;   // 3s when any failure detected (fast retry)
+const POLL_FAILING = 3_000; // 3s when any failure detected (fast retry)
 const POLL_UNREACHABLE = 5_000; // 5s when confirmed unreachable
 
 /** Timeout for each health check request */
@@ -94,8 +94,11 @@ export function useSandboxConnection() {
         if (!alive) return;
         incrementSandboxFail();
 
-        const { failCount, wasConnected } = useSandboxConnectionStore.getState();
-        const threshold = wasConnected ? FAIL_THRESHOLD_RECONNECT : FAIL_THRESHOLD_FIRST;
+        const { failCount, wasConnected } =
+          useSandboxConnectionStore.getState();
+        const threshold = wasConnected
+          ? FAIL_THRESHOLD_RECONNECT
+          : FAIL_THRESHOLD_FIRST;
 
         if (failCount >= threshold) {
           setSandboxStatus('unreachable');
