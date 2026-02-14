@@ -68,6 +68,7 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
 
   try {
     // Find sandbox by externalId (the Daytona sandbox ID) in kortix.sandboxes
+    console.log(`[PREVIEW] Ownership check: sandboxId=${sandboxId}, userId=${userId}`);
     const [sandbox] = await db
       .select({ accountId: sandboxes.accountId })
       .from(sandboxes)
@@ -80,9 +81,12 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
       .limit(1);
 
     if (!sandbox) {
+      console.warn(`[PREVIEW] No active sandbox found for externalId=${sandboxId}`);
       setCachedOwnership(sandboxId, userId, false);
       return false;
     }
+
+    console.log(`[PREVIEW] Sandbox found: accountId=${sandbox.accountId}`);
 
     // Check if user belongs to the account that owns this sandbox
     const [membership] = await db
@@ -97,6 +101,7 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
       .limit(1);
 
     const allowed = !!membership;
+    console.log(`[PREVIEW] Membership check: allowed=${allowed}, role=${membership?.accountRole}`);
     setCachedOwnership(sandboxId, userId, allowed);
     return allowed;
   } catch (err) {
