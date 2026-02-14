@@ -11,11 +11,19 @@ export async function getTransactions(
   accountId: string,
   limit: number,
   offset: number,
+  typeFilter?: string,
 ) {
+  const conditions = [eq(creditLedger.accountId, accountId)];
+  if (typeFilter) {
+    conditions.push(eq(creditLedger.type, typeFilter));
+  }
+
+  const where = conditions.length === 1 ? conditions[0] : and(...conditions)!;
+
   const rows = await db
     .select()
     .from(creditLedger)
-    .where(eq(creditLedger.accountId, accountId))
+    .where(where)
     .orderBy(desc(creditLedger.createdAt))
     .limit(limit)
     .offset(offset);
@@ -23,7 +31,7 @@ export async function getTransactions(
   const [countResult] = await db
     .select({ count: sql<number>`count(*)` })
     .from(creditLedger)
-    .where(eq(creditLedger.accountId, accountId));
+    .where(where);
 
   return { rows, total: Number(countResult?.count ?? 0) };
 }

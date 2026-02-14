@@ -60,7 +60,7 @@ app.get('/health', (c) => {
   });
 });
 
-// Health check at /v1/health (frontend calls this path)
+// Health check under /v1 prefix (frontend uses NEXT_PUBLIC_BACKEND_URL which includes /v1)
 app.get('/v1/health', (c) => {
   return c.json({
     status: 'ok',

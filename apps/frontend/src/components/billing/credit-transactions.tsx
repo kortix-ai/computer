@@ -142,11 +142,35 @@ export default function CreditTransactions({ accountId }: Props) {
     );
   }
 
-  const currentBalance = data?.current_balance;
   const transactions = data?.transactions || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Filter */}
+      <div className="flex items-center gap-2">
+        <Select
+          value={typeFilter ?? 'all'}
+          onValueChange={(v) => { setTypeFilter(v === 'all' ? undefined : v); setOffset(0); }}
+        >
+          <SelectTrigger className="w-[160px] h-9">
+            <SelectValue placeholder="All types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            <SelectItem value="tier_grant">Tier Grant</SelectItem>
+            <SelectItem value="purchase">Purchase</SelectItem>
+            <SelectItem value="usage">Usage</SelectItem>
+            <SelectItem value="refund">Refund</SelectItem>
+            <SelectItem value="expired">Expired</SelectItem>
+            <SelectItem value="adjustment">Adjustment</SelectItem>
+            <SelectItem value="promotional">Promotional</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </div>
+
       <Card className='p-0 px-0 bg-transparent shadow-none border-none'>
         <CardContent className='px-0'>
           {transactions.length === 0 ? (

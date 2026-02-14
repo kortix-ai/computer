@@ -1,3 +1,4 @@
+//@ts-ignore
 import type { Context } from 'hono'
 import { config } from '../config'
 
@@ -15,6 +16,7 @@ export async function proxyToOpenCode(c: Context): Promise<Response> {
 
   // Add OpenCode basic auth if configured
   if (config.OPENCODE_USERNAME && config.OPENCODE_PASSWORD) {
+    //@ts-ignore
     const auth = Buffer.from(`${config.OPENCODE_USERNAME}:${config.OPENCODE_PASSWORD}`).toString('base64')
     headers.set('Authorization', `Basic ${auth}`)
   }

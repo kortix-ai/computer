@@ -96,9 +96,10 @@ import { LanguageSwitcher } from './language-switcher';
 import { useTranslations } from 'next-intl';
 import { ReferralsTab } from '@/components/referrals/referrals-tab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Keyboard } from 'lucide-react';
+import { Keyboard, Receipt } from 'lucide-react';
 import { useUserPreferencesStore, type TabSwitchModifier } from '@/stores/user-preferences-store';
-type TabId = 'general' | 'plan' | 'billing' | 'usage' | 'env-manager' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
+import CreditTransactions from '@/components/billing/credit-transactions';
+type TabId = 'general' | 'plan' | 'billing' | 'transactions' | 'usage' | 'env-manager' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
 
 interface Tab {
     id: TabId;
@@ -131,6 +132,7 @@ export function UserSettingsModal({
         { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
         { id: 'plan', label: 'Plan', icon: Zap },
         { id: 'billing', label: 'Billing', icon: CreditCard },
+        { id: 'transactions', label: 'Transactions', icon: Receipt },
         { id: 'usage', label: 'Usage', icon: TrendingDown },
         ...(!isProduction ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
         { id: 'integrations', label: 'Integrations', icon: Plug },
@@ -220,6 +222,7 @@ export function UserSettingsModal({
                                 {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
                                 {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
                                 {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
+                                {activeTab === 'transactions' && <TransactionsTab />}
                                 {activeTab === 'usage' && <UsageTab />}
                                 {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
                                 {activeTab === 'env-manager' && isLocal && <EnvManagerTab />}
@@ -241,7 +244,7 @@ export function UserSettingsModal({
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
-                            
+
                             {/* Desktop Tabs */}
                             <div className="flex flex-col gap-1.5">
                                 {tabs.map((tab) => {
@@ -267,12 +270,13 @@ export function UserSettingsModal({
                                 })}
                             </div>
                         </div>
-                        
+
                         {/* Desktop Content */}
                         <div className="flex-1 overflow-y-auto min-h-0 w-full max-w-full">
                             {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
                             {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
                             {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
+                            {activeTab === 'transactions' && <TransactionsTab />}
                             {activeTab === 'usage' && <UsageTab />}
                             {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
                             {activeTab === 'env-manager' && isLocal && <EnvManagerTab />}
@@ -1418,6 +1422,20 @@ function UsageTab() {
         <ThreadUsage />
       </div>
   );
+}
+
+function TransactionsTab() {
+    return (
+        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 min-w-0 max-w-full overflow-x-hidden">
+            <div>
+                <h3 className="text-lg font-semibold mb-1">Transactions</h3>
+                <p className="text-sm text-muted-foreground">
+                    View your credit transaction history including renewals, purchases, and usage.
+                </p>
+            </div>
+            <CreditTransactions />
+        </div>
+    );
 }
 
 function EnvManagerTab() {

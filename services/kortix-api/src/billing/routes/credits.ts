@@ -33,6 +33,29 @@ creditsRouter.post('/deduct', async (c) => {
   });
 });
 
+creditsRouter.post('/deduct-usage', async (c) => {
+  const accountId = c.get('userId');
+  const body = await c.req.json<{ amount: number; thread_id?: string; description?: string }>();
+
+  if (!body.amount || body.amount <= 0) {
+    return c.json({ success: true, cost: 0, new_balance: 0 });
+  }
+
+  const result = await deductCredits(
+    accountId,
+    body.amount,
+    body.description || `Agent run usage: $${body.amount.toFixed(4)}`,
+    body.thread_id,
+  );
+
+  return c.json({
+    success: result.success,
+    cost: result.cost,
+    new_balance: result.newBalance,
+    transaction_id: result.transactionId,
+  });
+});
+
 creditsRouter.get('/tier-configurations', async (c) => {
   const tiers = getVisibleTiers().map((t) => ({
     name: t.name,

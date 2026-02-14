@@ -73,19 +73,31 @@ paymentsRouter.get('/transactions', async (c) => {
   const accountId = c.get('userId');
   const limit = Number(c.req.query('limit') ?? 50);
   const offset = Number(c.req.query('offset') ?? 0);
+  const typeFilter = c.req.query('type_filter') || undefined;
 
-  const { rows, total } = await getTransactions(accountId, limit, offset);
+  const { rows, total } = await getTransactions(accountId, limit, offset, typeFilter);
 
   const transactions = rows.map((r) => ({
     id: r.id,
-    type: Number(r.amount) >= 0 ? 'credit' : 'debit',
-    amount: Number(r.amount),
-    description: r.description,
-    reference_type: r.referenceType,
     created_at: r.createdAt,
+    amount: Number(r.amount),
+    balance_after: Number(r.balanceAfter),
+    type: r.type,
+    description: r.description,
+    is_expiring: r.isExpiring,
+    expires_at: r.expiresAt,
+    metadata: r.metadata,
   }));
 
-  return c.json({ transactions, count: total });
+  return c.json({
+    transactions,
+    pagination: {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total,
+    },
+  });
 });
 
 paymentsRouter.get('/transactions/summary', async (c) => {

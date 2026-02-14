@@ -109,6 +109,20 @@ export const creditUsage = pgTable('credit_usage', {
   metadata: jsonb().default({}),
 });
 
+// ─── account_deletion_requests ──────────────────────────────────────────────
+
+export const accountDeletionRequests = pgTable('account_deletion_requests', {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  accountId: uuid('account_id').notNull(),
+  userId: uuid('user_id').notNull(),
+  status: text().default('pending').notNull(), // pending, completed, cancelled
+  reason: text(),
+  requestedAt: timestamp('requested_at', { withTimezone: true, mode: 'string' }).defaultNow(),
+  scheduledFor: timestamp('scheduled_for', { withTimezone: true, mode: 'string' }).notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true, mode: 'string' }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'string' }),
+});
+
 // ─── credit_purchases ──────────────────────────────────────────────────────
 
 export const creditPurchases = pgTable('credit_purchases', {

@@ -6,18 +6,17 @@ import { subscriptionsRouter } from './routes/subscriptions';
 import { paymentsRouter } from './routes/payments';
 import { creditsRouter } from './routes/credits';
 import { webhooksRouter } from './routes/webhooks';
+import { accountDeletionRouter } from './routes/account-deletion';
 
 const billingApp = new Hono();
 
-// Webhooks — NO auth (handlers verify signatures internally)
 billingApp.route('/webhooks', webhooksRouter);
 
-// Auth for billing & setup routes
-billingApp.use('/billing/*', supabaseAuth);
-billingApp.use('/setup/*', supabaseAuth);
+billingApp.use('/v1/billing/*', supabaseAuth);
+billingApp.use('/v1/account/*', supabaseAuth);
+billingApp.use('/v1/setup/*', supabaseAuth);
 
-// Setup initialize endpoint
-billingApp.post('/setup/initialize', async (c: any) => {
+billingApp.post('/v1/setup/initialize', async (c: any) => {
   const accountId = c.get('userId') as string;
   const email = c.get('userEmail') as string;
   const { upsertCreditAccount, getCreditAccount } = await import('./repositories/credit-accounts');
@@ -60,10 +59,27 @@ billingApp.post('/setup/initialize', async (c: any) => {
   return c.json({ status: 'initialized', tier: 'free' });
 });
 
-// Billing routes
-billingApp.route('/billing/account-state', accountStateRouter);
-billingApp.route('/billing', subscriptionsRouter);
-billingApp.route('/billing', paymentsRouter);
-billingApp.route('/billing', creditsRouter);
+billingApp.route('/v1/billing/account-state', accountStateRouter);
+billingApp.route('/v1/billing', subscriptionsRouter);
+billingApp.route('/v1/billing', paymentsRouter);
+billingApp.route('/v1/billing', creditsRouter);
+
+billingApp.route('/v1/account', accountDeletionRouter);
+
+billingApp.post('/v1/billing/cron/yearly-rotation', async (c: any) => {
+  const { processYearlyCreditRotation } = await import('./services/yearly-rotation');
+  const result = await processYearlyCreditRotation();
+  return c.json(result);
+});
+
+const YEARLY_ROTATION_INTERVAL_MS = 60 * 60 * 1000;
+setInterval(async () => {
+  try {
+    const { processYearlyCreditRotation } = await import('./services/yearly-rotation');
+    await processYearlyCreditRotation();
+  } catch (err) {
+    console.error('[BillingApp] Yearly rotation interval error:', err);
+  }
+}, YEARLY_ROTATION_INTERVAL_MS);
 
 export { billingApp };
