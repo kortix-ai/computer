@@ -9,8 +9,10 @@ import {
   ChevronDown,
   FileCode2,
   AlertTriangle,
+  Ban,
   Braces,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { ToolViewProps } from '../types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +22,12 @@ import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import { useOcFileOpen } from './useOcFileOpen';
+import {
+  type OutputSection as OutputSectionType,
+  normalizeToolOutput,
+  hasStructuredContent,
+  parseStructuredOutput,
+} from '@/lib/utils/structured-output';
 
 /** Convert tool names like "apply_patch" or "oc-multi-edit" to "Apply Patch" / "Multi Edit" */
 function humanizeToolName(raw: string): string {
@@ -203,9 +211,147 @@ export function OcGenericToolView({
 
 /* ---------- Sub-components ---------- */
 
+/** Render parsed structured output sections with semantic styling (for detail panel). */
+function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }) {
+  const [showTrace, setShowTrace] = useState(false);
+
+  return (
+    <div className="space-y-2">
+      {sections.map((section, i) => {
+        switch (section.type) {
+          case 'warning':
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-yellow-500/5 border border-yellow-500/15"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-yellow-500" />
+                <p className="text-xs leading-relaxed text-yellow-700 dark:text-yellow-400 font-mono break-words">
+                  {section.text}
+                </p>
+              </div>
+            );
+
+          case 'error':
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/15"
+              >
+                <Ban className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-red-400" />
+                <div className="min-w-0 flex-1">
+                  {section.errorType && (
+                    <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider">
+                      {section.errorType}
+                    </span>
+                  )}
+                  <p className="text-xs leading-relaxed text-red-600 dark:text-red-400 font-mono break-words">
+                    {section.summary}
+                  </p>
+                </div>
+              </div>
+            );
+
+          case 'traceback':
+            return (
+              <div key={i}>
+                <button
+                  onClick={() => setShowTrace((v) => !v)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
+                >
+                  <ChevronRight
+                    className={cn(
+                      'h-3.5 w-3.5 transition-transform flex-shrink-0',
+                      showTrace && 'rotate-90',
+                    )}
+                  />
+                  <span className="text-xs font-medium">Stack trace</span>
+                  <span className="text-[10px] text-muted-foreground/40 font-mono ml-1">
+                    {section.lines.length} lines
+                  </span>
+                </button>
+                {showTrace && (
+                  <div className="mt-1 rounded-lg bg-muted/20 border border-border/30 overflow-hidden">
+                    <pre className="p-3 font-mono text-[10px] leading-relaxed text-muted-foreground/60 whitespace-pre-wrap break-all max-h-80 overflow-auto">
+                      {section.lines.map((line, li) => {
+                        if (/^\s+File "/.test(line)) {
+                          return (
+                            <span key={li} className="text-muted-foreground/80">
+                              {line}
+                              {'\n'}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span key={li}>
+                            {line}
+                            {'\n'}
+                          </span>
+                        );
+                      })}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            );
+
+          case 'install':
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15"
+              >
+                <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+                <span className="text-xs text-emerald-700 dark:text-emerald-400 font-mono">
+                  {section.text}
+                </span>
+              </div>
+            );
+
+          case 'info':
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-2.5 px-3 py-1.5 text-xs text-muted-foreground font-mono"
+              >
+                <span className="size-1.5 rounded-full bg-muted-foreground/30 flex-shrink-0" />
+                <span className="break-words">{section.text}</span>
+              </div>
+            );
+
+          case 'plain':
+            return (
+              <pre
+                key={i}
+                className="px-3 py-1.5 font-mono text-xs leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
+              >
+                {section.text}
+              </pre>
+            );
+
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+}
+
 function OutputSection({ output }: { output: unknown }) {
   const text = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
   const isJson = typeof output !== 'string';
+
+  // Try structured rendering for string output with warnings/tracebacks
+  const structuredSections = useMemo(() => {
+    if (isJson || !text) return null;
+    const normalized = normalizeToolOutput(text);
+    if (!hasStructuredContent(normalized)) return null;
+    return parseStructuredOutput(normalized);
+  }, [text, isJson]);
+
+  if (structuredSections) {
+    return <StructuredOutputDisplay sections={structuredSections} />;
+  }
 
   return isJson ? (
     <UnifiedMarkdown content={`\`\`\`json\n${text}\n\`\`\``} isStreaming={false} />
@@ -217,12 +363,80 @@ function OutputSection({ output }: { output: unknown }) {
 }
 
 function ErrorSection({ message }: { message: string }) {
+  const [showTrace, setShowTrace] = useState(false);
+
+  // Try structured rendering for error output with warnings/tracebacks
+  const structuredSections = useMemo(() => {
+    const normalized = normalizeToolOutput(message);
+    if (!hasStructuredContent(normalized)) return null;
+    return parseStructuredOutput(normalized);
+  }, [message]);
+
+  const { summary, traceback, errorType } = useMemo(() => {
+    const cleaned = message.replace(/^Error:\s*/, '');
+
+    // Python-style traceback
+    const tbIdx = cleaned.indexOf('Traceback (most recent call last):');
+    if (tbIdx >= 0) {
+      const before = cleaned.slice(0, tbIdx).trim();
+      const traceSection = cleaned.slice(tbIdx);
+      const lines = traceSection.split('\n').filter((l) => l.trim());
+      const lastLine = lines[lines.length - 1] || '';
+      const typeMatch = lastLine.match(/^([\w._]+(?:Error|Exception|Warning)):\s*/);
+      const errType = typeMatch ? typeMatch[1].split('.').pop() || typeMatch[1] : null;
+      const sum = before || (errType ? lastLine : lastLine.slice(0, 150));
+      return { summary: sum, traceback: traceSection, errorType: errType };
+    }
+
+    // Node.js-style stack trace
+    const stackIdx = cleaned.indexOf('\n    at ');
+    if (stackIdx >= 0) {
+      return { summary: cleaned.slice(0, stackIdx).trim(), traceback: cleaned.slice(stackIdx), errorType: null };
+    }
+
+    return { summary: cleaned, traceback: null, errorType: null };
+  }, [message]);
+
+  if (structuredSections) {
+    return <StructuredOutputDisplay sections={structuredSections} />;
+  }
+
+  const displayType = errorType || 'Error';
+
   return (
-    <div className="flex items-start gap-2.5 px-4 py-3 text-muted-foreground">
-      <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs whitespace-pre-wrap break-words">{message}</p>
+    <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-red-500/10">
+        <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-red-400" />
+        <span className="text-xs font-medium text-red-400">{displayType}</span>
       </div>
+
+      {/* Summary */}
+      <div className="px-3 py-2.5">
+        <p className="text-xs text-foreground/80 leading-relaxed break-words whitespace-pre-wrap font-mono">
+          {summary}
+        </p>
+      </div>
+
+      {/* Collapsible stack trace */}
+      {traceback && (
+        <>
+          <button
+            onClick={() => setShowTrace((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 w-full text-left border-t border-red-500/10 text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
+          >
+            <ChevronRight className={`h-3 w-3 transition-transform ${showTrace ? 'rotate-90' : ''}`} />
+            <span className="text-[10px] font-medium">Stack trace</span>
+          </button>
+          {showTrace && (
+            <div className="px-3 pb-2.5 max-h-64 overflow-auto">
+              <pre className="font-mono text-[10px] leading-relaxed text-muted-foreground/60 whitespace-pre-wrap break-all">
+                {traceback}
+              </pre>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
