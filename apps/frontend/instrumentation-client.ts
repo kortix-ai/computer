@@ -6,7 +6,9 @@ if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
     ui_host: 'https://eu.posthog.com',
     defaults: '2025-05-24',
     capture_exceptions: true, 
-    debug: process.env.NODE_ENV === 'development',
+    // Disable debug mode to suppress noisy PostHog retry logs in dev console
+    // (ERR_BLOCKED_BY_CLIENT from ad blockers causes endless retry spam)
+    debug: false,
     // Use localStorage only to avoid cookie header size issues (431 errors)
     // This prevents PostHog from storing data in cookies, which can cause headers to exceed size limits
     persistence: 'localStorage',

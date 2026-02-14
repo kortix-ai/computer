@@ -49,7 +49,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useTabStore } from '@/stores/tab-store';
 import { useTheme } from 'next-themes';
-import { isLocalMode, isProductionMode } from '@/lib/config';
+import { isLocalMode } from '@/lib/config';
 import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
 import { UserSettingsModal } from '@/components/settings/user-settings-modal';
 import { PlanSelectionModal } from '@/components/billing/pricing';
@@ -177,7 +177,7 @@ export function UserMenu({ user }: UserMenuProps) {
         <SidebarMenuItem className="relative">
           {/* Referral + Upgrade above user card */}
           <div className="absolute bottom-full left-0 right-0 mb-2 px-0 group-data-[collapsible=icon]:hidden z-50 flex flex-col gap-2">
-            {!isProductionMode() && (
+            {!isLocalMode() && (
               <SpotlightCard className="bg-zinc-200/60 dark:bg-zinc-800/60 backdrop-blur-md cursor-pointer">
                 <div onClick={openReferralDialog} className="flex items-center gap-3 px-3 py-2.5">
                   <Heart className="h-4 w-4 text-zinc-700 dark:text-zinc-300 flex-shrink-0" />

@@ -257,6 +257,17 @@ export function createTestApp(opts: TestAppOptions = {}) {
 
       const accountRouter = createAccountRouter(deps);
       app.route('/v1/account', accountRouter);
+
+      // Also mount the cloud sandbox router at /v1/sandbox (unified interface)
+      const { createCloudSandboxRouter } = require('../platform/routes/sandbox-cloud');
+      const sandboxRouter = createCloudSandboxRouter({
+        db,
+        getProvider: deps.getProvider,
+        getDefaultProviderName: deps.getDefaultProviderName,
+        resolveAccountId: deps.resolveAccountId,
+        useAuth: false,
+      });
+      app.route('/v1/sandbox', sandboxRouter);
     } catch (e) {
       console.warn('[test] Failed to mount platform routes:', e);
     }

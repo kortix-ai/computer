@@ -67,6 +67,22 @@ export function createLocalSandboxRouter(): Hono<{ Variables: AuthVariables }> {
     }
   });
 
+  // ─── GET /list ──────────────────────────────────────────────────────────
+  // List sandboxes. In local mode there's at most one.
+
+  router.get('/list', async (c) => {
+    try {
+      const info = await provider.find();
+      return c.json({
+        success: true,
+        data: info ? [serialize(info)] : [],
+      });
+    } catch (err) {
+      console.error('[SANDBOX-LOCAL] list error:', err);
+      return c.json({ success: false, error: String(err) }, 500);
+    }
+  });
+
   // ─── POST / ────────────────────────────────────────────────────────────
   // Ensure the sandbox exists and is running. Idempotent:
   //   - Running  → return it

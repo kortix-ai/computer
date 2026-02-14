@@ -1061,7 +1061,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={false}>
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>

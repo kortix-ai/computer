@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from '@/lib/toast';
-import { isLocalMode, isProductionMode } from '@/lib/config';
+import { isLocalMode } from '@/lib/config';
 import { backendApi } from '@/lib/api-client';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Switch } from '@/components/ui/switch';
@@ -85,7 +85,7 @@ import {
     CalendarClock,
     ArrowRight
 } from 'lucide-react';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { getPlanName, getPlanIcon } from '../billing/plan-utils';
 import { TierBadge } from '../billing/tier-badge';
 import { siteConfig } from '@/lib/site-config';
@@ -126,7 +126,6 @@ export function UserSettingsModal({
     const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
     const [showPlanModal, setShowPlanModal] = useState(false);
     const isLocal = isLocalMode();
-    const isProduction = isProductionMode();
     const tabs: Tab[] = [
         { id: 'general', label: 'General', icon: Settings },
         { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
@@ -134,7 +133,7 @@ export function UserSettingsModal({
         { id: 'billing', label: 'Billing', icon: CreditCard },
         { id: 'transactions', label: 'Transactions', icon: Receipt },
         { id: 'usage', label: 'Usage', icon: TrendingDown },
-        ...(!isProduction ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
+        ...(!isLocal ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
         { id: 'integrations', label: 'Integrations', icon: Plug },
         { id: 'api-keys', label: 'API Keys', icon: Key },
         ...(isLocal ? [{ id: 'env-manager' as TabId, label: 'Env Manager', icon: KeyRound }] : []),
@@ -765,9 +764,9 @@ function GeneralTab({ onClose }: { onClose: () => void }) {
                                 <AlertDialogTitle className="text-base sm:text-lg">{t('deleteAccount.cancelDeletionTitle')}</AlertDialogTitle>
                             </AlertDialogHeader>
                             <div className="space-y-4">
-                                <p className="text-xs sm:text-sm text-muted-foreground">
+                                <AlertDialogDescription className="text-xs sm:text-sm text-muted-foreground">
                                     {t('deleteAccount.cancelDeletionDescription')}
-                                </p>
+                                </AlertDialogDescription>
                                 <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
                                     <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="w-full sm:w-auto">
                                         {tCommon('back')}

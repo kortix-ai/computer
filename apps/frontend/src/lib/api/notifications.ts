@@ -1,4 +1,4 @@
-import { isStagingMode } from '@/lib/config';
+import { isCloudMode } from '@/lib/config';
 import { backendApi } from '../api-client';
 
 
@@ -38,8 +38,8 @@ export interface NotificationLog {
 
 export class NotificationAPI {
   private checkEnabled() {
-    if (!isStagingMode()) {
-      throw new Error('Notifications are only available in staging mode');
+    if (!isCloudMode()) {
+      throw new Error('Notifications are only available in cloud mode');
     }
   }
 

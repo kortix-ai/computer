@@ -17,7 +17,8 @@ interface AnnouncementStore {
 }
 
 const PENDING_ANNOUNCEMENTS: AnnouncementData[] = [
-  { component: 'memories', props: {} },
+  // Add announcements here when the corresponding component is registered in registry.ts
+  // Example: { component: 'memories', props: {} },
 ];
 
 export const useAnnouncementStore = create<AnnouncementStore>()(

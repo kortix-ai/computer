@@ -221,9 +221,6 @@ export function trackRouteChange(pathname: string, searchParams?: string) {
   // Only track documented pages (Homepage, Auth, Dashboard, Plans, Order Confirm)
   // Skip internal navigation like threads, settings, etc.
   if (!shouldTrackRouteChange(effectivePageType)) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[GTM] routeChange skipped (not a tracked page):', pathname, effectivePageType);
-    }
     return;
   }
   

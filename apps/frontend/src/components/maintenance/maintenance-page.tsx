@@ -6,7 +6,6 @@ import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useApiHealth } from '@/hooks/usage/use-health';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { isLocalMode } from '@/lib/config';
 import { AnimatedBg } from '@/components/ui/animated-bg';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 
@@ -49,11 +48,7 @@ export function MaintenancePage() {
 
           {/* Description - 16px */}
           <p className="text-[16px] text-foreground/60 text-center leading-relaxed">
-            {isLocalMode() ? (
-              "Performing scheduled maintenance to enhance system stability. All services will resume shortly."
-            ) : (
-              "Performing scheduled maintenance to enhance system stability. All services will resume shortly."
-            )}
+            Performing scheduled maintenance to enhance system stability. All services will resume shortly.
           </p>
 
           {/* Status Card - 456px width, 96px height */}

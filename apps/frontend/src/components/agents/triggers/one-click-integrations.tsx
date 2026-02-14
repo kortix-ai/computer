@@ -19,7 +19,7 @@ import {
 } from '@/hooks/triggers';
 import { toast } from '@/lib/toast';
 import { EventBasedTriggerDialog } from './event-based-trigger-dialog';
-import { config, EnvMode, isLocalMode } from '@/lib/config';
+import { isLocalMode } from '@/lib/config';
 import { useAccountState } from '@/hooks/billing';
 import { usePricingModalStore } from '@/stores/pricing-modal-store';
 import {
