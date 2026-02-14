@@ -12,7 +12,7 @@ services:
     build:
       context: ..
       dockerfile: sandbox/Dockerfile
-    image: kortix-sandbox:${SANDBOX_VERSION:-0.4.11}
+    image: kortixmarko/sandbox:${SANDBOX_VERSION:-latest}
     container_name: kortix-sandbox
     cap_add:
       - SYS_ADMIN

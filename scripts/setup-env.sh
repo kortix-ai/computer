@@ -81,7 +81,7 @@ write_env "services/kortix-api/.env" \
   "" \
   "KORTIX_URL=http://localhost:8008/router" \
   "$(kv SANDBOX_PROVIDER auto)" \
-  "$(kv SANDBOX_IMAGE heyagi/sandbox:latest)" \
+  "$(kv SANDBOX_IMAGE kortixmarko/sandbox:latest)" \
   "" \
   "$(kv OPENROUTER_API_KEY)" \
   "$(kv ANTHROPIC_API_KEY)" \
