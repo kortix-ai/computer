@@ -1,19 +1,23 @@
 /**
  * Platform API client.
  *
- * Routes through kortix-api (the unified backend) for sandbox lifecycle:
- *   GET  /v1/account/providers          — available sandbox providers
- *   POST /v1/account/init               — ensure user has a sandbox, provision if needed
- *   GET  /v1/account/sandbox            — get user's active sandbox
- *   GET  /v1/account/sandboxes          — list all sandboxes
- *   POST /v1/account/sandbox/:id/start  — start a stopped sandbox
- *   POST /v1/account/sandbox/:id/stop   — stop a running sandbox
- *   DELETE /v1/account/sandbox/:id      — remove a sandbox
+ * Routes through kortix-api (the unified backend):
  *
- * Auth: Supabase JWT passed as Bearer token.
+ *   Account:
+ *     POST /v1/account/init         — mock user info (local) / ensure account (cloud)
+ *     GET  /v1/account/providers    — available sandbox providers
  *
- * In production: https://api.kortix.com/v1/account/*
- * In local:      http://localhost:8008/v1/account/*
+ *   Sandbox lifecycle:
+ *     GET    /v1/sandbox            — get the user's sandbox (or 404)
+ *     POST   /v1/sandbox            — ensure sandbox is running (idempotent create-or-start)
+ *     POST   /v1/sandbox/stop       — stop the sandbox
+ *     POST   /v1/sandbox/restart    — restart the sandbox
+ *     DELETE /v1/sandbox            — remove the sandbox container
+ *
+ *   Version:
+ *     GET    /v1/sandbox/version    — latest sandbox image version
+ *
+ * Auth: Supabase JWT passed as Bearer token (skipped in local mode).
  */
 
 import { getSupabaseAccessToken } from '@/lib/auth-token';
@@ -85,6 +89,10 @@ function getPlatformUrl(): string {
 
 const PLATFORM_URL = getPlatformUrl();
 
+function isLocalMode(): boolean {
+  return process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type SandboxProviderName = 'daytona' | 'local_docker';
@@ -119,9 +127,9 @@ async function platformFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<PlatformResponse<T>> {
-  const isLocal = process.env.NEXT_PUBLIC_ENV_MODE?.toLowerCase() === 'local';
-  const token = isLocal ? null : await getSupabaseAccessToken();
-  if (!isLocal && !token) {
+  const local = isLocalMode();
+  const token = local ? null : await getSupabaseAccessToken();
+  if (!local && !token) {
     throw new Error('Not authenticated');
   }
 
@@ -222,32 +230,44 @@ export async function getProviders(): Promise<ProvidersInfo> {
 }
 
 /**
- * Initialize account — ensures the user has an active sandbox.
- * Idempotent: if a sandbox already exists, returns it.
- * If none exists, provisions a new one via the specified provider.
+ * Ensure a sandbox is running. Idempotent:
+ *   - Running  → return it
+ *   - Stopped  → start it
+ *   - Missing  → create it
+ *
+ * Replaces the old `initAccount()` — sandbox lifecycle is now separate
+ * from account initialization.
  */
-export async function initAccount(opts?: {
+export async function ensureSandbox(opts?: {
   provider?: SandboxProviderName;
 }): Promise<{ sandbox: SandboxInfo; created: boolean }> {
-  const result = await platformFetch<SandboxInfo>('/v1/account/init', {
+  const path = isLocalMode() ? '/v1/sandbox' : '/v1/account/init';
+  const result = await platformFetch<SandboxInfo>(path, {
     method: 'POST',
     body: opts?.provider ? JSON.stringify({ provider: opts.provider }) : undefined,
   });
 
   if (!result.success || !result.data) {
-    throw new Error(result.error || 'Failed to initialize account');
+    throw new Error(result.error || 'Failed to ensure sandbox');
   }
 
   return { sandbox: result.data, created: result.created ?? false };
 }
 
 /**
- * Get the user's active sandbox.
- * Returns null if no sandbox exists (user should call initAccount first).
+ * Backwards-compatible alias for ensureSandbox.
+ * @deprecated Use ensureSandbox() directly.
+ */
+export const initAccount = ensureSandbox;
+
+/**
+ * Get the user's sandbox.
+ * Returns null if no sandbox exists (call ensureSandbox first).
  */
 export async function getSandbox(): Promise<SandboxInfo | null> {
   try {
-    const result = await platformFetch<SandboxInfo>('/v1/account/sandbox', {
+    const path = isLocalMode() ? '/v1/sandbox' : '/v1/account/sandbox';
+    const result = await platformFetch<SandboxInfo>(path, {
       method: 'GET',
     });
 
@@ -263,8 +283,14 @@ export async function getSandbox(): Promise<SandboxInfo | null> {
 
 /**
  * List all sandboxes for the user's account.
+ * In local mode, this returns at most one sandbox.
  */
 export async function listSandboxes(): Promise<SandboxInfo[]> {
+  if (isLocalMode()) {
+    const sandbox = await getSandbox();
+    return sandbox ? [sandbox] : [];
+  }
+
   const result = await platformFetch<SandboxInfo[]>('/v1/account/sandboxes', {
     method: 'GET',
   });
@@ -278,9 +304,19 @@ export async function listSandboxes(): Promise<SandboxInfo[]> {
 
 /**
  * Start a stopped sandbox.
+ * In local mode the sandboxId is ignored (single sandbox).
  */
-export async function startSandbox(sandboxId: string): Promise<void> {
-  const result = await platformFetch<void>(`/v1/account/sandbox/${sandboxId}/start`, {
+export async function startSandbox(_sandboxId?: string): Promise<void> {
+  if (isLocalMode()) {
+    const result = await platformFetch<void>('/v1/sandbox', { method: 'POST' });
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to start sandbox');
+    }
+    return;
+  }
+
+  if (!_sandboxId) throw new Error('sandboxId is required');
+  const result = await platformFetch<void>(`/v1/account/sandbox/${_sandboxId}/start`, {
     method: 'POST',
   });
 
@@ -292,8 +328,17 @@ export async function startSandbox(sandboxId: string): Promise<void> {
 /**
  * Stop a running sandbox.
  */
-export async function stopSandbox(sandboxId: string): Promise<void> {
-  const result = await platformFetch<void>(`/v1/account/sandbox/${sandboxId}/stop`, {
+export async function stopSandbox(_sandboxId?: string): Promise<void> {
+  if (isLocalMode()) {
+    const result = await platformFetch<void>('/v1/sandbox/stop', { method: 'POST' });
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to stop sandbox');
+    }
+    return;
+  }
+
+  if (!_sandboxId) throw new Error('sandboxId is required');
+  const result = await platformFetch<void>(`/v1/account/sandbox/${_sandboxId}/stop`, {
     method: 'POST',
   });
 
@@ -303,10 +348,19 @@ export async function stopSandbox(sandboxId: string): Promise<void> {
 }
 
 /**
- * Remove (archive) a sandbox.
+ * Remove (destroy) a sandbox.
  */
-export async function removeSandbox(sandboxId: string): Promise<void> {
-  const result = await platformFetch<void>(`/v1/account/sandbox/${sandboxId}`, {
+export async function removeSandbox(_sandboxId?: string): Promise<void> {
+  if (isLocalMode()) {
+    const result = await platformFetch<void>('/v1/sandbox', { method: 'DELETE' });
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to remove sandbox');
+    }
+    return;
+  }
+
+  if (!_sandboxId) throw new Error('sandboxId is required');
+  const result = await platformFetch<void>(`/v1/account/sandbox/${_sandboxId}`, {
     method: 'DELETE',
   });
 

@@ -20,7 +20,7 @@ import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
-import { initAccount, getSandboxUrl, extractMappedPorts, type SandboxProviderName } from '@/lib/platform-client';
+import { ensureSandbox, getSandboxUrl, extractMappedPorts, type SandboxProviderName } from '@/lib/platform-client';
 import { useProviders } from '@/hooks/platform/use-sandbox';
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { SANDBOX_SERVER_ID } from '@/hooks/platform/use-sandbox';
@@ -435,7 +435,7 @@ export function InstanceManagerDialog({
     setIsCreatingSandbox(true);
     setSandboxError(null);
     try {
-      const { sandbox } = await initAccount(provider ? { provider } : undefined);
+      const { sandbox } = await ensureSandbox(provider ? { provider } : undefined);
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
 
       // Use setState directly to inject provider + sandboxId + mappedPorts metadata

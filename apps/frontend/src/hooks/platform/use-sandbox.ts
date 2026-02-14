@@ -17,7 +17,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import {
-  initAccount,
+  ensureSandbox,
   getProviders,
   getSandboxUrl,
   extractMappedPorts,
@@ -84,7 +84,7 @@ export function useSandbox() {
   const query = useQuery({
     queryKey: ['platform', 'sandbox'],
     queryFn: async () => {
-      const result = await initAccount();
+      const result = await ensureSandbox();
       return result.sandbox;
     },
     enabled: !!user,
