@@ -97,6 +97,7 @@ export function TierBadge({
         )}
       >
         {/* Use regular img for SVG icons to avoid Next.js Image aspect ratio warnings */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={planIcon}
           alt={planName}
@@ -112,6 +113,7 @@ export function TierBadge({
   // Use regular img for SVG icons to avoid Next.js Image aspect ratio warnings
   return (
     <div className="flex items-center">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={planIcon}
         alt={planName}

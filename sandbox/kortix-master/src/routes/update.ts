@@ -9,13 +9,15 @@ const VERSION_FILE = '/opt/kortix/.version';
  * - opencode first (depends on /opt/opencode/)
  * - then other services
  * - kortix-master LAST (deferred — it's us)
+ *
+ * Names must match s6-rc.d service directories (svc-* prefix).
  */
 const SERVICES_TO_RESTART = [
-  'opencode-serve',
-  'opencode-web',
-  'lss-sync',
-  'agent-browser-viewer',
-  'KORTIX-presentation-viewer',
+  'svc-opencode-serve',
+  'svc-opencode-web',
+  'svc-lss-sync',
+  'svc-agent-browser-viewer',
+  'svc-presentation-viewer',
 ];
 
 // ─── State ──────────────────────────────────────────────────────────────────
@@ -56,7 +58,10 @@ async function run(cmd: string): Promise<{ ok: boolean; output: string }> {
 }
 
 async function restartService(name: string): Promise<void> {
-  await run(`s6-svc -r /var/run/s6/services/${name} 2>/dev/null || s6-svc -r /etc/services.d/${name} 2>/dev/null || true`);
+  // s6-overlay v3: supervise control pipe is root-owned, so sudo is required.
+  // Services live under /run/service/{name} in the LinuxServer webtop base.
+  const result = await run(`sudo s6-svc -r /run/service/${name}`);
+  console.log(`[Update] restartService(${name}): ok=${result.ok} ${result.output}`);
 }
 
 async function performUpdate(targetVersion: string): Promise<{
@@ -65,7 +70,7 @@ async function performUpdate(targetVersion: string): Promise<{
 }> {
   console.log(`[Update] Installing @kortix/sandbox@${targetVersion}...`);
 
-  const result = await run(`npm install -g @kortix/sandbox@${targetVersion} 2>&1`);
+  const result = await run(`sudo npm install -g @kortix/sandbox@${targetVersion} 2>&1`);
 
   if (!result.ok) {
     console.error('[Update] npm install failed:', result.output);
@@ -81,7 +86,7 @@ async function performUpdate(targetVersion: string): Promise<{
 
   // Self-restart deferred so the HTTP response completes
   console.log('[Update] Scheduling kortix-master restart in 2s...');
-  setTimeout(() => restartService('kortix-master'), 2000);
+  setTimeout(() => restartService('svc-kortix-master'), 2000);
 
   return { success: true, output: result.output.slice(0, 1000) };
 }

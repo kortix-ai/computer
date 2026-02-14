@@ -13,6 +13,7 @@ export function KortixLogo({ size = 24, variant = 'symbol', className }: KortixL
   // and invert it for light mode using CSS (no JS needed)
   if (variant === 'logomark') {
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src="/logomark-white.svg"
         alt="Kortix"
@@ -25,6 +26,7 @@ export function KortixLogo({ size = 24, variant = 'symbol', className }: KortixL
 
   // Default symbol variant behavior - invert for dark mode
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/kortix-symbol.svg"
       alt="Kortix"

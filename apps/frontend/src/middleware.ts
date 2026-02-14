@@ -29,7 +29,6 @@ const PUBLIC_ROUTES = [
   '/support', // Support page should be public
   '/help', // Help center and documentation should be public
   '/credits-explained', // Credits explained page should be public
-  '/agents-101',
   '/about', // About page should be public 
   '/milano', // Milano page should be public
   '/berlin', // Berlin page should be public

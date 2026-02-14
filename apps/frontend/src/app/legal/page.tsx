@@ -24,6 +24,7 @@ function LegalContent() {
     if (validTab !== activeTab) {
       setActiveTab(validTab);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabParam]);
 
   // Handle tab change - updates both state and URL

@@ -23,8 +23,7 @@ const getToolColorScheme = (_toolName: string): { bg: string; iconColor: string 
 
 const isExternalAppTool = (toolCall: any): boolean => {
   const functionName = toolCall?.function_name?.toLowerCase() || '';
-  return functionName.startsWith('composio_') || 
-         functionName.includes('_app_') ||
+  return functionName.includes('_app_') ||
          (toolCall?.arguments && typeof toolCall.arguments === 'string' && toolCall.arguments.includes('app_slug'));
 };
 

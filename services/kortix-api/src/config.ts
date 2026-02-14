@@ -70,7 +70,7 @@ export const config = {
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: process.env.KORTIX_URL || '',
   SANDBOX_PROVIDER: (process.env.SANDBOX_PROVIDER || 'auto') as SandboxProviderType,
-  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'heyagi/sandbox:latest',
+  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'kortix-sandbox:0.4.2',
   DOCKER_HOST: process.env.DOCKER_HOST || '',
   SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
 

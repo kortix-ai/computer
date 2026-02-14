@@ -303,6 +303,7 @@ export function OcWebSearchToolView({
                                 >
                                   <div className="size-6 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                                     {favicon ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
                                       <img
                                         src={favicon}
                                         alt=""

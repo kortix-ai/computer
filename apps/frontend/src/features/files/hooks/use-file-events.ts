@@ -25,7 +25,7 @@ import { gitStatusKeys } from './use-git-status';
 export function useFileEventInvalidation() {
   const queryClient = useQueryClient();
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
-  const serverVersion = useServerStore((s) => s.serverVersion);
+  const urlVersion = useServerStore((s) => s.urlVersion);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -99,5 +99,5 @@ export function useFileEventInvalidation() {
       eventSource?.close();
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, [queryClient, serverUrl, serverVersion]);
+  }, [queryClient, serverUrl, urlVersion]);
 }

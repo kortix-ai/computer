@@ -265,9 +265,8 @@ function SkillRow({ skill }: { skill: Skill }) {
 
 function McpSection({ config }: { config: Config | undefined }) {
   const { data: mcpStatuses } = useOpenCodeMcpStatus();
-  const mcpConfig = config?.mcp ?? {};
-
   const servers = useMemo(() => {
+    const mcpConfig = config?.mcp ?? {};
     const statusMap = mcpStatuses ?? {};
     const names = new Set([...Object.keys(statusMap), ...Object.keys(mcpConfig)]);
     return Array.from(names).map((name) => ({
@@ -275,7 +274,7 @@ function McpSection({ config }: { config: Config | undefined }) {
       status: statusMap[name],
       config: mcpConfig[name],
     }));
-  }, [mcpStatuses, mcpConfig]);
+  }, [mcpStatuses, config?.mcp]);
 
   return servers.length === 0 ? (
     <p className="text-xs text-muted-foreground py-2">No MCP servers configured</p>
@@ -562,6 +561,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         toast.warning('Failed to create session');
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [isSubmitting, createSession, sendMessage, router, project, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 

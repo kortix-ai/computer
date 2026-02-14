@@ -72,6 +72,5 @@ export interface EventTriggerConfig {
   profile_id?: string;
   agent_prompt: string;
   trigger_slug: string;
-  composio_trigger_id?: string;
   model?: string;
 } 

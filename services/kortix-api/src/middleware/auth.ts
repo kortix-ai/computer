@@ -2,7 +2,7 @@ import { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { validateSecretKey } from '../repositories/api-keys';
 import { validateSandboxToken } from '../repositories/sandboxes';
-import { getSupabase } from '../lib/supabase';
+import { getSupabase } from '../shared/supabase';
 import { config } from '../config';
 
 /**

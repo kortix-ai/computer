@@ -517,7 +517,7 @@ describe('Deployment — LocalDockerProvider (mocked)', () => {
   // the configuration patterns.
 
   const providerSource = readFileSync(
-    join(SERVICES_DIR, 'kortix-api', 'src', 'services', 'platform', 'providers', 'local-docker.ts'),
+    join(SERVICES_DIR, 'kortix-api', 'src', 'platform', 'providers', 'local-docker.ts'),
     'utf-8',
   );
 

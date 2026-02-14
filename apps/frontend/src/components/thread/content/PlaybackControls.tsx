@@ -96,6 +96,7 @@ export const PlaybackControls = ({
         visibleMessages: [messages[0]], // Show only first message initially
       }));
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, visibleMessages.length]);
 
   // Define togglePlayback and resetPlayback functions
@@ -359,6 +360,7 @@ export const PlaybackControls = ({
         isPaused = true; // Stop processing
       };
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       isPlaying,
       messages,

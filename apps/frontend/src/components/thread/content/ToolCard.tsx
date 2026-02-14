@@ -196,6 +196,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({
         {favicons.length > 0 && !effectiveIsError && (
           <div className="flex items-center ml-1.5 -space-x-1">
             {favicons.map((favicon, idx) => (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={idx}
                 src={favicon}
@@ -225,6 +226,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({
               onClick={() => setSelectedImage(url)}
               className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted border border-border flex-shrink-0 hover:opacity-90 transition-opacity cursor-pointer"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
                 alt=""
@@ -295,6 +297,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={selectedImage}
                 alt=""

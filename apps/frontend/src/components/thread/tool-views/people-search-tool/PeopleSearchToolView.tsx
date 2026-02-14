@@ -133,6 +133,7 @@ export function PeopleSearchToolView({
                           <div className="flex items-center gap-3">
                             <div className="flex-shrink-0">
                               {result.person_picture_url && result.person_picture_url !== '' ? (
+                                // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={result.person_picture_url}
                                   alt={result.person_name}

@@ -109,16 +109,6 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     };
   }
 
-  const agentConfigMatch = pathname.match(/^\/agents\/config\/([^/]+)$/);
-  if (agentConfigMatch) {
-    return {
-      id: `page:${pathname}`,
-      title: 'Agent Config',
-      type: 'page',
-      href: pathname,
-    };
-  }
-
   const agentThreadMatch = pathname.match(/^\/agents\/([^/]+)$/);
   if (agentThreadMatch) {
     return {
@@ -751,6 +741,7 @@ export function TabBar() {
         openTab(routeTab);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, orderedTabs, activeTabId, tabs, openTab, setActiveTab, sessions]);
 
   // Build child map for permission aggregation across sub-sessions

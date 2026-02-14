@@ -274,6 +274,7 @@ export function PptxRenderer({
       cancelled = true;
       imageUrls.forEach((url) => URL.revokeObjectURL(url));
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blob, binaryUrl, hasPublicUrl, retryCount]);
 
   const handleRetry = useCallback(() => {
@@ -447,6 +448,7 @@ export function PptxRenderer({
             {slide.images.length > 0 && (
               <div className="space-y-4">
                 {slide.images.map((img, idx) => (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={idx}
                     src={img.url}

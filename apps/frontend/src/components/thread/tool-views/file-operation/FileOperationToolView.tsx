@@ -369,6 +369,7 @@ export function FileOperationToolView({
   const smoothCodeEdit = useSmoothStream(rawCodeEdit, isCodeEditAnimating);
 
   const extractedContent = useMemo(() => {
+    const args = toolCall.arguments || {};
     let filePath: string | null = args.file_path || args.target_file || args.path || null;
     let fileContent: string | null = null;
     let oldStr: string | null = null;
@@ -662,7 +663,7 @@ export function FileOperationToolView({
     }
 
     return { filePath, fileContent, oldStr, newStr };
-  }, [args, output, isStreaming, streamingSource, operation, isStrReplace, rawFileContents, rawCodeEdit, smoothFileContents, smoothCodeEdit]);
+  }, [toolCall.arguments, output, isStreaming, streamingSource, operation, isStrReplace, rawFileContents, rawCodeEdit, smoothFileContents, smoothCodeEdit]);
 
   const { filePath, fileContent, oldStr, newStr } = extractedContent;
   

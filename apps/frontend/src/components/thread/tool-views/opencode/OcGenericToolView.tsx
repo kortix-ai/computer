@@ -101,9 +101,10 @@ export function OcGenericToolView({
 
   // Build clean arguments without internal adapter fields
   const cleanArgs = useMemo(() => {
+    const args = toolCall?.arguments || {};
     const { _oc_tool, _oc_state, ...rest } = args;
     return Object.keys(rest).length > 0 ? rest : null;
-  }, [args]);
+  }, [toolCall?.arguments]);
 
   const isError = toolResult?.success === false || !!toolResult?.error;
 

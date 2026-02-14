@@ -23,12 +23,6 @@ export interface TransactionsResponse {
     offset: number;
     has_more: boolean;
   };
-  current_balance: {
-    total: number;
-    expiring: number;
-    non_expiring: number;
-    tier: string;
-  };
 }
 
 export interface TransactionsSummary {
@@ -57,17 +51,17 @@ export function useTransactions(
   typeFilter?: string
 ) {
   return useQuery<TransactionsResponse>({
-    queryKey: accountStateKeys.transactions(limit, offset),
+    queryKey: [...accountStateKeys.transactions(limit, offset), typeFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         limit: limit.toString(),
         offset: offset.toString(),
       });
-      
+
       if (typeFilter) {
         params.append('type_filter', typeFilter);
       }
-      
+
       const response = await backendApi.get(`/billing/transactions?${params.toString()}`);
       if (response.error) {
         throw new Error(response.error.message);
@@ -81,12 +75,6 @@ export function useTransactions(
           amount: dollarsToCredits(tx.amount),
           balance_after: dollarsToCredits(tx.balance_after),
         })),
-        current_balance: {
-          ...data.current_balance,
-          total: dollarsToCredits(data.current_balance.total),
-          expiring: dollarsToCredits(data.current_balance.expiring),
-          non_expiring: dollarsToCredits(data.current_balance.non_expiring),
-        },
       };
     },
     staleTime: 30000,

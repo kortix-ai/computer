@@ -114,6 +114,9 @@ import { ImagePreview } from '@/components/session/image-preview';
 import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
 import { useTabStore } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
+import { useQueryClient } from '@tanstack/react-query';
+import { billingApi } from '@/lib/api/billing';
+import { invalidateAccountState } from '@/hooks/billing/use-account-state';
 
 // ============================================================================
 // Sub-Session / Fork Breadcrumb
@@ -509,6 +512,7 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
               <div key={file.id} className="rounded-lg overflow-hidden border border-border/50">
                 {file.mime?.startsWith('image/') && file.url ? (
                   <ImagePreview src={file.url} alt={file.filename ?? 'Attachment'}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={file.url}
                       alt={file.filename ?? 'Attachment'}
@@ -757,6 +761,7 @@ function SessionTurn({
   const lastStatusChangeRef = useRef(Date.now());
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const childMessages = undefined as MessageWithParts[] | undefined; // placeholder for child session delegation
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const rawStatus = useMemo(() => getTurnStatus(allParts, childMessages), [allParts]);
   const [throttledStatus, setThrottledStatus] = useState('');
 
@@ -775,6 +780,7 @@ function SessionTurn({
       }, 2500 - elapsed);
     }
     return () => clearTimeout(statusTimeoutRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allParts, rawStatus, throttledStatus]);
 
   // ---- Retry countdown ----
@@ -896,7 +902,8 @@ function SessionTurn({
 
       {/* Kortix logo header */}
       {(working || hasSteps) && (
-        <div className="flex items-center gap-2 mt-3">
+         <div className="flex items-center gap-2 mt-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/kortix-logomark-white.svg"
             alt="Kortix"
@@ -1125,6 +1132,7 @@ function SessionTurn({
           {/* Kortix logo — shown when there are no steps (otherwise logo is already above) */}
           {!hasSteps && (
             <div className="flex items-center gap-2 mb-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/kortix-logomark-white.svg"
                 alt="Kortix"
@@ -1265,6 +1273,12 @@ function SessionTurn({
 }
 
 // ============================================================================
+// Billing: track billed turn IDs to prevent double-deduction
+// ============================================================================
+
+const billedTurnIds = new Set<string>();
+
+// ============================================================================
 // Main SessionChat Component
 // ============================================================================
 
@@ -1295,6 +1309,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const revertSession = useRevertSession();
   const unrevertSession = useUnrevertSession();
   const router = useRouter();
+
+  // ---- Billing: query client for invalidation ----
+  const queryClient = useQueryClient();
 
   // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
   const local = useOpenCodeLocal({ agents, providers, config });
@@ -1362,6 +1379,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   // Clear optimistic prompt once real messages arrive
@@ -1567,6 +1585,41 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, []);
 
   // ============================================================================
+  // Billing: deduct credits after agent run completes
+  // ============================================================================
+
+  useEffect(() => {
+    if (!messages || messages.length === 0 || isBusy) return;
+
+    const currentTurns = groupMessagesIntoTurns(messages);
+    for (const turn of currentTurns) {
+      const turnId = turn.userMessage.info.id;
+      if (billedTurnIds.has(turnId)) continue;
+
+      const parts = collectTurnParts(turn);
+      const costInfo = getTurnCost(parts);
+      console.log('[Billing] Turn', turnId, 'costInfo:', costInfo);
+      if (!costInfo || costInfo.cost <= 0) continue;
+
+      // Mark as billed immediately to prevent double-deduction
+      billedTurnIds.add(turnId);
+
+      console.log('[Billing] Deducting', costInfo.cost, 'for turn', turnId);
+      // Fire-and-forget deduction
+      billingApi.deductUsage({
+        amount: costInfo.cost,
+        thread_id: sessionId,
+        description: `Agent run: ${formatCost(costInfo.cost)} (${formatTokens(costInfo.tokens.input + costInfo.tokens.output)} tokens)`,
+      }).then((result) => {
+        console.log('[Billing] Deduction successful:', result);
+        invalidateAccountState(queryClient);
+      }).catch((err) => {
+        console.warn('[Billing] Failed to deduct usage:', err);
+      });
+    }
+  }, [messages, isBusy, sessionId, queryClient]);
+
+  // ============================================================================
   // Fork / Revert / Unrevert handlers
   // ============================================================================
 
@@ -1671,6 +1724,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         setPollingActive(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
@@ -1828,6 +1882,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
@@ -1899,6 +1954,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
@@ -1913,6 +1969,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 {/* Busy indicator when no turns yet but session is busy */}
                 {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
                   <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src="/kortix-logomark-white.svg"
                       alt="Kortix"

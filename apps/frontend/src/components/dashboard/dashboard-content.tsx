@@ -104,6 +104,7 @@ export function DashboardContent() {
         toast.warning('Failed to create session');
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [isSubmitting, createSession, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 

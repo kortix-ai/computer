@@ -223,7 +223,7 @@ export function ExampleShowcase() {
     return () => {
       clearTimeout(autoplayTimer);
     };
-  }, [activeExample]);
+  }, [activeExample, AUTOPLAY_DURATION]);
 
   // Step progression
   useEffect(() => {
@@ -300,7 +300,7 @@ export function ExampleShowcase() {
 
       return () => clearTimeout(timer);
     }
-  }, [currentStepIndex, currentExample, activeExample]);
+  }, [currentStepIndex, currentExample, activeExample, STEP_DURATION]);
 
   return (
     <div className="relative z-10 w-full max-w-5xl px-8">
@@ -331,6 +331,7 @@ export function ExampleShowcase() {
                     <div key={idx} className="flex justify-start">
                       <div className="max-w-[90%] space-y-1">
                         <div className="flex items-center gap-1 mb-1">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src="/kortix-logomark-white.svg"
                             alt="Kortix"

@@ -492,149 +492,181 @@ export function CommandPalette() {
   );
 
   return (
-  <>
-    <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput
-        placeholder="Search sessions, conversations, files, or type a command..."
-        value={query}
-        onValueChange={setQuery}
-      />
-      <CommandList>
-        {/* Global loading — only when absolutely nothing else is visible */}
-        {showGlobalLoading && (
-          <CommandEmpty>
-            <div className="flex items-center justify-center gap-2 py-4">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <span className="text-muted-foreground">Searching...</span>
-            </div>
-          </CommandEmpty>
-        )}
-
-        {/* No results — all searches done, nothing found */}
-        {hasQuery &&
-          queryLongEnough &&
-          !isAnyPending &&
-          !hasAnyResults && (
+    <>
+      <CommandDialog open={open} onOpenChange={setOpen}>
+        <CommandInput
+          placeholder="Search sessions, conversations, files, or type a command..."
+          value={query}
+          onValueChange={setQuery}
+        />
+        <CommandList>
+          {/* Global loading — only when absolutely nothing else is visible */}
+          {showGlobalLoading && (
             <CommandEmpty>
-              <div className="flex flex-col items-center gap-1.5 py-4">
-                <Search className="h-5 w-5 text-muted-foreground/50" />
-                <span className="text-muted-foreground">
-                  No results found.
-                </span>
+              <div className="flex items-center justify-center gap-2 py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="text-muted-foreground">Searching...</span>
               </div>
             </CommandEmpty>
           )}
 
-        {/* Session title matches (instant, client-side) */}
-        {hasQuery && hasSessionResults && (
-          <CommandGroup heading="Sessions">
-            {filteredSessions.map((session) => (
-              <CommandItem
-                key={session.id}
-                value={`session-${session.title || session.slug || session.id}`}
-                onSelect={() => handleSelectSession(session.id)}
-              >
-                <MessageCircle className="mr-2 h-4 w-4 flex-shrink-0" />
-                <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-                  <span className="truncate">
-                    {session.title || session.slug || 'Untitled'}
-                  </span>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {formatRelativeTime(session.time.updated)}
-                    {session.summary && session.summary.files > 0 && (
-                      <span className="ml-1.5">
-                        · {session.summary.files} file
-                        {session.summary.files !== 1 ? 's' : ''} changed
-                      </span>
-                    )}
+          {/* No results — all searches done, nothing found */}
+          {hasQuery &&
+            queryLongEnough &&
+            !isAnyPending &&
+            !hasAnyResults && (
+              <CommandEmpty>
+                <div className="flex flex-col items-center gap-1.5 py-4">
+                  <Search className="h-5 w-5 text-muted-foreground/50" />
+                  <span className="text-muted-foreground">
+                    No results found.
                   </span>
                 </div>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
+              </CommandEmpty>
+            )}
 
-        {/* Conversation content search (backend semantic search) */}
-        {showThreadSection &&
-          (hasThreadResults || showThreadSkeletons) && (
-            <CommandGroup heading={threadHeading}>
-              {hasThreadResults &&
-                threadResults.map((result, index) => (
-                  <CommandItem
-                    key={`thread-${result.thread_id}-${index}`}
-                    value={`thread-${result.thread_id}-${index}-${result.text_preview?.slice(0, 20)}`}
-                    onSelect={() =>
-                      handleSelectThread(
-                        result.thread_id,
-                        result.project_id,
-                      )
-                    }
-                  >
-                    <MessagesSquare className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                    <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-medium text-sm">
-                          {result.project_name || 'Untitled'}
+          {/* Session title matches (instant, client-side) */}
+          {hasQuery && hasSessionResults && (
+            <CommandGroup heading="Sessions">
+              {filteredSessions.map((session) => (
+                <CommandItem
+                  key={session.id}
+                  value={`session-${session.title || session.slug || session.id}`}
+                  onSelect={() => handleSelectSession(session.id)}
+                >
+                  <MessageCircle className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                    <span className="truncate">
+                      {session.title || session.slug || 'Untitled'}
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {formatRelativeTime(session.time.updated)}
+                      {session.summary && session.summary.files > 0 && (
+                        <span className="ml-1.5">
+                          · {session.summary.files} file
+                          {session.summary.files !== 1 ? 's' : ''} changed
                         </span>
-                        {result.updated_at && (
-                          <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
-                            {formatRelativeTimeFromISO(result.updated_at)}
+                      )}
+                    </span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {/* Conversation content search (backend semantic search) */}
+          {showThreadSection &&
+            (hasThreadResults || showThreadSkeletons) && (
+              <CommandGroup heading={threadHeading}>
+                {hasThreadResults &&
+                  threadResults.map((result, index) => (
+                    <CommandItem
+                      key={`thread-${result.thread_id}-${index}`}
+                      value={`thread-${result.thread_id}-${index}-${result.text_preview?.slice(0, 20)}`}
+                      onSelect={() =>
+                        handleSelectThread(
+                          result.thread_id,
+                          result.project_id,
+                        )
+                      }
+                    >
+                      <MessagesSquare className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-medium text-sm">
+                            {result.project_name || 'Untitled'}
+                          </span>
+                          {result.updated_at && (
+                            <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
+                              {formatRelativeTimeFromISO(result.updated_at)}
+                            </span>
+                          )}
+                        </div>
+                        {result.text_preview && (
+                          <span className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
+                            {result.text_preview}
                           </span>
                         )}
                       </div>
-                      {result.text_preview && (
-                        <span className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
-                          {result.text_preview}
-                        </span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
+                    </CommandItem>
+                  ))}
 
-              {showThreadSkeletons && (
-                <SearchSkeletons count={2} variant="conversation" />
+                {showThreadSkeletons && (
+                  <SearchSkeletons count={2} variant="conversation" />
+                )}
+              </CommandGroup>
+            )}
+
+          {/* Semantic file search (LSS — BM25 + embeddings) */}
+          {showLssSection && (hasLssResults || showLssSkeletons) && (
+            <CommandGroup heading={lssHeading}>
+              {hasLssResults &&
+                filteredLssResults.map((hit) => {
+                  const relativePath = stripWorkspacePrefix(hit.file_path);
+                  const FileIcon = getFileIcon(relativePath);
+                  const fileName =
+                    relativePath.split('/').pop() || relativePath;
+                  const dirPath = relativePath
+                    .split('/')
+                    .slice(0, -1)
+                    .join('/');
+                  const snippet = cleanSnippet(hit.snippet);
+
+                  return (
+                    <CommandItem
+                      key={`lss-${hit.file_path}-${hit.score}`}
+                      value={`lss-${relativePath}-${snippet.slice(0, 30)}`}
+                      onSelect={() => handleSelectLssResult(hit.file_path)}
+                    >
+                      <FileIcon className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-medium text-sm">
+                            {fileName}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 tabular-nums">
+                            {formatRelevance(hit.score)}
+                          </span>
+                        </div>
+                        {snippet && (
+                          <span className="text-xs text-muted-foreground/80 line-clamp-1 leading-relaxed">
+                            {snippet}
+                          </span>
+                        )}
+                        {dirPath && (
+                          <span className="text-[11px] text-muted-foreground/50 truncate">
+                            {dirPath}
+                          </span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+
+              {showLssSkeletons && (
+                <SearchSkeletons count={3} variant="content" />
               )}
             </CommandGroup>
           )}
 
-        {/* Semantic file search (LSS — BM25 + embeddings) */}
-        {showLssSection && (hasLssResults || showLssSkeletons) && (
-          <CommandGroup heading={lssHeading}>
-            {hasLssResults &&
-              filteredLssResults.map((hit) => {
-                const relativePath = stripWorkspacePrefix(hit.file_path);
-                const FileIcon = getFileIcon(relativePath);
-                const fileName =
-                  relativePath.split('/').pop() || relativePath;
-                const dirPath = relativePath
-                  .split('/')
-                  .slice(0, -1)
-                  .join('/');
-                const snippet = cleanSnippet(hit.snippet);
-
+          {/* File name search results */}
+          {hasQuery && hasFileResults && (
+            <CommandGroup heading="Files">
+              {fileResults.map((filePath) => {
+                const FileIcon = getFileIcon(filePath);
+                const fileName = filePath.split('/').pop() || filePath;
+                const dirPath = filePath.split('/').slice(0, -1).join('/');
                 return (
                   <CommandItem
-                    key={`lss-${hit.file_path}-${hit.score}`}
-                    value={`lss-${relativePath}-${snippet.slice(0, 30)}`}
-                    onSelect={() => handleSelectLssResult(hit.file_path)}
+                    key={filePath}
+                    value={`file-${filePath}`}
+                    onSelect={() => handleSelectFile(filePath)}
                   >
-                    <FileIcon className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                    <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-medium text-sm">
-                          {fileName}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 tabular-nums">
-                          {formatRelevance(hit.score)}
-                        </span>
-                      </div>
-                      {snippet && (
-                        <span className="text-xs text-muted-foreground/80 line-clamp-1 leading-relaxed">
-                          {snippet}
-                        </span>
-                      )}
+                    <FileIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                      <span className="truncate">{fileName}</span>
                       {dirPath && (
-                        <span className="text-[11px] text-muted-foreground/50 truncate">
+                        <span className="text-xs text-muted-foreground truncate">
                           {dirPath}
                         </span>
                       )}
@@ -642,130 +674,102 @@ export function CommandPalette() {
                   </CommandItem>
                 );
               })}
+            </CommandGroup>
+          )}
 
-            {showLssSkeletons && (
-              <SearchSkeletons count={3} variant="content" />
-            )}
-          </CommandGroup>
-        )}
-
-        {/* File name search results */}
-        {hasQuery && hasFileResults && (
-          <CommandGroup heading="Files">
-            {fileResults.map((filePath) => {
-              const FileIcon = getFileIcon(filePath);
-              const fileName = filePath.split('/').pop() || filePath;
-              const dirPath = filePath.split('/').slice(0, -1).join('/');
-              return (
-                <CommandItem
-                  key={filePath}
-                  value={`file-${filePath}`}
-                  onSelect={() => handleSelectFile(filePath)}
-                >
-                  <FileIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-                    <span className="truncate">{fileName}</span>
-                    {dirPath && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        {dirPath}
-                      </span>
-                    )}
-                  </div>
+          {/* Quick actions (when no query) */}
+          {showQuickActions && (
+            <>
+              <CommandGroup heading="Actions">
+                <CommandItem onSelect={handleNewSession} disabled={isCreating}>
+                  {isCreating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  <span>New Session</span>
+                  <CommandShortcut>⌘J</CommandShortcut>
                 </CommandItem>
-              );
-            })}
-          </CommandGroup>
-        )}
-
-        {/* Quick actions (when no query) */}
-        {showQuickActions && (
-          <>
-            <CommandGroup heading="Actions">
-              <CommandItem onSelect={handleNewSession} disabled={isCreating}>
-                {isCreating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="mr-2 h-4 w-4" />
-                )}
-                <span>New Session</span>
-                <CommandShortcut>⌘J</CommandShortcut>
-              </CommandItem>
-              <CommandItem onSelect={handleOpenTerminal}>
-                <TerminalSquare className="mr-2 h-4 w-4" />
-                <span>Open Terminal</span>
-                <CommandShortcut>⌘`</CommandShortcut>
-              </CommandItem>
-              {currentSessionId && (
-                <CommandItem onSelect={handleCompactSession}>
-                  <Layers className="mr-2 h-4 w-4" />
-                  <span>Compact Session</span>
+                <CommandItem onSelect={handleOpenTerminal}>
+                  <TerminalSquare className="mr-2 h-4 w-4" />
+                  <span>Open Terminal</span>
+                  <CommandShortcut>⌘`</CommandShortcut>
                 </CommandItem>
-              )}
-            </CommandGroup>
-
-            <CommandSeparator />
-
-            <CommandGroup heading="Navigation">
-              <CommandItem onSelect={() => handleNavigate('/dashboard', 'Dashboard')}>
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                <span>Dashboard</span>
-              </CommandItem>
-              <CommandItem onSelect={() => handleNavigate('/agents', 'Agents')}>
-                <Bot className="mr-2 h-4 w-4" />
-                <span>Agents</span>
-              </CommandItem>
-              <CommandItem onSelect={() => handleNavigate('/knowledge', 'Knowledge')}>
-                <Database className="mr-2 h-4 w-4" />
-                <span>Knowledge</span>
-              </CommandItem>
-              <CommandItem onSelect={() => handleNavigate('/triggers', 'Triggers')}>
-                <Zap className="mr-2 h-4 w-4" />
-                <span>Triggers</span>
-              </CommandItem>
-              <CommandItem onSelect={() => handleNavigate('/settings/api-keys', 'Settings')}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </CommandItem>
-              <CommandItem onSelect={() => handleNavigate('/configuration', 'Configuration')}>
-                <Cog className="mr-2 h-4 w-4" />
-                <span>Configuration</span>
-              </CommandItem>
-            </CommandGroup>
-
-            <CommandSeparator />
-
-            <CommandGroup heading="Appearance">
-              <CommandItem onSelect={handleToggleTheme}>
-                <ThemeIcon className="mr-2 h-4 w-4" />
-                <span>{themeLabel}</span>
-              </CommandItem>
-            </CommandGroup>
-
-            <CommandGroup heading="View">
-              <CommandItem onSelect={handleToggleSidebar}>
-                {sidebarOpen ? (
-                  <PanelLeftClose className="mr-2 h-4 w-4" />
-                ) : (
-                  <PanelLeftIcon className="mr-2 h-4 w-4" />
+                {currentSessionId && (
+                  <CommandItem onSelect={handleCompactSession}>
+                    <Layers className="mr-2 h-4 w-4" />
+                    <span>Compact Session</span>
+                  </CommandItem>
                 )}
-                <span>
-                  {sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
-                </span>
-                <CommandShortcut>⌘B</CommandShortcut>
-              </CommandItem>
-            </CommandGroup>
-          </>
-        )}
-      </CommandList>
-    </CommandDialog>
+              </CommandGroup>
 
-    {currentSessionId && (
-      <CompactDialog
-        sessionId={currentSessionId}
-        open={compactOpen}
-        onOpenChange={setCompactOpen}
-      />
-    )}
-  </>
+              <CommandSeparator />
+
+              <CommandGroup heading="Navigation">
+                <CommandItem onSelect={() => handleNavigate('/dashboard', 'Dashboard')}>
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  <span>Dashboard</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/agents', 'Agents')}>
+                  <Bot className="mr-2 h-4 w-4" />
+                  <span>Agents</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/knowledge', 'Knowledge')}>
+                  <Bot className="mr-2 h-4 w-4" />
+                  <span>Knowledge</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/skills')}>
+                  <Database className="mr-2 h-4 w-4" />
+                  <span>Skills</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/triggers', 'Triggers')}>
+                  <Zap className="mr-2 h-4 w-4" />
+                  <span>Triggers</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/settings/api-keys', 'Settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/configuration', 'Configuration')}>
+                  <Cog className="mr-2 h-4 w-4" />
+                  <span>Configuration</span>
+                </CommandItem>
+              </CommandGroup>
+
+              <CommandSeparator />
+
+              <CommandGroup heading="Appearance">
+                <CommandItem onSelect={handleToggleTheme}>
+                  <ThemeIcon className="mr-2 h-4 w-4" />
+                  <span>{themeLabel}</span>
+                </CommandItem>
+              </CommandGroup>
+
+              <CommandGroup heading="View">
+                <CommandItem onSelect={handleToggleSidebar}>
+                  {sidebarOpen ? (
+                    <PanelLeftClose className="mr-2 h-4 w-4" />
+                  ) : (
+                    <PanelLeftIcon className="mr-2 h-4 w-4" />
+                  )}
+                  <span>
+                    {sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+                  </span>
+                  <CommandShortcut>⌘B</CommandShortcut>
+                </CommandItem>
+              </CommandGroup>
+            </>
+          )}
+        </CommandList>
+      </CommandDialog>
+
+      {currentSessionId && (
+        <CompactDialog
+          sessionId={currentSessionId}
+          open={compactOpen}
+          onOpenChange={setCompactOpen}
+        />
+      )}
+    </>
   );
 }

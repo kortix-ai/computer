@@ -102,6 +102,7 @@ export function OcImageGenToolView({
             {/* Image preview */}
             {imageSource && (
               <div className="flex justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageSource}
                   alt={prompt || 'Generated image'}

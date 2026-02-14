@@ -842,6 +842,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
     });
     
     return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weeklyProjections, actualData, signupsByWeek, viewsByWeek, newPaidByWeek, churnByWeek, actualSubsByWeek]);
 
   // Calculate subscribers at 1st of each month for churn rate calculation
@@ -1096,7 +1097,8 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
         goalArr: goal?.arr || 0,
       };
     });
-  }, [metricsByCalendarMonth, monthlyActuals, monthlyActualData, monthlyFromWeekly, currentMonthIndex, getMonthlyActualData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metricsByCalendarMonth, monthlyActuals, monthlyFromWeekly, currentMonthIndex]);
 
   // View state
   const [simulatorView, setSimulatorView] = useState<'monthly' | 'weekly'>('monthly');

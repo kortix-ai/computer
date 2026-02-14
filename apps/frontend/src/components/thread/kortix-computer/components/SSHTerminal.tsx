@@ -69,7 +69,7 @@ const lightTheme: ITheme = {
 };
 
 const getWebSocketUrl = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008';
   return baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
 };
 
@@ -323,6 +323,7 @@ export const SSHTerminal = memo(function SSHTerminal({ sandboxId, className }: S
       xtermRef.current = null;
       fitAddonRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disconnect, invalidateFileQueries]);
 
   useEffect(() => {

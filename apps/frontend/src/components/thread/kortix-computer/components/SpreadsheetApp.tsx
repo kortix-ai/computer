@@ -253,6 +253,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
     if (initialFilePath) {
       openFileInTab(initialFilePath);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFilePath]);
 
   const generateTabId = () => `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

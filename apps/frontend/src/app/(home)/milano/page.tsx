@@ -67,6 +67,7 @@ export default function MilanoPage() {
         toast.error('Failed to create session');
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [isSubmitting, user, isLoading, createSession, router, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 

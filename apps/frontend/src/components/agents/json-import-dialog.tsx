@@ -84,74 +84,32 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
             const steps: SetupStep[] = [];
             
             result.missing_regular_credentials?.forEach(req => {
-              if (req.qualified_name.startsWith('composio.')) {
-                let app_slug = req.qualified_name;
-                
-                if (app_slug.startsWith('composio.')) {
-                  app_slug = app_slug.substring('composio.'.length);
-                } else if (app_slug.includes('composio_')) {
-                  const parts = app_slug.split('composio_');
-                  app_slug = parts[parts.length - 1];
-                }
-                
-                const composioStep: SetupStep = {
-                  id: req.qualified_name,
-                  title: `Connect ${req.display_name}`,
-                  description: `Select an existing ${req.display_name} profile or create a new one`,
-                  type: 'composio_profile' as const,
-                  service_name: req.display_name,
-                  qualified_name: req.qualified_name,
-                  app_slug: app_slug,
-                  app_name: req.display_name
-                };
-
-                steps.push(composioStep);
-              } else {
-                const credentialStep: SetupStep = {
-                  id: req.qualified_name,
-                  title: `Connect ${req.display_name}`,
-                  description: `Select an existing ${req.display_name} profile or create a new one`,
-                  type: 'credential_profile' as const,
-                  service_name: req.display_name,
-                  qualified_name: req.qualified_name
-                };
-                steps.push(credentialStep);
-              }
+              // Skip composio credentials
+              if (req.qualified_name.startsWith('composio.')) return;
+              
+              const credentialStep: SetupStep = {
+                id: req.qualified_name,
+                title: `Connect ${req.display_name}`,
+                description: `Select an existing ${req.display_name} profile or create a new one`,
+                type: 'credential_profile' as const,
+                service_name: req.display_name,
+                qualified_name: req.qualified_name
+              };
+              steps.push(credentialStep);
             });
             result.missing_custom_configs?.forEach(req => {
-              if (req.custom_type === 'composio') {
-                let app_slug = req.qualified_name;
-                
-                if (app_slug.startsWith('composio.')) {
-                  app_slug = app_slug.substring('composio.'.length);
-                } else if (app_slug.includes('composio_')) {
-                  const parts = app_slug.split('composio_');
-                  app_slug = parts[parts.length - 1];
-                }
-                
-                const composioStep: SetupStep = {
-                  id: req.qualified_name,
-                  title: `Connect ${req.display_name}`,
-                  description: `Select an existing ${req.display_name} profile or create a new one`,
-                  type: 'composio_profile' as const,
-                  service_name: req.display_name,
-                  qualified_name: req.qualified_name,
-                  app_slug: app_slug,
-                  app_name: req.display_name
-                };
-
-                steps.push(composioStep);
-              } else {
-                const customStep: SetupStep = {
-                  id: req.qualified_name,
-                  title: `Configure ${req.display_name}`,
-                  description: `Provide configuration for ${req.display_name}`,
-                  type: 'custom_server' as const,
-                  service_name: req.display_name,
-                  qualified_name: req.qualified_name
-                };
-                steps.push(customStep);
-              }
+              // Skip composio configs
+              if (req.custom_type === 'composio') return;
+              
+              const customStep: SetupStep = {
+                id: req.qualified_name,
+                title: `Configure ${req.display_name}`,
+                description: `Provide configuration for ${req.display_name}`,
+                type: 'custom_server' as const,
+                service_name: req.display_name,
+                qualified_name: req.qualified_name
+              };
+              steps.push(customStep);
             });
 
             setSetupSteps(steps);
@@ -181,7 +139,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
         }
       }
     );
-  }, [jsonText, instanceName, profileMappings, customMcpConfigs, onSuccess, onOpenChange]); // Remove mutation from dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jsonText, instanceName, profileMappings, customMcpConfigs, onSuccess, onOpenChange]);
 
   const handleProfileSelect = useCallback((qualifiedName: string, profileId: string | null) => {
     setProfileMappings(prev => ({
@@ -225,7 +184,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
         }
       }
     );
-  }, [analysis, jsonText, instanceName, profileMappings, customMcpConfigs, onSuccess, onOpenChange]); // Remove mutation from dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis, jsonText, instanceName, profileMappings, customMcpConfigs, onSuccess, onOpenChange]);
 
   const currentStepData = useMemo(() => setupSteps[currentStep], [setupSteps, currentStep]);
   
@@ -286,7 +246,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
         </div>
 
         <div>
-          {(currentStepData.type === 'credential_profile' || currentStepData.type === 'composio_profile') && (
+          {currentStepData.type === 'credential_profile' && (
             <ProfileConnector
               step={currentStepData}
               selectedProfileId={profileMappings[currentStepData.qualified_name]}

@@ -8,6 +8,8 @@
  * Local mode:  http://localhost:8080 → {serverUrl}/proxy/8080/
  */
 
+import { SANDBOX_PORTS } from '@/lib/platform-client';
+
 export interface DetectedLocalhostUrl {
   /** The original full URL found in text (e.g. "http://localhost:8080/api/docs") */
   originalUrl: string;
@@ -35,8 +37,8 @@ const LOCALHOST_URL_REGEX =
  * by the sandbox infrastructure (VNC, OpenCode Web, presentation viewer, etc.)
  */
 const EXCLUDED_PORTS = new Set([
-  4096,  // OpenCode API (proxied by Kortix Master on 8000)
-  8000,  // Kortix Master itself
+  4096,  // OpenCode API (proxied by Kortix Master)
+  parseInt(SANDBOX_PORTS.KORTIX_MASTER, 10),  // Kortix Master itself
 ]);
 
 /**
@@ -121,15 +123,15 @@ export function rewriteLocalhostUrl(
   // Local mode: use kortix-master's proxy endpoint
   // If mappedPorts is available, look up the host port for container port 8000
   // (that's where kortix-master listens inside the container).
-  // Otherwise fall back to hardcoded 8000 for backwards compat (single-sandbox).
+  // Otherwise fall back to the container port for backwards compat (single-sandbox).
   try {
     const url = new URL(serverUrl);
-    const masterHostPort = mappedPorts?.['8000'] ?? '8000';
+    const masterHostPort = mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER] ?? SANDBOX_PORTS.KORTIX_MASTER;
     url.port = masterHostPort;
     const base = url.origin;
     return `${base}/proxy/${port}${path}`;
   } catch {
-    const masterHostPort = mappedPorts?.['8000'] ?? '8000';
+    const masterHostPort = mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER] ?? SANDBOX_PORTS.KORTIX_MASTER;
     return `http://localhost:${masterHostPort}/proxy/${port}${path}`;
   }
 }

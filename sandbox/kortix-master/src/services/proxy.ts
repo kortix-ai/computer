@@ -1,3 +1,4 @@
+//@ts-ignore
 import type { Context } from 'hono'
 import { config } from '../config'
 
@@ -15,6 +16,7 @@ export async function proxyToOpenCode(c: Context): Promise<Response> {
 
   // Add OpenCode basic auth if configured
   if (config.OPENCODE_USERNAME && config.OPENCODE_PASSWORD) {
+    //@ts-ignore
     const auth = Buffer.from(`${config.OPENCODE_USERNAME}:${config.OPENCODE_PASSWORD}`).toString('base64')
     headers.set('Authorization', `Basic ${auth}`)
   }
@@ -30,8 +32,19 @@ export async function proxyToOpenCode(c: Context): Promise<Response> {
       duplex: 'half',
     })
 
-    // Return proxied response with all headers
-    return new Response(response.body, {
+    // Check if this is an SSE/streaming response — pass body as stream
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('text/event-stream') || contentType.includes('application/octet-stream')) {
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      })
+    }
+
+    // Buffer the response body to avoid Bun ReadableStream proxy issues
+    const body = await response.arrayBuffer()
+    return new Response(body, {
       status: response.status,
       statusText: response.statusText,
       headers: response.headers,

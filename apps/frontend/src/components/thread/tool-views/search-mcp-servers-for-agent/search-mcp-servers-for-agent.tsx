@@ -26,7 +26,6 @@ import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { extractSearchMcpServersData } from './_utils';
-import { useComposioToolkitIcon } from '@/hooks/composio/use-composio';
 
 export function SearchMcpServersForAgentToolView({
   toolCall,
@@ -202,32 +201,12 @@ export function SearchMcpServersForAgentToolView({
 }
 
 function ToolkitCard({ toolkit }: { toolkit: { name: string; slug: string; description?: string; categories?: string[] } }) {
-  const { data: iconData } = useComposioToolkitIcon(toolkit.slug, {
-    enabled: !!toolkit.slug
-  });
-
   return (
     <div className="bg-muted/30 rounded-lg p-4 space-y-3">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden">
-            {iconData?.icon_url ? (
-              <img
-                src={iconData.icon_url}
-                alt={`${toolkit.name} logo`}
-                className="w-6 h-6 object-cover rounded"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center"><svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></div>`;
-                  }
-                }}
-              />
-            ) : (
-              <Package className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-            )}
+            <Package className="w-5 h-5 text-orange-600 dark:text-orange-400" />
           </div>
           <div>
             <h5 className="font-medium text-sm text-zinc-900 dark:text-zinc-100">

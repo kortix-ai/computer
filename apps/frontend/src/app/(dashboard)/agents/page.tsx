@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { Bot, ChevronRight, EyeOff } from 'lucide-react';
+import { Bot, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useOpenCodeAgents } from '@/hooks/opencode/use-opencode-sessions';
@@ -38,9 +37,8 @@ export default function AgentsPage() {
         ) : (
           <div className="space-y-2">
             {agents.map((agent) => (
-              <Link
+              <div
                 key={agent.name}
-                href={`/agents/config/${encodeURIComponent(agent.name)}`}
                 className="group flex items-center gap-4 px-4 py-3 rounded-lg border border-border/50 hover:border-border hover:bg-muted/30 transition-colors"
               >
                 {/* Icon */}
@@ -83,8 +81,7 @@ export default function AgentsPage() {
                 </div>
 
                 {/* Arrow */}
-                <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
-              </Link>
+              </div>
             ))}
           </div>
         )}

@@ -263,6 +263,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
           >
             {isSvg ? (
               // For SVGs, just use img tag - object tag has issues with blob URLs
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 ref={imageRef}
                 src={url}
@@ -277,6 +278,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
                 onError={handleImageError}
               />
             ) : (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 ref={imageRef}
                 src={url}

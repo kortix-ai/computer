@@ -59,6 +59,7 @@ function SourceRow({ result }: { result: { title: string; url: string; snippet?:
     >
       <div className="size-7 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden border border-border/30">
         {favicon ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={favicon}
             alt=""
@@ -136,6 +137,7 @@ function ImageGrid({
                   rel="noopener noreferrer"
                   className="group relative overflow-hidden rounded-lg border border-border/40 bg-muted/30 hover:border-primary/30 transition-all shadow-sm hover:shadow-md"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageUrl}
                     alt={image.title || `Search result ${idx + 1}`}
@@ -245,6 +247,7 @@ export function WebSearchToolView({
     if (isBatch && batchResults && batchResults.length > 0) {
       setCurrentQueryIndex(0);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBatch, batchResults?.length]);
 
   const safeQueryIndex = batchResults && batchResults.length > 0

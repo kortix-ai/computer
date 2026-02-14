@@ -159,6 +159,7 @@ export function useSpreadsheetSync({
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -528,6 +529,7 @@ export function useSpreadsheetSync({
     if (sandboxId && filePath && isComponentReady && enabled && !initialLoadDoneRef.current) {
       loadFromServer();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxId, filePath, isComponentReady, enabled]);
 
   useEffect(() => {

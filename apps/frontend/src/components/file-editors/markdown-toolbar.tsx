@@ -858,6 +858,7 @@ export function MarkdownToolbar({
               />
               {imagePreview ? (
                 <div className="space-y-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imagePreview}
                     alt="Preview"
@@ -895,6 +896,7 @@ export function MarkdownToolbar({
             </div>
             {imageUrl && (
               <div className="border rounded-lg p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageUrl}
                   alt="Preview"

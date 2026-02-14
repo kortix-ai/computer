@@ -124,6 +124,7 @@ function InlineImage({ filePath, sandboxId }: { filePath: string; sandboxId?: st
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={imageUrl}
       alt={filePath}

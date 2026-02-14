@@ -15,7 +15,7 @@ services:
     build:
       context: ..
       dockerfile: sandbox/Dockerfile
-    image: kortix-sandbox:${SANDBOX_VERSION:-0.4.1}
+    image: kortix-sandbox:${SANDBOX_VERSION:-0.4.3}
     # No container_name — allows multiple instances via --project-name / COMPOSE_PROJECT_NAME
     cap_add:
       - SYS_ADMIN
@@ -35,7 +35,7 @@ services:
       # Kortix Master
       - OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME:-admin}
       - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-changeme}
-      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai}
+      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai/router}
       - KORTIX_TOKEN=${KORTIX_TOKEN:-}
       - SANDBOX_ID=${SANDBOX_ID:-local}
       - PROJECT_ID=${PROJECT_ID:-local}

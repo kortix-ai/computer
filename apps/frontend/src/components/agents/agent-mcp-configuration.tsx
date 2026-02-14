@@ -29,22 +29,10 @@ export const AgentMCPConfiguration: React.FC<AgentMCPConfigurationProps> = ({
 }) => {
   const allMCPs = [
     ...(configuredMCPs || []),
-    ...(customMCPs || []).map(customMcp => {
-      if (customMcp.type === 'composio' || customMcp.customType === 'composio') {
-        return {
-          name: customMcp.name,
-          qualifiedName: customMcp.mcp_qualified_name || customMcp.config?.mcp_qualified_name || customMcp.qualifiedName || `composio.${customMcp.toolkit_slug || customMcp.config?.toolkit_slug || customMcp.name.toLowerCase()}`,
-          mcp_qualified_name: customMcp.mcp_qualified_name || customMcp.config?.mcp_qualified_name,
-          config: customMcp.config,
-          enabledTools: customMcp.enabledTools,
-          isCustom: true,
-          customType: 'composio',
-          isComposio: true,
-          toolkitSlug: customMcp.toolkit_slug || customMcp.config?.toolkit_slug,
-          toolkit_slug: customMcp.toolkit_slug || customMcp.config?.toolkit_slug  // Add for logo system
-        };
-      }
-      
+    ...(customMCPs || []).filter(customMcp => {
+      // Filter out composio MCPs
+      return customMcp.type !== 'composio' && customMcp.customType !== 'composio';
+    }).map(customMcp => {
       // Map 'sse' backend type to 'http' for frontend display
       const displayType = customMcp.type === 'sse' ? 'http' : (customMcp.type || customMcp.customType);
       
@@ -66,16 +54,6 @@ export const AgentMCPConfiguration: React.FC<AgentMCPConfigurationProps> = ({
     const custom = mcps
       .filter(mcp => mcp.isCustom)
       .map(mcp => {
-        if (mcp.customType === 'composio' || mcp.isComposio) {
-          return {
-            name: mcp.name,
-            type: 'composio',
-            customType: 'composio',
-            config: mcp.config,
-            enabledTools: mcp.enabledTools
-          };
-        }
-        
         // Map 'http' to 'sse' for backend compatibility
         const backendType = mcp.customType === 'http' ? 'sse' : mcp.customType;
         

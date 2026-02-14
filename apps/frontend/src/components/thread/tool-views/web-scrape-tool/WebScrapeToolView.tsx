@@ -183,6 +183,7 @@ export function WebScrapeToolView({
                     <div className="flex-shrink-0">
                       <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 overflow-hidden">
                         {favicon ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={favicon}
                             alt=""
@@ -254,6 +255,7 @@ export function WebScrapeToolView({
                   >
                     <div className="size-7 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden border border-border/30">
                       {favicon ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={favicon}
                           alt=""
@@ -316,6 +318,7 @@ export function WebScrapeToolView({
                       >
                         <div className="size-7 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden border border-border/30">
                           {favicon ? (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={favicon}
                               alt=""

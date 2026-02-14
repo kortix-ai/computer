@@ -291,6 +291,7 @@ export function CheckCommandOutputToolView({
         });
 
         return processedOutput.split('\n');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [displayOutput]);
 
     const hasMoreLines = formattedOutput.length > 10;

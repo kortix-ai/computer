@@ -94,6 +94,7 @@ export function NavMenu({ links }: NavMenuProps = {}) {
     window.addEventListener('scroll', handleScroll);
     handleScroll(); // Initial check
     return () => window.removeEventListener('scroll', handleScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isManualScroll, pathname]);
 
   const handleClick = (

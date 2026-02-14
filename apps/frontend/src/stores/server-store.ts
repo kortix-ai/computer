@@ -23,10 +23,26 @@ export interface ServerEntry {
 interface ServerStore {
   servers: ServerEntry[];
   activeServerId: string;
-  /** Monotonic counter that bumps on every server switch. Subscribe to this to react. */
+  /**
+   * Bumps ONLY on actual server switches (user picks a different server).
+   * The SSE event stream subscribes to this — bumping it nukes all cached
+   * queries and reconnects, so it must be used sparingly.
+   */
   serverVersion: number;
+  /**
+   * Bumps on any URL/port update to the active server. The connection
+   * health monitor subscribes to this for silent re-verification without
+   * nuking cached data.
+   */
+  urlVersion: number;
   addServer: (label: string, url: string) => ServerEntry;
   updateServer: (id: string, updates: Partial<Pick<ServerEntry, 'label' | 'url'>>) => void;
+  /**
+   * Silently update a server's URL and/or ports without triggering a full
+   * reconnect (no serverVersion bump). Only bumps urlVersion so the
+   * connection monitor re-verifies.
+   */
+  updateServerSilent: (id: string, updates: Partial<Pick<ServerEntry, 'url'>> & { mappedPorts?: Record<string, string>; label?: string }) => void;
   removeServer: (id: string) => void;
   setActiveServer: (id: string) => void;
   getActiveServerUrl: () => string;
@@ -54,6 +70,7 @@ export const useServerStore = create<ServerStore>()(
       servers: [createDefaultServer()],
       activeServerId: DEFAULT_SERVER_ID,
       serverVersion: 0,
+      urlVersion: 0,
 
       addServer: (label: string, url: string) => {
         const normalizedUrl = url.replace(/\/+$/, '');
@@ -81,8 +98,41 @@ export const useServerStore = create<ServerStore>()(
                 }
               : s,
           ),
-          // If we updated the active server's URL, bump version to force reconnect
+          // Manual updateServer bumps serverVersion (full reconnect) —
+          // use updateServerSilent for sandbox URL/port changes.
           ...(isActive && updates.url ? { serverVersion: state.serverVersion + 1 } : {}),
+        }));
+      },
+
+      updateServerSilent: (id, updates) => {
+        const state = get();
+        const isActive = state.activeServerId === id;
+        const existing = state.servers.find((s) => s.id === id);
+        if (!existing) return;
+
+        const urlChanged = updates.url != null && updates.url !== existing.url;
+        const portsChanged =
+          updates.mappedPorts != null &&
+          JSON.stringify(existing.mappedPorts) !== JSON.stringify(updates.mappedPorts);
+
+        if (!urlChanged && !portsChanged && !updates.label) return; // nothing to do
+
+        set((state) => ({
+          servers: state.servers.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  ...(updates.url ? { url: updates.url.replace(/\/+$/, '') } : {}),
+                  ...(updates.label ? { label: updates.label } : {}),
+                  ...(updates.mappedPorts ? { mappedPorts: updates.mappedPorts } : {}),
+                }
+              : s,
+          ),
+          // Only bump urlVersion (not serverVersion) so connection hook re-checks
+          // but SSE stream does NOT reconnect and queries are NOT nuked.
+          ...(isActive && (urlChanged || portsChanged)
+            ? { urlVersion: state.urlVersion + 1 }
+            : {}),
         }));
       },
 

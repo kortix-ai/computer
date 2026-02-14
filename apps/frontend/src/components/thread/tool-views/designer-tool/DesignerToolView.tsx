@@ -104,6 +104,7 @@ function DesignElementImage({
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={finalUrl}
       alt={element.name}

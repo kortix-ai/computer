@@ -128,6 +128,7 @@ export function CreateCredentialProfileToolView({
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-muted/50 border flex items-center justify-center overflow-hidden">
                       {logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={logoUrl}
                           alt={`${profile.toolkit_name} logo`}

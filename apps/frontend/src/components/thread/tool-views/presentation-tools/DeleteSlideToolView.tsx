@@ -43,7 +43,7 @@ export function DeleteSlideToolView({
 
   try {
     if (toolResult?.output) {
-      let output = toolResult.output;
+      const output = toolResult.output;
       if (typeof output === 'string') {
         try {
           deleteData = JSON.parse(output);

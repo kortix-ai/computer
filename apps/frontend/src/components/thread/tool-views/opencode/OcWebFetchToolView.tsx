@@ -38,7 +38,7 @@ function parseError(output: string): { statusCode: string | null; message: strin
   const statusCode = statusMatch ? statusMatch[1] : null;
 
   // Clean up the error message
-  let message = output
+  const message = output
     .replace(/^Error:\s*/i, '')
     .trim();
 
@@ -210,6 +210,7 @@ export function OcWebFetchToolView({
                   >
                     <div className="size-6 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                       {favicon ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={favicon}
                           alt=""

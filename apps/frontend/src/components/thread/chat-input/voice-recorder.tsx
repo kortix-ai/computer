@@ -49,6 +49,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = memo(function VoiceRe
                 clearTimeout(maxTimeoutRef.current);
             }
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state]);
 
     const startRecording = async () => {

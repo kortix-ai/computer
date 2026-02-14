@@ -109,12 +109,13 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
 
   const selectOption = useCallback(
     (optIndex: number) => {
+      const opts = currentQuestion?.options ?? [];
       // Last option is "Type own answer"
-      if (showCustom && optIndex === options.length) {
+      if (showCustom && optIndex === opts.length) {
         setEditing(true);
         return;
       }
-      const opt = options[optIndex];
+      const opt = opts[optIndex];
       if (!opt) return;
 
       if (isMulti) {
@@ -123,7 +124,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
         pick(opt.label);
       }
     },
-    [options, isMulti, showCustom, toggle, pick],
+    [currentQuestion?.options, isMulti, showCustom, toggle, pick],
   );
 
   const handleCustomSubmit = useCallback(

@@ -1467,6 +1467,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                               {/* Favicon */}
                               <div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                                 {favicon ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={favicon}
                                     alt=""
@@ -1634,6 +1635,7 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
                   {/* Favicon */}
                   <div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                     {favicon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={favicon}
                         alt=""
@@ -1767,6 +1769,7 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                   className="relative group overflow-hidden rounded border border-border/30 bg-muted/20 aspect-square"
                   title={title}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imgUrl}
                     alt={title}
@@ -1829,6 +1832,7 @@ function ImageGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
     >
       {imagePath ? (
         <div className="p-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imagePath}
             alt={prompt}

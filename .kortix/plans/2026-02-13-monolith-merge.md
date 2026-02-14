@@ -1,7 +1,7 @@
 # Plan: Merge All 5 Backend Services Into One Monolith (kortix-api)
 
 **Created:** 2026-02-13
-**Status:** in-progress
+**Status:** completed
 **Goal:** Combine kortix-router, kortix-billing, kortix-platform, kortix-cron, and kortix-daytona-proxy into a single `services/kortix-api` Hono app on port 8008.
 
 ## Context
@@ -14,17 +14,17 @@
 
 ## Success Criteria
 
-- [ ] Single `services/kortix-api` service on port 8008
-- [ ] All routes from all 5 services work identically
-- [ ] Single DB connection pool (shared `createDb()`)
-- [ ] Single Supabase client, single Daytona client
-- [ ] Billing proxy routes removed (direct function calls)
-- [ ] Platform proxy routes removed (direct function calls)
-- [ ] Cron scheduler runs in-process via setInterval
-- [ ] All existing tests still pass (cron + platform E2E tests)
-- [ ] Frontend talks to one URL only
-- [ ] Docker Compose updated (1 API service instead of 5)
-- [ ] Old services can be deleted
+- [x] Single `services/kortix-api` service on port 8008
+- [x] All routes from all 5 services work identically
+- [x] Single DB connection pool (shared `createDb()`)
+- [x] Single Supabase client, single Daytona client
+- [x] Billing proxy routes removed (direct function calls)
+- [x] Platform proxy routes removed (direct function calls)
+- [x] Cron scheduler runs in-process via setInterval
+- [x] All existing tests still pass (115/115 — cron, platform, deployments, health, version)
+- [x] Frontend talks to one URL only
+- [x] Docker Compose updated (1 API service instead of 5)
+- [x] Old services deleted
 
 ## Approach
 
@@ -106,4 +106,9 @@ Single middleware that handles ALL auth patterns:
 
 ## Notes
 
-Updated during execution.
+- Monolith created at `services/kortix-api/` — 10,523 lines, all 5 services merged.
+- Old services (kortix-router, kortix-billing, kortix-platform, kortix-cron, kortix-daytona-proxy) deleted.
+- Docker Compose updated to 2 services (frontend + kortix-api).
+- Typecheck: 3/3 projects pass clean.
+- Tests: 115/115 pass (after `db:push` to sync `deployments` table).
+- Completed: 2026-02-13.

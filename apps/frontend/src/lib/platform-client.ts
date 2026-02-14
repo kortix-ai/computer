@@ -17,6 +17,54 @@
  */
 
 import { getSupabaseAccessToken } from '@/lib/auth-token';
+import type { ServerEntry } from '@/stores/server-store';
+
+// ─── Sandbox Port Constants ──────────────────────────────────────────────────
+
+/**
+ * Well-known container ports exposed by the sandbox image.
+ * These are the ports INSIDE the container — Docker maps them to random host ports.
+ */
+export const SANDBOX_PORTS = {
+  DESKTOP: '6080',
+  DESKTOP_HTTPS: '6081',
+  OPENCODE_UI: '3111',
+  PRESENTATION_VIEWER: '3210',
+  KORTIX_MASTER: '8000',
+  BROWSER_STREAM: '9223',
+  BROWSER_VIEWER: '9224',
+} as const;
+
+/**
+ * Get a direct URL to a sandbox service (no proxy).
+ *
+ * - Local Docker: resolves via `mappedPorts` → `http://localhost:{hostPort}`
+ * - Daytona: `https://kortix.cloud/{externalId}/{containerPort}`
+ * - Manual/unknown: returns null (caller should fall back to proxy)
+ */
+export function getDirectPortUrl(
+  server: ServerEntry,
+  containerPort: string,
+): string | null {
+  // Daytona: port is embedded in the URL path
+  if (server.provider === 'daytona' && server.sandboxId) {
+    return `https://kortix.cloud/${server.sandboxId}/${containerPort}`;
+  }
+
+  // Local Docker: look up the random host port from mappedPorts
+  if (server.provider === 'local_docker' && server.mappedPorts) {
+    const hostPort = server.mappedPorts[containerPort];
+    if (!hostPort) return null;
+    try {
+      const base = new URL(server.url);
+      return `${base.protocol}//${base.hostname}:${hostPort}`;
+    } catch {
+      return `http://localhost:${hostPort}`;
+    }
+  }
+
+  return null;
+}
 
 /**
  * Get the base URL for platform API calls.
@@ -110,7 +158,7 @@ export function getSandboxUrl(sandbox: SandboxInfo): string {
   if (sandbox.provider === 'local_docker') {
     return sandbox.base_url;
   }
-  return `https://kortix.cloud/${sandbox.external_id}/8000`;
+  return `https://kortix.cloud/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
 }
 
 /**
@@ -125,7 +173,7 @@ export function getSandboxPortUrl(
   sandbox: SandboxInfo,
   containerPort: string,
 ): string | null {
-  if (sandbox.provider === 'daytona') {
+  if (sandbox.provider === 'daytona' || (!sandbox.provider && sandbox.external_id)) {
     return `https://kortix.cloud/${sandbox.external_id}/${containerPort}`;
   }
 

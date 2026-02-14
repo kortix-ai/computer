@@ -383,6 +383,7 @@ function AttachmentPreview({
           <div key={i} className="relative group">
             {af.isImage ? (
               <div className="h-[54px] w-[54px] rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={af.localUrl} alt={af.file.name} className="h-full w-full object-cover" />
               </div>
             ) : (
@@ -718,6 +719,7 @@ export function SessionChatInput({
       }
     }, 200);
     return () => clearTimeout(fileSearchTimer.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentionQuery?.query, onFileSearch]);
 
   // Build mention popover items: agents (sync) + files (async)

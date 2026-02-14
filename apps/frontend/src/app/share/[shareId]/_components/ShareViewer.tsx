@@ -193,6 +193,7 @@ export function ShareViewer({ shareId }: { shareId: string }) {
       <header className="sticky top-0 z-20 bg-background border-b border-border/40">
         <div className="h-12 sm:h-14 flex items-center justify-between px-4 sm:px-6 max-w-5xl mx-auto w-full">
           <div className="flex items-center gap-3 min-w-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/kortix-logomark-white.svg"
               alt="Kortix"
@@ -248,6 +249,7 @@ export function ShareViewer({ shareId }: { shareId: string }) {
 
           {/* Footer */}
           <div className="flex items-center justify-center pt-16 pb-8">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/kortix-logomark-white.svg"
               alt="Kortix"
@@ -317,6 +319,7 @@ function ShareMessageView({
     <div className="flex flex-col gap-2">
       {/* Agent header */}
       <div className="flex items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/kortix-logomark-white.svg"
           alt="Kortix"

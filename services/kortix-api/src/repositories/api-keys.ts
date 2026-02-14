@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { apiKeys } from '@kortix/db';
-import { db } from '../db';
-import { hashSecretKey, isApiKeySecretConfigured } from '../lib/crypto';
+import { db } from '../shared/db';
+import { hashSecretKey, isApiKeySecretConfigured } from '../shared/crypto';
 
 export interface ApiKeyValidationResult {
   isValid: boolean;
