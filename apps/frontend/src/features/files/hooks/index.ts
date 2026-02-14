@@ -46,3 +46,11 @@ export {
 
 // SSE-based real-time invalidation
 export { useFileEventInvalidation } from './use-file-events';
+
+// Git history
+export {
+  useFileHistory,
+  useFileCommitDiff,
+  useFileAtCommit,
+  fileHistoryKeys,
+} from './use-file-history';

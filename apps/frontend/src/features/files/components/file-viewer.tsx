@@ -8,6 +8,7 @@ import {
   Download,
   FileWarning,
   GitBranch,
+  History,
   Loader2,
   Save,
 } from 'lucide-react';
@@ -221,6 +222,7 @@ export function FileViewer() {
   const goBackToBrowser = useFilesStore((s) => s.goBackToBrowser);
   const nextFile = useFilesStore((s) => s.nextFile);
   const prevFile = useFilesStore((s) => s.prevFile);
+  const openHistory = useFilesStore((s) => s.openHistory);
 
   // Text content (for code/text files, CSV, images)
   const { data: fileContent, isLoading, error, refetch } = useFileContent(selectedFilePath);
@@ -393,6 +395,19 @@ export function FileViewer() {
               ) : (
                 <Save className="h-3.5 w-3.5" />
               )}
+            </Button>
+          )}
+
+          {/* History button */}
+          {selectedFilePath && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => openHistory(selectedFilePath)}
+              title="View file history"
+            >
+              <History className="h-3.5 w-3.5" />
             </Button>
           )}
 

@@ -47,6 +47,7 @@ export function FileBrowser() {
   const openFileWithList = useFilesStore((s) => s.openFileWithList);
   const isSearchOpen = useFilesStore((s) => s.isSearchOpen);
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
+  const openHistory = useFilesStore((s) => s.openHistory);
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
 
   const { data: health, isLoading: isHealthLoading } = useServerHealth();
@@ -138,6 +139,14 @@ export function FileBrowser() {
     parts.pop();
     navigateToPath(parts.length > 0 ? parts.join('/') : '.');
   }, [currentPath, navigateToPath]);
+
+  // Open file history
+  const handleHistory = useCallback(
+    (node: FileNode) => {
+      openHistory(node.path);
+    },
+    [openHistory],
+  );
 
   // Download a file
   const handleDownload = useCallback(async (node: FileNode) => {
@@ -428,6 +437,7 @@ export function FileBrowser() {
                     onDownload={handleDownload}
                     onRename={handleRename}
                     onDelete={handleDelete}
+                    onHistory={handleHistory}
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
                   />

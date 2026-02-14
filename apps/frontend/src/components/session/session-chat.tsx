@@ -673,9 +673,14 @@ function SessionTurn({
     () => isLastUserMessage(turn.userMessage.info.id, allMessages),
     [turn.userMessage.info.id, allMessages],
   );
+  // A turn is "working" when:
+  // 1. The session status says busy/retry (via getWorkingState), OR
+  // 2. This is the last turn AND the parent component says isBusy (e.g. we
+  //    just sent a message but sessionStatus hasn't updated to busy yet).
+  //    This covers the race between sending and the server acknowledging.
   const working = useMemo(
-    () => getWorkingState(sessionStatus, isLast),
-    [sessionStatus, isLast],
+    () => getWorkingState(sessionStatus, isLast) || (isLast && isBusy),
+    [sessionStatus, isLast, isBusy],
   );
   const hasSteps = useMemo(() => turnHasSteps(allParts), [allParts]);
   const lastTodoWritePart = useMemo(() => {
@@ -1324,6 +1329,13 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // ---- Polling fallback & optimistic send ----
   const [pollingActive, setPollingActive] = useState(false);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
+  // Track whether we're retrying a failed send (keeps loader visible)
+  const [isRetrying, setIsRetrying] = useState(false);
+  // Track whether a pending prompt send is in flight (dashboard→session flow).
+  // Keeps isBusy true until the server acknowledges with a busy status.
+  const [pendingSendInFlight, setPendingSendInFlight] = useState(false);
+  // Grace period: don't stop polling immediately on idle after a recent send
+  const lastSendTimeRef = useRef<number>(0);
   useSessionBusyPolling(sessionId, pollingActive);
 
   // ---- Optimistic prompt (from dashboard/project page) ----
@@ -1347,6 +1359,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     if (pendingPrompt) {
       pendingPromptHandled.current = true;
       setPollingActive(true);
+      setPendingSendInFlight(true);
       sessionStorage.removeItem(`opencode_pending_prompt:${sessionId}`);
       sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
 
@@ -1365,22 +1378,35 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         // ignore
       }
 
-      // Send the message with retries
+      // Send the message with retry. The useSendOpenCodeMessage hook already
+      // retries 3 times internally for transient errors. We add one additional
+      // outer retry (2 attempts total at this level) to cover cases where the
+      // SDK client itself fails to initialize or the server takes longer to start.
       const sendOpts = Object.keys(options).length > 0 ? options as any : undefined;
-      const maxRetries = 3;
-      let attempt = 0;
+      const maxOuterRetries = 2;
+      let outerAttempt = 0;
+      lastSendTimeRef.current = Date.now();
       const trySend = () => {
-        attempt++;
+        outerAttempt++;
         sendMessage.mutateAsync({
           sessionId,
           parts: [{ type: 'text', text: pendingPrompt }],
           options: sendOpts,
+        }).then(() => {
+          // Send succeeded — update send time for grace period and clear retrying.
+          // Keep pendingSendInFlight true until server status goes busy (cleared below).
+          lastSendTimeRef.current = Date.now();
+          setIsRetrying(false);
         }).catch(() => {
-          if (attempt < maxRetries) {
-            // Exponential backoff: 1s, 2s, 4s
-            setTimeout(trySend, 1000 * Math.pow(2, attempt - 1));
+          if (outerAttempt < maxOuterRetries) {
+            // Show retrying indicator and keep loader visible
+            setIsRetrying(true);
+            // Wait 3s before outer retry (inner retries already used 1s + 2s)
+            setTimeout(trySend, 3000);
           } else {
             // All retries failed — clear optimistic display so user can retry manually
+            setIsRetrying(false);
+            setPendingSendInFlight(false);
             setOptimisticPrompt(null);
             setPollingActive(false);
           }
@@ -1432,14 +1458,46 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     (s) => s.statuses[sessionId],
   );
   const isServerBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
-  const isBusy = isServerBusy || !!pendingUserMessage;
+  const isBusy = isServerBusy || !!pendingUserMessage || pendingSendInFlight;
 
-  // Stop polling when session goes idle (via SSE or polling fallback)
+  // Stop polling when session goes idle (via SSE or polling fallback).
+  // Grace period: if we sent a message recently (within 5s), don't stop polling
+  // on the first idle status — the server may not have started processing yet.
   useEffect(() => {
     if (pollingActive && sessionStatus?.type === 'idle') {
+      const timeSinceSend = Date.now() - lastSendTimeRef.current;
+      if (timeSinceSend < 5000) {
+        // Still within grace period — check again shortly
+        const remaining = 5000 - timeSinceSend;
+        const timer = setTimeout(() => {
+          // Re-check: if still idle after grace period, stop polling
+          const currentStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
+          if (currentStatus?.type === 'idle') {
+            setPollingActive(false);
+          }
+        }, remaining);
+        return () => clearTimeout(timer);
+      }
       setPollingActive(false);
     }
-  }, [pollingActive, sessionStatus?.type]);
+  }, [pollingActive, sessionStatus?.type, sessionId]);
+
+  // Clear pendingSendInFlight once the server acknowledges it's working,
+  // or once assistant messages arrive (server processed so fast we missed busy).
+  // This bridges the gap between the optimistic prompt clearing and the
+  // server status updating — keeps isBusy true so the turn shows a loader.
+  useEffect(() => {
+    if (!pendingSendInFlight) return;
+    if (isServerBusy) {
+      setPendingSendInFlight(false);
+      return;
+    }
+    // If messages include assistant content, the server already processed it
+    const hasAssistant = messages?.some((m) => m.info.role === 'assistant');
+    if (hasAssistant) {
+      setPendingSendInFlight(false);
+    }
+  }, [pendingSendInFlight, isServerBusy, messages]);
 
   // Clear pending user message when server acknowledges (status becomes busy)
   // or when new messages arrive from the server
@@ -1587,6 +1645,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     setExpanded({});
     setPollingActive(false);
     setPendingUserMessage(null);
+    setPendingSendInFlight(false);
+    setIsRetrying(false);
+    lastSendTimeRef.current = 0;
   }, [sessionId]);
 
   const toggleExpanded = useCallback((id: string) => {
@@ -1682,6 +1743,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       // Optimistic: show message immediately and start polling fallback
       setPendingUserMessage(text);
       setPollingActive(true);
+      lastSendTimeRef.current = Date.now();
 
       const options: Record<string, unknown> = {};
       if (local.agent.current) options.agent = local.agent.current.name;
@@ -1727,8 +1789,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           parts,
           options: Object.keys(options).length > 0 ? options as any : undefined,
         });
+        // Send succeeded — update send time for grace period
+        lastSendTimeRef.current = Date.now();
       } catch {
-        // If send fails, clear optimistic state
+        // If send fails (after all internal retries), clear optimistic state
         setPendingUserMessage(null);
         setPollingActive(false);
       }
@@ -1899,6 +1963,11 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                         style={{ height: '14px', width: 'auto' }}
                       />
                       <KortixLoader size="small" />
+                      {isRetrying && (
+                        <span className="text-xs text-amber-500 animate-pulse">
+                          Retrying connection...
+                        </span>
+                      )}
                     </div>
                   </>
                 )}
@@ -1971,6 +2040,11 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                         style={{ height: '14px', width: 'auto' }}
                       />
                       <KortixLoader size="small" />
+                      {isRetrying && (
+                        <span className="text-xs text-amber-500 animate-pulse">
+                          Retrying connection...
+                        </span>
+                      )}
                     </div>
                   </>
                 )}

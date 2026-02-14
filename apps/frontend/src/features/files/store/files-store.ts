@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type FilesView = 'browser' | 'viewer';
+export type FilesView = 'browser' | 'viewer' | 'history';
 
 interface FilesStoreState {
   /** Which view is active: directory browser or file viewer */
@@ -19,6 +19,10 @@ interface FilesStoreState {
   unsavedFileContent: Record<string, string>;
   /** Unsaved state tracking (has user made edits?) */
   unsavedFileState: Record<string, boolean>;
+  /** Path of the file whose history is being viewed */
+  historyFilePath: string | null;
+  /** Currently selected commit hash in the history panel */
+  selectedCommitHash: string | null;
 }
 
 interface FilesStoreActions {
@@ -48,6 +52,12 @@ interface FilesStoreActions {
   setUnsavedState: (filePath: string, hasUnsaved: boolean) => void;
   /** Get unsaved state for a file */
   getUnsavedState: (filePath: string) => boolean;
+  /** Open the history view for a file */
+  openHistory: (filePath: string) => void;
+  /** Select a commit in the history panel */
+  selectCommit: (commitHash: string | null) => void;
+  /** Close the history view (go back to viewer or browser) */
+  closeHistory: () => void;
   /** Reset all state */
   reset: () => void;
 }
@@ -63,6 +73,8 @@ const initialState: FilesStoreState = {
   isSearchOpen: false,
   unsavedFileContent: {},
   unsavedFileState: {},
+  historyFilePath: null,
+  selectedCommitHash: null,
 };
 
 export const useFilesStore = create<FilesStore>()((set, get) => ({
@@ -168,6 +180,28 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
 
   getUnsavedState: (filePath: string) => {
     return get().unsavedFileState[filePath] ?? false;
+  },
+
+  openHistory: (filePath: string) => {
+    set({
+      view: 'history',
+      historyFilePath: filePath,
+      selectedCommitHash: null,
+      isSearchOpen: false,
+    });
+  },
+
+  selectCommit: (commitHash: string | null) => {
+    set({ selectedCommitHash: commitHash });
+  },
+
+  closeHistory: () => {
+    const { selectedFilePath } = get();
+    set({
+      view: selectedFilePath ? 'viewer' : 'browser',
+      historyFilePath: null,
+      selectedCommitHash: null,
+    });
   },
 
   reset: () => {

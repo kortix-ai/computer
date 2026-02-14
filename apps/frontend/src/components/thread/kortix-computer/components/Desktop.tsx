@@ -13,7 +13,7 @@ import { Project } from '@/lib/api/threads';
 import { ApiMessageType } from '@/components/thread/types';
 import { ViewType } from '@/stores/kortix-computer-store';
 import { cn } from '@/lib/utils';
-import { useFileList, readFile, fileListKeys, useFileUpload, useFileMkdir, useFileDelete, useFileRename, useFilesStore, FileBrowser, FileViewer } from '@/features/files';
+import { useFileList, readFile, fileListKeys, useFileUpload, useFileMkdir, useFileDelete, useFileRename, useFilesStore, FileBrowser, FileViewer, FileHistoryPanel } from '@/features/files';
 import { DesktopContextMenu } from './DesktopContextMenu';
 import { QuickLaunch } from './QuickLaunch';
 import { DesktopIcons } from './DesktopIcons';
@@ -68,13 +68,19 @@ interface FolderWindowProps {
 
 /**
  * Wrapper that sets files store state before rendering the unified FileViewer.
- * Used for Desktop individual file windows.
+ * Used for Desktop individual file windows. Supports switching to history view.
  */
 const DesktopFileViewer = memo(function DesktopFileViewer({ filePath }: { filePath: string }) {
   const openFile = useFilesStore((s) => s.openFile);
+  const view = useFilesStore((s) => s.view);
+  const historyFilePath = useFilesStore((s) => s.historyFilePath);
   useEffect(() => {
     openFile(filePath);
   }, [filePath, openFile]);
+
+  if (view === 'history' && historyFilePath) {
+    return <FileHistoryPanel />;
+  }
   return <FileViewer />;
 });
 

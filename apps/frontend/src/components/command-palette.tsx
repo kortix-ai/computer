@@ -27,6 +27,8 @@ import {
   Search,
   MessagesSquare,
   Layers,
+  GitCompareArrows,
+  ListTodo,
 } from 'lucide-react';
 
 import {
@@ -49,6 +51,9 @@ import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions
 import { useTabStore } from '@/stores/tab-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { CompactDialog } from '@/components/session/compact-dialog';
+import { DiffDialog } from '@/components/session/diff-dialog';
+import { TodoDialog } from '@/components/session/todo-dialog';
+import { InitProjectDialog } from '@/components/session/init-project-dialog';
 
 // ============================================================================
 // Helpers
@@ -190,6 +195,9 @@ export function CommandPalette() {
   const [lssDebouncedQuery, setLssDebouncedQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [compactOpen, setCompactOpen] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [todoOpen, setTodoOpen] = useState(false);
+  const [initOpen, setInitOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -461,6 +469,24 @@ export function CommandPalette() {
     setCompactOpen(true);
   }, [currentSessionId, close]);
 
+  const handleViewChanges = useCallback(() => {
+    if (!currentSessionId) return;
+    close();
+    setDiffOpen(true);
+  }, [currentSessionId, close]);
+
+  const handleViewTasks = useCallback(() => {
+    if (!currentSessionId) return;
+    close();
+    setTodoOpen(true);
+  }, [currentSessionId, close]);
+
+  const handleInitProject = useCallback(() => {
+    if (!currentSessionId) return;
+    close();
+    setInitOpen(true);
+  }, [currentSessionId, close]);
+
   const themeLabel = useMemo(() => {
     if (theme === 'light') return 'Switch to Dark';
     if (theme === 'dark') return 'Switch to System';
@@ -701,6 +727,24 @@ export function CommandPalette() {
                     <span>Compact Session</span>
                   </CommandItem>
                 )}
+                {currentSessionId && (
+                  <CommandItem onSelect={handleViewChanges}>
+                    <GitCompareArrows className="mr-2 h-4 w-4" />
+                    <span>View Changes</span>
+                  </CommandItem>
+                )}
+                {currentSessionId && (
+                  <CommandItem onSelect={handleViewTasks}>
+                    <ListTodo className="mr-2 h-4 w-4" />
+                    <span>View Tasks</span>
+                  </CommandItem>
+                )}
+                {currentSessionId && (
+                  <CommandItem onSelect={handleInitProject}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    <span>Initialize Project</span>
+                  </CommandItem>
+                )}
               </CommandGroup>
 
               <CommandSeparator />
@@ -764,11 +808,28 @@ export function CommandPalette() {
       </CommandDialog>
 
       {currentSessionId && (
-        <CompactDialog
-          sessionId={currentSessionId}
-          open={compactOpen}
-          onOpenChange={setCompactOpen}
-        />
+        <>
+          <CompactDialog
+            sessionId={currentSessionId}
+            open={compactOpen}
+            onOpenChange={setCompactOpen}
+          />
+          <DiffDialog
+            sessionId={currentSessionId}
+            open={diffOpen}
+            onOpenChange={setDiffOpen}
+          />
+          <TodoDialog
+            sessionId={currentSessionId}
+            open={todoOpen}
+            onOpenChange={setTodoOpen}
+          />
+          <InitProjectDialog
+            sessionId={currentSessionId}
+            open={initOpen}
+            onOpenChange={setInitOpen}
+          />
+        </>
       )}
     </>
   );

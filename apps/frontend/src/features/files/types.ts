@@ -55,6 +55,60 @@ export interface FindMatch {
   submatches: Array<{ start: number; end: number }>;
 }
 
+// ---------------------------------------------------------------------------
+// Git commit history types (parsed from `git log` output)
+// ---------------------------------------------------------------------------
+
+/** A single git commit entry for a file's history. */
+export interface GitCommit {
+  /** Full commit hash */
+  hash: string;
+  /** Abbreviated commit hash (7 chars) */
+  shortHash: string;
+  /** Commit author name */
+  author: string;
+  /** Commit author email */
+  authorEmail: string;
+  /** Commit date as ISO string */
+  date: string;
+  /** Commit date as unix timestamp (ms) */
+  timestamp: number;
+  /** Commit message (first line / subject) */
+  subject: string;
+  /** Full commit message body (may be empty) */
+  body: string;
+}
+
+/** Response shape for file history queries. */
+export interface FileHistoryResult {
+  /** The file path this history belongs to */
+  filePath: string;
+  /** Ordered list of commits (newest first) */
+  commits: GitCommit[];
+  /** Whether there are more commits beyond the requested limit */
+  hasMore: boolean;
+}
+
+/** Diff content between two commits for a single file. */
+export interface FileCommitDiff {
+  /** The commit hash this diff represents */
+  commitHash: string;
+  /** The parent commit hash (null for initial commit) */
+  parentHash: string | null;
+  /** Unified diff patch string */
+  patch: string;
+  /** File content before the commit (empty for added files) */
+  before: string;
+  /** File content after the commit (empty for deleted files) */
+  after: string;
+  /** Number of added lines */
+  additions: number;
+  /** Number of deleted lines */
+  deletions: number;
+  /** Change type */
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
+}
+
 /** LSS semantic search hit (from /lss/search endpoint) */
 export interface LssHit {
   file_path: string;

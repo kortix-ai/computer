@@ -16,6 +16,9 @@ export type {
   LssSearchResult,
   OpenCodeProjectInfo,
   ServerHealth,
+  GitCommit,
+  FileHistoryResult,
+  FileCommitDiff,
 } from './types';
 
 // API — read
@@ -41,6 +44,9 @@ export {
 // API — semantic search (LSS)
 export { searchLss } from './api/lss-search';
 
+// API — git history
+export { getFileHistory, getFileCommitDiff, getFileAtCommit } from './api/git-history';
+
 // Hooks
 export {
   useFileList,
@@ -57,9 +63,13 @@ export {
   useFileDelete,
   useFileMkdir,
   useFileRename,
+  useFileHistory,
+  useFileCommitDiff,
+  useFileAtCommit,
   fileListKeys,
   fileContentKeys,
   fileSearchKeys,
+  fileHistoryKeys,
   lssSearchKeys,
 } from './hooks';
 
@@ -73,4 +83,5 @@ export {
   FileSearch,
   FileBreadcrumbs,
   FileTreeItem,
+  FileHistoryPanel,
 } from './components';

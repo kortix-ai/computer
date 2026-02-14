@@ -3,6 +3,7 @@
 import { useFilesStore } from '@/features/files/store/files-store';
 import { FileBrowser } from '@/features/files/components/file-browser';
 import { FileViewer } from '@/features/files/components/file-viewer';
+import { FileHistoryPanel } from '@/features/files/components/file-history-panel';
 import { useFileEventInvalidation } from '@/features/files/hooks/use-file-events';
 import { useServerStore } from '@/stores/server-store';
 import { useCurrentProject } from '@/features/files/hooks/use-server-health';
@@ -10,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Server } from 'lucide-react';
 
 export default function FilesPage() {
-  const { view, selectedFilePath } = useFilesStore();
+  const { view, selectedFilePath, historyFilePath } = useFilesStore();
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
   const { data: project } = useCurrentProject();
 
@@ -38,7 +39,9 @@ export default function FilesPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {view === 'viewer' && selectedFilePath ? (
+        {view === 'history' && historyFilePath ? (
+          <FileHistoryPanel />
+        ) : view === 'viewer' && selectedFilePath ? (
           <FileViewer />
         ) : (
           <FileBrowser />

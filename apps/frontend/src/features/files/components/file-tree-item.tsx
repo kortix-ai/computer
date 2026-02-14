@@ -12,6 +12,7 @@ import {
   File as FileIcon,
   ChevronRight,
   Download,
+  History,
   Pencil,
   Trash2,
   Copy,
@@ -35,6 +36,7 @@ interface FileTreeItemProps {
   onDownload?: (node: FileNode) => void;
   onRename?: (node: FileNode, newName: string) => void;
   onDelete?: (node: FileNode) => void;
+  onHistory?: (node: FileNode) => void;
   /** All sibling names in the current directory, for duplicate detection */
   siblingNames?: string[];
   /** Git status for this file/directory */
@@ -108,8 +110,8 @@ function getNameSelectionEnd(name: string, isDirectory: boolean): number {
   return dotIdx > 0 ? dotIdx : name.length;
 }
 
-export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, siblingNames, gitStatus }: FileTreeItemProps) {
-  const hasContextMenu = onDownload || onRename || onDelete;
+export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, onHistory, siblingNames, gitStatus }: FileTreeItemProps) {
+  const hasContextMenu = onDownload || onRename || onDelete || onHistory;
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameName, setRenameName] = useState('');
@@ -235,6 +237,13 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, si
           <ContextMenuItem onClick={() => onDownload(node)}>
             <Download className="mr-2 h-4 w-4" />
             Download
+          </ContextMenuItem>
+        )}
+
+        {node.type === 'file' && onHistory && (
+          <ContextMenuItem onClick={() => onHistory(node)}>
+            <History className="mr-2 h-4 w-4" />
+            View History
           </ContextMenuItem>
         )}
 

@@ -540,20 +540,15 @@ export function ProjectPage({ projectId }: { projectId: string }) {
           directory: project.worktree,
         });
 
-        // Store prompt/options for optimistic display on the session page
+        // Store prompt/options for optimistic display on the session page.
+        // The session page will handle sending the message so SSE/polling are
+        // active before the response starts streaming.
         sessionStorage.setItem(`opencode_pending_prompt:${session.id}`, text);
         if (Object.keys(options).length > 0) {
           sessionStorage.setItem(`opencode_pending_options:${session.id}`, JSON.stringify(options));
         }
 
-        // Step 2: Send the prompt directly (don't rely on session page)
-        sendMessage.mutateAsync({
-          sessionId: session.id,
-          parts: [{ type: 'text', text }],
-          options: Object.keys(options).length > 0 ? options as any : undefined,
-        }).catch(() => {});
-
-        // Step 3: Navigate
+        // Step 2: Navigate — session page sends the message on mount
         router.push(`/sessions/${session.id}`);
       } catch {
         // Session creation failed — nothing stored yet

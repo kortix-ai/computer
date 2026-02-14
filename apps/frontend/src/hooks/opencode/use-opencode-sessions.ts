@@ -265,23 +265,41 @@ export function useSendOpenCodeMessage() {
       parts: PromptPart[];
       options?: SendMessageOptions;
     }) => {
-      const client = getClient();
-      const result = await client.session.promptAsync({
+      const mappedParts = parts.map((p) => {
+        if (p.type === 'file') return { type: 'file' as const, mime: p.mime, url: p.url, filename: p.filename, source: p.source };
+        if (p.type === 'agent') return { type: 'agent' as const, name: p.name, source: p.source };
+        return { type: 'text' as const, text: p.text };
+      });
+      const payload = {
         sessionID: sessionId,
-        parts: parts.map((p) => {
-          if (p.type === 'file') return { type: 'file' as const, mime: p.mime, url: p.url, filename: p.filename, source: p.source };
-          if (p.type === 'agent') return { type: 'agent' as const, name: p.name, source: p.source };
-          return { type: 'text' as const, text: p.text };
-        }),
+        parts: mappedParts,
         ...(options?.model && { model: options.model }),
         ...(options?.agent && { agent: options.agent }),
         ...(options?.variant && { variant: options.variant }),
-      });
-      // promptAsync returns void (204) — no unwrap needed, but check for errors
-      if (result.error) {
-        const err = result.error as any;
-        throw new Error(err?.data?.message || err?.message || 'Failed to send message');
+      };
+
+      // Retry up to 2 times on transient connection errors
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const client = getClient();
+          const result = await client.session.promptAsync(payload);
+          // promptAsync returns void (204) — no unwrap needed, but check for errors
+          if (result.error) {
+            const err = result.error as any;
+            throw new Error(err?.data?.message || err?.message || 'Failed to send message');
+          }
+          return; // success
+        } catch (err: any) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          const msg = lastError.message.toLowerCase();
+          const isTransient = msg.includes('unable to connect') || msg.includes('fetch') || msg.includes('network') || msg.includes('econnrefused') || msg.includes('timeout');
+          if (!isTransient || attempt >= 2) throw lastError;
+          // Wait before retry: 1s, 2s
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
       }
+      if (lastError) throw lastError;
     },
   });
 }
