@@ -90,12 +90,9 @@ export function useSandboxConnection() {
         setSandboxStatus('connected');
       } catch {
         if (!alive) return;
-        incrementSandboxFail();
-
-        const { failCount } = useSandboxConnectionStore.getState();
-        if (failCount >= FAIL_THRESHOLD) {
-          setSandboxStatus('unreachable');
-        }
+        // Atomically increment fail count and transition to 'unreachable'
+        // if the threshold is reached — no separate read+write race.
+        incrementSandboxFail(FAIL_THRESHOLD);
       } finally {
         if (alive) {
           markInitialCheckDone();

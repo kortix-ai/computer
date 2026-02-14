@@ -29,19 +29,20 @@ export function useOpenCodeEventStream() {
   const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
   const clearPending = useOpenCodePendingStore((s) => s.clear);
   const serverVersion = useServerStore((s) => s.serverVersion);
-  const urlVersion = useServerStore((s) => s.urlVersion);
   const abortRef = useRef<AbortController | null>(null);
   const prevServerVersionRef = useRef(serverVersion);
 
   useEffect(() => {
-    // Always reset the client so it picks up the new URL
-    resetClient();
-
     // Only nuke caches on actual server switches (not URL/port updates)
     const isServerSwitch = prevServerVersionRef.current !== serverVersion;
     prevServerVersionRef.current = serverVersion;
 
+    // Only reset the SDK client on actual server switches — NOT on URL/port
+    // updates. Resetting on every urlVersion change tears down the client
+    // unnecessarily, causing SSE disconnection → reconnection → cache
+    // invalidation cascade that manifests as random loading flashes.
     if (isServerSwitch) {
+      resetClient();
       clearStatuses({});
       clearPending();
       queryClient.removeQueries({ queryKey: opcodeKeys.all });
@@ -116,9 +117,13 @@ export function useOpenCodeEventStream() {
           } as any);
           const { stream } = result;
 
-          // On successful reconnection, refresh all data to catch up on missed events
+          // On successful reconnection, refresh data to catch up on missed events.
+          // Use refetchQueries instead of invalidateQueries — invalidation marks
+          // queries as stale which causes components to show loading spinners
+          // while refetching. refetchQueries fetches in the background and only
+          // updates the UI once the new data arrives, avoiding the loading flash.
           if (retryCount > 0) {
-            queryClient.invalidateQueries({ queryKey: opcodeKeys.all });
+            queryClient.refetchQueries({ queryKey: opcodeKeys.all });
           }
           retryCount = 0;
 
@@ -412,7 +417,14 @@ export function useOpenCodeEventStream() {
       abortRef.current = null;
       if (flushTimer) clearTimeout(flushTimer);
     };
-  }, [queryClient, setStatus, clearStatuses, addPermission, removePermission, addQuestion, removeQuestion, clearPending, serverVersion, urlVersion]);
+    // NOTE: urlVersion is intentionally excluded from deps. URL/port updates
+    // (via updateServerSilent) don't change the SSE endpoint — only the
+    // connection health monitor needs to re-verify on urlVersion changes.
+    // Including urlVersion here caused unnecessary SSE disconnection →
+    // reconnection → cache invalidation cascades (the "random loading" bug).
+    // The SDK's getClient() auto-detects URL changes via URL comparison,
+    // so it handles URL updates lazily on next API call.
+  }, [queryClient, setStatus, clearStatuses, addPermission, removePermission, addQuestion, removeQuestion, clearPending, serverVersion]);
 }
 
 // Use the correct key reference

@@ -5,6 +5,8 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useMemo,
+  useCallback,
   ReactNode,
 } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -127,22 +129,21 @@ function CloudAuthProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
       clearUserLocalStorage();
     } catch (error) {
       console.error('Error signing out:', error);
     }
-  };
+  }, [supabase]);
 
-  const value: AuthContextType = {
-    supabase,
-    session,
-    user,
-    isLoading,
-    signOut,
-  };
+  // Memoize the context value to prevent cascading re-renders of the entire
+  // component tree on every auth state change (e.g. silent token refreshes).
+  const value = useMemo<AuthContextType>(
+    () => ({ supabase, session, user, isLoading, signOut }),
+    [supabase, session, user, isLoading, signOut],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

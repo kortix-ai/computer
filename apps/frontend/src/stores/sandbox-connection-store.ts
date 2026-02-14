@@ -32,13 +32,29 @@ export function setSandboxStatus(next: SandboxConnectionStatus) {
 }
 
 export function markInitialCheckDone() {
+  if (useSandboxConnectionStore.getState().initialCheckDone) return; // no-op
   useSandboxConnectionStore.setState({ initialCheckDone: true });
 }
 
-export function incrementSandboxFail() {
-  useSandboxConnectionStore.setState((s) => ({ failCount: s.failCount + 1 }));
+/**
+ * Atomically increment fail count and transition to 'unreachable' if the
+ * threshold is reached. This prevents the race condition where cleanup
+ * runs between incrementing failCount and checking the threshold.
+ */
+export function incrementSandboxFail(failThreshold: number) {
+  useSandboxConnectionStore.setState((s) => {
+    const nextFailCount = s.failCount + 1;
+    return {
+      failCount: nextFailCount,
+      ...(nextFailCount >= failThreshold && s.status !== 'unreachable'
+        ? { status: 'unreachable' as const }
+        : {}),
+    };
+  });
 }
 
 export function resetSandboxFail() {
+  const { failCount } = useSandboxConnectionStore.getState();
+  if (failCount === 0) return; // no-op — avoids unnecessary re-renders
   useSandboxConnectionStore.setState({ failCount: 0 });
 }

@@ -54,14 +54,16 @@ export const SessionLayout = memo(function SessionLayout({
   );
   const agentStatus = adaptAgentStatus(isBusy);
 
-  const {
-    isSidePanelOpen,
-    setIsSidePanelOpen,
-    shouldOpenPanel,
-    clearShouldOpenPanel,
-    isExpanded,
-    toggleExpanded,
-  } = useKortixComputerStore();
+  // Use individual selectors to avoid re-rendering on unrelated store changes
+  // (e.g. currentSandboxId, files store resets). Destructuring the whole store
+  // subscribes to ALL properties and causes unnecessary re-renders for every
+  // open session tab.
+  const isSidePanelOpen = useKortixComputerStore((s) => s.isSidePanelOpen);
+  const setIsSidePanelOpen = useKortixComputerStore((s) => s.setIsSidePanelOpen);
+  const shouldOpenPanel = useKortixComputerStore((s) => s.shouldOpenPanel);
+  const clearShouldOpenPanel = useKortixComputerStore((s) => s.clearShouldOpenPanel);
+  const isExpanded = useKortixComputerStore((s) => s.isExpanded);
+  const toggleExpanded = useKortixComputerStore((s) => s.toggleExpanded);
 
   const hasToolCalls = toolCalls.length > 0;
   const prevHasToolCallsRef = useRef(false);
