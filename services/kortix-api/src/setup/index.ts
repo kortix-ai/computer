@@ -140,6 +140,9 @@ const KEY_SCHEMA = {
   },
 };
 
+// Keys to check for onboarding status (not part of the UI schema)
+const SYSTEM_KEYS = ['ONBOARDING_COMPLETE'];
+
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 /**
@@ -192,6 +195,12 @@ setupApp.get('/env', async (c) => {
       masked[k.key] = maskKey(val);
       configured[k.key] = !!val;
     }
+  }
+
+  // Include system keys in the configured map
+  for (const key of SYSTEM_KEYS) {
+    const val = rootEnv[key] || sandboxEnv[key] || '';
+    configured[key] = !!val;
   }
 
   return c.json({ masked, configured });
@@ -291,4 +300,26 @@ setupApp.get('/health', async (c) => {
   }
 
   return c.json(checks);
+});
+
+/**
+ * GET /v1/setup/onboarding-status
+ * Check if onboarding is complete
+ */
+setupApp.get('/onboarding-status', async (c) => {
+  const root = getProjectRoot();
+  const rootEnv = parseEnvFile(resolve(root, '.env'));
+  const complete = rootEnv['ONBOARDING_COMPLETE'] === 'true';
+  return c.json({ complete });
+});
+
+/**
+ * POST /v1/setup/onboarding-complete
+ * Mark onboarding as complete (called by the onboarding tool or frontend)
+ */
+setupApp.post('/onboarding-complete', async (c) => {
+  const root = getProjectRoot();
+  const rootEnvPath = resolve(root, '.env');
+  writeEnvFile(rootEnvPath, { ONBOARDING_COMPLETE: 'true' });
+  return c.json({ ok: true });
 });

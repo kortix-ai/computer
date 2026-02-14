@@ -12,7 +12,7 @@ WORKDIR /app
 ARG PNPM_LOCKFILE_MODE=--frozen-lockfile
 
 # Copy only the files needed for dependency resolution and workspace linking.
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc* ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc* tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
 
@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install only the frontend workspace project (and its deps) using pnpm.
-RUN corepack enable pnpm && pnpm install --filter ./apps/frontend ${PNPM_LOCKFILE_MODE}
+# Install frontend + shared workspace deps.
+RUN corepack enable pnpm && pnpm install --filter ./apps/frontend... ${PNPM_LOCKFILE_MODE}
 
 
 # ---- Builder Stage ----
@@ -53,14 +53,15 @@ ENV NEXT_OUTPUT=standalone
 ARG NEXT_PUBLIC_ENV_MODE=cloud
 ARG NEXT_PUBLIC_BACKEND_URL=
 ARG NEXT_PUBLIC_OPENCODE_URL=
-ARG NEXT_PUBLIC_SUPABASE_URL=
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=
+ARG NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder
 ENV NEXT_PUBLIC_ENV_MODE=${NEXT_PUBLIC_ENV_MODE}
 ENV NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
 ENV NEXT_PUBLIC_OPENCODE_URL=${NEXT_PUBLIC_OPENCODE_URL}
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN corepack enable pnpm && pnpm run build
 
 

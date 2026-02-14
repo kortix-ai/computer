@@ -21,8 +21,7 @@
     "local:down": "docker compose -f docker-compose.local.yml down",
     "local:logs": "docker compose -f docker-compose.local.yml logs -f",
     "local:restart": "docker compose -f docker-compose.local.yml down && docker compose -f docker-compose.local.yml up --build -d",
-    "setup": "bash scripts/install.sh --setup-only",
-    "kortix": "bash scripts/kortix.sh",
+    "setup": "echo 'Run: bash scripts/get-kortix.sh'",
     "test:cli": "bash scripts/tests/run-all.sh",
     "graph": "nx graph"
   },

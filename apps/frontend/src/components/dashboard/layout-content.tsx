@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Suspense, lazy } from 'react';
 import { useAuth } from '@/components/AuthProvider';
@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useAdminRole } from '@/hooks/admin';
 import { usePresence } from '@/hooks/use-presence';
 import { featureFlags } from '@/lib/feature-flags';
+import { isLocalMode } from '@/lib/config';
 
 import { useProjects } from '@/hooks/threads/use-project';
 import { AppProviders } from '@/components/layout/app-providers';
@@ -289,6 +290,34 @@ export default function DashboardLayoutContent({
     }
   }, [user, isLoading, router]);
 
+  // Hard gate: redirect to /setup if onboarding not complete (local mode only)
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  useEffect(() => {
+    if (!isLocalMode()) {
+      setOnboardingChecked(true);
+      return;
+    }
+
+    const checkOnboarding = async () => {
+      try {
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const res = await fetch(`${backendUrl}/setup/onboarding-status`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.complete) {
+            router.replace('/setup');
+            return;
+          }
+        }
+      } catch {
+        // Backend not reachable — don't block, let them in
+      }
+      setOnboardingChecked(true);
+    };
+    checkOnboarding();
+  }, [router]);
+
   const isMaintenanceActive = (() => {
     if (!maintenanceNotice?.enabled || !maintenanceNotice.startTime || !maintenanceNotice.endTime) {
       return false;
@@ -309,7 +338,7 @@ export default function DashboardLayoutContent({
     return now < start && now < end;
   })();
 
-  if (isLoading) {
+  if (isLoading || !onboardingChecked) {
     return <DashboardSkeleton />;
   }
 
