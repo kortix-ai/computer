@@ -7,7 +7,6 @@
 
 import { getDaytona } from '../../shared/daytona';
 import { config } from '../../config';
-import { generateSandboxToken } from '../services/token';
 import type {
   SandboxProvider,
   ProviderName,
@@ -25,7 +24,6 @@ export class DaytonaProvider implements SandboxProvider {
       throw new Error('DAYTONA_SNAPSHOT is not configured — set it to the snapshot name (e.g. kortix-sandbox-v0.4.1)');
     }
 
-    const authToken = generateSandboxToken();
     const daytona = getDaytona();
 
     const daytonaSandbox = await daytona.create(
@@ -33,7 +31,6 @@ export class DaytonaProvider implements SandboxProvider {
         snapshot,
         envVars: {
           KORTIX_API_URL: config.KORTIX_URL,
-          KORTIX_TOKEN: authToken,
           ENV_MODE: 'cloud',
           ...opts.envVars,
         },
@@ -53,7 +50,6 @@ export class DaytonaProvider implements SandboxProvider {
       metadata: {
         provisionedBy: opts.userId,
         daytonaSandboxId: externalId,
-        authToken,
         snapshot,
       },
     };

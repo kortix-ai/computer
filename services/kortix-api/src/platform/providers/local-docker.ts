@@ -216,7 +216,7 @@ export class LocalDockerProvider implements SandboxProvider {
   // ── Private ─────────────────────────────────────────────────────────────
 
   private async createContainer(): Promise<void> {
-    const authToken = generateSandboxToken();
+    const authToken = this.opts?.envVars?.KORTIX_TOKEN || generateSandboxToken();
     const sandboxEnvVars = readSandboxEnv();
 
     const env = [
