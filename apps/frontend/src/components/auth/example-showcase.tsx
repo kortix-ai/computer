@@ -446,8 +446,7 @@ export function ExampleShowcase() {
               {/* Computer Header */}
               <div className="border-b px-3 py-2 flex items-center justify-between bg-card shrink-0">
                 <div className="flex items-center gap-1.5">
-                  <KortixLogo size={12} />
-                  <span className="text-xs font-medium">Kortix Computer</span>
+                  <span className="text-xs font-medium">Actions</span>
                 </div>
                 <div className="flex items-center gap-0.5 border rounded-full bg-card p-1 relative">
                   <div className="p-1 relative z-10 pointer-events-none">

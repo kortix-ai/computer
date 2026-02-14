@@ -7,7 +7,6 @@ import { DrawerTitle } from '@/components/ui/drawer';
 import { ViewType } from '@/stores/kortix-computer-store';
 import { cn } from '@/lib/utils';
 import { ToolbarButtons } from './ToolbarButtons';
-import Image from 'next/image';
 
 
 interface PanelHeaderProps {
@@ -48,33 +47,15 @@ export const PanelHeader = memo(function PanelHeader({
   if (variant === 'drawer') {
     return (
       <div className="h-12 flex-shrink-0 px-3 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur-sm">
-        {/* Left: Logo */}
-        <div className="flex items-center min-w-0">
-          <Image
-            src="/kortix-computer-white.svg"
-            alt="Kortix Computer"
-            width={120}
-            height={14}
-            className="hidden dark:block"
-            priority
-          />
-          <Image
-            src="/kortix-computer-black.svg"
-            alt="Kortix Computer"
-            width={120}
-            height={14}
-            className="block dark:hidden"
-            priority
-          />
-          <DrawerTitle className="sr-only">Kortix Computer</DrawerTitle>
+        {/* Left: Title */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Activity className="w-3.5 h-3.5 text-foreground/70" strokeWidth={2.5} />
+          <span className="text-sm font-medium text-foreground">Actions</span>
+          <DrawerTitle className="sr-only">Actions</DrawerTitle>
         </div>
         
-        {/* Right: Actions label + Close */}
+        {/* Right: Close */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300">
-            <Activity className="w-3 h-3" strokeWidth={2.5} />
-            <span className="text-[11px] font-medium">Actions</span>
-          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -106,32 +87,13 @@ export const PanelHeader = memo(function PanelHeader({
       </div>
       <div
         onClick={() => onMaximize?.()}
-        className="flex items-center justify-center cursor-pointer select-none hover:opacity-80 transition-opacity"
+        className="flex items-center justify-center cursor-pointer select-none hover:opacity-80 transition-opacity gap-1.5"
       >
-        <Image
-          src="/kortix-computer-white.svg"
-          alt="Kortix Computer"
-          width={140}
-          height={16}
-          className="hidden dark:block"
-          priority
-        />
-        <Image
-          src="/kortix-computer-black.svg"
-          alt="Kortix Computer"
-          width={140}
-          height={16}
-          className="block dark:hidden"
-          priority
-        />
+        <Activity className="w-3.5 h-3.5 text-foreground/70" strokeWidth={2.5} />
+        <span className="text-sm font-medium text-foreground">Actions</span>
       </div>
 
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300">
-          <Activity className="w-3 h-3" strokeWidth={2.5} />
-          <span className="text-[11px] font-medium">Actions</span>
-        </div>
-      </div>
+      <div className="flex items-center justify-end" />
     </div>
   );
 });

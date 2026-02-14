@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo, useCallback, startTransition } from 'react';
+import { useState, useMemo, useCallback, startTransition, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useRef } from 'react';
 import {
   MoreHorizontal,
   Trash2,
@@ -40,6 +39,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useTabStore } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
+import { useSandboxConnectionStore } from '@/stores/sandbox-connection-store';
 
 import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
@@ -374,9 +374,20 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<{ id: string; name: string } | null>(null);
 
-  const { data: sessions, isLoading, error } = useOpenCodeSessions();
+  const { data: sessions, isLoading, error, refetch } = useOpenCodeSessions();
   const { mutate: deleteSession, isPending: isDeleting } = useDeleteOpenCodeSession();
   const { mutate: updateSession } = useUpdateOpenCodeSession();
+
+  // Auto-refetch sessions when connection recovers from error state
+  const connectionStatus = useSandboxConnectionStore((s) => s.status);
+  const prevConnectionRef = useRef(connectionStatus);
+  useEffect(() => {
+    const prev = prevConnectionRef.current;
+    prevConnectionRef.current = connectionStatus;
+    if (prev !== 'connected' && connectionStatus === 'connected' && error) {
+      refetch();
+    }
+  }, [connectionStatus, error, refetch]);
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
   const [compactSessionId, setCompactSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -698,6 +709,12 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             <Frown className="h-8 w-8 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">Failed to connect</p>
             <p className="text-xs text-muted-foreground/60 mt-1">Could not reach server</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-3 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
           </div>
         ) : rootSessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">

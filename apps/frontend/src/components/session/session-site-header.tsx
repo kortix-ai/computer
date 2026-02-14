@@ -160,7 +160,7 @@ export function SessionSiteHeader({
                   <p>
                     {!canOpenSidePanel
                       ? 'No tools yet'
-                      : `${isSidePanelOpen ? 'Close' : 'Open'} Kortix Computer`}
+                      : `${isSidePanelOpen ? 'Close' : 'Open'} Actions`}
                   </p>
                 </TooltipContent>
               </Tooltip>

@@ -22,8 +22,7 @@ import {
   adaptMessagesToToolCalls,
   adaptAgentStatus,
 } from '@/lib/adapters/opencode-to-kortix-computer';
-import { X, Maximize2, Minimize2 } from 'lucide-react';
-import Image from 'next/image';
+import { X, Maximize2, Minimize2, Activity } from 'lucide-react';
 
 // ============================================================================
 // Session Layout
@@ -64,20 +63,23 @@ export const SessionLayout = memo(function SessionLayout({
   } = useKortixComputerStore();
 
   const hasToolCalls = toolCalls.length > 0;
-  const prevHasToolCallsRef = useRef(false);
 
-  // Reset the tool-call transition tracker when switching sessions so the
-  // auto-open logic fires correctly for the new session.
-  useEffect(() => {
-    prevHasToolCallsRef.current = false;
-  }, [sessionId]);
+  // Auto-open the side panel the FIRST time tool calls appear for a session.
+  // Uses a Set to track which sessions have already triggered auto-open,
+  // preventing re-opens on query refetches (e.g. after reconnection) or
+  // when the user has manually closed the panel.
+  const autoOpenedSessionsRef = useRef(new Set<string>());
 
   useEffect(() => {
-    if (hasToolCalls && !prevHasToolCallsRef.current && !isMobile) {
+    if (
+      hasToolCalls &&
+      !isMobile &&
+      !autoOpenedSessionsRef.current.has(sessionId)
+    ) {
+      autoOpenedSessionsRef.current.add(sessionId);
       setIsSidePanelOpen(true);
     }
-    prevHasToolCallsRef.current = hasToolCalls;
-  }, [hasToolCalls, isMobile, setIsSidePanelOpen]);
+  }, [hasToolCalls, isMobile, sessionId, setIsSidePanelOpen]);
 
   useEffect(() => {
     if (shouldOpenPanel && !isSidePanelOpen) {
@@ -225,23 +227,9 @@ export const SessionLayout = memo(function SessionLayout({
                 hideTopBar={true}
                 headerSlot={
                   <div className="flex-shrink-0 h-11 flex items-center justify-between px-4">
-                    <div className="flex items-center gap-3">
-                      <Image
-                        src="/kortix-computer-white.svg"
-                        alt="Kortix Computer"
-                        width={120}
-                        height={14}
-                        className="hidden dark:block"
-                        priority
-                      />
-                      <Image
-                        src="/kortix-computer-black.svg"
-                        alt="Kortix Computer"
-                        width={120}
-                        height={14}
-                        className="block dark:hidden"
-                        priority
-                      />
+                    <div className="flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-foreground/70" strokeWidth={2.5} />
+                      <span className="text-sm font-medium text-foreground">Actions</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <button

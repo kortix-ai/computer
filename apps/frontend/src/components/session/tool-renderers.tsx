@@ -2971,10 +2971,29 @@ function parseErrorContent(error: string): {
 
 export function ToolError({ error, toolName }: { error: string; toolName?: string }) {
   const [showTrace, setShowTrace] = useState(false);
-  const { summary, traceback, errorType } = useMemo(() => parseErrorContent(error), [error]);
+
+  // Normalize and try structured rendering
+  const structuredSections = useMemo(() => {
+    const normalized = normalizeToolOutput(error);
+    if (!hasStructuredContent(normalized)) return null;
+    return parseStructuredOutput(normalized);
+  }, [error]);
+
+  const { summary, traceback, errorType } = useMemo(() => parseErrorContent(
+    normalizeToolOutput(error),
+  ), [error]);
 
   // Display name: prefer short error type, else "Error"
   const displayType = errorType || 'Error';
+
+  // Use structured output when we detect warnings + tracebacks etc.
+  if (structuredSections) {
+    return (
+      <div className="text-xs">
+        <StructuredOutput sections={structuredSections} />
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden text-xs">

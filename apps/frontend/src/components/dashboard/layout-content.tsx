@@ -21,6 +21,7 @@ import { NovuInboxProvider } from '../notifications/novu-inbox-provider';
 import { useOpenCodeEventStream } from '@/hooks/opencode/use-opencode-events';
 import { useSandbox } from '@/hooks/platform/use-sandbox';
 import { useSandboxConnection } from '@/hooks/platform/use-sandbox-connection';
+import { useConnectionToasts } from '@/components/dashboard/connecting-screen';
 import { TabBar } from '@/components/tabs/tab-bar';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
@@ -36,9 +37,10 @@ function SandboxInitProvider() {
   return null;
 }
 
-/** Monitors sandbox connection health. Renders nothing. */
+/** Monitors sandbox connection health + shows toast on connect/disconnect. Renders nothing. */
 function SandboxConnectionProvider() {
   useSandboxConnection();
+  useConnectionToasts();
   return null;
 }
 
