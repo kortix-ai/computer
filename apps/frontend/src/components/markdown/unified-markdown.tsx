@@ -453,6 +453,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
             if (!src) return null;
             return (
               <span className="block my-5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={src}
                   alt={alt || ''}

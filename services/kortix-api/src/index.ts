@@ -60,7 +60,7 @@ app.get('/health', (c) => {
   });
 });
 
-// Health check under /v1 prefix (frontend uses NEXT_PUBLIC_BACKEND_URL which includes /v1)
+// Health check at /v1/health (frontend calls this path)
 app.get('/v1/health', (c) => {
   return c.json({
     status: 'ok',
@@ -87,7 +87,12 @@ app.route('/', billingApp);           // /billing/*, /setup/*, /webhooks/*
 app.route('/', platformApp);          // /v1/account/*, /v1/sandbox/version
 app.route('/', cronApp);              // /v1/sandboxes/*, /v1/triggers/*, /v1/executions/*
 app.route('/', deploymentsApp);       // /v1/deployments/*
-app.route('/', daytonaProxyApp);      // /:sandboxId/:port/* (MUST BE LAST — wildcard catch-all)
+// Daytona Proxy is cloud-only (requires Daytona API). In local mode the catch-all
+// /:sandboxId/:port/* pattern would intercept every unmatched request and throw
+// "Invalid port" errors for paths like /v1/health, /v1/billing/*, etc.
+if (!config.isLocal()) {
+  app.route('/', daytonaProxyApp);    // /:sandboxId/:port/* (MUST BE LAST — wildcard catch-all)
+}
 
 // === Error Handling ===
 

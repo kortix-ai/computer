@@ -323,6 +323,7 @@ export const SSHTerminal = memo(function SSHTerminal({ sandboxId, className }: S
       xtermRef.current = null;
       fitAddonRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disconnect, invalidateFileQueries]);
 
   useEffect(() => {

@@ -140,13 +140,14 @@ export function useAgentStream(
   
   useEffect(() => {
     isMountedRef.current = true;
+    const throttleState = toolCallThrottleRef.current;
     return () => {
       isMountedRef.current = false;
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
       }
-      if (toolCallThrottleRef.current.timeoutId) {
-        clearTimeout(toolCallThrottleRef.current.timeoutId);
+      if (throttleState.timeoutId) {
+        clearTimeout(throttleState.timeoutId);
       }
     };
   }, []);
@@ -298,6 +299,7 @@ export function useAgentStream(
     }
     
     return response.json();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   const getAuthToken = useCallback(async (): Promise<string | null> => {

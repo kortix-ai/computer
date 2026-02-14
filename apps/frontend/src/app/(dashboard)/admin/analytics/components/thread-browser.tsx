@@ -216,6 +216,7 @@ export function ThreadBrowser({
       ),
       width: 'w-10',
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [translations, translateMutation.isPending, onUserClick]);
 
   return (

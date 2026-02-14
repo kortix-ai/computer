@@ -34,6 +34,7 @@ export function SessionWelcome({ showPrompts = false, onPromptSelect }: SessionW
         className="absolute inset-0 pointer-events-none overflow-hidden"
         aria-hidden="true"
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/kortix-brandmark-bg.svg"
           alt=""

@@ -343,6 +343,7 @@ export const SimplifiedScheduleConfig: React.FC<SimplifiedScheduleConfigProps> =
     if (!selectedPreset && oneTimeDate) { // Only auto-generate if no preset is selected
       handleOneTimeScheduleChange();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oneTimeDate, oneTimeHour, oneTimeMinute]);
 
   // Initialize recurring schedule on component mount if no preset is selected
@@ -350,6 +351,7 @@ export const SimplifiedScheduleConfig: React.FC<SimplifiedScheduleConfigProps> =
     if (!selectedPreset && !config.cron_expression) {
       handleRecurringScheduleChange();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePresetSelect = (presetId: string) => {

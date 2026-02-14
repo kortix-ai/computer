@@ -47,6 +47,7 @@ export function AppDownloadQR({
 
   return (
     <div className={cn("relative bg-white rounded-2xl p-4 shadow-lg", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img 
         src={qrUrl}
         alt="Scan to download Kortix - redirects to App Store or Google Play based on your device"

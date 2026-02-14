@@ -54,7 +54,7 @@ export function ListPresentationsToolView({
 
   try {
     if (toolResult?.output) {
-      let output = toolResult.output;
+      const output = toolResult.output;
       if (typeof output === 'string') {
         try {
           presentationsData = JSON.parse(output);

@@ -56,7 +56,7 @@ export function ListPresentationTemplatesToolView({
 
   try {
     if (toolResult?.output) {
-      let output = toolResult.output
+      const output = toolResult.output
       if (typeof output === "string") {
         try {
           templatesData = JSON.parse(output)

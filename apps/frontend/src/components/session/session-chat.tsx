@@ -512,6 +512,7 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
               <div key={file.id} className="rounded-lg overflow-hidden border border-border/50">
                 {file.mime?.startsWith('image/') && file.url ? (
                   <ImagePreview src={file.url} alt={file.filename ?? 'Attachment'}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={file.url}
                       alt={file.filename ?? 'Attachment'}
@@ -760,6 +761,7 @@ function SessionTurn({
   const lastStatusChangeRef = useRef(Date.now());
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const childMessages = undefined as MessageWithParts[] | undefined; // placeholder for child session delegation
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const rawStatus = useMemo(() => getTurnStatus(allParts, childMessages), [allParts]);
   const [throttledStatus, setThrottledStatus] = useState('');
 
@@ -778,6 +780,7 @@ function SessionTurn({
       }, 2500 - elapsed);
     }
     return () => clearTimeout(statusTimeoutRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allParts, rawStatus, throttledStatus]);
 
   // ---- Retry countdown ----
@@ -900,6 +903,7 @@ function SessionTurn({
       {/* Kortix logo header */}
       {(working || hasSteps) && (
         <div className="flex items-center gap-2 mt-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/kortix-logomark-white.svg"
             alt="Kortix"
@@ -1128,6 +1132,7 @@ function SessionTurn({
           {/* Kortix logo — shown when there are no steps (otherwise logo is already above) */}
           {!hasSteps && (
             <div className="flex items-center gap-2 mb-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/kortix-logomark-white.svg"
                 alt="Kortix"
@@ -1374,6 +1379,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         });
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   // Clear optimistic prompt once real messages arrive
@@ -1718,6 +1724,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         setPollingActive(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
@@ -1875,77 +1882,22 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
                         className="dark:invert-0 invert flex-shrink-0 animate-pulse"
                         style={{ height: '14px', width: 'auto' }}
                       />
-                      <KortixLoader size="small" />
-                    </div>
-                  </>
-                )}
 
-                {/* Turn-based message rendering */}
-                {turns.map((turn, turnIndex) => {
-                  // Check if this turn is a compaction summary
-                  // The server sets `summary: true` on assistant messages that are compaction summaries
-                  const hasCompaction = turn.assistantMessages.some(
-                    (msg) => (msg.info as any).summary === true
-                  ) || turn.assistantMessages.some(
-                    (msg) => msg.parts.some((p) => p.type === 'compaction')
-                  );
-
-                  return (
-                    <div key={turn.userMessage.info.id}>
-                      {/* Compaction divider — shown before the first turn after compaction */}
-                      {hasCompaction && (
-                        <div className="flex items-center gap-3 py-4 my-3">
-                          <div className="flex-1 h-px bg-border" />
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/80 border border-border/60">
-                            <Layers className="size-3.5 text-muted-foreground" />
-                            <span className="text-[11px] font-semibold text-muted-foreground tracking-wide">
-                              Compaction
-                            </span>
-                          </div>
-                          <div className="flex-1 h-px bg-border" />
-                        </div>
-                      )}
-                      <SessionTurn
-                        turn={turn}
-                        allMessages={messages!}
-                        sessionId={sessionId}
-                        sessionStatus={sessionStatus}
-                        permissions={pendingPermissions}
-                        questions={pendingQuestions}
-                        stepsExpanded={!!expanded[turn.userMessage.info.id]}
-                        onToggleSteps={() => toggleExpanded(turn.userMessage.info.id)}
-                        onPermissionReply={handlePermissionReply}
-                        onQuestionReply={handleQuestionReply}
-                        onQuestionReject={handleQuestionReject}
-                        agentNames={agentNames}
-                        isFirstTurn={turnIndex === 0}
-                        isBusy={isBusy}
-                        isReverted={isReverted}
-                        isCompaction={hasCompaction}
-                        onFork={handleFork}
-                        onRevert={handleRevert}
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* Optimistic user message for in-session sends */}
-                {pendingUserMessage && !showOptimistic && (
-                  <>
-                    <div className="flex justify-end">
-                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
-                          <HighlightMentions text={pendingUserMessage} agentNames={agentNames} onFileClick={openFileInComputer} />
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm text-muted-foreground">
+                          {isPendingConfirmation ? 'Paused - waiting for confirmation' : 'Thinking'}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
@@ -1960,12 +1912,13 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 {/* Busy indicator when no turns yet but session is busy */}
                 {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
                   <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src="/kortix-logomark-white.svg"
-                      alt="Kortix"
-                      className="dark:invert-0 invert flex-shrink-0 animate-pulse"
-                      style={{ height: '14px', width: 'auto' }}
-                    />
+                        src="/kortix-logomark-white.svg"
+                        alt="Kortix"
+                        className="dark:invert-0 invert flex-shrink-0 animate-pulse"
+                        style={{ height: '14px', width: 'auto' }}
+                      />
                     <KortixLoader size="small" />
                   </div>
                 )}

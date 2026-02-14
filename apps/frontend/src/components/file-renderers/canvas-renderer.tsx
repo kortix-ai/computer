@@ -647,6 +647,7 @@ function CanvasImageElement({
         className="w-full h-full rounded overflow-hidden relative"
         style={{ clipPath: clipPath || undefined }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageSrc} alt={element.name} draggable={false} className="w-full h-full object-fill pointer-events-none" />
       </div>
 
@@ -821,7 +822,8 @@ function CanvasFrameElement({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragState, scale, onChange]);
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [dragState, scale, onChange]);
 
   const isDragging = dragState?.type === 'move';
 
@@ -1145,6 +1147,7 @@ function FloatingToolbar({
       setNewTextContent(prefillText);
       setShowTextEditDialog(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalSelectedRegion]);
 
   // Reset text edit mode when element changes (user clicks different image)
@@ -2333,6 +2336,7 @@ function MultiSelectToolbar({
                     <div className="relative group">
                       <div className="w-16 h-16 rounded border border-border overflow-hidden bg-card shrink-0 relative">
                         {el.src?.startsWith('data:') ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={el.src}
                             alt={el.name}
@@ -2508,6 +2512,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
         setElements([]);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, fileName]);
 
   useEffect(() => { setIsMounted(true); }, []);
@@ -2781,9 +2786,11 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
   useEffect(() => {
     if (!isMounted) return;
 
+    const currentContainer = containerRef.current;
+
     // Use requestAnimationFrame to ensure DOM is ready
     const rafId = requestAnimationFrame(() => {
-      const container = containerRef.current;
+      const container = currentContainer;
       if (!container) {
         console.warn('Canvas container not found for wheel handler');
         return;
@@ -2830,11 +2837,10 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
 
     return () => {
       cancelAnimationFrame(rafId);
-      const container = containerRef.current;
-      if (container) {
-        const handler = (container as HTMLDivElement & { _wheelHandler?: (e: WheelEvent) => void })._wheelHandler;
+      if (currentContainer) {
+        const handler = (currentContainer as HTMLDivElement & { _wheelHandler?: (e: WheelEvent) => void })._wheelHandler;
         if (handler) {
-          container.removeEventListener('wheel', handler);
+          currentContainer.removeEventListener('wheel', handler);
         }
       }
     };
@@ -3460,6 +3466,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
                           style={{ borderColor: 'var(--border)' }}
                           className="relative aspect-square rounded-lg overflow-hidden border outline-none transition-colors group cursor-pointer"
                         >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={src} alt={`Generated ${idx + 1}`} className="w-full h-full object-cover" />
                           <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <Plus className="h-3 w-3" />
@@ -3835,7 +3842,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
                 toast.info('Converting to SVG...');
 
                 // Get base64 data
-                let imageBase64 = selectedElement.src;
+                const imageBase64 = selectedElement.src;
                 if (!imageBase64.startsWith('data:')) {
                   toast.error('SVG conversion requires base64 image data');
                   return;

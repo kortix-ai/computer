@@ -408,6 +408,7 @@ export default function TemplateSharePage() {
                       size={120}
                     />
                   </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={imageRef}
                     src={""}

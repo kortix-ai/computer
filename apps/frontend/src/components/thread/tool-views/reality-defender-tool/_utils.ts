@@ -55,7 +55,7 @@ export function extractRealityDefenderData(
     // Extract output from toolResult.output (from metadata)
     let output: any = null;
     let actualIsSuccess = isSuccess;
-    let actualToolTimestamp = toolTimestamp;
+    const actualToolTimestamp = toolTimestamp;
     
     if (toolResult?.output) {
       output = toolResult.output;

@@ -463,6 +463,7 @@ export function ApifyToolView({
                   {/* Actor Header */}
                   <div className="flex items-start gap-4 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
                     {detailsData.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={detailsData.imageUrl}
                         alt={detailsData.title || detailsData.name || 'Actor'}

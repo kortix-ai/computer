@@ -14,9 +14,9 @@ export function PromoBanner({ className }: PromoBannerProps) {
   useEffect(() => {
     if (promo && process.env.NODE_ENV !== 'production') {
       // Helpful during development/debugging; logs only when the active promo changes.
-      // eslint-disable-next-line no-console
       console.log('[PromoBanner] promo', promo);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promo?.promoId]);
 
   // Don't render if no active promo

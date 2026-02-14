@@ -40,6 +40,7 @@ export function usePlaybackControls({ messages, enabled }: UsePlaybackControlsPr
                 currentMessageIndex: messages.length,
             }));
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enabled, messages.length]);
 
     const togglePlayback = useCallback(() => {

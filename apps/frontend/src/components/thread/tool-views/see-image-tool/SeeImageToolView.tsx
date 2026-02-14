@@ -158,6 +158,7 @@ function SafeImage({ src, alt, filePath, className, sandboxId, project }: {
         isZoomed ? "cursor-zoom-out" : "cursor-zoom-in"
       )}>
         <div className="relative flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={finalImageUrl}
             alt={alt}

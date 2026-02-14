@@ -38,8 +38,7 @@ export const ProfileConnector: React.FC<ProfileConnectorProps> = ({
     true
   );
   
-  const configProperties = serverDetails?.connections?.[0]?.configSchema?.properties || {};
-  const requiredFields = serverDetails?.connections?.[0]?.configSchema?.required || [];
+  // configProperties and requiredFields are computed inside CreateProfileStep useMemo
 
   useEffect(() => {
     setProfileStep('select');
@@ -96,10 +95,6 @@ export const ProfileConnector: React.FC<ProfileConnectorProps> = ({
     }
   }, [handleCreateProfile, profileStep]);
 
-  const isFieldRequired = (fieldName: string) => {
-    return requiredFields.includes(fieldName);
-  };
-
   const SelectProfileStep = useMemo(() => (
     <div className="space-y-4">
       <div className="space-y-4">
@@ -124,7 +119,12 @@ export const ProfileConnector: React.FC<ProfileConnectorProps> = ({
     </div>
   ), [step.service_name]);
 
-  const CreateProfileStep = useMemo(() => (
+  const CreateProfileStep = useMemo(() => {
+    const configProperties = serverDetails?.connections?.[0]?.configSchema?.properties || {};
+    const requiredFields = serverDetails?.connections?.[0]?.configSchema?.required || [];
+    const isFieldRequired = (fieldName: string) => requiredFields.includes(fieldName);
+
+    return (
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2">
@@ -219,17 +219,17 @@ export const ProfileConnector: React.FC<ProfileConnectorProps> = ({
         </Button>
       </div>
     </div>
-  ), [
+    );
+  }, [
     step.service_name,
     newProfileName,
     config,
-    configProperties,
+    serverDetails,
     isCreatingProfile,
     handleProfileNameChange,
     handleKeyDown,
     handleConfigChange,
     handleCreateProfile,
-    isFieldRequired
   ]);
 
   return (

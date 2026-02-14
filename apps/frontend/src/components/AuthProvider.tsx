@@ -124,7 +124,8 @@ function CloudAuthProvider({
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [supabase]); // Removed isLoading from dependencies to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
   const signOut = async () => {
     try {

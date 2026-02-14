@@ -310,6 +310,7 @@ export function OcImageSearchToolView({
                             rel="noopener noreferrer"
                             className="group relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 hover:border-violet-300 dark:hover:border-violet-700 transition-colors shadow-sm hover:shadow-md"
                           >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={imageUrl}
                               alt={img.title || `Image ${idx + 1}`}

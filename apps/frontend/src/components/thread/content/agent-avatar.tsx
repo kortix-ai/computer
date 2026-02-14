@@ -89,6 +89,7 @@ export const AgentAvatar: React.FC<AgentAvatarProps> = ({
         )}
         style={{ width: size, height: size, ...borderRadiusStyle }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/kortix-symbol.svg"
           alt="Kortix"

@@ -134,6 +134,7 @@ export function ListAppEventTriggersToolView({
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     {toolkit.logo && (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img 
                         src={toolkit.logo} 
                         alt={toolkit.name}

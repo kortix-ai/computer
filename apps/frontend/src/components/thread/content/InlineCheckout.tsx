@@ -648,7 +648,7 @@ export function extractInlineCheckout(content: string): {
   options: InlineCheckoutOptions;
 } {
   let hasCheckout = false;
-  let options: InlineCheckoutOptions = {};
+  const options: InlineCheckoutOptions = {};
 
   const cleanContent = content.replace(INLINE_CHECKOUT_REGEX, (match, plan, period) => {
     hasCheckout = true;

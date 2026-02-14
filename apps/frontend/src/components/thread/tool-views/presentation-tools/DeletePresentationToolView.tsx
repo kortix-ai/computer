@@ -46,7 +46,7 @@ export function DeletePresentationToolView({
 
   try {
     if (toolResult?.output) {
-      let output = toolResult.output;
+      const output = toolResult.output;
       if (typeof output === 'string') {
         // Try to parse as JSON first, but handle plain string messages
         try {

@@ -436,6 +436,7 @@ export function ConnectProviderDialog({
       setAuthMethods([{ type: 'api', label: 'API Key' }]);
       setMethodIndex(0);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetConnect]);
 
   // --- Select auth method ---

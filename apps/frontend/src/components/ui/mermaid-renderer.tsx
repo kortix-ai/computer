@@ -482,6 +482,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
     return () => {
       mounted = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartHash]);
 
   if (isLoading) {

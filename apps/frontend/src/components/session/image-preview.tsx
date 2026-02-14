@@ -36,6 +36,7 @@ export function ImagePreview({ src, alt = 'Image preview', children }: ImagePrev
           <VisuallyHidden>
             <DialogTitle>{alt}</DialogTitle>
           </VisuallyHidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
             alt={alt}

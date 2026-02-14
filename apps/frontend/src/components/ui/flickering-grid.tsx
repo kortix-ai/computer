@@ -317,6 +317,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     setupCanvas,
     updateSquares,

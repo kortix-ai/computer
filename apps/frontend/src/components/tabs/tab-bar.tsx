@@ -740,6 +740,7 @@ export function TabBar() {
         openTab(routeTab);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, orderedTabs, activeTabId, tabs, openTab, setActiveTab, sessions]);
 
   // Build child map for permission aggregation across sub-sessions

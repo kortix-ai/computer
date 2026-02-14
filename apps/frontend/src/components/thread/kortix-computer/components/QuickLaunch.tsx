@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useEffect, useCallback, useRef } from 'react';
+import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -59,23 +59,23 @@ export const QuickLaunch = memo(function QuickLaunch({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const filteredFiles = query.length > 0
+  const filteredFiles = useMemo(() => query.length > 0
     ? files.filter(file => 
         file.name.toLowerCase().includes(query.toLowerCase()) ||
         file.path.toLowerCase().includes(query.toLowerCase())
       ).slice(0, 8)
-    : [];
+    : [], [query, files]);
 
-  const filteredActions = query.length === 0
+  const filteredActions = useMemo(() => query.length === 0
     ? quickActions
     : quickActions.filter(action => 
         action.name.toLowerCase().includes(query.toLowerCase())
-      );
+      ), [query]);
 
-  const allResults = [
+  const allResults = useMemo(() => [
     ...filteredActions.map(a => ({ type: 'action' as const, ...a })),
     ...filteredFiles.map(f => ({ ...f, type: 'file' as const })),
-  ];
+  ], [filteredActions, filteredFiles]);
 
   const totalResults = allResults.length;
 

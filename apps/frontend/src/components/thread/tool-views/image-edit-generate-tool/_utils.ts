@@ -240,7 +240,7 @@ export function extractImageEditGenerateData(
   const batchResults: BatchImageResult[] = [];
   
   if (isBatch) {
-    let imageIndex = 0;
+    const imageIndex = 0;
     const totalFailed = prompts.length - generatedImagePaths.length;
     
     for (let i = 0; i < prompts.length; i++) {

@@ -60,9 +60,9 @@ export function extractSpreadsheetData(
   let headers = args.headers || [];
   let rows = args.rows || [];
   let sheetIndex = args.sheet_index || 0;
-  let startCell = args.start_cell || 'A1';
-  let includeTotals = args.include_totals || false;
-  let operations = args.operations || [];
+  const startCell = args.start_cell || 'A1';
+  const includeTotals = args.include_totals || false;
+  const operations = args.operations || [];
 
   let parsedResult: any = null;
   if (toolResult?.output) {

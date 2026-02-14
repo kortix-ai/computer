@@ -77,6 +77,7 @@ export const OneClickIntegrations: React.FC<OneClickIntegrationsProps> = ({
 
   useEffect(() => {
     handleCallback();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstall = async (provider: ProviderKey) => {

@@ -540,6 +540,7 @@ export function PresentationViewer({
       clearInterval(streamingPollingRef.current);
       streamingPollingRef.current = null;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, streamingPresentationName, extractedPresentationName, project?.sandbox?.sandbox_url]);
 
   // Create a unique key for this tool call to track scroll state
@@ -552,9 +553,9 @@ export function PresentationViewer({
     setHasScrolledToCurrentSlide(false);
   }, [toolCallKey]);
 
-  const slides = metadata ? Object.entries(metadata.slides)
+  const slides = useMemo(() => metadata ? Object.entries(metadata.slides)
       .map(([num, slide]) => ({ number: parseInt(num), ...slide }))
-    .sort((a, b) => a.number - b.number) : [];
+    .sort((a, b) => a.number - b.number) : [], [metadata]);
 
   // Scroll to current slide when metadata loads or when tool content changes
   useEffect(() => {
@@ -567,6 +568,7 @@ export function PresentationViewer({
 
       return () => clearTimeout(timer);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metadata, currentSlideNumber, hasScrolledToCurrentSlide, slides.length]);
 
   // Scroll-based slide detection with proper edge handling

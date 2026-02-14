@@ -460,6 +460,7 @@ export function FileAttachmentGrid({
                                     key={`url-${index}`}
                                     className="block my-5"
                                 >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src={url}
                                         alt={imageName}

@@ -95,6 +95,7 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
                     </h4>
                   </div>
                   {result.image && (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={result.image}
                       alt=""
@@ -118,6 +119,7 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
                 {result.url && (
                   <div className="flex items-center gap-1.5 text-xs">
                     {result.favicon && (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={result.favicon}
                         alt=""

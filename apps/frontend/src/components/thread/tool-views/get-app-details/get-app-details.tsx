@@ -101,6 +101,7 @@ export function GetAppDetailsToolView({
                   <div className="relative flex-shrink-0">
                     <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted/50 border flex items-center justify-center">
                       {toolkit.logo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={toolkit.logo_url}
                           alt={`${toolkit.name} logo`}
