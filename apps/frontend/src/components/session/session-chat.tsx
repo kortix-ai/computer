@@ -12,11 +12,16 @@ import {
   AlertTriangle,
   Bug,
   FileText,
+  FileDown,
   Image as ImageIcon,
   ArrowUpLeft,
   Info,
+  GitCompareArrows,
   GitFork,
   Layers,
+  ListTodo,
+  MoreHorizontal,
+  Sparkles,
   Undo2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -53,6 +58,18 @@ import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { useThrottledValue } from '@/hooks/use-throttled-value';
 import { SessionSiteHeader } from '@/components/session/session-site-header';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { CompactDialog } from '@/components/session/compact-dialog';
+import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
+import { DiffDialog } from '@/components/session/diff-dialog';
+import { TodoDialog } from '@/components/session/todo-dialog';
+import { InitProjectDialog } from '@/components/session/init-project-dialog';
 
 // Shared UI primitives (framework-agnostic, reusable on mobile)
 import {
@@ -126,14 +143,23 @@ function SubSessionBar({
   sessionId,
   parentID,
   variant = 'thread',
+  isCompacting = false,
 }: {
   sessionId: string;
   parentID: string;
   /** 'thread' for task sub-sessions, 'fork' for forked sessions */
   variant?: 'thread' | 'fork';
+  isCompacting?: boolean;
 }) {
   const { data: parentSession } = useOpenCodeSession(parentID);
   const router = useRouter();
+
+  // Dialog states for actions menu
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [todoOpen, setTodoOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [compactOpen, setCompactOpen] = useState(false);
+  const [initOpen, setInitOpen] = useState(false);
 
   const handleBackToParent = useCallback(() => {
     if (parentSession) {
@@ -145,52 +171,108 @@ function SubSessionBar({
   const isFork = variant === 'fork';
 
   return (
-    <div className="flex-shrink-0">
-      {/* Thin accent stripe */}
-      <div
-        className={cn(
-          'h-[2px] bg-gradient-to-r',
-          isFork
-            ? 'from-muted-foreground/30 via-muted-foreground/20 to-muted-foreground/10'
-            : 'from-indigo-500/80 via-violet-500/80 to-purple-500/60',
-        )}
-      />
-      {/* Bar */}
-      <div className="flex items-center h-10 px-3 gap-2 border-b border-border/50 bg-background">
-        <button
-          onClick={handleBackToParent}
+    <>
+      <div className="flex-shrink-0">
+        {/* Thin accent stripe */}
+        <div
           className={cn(
-            'flex items-center gap-1.5 h-7 px-2 rounded-md',
-            'text-xs text-muted-foreground hover:text-foreground',
-            'hover:bg-muted/60 active:bg-muted/80',
-            'transition-colors cursor-pointer group',
+            'h-[2px] bg-gradient-to-r',
+            isFork
+              ? 'from-muted-foreground/30 via-muted-foreground/20 to-muted-foreground/10'
+              : 'from-indigo-500/80 via-violet-500/80 to-purple-500/60',
           )}
-        >
-          <ArrowUpLeft className="size-3.5 group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          <span className="max-w-[200px] truncate">{parentTitle}</span>
-        </button>
+        />
+        {/* Bar */}
+        <div className="flex items-center h-10 px-3 gap-2 border-b border-border/50 bg-background">
+          <button
+            onClick={handleBackToParent}
+            className={cn(
+              'flex items-center gap-1.5 h-7 px-2 rounded-md',
+              'text-xs text-muted-foreground hover:text-foreground',
+              'hover:bg-muted/60 active:bg-muted/80',
+              'transition-colors cursor-pointer group',
+            )}
+          >
+            <ArrowUpLeft className="size-3.5 group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            <span className="max-w-[200px] truncate">{parentTitle}</span>
+          </button>
 
-        <div className="flex-1" />
+          <div className="flex-1" />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-muted/50">
-              {isFork ? (
-                <GitFork className="size-3 text-muted-foreground flex-shrink-0" />
-              ) : (
-                <span className="h-1.5 w-1.5 rounded-full bg-violet-500 flex-shrink-0" />
-              )}
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {isFork ? 'Fork' : 'Thread'}
-              </span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">
-            {isFork ? `Forked from: ${parentTitle}` : `Sub-session of: ${parentTitle}`}
-          </TooltipContent>
-        </Tooltip>
+          {/* More actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  'flex items-center justify-center h-7 w-7 rounded-md',
+                  'text-muted-foreground hover:text-foreground',
+                  'hover:bg-muted/60 active:bg-muted/80',
+                  'transition-colors cursor-pointer',
+                )}
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => setDiffOpen(true)}>
+                <GitCompareArrows className="mr-2 h-4 w-4" />
+                View changes
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTodoOpen(true)}>
+                <ListTodo className="mr-2 h-4 w-4" />
+                View tasks
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setExportOpen(true)}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Export transcript
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setCompactOpen(true)}
+                disabled={isCompacting}
+              >
+                {isCompacting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Layers className="mr-2 h-4 w-4" />
+                )}
+                {isCompacting ? 'Compacting...' : 'Compact session'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setInitOpen(true)}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Initialize project
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-muted/50">
+                {isFork ? (
+                  <GitFork className="size-3 text-muted-foreground flex-shrink-0" />
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500 flex-shrink-0" />
+                )}
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {isFork ? 'Fork' : 'Thread'}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {isFork ? `Forked from: ${parentTitle}` : `Sub-session of: ${parentTitle}`}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-    </div>
+
+      {/* Dialogs */}
+      <DiffDialog sessionId={sessionId} open={diffOpen} onOpenChange={setDiffOpen} />
+      <TodoDialog sessionId={sessionId} open={todoOpen} onOpenChange={setTodoOpen} />
+      <ExportTranscriptDialog sessionId={sessionId} open={exportOpen} onOpenChange={setExportOpen} />
+      <CompactDialog sessionId={sessionId} open={compactOpen} onOpenChange={setCompactOpen} />
+      <InitProjectDialog sessionId={sessionId} open={initOpen} onOpenChange={setInitOpen} />
+    </>
   );
 }
 
@@ -1876,6 +1958,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           sessionId={sessionId}
           parentID={effectiveParentId}
           variant={isFork ? 'fork' : 'thread'}
+          isCompacting={!!session?.time?.compacting}
         />
       )}
 
