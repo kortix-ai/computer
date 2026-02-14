@@ -1,10 +1,10 @@
 #!/usr/bin/with-contenv bash
 # Kortix environment setup — runs once on container start (s6 cont-init.d)
 #
-# In cloud/production mode, overrides SDK base URLs to route through
+# In cloud mode, overrides SDK base URLs to route through
 # the Kortix router proxy. In local mode, does nothing.
 
-if [ "$ENV_MODE" = "cloud" ] || [ "$ENV_MODE" = "production" ]; then
+if [ "$ENV_MODE" = "cloud" ]; then
     echo "[Kortix] Cloud mode — enabling API proxy routing"
 
     if [ -z "$KORTIX_API_URL" ]; then

@@ -59,6 +59,7 @@ echo ""
 write_env "services/kortix-api/.env" \
   "PORT=8008" \
   "$(kv ENV_MODE local)" \
+  "$(kv STRIPE_ENV production)" \
   "" \
   "$(kv DATABASE_URL)" \
   "" \

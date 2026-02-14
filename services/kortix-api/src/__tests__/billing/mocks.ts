@@ -65,7 +65,8 @@ export function registerGlobalMocks() {
   mock.module('../../config', () => ({
     config: {
       STRIPE_WEBHOOK_SECRET: 'whsec_test',
-      ENV_MODE: 'staging',
+      ENV_MODE: 'cloud',
+      STRIPE_ENV: 'staging',
     },
   }));
 

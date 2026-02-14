@@ -2,7 +2,10 @@ export type SandboxProviderType = 'daytona' | 'local_docker' | 'auto';
 
 export const config = {
   PORT: parseInt(process.env.PORT || '8008', 10),
+  // local | cloud — matches frontend's EnvMode
   ENV_MODE: process.env.ENV_MODE || 'local',
+  // staging | production — controls which Stripe price IDs to use (cloud only)
+  STRIPE_ENV: (process.env.STRIPE_ENV || 'production') as 'staging' | 'production',
 
   // ─── Database ──────────────────────────────────────────────────────────────
   DATABASE_URL: process.env.DATABASE_URL || '',
@@ -93,8 +96,8 @@ export const config = {
     return this.ENV_MODE === 'local';
   },
 
-  isDevelopment(): boolean {
-    return this.ENV_MODE === 'local' || this.ENV_MODE === 'staging';
+  isCloud(): boolean {
+    return !this.isLocal();
   },
 
   isDaytonaEnabled(): boolean {
