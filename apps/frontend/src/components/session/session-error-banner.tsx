@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   AlertTriangle,
   XCircle,
@@ -204,24 +204,55 @@ export function SessionErrorBanner({
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [errors, sessionId]);
 
-  // Classify each error once
-  const classified = useMemo(() => {
-    return activeErrors.map((err) => ({
+  // Classify each error and deduplicate by title+description,
+  // keeping only the most recent instance of each unique error.
+  const { deduplicated, duplicateIds } = useMemo(() => {
+    const all = activeErrors.map((err) => ({
       error: err,
       display: classifySessionError(err.error),
     }));
+
+    const seen = new Map<string, number>();
+    const unique: typeof all = [];
+    // Map from shown error ID → all duplicate error IDs (for batch dismiss)
+    const dupeMap = new Map<string, string[]>();
+
+    for (const item of all) {
+      const key = `${item.display.title}::${item.display.description}`;
+      if (!seen.has(key)) {
+        seen.set(key, unique.length);
+        unique.push(item);
+        dupeMap.set(item.error.id, [item.error.id]);
+      } else {
+        // Duplicate — add its ID to the first occurrence's list
+        const firstIdx = seen.get(key)!;
+        const firstId = unique[firstIdx].error.id;
+        dupeMap.get(firstId)!.push(item.error.id);
+      }
+    }
+
+    return { deduplicated: unique, duplicateIds: dupeMap };
   }, [activeErrors]);
 
-  if (classified.length === 0) return null;
+  // Dismiss all duplicates when the user dismisses one
+  const handleDismiss = useCallback(
+    (errorId: string) => {
+      const ids = duplicateIds.get(errorId) ?? [errorId];
+      ids.forEach(dismissError);
+    },
+    [duplicateIds, dismissError],
+  );
+
+  if (deduplicated.length === 0) return null;
 
   return (
     <div className="flex flex-col">
-      {classified.map(({ error, display }) => (
+      {deduplicated.map(({ error, display }) => (
         <ErrorRow
           key={error.id}
           error={error}
           display={display}
-          onDismiss={dismissError}
+          onDismiss={handleDismiss}
           onAction={onErrorAction}
         />
       ))}

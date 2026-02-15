@@ -8,6 +8,11 @@ import { useSessionErrorStore } from '@/stores/opencode-session-error-store';
 import { useServerStore } from '@/stores/server-store';
 import { getClient, resetClient } from '@/lib/opencode-sdk';
 import { logger } from '@/lib/logger';
+import {
+  notifySessionError,
+  notifyQuestion,
+  notifyPermissionRequest,
+} from '@/lib/web-notifications';
 import { opencodeKeys } from './use-opencode-sessions';
 import { ptyKeys } from './use-opencode-pty';
 import type { Event as OpenCodeEvent, Message, Part } from '@kortix/opencode-sdk/v2/client';
@@ -170,6 +175,17 @@ export function useOpenCodeEventStream() {
       }
     })();
 
+    // Helper: look up a session title from the React Query cache for notifications
+    function getSessionTitle(sessionID: string): string | undefined {
+      const sessions = queryClient.getQueryData<any[]>(opencodeKeys.sessions());
+      if (sessions) {
+        const s = sessions.find((s: any) => s.id === sessionID);
+        if (s?.title) return s.title;
+      }
+      const session = queryClient.getQueryData<any>(opencodeKeys.session(sessionID));
+      return session?.title || undefined;
+    }
+
     function handleEvent(event: OpenCodeEvent) {
       switch (event.type) {
         // ---- Message events (INCREMENTAL) ----
@@ -247,6 +263,13 @@ export function useOpenCodeEventStream() {
           const props = event.properties as { sessionID?: string; error?: any };
           if (props.sessionID && props.error) {
             addSessionError(props.sessionID, props.error);
+            // Fire browser notification for errors
+            const errorTitle = props.error?.name || props.error?.data?.message || 'An error occurred';
+            notifySessionError(
+              props.sessionID,
+              errorTitle,
+              getSessionTitle(props.sessionID),
+            );
           }
           break;
         }
@@ -256,6 +279,13 @@ export function useOpenCodeEventStream() {
           const props = event.properties as any;
           if (props.id && props.sessionID) {
             addPermission(props);
+            // Fire browser notification for permission requests
+            const toolName = props.tool || props.type || 'a tool';
+            notifyPermissionRequest(
+              props.sessionID,
+              toolName,
+              getSessionTitle(props.sessionID),
+            );
           }
           break;
         }
@@ -270,6 +300,15 @@ export function useOpenCodeEventStream() {
           const props = event.properties as any;
           if (props.id && props.sessionID) {
             addQuestion(props);
+            // Fire browser notification for questions needing user input
+            const questionText = props.questions?.[0]?.question
+              || props.questions?.[0]?.header
+              || 'Kortix needs your input';
+            notifyQuestion(
+              props.sessionID,
+              questionText,
+              getSessionTitle(props.sessionID),
+            );
           }
           break;
         }
