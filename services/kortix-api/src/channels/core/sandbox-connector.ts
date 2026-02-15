@@ -11,13 +11,11 @@ interface CreateSessionResponse {
 export interface StreamEvent {
   type: 'text' | 'busy' | 'done' | 'error' | 'permission' | 'file';
   data?: string;
-  /** Permission request details (when type === 'permission') */
   permission?: {
     id: string;
     tool: string;
     description: string;
   };
-  /** File output details (when type === 'file') */
   file?: {
     name: string;
     url: string;
@@ -30,9 +28,6 @@ interface ResolvedEndpoint {
   headers: Record<string, string>;
 }
 
-/**
- * Resolve the direct Daytona sandbox URL, bypassing the preview proxy.
- */
 async function resolveDirectEndpoint(target: SandboxTarget): Promise<ResolvedEndpoint> {
   if (target.externalId && isDaytonaConfigured()) {
     try {
@@ -144,6 +139,7 @@ export class SandboxConnector {
     content: string,
     agentName?: string,
     model?: { providerID: string; modelID: string },
+    fileParts?: Array<{ type: 'file'; mime: string; url: string; filename?: string }>,
   ): AsyncGenerator<StreamEvent> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 300000);
@@ -160,9 +156,13 @@ export class SandboxConnector {
         throw new Error(`Failed to connect to SSE: ${sseRes.status}`);
       }
 
-      const promptBody: Record<string, unknown> = {
-        parts: [{ type: 'text', text: content }],
-      };
+      const parts: Array<Record<string, unknown>> = [{ type: 'text', text: content }];
+      if (fileParts && fileParts.length > 0) {
+        for (const fp of fileParts) {
+          parts.push({ type: 'file', mime: fp.mime, url: fp.url, filename: fp.filename });
+        }
+      }
+      const promptBody: Record<string, unknown> = { parts };
       if (agentName) {
         promptBody.agent = agentName;
       }
@@ -244,7 +244,6 @@ export class SandboxConnector {
               yield { type: 'text', data: delta };
             }
 
-            // Detect file outputs from assistant messages
             if (part.type === 'file') {
               yield {
                 type: 'file',
@@ -257,7 +256,6 @@ export class SandboxConnector {
             }
           }
 
-          // Permission request event
           if (evt === 'permission.asked' || evt === 'permission.requested') {
             const permProps = props as Record<string, unknown>;
             yield {
@@ -298,9 +296,6 @@ export class SandboxConnector {
     }
   }
 
-  /**
-   * Reply to a permission request in the sandbox.
-   */
   async replyPermission(permissionId: string, approved: boolean): Promise<void> {
     try {
       const { url, headers } = await this.getEndpoint();
@@ -328,7 +323,6 @@ export class SandboxConnector {
         signal: AbortSignal.timeout(5000),
       });
     } catch {
-      // Best effort
     }
   }
 }

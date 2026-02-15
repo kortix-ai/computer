@@ -54,7 +54,6 @@ export class ChannelEngineImpl {
       return;
     }
 
-    // Decrypt credentials so adapters receive plaintext tokens
     config.credentials = await decryptCredentials(config.credentials as Record<string, unknown>);
 
     const rateResult = this.rateLimiter.check(config.channelConfigId, message.platformUser.id);
@@ -120,13 +119,16 @@ export class ChannelEngineImpl {
       const prompt = this.buildPrompt(config, message);
       const model = message.overrides?.model ?? this.resolveModel(config);
 
-      // Stream the response, handling permissions and collecting files
       let responseText = '';
       const collectedFiles: FileOutput[] = [];
       const startTime = Date.now();
 
+      const fileParts = message.attachments
+        .filter((a) => a.url)
+        .map((a) => ({ type: 'file' as const, mime: a.mimeType || 'application/octet-stream', url: a.url!, filename: a.name }));
+
       try {
-        for await (const event of connector.promptStreaming(sessionId, prompt, agentName, model)) {
+        for await (const event of connector.promptStreaming(sessionId, prompt, agentName, model, fileParts)) {
           responseText = await this.handleStreamEvent(
             event, responseText, collectedFiles, connector, adapter, config, message,
           );
@@ -146,7 +148,6 @@ export class ChannelEngineImpl {
 
       await adapter.sendResponse(config, message, agentResponse);
 
-      // Upload any files the agent produced
       if (collectedFiles.length > 0 && adapter.sendFiles) {
         await adapter.sendFiles(config, message, collectedFiles).catch((err) => {
           console.error('[CHANNELS] File upload failed:', err);
@@ -159,9 +160,6 @@ export class ChannelEngineImpl {
     }
   }
 
-  /**
-   * Process a single stream event. Returns the updated responseText.
-   */
   private async handleStreamEvent(
     event: StreamEvent,
     responseText: string,
@@ -195,9 +193,6 @@ export class ChannelEngineImpl {
     }
   }
 
-  /**
-   * Handle a permission request: show UI to user, wait for response, reply to sandbox.
-   */
   private async handlePermissionEvent(
     event: StreamEvent,
     connector: SandboxConnector,
@@ -207,13 +202,8 @@ export class ChannelEngineImpl {
   ): Promise<void> {
     const perm = event.permission!;
 
-    // Post the permission request UI to the user
     await adapter.sendPermissionRequest!(config, message, perm);
-
-    // Wait for user to click Approve/Reject (or timeout after 5 min)
     const approved = await createPermissionRequest(perm.id);
-
-    // Forward the decision to the sandbox
     await connector.replyPermission(perm.id, approved);
   }
 
@@ -237,7 +227,6 @@ export class ChannelEngineImpl {
       parts.push(config.systemPrompt);
     }
 
-    // Inject channel-specific prompt override if configured
     if (message.groupId) {
       const platformConfig = config.platformConfig as Record<string, unknown> | null;
       const channelPrompts = platformConfig?.channelPrompts as Record<string, string> | undefined;

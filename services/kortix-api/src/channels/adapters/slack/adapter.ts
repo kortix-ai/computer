@@ -43,7 +43,6 @@ export class SlackAdapter extends BaseAdapter {
     message: NormalizedMessage,
     response: AgentResponse,
   ): Promise<void> {
-    // Handle slash command responses via response_url
     const rawPayload = message.raw as Record<string, unknown> | undefined;
     if (rawPayload?._slackCommand && rawPayload?.responseUrl) {
       const sessionUrl = `${config.FRONTEND_URL}/sessions/${response.sessionId}`;
@@ -276,7 +275,7 @@ export class SlackAdapter extends BaseAdapter {
     }
 
     const state = JSON.stringify({ sandboxId, accountId: sandbox.accountId });
-    const scopes = 'chat:write,reactions:read,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history,commands,files:write,links:read,links:write,channels:read';
+    const scopes = 'chat:write,reactions:read,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history,commands,files:read,files:write,links:read,links:write,channels:read';
 
     const slackUrl = new URL('https://slack.com/oauth/v2/authorize');
     slackUrl.searchParams.set('client_id', clientId);
