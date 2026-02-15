@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useServerStore } from '@/stores/server-store';
 
 // ============================================================================
 // Types
@@ -339,3 +340,32 @@ export const useTabStore = create<TabState>()(
     }
   )
 );
+
+// ============================================================================
+// Keep per-server tab cache in sync
+// ============================================================================
+// Whenever the tab state changes, persist it to the per-server cache for the
+// currently active server. This ensures the cache is always up-to-date — not
+// just when explicitly switching servers via swapForServer(). Without this,
+// tabs opened/closed after the last swap would be lost on page reload.
+
+let _syncTimer: ReturnType<typeof setTimeout> | undefined;
+
+useTabStore.subscribe((state) => {
+  // Debounce to avoid excessive writes on rapid tab changes
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => {
+    try {
+      const serverId = useServerStore.getState().activeServerId;
+      if (!serverId) return;
+
+      const cache = JSON.parse(localStorage.getItem('kortix-tabs-per-server') || '{}');
+      cache[serverId] = {
+        tabs: state.tabs,
+        tabOrder: state.tabOrder,
+        activeTabId: state.activeTabId,
+      };
+      localStorage.setItem('kortix-tabs-per-server', JSON.stringify(cache));
+    } catch {}
+  }, 500);
+});

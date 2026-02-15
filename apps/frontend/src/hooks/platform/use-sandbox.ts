@@ -25,6 +25,7 @@ import {
   type SandboxProviderName,
 } from '@/lib/platform-client';
 import { useServerStore } from '@/stores/server-store';
+import { useTabStore } from '@/stores/tab-store';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useRef } from 'react';
 
@@ -83,6 +84,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
 
   // Auto-switch to sandbox only if the user hasn't manually picked a server
   if (!store.userSelected && store.activeServerId === 'default') {
+    useTabStore.getState().swapForServer(SANDBOX_SERVER_ID, store.activeServerId);
     store.setActiveServer(SANDBOX_SERVER_ID, { auto: true });
   }
 }
