@@ -8,14 +8,15 @@ import {
 } from '@kortix/db';
 import type { ChannelConfig } from '@kortix/db';
 
-import type { ChannelAdapter } from '../adapters/adapter';
+import type { ChannelAdapter, FileOutput } from '../adapters/adapter';
 import type { ChannelType, NormalizedMessage, AgentResponse, SandboxTarget, SessionStrategy } from '../types';
 import { SandboxConnector } from './sandbox-connector';
+import type { StreamEvent } from './sandbox-connector';
 import { SessionManager } from './session-manager';
 import { MessageQueue } from './queue';
 import { RateLimiter } from './rate-limiter';
-import { splitMessage } from '../lib/message-splitter';
 import { ChannelError } from '../../errors';
+import { createPermissionRequest } from './pending-permissions';
 
 export class ChannelEngineImpl {
   private adapters: Map<ChannelType, ChannelAdapter>;
@@ -110,28 +111,40 @@ export class ChannelEngineImpl {
         return;
       }
 
+      const agentName = message.overrides?.agentName ?? config.agentName ?? undefined;
       const sessionId = await this.sessionManager.resolve(config, message, connector);
-
       const prompt = this.buildPrompt(config, message);
+      const model = message.overrides?.model ?? this.resolveModel(config);
 
-      let responseText: string;
+      // Stream the response, handling permissions and collecting files
+      let responseText = '';
+      const collectedFiles: FileOutput[] = [];
+
       try {
-        const model = this.resolveModel(config);
-        responseText = await connector.prompt(sessionId, prompt, config.agentName ?? undefined, model);
+        for await (const event of connector.promptStreaming(sessionId, prompt, agentName, model)) {
+          responseText = await this.handleStreamEvent(
+            event, responseText, collectedFiles, connector, adapter, config, message,
+          );
+        }
       } catch (err) {
         console.error(`[CHANNELS] Agent prompt failed:`, err);
         throw new ChannelError(`Failed to get response from agent: ${err instanceof Error ? err.message : String(err)}`);
       }
 
-      const chunks = this.chunkResponse(responseText, adapter.capabilities.textChunkLimit);
-
       const agentResponse: AgentResponse = {
         content: responseText,
         sessionId,
-        truncated: chunks.length > 1,
+        truncated: false,
       };
 
       await adapter.sendResponse(config, message, agentResponse);
+
+      // Upload any files the agent produced
+      if (collectedFiles.length > 0 && adapter.sendFiles) {
+        await adapter.sendFiles(config, message, collectedFiles).catch((err) => {
+          console.error('[CHANNELS] File upload failed:', err);
+        });
+      }
 
       await this.logMessage(config, message, 'outbound', responseText, sessionId);
     } finally {
@@ -139,11 +152,67 @@ export class ChannelEngineImpl {
     }
   }
 
+  /**
+   * Process a single stream event. Returns the updated responseText.
+   */
+  private async handleStreamEvent(
+    event: StreamEvent,
+    responseText: string,
+    collectedFiles: FileOutput[],
+    connector: SandboxConnector,
+    adapter: ChannelAdapter,
+    config: ChannelConfig,
+    message: NormalizedMessage,
+  ): Promise<string> {
+    switch (event.type) {
+      case 'text':
+        return responseText + (event.data || '');
+
+      case 'permission':
+        if (event.permission && adapter.sendPermissionRequest) {
+          await this.handlePermissionEvent(event, connector, adapter, config, message);
+        }
+        return responseText;
+
+      case 'file':
+        if (event.file && event.file.url) {
+          collectedFiles.push(event.file);
+        }
+        return responseText;
+
+      case 'error':
+        throw new Error(`Agent error: ${event.data}`);
+
+      default:
+        return responseText;
+    }
+  }
+
+  /**
+   * Handle a permission request: show UI to user, wait for response, reply to sandbox.
+   */
+  private async handlePermissionEvent(
+    event: StreamEvent,
+    connector: SandboxConnector,
+    adapter: ChannelAdapter,
+    config: ChannelConfig,
+    message: NormalizedMessage,
+  ): Promise<void> {
+    const perm = event.permission!;
+
+    // Post the permission request UI to the user
+    await adapter.sendPermissionRequest!(config, message, perm);
+
+    // Wait for user to click Approve/Reject (or timeout after 5 min)
+    const approved = await createPermissionRequest(perm.id);
+
+    // Forward the decision to the sandbox
+    await connector.replyPermission(perm.id, approved);
+  }
+
   private resolveModel(config: ChannelConfig): { providerID: string; modelID: string } {
-    // Allow per-channel model override via metadata
     const meta = config.metadata as Record<string, unknown> | null;
 
-    // Object format: { providerID: "kortix", modelID: "kortix/basic" }
     if (meta?.model && typeof meta.model === 'object' && !Array.isArray(meta.model)) {
       const m = meta.model as Record<string, unknown>;
       if (typeof m.providerID === 'string' && typeof m.modelID === 'string') {
@@ -151,8 +220,6 @@ export class ChannelEngineImpl {
       }
     }
 
-    // Default to kortix/basic (free tier, routed through kortix-api).
-    // modelID must match the key in opencode.jsonc's provider.kortix.models
     return { providerID: 'kortix', modelID: 'kortix/basic' };
   }
 
@@ -178,10 +245,6 @@ export class ChannelEngineImpl {
     parts.push(message.content);
 
     return parts.join('\n\n');
-  }
-
-  private chunkResponse(text: string, limit: number): string[] {
-    return splitMessage(text, limit);
   }
 
   private async checkAccess(config: ChannelConfig, message: NormalizedMessage): Promise<boolean> {
