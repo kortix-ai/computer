@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 // Dynamically determine backend URL based on Vercel environment
 const getBackendUrl = (): string => {
@@ -34,6 +35,9 @@ const getBackendUrl = (): string => {
 
 const nextConfig = (): NextConfig => ({
   output: (process.env.NEXT_OUTPUT as 'standalone') || undefined,
+  // Pin the tracing root to the monorepo root so standalone output uses
+  // `apps/frontend/server.js` instead of `computer/apps/frontend/server.js`.
+  outputFileTracingRoot: path.join(__dirname, '../../'),
 
   // Skip type checking during build (done in CI via `pnpm typecheck`)
   typescript: {

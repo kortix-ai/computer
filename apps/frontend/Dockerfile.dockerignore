@@ -1,21 +1,15 @@
-# Frontend build — exclude everything not needed
-node_modules
-**/node_modules
+# Frontend runner-only image — include ONLY the pre-built standalone output + static + public.
+# Start by ignoring everything, then whitelist what we need.
+*
 
-# Ignore Next.js build output by default, but keep standalone runtime artifacts
-**/.next
+# Whitelist standalone output (includes server.js, node_modules, etc.)
 !apps/frontend/.next/standalone
 !apps/frontend/.next/standalone/**
+
+# Whitelist static assets
 !apps/frontend/.next/static
 !apps/frontend/.next/static/**
-.git
-**/.env
-**/.env.*
-dist
-**/dist
-.turbo
-.nx
 
-# The big one — services/ is 6.6GB and irrelevant for frontend
-services
-sandbox
+# Whitelist public directory
+!apps/frontend/public
+!apps/frontend/public/**
