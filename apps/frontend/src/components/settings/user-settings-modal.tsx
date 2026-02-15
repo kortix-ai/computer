@@ -16,7 +16,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
     Settings,
     CreditCard,
-    KeyRound,
     X,
     Trash2,
     TrendingDown,
@@ -45,7 +44,7 @@ import { isLocalMode } from '@/lib/config';
 import { backendApi } from '@/lib/api-client';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Switch } from '@/components/ui/switch';
-import { LocalEnvManager } from '@/components/env-manager/local-env-manager';
+import { ProviderSettings } from '@/components/providers/provider-settings';
 import { useIsMobile } from '@/hooks/utils';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { useQueryClient } from '@tanstack/react-query';
@@ -99,7 +98,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Keyboard, Receipt } from 'lucide-react';
 import { useUserPreferencesStore, type TabSwitchModifier } from '@/stores/user-preferences-store';
 import CreditTransactions from '@/components/billing/credit-transactions';
-type TabId = 'general' | 'plan' | 'billing' | 'transactions' | 'usage' | 'env-manager' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
+type TabId = 'general' | 'plan' | 'billing' | 'transactions' | 'usage' | 'providers' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
 
 interface Tab {
     id: TabId;
@@ -136,7 +135,7 @@ export function UserSettingsModal({
         ...(!isLocal ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
         { id: 'integrations', label: 'Integrations', icon: Plug },
         { id: 'api-keys', label: 'API Keys', icon: Key },
-        ...(isLocal ? [{ id: 'env-manager' as TabId, label: 'Env Manager', icon: KeyRound }] : []),
+        ...(isLocal ? [{ id: 'providers' as TabId, label: 'Providers', icon: Plug }] : []),
     ];
     
     useEffect(() => {
@@ -224,7 +223,7 @@ export function UserSettingsModal({
                                 {activeTab === 'transactions' && <TransactionsTab />}
                                 {activeTab === 'usage' && <UsageTab />}
                                 {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                                {activeTab === 'env-manager' && isLocal && <EnvManagerTab />}
+                                {activeTab === 'providers' && isLocal && <ProvidersTab />}
                             </div>
                         </div>
                     </div>
@@ -278,7 +277,7 @@ export function UserSettingsModal({
                             {activeTab === 'transactions' && <TransactionsTab />}
                             {activeTab === 'usage' && <UsageTab />}
                             {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                            {activeTab === 'env-manager' && isLocal && <EnvManagerTab />}
+                            {activeTab === 'providers' && isLocal && <ProvidersTab />}
                         </div>
                     </div>
                 )}
@@ -800,9 +799,15 @@ function KeyboardShortcutsTab() {
     const modLabel = getModifierLabel();
 
     const shortcuts = [
+        { label: 'New tab', keys: `${modLabel}+T` },
+        { label: 'Close active tab', keys: `${modLabel}+W` },
+        { label: 'Reopen closed tab', keys: `${modLabel}+Shift+T` },
+        { label: 'Next tab', keys: `${modLabel}+Shift+]` },
+        { label: 'Previous tab', keys: `${modLabel}+Shift+[` },
+        { label: 'Next tab (alt)', keys: `${modLabel}+${isMacPlatform ? 'Option' : 'Alt'}+→` },
+        { label: 'Previous tab (alt)', keys: `${modLabel}+${isMacPlatform ? 'Option' : 'Alt'}+←` },
         { label: 'Switch to tab 1-8', keys: `${modLabel}+1 ... ${modLabel}+8` },
         { label: 'Switch to last tab', keys: `${modLabel}+9` },
-        { label: 'Close active tab', keys: `${modLabel}+W` },
         { label: 'New session', keys: `${isMacPlatform ? 'Cmd' : 'Ctrl'}+J` },
         { label: 'Command palette', keys: `${isMacPlatform ? 'Cmd' : 'Ctrl'}+K` },
         { label: 'Toggle left sidebar', keys: `${isMacPlatform ? 'Cmd' : 'Ctrl'}+B` },
@@ -1437,10 +1442,10 @@ function TransactionsTab() {
     );
 }
 
-function EnvManagerTab() {
+function ProvidersTab() {
     return (
         <div className="p-4 sm:p-6 min-w-0 max-w-full overflow-x-hidden">
-            <LocalEnvManager />
+            <ProviderSettings />
         </div>
     );
 }

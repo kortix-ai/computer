@@ -14,7 +14,6 @@ import {
   SlidersHorizontal,
   Sun,
   Moon,
-  KeyRound,
   Plug,
   Zap,
   BarChart3,
@@ -76,7 +75,7 @@ interface UserMenuProps {
   };
 }
 
-type SettingsTab = 'general' | 'billing' | 'usage' | 'env-manager';
+type SettingsTab = 'general' | 'billing' | 'usage' | 'providers';
 
 interface MenuItemConfig {
   icon: React.ComponentType<{ className?: string }>;
@@ -267,9 +266,9 @@ export function UserMenu({ user }: UserMenuProps) {
                   <DropdownMenuGroup>
                     {user.isAdmin && adminItems.map(renderMenuItem)}
                     {isLocalMode() && (
-                      <DropdownMenuItem onClick={() => openSettings('env-manager')} className="gap-2 p-2">
-                        <KeyRound className="h-4 w-4" />
-                        <span>Local .Env Manager</span>
+                      <DropdownMenuItem onClick={() => openSettings('providers')} className="gap-2 p-2">
+                        <Plug className="h-4 w-4" />
+                        <span>Providers</span>
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuGroup>

@@ -12,6 +12,9 @@ export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' 
 
 /** The permanent dashboard/home tab. Always pinned, always first. */
 export const DASHBOARD_TAB_ID = 'page:/dashboard';
+
+/** Maximum number of recently closed tabs to remember for CMD+Shift+T */
+const MAX_RECENTLY_CLOSED = 20;
 export const DASHBOARD_TAB: Omit<Tab, 'openedAt'> & { openedAt: number } = {
   id: DASHBOARD_TAB_ID,
   title: '',
@@ -70,6 +73,8 @@ interface TabState {
   tabOrder: string[];
   /** The currently active/focused tab ID */
   activeTabId: string | null;
+  /** Stack of recently closed tabs (most recent first) for Mod+Shift+T reopen */
+  recentlyClosedTabs: Tab[];
 
   // --- Actions ---
 
@@ -78,6 +83,9 @@ interface TabState {
 
   /** Close a tab by ID. Returns the next tab to activate (or null). */
   closeTab: (tabId: string) => string | null;
+
+  /** Reopen the most recently closed tab. Returns the reopened tab or null. */
+  reopenLastClosedTab: () => Tab | null;
 
   /** Set the active tab */
   setActiveTab: (tabId: string) => void;
@@ -116,6 +124,7 @@ export const useTabStore = create<TabState>()(
       tabs: {},
       tabOrder: [],
       activeTabId: null,
+      recentlyClosedTabs: [],
 
       openTab: (tabInput) => {
         const { tabs, tabOrder } = get();
@@ -143,10 +152,13 @@ export const useTabStore = create<TabState>()(
       },
 
       closeTab: (tabId) => {
-        const { tabs, tabOrder, activeTabId } = get();
+        const { tabs, tabOrder, activeTabId, recentlyClosedTabs } = get();
         const tab = tabs[tabId];
         // Prevent closing dashboard tab or any pinned tab
         if (!tab || tab.pinned || tabId === DASHBOARD_TAB_ID) return activeTabId;
+
+        // Push closed tab onto recently-closed stack
+        const updatedClosedTabs = [tab, ...recentlyClosedTabs].slice(0, MAX_RECENTLY_CLOSED);
 
         const { [tabId]: _, ...remainingTabs } = tabs;
         const newOrder = tabOrder.filter((id) => id !== tabId);
@@ -172,9 +184,36 @@ export const useTabStore = create<TabState>()(
           tabs: remainingTabs,
           tabOrder: newOrder,
           activeTabId: nextActiveId,
+          recentlyClosedTabs: updatedClosedTabs,
         });
 
         return nextActiveId;
+      },
+
+      reopenLastClosedTab: () => {
+        const { recentlyClosedTabs, tabs, tabOrder } = get();
+        if (recentlyClosedTabs.length === 0) return null;
+
+        const [tabToReopen, ...remaining] = recentlyClosedTabs;
+
+        // If a tab with the same ID already exists, just activate it
+        if (tabs[tabToReopen.id]) {
+          set({ activeTabId: tabToReopen.id, recentlyClosedTabs: remaining });
+          return tabToReopen;
+        }
+
+        const updated = ensureDashboardTab(
+          { ...tabs, [tabToReopen.id]: tabToReopen },
+          [...tabOrder, tabToReopen.id],
+        );
+
+        set({
+          ...updated,
+          activeTabId: tabToReopen.id,
+          recentlyClosedTabs: remaining,
+        });
+
+        return tabToReopen;
       },
 
       setActiveTab: (tabId) => {
@@ -325,6 +364,7 @@ export const useTabStore = create<TabState>()(
         tabs: state.tabs,
         tabOrder: state.tabOrder,
         activeTabId: state.activeTabId,
+        recentlyClosedTabs: state.recentlyClosedTabs,
       }),
       // On rehydration, ensure dashboard tab is always present
       onRehydrateStorage: () => (state) => {
