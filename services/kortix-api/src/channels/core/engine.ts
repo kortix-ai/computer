@@ -123,6 +123,7 @@ export class ChannelEngineImpl {
       // Stream the response, handling permissions and collecting files
       let responseText = '';
       const collectedFiles: FileOutput[] = [];
+      const startTime = Date.now();
 
       try {
         for await (const event of connector.promptStreaming(sessionId, prompt, agentName, model)) {
@@ -139,6 +140,8 @@ export class ChannelEngineImpl {
         content: responseText,
         sessionId,
         truncated: false,
+        modelName: model.modelID,
+        durationMs: Date.now() - startTime,
       };
 
       await adapter.sendResponse(config, message, agentResponse);
@@ -232,6 +235,16 @@ export class ChannelEngineImpl {
 
     if (config.systemPrompt) {
       parts.push(config.systemPrompt);
+    }
+
+    // Inject channel-specific prompt override if configured
+    if (message.groupId) {
+      const platformConfig = config.platformConfig as Record<string, unknown> | null;
+      const channelPrompts = platformConfig?.channelPrompts as Record<string, string> | undefined;
+      const channelPrompt = channelPrompts?.[message.groupId];
+      if (channelPrompt) {
+        parts.push(`[Channel-specific instructions]\n${channelPrompt}`);
+      }
     }
 
     parts.push(

@@ -11,7 +11,7 @@ import { handleSlackCommand, postToResponseUrl } from './commands';
 import { handleSlackInteractivity } from './interactivity';
 import { splitMessage } from '../../lib/message-splitter';
 import { markdownToSlack } from '../../lib/markdown-to-slack';
-import { buildBlockKitMessage } from './block-kit-builder';
+import { buildBlockKitMessage, type UsageMetadata } from './block-kit-builder';
 import { config } from '../../../config';
 import { db } from '../../../shared/db';
 import { channelConfigs, sandboxes } from '@kortix/db';
@@ -71,7 +71,11 @@ export class SlackAdapter extends BaseAdapter {
     const threadTs = message.threadId || message.externalId;
 
     const sessionUrl = `${config.FRONTEND_URL}/sessions/${response.sessionId}`;
-    const blocks = buildBlockKitMessage(response.content, sessionUrl);
+    const usageMeta: UsageMetadata = {
+      modelName: response.modelName,
+      durationMs: response.durationMs,
+    };
+    const blocks = buildBlockKitMessage(response.content, sessionUrl, usageMeta);
     const fallbackText = markdownToSlack(response.content) + `\n\n<${sessionUrl}|View full session>`;
 
     const chunks = splitMessage(fallbackText, this.capabilities.textChunkLimit);
@@ -272,7 +276,7 @@ export class SlackAdapter extends BaseAdapter {
     }
 
     const state = JSON.stringify({ sandboxId, accountId: sandbox.accountId });
-    const scopes = 'chat:write,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history,commands,files:write,links:read,links:write,channels:read';
+    const scopes = 'chat:write,reactions:read,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history,commands,files:write,links:read,links:write,channels:read';
 
     const slackUrl = new URL('https://slack.com/oauth/v2/authorize');
     slackUrl.searchParams.set('client_id', clientId);

@@ -7,6 +7,7 @@ import { config as appConfig } from '../../../config';
 import { verifySlackSignature, findConfigByTeamId } from './utils';
 import { parseCommand } from './command-parser';
 import { SlackApi } from './api';
+import { handleReactionAdded } from './reactions';
 
 interface SlackUrlVerification {
   type: 'url_verification';
@@ -35,9 +36,65 @@ interface SlackEvent {
   thread_ts?: string;
   event_ts?: string;
   links?: Array<{ domain: string; url: string }>;
+  // Reaction events
+  reaction?: string;
+  item?: { type: string; channel: string; ts: string };
+  item_user?: string;
 }
 
 type SlackPayload = SlackUrlVerification | SlackEventCallback | { type: string };
+
+// ─── Bot participation cache for smart @mention handling ────────────────────
+
+interface ParticipationEntry {
+  participated: boolean;
+  expiresAt: number;
+}
+
+const botParticipationCache = new Map<string, ParticipationEntry>();
+const PARTICIPATION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const PARTICIPATION_CACHE_MAX = 1000;
+
+async function checkBotParticipation(
+  channelConfig: ChannelConfig,
+  channel: string,
+  threadTs: string,
+  botUserId?: string,
+): Promise<boolean> {
+  const cacheKey = `${channel}:${threadTs}`;
+  const now = Date.now();
+
+  const cached = botParticipationCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.participated;
+  }
+
+  const credentials = channelConfig.credentials as Record<string, unknown>;
+  const botToken = credentials?.botToken as string | undefined;
+  if (!botToken) return false;
+
+  const api = new SlackApi(botToken);
+  const result = await api.conversationsReplies(channel, threadTs, 10);
+  let participated = false;
+
+  if (result.ok && result.messages) {
+    for (const msg of result.messages) {
+      if (msg.bot_id || (botUserId && msg.user === botUserId)) {
+        participated = true;
+        break;
+      }
+    }
+  }
+
+  // Evict oldest entries when cache gets too large
+  if (botParticipationCache.size >= PARTICIPATION_CACHE_MAX) {
+    const firstKey = botParticipationCache.keys().next().value as string;
+    botParticipationCache.delete(firstKey);
+  }
+
+  botParticipationCache.set(cacheKey, { participated, expiresAt: now + PARTICIPATION_TTL_MS });
+  return participated;
+}
 
 
 export async function handleSlackWebhook(
@@ -83,6 +140,22 @@ export async function handleSlackWebhook(
     return c.json({ ok: true });
   }
 
+  if (event.type === 'reaction_added') {
+    (async () => {
+      const channelConfig = await findConfigByTeamId(eventPayload.team_id);
+      if (!channelConfig) return;
+
+      await handleReactionAdded(
+        event as unknown as { type: 'reaction_added'; user: string; reaction: string; item: { type: string; channel: string; ts: string }; item_user?: string; event_ts: string },
+        channelConfig,
+        engine,
+      );
+    })().catch((err) => {
+      console.error('[SLACK] reaction_added handler failed:', err);
+    });
+    return c.json({ ok: true });
+  }
+
   if (event.type !== 'message' && event.type !== 'app_mention') {
     return c.json({ ok: true });
   }
@@ -123,7 +196,18 @@ export async function handleSlackWebhook(
     const requireMention = groupConfig.requireMention !== false;
 
     if (requireMention && !isMention) {
-      return c.json({ ok: true });
+      // In threads where the bot already participated, auto-respond without @mention
+      if (event.thread_ts && event.channel) {
+        const participated = await checkBotParticipation(
+          channelConfig, event.channel, event.thread_ts, botUserId,
+        );
+        if (!participated) {
+          return c.json({ ok: true });
+        }
+      } else {
+        // Top-level messages still require @mention
+        return c.json({ ok: true });
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import type { ChannelEngine } from '../adapter';
 import { verifySlackRequest, findConfigByTeamId } from './utils';
 import { replyPermissionRequest } from '../../core/pending-permissions';
 import { SlackApi } from './api';
+import { exportThreadAsMarkdown } from './export';
 import type { NormalizedMessage } from '../../types';
 
 export async function handleSlackInteractivity(
@@ -39,9 +40,15 @@ export async function handleSlackInteractivity(
       return c.json({ ok: true }, 200);
 
     case 'message_action':
-      handleMessageAction(payload, engine).catch((err) => {
-        console.error('[SLACK/INTERACTIVITY] message_action handler failed:', err);
-      });
+      if (payload.callback_id === 'export_thread') {
+        handleExportThread(payload).catch((err) => {
+          console.error('[SLACK/INTERACTIVITY] export_thread handler failed:', err);
+        });
+      } else {
+        handleMessageAction(payload, engine).catch((err) => {
+          console.error('[SLACK/INTERACTIVITY] message_action handler failed:', err);
+        });
+      }
       return c.json({ ok: true }, 200);
 
     default:
@@ -158,4 +165,43 @@ async function handleMessageAction(
   }
 
   await engine.processMessage(normalized);
+}
+
+async function handleExportThread(payload: InteractivityPayload): Promise<void> {
+  const teamId = payload.team?.id;
+  if (!teamId) return;
+
+  const channelConfig = await findConfigByTeamId(teamId);
+  if (!channelConfig) {
+    console.warn(`[SLACK/INTERACTIVITY] No config for team: ${teamId}`);
+    return;
+  }
+
+  const credentials = channelConfig.credentials as Record<string, unknown>;
+  const botToken = credentials?.botToken as string;
+  if (!botToken) return;
+
+  const api = new SlackApi(botToken);
+  const channelId = payload.channel?.id || '';
+  const messageTs = payload.message?.ts || '';
+  const threadTs = payload.message?.thread_ts || messageTs;
+
+  if (!channelId || !threadTs) return;
+
+  const markdown = await exportThreadAsMarkdown({
+    channel: channelId,
+    threadTs,
+    api,
+  });
+
+  const fileBuffer = Buffer.from(markdown, 'utf-8');
+  const filename = `thread-export-${threadTs}.md`;
+
+  await api.filesUploadV2({
+    channel: channelId,
+    threadTs,
+    filename,
+    content: fileBuffer,
+    title: `Thread Export — ${new Date().toISOString().slice(0, 10)}`,
+  });
 }
