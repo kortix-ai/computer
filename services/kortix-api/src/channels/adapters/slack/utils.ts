@@ -3,6 +3,7 @@ import { db } from '../../../shared/db';
 import { channelConfigs } from '@kortix/db';
 import type { ChannelConfig } from '@kortix/db';
 import { config as appConfig } from '../../../config';
+import { decryptCredentials } from '../../lib/credentials';
 
 export async function verifySlackSignature(
   signingSecret: string,
@@ -47,8 +48,10 @@ export async function findConfigByTeamId(teamId: string): Promise<ChannelConfig 
     );
 
   for (const cfg of configs) {
-    const creds = cfg.credentials as Record<string, unknown>;
+    const creds = await decryptCredentials(cfg.credentials as Record<string, unknown>);
     if (creds?.teamId === teamId) {
+      // Attach decrypted credentials so callers don't need to decrypt again
+      cfg.credentials = creds;
       return cfg;
     }
   }

@@ -89,6 +89,8 @@ export const config = {
   // ─── Channels ───────────────────────────────────────────────────────────────
   CHANNELS_ENABLED: process.env.CHANNELS_ENABLED !== 'false',
   CHANNELS_PUBLIC_URL: process.env.CHANNELS_PUBLIC_URL || '',
+  /** 64-char hex string (32 bytes) for AES-256-GCM credential encryption. Omit to disable. */
+  CHANNELS_CREDENTIAL_KEY: process.env.CHANNELS_CREDENTIAL_KEY || '',
 
   // ─── Frontend ────────────────────────────────────────────────────────────
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',

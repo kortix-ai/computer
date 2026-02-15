@@ -17,6 +17,7 @@ import { MessageQueue } from './queue';
 import { RateLimiter } from './rate-limiter';
 import { ChannelError } from '../../errors';
 import { createPermissionRequest } from './pending-permissions';
+import { decryptCredentials } from '../lib/credentials';
 
 export class ChannelEngineImpl {
   private adapters: Map<ChannelType, ChannelAdapter>;
@@ -52,6 +53,9 @@ export class ChannelEngineImpl {
       console.warn(`[CHANNELS] No enabled config found for ${message.channelConfigId}`);
       return;
     }
+
+    // Decrypt credentials so adapters receive plaintext tokens
+    config.credentials = await decryptCredentials(config.credentials as Record<string, unknown>);
 
     const rateResult = this.rateLimiter.check(config.channelConfigId, message.platformUser.id);
     if (!rateResult.allowed) {
