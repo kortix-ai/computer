@@ -46,6 +46,7 @@ export const useThreadSearch = (query: string, limit: number = 10) => {
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
+    retry: 0, // Don't retry — endpoint may not exist
   });
 
   // Compute loading state:
@@ -68,7 +69,7 @@ export const useThreadSearch = (query: string, limit: number = 10) => {
     total: data?.total || 0,
     isLoading,
     isSearching,
-    isConfigured: data?.configured ?? true, // Assume configured if no data yet
+    isConfigured: data?.configured ?? false, // Default to false until we know the endpoint exists
     error,
     query: debouncedQuery,
     shouldSearch,

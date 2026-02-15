@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { logger } from '@/lib/logger';
 
 export type SandboxConnectionStatus =
   | 'connecting'
@@ -46,7 +47,23 @@ export function setSandboxStatus(next: SandboxConnectionStatus) {
     updates.wasConnected = true;
     updates.reconnectAttempts = 0;
     updates.disconnectedAt = null;
-  } else if (next === 'unreachable' || next === 'connecting') {
+
+    if (state.status === 'unreachable') {
+      logger.info('Sandbox connection restored', {
+        previousStatus: state.status,
+        reconnectAttempts: state.reconnectAttempts,
+      });
+    }
+  } else if (next === 'unreachable') {
+    if (!state.disconnectedAt) {
+      updates.disconnectedAt = Date.now();
+    }
+    logger.error('Sandbox became unreachable', {
+      failCount: state.failCount,
+      reconnectAttempts: state.reconnectAttempts,
+      wasConnected: state.wasConnected,
+    });
+  } else if (next === 'connecting') {
     // Track when we first went down (don't overwrite if already set)
     if (!state.disconnectedAt) {
       updates.disconnectedAt = Date.now();
@@ -62,6 +79,11 @@ export function markInitialCheckDone() {
 }
 
 export function incrementSandboxFail() {
+  const state = useSandboxConnectionStore.getState();
+  logger.warn('Sandbox health-check failed', {
+    failCount: state.failCount + 1,
+    reconnectAttempts: state.reconnectAttempts + 1,
+  });
   useSandboxConnectionStore.setState((s) => ({
     failCount: s.failCount + 1,
     reconnectAttempts: s.reconnectAttempts + 1,

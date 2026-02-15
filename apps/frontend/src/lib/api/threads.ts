@@ -601,7 +601,8 @@ export const searchThreads = async (
     );
 
     if (response.error) {
-      console.error('Error searching threads:', response.error);
+      // Silently handle — thread search may not be configured
+      console.debug('Thread search unavailable:', response.error?.message || response.error);
       return {
         results: [],
         total: 0,
@@ -615,7 +616,8 @@ export const searchThreads = async (
       configured: false,
     };
   } catch (error) {
-    console.error('Error searching threads:', error);
+    // Silently handle — thread search endpoint may not exist
+    console.debug('Thread search unavailable:', error);
     return {
       results: [],
       total: 0,

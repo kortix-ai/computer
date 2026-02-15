@@ -36,6 +36,7 @@ import {
   getStreamPreconnectService, 
   consumePreconnectInfo,
 } from './stream-preconnect';
+import { logger } from '@/lib/logger';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
@@ -583,10 +584,10 @@ export function useAgentStream(
     const adopted = preconnectService.adopt(runId);
     
     if (adopted) {
-      console.log(`[useAgentStream] Adopting pre-connected stream for ${runId}`);
+      logger.info('useAgentStream adopting pre-connected stream', { runId });
       connectionRef.current = adopted.stream.connection;
       if (adopted.bufferedMessages.length > 0) {
-        console.log(`[useAgentStream] Processing ${adopted.bufferedMessages.length} buffered messages`);
+        logger.info('useAgentStream processing buffered messages', { runId, count: adopted.bufferedMessages.length });
         setStatus('streaming');
         callbacksRef.current.onStatusChange?.('streaming');
         
@@ -630,7 +631,7 @@ export function useAgentStream(
     }
     
     // No pre-connected stream, create a new connection
-    console.log(`[useAgentStream] Creating new stream connection for ${runId}`);
+    logger.info('useAgentStream creating new stream connection', { runId });
     
     const connection = new StreamConnection({
       apiUrl: API_URL,
@@ -680,7 +681,7 @@ export function useAgentStream(
         optionsRef.current.showToast?.('Worker stopped.', 'success');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error('[useAgentStream] Error stopping agent:', err);
+        logger.error('useAgentStream error stopping agent', { runId, error: errorMessage });
         optionsRef.current.showToast?.(`Failed to stop Worker: ${errorMessage}`, 'error');
       }
     }

@@ -7,6 +7,7 @@ import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useSessionErrorStore } from '@/stores/opencode-session-error-store';
 import { useServerStore } from '@/stores/server-store';
 import { getClient, resetClient } from '@/lib/opencode-sdk';
+import { logger } from '@/lib/logger';
 import { opencodeKeys } from './use-opencode-sessions';
 import { ptyKeys } from './use-opencode-pty';
 import type { Event as OpenCodeEvent, Message, Part } from '@kortix/opencode-sdk/v2/client';
@@ -57,11 +58,15 @@ export function useOpenCodeEventStream() {
     // Hydrate pending permissions & questions from server on connect
     client.permission.list().then((res) => {
       if (res.data) (res.data as any[]).forEach(addPermission);
-    }).catch(() => {});
+    }).catch((err) => {
+      logger.error('Failed to hydrate pending permissions', { error: String(err) });
+    });
 
     client.question.list().then((res) => {
       if (res.data) (res.data as any[]).forEach(addQuestion);
-    }).catch(() => {});
+    }).catch((err) => {
+      logger.error('Failed to hydrate pending questions', { error: String(err) });
+    });
 
     // Set up SSE via the SDK's AsyncGenerator
     const abortController = new AbortController();
@@ -145,8 +150,9 @@ export function useOpenCodeEventStream() {
             queue.push({ type: (e as any).type, event: e });
             schedule();
           }
-        } catch {
+        } catch (err) {
           if (abortController.signal.aborted) break;
+          logger.error('SSE event stream error', { error: String(err), retryCount });
         } finally {
           flush();
         }
@@ -154,6 +160,7 @@ export function useOpenCodeEventStream() {
         // Stream ended or errored — retry with exponential backoff
         if (abortController.signal.aborted) break;
         retryCount++;
+        logger.warn('SSE event stream reconnecting', { retryCount });
         const delay = Math.min(1000 * Math.pow(2, Math.min(retryCount, 5)), 30000);
         await new Promise<void>((resolve) => {
           const timer = setTimeout(resolve, delay);
