@@ -28,6 +28,7 @@ billingApp.use('/purchase-*', supabaseAuth);
 billingApp.use('/transactions*', supabaseAuth);
 billingApp.use('/credit-*', supabaseAuth);
 billingApp.use('/deduct', supabaseAuth);
+billingApp.use('/deduct-*', supabaseAuth);
 billingApp.use('/tier-*', supabaseAuth);
 billingApp.use('/usage-*', supabaseAuth);
 billingApp.use('/trial/*', supabaseAuth);

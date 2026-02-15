@@ -1,0 +1,127 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  Kortix Local — All-in-One Docker Compose                                 ║
+# ║                                                                            ║
+# ║  Starts all 3 services needed for local development:                       ║
+# ║    1. frontend   — Next.js dashboard         (http://localhost:3000)        ║
+# ║    2. kortix-api — Backend API (Bun/Hono)     (http://localhost:8008)       ║
+# ║    3. sandbox    — AI agent environment       (http://localhost:14000)      ║
+# ║                                                                            ║
+# ║  Usage:                                                                    ║
+# ║    docker compose -f docker-compose.local.yml up                           ║
+# ║    docker compose -f docker-compose.local.yml up -d        (background)    ║
+# ║    docker compose -f docker-compose.local.yml down                         ║
+# ║    docker compose -f docker-compose.local.yml logs -f      (tail logs)     ║
+# ║                                                                            ║
+# ║  Prerequisites:                                                            ║
+# ║    1. cp .env.example .env   (fill in at least one LLM API key)            ║
+# ║    2. cp sandbox/.env.example sandbox/.env  (fill in API keys)             ║
+# ║    3. ./scripts/setup-env.sh  (generates per-service .env files)           ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+services:
+  # ─── Frontend (Next.js Dashboard) ──────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        PNPM_LOCKFILE_MODE: --no-frozen-lockfile
+        # NEXT_PUBLIC_* must be build args (baked into JS bundle at build time)
+        NEXT_PUBLIC_ENV_MODE: local
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:8008/v1
+        NEXT_PUBLIC_OPENCODE_URL: http://localhost:14000
+    ports:
+      - "3000:3000"
+    environment:
+      # Runtime env vars (not strictly needed for NEXT_PUBLIC_*, but keeps
+      # them visible in `docker inspect` and available to server-side code)
+      - NEXT_PUBLIC_ENV_MODE=local
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1
+      - NEXT_PUBLIC_OPENCODE_URL=http://localhost:14000
+    env_file:
+      - path: apps/frontend/.env
+        required: false
+    depends_on:
+      kortix-api:
+        condition: service_started
+    restart: unless-stopped
+
+  # ─── Kortix API (Backend Monolith) ─────────────────────────────────────────
+  kortix-api:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        SERVICE: kortix-api
+    ports:
+      - "8008:8008"
+    environment:
+      - ENV_MODE=local
+      - PORT=8008
+      - SANDBOX_PROVIDER=local_docker
+      # Docker socket lets the API detect/manage the sandbox container
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      # The API tells sandboxes to call back via the Docker network
+      - KORTIX_URL=http://kortix-api:8008/v1/router
+    env_file:
+      - path: services/kortix-api/.env
+        required: false
+    volumes:
+      # Mount Docker socket so the API can detect the sandbox container
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  # ─── Sandbox (AI Agent Environment) ────────────────────────────────────────
+  sandbox:
+    image: kortixmarko/sandbox:${SANDBOX_VERSION:-latest}
+    container_name: kortix-sandbox
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - SUBFOLDER=/
+      - TITLE=Kortix Sandbox
+      - OPENCODE_CONFIG_DIR=/opt/opencode
+      - OPENCODE_PERMISSION={"*":"allow"}
+      - DISPLAY=:1
+      - LSS_DIR=/workspace/.lss
+      - KORTIX_WORKSPACE=/workspace
+      # Kortix Master auth
+      - OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME:-admin}
+      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-changeme}
+      # The sandbox reaches the API through the Docker network
+      - KORTIX_API_URL=http://kortix-api:8008/v1/router
+      - KORTIX_TOKEN=${KORTIX_TOKEN:-}
+      - SANDBOX_ID=kortix-sandbox
+      - PROJECT_ID=local
+      - ENV_MODE=local
+    env_file:
+      - path: sandbox/.env
+        required: false
+    volumes:
+      - sandbox-workspace:/workspace
+      - sandbox-secrets:/app/secrets
+    ports:
+      - "14000:8000"   # Kortix Master (proxy entry point)
+      - "14001:3111"   # OpenCode Web UI
+      - "14002:6080"   # Desktop (noVNC)
+      - "14003:6081"   # Desktop (HTTPS)
+      - "14004:3210"   # Presentation Viewer
+      - "14005:9223"   # Agent Browser Stream (WS)
+      - "14006:9224"   # Agent Browser Viewer
+    shm_size: "2gb"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/kortix/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  sandbox-workspace:
+  sandbox-secrets:

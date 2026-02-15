@@ -1,0 +1,16 @@
+# Frontend build — exclude everything not needed
+node_modules
+**/node_modules
+.next
+**/.next
+.git
+**/.env
+**/.env.*
+dist
+**/dist
+.turbo
+.nx
+
+# The big one — services/ is 6.6GB and irrelevant for frontend
+services
+sandbox

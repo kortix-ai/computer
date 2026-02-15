@@ -52,16 +52,16 @@ export const MODELS: Record<string, ModelConfig> = {
   // Kortix Aliases (simple names for users)
   // -------------------------------------------------------------------------
   'kortix/basic': {
-    model: openrouter('minimax/minimax-m2'),
-    inputPer1M: 0.30,
-    outputPer1M: 1.20,
+    model: openrouter('moonshotai/kimi-k2.5'),
+    inputPer1M: 0.45,
+    outputPer1M: 2.25,
     contextWindow: 200000,
     tier: 'free',
   },
   'kortix/power': {
-    model: openrouter('moonshotai/kimi-k2.5'),
-    inputPer1M: 0.60,
-    outputPer1M: 3.00,
+    model: openrouter('anthropic/claude-opus-4.6'),
+    inputPer1M: 5.00,
+    outputPer1M: 25.00,
     contextWindow: 200000,
     tier: 'paid',
   },

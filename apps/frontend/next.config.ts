@@ -35,6 +35,11 @@ const getBackendUrl = (): string => {
 const nextConfig = (): NextConfig => ({
   output: (process.env.NEXT_OUTPUT as 'standalone') || undefined,
 
+  // Skip type checking during build (done in CI via `pnpm typecheck`)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   // Transpile shared package
   transpilePackages: ['@kortix/shared'],
 

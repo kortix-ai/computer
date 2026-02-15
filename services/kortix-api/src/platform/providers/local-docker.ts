@@ -200,6 +200,7 @@ export class LocalDockerProvider implements SandboxProvider {
   // ── Legacy SandboxProvider interface (for provider registry) ────────────
 
   async create(opts: CreateSandboxOpts): Promise<ProvisionResult> {
+    this._lastCreateOpts = opts;
     const info = await this.ensure();
     return {
       externalId: info.containerId,
@@ -215,8 +216,10 @@ export class LocalDockerProvider implements SandboxProvider {
 
   // ── Private ─────────────────────────────────────────────────────────────
 
+  private _lastCreateOpts?: CreateSandboxOpts;
+
   private async createContainer(): Promise<void> {
-    const authToken = this.opts?.envVars?.KORTIX_TOKEN || generateSandboxToken();
+    const authToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN || generateSandboxToken();
     const sandboxEnvVars = readSandboxEnv();
 
     const env = [

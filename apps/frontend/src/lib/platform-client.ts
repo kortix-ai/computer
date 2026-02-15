@@ -44,8 +44,8 @@ export function getDirectPortUrl(
   server: ServerEntry,
   containerPort: string,
 ): string | null {
-  // Cloud: route through the preview proxy
-  if (server.provider === 'daytona' && server.sandboxId) {
+  // Cloud: route through the preview proxy (guard against undefined sandboxId)
+  if (server.provider === 'daytona' && server.sandboxId && server.sandboxId !== 'undefined') {
     return `${PLATFORM_URL}/preview/${server.sandboxId}/${containerPort}`;
   }
 
@@ -151,13 +151,26 @@ async function platformFetch<T>(
 
 /**
  * Build the OpenCode server URL for a sandbox.
- * - Daytona (cloud): {BACKEND_URL}/preview/{externalId}/8000
  * - Local Docker: uses the base_url directly (http://localhost:{port})
+ * - Daytona (cloud): {BACKEND_URL}/preview/{externalId}/8000
+ *
+ * Guards against missing external_id to prevent broken URLs.
  */
 export function getSandboxUrl(sandbox: SandboxInfo): string {
+  // Local Docker always uses base_url (direct localhost port mapping)
   if (sandbox.provider === 'local_docker') {
     return sandbox.base_url;
   }
+
+  // Daytona requires a valid external_id for URL construction
+  if (!sandbox.external_id) {
+    // Fallback: if base_url is set, use it directly
+    if (sandbox.base_url) return sandbox.base_url;
+    throw new Error(
+      `Cannot build sandbox URL: missing external_id for ${sandbox.provider} sandbox "${sandbox.sandbox_id}"`,
+    );
+  }
+
   return `${PLATFORM_URL}/preview/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
 }
 
@@ -173,7 +186,7 @@ export function getSandboxPortUrl(
   sandbox: SandboxInfo,
   containerPort: string,
 ): string | null {
-  if (sandbox.provider === 'daytona' || (!sandbox.provider && sandbox.external_id)) {
+  if ((sandbox.provider === 'daytona' || (!sandbox.provider && sandbox.external_id)) && sandbox.external_id) {
     return `${PLATFORM_URL}/preview/${sandbox.external_id}/${containerPort}`;
   }
 

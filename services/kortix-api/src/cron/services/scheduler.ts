@@ -1,5 +1,6 @@
 import { and, eq, lte, isNotNull } from 'drizzle-orm';
 import { db } from '../../shared/db';
+import { hasDatabase } from '../../shared/db';
 import { triggers } from '@kortix/db';
 import { config } from '../../config';
 import { processTrigger } from './executor';
@@ -65,6 +66,11 @@ async function tick(): Promise<void> {
 export function startScheduler(): void {
   if (!config.SCHEDULER_ENABLED) {
     console.log('[scheduler] Scheduler is disabled via SCHEDULER_ENABLED=false');
+    return;
+  }
+
+  if (!hasDatabase) {
+    console.log('[scheduler] Scheduler disabled — no DATABASE_URL configured (local mode)');
     return;
   }
 

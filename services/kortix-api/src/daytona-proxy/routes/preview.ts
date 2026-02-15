@@ -68,7 +68,6 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
 
   try {
     // Find sandbox by externalId (the Daytona sandbox ID) in kortix.sandboxes
-    console.log(`[PREVIEW] Ownership check: sandboxId=${sandboxId}, userId=${userId}`);
     const [sandbox] = await db
       .select({ accountId: sandboxes.accountId })
       .from(sandboxes)
@@ -86,8 +85,6 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
       return false;
     }
 
-    console.log(`[PREVIEW] Sandbox found: accountId=${sandbox.accountId}`);
-
     // Check if user belongs to the account that owns this sandbox
     const [membership] = await db
       .select({ accountRole: accountUser.accountRole })
@@ -101,7 +98,6 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
       .limit(1);
 
     const allowed = !!membership;
-    console.log(`[PREVIEW] Membership check: allowed=${allowed}, role=${membership?.accountRole}`);
     setCachedOwnership(sandboxId, userId, allowed);
     return allowed;
   } catch (err) {
@@ -239,18 +235,31 @@ preview.all('/:sandboxId/:port/*', async (c) => {
           continue;
         }
         // Not a Daytona stopped error -- pass through
+        const errHeaders = new Headers(upstream.headers);
+        const errOrigin = c.req.header('Origin') || '';
+        if (errOrigin) {
+          errHeaders.set('Access-Control-Allow-Origin', errOrigin);
+          errHeaders.set('Access-Control-Allow-Credentials', 'true');
+        }
         return new Response(bodyText, {
           status: upstream.status,
           statusText: upstream.statusText,
-          headers: new Headers(upstream.headers),
+          headers: errHeaders,
         });
       }
 
       // Got an HTTP response -> sandbox is alive, pass it through
+      // Inject CORS headers since the raw upstream response won't have them
+      const respHeaders = new Headers(upstream.headers);
+      const origin = c.req.header('Origin') || '';
+      if (origin) {
+        respHeaders.set('Access-Control-Allow-Origin', origin);
+        respHeaders.set('Access-Control-Allow-Credentials', 'true');
+      }
       return new Response(upstream.body, {
         status: upstream.status,
         statusText: upstream.statusText,
-        headers: new Headers(upstream.headers),
+        headers: respHeaders,
       });
     } catch (err) {
       // Re-throw our own HTTP exceptions (400, 403, etc.) -- don't retry those
