@@ -134,6 +134,7 @@ export function UserMenu({ user }: UserMenuProps) {
         { icon: LifeBuoy, label: 'Support', href: '/support' },
         { icon: CreditCard, label: 'Billing', onClick: () => openSettings('billing') },
         { icon: TrendingDown, label: 'Usage', onClick: () => openSettings('usage') },
+        { icon: Plug, label: 'Providers', onClick: () => openSettings('providers') },
         { icon: Plug, label: 'Integrations', href: '/settings/credentials' },
         { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
         { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },

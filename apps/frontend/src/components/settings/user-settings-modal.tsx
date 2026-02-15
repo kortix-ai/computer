@@ -127,7 +127,7 @@ export function UserSettingsModal({
     const isLocal = isLocalMode();
     const tabs: Tab[] = [
         { id: 'general', label: 'General', icon: Settings },
-        ...(isLocal ? [{ id: 'providers' as TabId, label: 'Providers', icon: Plug }] : []),
+        { id: 'providers' as TabId, label: 'Providers', icon: Plug },
         { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
         { id: 'plan', label: 'Plan', icon: Zap },
         { id: 'billing', label: 'Billing', icon: CreditCard },
@@ -223,7 +223,7 @@ export function UserSettingsModal({
                                 {activeTab === 'transactions' && <TransactionsTab />}
                                 {activeTab === 'usage' && <UsageTab />}
                                 {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                                {activeTab === 'providers' && isLocal && <ProvidersTab />}
+                                {activeTab === 'providers' && <ProvidersTab />}
                             </div>
                         </div>
                     </div>
@@ -277,7 +277,7 @@ export function UserSettingsModal({
                             {activeTab === 'transactions' && <TransactionsTab />}
                             {activeTab === 'usage' && <UsageTab />}
                             {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                            {activeTab === 'providers' && isLocal && <ProvidersTab />}
+                            {activeTab === 'providers' && <ProvidersTab />}
                         </div>
                     </div>
                 )}

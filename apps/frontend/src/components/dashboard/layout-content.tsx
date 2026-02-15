@@ -391,6 +391,13 @@ export default function DashboardLayoutContent({
           <SetupOverlay
             onComplete={() => {
               setShowSetupOverlay(false);
+              // Persist onboarding completion server-side so it doesn't show again
+              const backendUrl =
+                process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+              fetch(`${backendUrl}/setup/onboarding-complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              }).catch(() => {});
             }}
           />
         </Suspense>
