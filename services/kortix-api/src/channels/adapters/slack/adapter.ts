@@ -7,6 +7,7 @@ import type { ChannelConfig } from '@kortix/db';
 import { SlackApi } from './api';
 import { handleSlackWebhook } from './webhook';
 import { splitMessage } from '../../lib/message-splitter';
+import { markdownToSlack } from '../../lib/markdown-to-slack';
 import { config } from '../../../config';
 import { db } from '../../../shared/db';
 import { channelConfigs, sandboxes } from '@kortix/db';
@@ -53,12 +54,18 @@ export class SlackAdapter extends BaseAdapter {
     }
 
     const threadTs = message.threadId || message.externalId;
-    const chunks = splitMessage(response.content, this.capabilities.textChunkLimit);
 
-    for (const chunk of chunks) {
+    let slackText = markdownToSlack(response.content);
+
+    const sessionUrl = `${config.FRONTEND_URL}/sessions/${response.sessionId}`;
+    slackText += `\n\n<${sessionUrl}|View full session>`;
+
+    const chunks = splitMessage(slackText, this.capabilities.textChunkLimit);
+
+    for (let i = 0; i < chunks.length; i++) {
       const result = await api.postMessage({
         channel,
-        text: chunk,
+        text: chunks[i],
         thread_ts: threadTs,
       });
 
