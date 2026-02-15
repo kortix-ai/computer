@@ -11,12 +11,12 @@ import {
   Sun,
   Moon,
   Monitor,
+  Palette,
   PanelLeftClose,
   PanelLeftIcon,
   FileText,
   Loader2,
   Database,
-  Zap,
   Settings,
   Cog,
   MessageCircle,
@@ -60,7 +60,9 @@ import type { FindMatch } from '@/features/files';
 import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore } from '@/stores/tab-store';
+import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
+import { THEMES, getThemeById } from '@/lib/themes';
 import { CompactDialog } from '@/components/session/compact-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
 import { TodoDialog } from '@/components/session/todo-dialog';
@@ -579,6 +581,17 @@ export function CommandPalette() {
     close();
   }, [theme, setTheme, close]);
 
+  const setThemeId = useUserPreferencesStore((s) => s.setThemeId);
+  const currentThemeId = useUserPreferencesStore((s) => s.preferences.themeId);
+
+  const handleSwitchTheme = useCallback(
+    (themeId: string) => {
+      setThemeId(themeId);
+      close();
+    },
+    [setThemeId, close],
+  );
+
   const handleToggleSidebar = useCallback(() => {
     toggleSidebar();
     close();
@@ -1063,10 +1076,6 @@ export function CommandPalette() {
                   <Database className="mr-2 h-4 w-4" />
                   <span>Skills</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/triggers', 'Triggers')}>
-                  <Zap className="mr-2 h-4 w-4" />
-                  <span>Triggers</span>
-                </CommandItem>
               </CommandGroup>
 
               <CommandSeparator />
@@ -1093,6 +1102,22 @@ export function CommandPalette() {
                   <ThemeIcon className="mr-2 h-4 w-4" />
                   <span>{themeLabel}</span>
                 </CommandItem>
+                {THEMES.map((t) => (
+                  <CommandItem
+                    key={t.id}
+                    onSelect={() => handleSwitchTheme(t.id)}
+                    keywords={['theme', t.name.toLowerCase()]}
+                  >
+                    <span
+                      className="mr-2 h-3 w-3 rounded-full shrink-0 inline-block"
+                      style={{ backgroundColor: t.accentColor }}
+                    />
+                    <span className="flex-1">{t.name}</span>
+                    {t.id === currentThemeId && (
+                      <span className="ml-auto text-xs text-muted-foreground">Active</span>
+                    )}
+                  </CommandItem>
+                ))}
               </CommandGroup>
 
               <CommandGroup heading="View">

@@ -3,7 +3,6 @@ import { siteMetadata } from '@/lib/site-metadata';
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/components/AuthProvider';
-import { PresenceProvider } from '@/components/presence-provider';
 import { ReactQueryProvider } from './react-query-provider';
 import { Toaster } from '@/components/ui/sonner';
 import '@/lib/polyfills';
@@ -243,7 +242,6 @@ export default function RootLayout({
         >
           <AuthProvider>
             <I18nProvider>
-              <PresenceProvider>
               <ReactQueryProvider>
                 {children}
                 <Toaster />
@@ -251,7 +249,6 @@ export default function RootLayout({
                   <PlanSelectionModal />
                 </Suspense>
               </ReactQueryProvider>
-              </PresenceProvider>
             </I18nProvider>
           </AuthProvider>
           {/* Analytics - lazy loaded to not block FCP */}

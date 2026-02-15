@@ -68,16 +68,7 @@ import { SearchMcpServersForAgentToolView } from '../search-mcp-servers-for-agen
 import { CreateCredentialProfileForAgentToolView } from '../create-credential-profile-for-agent/create-credential-profile-for-agent';
 import { DiscoverMcpToolsForAgentToolView } from '../discover-mcp-tools-for-agent/discover-mcp-tools-for-agent';
 import { DiscoverUserMcpServersToolView } from '../discover-user-mcp-servers/discover-user-mcp-servers';
-import { ListAppEventTriggersToolView } from '../list-app-event-triggers/list-app-event-triggers';
-import { CreateEventTriggerToolView } from '../create-event-trigger/create-event-trigger';
 import { ConfigureAgentIntegrationToolView } from '../configure-agent-integration/configure-agent-integration';
-import CreateAgentScheduledTriggerToolView from '../create-agent-scheduled-trigger/create-agent-scheduled-trigger';
-import { MakeCallToolView } from '../vapi-call/MakeCallToolView';
-import { CallStatusToolView } from '../vapi-call/CallStatusToolView';
-import { EndCallToolView } from '../vapi-call/EndCallToolView';
-import { ListCallsToolView } from '../vapi-call/ListCallsToolView';
-import { MonitorCallToolView } from '../vapi-call/MonitorCallToolView';
-import { WaitForCallCompletionToolView } from '../vapi-call/WaitForCallCompletionToolView';
 import { createPresentationViewerToolContent, parsePresentationSlidePath } from '../utils/presentation-utils';
 import { parseCanvasFilePath } from '../canvas-tool/_utils';
 import { KbToolView } from '../KbToolView';
@@ -271,23 +262,7 @@ const defaultRegistry: ToolViewRegistryType = {
   'create-credential-profile-for-agent': CreateCredentialProfileForAgentToolView,
   'discover-mcp-tools-for-agent': DiscoverMcpToolsForAgentToolView,
   'discover-user-mcp-servers': DiscoverUserMcpServersToolView,
-  'list-app-event-triggers': ListAppEventTriggersToolView,
-  'create-event-trigger': CreateEventTriggerToolView,
   'configure-agent-integration': ConfigureAgentIntegrationToolView,
-  'create-agent-scheduled-trigger': CreateAgentScheduledTriggerToolView,
-
-  'make_phone_call': MakeCallToolView,
-  'make-phone-call': MakeCallToolView,
-  'end_call': EndCallToolView,
-  'end-call': EndCallToolView,
-  'get_call_details': CallStatusToolView,
-  'get-call-details': CallStatusToolView,
-  'list_calls': ListCallsToolView,
-  'list-calls': ListCallsToolView,
-  'monitor_call': MonitorCallToolView,
-  'monitor-call': MonitorCallToolView,
-  'wait_for_call_completion': WaitForCallCompletionToolView,
-  'wait-for-call-completion': WaitForCallCompletionToolView,
 
   'detect-deepfake': RealityDefenderToolView,
   'detect_deepfake': RealityDefenderToolView,

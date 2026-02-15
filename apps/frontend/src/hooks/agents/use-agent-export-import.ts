@@ -81,50 +81,6 @@ export const useExportAgent = () => {
   });
 };
 
-// Import agent hook
-export const useImportAgent = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (importRequest: AgentImportRequest) => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error('You must be logged in to import workers');
-      }
-
-      const response = await fetch(`${API_URL}/agents/import`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(importRequest),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data;
-    },
-    onSuccess: (data, variables) => {
-      // Invalidate agents list to refresh data
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      
-      const action = variables.import_as_new ? 'imported' : 'updated';
-      toast.success(`Worker "${variables.import_data.name}" ${action} successfully`);
-    },
-    onError: (error: any) => {
-      console.error('Import error:', error);
-      toast.error(error?.message || "Failed to import Worker");
-    },
-  });
-};
-
 // Helper function to validate import data
 export const validateImportData = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];

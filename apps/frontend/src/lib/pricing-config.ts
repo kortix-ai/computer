@@ -49,8 +49,7 @@ export const pricingTiers: PricingTier[] = [
     ],
     disabledFeatures: [
       'No custom AI Workers',
-      'No scheduled triggers',
-      'No app-based triggers',
+
       'No integrations',
     ],
     tierKey: config.SUBSCRIPTION_TIERS.FREE_TIER.tierKey,
@@ -74,8 +73,7 @@ export const pricingTiers: PricingTier[] = [
       'Unlimited Chats',
       '3 concurrent runs - Run multiple Chats simultaneously',
       '5 custom AI Workers - Create Kortix Workers with custom Knowledge, Tools & Integrations',
-      '5 scheduled triggers - Run at 9am daily, every Monday, first of month...',
-      '25 app triggers - Auto-respond to new emails, Slack messages, form submissions...',
+
       '100+ Integrations - Google Drive, Slack, Notion, Gmail, Calendar, GitHub & more',
       'Kortix Advanced mode - Strongest autonomy & decision-making capabilities',
     ],
@@ -100,8 +98,7 @@ export const pricingTiers: PricingTier[] = [
       'Unlimited Chats',
       '5 concurrent runs - Run multiple Chats simultaneously',
       '20 custom AI Workers - Create Kortix Workers with custom Knowledge, Tools & Integrations',
-      '10 scheduled triggers - Run at 9am daily, every Monday, first of month...',
-      '50 app triggers - Auto-respond to new emails, Slack messages, form submissions...',
+
       '100+ Integrations - Google Drive, Slack, Notion, Gmail, Calendar, GitHub & more',
       'Kortix Advanced mode - Strongest autonomy & decision-making capabilities',
     ],
@@ -148,8 +145,7 @@ export const pricingTiers: PricingTier[] = [
       'Unlimited Chats',
       '20 concurrent runs - Run multiple Chats simultaneously',
       '100 custom AI Workers - Create Kortix Workers with custom Knowledge, Tools & Integrations',
-      '50 scheduled triggers - Run at 9am daily, every Monday, first of month...',
-      '200 app triggers - Auto-respond to new emails, Slack messages, form submissions...',
+
       '100+ Integrations - Google Drive, Slack, Notion, Gmail, Calendar, GitHub & more',
       'Kortix Advanced mode - Strongest autonomy & decision-making capabilities',
     ],

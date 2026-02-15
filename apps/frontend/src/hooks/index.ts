@@ -23,9 +23,6 @@ export * from './dashboard/use-initiate-agent';
 // Usage
 export * from './usage/use-health';
 
-// Triggers
-export * from './triggers';
-
 // Billing
 export * from './billing';
 
@@ -47,5 +44,3 @@ export * from './utils';
 // Onboarding
 export * from './onboarding';
 
-// Integrations
-export * from './integrations';

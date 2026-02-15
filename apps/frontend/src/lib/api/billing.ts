@@ -99,19 +99,7 @@ export interface AccountState {
       can_create: boolean;
       tier_name: string;
     };
-    trigger_count: {
-      scheduled: {
-        current_count: number;
-        limit: number;
-        can_create: boolean;
-      };
-      app: {
-        current_count: number;
-        limit: number;
-        can_create: boolean;
-      };
-      tier_name: string;
-    };
+
   };
   tier: {
     name: string;
@@ -413,19 +401,7 @@ export const billingApi = {
             can_create: false,
             tier_name: 'none'
           },
-          trigger_count: {
-            scheduled: {
-              current_count: 0,
-              limit: 0,
-              can_create: false
-            },
-            app: {
-              current_count: 0,
-              limit: 0,
-              can_create: false
-            },
-            tier_name: 'none'
-          }
+
         },
         tier: {
           name: 'none',

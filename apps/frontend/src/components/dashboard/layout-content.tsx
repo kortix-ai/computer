@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
 import { Suspense, lazy } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useSystemStatusQuery } from '@/hooks/edge-flags';
 import { useRouter } from 'next/navigation';
 import { useAdminRole } from '@/hooks/admin';
-import { usePresence } from '@/hooks/use-presence';
 import { featureFlags } from '@/lib/feature-flags';
 import { isLocalMode } from '@/lib/config';
 
@@ -68,10 +66,6 @@ const OnboardingProvider = lazy(() =>
 );
 const DashboardPromoBanner = lazy(() => 
   import('@/components/home/dashboard-promo-banner').then(mod => ({ default: mod.DashboardPromoBanner }))
-);
-
-const PresenceDebug = lazy(() => 
-  import('@/components/debug/presence-debug').then(mod => ({ default: mod.PresenceDebug }))
 );
 
 const KortixAppBanners = lazy(() => 
@@ -268,11 +262,6 @@ export default function DashboardLayoutContent({
   children,
 }: DashboardLayoutContentProps) {
   const { user, isLoading } = useAuth();
-  const params = useParams();
-  const threadId = params?.threadId as string | undefined;
-  
-  usePresence(threadId);
-  
   const router = useRouter();
   const { data: systemStatus, isLoading: systemStatusLoading } = useSystemStatusQuery();
   const maintenanceNotice = systemStatus?.maintenanceNotice;

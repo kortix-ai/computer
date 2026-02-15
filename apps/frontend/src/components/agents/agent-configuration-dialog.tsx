@@ -30,7 +30,6 @@ import {
   Settings,
   Wrench,
   Server,
-  Zap,
   Download,
   Check,
   X,
@@ -60,7 +59,6 @@ import { ExpandableMarkdownEditor } from '@/components/ui/expandable-markdown-ed
 import { AgentModelSelector } from './config/model-selector';
 import { GranularToolConfiguration } from './tools/granular-tool-configuration';
 import { AgentMCPConfiguration } from './agent-mcp-configuration';
-import { AgentTriggersConfiguration } from './triggers/agent-triggers-configuration';
 import { AgentAvatar } from '../thread/content/agent-avatar';
 import { AgentIconEditorDialog } from './config/agent-icon-editor-dialog';
 import { AgentVersionSwitcher } from './agent-version-switcher';
@@ -69,7 +67,7 @@ interface AgentConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agentId: string;
-  initialTab?: 'instructions' | 'tools' | 'integrations' | 'triggers';
+  initialTab?: 'instructions' | 'tools' | 'integrations';
   onAgentChange?: (agentId: string) => void;
 }
 
@@ -385,7 +383,6 @@ export function AgentConfigurationDialog({
     { id: 'instructions', label: 'Instructions', icon: Brain, disabled: false },
     { id: 'tools', label: 'Tools', icon: Wrench, disabled: false },
     { id: 'integrations', label: 'Integrations', icon: Server, disabled: false },
-    { id: 'triggers', label: 'Triggers', icon: Zap, disabled: false },
   ];
 
   return (
@@ -733,42 +730,7 @@ export function AgentConfigurationDialog({
                   </div>
                 </TabsContent>
 
-                <TabsContent value="triggers" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 min-h-0 h-full relative">
-                    <AgentTriggersConfiguration agentId={agentId} />
-                    {isFreeTier && (
-                      <div className="absolute inset-0 z-10">
-                        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
-                        <div className="relative h-full flex flex-col items-center justify-center px-8">
-                          <div 
-                            className="max-w-md w-full rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-background to-background p-8 cursor-pointer hover:border-primary/50 transition-all group shadow-lg"
-                            onClick={() => openPricingModal()}
-                          >
-                            <div className="flex flex-col items-center text-center gap-4">
-                              <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/15 border border-primary/20 group-hover:bg-primary/20 transition-colors">
-                                <Zap className="h-7 w-7 text-primary" />
-                              </div>
-                              <div>
-                                <h3 className="text-lg font-semibold text-foreground mb-2">Unlock Automation Triggers</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                  Set up scheduled tasks and event-based triggers to automate your AI Workers 24/7
-                                </p>
-                              </div>
-                              <Button 
-                                variant="default"
-                                className="mt-2 gap-2"
-                                onClick={(e) => { e.stopPropagation(); openPricingModal(); }}
-                              >
-                                <Sparkles className="h-4 w-4" />
-                                Upgrade to Unlock
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
+
               </div>
             </Tabs>
           )}

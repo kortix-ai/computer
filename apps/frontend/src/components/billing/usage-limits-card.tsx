@@ -140,40 +140,7 @@ export function UsageLimitsCard() {
                 value={((limits?.custom_mcp_count?.current_count || 0) / (limits?.custom_mcp_count?.limit || 1)) * 100} 
               />
             </div>
-            <div className="space-y-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex justify-between text-sm cursor-help">
-                    <span className="text-muted-foreground">Scheduled Triggers</span>
-                    <span className="font-medium">{limits?.trigger_count?.scheduled?.current_count || 0} / {limits?.trigger_count?.scheduled?.limit || 0}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Time-based automation (daily, weekly, hourly runs)</p>
-                </TooltipContent>
-              </Tooltip>
-              <Progress 
-                className="h-2"
-                value={((limits?.trigger_count?.scheduled?.current_count || 0) / (limits?.trigger_count?.scheduled?.limit || 1)) * 100} 
-              />
-            </div>
-            <div className="space-y-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex justify-between text-sm cursor-help">
-                    <span className="text-muted-foreground">App Triggers</span>
-                    <span className="font-medium">{limits?.trigger_count?.app?.current_count || 0} / {limits?.trigger_count?.app?.limit || 0}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Event-based automation (new email, CRM entry, Notion page, etc.)</p>
-                </TooltipContent>
-              </Tooltip>
-              <Progress 
-                className="h-2"
-                value={((limits?.trigger_count?.app?.current_count || 0) / (limits?.trigger_count?.app?.limit || 1)) * 100} 
-              />
-            </div>
+
           </div>
         </TooltipProvider>
       </CardContent>

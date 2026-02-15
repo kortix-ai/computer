@@ -13,7 +13,6 @@ import {
   User,
   Tag,
   Wrench,
-  Zap,
   Plug,
   Code,
   Globe,
@@ -139,7 +138,7 @@ export default function TemplateSharePage() {
   // Navigation state management
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['system-prompt', 'integrations', 'triggers', 'tools'];
+      const sections = ['system-prompt', 'integrations', 'tools'];
       let currentSection = '';
 
       // Find the section that's currently in view
@@ -288,7 +287,6 @@ export default function TemplateSharePage() {
 
   const tools = template.mcp_requirements || [];
   const toolRequirements = tools.filter((req: any) => req.source === 'tool');
-  const triggerRequirements = tools.filter((req: any) => req.source === 'trigger');
   const integrations = toolRequirements.filter((tool: any) => !tool.custom_type || tool.custom_type !== 'sse');
   const customTools = toolRequirements.filter((tool: any) => tool.custom_type === 'sse');
   const agentpressTools = Object.entries(template.agentpress_tools || {})
@@ -297,7 +295,6 @@ export default function TemplateSharePage() {
 
   // Navigation helper variables
   const hasIntegrations = integrations.length > 0;
-  const hasTriggers = triggerRequirements.length > 0;
   const hasTools = customTools.length > 0 || agentpressTools.length > 0;
 
   const getDefaultAvatar = () => {
@@ -479,16 +476,6 @@ export default function TemplateSharePage() {
                       Integrations
                     </button>
                   )}
-                  {hasTriggers && (
-                    <button
-                      onClick={() => scrollToSection('triggers')}
-                      className="w-full px-3 py-2 text-sm rounded-lg transition-colors text-left flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    >
-                      <Zap className="w-4 h-4" />
-                      Triggers
-                    </button>
-                  )}
-
                 </nav>
               </div>
             </div>
@@ -578,52 +565,6 @@ export default function TemplateSharePage() {
                         </div>
                       </div>
                     ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {triggerRequirements.length > 0 && (
-              <Card id="triggers" className="bg-transparent border-0 shadow-none">
-                <CardHeader className="px-0">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <Zap className="w-5 h-5" />
-                    Event Triggers
-                  </CardTitle>
-                  <CardDescription>
-                    Automated triggers that can activate this agent
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="px-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {triggerRequirements.map((trigger: any, index: number) => {
-                      const appName = trigger.display_name?.split(' (')[0] || trigger.display_name;
-                      const triggerName = trigger.display_name?.match(/\(([^)]+)\)/)?.[1] || trigger.display_name;
-
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center gap-3 p-3 rounded-lg border bg-background"
-                        >
-                          <IntegrationIcon
-                            qualifiedName={trigger.qualified_name}
-                            displayName={appName || trigger.qualified_name}
-                            customType={trigger.custom_type}
-                            toolkitSlug={trigger.toolkit_slug}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">
-                              {triggerName || trigger.display_name || trigger.qualified_name}
-                            </p>
-                            {appName && triggerName && (
-                              <p className="text-xs text-muted-foreground">
-                                {appName}
-                              </p>
-                            )}
-                          </div>
-                          <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                        </div>
-                      );
-                    })}
                   </div>
                 </CardContent>
               </Card>

@@ -138,34 +138,7 @@ async function setDefaultProfile(profileId: string): Promise<void> {
   }
 }
 
-async function deleteCredentialProfile(profileId: string): Promise<void> {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
 
-  if (!session) {
-    throw new Error('You must be logged in to delete credential profiles');
-  }
-
-  const response = await fetch(`${API_BASE}/credential-profiles/${profileId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-    },
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-  }
-}
-
-export function useCredentialProfiles() {
-  return useQuery({
-    queryKey: ['credential-profiles'],
-    queryFn: fetchAllCredentialProfiles,
-    staleTime: 5 * 60 * 1000,
-  });
-}
 
 export function useCredentialProfilesForMcp(mcpQualifiedName: string | null) {
   return useQuery({
@@ -214,21 +187,6 @@ export function useSetDefaultProfile() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to set default profile: ${error.message}`);
-    },
-  });
-}
-
-export function useDeleteCredentialProfile() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: deleteCredentialProfile,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credential-profiles'] });
-      toast.success('Credential profile deleted successfully');
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to delete credential profile: ${error.message}`);
     },
   });
 }
