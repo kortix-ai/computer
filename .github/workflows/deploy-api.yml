@@ -20,9 +20,9 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.AWS_PRODUCTION_HOST }}
+          username: ${{ secrets.AWS_PRODUCTION_USERNAME }}
+          key: ${{ secrets.AWS_PRODUCTION_KEY }}
           port: 22
           timeout: 300s
           script: |

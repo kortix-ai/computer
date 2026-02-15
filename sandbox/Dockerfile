@@ -117,7 +117,7 @@ RUN mkdir -p /opt/kortix \
 RUN mkdir -p /app/secrets && chmod 700 /app/secrets
 
 # ── Workspace ───────────────────────────────────────────────────────────────
-RUN mkdir -p /workspace/.kortix /workspace/.agent-browser /workspace/.browser-profile \
+RUN mkdir -p /workspace/.kortix /workspace/.kortix/mem /workspace/.agent-browser /workspace/.browser-profile \
     /workspace/.lss /workspace/.cache/opencode /workspace/presentations \
     /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
     /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../../shared/db';
-import { channelConfigs, channelMessages, sandboxes } from '@kortix/db';
+import { channelConfigs, channelMessages, sandboxes, accountUser } from '@kortix/db';
 import { NotFoundError, ValidationError } from '../../errors';
 import type { AppEnv } from '../../types';
 import type { ChannelEngineImpl } from '../core/engine';
@@ -44,11 +44,21 @@ const updateChannelSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
+async function resolveAccountId(userId: string): Promise<string> {
+  const [membership] = await db
+    .select({ accountId: accountUser.accountId })
+    .from(accountUser)
+    .where(eq(accountUser.userId, userId))
+    .limit(1);
+  return membership?.accountId ?? userId;
+}
+
 export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
   app.post('/', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const body = await c.req.json();
     const parsed = createChannelSchema.safeParse(body);
 
@@ -62,7 +72,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(sandboxes.sandboxId, parsed.data.sandbox_id),
-          eq(sandboxes.accountId, userId),
+          eq(sandboxes.accountId, accountId),
         ),
       );
 
@@ -82,7 +92,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .insert(channelConfigs)
       .values({
         sandboxId: parsed.data.sandbox_id,
-        accountId: userId,
+        accountId: accountId,
         channelType: parsed.data.channel_type,
         name: parsed.data.name,
         enabled: parsed.data.enabled,
@@ -108,11 +118,12 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
   app.get('/', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const sandboxId = c.req.query('sandbox_id');
     const channelType = c.req.query('channel_type');
     const enabled = c.req.query('enabled');
 
-    const conditions = [eq(channelConfigs.accountId, userId)];
+    const conditions = [eq(channelConfigs.accountId, accountId)];
 
     if (sandboxId) {
       conditions.push(eq(channelConfigs.sandboxId, sandboxId));
@@ -137,6 +148,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
   app.get('/:id', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const configId = c.req.param('id');
 
     const [config] = await db
@@ -145,7 +157,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       );
 
@@ -163,6 +175,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
   app.patch('/:id', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const configId = c.req.param('id');
     const body = await c.req.json();
     const parsed = updateChannelSchema.safeParse(body);
@@ -177,7 +190,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       );
 
@@ -201,7 +214,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       )
       .returning();
@@ -211,6 +224,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
   app.delete('/:id', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const configId = c.req.param('id');
 
     const [config] = await db
@@ -219,7 +233,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       );
 
@@ -241,7 +255,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       );
 
@@ -250,6 +264,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
   app.post('/:id/enable', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const configId = c.req.param('id');
 
     const [updated] = await db
@@ -258,7 +273,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       )
       .returning();
@@ -272,6 +287,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
   app.post('/:id/disable', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const configId = c.req.param('id');
 
     const [updated] = await db
@@ -280,7 +296,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       )
       .returning();
@@ -294,6 +310,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
   app.get('/:id/messages', async (c) => {
     const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const configId = c.req.param('id');
     const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 100);
     const offset = parseInt(c.req.query('offset') || '0', 10);
@@ -304,7 +321,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       .where(
         and(
           eq(channelConfigs.channelConfigId, configId),
-          eq(channelConfigs.accountId, userId),
+          eq(channelConfigs.accountId, accountId),
         ),
       );
 

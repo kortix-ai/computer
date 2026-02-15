@@ -90,9 +90,6 @@ services:
       - DISPLAY=:1
       - LSS_DIR=/workspace/.lss
       - KORTIX_WORKSPACE=/workspace
-      # Kortix Master auth
-      - OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME:-admin}
-      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-changeme}
       # The sandbox reaches the API through the Docker network
       - KORTIX_API_URL=http://kortix-api:8008/v1/router
       - KORTIX_TOKEN=${KORTIX_TOKEN:-}

@@ -106,7 +106,7 @@ bash scripts/get-kortix.sh
 # Verify
 docker ps --format 'table {{.Names}}\t{{.Status}}'
 curl -s http://localhost:3000/dashboard  # Frontend
-curl -s http://localhost:8008/v1/setup/env  # API
+curl -s http://localhost:8008/v1/providers  # Provider status (new API)
 curl -s http://localhost:8008/v1/setup/onboarding-status  # Onboarding
 ```
 
@@ -128,12 +128,21 @@ docker compose down frontend && docker compose up -d frontend
 ### Test key save flow
 
 ```bash
-# Save a key
-curl -s -X POST http://localhost:8008/v1/setup/env \
+# Connect a provider (new API)
+curl -s -X PUT http://localhost:8008/v1/providers/anthropic/connect \
   -H "Content-Type: application/json" \
   -d '{"keys":{"ANTHROPIC_API_KEY":"sk-ant-your-key"}}' | python3 -m json.tool
 
-# Verify
+# Verify via provider list
+curl -s http://localhost:8008/v1/providers | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+for p in d['providers']:
+    if p['id'] == 'anthropic':
+        print('Anthropic connected:', p['connected'])
+"
+
+# Legacy API still works too
 curl -s http://localhost:8008/v1/setup/env | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
@@ -145,7 +154,7 @@ print('ANTHROPIC configured:', d['configured']['ANTHROPIC_API_KEY'])
 
 ## Key Architecture: Installed Mode vs Repo/Dev Mode
 
-The setup API routes (`services/kortix-api/src/setup/index.ts`) operate in two modes:
+The provider API routes (`services/kortix-api/src/providers/routes.ts`) and legacy setup routes (`services/kortix-api/src/setup/index.ts`) both operate in two modes:
 
 ### Repo/Dev Mode (running from source)
 
@@ -158,7 +167,7 @@ The setup API routes (`services/kortix-api/src/setup/index.ts`) operate in two m
 - No repo root found — `findRepoRoot()` returns `null`
 - API container has NO access to host filesystem
 - All keys are stored in the sandbox's encrypted secret store
-- Flow: Frontend → `POST /v1/setup/env` → kortix-api → `POST http://sandbox:8000/env` → sandbox's `kortix-master` → encrypted storage in `/app/secrets/.secrets.json`
+- Flow: Frontend → `PUT /v1/providers/:id/connect` → kortix-api → `POST http://sandbox:8000/env` → sandbox's `kortix-master` → encrypted storage in `/app/secrets/.secrets.json`
 - Keys are synced to s6 container environment (`/run/s6/container_environment/`) so services pick them up via `with-contenv`
 
 ### Sandbox Secret Store
@@ -179,11 +188,12 @@ The setup/onboarding flow is an **overlay on top of the dashboard**, not a separ
 
 | Component | File | Purpose |
 |---|---|---|
-| `SetupOverlay` | `components/dashboard/setup-overlay.tsx` | Two-step overlay: welcome splash → API keys card |
+| `SetupOverlay` | `components/dashboard/setup-overlay.tsx` | Two-step overlay: welcome splash → provider connection card |
+| `ProviderSettings` | `components/providers/provider-settings.tsx` | OpenCode-inspired provider management (connect/disconnect per provider) |
+| `ConnectProviderDialog` | `components/providers/connect-provider-dialog.tsx` | Per-provider key entry dialog |
 | `layout-content.tsx` | `components/dashboard/layout-content.tsx` | Dashboard layout, renders `SetupOverlay` when `!onboardingComplete` |
 | `/setup` page | `app/setup/page.tsx` | Just redirects to `/dashboard` (overlay handles everything) |
 | `/onboarding` page | `app/onboarding/page.tsx` | Chat session with onboarding agent |
-| `LocalEnvManager` | `components/env-manager/local-env-manager.tsx` | Key management form (supports `compact` + `renderActions` props) |
 
 ### Flow
 
@@ -191,11 +201,12 @@ The setup/onboarding flow is an **overlay on top of the dashboard**, not a separ
 2. `/setup` redirects to `/dashboard`
 3. Dashboard layout checks onboarding status → shows `SetupOverlay`
 4. Welcome step: "Welcome to" + Kortix logo + confetti (auto-advances after 4s)
-5. API Keys step: card overlay with `LocalEnvManager` in compact mode, unified footer (Save + Continue)
-6. User saves at least one LLM key → Continue button enables
-7. Continue → dismisses overlay → navigates to `/onboarding`
-8. Onboarding: creates OpenCode session, chats with `kortix-onboarding` agent
-9. Agent calls `onboarding_complete` tool → confetti → dashboard unlocked
+5. Provider step: card overlay with `ProviderSettings` showing LLM providers with Connect buttons
+6. User clicks Connect on a provider → dialog opens → enters API key → saves
+7. Continue button enables once at least one LLM provider is connected
+8. Continue → dismisses overlay → navigates to `/onboarding`
+9. Onboarding: creates OpenCode session, chats with `kortix-onboarding` agent
+10. Agent calls `onboarding_complete` tool → confetti → dashboard unlocked
 
 ### Sidebar
 
@@ -291,9 +302,11 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 - `scripts/tests/test-cli.sh` — Embedded CLI tests (16 tests)
 
 ### Frontend — Setup & Onboarding
-- `apps/frontend/src/components/dashboard/setup-overlay.tsx` — Setup overlay (welcome + keys)
+- `apps/frontend/src/components/dashboard/setup-overlay.tsx` — Setup overlay (welcome + providers)
 - `apps/frontend/src/components/dashboard/layout-content.tsx` — Dashboard layout with overlay integration
-- `apps/frontend/src/components/env-manager/local-env-manager.tsx` — Key management form
+- `apps/frontend/src/components/providers/provider-settings.tsx` — OpenCode-inspired provider management
+- `apps/frontend/src/components/providers/connect-provider-dialog.tsx` — Per-provider key entry dialog
+- `apps/frontend/src/hooks/providers/use-providers.ts` — React Query hooks for provider API
 - `apps/frontend/src/app/onboarding/page.tsx` — Onboarding chat page
 - `apps/frontend/src/app/setup/page.tsx` — Redirect to /dashboard
 
@@ -302,8 +315,10 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 - `apps/frontend/Dockerfile.dockerignore` — Whitelist-only approach
 - `apps/frontend/next.config.ts` — `outputFileTracingRoot`, `output: standalone`
 
-### Backend — Setup API
-- `services/kortix-api/src/setup/index.ts` — Dual-mode setup routes
+### Backend — Provider & Setup API
+- `services/kortix-api/src/providers/registry.ts` — Shared provider registry (single source of truth)
+- `services/kortix-api/src/providers/routes.ts` — Unified provider API (`/v1/providers/*`)
+- `services/kortix-api/src/setup/index.ts` — Legacy setup routes (backward compat, onboarding)
 
 ### Sandbox
 - `sandbox/kortix-master/src/routes/env.ts` — Env routes (GET, POST, DELETE)

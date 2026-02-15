@@ -160,7 +160,7 @@ preview.all('/:sandboxId/:port/*', async (c) => {
   // 1. Verify ownership (cached after first check)
   const allowed = await verifyOwnership(sandboxId, userId);
   if (!allowed) {
-    throw new HTTPException(403, { message: 'Not authorized to access this sandbox' });
+    throw new HTTPException(403, { message: "Not authorized to access this sandbox, userId: " + userId + ", sandboxId: " + sandboxId });
   }
 
   // 2. Read body once up front (needed across retries)
@@ -220,16 +220,27 @@ preview.all('/:sandboxId/:port/*', async (c) => {
         duplex: 'half',
       });
 
-      // Daytona returns 400 "no IP address found" when sandbox is stopped.
-      // Detect this and treat it like a connection failure so auto-wake kicks in.
-      if (upstream.status === 400 && !wakeTriggered && attempt < MAX_RETRIES) {
+      // Daytona returns 400 "no IP address found" when sandbox is stopped,
+      // and 400 "failed to get runner info" when sandbox is archived (no runner assigned).
+      // Detect both and treat them like connection failures so auto-wake kicks in.
+      // We keep retrying even after wake is triggered (sandbox may still be booting).
+      if (upstream.status === 400 && attempt < MAX_RETRIES) {
         const bodyText = await upstream.text();
-        if (bodyText.includes('no IP address found')) {
-          console.warn(
-            `[PREVIEW] Sandbox ${sandboxId} is stopped (Daytona: no IP address), triggering wake`
-          );
-          await wakeSandbox(sandboxId);
-          wakeTriggered = true;
+        const isSandboxDown =
+          bodyText.includes('no IP address found') ||
+          bodyText.includes('failed to get runner info');
+        if (isSandboxDown) {
+          if (!wakeTriggered) {
+            console.warn(
+              `[PREVIEW] Sandbox ${sandboxId} is stopped/archived (Daytona: ${bodyText.slice(0, 120)}), triggering wake`
+            );
+            await wakeSandbox(sandboxId);
+            wakeTriggered = true;
+          } else {
+            console.warn(
+              `[PREVIEW] Sandbox ${sandboxId} still booting (attempt ${attempt + 1}/${MAX_RETRIES + 1})`
+            );
+          }
           previewLinkCache.delete(`${sandboxId}:${port}`);
           await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
           continue;

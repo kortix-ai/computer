@@ -233,8 +233,7 @@ export class LocalDockerProvider implements SandboxProvider {
       'DISPLAY=:1',
       'LSS_DIR=/workspace/.lss',
       'KORTIX_WORKSPACE=/workspace',
-      'OPENCODE_SERVER_USERNAME=admin',
-      `OPENCODE_SERVER_PASSWORD=${authToken.slice(0, 16)}`,
+      // OpenCode is always unprotected in local mode (no auth)
       `KORTIX_API_URL=${config.KORTIX_URL || ''}`,
       `KORTIX_TOKEN=${authToken}`,
       `SANDBOX_ID=${CONTAINER_NAME}`,

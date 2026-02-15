@@ -84,20 +84,19 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
   };
 
   const resolveSandboxId = async (): Promise<string | null> => {
-    // 1. From useSandbox hook (React Query cache)
-    if (sandbox?.sandbox_id) return sandbox.sandbox_id;
-    // 2. From server store (populated by layout on init)
-    const store = useServerStore.getState();
-    for (const s of store.servers) {
-      if (s.sandboxId) return s.sandboxId;
-    }
-    // 3. Direct API call as last resort (works in both local and cloud mode)
+    // Always fetch fresh from the API to avoid stale sandbox IDs
     try {
       const result = await ensureSandbox();
       return result.sandbox.sandbox_id;
     } catch {
-      return null;
+      // Fall back to cached values if API call fails
     }
+    if (sandbox?.sandbox_id) return sandbox.sandbox_id;
+    const store = useServerStore.getState();
+    for (const s of store.servers) {
+      if (s.sandboxId) return s.sandboxId;
+    }
+    return null;
   };
 
   const handleSelectType = async (type: ChannelType) => {
@@ -120,11 +119,17 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
   };
 
   const handleCreate = async () => {
-    if (!channelType || !sandbox) return;
+    if (!channelType) return;
+
+    const sandboxId = await resolveSandboxId();
+    if (!sandboxId) {
+      toast.error('Could not find your sandbox — is the backend running?');
+      return;
+    }
 
     try {
       await createMutation.mutateAsync({
-        sandbox_id: sandbox.sandbox_id,
+        sandbox_id: sandboxId,
         channel_type: channelType,
         name,
         credentials: buildCredentials(),
