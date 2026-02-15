@@ -44,10 +44,71 @@ import { downloadFile } from '../api/opencode-files';
 import { useServerStore } from '@/stores/server-store';
 import type { FileNode } from '../types';
 import { FileBreadcrumbs } from './file-breadcrumbs';
-import { FileTreeItem } from './file-tree-item';
+import { FileTreeItem, DRAG_MIME } from './file-tree-item';
 import { FileSearch } from './file-search';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+
+/** Drop target for the ".." (parent directory) row */
+function ParentDropTarget({
+  currentPath,
+  onClick,
+  onDropMove,
+}: {
+  currentPath: string;
+  onClick: () => void;
+  onDropMove: (sourcePath: string, targetDirPath: string) => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const counterRef = useRef(0);
+
+  const parentPath = useMemo(() => {
+    const parts = currentPath.split('/').filter(Boolean);
+    parts.pop();
+    return parts.length > 0 ? parts.join('/') : '.';
+  }, [currentPath]);
+
+  return (
+    <button
+      onClick={onClick}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDragEnter={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+        e.preventDefault();
+        counterRef.current++;
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => {
+        counterRef.current--;
+        if (counterRef.current <= 0) {
+          counterRef.current = 0;
+          setIsDragOver(false);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        counterRef.current = 0;
+        setIsDragOver(false);
+        const sourcePath = e.dataTransfer.getData(DRAG_MIME);
+        if (!sourcePath) return;
+        onDropMove(sourcePath, parentPath === '.' ? '' : parentPath);
+      }}
+      className={cn(
+        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer',
+        'hover:bg-muted/80 text-muted-foreground',
+        isDragOver && 'bg-primary/15 ring-1 ring-primary/40',
+      )}
+    >
+      <FolderUp className="h-4 w-4 shrink-0" />
+      <span>..</span>
+    </button>
+  );
+}
 
 export function FileBrowser() {
   const currentPath = useFilesStore((s) => s.currentPath);
@@ -330,6 +391,24 @@ export function FileBrowser() {
     [cutToClipboard],
   );
 
+  // Drag-and-drop move handler: move sourcePath into targetDirPath
+  const handleDropMove = useCallback(
+    async (sourcePath: string, targetDirPath: string) => {
+      const sourceName = sourcePath.split('/').pop() || '';
+      const destPath = targetDirPath ? `${targetDirPath}/${sourceName}` : sourceName;
+
+      if (sourcePath === destPath) return;
+
+      try {
+        await renameMutation.mutateAsync({ from: sourcePath, to: destPath });
+        toast.success(`Moved "${sourceName}" to ${targetDirPath.split('/').pop() || 'root'}`);
+      } catch (err) {
+        toast.error(`Failed to move: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    },
+    [renameMutation],
+  );
+
   // Paste handler
   const handlePaste = useCallback(async () => {
     if (!clipboard) return;
@@ -562,18 +641,13 @@ export function FileBrowser() {
           <ContextMenu>
             <ContextMenuTrigger asChild>
               <div className="p-1.5 min-h-full">
-                {/* Go up */}
+                {/* Go up — also a drop target for moving items to parent */}
                 {currentPath !== '.' && currentPath !== '' && (
-                  <button
+                  <ParentDropTarget
+                    currentPath={currentPath}
                     onClick={handleNavigateUp}
-                    className={cn(
-                      'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer',
-                      'hover:bg-muted/80 text-muted-foreground',
-                    )}
-                  >
-                    <FolderUp className="h-4 w-4 shrink-0" />
-                    <span>..</span>
-                  </button>
+                    onDropMove={handleDropMove}
+                  />
                 )}
 
                 {/* New folder inline input */}
@@ -666,6 +740,7 @@ export function FileBrowser() {
                     onDelete={handleDelete}
                     onCopy={handleCopy}
                     onCut={handleCut}
+                    onDropMove={handleDropMove}
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
                     isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}
@@ -684,6 +759,7 @@ export function FileBrowser() {
                     onHistory={handleHistory}
                     onCopy={handleCopy}
                     onCut={handleCut}
+                    onDropMove={handleDropMove}
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
                     isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}

@@ -14,6 +14,8 @@
  */
 
 import { useWebNotificationStore } from '@/stores/web-notification-store';
+import { useTabStore } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 import { toast as sonnerToast } from 'sonner';
 import { logger } from '@/lib/logger';
 
@@ -32,7 +34,9 @@ export interface WebNotificationPayload {
   body: string;
   /** Optional tag for deduplication (same tag replaces previous notification) */
   tag?: string;
-  /** Optional click handler — by default focuses the window */
+  /** Session ID to navigate to when clicked */
+  sessionId?: string;
+  /** Optional click handler — by default focuses the window and navigates to session */
   onClick?: () => void;
 }
 
@@ -92,6 +96,31 @@ function playNotificationPing() {
 // ============================================================================
 // Core
 // ============================================================================
+
+/**
+ * Navigate to a session by opening/activating its tab and navigating to it.
+ */
+function navigateToSession(sessionId: string, sessionTitle?: string) {
+  try {
+    const href = `/sessions/${sessionId}`;
+    // Open/activate the tab in the tab store
+    useTabStore.getState().openTab({
+      id: sessionId,
+      title: sessionTitle || 'Session',
+      type: 'session',
+      href,
+      serverId: useServerStore.getState().activeServerId,
+    });
+    // Use location.assign for a reliable navigation that always works,
+    // even when triggered from a native notification click while the
+    // browser is in the background.
+    if (window.location.pathname !== href) {
+      window.location.assign(href);
+    }
+  } catch {
+    window.location.href = `/sessions/${sessionId}`;
+  }
+}
 
 /**
  * Check if the user is NOT actively looking at the app — either switched
@@ -158,9 +187,11 @@ export function sendWebNotification(
       });
 
       notification.onclick = () => {
-        // Focus the window
         window.focus();
         notification?.close();
+        if (payload.sessionId) {
+          navigateToSession(payload.sessionId, payload.body);
+        }
         payload.onClick?.();
       };
 
@@ -207,6 +238,16 @@ function showInAppToast(payload: WebNotificationPayload) {
     toastFn(payload.title, {
       description: payload.body,
       duration: 8000,
+      ...(payload.sessionId
+        ? {
+            action: {
+              label: 'Open',
+              onClick: () => {
+                navigateToSession(payload.sessionId!, payload.body);
+              },
+            },
+          }
+        : {}),
     });
   } catch {
     // Silently ignore — toast not critical
@@ -230,6 +271,7 @@ export function notifyTaskComplete(sessionId: string, sessionTitle?: string) {
     title: 'Task Complete',
     body: `${label} has finished.`,
     tag: `completion:${sessionId}`,
+    sessionId,
   });
 }
 
@@ -250,6 +292,7 @@ export function notifySessionError(
     title: 'Session Error',
     body: `${label}: ${errorTitle}`,
     tag: `error:${sessionId}`,
+    sessionId,
   });
 }
 
@@ -270,6 +313,7 @@ export function notifyQuestion(
     title: 'Input Needed',
     body: `${label}: ${questionText.slice(0, 100)}`,
     tag: `question:${sessionId}`,
+    sessionId,
   });
 }
 
@@ -290,5 +334,6 @@ export function notifyPermissionRequest(
     title: 'Permission Requested',
     body: `${label} needs permission for: ${toolName}`,
     tag: `permission:${sessionId}`,
+    sessionId,
   });
 }

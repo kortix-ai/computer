@@ -34,7 +34,7 @@ import {
 } from '@/features/files/hooks/use-file-mutations';
 import { useFileEventInvalidation } from '@/features/files/hooks/use-file-events';
 import { downloadFile } from '@/features/files/api/opencode-files';
-import { FileTreeItem } from '@/features/files/components/file-tree-item';
+import { FileTreeItem, DRAG_MIME } from '@/features/files/components/file-tree-item';
 import { FileBreadcrumbs } from '@/features/files/components/file-breadcrumbs';
 import { FileSearch } from '@/features/files/components/file-search';
 import type { FileNode } from '@/features/files/types';
@@ -88,6 +88,70 @@ export function SidebarPanelTabs({ active, onChange }: SidebarPanelTabsProps) {
 }
 
 // ============================================================================
+// Parent drop target for sidebar
+// ============================================================================
+
+function SidebarParentDropTarget({
+  currentPath,
+  onClick,
+  onDropMove,
+}: {
+  currentPath: string;
+  onClick: () => void;
+  onDropMove: (sourcePath: string, targetDirPath: string) => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const counterRef = useRef(0);
+
+  const parentPath = useMemo(() => {
+    const parts = currentPath.split('/').filter(Boolean);
+    parts.pop();
+    return parts.length > 0 ? parts.join('/') : '.';
+  }, [currentPath]);
+
+  return (
+    <button
+      onClick={onClick}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDragEnter={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+        e.preventDefault();
+        counterRef.current++;
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => {
+        counterRef.current--;
+        if (counterRef.current <= 0) {
+          counterRef.current = 0;
+          setIsDragOver(false);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        counterRef.current = 0;
+        setIsDragOver(false);
+        const sourcePath = e.dataTransfer.getData(DRAG_MIME);
+        if (!sourcePath) return;
+        onDropMove(sourcePath, parentPath === '.' ? '' : parentPath);
+      }}
+      className={cn(
+        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer',
+        'hover:bg-muted/80 text-muted-foreground',
+        isDragOver && 'bg-primary/15 ring-1 ring-primary/40',
+      )}
+    >
+      <FolderUp className="h-4 w-4 shrink-0" />
+      <span>..</span>
+    </button>
+  );
+}
+
+// ============================================================================
 // Compact file browser for sidebar
 // ============================================================================
 
@@ -137,10 +201,26 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
   // Upload state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
+
+  // Auto-focus and select all text when folder input appears
+  useEffect(() => {
+    if (isCreatingFolder) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = folderInputRef.current;
+          if (el) {
+            el.focus();
+            el.setSelectionRange(0, el.value.length);
+          }
+        });
+      });
+    }
+  }, [isCreatingFolder]);
 
   // Auto-focus for file create input
   useEffect(() => {
@@ -334,6 +414,24 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
     [cutToClipboard],
   );
 
+  // Drag-and-drop move handler
+  const handleDropMove = useCallback(
+    async (sourcePath: string, targetDirPath: string) => {
+      const sourceName = sourcePath.split('/').pop() || '';
+      const destPath = targetDirPath ? `${targetDirPath}/${sourceName}` : sourceName;
+
+      if (sourcePath === destPath) return;
+
+      try {
+        await renameMutation.mutateAsync({ from: sourcePath, to: destPath });
+        toast.success(`Moved "${sourceName}" to ${targetDirPath.split('/').pop() || 'root'}`);
+      } catch (err) {
+        toast.error(`Failed to move: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    },
+    [renameMutation],
+  );
+
   // Paste handler
   const handlePaste = useCallback(async () => {
     if (!clipboard) return;
@@ -474,15 +572,13 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
           <ContextMenu>
             <ContextMenuTrigger asChild>
               <div className="p-1 min-h-full">
-                {/* Go up */}
+                {/* Go up — also a drop target for moving items to parent */}
                 {currentPath !== '.' && currentPath !== '' && (
-                  <button
+                  <SidebarParentDropTarget
+                    currentPath={currentPath}
                     onClick={handleNavigateUp}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer hover:bg-muted/80 text-muted-foreground"
-                  >
-                    <FolderUp className="h-4 w-4 shrink-0" />
-                    <span>..</span>
-                  </button>
+                    onDropMove={handleDropMove}
+                  />
                 )}
 
                 {/* New folder inline input */}
@@ -491,6 +587,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                     <FolderPlus className="h-4 w-4 text-blue-400 shrink-0" />
                     <input
                       type="text"
+                      ref={folderInputRef}
                       value={newFolderName}
                       onChange={(e) => setNewFolderName(e.target.value)}
                       onKeyDown={(e) => {
@@ -498,8 +595,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                         if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); }
                       }}
                       onBlur={handleCreateFolder}
-                      autoFocus
-                      className="flex-1 text-sm bg-transparent border border-primary rounded px-1.5 py-0.5 outline-none"
+                      className="flex-1 text-sm bg-transparent border border-primary rounded px-1.5 py-0.5 outline-none selection:bg-primary/15 selection:text-foreground"
                     />
                   </div>
                 )}
@@ -546,6 +642,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                     onDelete={handleDelete}
                     onCopy={handleCopy}
                     onCut={handleCut}
+                    onDropMove={handleDropMove}
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
                     isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}
@@ -563,6 +660,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                     onDelete={handleDelete}
                     onCopy={handleCopy}
                     onCut={handleCut}
+                    onDropMove={handleDropMove}
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
                     isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}
