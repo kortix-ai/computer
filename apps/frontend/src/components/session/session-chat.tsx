@@ -2042,6 +2042,26 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     [messages],
   );
 
+  // ---- Hydrate session errors from AssistantMessage.error ----
+  // Errors can arrive via two channels: `session.error` SSE events (stored
+  // directly in the error store) and `AssistantMessage.error` fields (stored
+  // on messages in React Query cache). On initial load or SSE reconnection,
+  // `session.error` events from before the SSE connection may have been missed.
+  // This effect scans messages for errors and populates the store as a fallback,
+  // using the message ID as a dedup key to avoid duplicating SSE-sourced errors.
+  const addErrorIfNew = useSessionErrorStore((s) => s.addErrorIfNew);
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    for (const msg of messages) {
+      if (msg.info.role === 'assistant') {
+        const info = msg.info as any;
+        if (info.error) {
+          addErrorIfNew(info.sessionID || sessionId, info.error, info.id);
+        }
+      }
+    }
+  }, [messages, sessionId, addErrorIfNew]);
+
   // ============================================================================
   // Expanded state management (keyed by user message ID)
   // ============================================================================
@@ -2273,16 +2293,24 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
   if ((sessionLoading || messagesLoading) && !optimisticPrompt) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <KortixLoader size="small" />
+      <div className="flex-1 flex flex-col bg-background">
+        {/* Show error banner even during loading — errors from the Zustand store
+            persist across loading states and should be visible immediately */}
+        <SessionErrorBanner sessionId={sessionId} onErrorAction={handleErrorAction} />
+        <div className="flex-1 flex items-center justify-center">
+          <KortixLoader size="small" />
+        </div>
       </div>
     );
   }
 
   if (!session && !optimisticPrompt) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-        Session not found
+      <div className="flex-1 flex flex-col bg-background">
+        <SessionErrorBanner sessionId={sessionId} onErrorAction={handleErrorAction} />
+        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+          Session not found
+        </div>
       </div>
     );
   }

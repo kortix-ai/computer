@@ -7,7 +7,8 @@ import { create } from 'zustand';
 // ============================================================================
 
 /**
- * Structured session error received from `session.error` SSE events.
+ * Structured session error received from `session.error` SSE events
+ * or hydrated from `AssistantMessage.error` fields.
  *
  * The SDK defines these error variants:
  *   ProviderAuthError | UnknownError | MessageOutputLengthError |
@@ -26,6 +27,12 @@ export interface SessionError {
   error: SessionErrorPayload;
   /** Whether the user has dismissed this error */
   dismissed: boolean;
+  /**
+   * Optional source key for deduplication.
+   * For errors hydrated from AssistantMessage.error, this is the message ID.
+   * For SSE events, this is left undefined (each event is unique).
+   */
+  sourceKey?: string;
 }
 
 /**
@@ -50,11 +57,22 @@ export interface SessionErrorPayload {
 // ============================================================================
 
 interface SessionErrorState {
-  /** All active (non-dismissed) errors keyed by error ID */
+  /** All errors keyed by error ID */
   errors: Record<string, SessionError>;
 
   /** Add a new session error from an SSE event */
   addError: (sessionID: string, error: SessionErrorPayload) => void;
+
+  /**
+   * Add an error only if no error with the same sourceKey exists for the session.
+   * Used for hydrating errors from AssistantMessage.error fields — prevents
+   * duplicating errors that were already received via SSE.
+   */
+  addErrorIfNew: (
+    sessionID: string,
+    error: SessionErrorPayload,
+    sourceKey: string,
+  ) => void;
 
   /** Dismiss a specific error */
   dismissError: (errorId: string) => void;
@@ -85,6 +103,29 @@ export const useSessionErrorStore = create<SessionErrorState>()((set, get) => ({
       id,
       error,
       dismissed: false,
+    };
+    set((state) => ({
+      errors: { ...state.errors, [id]: sessionError },
+    }));
+  },
+
+  addErrorIfNew: (sessionID, error, sourceKey) => {
+    const existing = Object.values(get().errors);
+    // Skip if an error with this sourceKey already exists for this session
+    // (regardless of dismissed state — we don't want to re-show dismissed errors)
+    const alreadyExists = existing.some(
+      (e) => e.sessionID === sessionID && e.sourceKey === sourceKey,
+    );
+    if (alreadyExists) return;
+
+    const id = `err_${Date.now()}_${++errorCounter}`;
+    const sessionError: SessionError = {
+      sessionID,
+      timestamp: Date.now(),
+      id,
+      error,
+      dismissed: false,
+      sourceKey,
     };
     set((state) => ({
       errors: { ...state.errors, [id]: sessionError },
