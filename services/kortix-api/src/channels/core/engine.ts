@@ -107,7 +107,8 @@ export class ChannelEngineImpl {
 
     let responseText: string;
     try {
-      responseText = await connector.prompt(sessionId, prompt, config.agentName ?? undefined);
+      const model = this.resolveModel(config);
+      responseText = await connector.prompt(sessionId, prompt, config.agentName ?? undefined, model);
     } catch (err) {
       console.error(`[CHANNELS] Agent prompt failed:`, err);
       throw new ChannelError(`Failed to get response from agent: ${err instanceof Error ? err.message : String(err)}`);
@@ -124,6 +125,17 @@ export class ChannelEngineImpl {
     await adapter.sendResponse(config, message, agentResponse);
 
     await this.logMessage(config, message, 'outbound', responseText, sessionId);
+  }
+
+  private resolveModel(config: ChannelConfig): { providerID: string; modelID: string } {
+    // Allow per-channel model override via metadata
+    const meta = config.metadata as Record<string, unknown> | null;
+    if (meta?.model && typeof meta.model === 'string' && meta.model.includes('/')) {
+      const [providerID, ...rest] = meta.model.split('/');
+      return { providerID, modelID: rest.join('/') };
+    }
+    // Default to kortix/basic (free tier, routed through kortix-api)
+    return { providerID: 'kortix', modelID: 'basic' };
   }
 
   private buildPrompt(config: ChannelConfig, message: NormalizedMessage): string {

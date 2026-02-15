@@ -1,6 +1,7 @@
 import type { SandboxTarget } from '../types';
 import { getProvider } from '../../platform/providers';
 import type { ProviderName } from '../../platform/providers';
+import { getDaytona, isDaytonaConfigured } from '../../shared/daytona';
 
 interface CreateSessionResponse {
   id: string;
@@ -12,26 +13,70 @@ export interface StreamEvent {
   data?: string;
 }
 
+interface ResolvedEndpoint {
+  url: string;
+  headers: Record<string, string>;
+}
+
+/**
+ * Resolve the direct Daytona sandbox URL, bypassing the preview proxy.
+ * The preview proxy requires a Supabase JWT (user auth), but the channel
+ * engine is a backend service that talks to sandboxes directly.
+ * Returns the direct URL + Daytona preview headers (same as the proxy uses).
+ */
+async function resolveDirectEndpoint(target: SandboxTarget): Promise<ResolvedEndpoint> {
+  if (target.externalId && isDaytonaConfigured()) {
+    try {
+      const daytona = getDaytona();
+      const sandbox = await daytona.get(target.externalId);
+      const link = await (sandbox as any).getPreviewLink(8000);
+      const url = (link.url || String(link)).replace(/\/$/, '');
+      const token = link.token || null;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Daytona-Skip-Preview-Warning': 'true',
+        'X-Daytona-Disable-CORS': 'true',
+      };
+      if (token) {
+        headers['X-Daytona-Preview-Token'] = token;
+      }
+
+      return { url, headers };
+    } catch (err) {
+      console.warn(`[SANDBOX-CONNECTOR] Failed to resolve direct URL, falling back to baseUrl:`, err);
+    }
+  }
+
+  // Fallback: use base_url with Basic auth (local dev / non-Daytona)
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (target.authToken) {
+    headers['Authorization'] = `Basic ${btoa(target.authToken)}`;
+  }
+  return { url: target.baseUrl.replace(/\/$/, ''), headers };
+}
+
 export class SandboxConnector {
-  private baseUrl: string;
-  private headers: Record<string, string>;
+  private endpoint: ResolvedEndpoint | null = null;
   private target: SandboxTarget;
 
   constructor(target: SandboxTarget) {
     this.target = target;
-    this.baseUrl = target.baseUrl.replace(/\/$/, '');
-    this.headers = { 'Content-Type': 'application/json' };
+  }
 
-    if (target.authToken) {
-      this.headers['Authorization'] = `Basic ${btoa(target.authToken)}`;
+  private async getEndpoint(): Promise<ResolvedEndpoint> {
+    if (!this.endpoint) {
+      this.endpoint = await resolveDirectEndpoint(this.target);
     }
+    return this.endpoint;
   }
 
   async isReady(): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseUrl}/kortix/health`, {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/global/health`, {
         method: 'GET',
-        headers: this.headers,
+        headers,
         signal: AbortSignal.timeout(5000),
       });
       return res.ok;
@@ -49,14 +94,15 @@ export class SandboxConnector {
   }
 
   async createSession(agentName?: string): Promise<string> {
+    const { url, headers } = await this.getEndpoint();
     const body: Record<string, unknown> = {};
     if (agentName) {
       body.agent = agentName;
     }
 
-    const res = await fetch(`${this.baseUrl}/session`, {
+    const res = await fetch(`${url}/session`, {
       method: 'POST',
-      headers: this.headers,
+      headers,
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30000),
     });
@@ -70,10 +116,10 @@ export class SandboxConnector {
     return session.id;
   }
 
-  async prompt(sessionId: string, content: string, agentName?: string): Promise<string> {
+  async prompt(sessionId: string, content: string, agentName?: string, model?: { providerID: string; modelID: string }): Promise<string> {
     let fullText = '';
 
-    for await (const event of this.promptStreaming(sessionId, content, agentName)) {
+    for await (const event of this.promptStreaming(sessionId, content, agentName, model)) {
       if (event.type === 'text' && event.data) {
         fullText += event.data;
       }
@@ -89,14 +135,16 @@ export class SandboxConnector {
     sessionId: string,
     content: string,
     agentName?: string,
+    model?: { providerID: string; modelID: string },
   ): AsyncGenerator<StreamEvent> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 300000);
 
     try {
-      const sseRes = await fetch(`${this.baseUrl}/event`, {
+      const { url, headers } = await this.getEndpoint();
+      const sseRes = await fetch(`${url}/event`, {
         method: 'GET',
-        headers: { ...this.headers, Accept: 'text/event-stream' },
+        headers: { ...headers, Accept: 'text/event-stream' },
         signal: controller.signal,
       });
 
@@ -110,10 +158,13 @@ export class SandboxConnector {
       if (agentName) {
         promptBody.agent = agentName;
       }
+      if (model) {
+        promptBody.model = model;
+      }
 
-      const promptPromise = fetch(`${this.baseUrl}/session/${sessionId}/prompt_async`, {
+      const promptPromise = fetch(`${url}/session/${sessionId}/prompt_async`, {
         method: 'POST',
-        headers: this.headers,
+        headers,
         body: JSON.stringify(promptBody),
         signal: controller.signal,
       });
@@ -216,9 +267,10 @@ export class SandboxConnector {
 
   async abort(sessionId: string): Promise<void> {
     try {
-      await fetch(`${this.baseUrl}/session/${sessionId}/abort`, {
+      const { url, headers } = await this.getEndpoint();
+      await fetch(`${url}/session/${sessionId}/abort`, {
         method: 'POST',
-        headers: this.headers,
+        headers,
         signal: AbortSignal.timeout(5000),
       });
     } catch {
