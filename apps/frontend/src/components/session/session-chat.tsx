@@ -20,6 +20,7 @@ import {
   Layers,
   ListTodo,
   MoreHorizontal,
+  Scissors,
   Pencil,
   Send,
   Sparkles,
@@ -495,6 +496,229 @@ function parseFileReferences(text: string): { cleanText: string; files: ParsedFi
 }
 
 // ============================================================================
+// Parse <dcp-notification> XML tags from DCP plugin messages
+// ============================================================================
+
+interface DCPPrunedItem {
+  tool: string;
+  description: string;
+}
+
+interface DCPNotification {
+  type: 'prune' | 'compress';
+  tokensSaved: number;
+  batchSaved: number;
+  prunedCount: number;
+  extractedTokens: number;
+  reason?: string;
+  items: DCPPrunedItem[];
+  distilled?: string;
+  // compress-specific
+  messagesCount?: number;
+  toolsCount?: number;
+  topic?: string;
+  summary?: string;
+}
+
+const DCP_TAG_REGEX = /<dcp-notification\s+([^>]*)>([\s\S]*?)<\/dcp-notification>/g;
+const DCP_ITEM_REGEX = /<dcp-item\s+tool="([^"]*?)"\s+description="([^"]*?)"\s*\/>/g;
+const DCP_DISTILLED_REGEX = /<dcp-distilled>([\s\S]*?)<\/dcp-distilled>/;
+const DCP_SUMMARY_REGEX = /<dcp-summary>([\s\S]*?)<\/dcp-summary>/;
+
+function unescapeXml(str: string): string {
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function parseAttr(attrs: string, name: string): string | undefined {
+  const re = new RegExp(`${name}="([^"]*?)"`);
+  const m = attrs.match(re);
+  return m ? unescapeXml(m[1]) : undefined;
+}
+
+function parseDCPNotifications(text: string): { cleanText: string; notifications: DCPNotification[] } {
+  const notifications: DCPNotification[] = [];
+  const cleanText = text.replace(DCP_TAG_REGEX, (_, attrs: string, body: string) => {
+    const type = (parseAttr(attrs, 'type') || 'prune') as 'prune' | 'compress';
+    const tokensSaved = parseInt(parseAttr(attrs, 'tokens-saved') || '0', 10);
+    const batchSaved = parseInt(parseAttr(attrs, 'batch-saved') || '0', 10);
+    const prunedCount = parseInt(parseAttr(attrs, 'pruned-count') || '0', 10);
+    const extractedTokens = parseInt(parseAttr(attrs, 'extracted-tokens') || '0', 10);
+    const reason = parseAttr(attrs, 'reason');
+
+    // Parse items
+    const items: DCPPrunedItem[] = [];
+    let itemMatch;
+    DCP_ITEM_REGEX.lastIndex = 0;
+    while ((itemMatch = DCP_ITEM_REGEX.exec(body)) !== null) {
+      items.push({ tool: unescapeXml(itemMatch[1]), description: unescapeXml(itemMatch[2]) });
+    }
+
+    // Parse distilled
+    const distilledMatch = body.match(DCP_DISTILLED_REGEX);
+    const distilled = distilledMatch ? unescapeXml(distilledMatch[1]) : undefined;
+
+    // Compress-specific
+    const messagesCount = parseInt(parseAttr(attrs, 'messages-count') || '0', 10) || undefined;
+    const toolsCount = parseInt(parseAttr(attrs, 'tools-count') || '0', 10) || undefined;
+    const topic = parseAttr(attrs, 'topic');
+    const summaryMatch = body.match(DCP_SUMMARY_REGEX);
+    const summary = summaryMatch ? unescapeXml(summaryMatch[1]) : undefined;
+
+    notifications.push({
+      type,
+      tokensSaved,
+      batchSaved,
+      prunedCount,
+      extractedTokens,
+      reason,
+      items,
+      distilled,
+      messagesCount,
+      toolsCount,
+      topic,
+      summary,
+    });
+    return '';
+  }).trim();
+
+  return { cleanText, notifications };
+}
+
+// ============================================================================
+// DCP Notification Card — styled component for pruning/compress events
+// ============================================================================
+
+const DCP_REASON_LABELS: Record<string, string> = {
+  completion: 'Task Complete',
+  noise: 'Noise Removal',
+  extraction: 'Extraction',
+};
+
+function formatDCPTokens(tokens: number): string {
+  if (tokens >= 1000) {
+    const k = (tokens / 1000).toFixed(1).replace('.0', '');
+    return `${k}K`;
+  }
+  return tokens.toString();
+}
+
+function DCPNotificationCard({ notification }: { notification: DCPNotification }) {
+  const [expanded, setExpanded] = useState(false);
+  const isPrune = notification.type === 'prune';
+  const hasItems = notification.items.length > 0;
+  const hasDetails = hasItems || notification.distilled || notification.summary;
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={() => hasDetails && setExpanded(!expanded)}
+        className={cn(
+          'flex items-center gap-2 w-full px-3 py-2 border-b border-border/40 bg-muted/30',
+          hasDetails && 'cursor-pointer hover:bg-muted/50 transition-colors',
+        )}
+      >
+        <Scissors className="size-3.5 text-muted-foreground/70 flex-shrink-0" />
+        <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+          {isPrune ? 'Context Pruned' : 'Context Compressed'}
+        </span>
+
+        {/* Stats pills */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          {notification.reason && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/70">
+              {DCP_REASON_LABELS[notification.reason] || notification.reason}
+            </span>
+          )}
+          {isPrune && notification.prunedCount > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-medium">
+              {notification.prunedCount} pruned
+            </span>
+          )}
+          {!isPrune && notification.messagesCount && notification.messagesCount > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium">
+              {notification.messagesCount} msgs
+            </span>
+          )}
+          {notification.batchSaved > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-500 font-medium">
+              -{formatDCPTokens(notification.batchSaved)} tokens
+            </span>
+          )}
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+            {formatDCPTokens(notification.tokensSaved)} saved
+          </span>
+          {hasDetails && (
+            <ChevronDown className={cn(
+              'size-3 text-muted-foreground/50 transition-transform',
+              expanded && 'rotate-180'
+            )} />
+          )}
+        </div>
+      </button>
+
+      {/* Expandable details */}
+      {expanded && hasDetails && (
+        <div className="px-3 py-2 space-y-2">
+          {/* Pruned items list */}
+          {hasItems && (
+            <div className="space-y-0.5">
+              {notification.items.map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
+                  <span className="text-muted-foreground/40">&rarr;</span>
+                  <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground/70">
+                    {item.tool}
+                  </span>
+                  {item.description && (
+                    <span className="truncate max-w-[300px]">{item.description}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Compress topic */}
+          {notification.topic && (
+            <div className="text-[11px] text-muted-foreground/80">
+              <span className="text-muted-foreground/50">Topic:</span>{' '}
+              <span>{notification.topic}</span>
+            </div>
+          )}
+
+          {/* Distilled content */}
+          {notification.distilled && (
+            <div className="mt-1.5 border-t border-border/30 pt-1.5">
+              <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">
+                Distilled
+              </div>
+              <div className="text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                {notification.distilled}
+              </div>
+            </div>
+          )}
+
+          {/* Compress summary */}
+          {notification.summary && (
+            <div className="mt-1.5 border-t border-border/30 pt-1.5">
+              <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">
+                Summary
+              </div>
+              <div className="text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                {notification.summary}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Edit Part Dialog — inline editing for text parts
 // ============================================================================
 
@@ -718,9 +942,18 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
   );
 
   // Extract text from sticky parts, parse out <file> XML references
-  const textParts = stickyParts.filter(isTextPart).filter((p) => (p as TextPart).text?.trim() && !(p as TextPart).synthetic);
+  // Filter out both synthetic AND ignored parts from user-visible text
+  const textParts = stickyParts.filter(isTextPart).filter((p) => (p as TextPart).text?.trim() && !(p as TextPart).synthetic && !(p as any).ignored);
   const rawText = textParts.map((p) => (p as TextPart).text).join('\n');
   const { cleanText: text, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
+
+  // Extract DCP notifications from ignored text parts (DCP plugin sends ignored user messages)
+  const ignoredTextParts = stickyParts.filter(isTextPart).filter((p) => (p as any).ignored && (p as TextPart).text?.trim());
+  const ignoredRawText = ignoredTextParts.map((p) => (p as TextPart).text).join('\n');
+  const dcpNotifications = useMemo(() => {
+    if (!ignoredRawText) return [];
+    return parseDCPNotifications(ignoredRawText).notifications;
+  }, [ignoredRawText]);
 
   // Check if any text part was edited
   const isEdited = textParts.some((p) => (p as any).metadata?.edited);
@@ -810,6 +1043,19 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
     if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
     return result;
   }, [text, filesWithSource, agentParts, agentNames]);
+
+  // If the message is purely DCP notifications (no real user content), render only the cards
+  const hasUserContent = !!(text || uploadedFiles.length > 0 || attachments.length > 0);
+
+  if (!hasUserContent && dcpNotifications.length > 0) {
+    return (
+      <div className="flex flex-col gap-1.5 w-full">
+        {dcpNotifications.map((n, i) => (
+          <DCPNotificationCard key={i} notification={n} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -915,6 +1161,15 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
       </div>
       {isEdited && (
         <span className="text-[10px] text-muted-foreground/50 pr-1">edited</span>
+      )}
+
+      {/* DCP notifications from ignored parts (rendered below user bubble if mixed) */}
+      {dcpNotifications.length > 0 && (
+        <div className="flex flex-col gap-1.5 w-full mt-1">
+          {dcpNotifications.map((n, i) => (
+            <DCPNotificationCard key={i} notification={n} />
+          ))}
+        </div>
       )}
     </div>
   );

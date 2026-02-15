@@ -713,7 +713,25 @@ export function SessionChatInput({
   onFileSearch,
   providers,
 }: SessionChatInputProps) {
+  const placeholderVariants = useMemo(
+    () => [
+      placeholder,
+      'Use / to run commands',
+      'Reference files with @',
+      'Ask about any file in this project',
+      'Use Cmd+K to open command palette',
+      'Press Tab to switch modes',
+      'Use Up arrow to recall your last prompt',
+      'Use Shift+Enter for a new line',
+      'Ask to compact this session when context is full',
+      'Ask for changed files and diffs',
+      'Mention multiple files like @README.md @src/app.tsx',
+    ],
+    [placeholder],
+  );
   const [text, setText] = useState('');
+  const [showAnimatedPlaceholder, setShowAnimatedPlaceholder] = useState(true);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -727,6 +745,29 @@ export function SessionChatInput({
   const [mentions, setMentions] = useState<TrackedMention[]>([]);
   const [fileResults, setFileResults] = useState<string[]>([]);
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const placeholderFadeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (text.trim().length > 0) {
+      setShowAnimatedPlaceholder(false);
+      return;
+    }
+
+    setShowAnimatedPlaceholder(true);
+    const interval = setInterval(() => {
+      setShowAnimatedPlaceholder(false);
+      clearTimeout(placeholderFadeTimer.current);
+      placeholderFadeTimer.current = setTimeout(() => {
+        setPlaceholderIndex((i) => (i + 1) % placeholderVariants.length);
+        setShowAnimatedPlaceholder(true);
+      }, 180);
+    }, 2800);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(placeholderFadeTimer.current);
+    };
+  }, [text, placeholderVariants.length]);
 
   // Listen for 'focus-session-textarea' events (dispatched when a session tab
   // is activated from the sidebar or dashboard). Only the visible textarea
@@ -784,10 +825,6 @@ export function SessionChatInput({
   useEffect(() => {
     clearTimeout(fileSearchTimer.current);
     if (!mentionQuery || !onFileSearch) {
-      setFileResults([]);
-      return;
-    }
-    if (mentionQuery.query.length === 0) {
       setFileResults([]);
       return;
     }
@@ -1106,6 +1143,17 @@ export function SessionChatInput({
 
               <div className="flex flex-col gap-1 px-2">
                 <div className="relative w-full">
+                  {text.trim().length === 0 && (
+                    <div
+                      aria-hidden
+                      className={cn(
+                        'absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground/50 pointer-events-none transition-all duration-200',
+                        showAnimatedPlaceholder ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-0.5',
+                      )}
+                    >
+                      {placeholderVariants[placeholderIndex]}
+                    </div>
+                  )}
                   {/* Highlight overlay — mirrors textarea text with colored mention spans */}
                   {highlightSegments && (
                     <div
@@ -1138,7 +1186,7 @@ export function SessionChatInput({
                         highlightRef.current.scrollTop = textareaRef.current.scrollTop;
                       }
                     }}
-                    placeholder={placeholder}
+                    placeholder=""
                     rows={1}
                     disabled={disabled}
                     className={cn(
