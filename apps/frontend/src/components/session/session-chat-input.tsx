@@ -34,6 +34,8 @@ import type {
   Command,
   ProviderListResponse,
 } from '@/hooks/opencode/use-opencode-sessions';
+import { useSummarizeOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
+import { toast } from '@/lib/toast';
 
 export type { ProviderListResponse };
 
@@ -245,7 +247,13 @@ function VariantSelector({
 // Token Progress Circle
 // ============================================================================
 
-function TokenProgress({ messages }: { messages: MessageWithParts[] | undefined }) {
+const AUTO_COMPACT_THRESHOLD = 0.9;
+
+function TokenProgress({ messages, sessionId }: { messages: MessageWithParts[] | undefined; sessionId?: string }) {
+  const summarize = useSummarizeOpenCodeSession();
+  const autoCompactTriggered = useRef(false);
+  const [isCompacting, setIsCompacting] = useState(false);
+
   const totalTokens = useMemo(() => {
     if (!messages) return { input: 0, output: 0 };
     let input = 0;
@@ -263,12 +271,56 @@ function TokenProgress({ messages }: { messages: MessageWithParts[] | undefined 
   }, [messages]);
 
   const total = totalTokens.input + totalTokens.output;
-  if (total === 0) return null;
 
   const contextLimit = 200000;
-  const ratio = Math.min(total / contextLimit, 1);
+  const ratio = total > 0 ? Math.min(total / contextLimit, 1) : 0;
+
+  // Reset auto-compact flag if ratio drops below threshold (e.g. after compaction)
+  useEffect(() => {
+    if (ratio < AUTO_COMPACT_THRESHOLD) {
+      autoCompactTriggered.current = false;
+    }
+  }, [ratio]);
+
+  // Auto-compact at 90% threshold
+  useEffect(() => {
+    if (
+      ratio >= AUTO_COMPACT_THRESHOLD &&
+      !autoCompactTriggered.current &&
+      !isCompacting &&
+      !summarize.isPending &&
+      sessionId
+    ) {
+      autoCompactTriggered.current = true;
+      setIsCompacting(true);
+      toast.info('Context is 90% full — auto-compacting session...');
+
+      summarize.mutate({ sessionId }, {
+        onSuccess: () => {
+          toast.success('Session compacted successfully');
+          setIsCompacting(false);
+        },
+        onError: (error) => {
+          toast.error(error instanceof Error ? error.message : 'Failed to auto-compact session');
+          setIsCompacting(false);
+        },
+      });
+    }
+  }, [ratio, sessionId, isCompacting, summarize]);
+
+  if (total === 0) return null;
+
   const circumference = 2 * Math.PI * 7;
   const offset = circumference * (1 - ratio);
+
+  // Color thresholds: >90% = amber/yellow warning, >80% = orange, default = muted
+  const circleColor = isCompacting
+    ? 'text-blue-500 animate-pulse'
+    : ratio >= AUTO_COMPACT_THRESHOLD
+      ? 'text-amber-400'
+      : ratio > 0.8
+        ? 'text-orange-500'
+        : 'text-muted-foreground';
 
   return (
     <Tooltip>
@@ -279,9 +331,13 @@ function TokenProgress({ messages }: { messages: MessageWithParts[] | undefined 
             <circle
               cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2"
               strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-              className={ratio > 0.8 ? 'text-orange-500' : 'text-muted-foreground'}
+              className={circleColor}
             />
           </svg>
+          {/* Pulsing dot indicator when compacting */}
+          {isCompacting && (
+            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500 animate-pulse" />
+          )}
         </div>
       </TooltipTrigger>
       <TooltipContent side="top">
@@ -289,7 +345,18 @@ function TokenProgress({ messages }: { messages: MessageWithParts[] | undefined 
           <div>Total: {(total / 1000).toFixed(1)}k tokens</div>
           <div>Input: {(totalTokens.input / 1000).toFixed(1)}k</div>
           <div>Output: {(totalTokens.output / 1000).toFixed(1)}k</div>
-          {ratio > 0.8 && (
+          <div className="text-muted-foreground">{Math.round(ratio * 100)}% of context used</div>
+          {isCompacting && (
+            <div className="text-blue-500 font-sans pt-0.5">
+              Compacting session...
+            </div>
+          )}
+          {!isCompacting && ratio >= AUTO_COMPACT_THRESHOLD && (
+            <div className="text-amber-400 font-sans pt-0.5">
+              Context almost full — compaction will start automatically.
+            </div>
+          )}
+          {!isCompacting && ratio > 0.8 && ratio < AUTO_COMPACT_THRESHOLD && (
             <div className="text-orange-500 font-sans pt-0.5">
               Context getting full. Consider compacting.
             </div>
@@ -590,6 +657,8 @@ export interface SessionChatInputProps {
   selectedVariant?: string | null;
   onVariantChange?: (variant: string | null | undefined) => void;
   messages?: MessageWithParts[];
+  /** Session ID — used for auto-compaction when context is nearly full */
+  sessionId?: string;
   /** If true, disables the input (e.g. during session creation redirect) */
   disabled?: boolean;
   /** Auto-focus the textarea on mount (default: true on desktop) */
@@ -623,6 +692,7 @@ export function SessionChatInput({
   selectedVariant = null,
   onVariantChange,
   messages,
+  sessionId,
   disabled = false,
   autoFocus,
   placeholder = 'Ask anything...',
@@ -1133,7 +1203,7 @@ export function SessionChatInput({
                     </Tooltip>
                   )}
 
-                  <TokenProgress messages={messages} />
+                  <TokenProgress messages={messages} sessionId={sessionId} />
 
                   <VoiceRecorder
                     onTranscription={handleTranscription}

@@ -12,9 +12,11 @@ interface KortixComputerState {
   // Main view state
   activeView: ViewType;
   
-  // Panel state
+  // Panel state — per-session so switching tabs preserves each session's panel state
   shouldOpenPanel: boolean;
   isSidePanelOpen: boolean;
+  _panelOpenBySession: Record<string, boolean>;
+  _activeSessionId: string | null;
   isExpanded: boolean;
   
   // Tool navigation state (for external tool click triggers)
@@ -40,6 +42,8 @@ interface KortixComputerState {
   // Panel control
   clearShouldOpenPanel: () => void;
   setIsSidePanelOpen: (open: boolean) => void;
+  /** Call when a session tab becomes active — restores that session's panel state */
+  setActiveSession: (sessionId: string | null) => void;
   openSidePanel: () => void;
   closeSidePanel: () => void;
   setIsExpanded: (expanded: boolean) => void;
@@ -54,6 +58,8 @@ const initialState = {
   activeView: 'tools' as ViewType,
   shouldOpenPanel: false,
   isSidePanelOpen: false,
+  _panelOpenBySession: {} as Record<string, boolean>,
+  _activeSessionId: null as string | null,
   isExpanded: false,
   pendingToolNavIndex: null as number | null,
 };
@@ -128,15 +134,49 @@ export const useKortixComputerStore = create<KortixComputerState>()(
       },
       
       setIsSidePanelOpen: (open: boolean) => {
-        set({ isSidePanelOpen: open });
+        const sessionId = get()._activeSessionId;
+        const update: Partial<KortixComputerState> = { isSidePanelOpen: open };
+        if (sessionId) {
+          update._panelOpenBySession = { ...get()._panelOpenBySession, [sessionId]: open };
+        }
+        set(update);
+      },
+
+      setActiveSession: (sessionId: string | null) => {
+        const prev = get()._activeSessionId;
+        if (prev === sessionId) return;
+        // Save current panel state for the previous session
+        const panelMap = { ...get()._panelOpenBySession };
+        if (prev) {
+          panelMap[prev] = get().isSidePanelOpen;
+        }
+        // Restore panel state for the new session (default to false if unseen)
+        const restored = sessionId ? (panelMap[sessionId] ?? false) : false;
+        set({
+          _activeSessionId: sessionId,
+          _panelOpenBySession: panelMap,
+          isSidePanelOpen: restored,
+          // Reset expanded state when switching sessions
+          isExpanded: false,
+        });
       },
       
       openSidePanel: () => {
-        set({ isSidePanelOpen: true });
+        const sessionId = get()._activeSessionId;
+        const update: Partial<KortixComputerState> = { isSidePanelOpen: true };
+        if (sessionId) {
+          update._panelOpenBySession = { ...get()._panelOpenBySession, [sessionId]: true };
+        }
+        set(update);
       },
       
       closeSidePanel: () => {
-        set({ isSidePanelOpen: false, isExpanded: false });
+        const sessionId = get()._activeSessionId;
+        const update: Partial<KortixComputerState> = { isSidePanelOpen: false, isExpanded: false };
+        if (sessionId) {
+          update._panelOpenBySession = { ...get()._panelOpenBySession, [sessionId]: false };
+        }
+        set(update);
       },
 
       setIsExpanded: (expanded: boolean) => {

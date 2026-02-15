@@ -883,14 +883,15 @@ function SessionTurn({
   // ---- Duration ticking ----
   const [duration, setDuration] = useState('');
   useEffect(() => {
+    const startTime = (turn.userMessage.info as any)?.time?.created;
+    if (!startTime) return;
+
     if (!working) {
-      const startTime = turn.userMessage.info.time.created;
       const lastMsg = turn.assistantMessages[turn.assistantMessages.length - 1];
       const endTime = (lastMsg?.info as any)?.time?.completed || (lastMsg?.info as any)?.time?.created || startTime;
       setDuration(formatDuration(endTime - startTime));
       return;
     }
-    const startTime = turn.userMessage.info.time.created;
     const update = () => setDuration(formatDuration(Date.now() - startTime));
     update();
     const timer = setInterval(update, 1000);
@@ -2193,6 +2194,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         selectedVariant={local.model.variant.current ?? null}
         onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
         messages={messages}
+        sessionId={sessionId}
         onTogglePanel={handleTogglePanel}
         isPanelOpen={isSidePanelOpen}
         hasToolCalls={hasToolCalls}
