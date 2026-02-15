@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { NormalizedMessage, ChatType, ThreadMessage } from '../../types';
+import type { NormalizedMessage, ChatType, ThreadMessage, Attachment } from '../../types';
 import type { ChannelEngine } from '../adapter';
 import type { ChannelConfig } from '@kortix/db';
 import { WebhookVerificationError } from '../../../errors';
@@ -36,15 +36,21 @@ interface SlackEvent {
   thread_ts?: string;
   event_ts?: string;
   links?: Array<{ domain: string; url: string }>;
-  // Reaction events
   reaction?: string;
   item?: { type: string; channel: string; ts: string };
   item_user?: string;
+  files?: Array<{
+    id: string;
+    name: string;
+    mimetype: string;
+    filetype: string;
+    url_private: string;
+    url_private_download?: string;
+    size: number;
+  }>;
 }
 
 type SlackPayload = SlackUrlVerification | SlackEventCallback | { type: string };
-
-// ─── Bot participation cache for smart @mention handling ────────────────────
 
 interface ParticipationEntry {
   participated: boolean;
@@ -52,7 +58,7 @@ interface ParticipationEntry {
 }
 
 const botParticipationCache = new Map<string, ParticipationEntry>();
-const PARTICIPATION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const PARTICIPATION_TTL_MS = 5 * 60 * 1000;
 const PARTICIPATION_CACHE_MAX = 1000;
 
 async function checkBotParticipation(
@@ -86,7 +92,6 @@ async function checkBotParticipation(
     }
   }
 
-  // Evict oldest entries when cache gets too large
   if (botParticipationCache.size >= PARTICIPATION_CACHE_MAX) {
     const firstKey = botParticipationCache.keys().next().value as string;
     botParticipationCache.delete(firstKey);
@@ -96,6 +101,57 @@ async function checkBotParticipation(
   return participated;
 }
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+async function downloadSlackFiles(
+  files: NonNullable<SlackEvent['files']>,
+  botToken: string,
+): Promise<Attachment[]> {
+  const attachments: Attachment[] = [];
+
+  for (const file of files) {
+    if (file.size > MAX_FILE_SIZE) {
+      console.warn(`[SLACK] Skipping file ${file.name}: too large (${file.size} bytes)`);
+      continue;
+    }
+
+    try {
+      const url = file.url_private_download || file.url_private;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${botToken}` },
+      });
+
+      if (!res.ok) {
+        console.warn(`[SLACK] Failed to download file ${file.name}: ${res.status}`);
+        continue;
+      }
+
+      const buffer = await res.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const dataUrl = `data:${file.mimetype};base64,${base64}`;
+
+      const type = file.mimetype.startsWith('image/')
+        ? 'image' as const
+        : file.mimetype.startsWith('audio/')
+          ? 'audio' as const
+          : file.mimetype.startsWith('video/')
+            ? 'video' as const
+            : 'file' as const;
+
+      attachments.push({
+        type,
+        url: dataUrl,
+        mimeType: file.mimetype,
+        name: file.name,
+        size: file.size,
+      });
+    } catch (err) {
+      console.warn(`[SLACK] Failed to download file ${file.name}:`, err);
+    }
+  }
+
+  return attachments;
+}
 
 export async function handleSlackWebhook(
   c: Context,
@@ -196,7 +252,6 @@ export async function handleSlackWebhook(
     const requireMention = groupConfig.requireMention !== false;
 
     if (requireMention && !isMention) {
-      // In threads where the bot already participated, auto-respond without @mention
       if (event.thread_ts && event.channel) {
         const participated = await checkBotParticipation(
           channelConfig, event.channel, event.thread_ts, botUserId,
@@ -205,7 +260,6 @@ export async function handleSlackWebhook(
           return c.json({ ok: true });
         }
       } else {
-        // Top-level messages still require @mention
         return c.json({ ok: true });
       }
     }
@@ -254,6 +308,14 @@ export async function handleSlackWebhook(
   }
 
   (async () => {
+    if (event.files && event.files.length > 0) {
+      const credentials = channelConfig.credentials as Record<string, unknown>;
+      const botToken = credentials?.botToken as string;
+      if (botToken) {
+        normalized.attachments = await downloadSlackFiles(event.files, botToken);
+      }
+    }
+
     if (event.thread_ts && event.channel) {
       normalized.threadContext = await fetchThreadContext(
         channelConfig,
