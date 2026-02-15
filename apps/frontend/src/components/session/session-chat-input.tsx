@@ -16,7 +16,6 @@ import {
   File,
   Archive,
   Database,
-  PanelRight,
   ListPlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -675,12 +674,7 @@ export interface SessionChatInputProps {
   /** Auto-focus the textarea on mount (default: true on desktop) */
   autoFocus?: boolean;
   placeholder?: string;
-  /** Toggle the Kortix Computer side panel */
-  onTogglePanel?: () => void;
-  /** Whether the panel is currently open */
-  isPanelOpen?: boolean;
-  /** Whether there are tool calls available to show in the panel */
-  hasToolCalls?: boolean;
+
   /** Callback to search files via SDK for @ mentions */
   onFileSearch?: (query: string) => Promise<string[]>;
   /** Full provider list response (for connect/manage provider dialogs) */
@@ -707,9 +701,7 @@ export function SessionChatInput({
   disabled = false,
   autoFocus,
   placeholder = 'Ask anything...',
-  onTogglePanel,
-  isPanelOpen = false,
-  hasToolCalls = false,
+
   onFileSearch,
   providers,
 }: SessionChatInputProps) {
@@ -1250,30 +1242,8 @@ export function SessionChatInput({
                   )}
                 </div>
 
-                {/* RIGHT: Panel toggle + TokenProgress + Voice + Submit/Stop */}
+                {/* RIGHT: TokenProgress + Voice + Submit/Stop */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {hasToolCalls && onTogglePanel && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={onTogglePanel}
-                          className={cn(
-                            'inline-flex items-center justify-center h-10 w-10 p-0 bg-transparent border-[1.5px] rounded-2xl transition-colors cursor-pointer',
-                            isPanelOpen
-                              ? 'border-primary/50 text-primary bg-primary/10 hover:bg-primary/15'
-                              : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                          )}
-                        >
-                          <PanelRight className="h-4 w-4" strokeWidth={2} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p>{isPanelOpen ? 'Close panel' : 'Open panel'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-
                   <TokenProgress messages={messages} sessionId={sessionId} models={models} selectedModel={selectedModel} />
 
                   <VoiceRecorder

@@ -625,27 +625,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 <SquarePen className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" />
                 <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
               </button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => {
-                      const store = useKortixComputerStore.getState();
-                      store.setActiveView('terminal');
-                      store.openSidePanel();
-                    }}
-                    className={cn(
-                      'flex items-center justify-center h-8 w-8 flex-shrink-0 rounded-lg cursor-pointer',
-                      'transition-all duration-150 ease-out',
-                      'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                    )}
-                  >
-                    <TerminalSquare className="h-4 w-4 text-muted-foreground/60" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  Open Terminal <kbd className="ml-1.5 text-[10px] text-muted-foreground">⌘`</kbd>
-                </TooltipContent>
-              </Tooltip>
             </div>
 
             {/* Projects accordion */}

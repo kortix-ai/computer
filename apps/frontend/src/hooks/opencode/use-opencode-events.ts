@@ -255,19 +255,41 @@ export function useOpenCodeEventStream() {
         }
 
         // ---- Session errors ----
-        // NOTE: session.error is only used for browser notifications.
-        // The actual error data arrives via message.updated with AssistantMessage.error set,
-        // which is rendered inline by TurnErrorDisplay (matching SolidJS reference).
         case 'session.error': {
           const props = event.properties as { sessionID?: string; error?: any };
           if (props.sessionID && props.error) {
-            // Fire browser notification for errors
+            // Fire browser notification
             const errorTitle = props.error?.name || props.error?.data?.message || 'An error occurred';
             notifySessionError(
               props.sessionID,
               errorTitle,
               getSessionTitle(props.sessionID),
             );
+
+            // Patch the error onto the last assistant message in cache.
+            // This is critical because:
+            // 1. session.error arrives BEFORE message.updated with .error
+            // 2. Some error paths (model-not-found, agent-not-found) never
+            //    emit message.updated with .error at all
+            // 3. Polling can race and overwrite the error from message.updated
+            const key = opencodeKeys.messages(props.sessionID);
+            queryClient.cancelQueries({ queryKey: key });
+            queryClient.setQueryData<MessageWithParts[]>(key, (old) => {
+              if (!old || old.length === 0) return old;
+              // Find the last assistant message and patch error onto it
+              for (let i = old.length - 1; i >= 0; i--) {
+                if (old[i].info.role === 'assistant') {
+                  if ((old[i].info as any).error) return old; // already has error
+                  const updated = [...old];
+                  updated[i] = {
+                    ...old[i],
+                    info: { ...old[i].info, error: props.error } as any,
+                  };
+                  return updated;
+                }
+              }
+              return old;
+            });
           }
           break;
         }
@@ -373,6 +395,10 @@ export function useOpenCodeEventStream() {
 
     function updateMessageInCache(info: Message) {
       const key = opencodeKeys.messages(info.sessionID);
+      // Cancel pending refetches to prevent stale polling data from overwriting
+      // this SSE update. The backend publishes session.status(idle) BEFORE
+      // message.updated (with .error), so polling can race and overwrite.
+      queryClient.cancelQueries({ queryKey: key });
       queryClient.setQueryData<MessageWithParts[]>(key, (old) => {
         if (!old) {
           // Initialize cache with this message so SSE events arriving before
@@ -396,6 +422,7 @@ export function useOpenCodeEventStream() {
 
     function removeMessageFromCache(sessionID: string, messageID: string) {
       const key = opencodeKeys.messages(sessionID);
+      queryClient.cancelQueries({ queryKey: key });
       queryClient.setQueryData<MessageWithParts[]>(key, (old) => {
         if (!old) return old;
         return old.filter((m) => m.info.id !== messageID);
@@ -408,6 +435,7 @@ export function useOpenCodeEventStream() {
       if (!sessionID) return;
 
       const key = opencodeKeys.messages(sessionID);
+      queryClient.cancelQueries({ queryKey: key });
       queryClient.setQueryData<MessageWithParts[]>(key, (old) => {
         if (!old) {
           // Cache not yet initialized — create a stub message entry so the part

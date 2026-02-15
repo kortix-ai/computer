@@ -1810,8 +1810,8 @@ function SessionTurn({
       {/* Streaming text is only visible inside expanded steps (matching SolidJS reference) */}
 
 
-      {/* Error shown outside steps when collapsed */}
-      {turnError && !stepsExpanded && (
+      {/* Error — always visible. Shown here (outside steps) when steps are collapsed OR when there are no steps at all */}
+      {turnError && (!stepsExpanded || (!working && !hasSteps)) && (
         <TurnErrorDisplay errorText={turnError} />
       )}
 

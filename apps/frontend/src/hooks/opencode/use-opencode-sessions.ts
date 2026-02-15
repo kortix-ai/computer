@@ -982,9 +982,10 @@ export function useSessionBusyPolling(sessionId: string, enabled: boolean) {
       } catch {
         // ignore polling errors
       }
-      if (!cancelled) {
-        queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionId) });
-      }
+      // NOTE: Do NOT invalidateQueries for messages here.
+      // Message cache is updated via SSE (message.updated → setQueryData).
+      // Polling invalidation causes a race: the API refetch returns stale
+      // data (without .error) and overwrites the SSE-patched cache.
     };
 
     // Immediate first poll, then every 2s

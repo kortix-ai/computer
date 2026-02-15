@@ -411,6 +411,12 @@ main() {
       exit 0
     fi
     echo ""
+    # Tear down old install (remove secrets volume so onboarding resets)
+    info "Stopping old services..."
+    cd "$INSTALL_DIR"
+    docker compose down -v 2>/dev/null || true
+    docker rm -f kortix-sandbox 2>/dev/null || true
+    echo ""
   fi
 
   mkdir -p "$INSTALL_DIR"
