@@ -9,7 +9,7 @@ export interface ParsedCommand {
 
 const MODEL_TIERS: Record<string, { providerID: string; modelID: string }> = {
   power: { providerID: 'kortix', modelID: 'kortix/power' },
-  basic: { providerID: 'kortix', modelID: 'kortix/basic' },
+  basic: { providerID: 'kortix', modelID: 'claude-3-5-haiku' },
 };
 
 export function parseCommand(text: string): ParsedCommand {

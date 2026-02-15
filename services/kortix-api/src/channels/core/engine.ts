@@ -220,7 +220,7 @@ export class ChannelEngineImpl {
       }
     }
 
-    return { providerID: 'kortix', modelID: 'kortix/basic' };
+    return { providerID: 'kortix', modelID: 'claude-3-5-haiku' };
   }
 
   private buildPrompt(config: ChannelConfig, message: NormalizedMessage): string {
