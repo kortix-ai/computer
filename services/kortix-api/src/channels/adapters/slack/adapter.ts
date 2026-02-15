@@ -2,12 +2,16 @@ import type { Context } from 'hono';
 import type { Hono } from 'hono';
 import type { ChannelEngine } from '../adapter';
 import { BaseAdapter } from '../adapter';
+import type { PermissionRequest, FileOutput } from '../adapter';
 import type { ChannelCapabilities, NormalizedMessage, AgentResponse } from '../../types';
 import type { ChannelConfig } from '@kortix/db';
 import { SlackApi } from './api';
 import { handleSlackWebhook } from './webhook';
+import { handleSlackCommand, postToResponseUrl } from './commands';
+import { handleSlackInteractivity } from './interactivity';
 import { splitMessage } from '../../lib/message-splitter';
 import { markdownToSlack } from '../../lib/markdown-to-slack';
+import { buildBlockKitMessage } from './block-kit-builder';
 import { config } from '../../../config';
 import { db } from '../../../shared/db';
 import { channelConfigs, sandboxes } from '@kortix/db';
@@ -27,6 +31,8 @@ export class SlackAdapter extends BaseAdapter {
 
   registerRoutes(router: Hono, engine: ChannelEngine): void {
     router.post('/slack/events', (c) => handleSlackWebhook(c, engine));
+    router.post('/slack/commands', (c) => handleSlackCommand(c, engine));
+    router.post('/slack/interactivity', (c) => handleSlackInteractivity(c, engine));
     router.get('/slack/install', (c) => this.handleInstall(c));
     router.get('/slack/oauth_callback', (c) => this.handleOAuthCallback(c));
   }
@@ -36,6 +42,15 @@ export class SlackAdapter extends BaseAdapter {
     message: NormalizedMessage,
     response: AgentResponse,
   ): Promise<void> {
+    // Handle slash command responses via response_url
+    const rawPayload = message.raw as Record<string, unknown> | undefined;
+    if (rawPayload?._slackCommand && rawPayload?.responseUrl) {
+      const sessionUrl = `${config.FRONTEND_URL}/sessions/${response.sessionId}`;
+      const slackText = markdownToSlack(response.content) + `\n\n<${sessionUrl}|View full session>`;
+      await postToResponseUrl(rawPayload.responseUrl as string, slackText);
+      return;
+    }
+
     const botToken = this.getBotToken(channelConfig);
     if (!botToken) {
       console.error('[SLACK] No bot token in credentials');
@@ -44,7 +59,6 @@ export class SlackAdapter extends BaseAdapter {
 
     const api = new SlackApi(botToken);
 
-    const rawPayload = message.raw as Record<string, unknown> | undefined;
     const event = rawPayload?.event as Record<string, unknown> | undefined;
     const channel = event?.channel as string;
 
@@ -55,14 +69,24 @@ export class SlackAdapter extends BaseAdapter {
 
     const threadTs = message.threadId || message.externalId;
 
-    let slackText = markdownToSlack(response.content);
-
     const sessionUrl = `${config.FRONTEND_URL}/sessions/${response.sessionId}`;
-    slackText += `\n\n<${sessionUrl}|View full session>`;
+    const blocks = buildBlockKitMessage(response.content, sessionUrl);
+    const fallbackText = markdownToSlack(response.content) + `\n\n<${sessionUrl}|View full session>`;
 
-    const chunks = splitMessage(slackText, this.capabilities.textChunkLimit);
+    const chunks = splitMessage(fallbackText, this.capabilities.textChunkLimit);
 
-    for (let i = 0; i < chunks.length; i++) {
+    const firstResult = await api.postMessage({
+      channel,
+      text: chunks[0] || fallbackText,
+      thread_ts: threadTs,
+      blocks,
+    });
+
+    if (!firstResult.ok) {
+      console.error(`[SLACK] postMessage failed: ${firstResult.error}`);
+    }
+
+    for (let i = 1; i < chunks.length; i++) {
       const result = await api.postMessage({
         channel,
         text: chunks[i],
@@ -135,6 +159,96 @@ export class SlackAdapter extends BaseAdapter {
     }
   }
 
+  override async sendPermissionRequest(
+    channelConfig: ChannelConfig,
+    message: NormalizedMessage,
+    permission: PermissionRequest,
+  ): Promise<void> {
+    const botToken = this.getBotToken(channelConfig);
+    if (!botToken) return;
+
+    const rawPayload = message.raw as Record<string, unknown> | undefined;
+    const event = rawPayload?.event as Record<string, unknown> | undefined;
+    const channel = event?.channel as string;
+    if (!channel) return;
+
+    const api = new SlackApi(botToken);
+    const threadTs = message.threadId || message.externalId;
+
+    await api.postMessage({
+      channel,
+      text: `Permission requested: ${permission.tool}`,
+      thread_ts: threadTs,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `:lock: *Permission Request*\n*Tool:* \`${permission.tool}\`\n${permission.description || ''}`,
+          },
+        },
+        {
+          type: 'actions',
+          block_id: `perm_${permission.id}`,
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Approve', emoji: true },
+              style: 'primary',
+              action_id: 'permission_approve',
+              value: permission.id,
+            },
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Reject', emoji: true },
+              style: 'danger',
+              action_id: 'permission_reject',
+              value: permission.id,
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  override async sendFiles(
+    channelConfig: ChannelConfig,
+    message: NormalizedMessage,
+    files: FileOutput[],
+  ): Promise<void> {
+    const botToken = this.getBotToken(channelConfig);
+    if (!botToken) return;
+
+    const rawPayload = message.raw as Record<string, unknown> | undefined;
+    const event = rawPayload?.event as Record<string, unknown> | undefined;
+    const channel = event?.channel as string;
+    if (!channel) return;
+
+    const api = new SlackApi(botToken);
+    const threadTs = message.threadId || message.externalId;
+
+    for (const file of files) {
+      try {
+        const fileRes = await fetch(file.url);
+        if (!fileRes.ok) {
+          console.error(`[SLACK] Failed to download file ${file.name}: ${fileRes.status}`);
+          continue;
+        }
+        const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+
+        await api.filesUploadV2({
+          channel,
+          threadTs,
+          filename: file.name,
+          content: fileBuffer,
+          title: file.name,
+        });
+      } catch (err) {
+        console.error(`[SLACK] Failed to upload file ${file.name}:`, err);
+      }
+    }
+  }
+
   private async handleInstall(c: Context): Promise<Response> {
     const sandboxId = c.req.query('sandboxId');
 
@@ -157,7 +271,7 @@ export class SlackAdapter extends BaseAdapter {
     }
 
     const state = JSON.stringify({ sandboxId, accountId: sandbox.accountId });
-    const scopes = 'chat:write,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history';
+    const scopes = 'chat:write,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history,commands,files:write,links:read,links:write,channels:read';
 
     const slackUrl = new URL('https://slack.com/oauth/v2/authorize');
     slackUrl.searchParams.set('client_id', clientId);

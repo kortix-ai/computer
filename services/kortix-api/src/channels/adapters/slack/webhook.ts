@@ -1,12 +1,11 @@
 import type { Context } from 'hono';
-import { eq, and } from 'drizzle-orm';
-import { db } from '../../../shared/db';
-import { channelConfigs } from '@kortix/db';
-import type { ChannelConfig } from '@kortix/db';
 import type { NormalizedMessage, ChatType, ThreadMessage } from '../../types';
 import type { ChannelEngine } from '../adapter';
+import type { ChannelConfig } from '@kortix/db';
 import { WebhookVerificationError } from '../../../errors';
 import { config as appConfig } from '../../../config';
+import { verifySlackSignature, findConfigByTeamId } from './utils';
+import { parseCommand } from './command-parser';
 import { SlackApi } from './api';
 
 interface SlackUrlVerification {
@@ -35,40 +34,11 @@ interface SlackEvent {
   ts?: string;
   thread_ts?: string;
   event_ts?: string;
+  links?: Array<{ domain: string; url: string }>;
 }
 
 type SlackPayload = SlackUrlVerification | SlackEventCallback | { type: string };
 
-async function verifySlackSignature(
-  signingSecret: string,
-  timestamp: string,
-  body: string,
-  signature: string,
-): Promise<boolean> {
-  const basestring = `v0:${timestamp}:${body}`;
-  const key = new TextEncoder().encode(signingSecret);
-  const message = new TextEncoder().encode(basestring);
-
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    key,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', cryptoKey, message);
-  const hex = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  const expected = `v0=${hex}`;
-
-  if (expected.length !== signature.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < expected.length; i++) {
-    mismatch |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
 
 export async function handleSlackWebhook(
   c: Context,
@@ -105,6 +75,13 @@ export async function handleSlackWebhook(
 
   const eventPayload = payload as SlackEventCallback;
   const event = eventPayload.event;
+
+  if (event.type === 'link_shared') {
+    handleLinkShared(eventPayload).catch((err) => {
+      console.error('[SLACK] link_shared handler failed:', err);
+    });
+    return c.json({ ok: true });
+  }
 
   if (event.type !== 'message' && event.type !== 'app_mention') {
     return c.json({ ok: true });
@@ -150,12 +127,21 @@ export async function handleSlackWebhook(
     }
   }
 
+  const parsed = parseCommand(content);
+
+  if (parsed.type === 'reset') {
+    handleSessionReset(engine, channelConfig, eventPayload, event).catch((err) => {
+      console.error('[SLACK] Session reset failed:', err);
+    });
+    return c.json({ ok: true });
+  }
+
   const normalized: NormalizedMessage = {
     externalId: event.ts || event.event_ts || '',
     channelType: 'slack',
     channelConfigId: channelConfig.channelConfigId,
     chatType,
-    content,
+    content: parsed.type === 'none' ? content : parsed.remainingText,
     attachments: [],
     platformUser: {
       id: event.user || '',
@@ -166,6 +152,22 @@ export async function handleSlackWebhook(
     isMention,
     raw: eventPayload,
   };
+
+  if (parsed.type === 'set_model' && parsed.model) {
+    normalized.overrides = { model: parsed.model };
+    if (!parsed.remainingText) {
+      confirmCommandInThread(channelConfig, event, `Model switched to *${parsed.model.modelID}* for this conversation.`);
+      return c.json({ ok: true });
+    }
+  }
+
+  if (parsed.type === 'set_agent' && parsed.agentName) {
+    normalized.overrides = { agentName: parsed.agentName };
+    if (!parsed.remainingText) {
+      confirmCommandInThread(channelConfig, event, `Agent switched to *${parsed.agentName}*.`);
+      return c.json({ ok: true });
+    }
+  }
 
   (async () => {
     if (event.thread_ts && event.channel) {
@@ -185,25 +187,83 @@ export async function handleSlackWebhook(
   return c.json({ ok: true });
 }
 
-async function findConfigByTeamId(teamId: string): Promise<ChannelConfig | null> {
-  const configs = await db
-    .select()
-    .from(channelConfigs)
-    .where(
-      and(
-        eq(channelConfigs.channelType, 'slack'),
-        eq(channelConfigs.enabled, true),
-      ),
-    );
+async function handleSessionReset(
+  engine: ChannelEngine,
+  channelConfig: ChannelConfig,
+  eventPayload: SlackEventCallback,
+  event: SlackEvent,
+): Promise<void> {
+  const message: NormalizedMessage = {
+    externalId: event.ts || event.event_ts || '',
+    channelType: 'slack',
+    channelConfigId: channelConfig.channelConfigId,
+    chatType: detectChatType(event.channel_type),
+    content: '',
+    attachments: [],
+    platformUser: {
+      id: event.user || '',
+      name: event.user || 'Unknown',
+    },
+    threadId: event.thread_ts,
+    groupId: event.channel,
+    raw: eventPayload,
+  };
 
-  for (const cfg of configs) {
-    const creds = cfg.credentials as Record<string, unknown>;
-    if (creds?.teamId === teamId) {
-      return cfg;
-    }
+  const strategy = (channelConfig.sessionStrategy as 'single' | 'per-thread' | 'per-user' | 'per-message') || 'per-user';
+  await engine.resetSession(channelConfig.channelConfigId, 'slack', strategy, message);
+
+  confirmCommandInThread(channelConfig, event, ':white_check_mark: Session reset. Starting fresh!');
+}
+
+async function handleLinkShared(eventPayload: SlackEventCallback): Promise<void> {
+  const event = eventPayload.event;
+  const links = event.links;
+  if (!links || links.length === 0) return;
+
+  const channelConfig = await findConfigByTeamId(eventPayload.team_id);
+  if (!channelConfig) return;
+
+  const credentials = channelConfig.credentials as Record<string, unknown>;
+  const botToken = credentials?.botToken as string;
+  if (!botToken) return;
+
+  const api = new SlackApi(botToken);
+  const unfurls: Record<string, { title: string; text: string; color?: string }> = {};
+
+  for (const link of links) {
+    unfurls[link.url] = {
+      title: link.domain,
+      text: `Link shared: ${link.url}`,
+      color: '#7C3AED',
+    };
   }
 
-  return null;
+  await api.chatUnfurl(
+    event.channel || '',
+    event.ts || event.event_ts || '',
+    unfurls,
+  );
+}
+
+function confirmCommandInThread(
+  channelConfig: ChannelConfig,
+  event: SlackEvent,
+  text: string,
+): void {
+  const credentials = channelConfig.credentials as Record<string, unknown>;
+  const botToken = credentials?.botToken as string;
+  if (!botToken || !event.channel) return;
+
+  const api = new SlackApi(botToken);
+  const threadTs = event.thread_ts || event.ts;
+
+  api.postMessage({
+    channel: event.channel,
+    text,
+    thread_ts: threadTs,
+  }).catch((err) => {
+    console.error('[SLACK] Failed to confirm command:', err);
+  });
 }
 
 async function fetchThreadContext(

@@ -28,6 +28,11 @@ export interface ThreadMessage {
   isBot?: boolean;
 }
 
+export interface MessageOverrides {
+  model?: { providerID: string; modelID: string };
+  agentName?: string;
+}
+
 export interface NormalizedMessage {
   externalId: string;
   channelType: ChannelType;
@@ -46,6 +51,8 @@ export interface NormalizedMessage {
   raw?: unknown;
   /** Previous messages in the thread, for context */
   threadContext?: ThreadMessage[];
+  /** Per-message overrides for model or agent routing */
+  overrides?: MessageOverrides;
 }
 
 export interface AgentResponse {

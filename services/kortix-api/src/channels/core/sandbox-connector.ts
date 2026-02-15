@@ -9,8 +9,20 @@ interface CreateSessionResponse {
 }
 
 export interface StreamEvent {
-  type: 'text' | 'busy' | 'done' | 'error';
+  type: 'text' | 'busy' | 'done' | 'error' | 'permission' | 'file';
   data?: string;
+  /** Permission request details (when type === 'permission') */
+  permission?: {
+    id: string;
+    tool: string;
+    description: string;
+  };
+  /** File output details (when type === 'file') */
+  file?: {
+    name: string;
+    url: string;
+    mimeType?: string;
+  };
 }
 
 interface ResolvedEndpoint {
@@ -20,9 +32,6 @@ interface ResolvedEndpoint {
 
 /**
  * Resolve the direct Daytona sandbox URL, bypassing the preview proxy.
- * The preview proxy requires a Supabase JWT (user auth), but the channel
- * engine is a backend service that talks to sandboxes directly.
- * Returns the direct URL + Daytona preview headers (same as the proxy uses).
  */
 async function resolveDirectEndpoint(target: SandboxTarget): Promise<ResolvedEndpoint> {
   if (target.externalId && isDaytonaConfigured()) {
@@ -48,7 +57,6 @@ async function resolveDirectEndpoint(target: SandboxTarget): Promise<ResolvedEnd
     }
   }
 
-  // Fallback: use base_url with Basic auth (local dev / non-Daytona)
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (target.authToken) {
     headers['Authorization'] = `Basic ${btoa(target.authToken)}`;
@@ -235,6 +243,31 @@ export class SandboxConnector {
               sawBusy = true;
               yield { type: 'text', data: delta };
             }
+
+            // Detect file outputs from assistant messages
+            if (part.type === 'file') {
+              yield {
+                type: 'file',
+                file: {
+                  name: (part.filename as string) || 'file',
+                  url: (part.url as string) || '',
+                  mimeType: part.mimeType as string | undefined,
+                },
+              };
+            }
+          }
+
+          // Permission request event
+          if (evt === 'permission.asked' || evt === 'permission.requested') {
+            const permProps = props as Record<string, unknown>;
+            yield {
+              type: 'permission',
+              permission: {
+                id: (permProps.id as string) || (permProps.requestID as string) || '',
+                tool: (permProps.tool as string) || (permProps.toolName as string) || 'unknown',
+                description: (permProps.description as string) || (permProps.message as string) || '',
+              },
+            };
           }
 
           if (evt === 'session.status') {
@@ -262,6 +295,27 @@ export class SandboxConnector {
     } finally {
       clearTimeout(timeout);
       controller.abort();
+    }
+  }
+
+  /**
+   * Reply to a permission request in the sandbox.
+   */
+  async replyPermission(permissionId: string, approved: boolean): Promise<void> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/permission/${permissionId}/reply`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ approved }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(`[SANDBOX-CONNECTOR] Permission reply failed: ${res.status} ${errText}`);
+      }
+    } catch (err) {
+      console.error('[SANDBOX-CONNECTOR] Permission reply error:', err);
     }
   }
 

@@ -8,6 +8,18 @@ import type {
 } from '../types';
 import type { ChannelConfig } from '@kortix/db';
 
+export interface PermissionRequest {
+  id: string;
+  tool: string;
+  description: string;
+}
+
+export interface FileOutput {
+  name: string;
+  url: string;
+  mimeType?: string;
+}
+
 export interface ChannelAdapter {
   readonly type: ChannelType;
   readonly name: string;
@@ -29,6 +41,20 @@ export interface ChannelAdapter {
   onChannelCreated?(config: ChannelConfig): Promise<void>;
   onChannelRemoved?(config: ChannelConfig): Promise<void>;
   validateCredentials?(credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }>;
+
+  /** Send a permission request UI (e.g. Approve/Reject buttons) to the user */
+  sendPermissionRequest?(
+    config: ChannelConfig,
+    message: NormalizedMessage,
+    permission: PermissionRequest,
+  ): Promise<void>;
+
+  /** Upload files to the channel (e.g. images, PDFs produced by the agent) */
+  sendFiles?(
+    config: ChannelConfig,
+    message: NormalizedMessage,
+    files: FileOutput[],
+  ): Promise<void>;
 }
 
 export interface ChannelEngine {
@@ -65,4 +91,6 @@ export abstract class BaseAdapter implements ChannelAdapter {
   async validateCredentials(_credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }> {
     return { valid: true };
   }
+  async sendPermissionRequest(_config: ChannelConfig, _message: NormalizedMessage, _permission: PermissionRequest): Promise<void> {}
+  async sendFiles(_config: ChannelConfig, _message: NormalizedMessage, _files: FileOutput[]): Promise<void> {}
 }

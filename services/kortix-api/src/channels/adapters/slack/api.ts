@@ -1,9 +1,12 @@
 const SLACK_API = 'https://slack.com/api';
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
 export interface SlackPostMessageOptions {
   channel: string;
   text: string;
   thread_ts?: string;
+  blocks?: unknown[];
 }
 
 export interface SlackPostMessageResult {
@@ -43,6 +46,35 @@ export interface SlackUserInfo {
   error?: string;
 }
 
+export interface SlackReplyMessage {
+  type: string;
+  user?: string;
+  bot_id?: string;
+  text?: string;
+  ts: string;
+  thread_ts?: string;
+  subtype?: string;
+}
+
+export interface SlackFileUploadOptions {
+  channel: string;
+  threadTs?: string;
+  filename: string;
+  content: Buffer;
+  title?: string;
+}
+
+export interface SlackConversationMessage {
+  type: string;
+  user?: string;
+  bot_id?: string;
+  text?: string;
+  ts: string;
+  subtype?: string;
+}
+
+// ─── API Client ─────────────────────────────────────────────────────────────
+
 export class SlackApi {
   private botToken: string;
 
@@ -50,13 +82,17 @@ export class SlackApi {
     this.botToken = botToken;
   }
 
+  private get headers(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${this.botToken}`,
+    };
+  }
+
   async postMessage(options: SlackPostMessageOptions): Promise<SlackPostMessageResult> {
     const res = await fetch(`${SLACK_API}/chat.postMessage`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.botToken}`,
-      },
+      headers: this.headers,
       body: JSON.stringify(options),
     });
     return res.json() as Promise<SlackPostMessageResult>;
@@ -65,10 +101,7 @@ export class SlackApi {
   async updateMessage(options: SlackUpdateMessageOptions): Promise<{ ok: boolean; error?: string }> {
     const res = await fetch(`${SLACK_API}/chat.update`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.botToken}`,
-      },
+      headers: this.headers,
       body: JSON.stringify(options),
     });
     return res.json() as Promise<{ ok: boolean; error?: string }>;
@@ -97,10 +130,7 @@ export class SlackApi {
   async addReaction(channel: string, timestamp: string, name: string): Promise<{ ok: boolean; error?: string }> {
     const res = await fetch(`${SLACK_API}/reactions.add`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.botToken}`,
-      },
+      headers: this.headers,
       body: JSON.stringify({ channel, timestamp, name }),
     });
     return res.json() as Promise<{ ok: boolean; error?: string }>;
@@ -109,10 +139,7 @@ export class SlackApi {
   async removeReaction(channel: string, timestamp: string, name: string): Promise<{ ok: boolean; error?: string }> {
     const res = await fetch(`${SLACK_API}/reactions.remove`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.botToken}`,
-      },
+      headers: this.headers,
       body: JSON.stringify({ channel, timestamp, name }),
     });
     return res.json() as Promise<{ ok: boolean; error?: string }>;
@@ -132,14 +159,86 @@ export class SlackApi {
     });
     return res.json() as Promise<{ ok: boolean; messages?: SlackReplyMessage[]; error?: string }>;
   }
-}
 
-export interface SlackReplyMessage {
-  type: string;
-  user?: string;
-  bot_id?: string;
-  text?: string;
-  ts: string;
-  thread_ts?: string;
-  subtype?: string;
+
+  async filesUploadV2(options: SlackFileUploadOptions): Promise<{ ok: boolean; error?: string }> {
+    const getUrlRes = await fetch(`${SLACK_API}/files.getUploadURLExternal`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify({
+        filename: options.filename,
+        length: options.content.length,
+      }),
+    });
+
+    const urlData = (await getUrlRes.json()) as {
+      ok: boolean;
+      upload_url?: string;
+      file_id?: string;
+      error?: string;
+    };
+
+    if (!urlData.ok || !urlData.upload_url || !urlData.file_id) {
+      console.error(`[SLACK API] getUploadURLExternal failed: ${urlData.error}`);
+      return { ok: false, error: urlData.error || 'Failed to get upload URL' };
+    }
+
+    const uploadRes = await fetch(urlData.upload_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: new Uint8Array(options.content),
+    });
+
+    if (!uploadRes.ok) {
+      return { ok: false, error: `Upload failed: ${uploadRes.status}` };
+    }
+
+    const channelId = options.channel;
+    const completeRes = await fetch(`${SLACK_API}/files.completeUploadExternal`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify({
+        files: [{
+          id: urlData.file_id,
+          title: options.title || options.filename,
+        }],
+        channel_id: channelId,
+        thread_ts: options.threadTs,
+      }),
+    });
+
+    return completeRes.json() as Promise<{ ok: boolean; error?: string }>;
+  }
+
+  async chatUnfurl(
+    channel: string,
+    ts: string,
+    unfurls: Record<string, unknown>,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const res = await fetch(`${SLACK_API}/chat.unfurl`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify({ channel, ts, unfurls }),
+    });
+    return res.json() as Promise<{ ok: boolean; error?: string }>;
+  }
+
+  async conversationsHistory(
+    channel: string,
+    oldest?: string,
+    limit = 100,
+  ): Promise<{ ok: boolean; messages?: SlackConversationMessage[]; error?: string }> {
+    const params = new URLSearchParams({ channel, limit: String(limit) });
+    if (oldest) {
+      params.set('oldest', oldest);
+    }
+
+    const res = await fetch(`${SLACK_API}/conversations.history?${params}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.botToken}`,
+      },
+    });
+    return res.json() as Promise<{ ok: boolean; messages?: SlackConversationMessage[]; error?: string }>;
+  }
 }
