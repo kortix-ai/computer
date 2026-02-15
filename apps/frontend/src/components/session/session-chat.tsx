@@ -56,6 +56,7 @@ import {
   findOpenCodeFiles,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
+import { getClient } from '@/lib/opencode-sdk';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
@@ -1638,6 +1639,44 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       setPendingSendInFlight(false);
     }
   }, [pendingSendInFlight, isServerBusy, messages]);
+
+  // Safety timeout: clear pendingSendInFlight after 30s even if the server
+  // never acknowledged. Prevents the UI from being stuck forever in "busy"
+  // when the send succeeded (HTTP 204) but the server never started processing.
+  useEffect(() => {
+    if (!pendingSendInFlight) return;
+    const timer = setTimeout(() => {
+      setPendingSendInFlight(false);
+    }, 30_000);
+    return () => clearTimeout(timer);
+  }, [pendingSendInFlight]);
+
+  // Stale session watchdog: when the session has been busy for a while, do a
+  // direct status check every 30s. If the server reports idle but our store
+  // still shows busy, force the status to idle — recovering from a silently
+  // dropped SSE stream or missed event.
+  useEffect(() => {
+    if (!isServerBusy) return;
+
+    const check = async () => {
+      try {
+        const client = getClient();
+        const result = await client.session.status();
+        if (result.data) {
+          const statuses = result.data as Record<string, any>;
+          const serverStatus = statuses[sessionId];
+          if (serverStatus) {
+            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, serverStatus);
+          }
+        }
+      } catch {
+        // ignore — next interval will retry
+      }
+    };
+
+    const interval = setInterval(check, 30_000);
+    return () => clearInterval(interval);
+  }, [isServerBusy, sessionId]);
 
   // Clear pending user message when server acknowledges (status becomes busy)
   // or when new messages arrive from the server

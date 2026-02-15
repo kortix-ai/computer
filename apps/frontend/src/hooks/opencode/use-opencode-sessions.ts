@@ -850,10 +850,25 @@ export function useSessionBusyPolling(sessionId: string, enabled: boolean) {
     poll();
     const interval = setInterval(poll, 2000);
 
-    // Safety: stop after 5 minutes to prevent infinite polling
-    const timeout = setTimeout(() => {
-      cancelled = true;
+    // Safety: stop after 5 minutes to prevent infinite polling.
+    // Do one final status check — if server says idle, update the store so
+    // the UI doesn't stay stuck in a "busy" state after polling stops.
+    const timeout = setTimeout(async () => {
       clearInterval(interval);
+      try {
+        const client = getClient();
+        const statusResult = await client.session.status();
+        if (!cancelled && statusResult.data) {
+          const statuses = statusResult.data as Record<string, any>;
+          const status = statuses[sessionId];
+          if (status) {
+            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, status);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      cancelled = true;
     }, 5 * 60 * 1000);
 
     return () => {
