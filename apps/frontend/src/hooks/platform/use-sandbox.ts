@@ -81,10 +81,9 @@ function registerSandboxServer(sandbox: SandboxInfo) {
     }));
   }
 
-  // Auto-switch to sandbox if user is still on the default localhost server
-  // (means they haven't manually selected something else)
-  if (store.activeServerId === 'default') {
-    store.setActiveServer(SANDBOX_SERVER_ID);
+  // Auto-switch to sandbox only if the user hasn't manually picked a server
+  if (!store.userSelected && store.activeServerId === 'default') {
+    store.setActiveServer(SANDBOX_SERVER_ID, { auto: true });
   }
 }
 
