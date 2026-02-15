@@ -86,6 +86,18 @@ export const config = {
   SCHEDULER_TICK_INTERVAL_MS: parseInt(process.env.SCHEDULER_TICK_INTERVAL_MS || '1000', 10),
   SCHEDULER_ENABLED: process.env.SCHEDULER_ENABLED !== 'false',
 
+  // ─── Channels ───────────────────────────────────────────────────────────────
+  CHANNELS_ENABLED: process.env.CHANNELS_ENABLED !== 'false',
+  CHANNELS_PUBLIC_URL: process.env.CHANNELS_PUBLIC_URL || '',
+
+  // ─── Frontend ────────────────────────────────────────────────────────────
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+
+  // ─── Slack (Platform App) ─────────────────────────────────────────────────
+  SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID || '',
+  SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET || '',
+  SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET || '',
+
   // ─── Legacy Backend (fallback) ─────────────────────────────────────────────
   BACKEND_API_URL: process.env.BACKEND_API_URL || 'http://localhost:8000',
   BACKEND_API_KEY: process.env.BACKEND_API_KEY || '',

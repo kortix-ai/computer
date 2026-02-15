@@ -88,6 +88,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
     }));
   }
 
+<<<<<<< HEAD
   // Auto-switch to sandbox ONLY on the very first registration in this browser
   // session, and ONLY if the user is still on the default localhost server
   // (meaning they haven't manually selected any instance yet).
@@ -95,6 +96,11 @@ function registerSandboxServer(sandbox: SandboxInfo) {
   if (!hasAutoSwitchedToSandbox && store.activeServerId === 'default') {
     hasAutoSwitchedToSandbox = true;
     store.setActiveServer(SANDBOX_SERVER_ID);
+=======
+  // Auto-switch to sandbox only if the user hasn't manually picked a server
+  if (!store.userSelected && store.activeServerId === 'default') {
+    store.setActiveServer(SANDBOX_SERVER_ID, { auto: true });
+>>>>>>> 2d8949d61386c4f7c99a29f7dcad128288a91cd5
   }
 }
 

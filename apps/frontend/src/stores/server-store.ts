@@ -23,6 +23,8 @@ export interface ServerEntry {
 interface ServerStore {
   servers: ServerEntry[];
   activeServerId: string;
+  /** True when the user has manually picked a server via the selector UI. */
+  userSelected: boolean;
   /**
    * Bumps ONLY on actual server switches (user picks a different server).
    * The SSE event stream subscribes to this — bumping it nukes all cached
@@ -44,7 +46,7 @@ interface ServerStore {
    */
   updateServerSilent: (id: string, updates: Partial<Pick<ServerEntry, 'url' | 'provider' | 'sandboxId'>> & { mappedPorts?: Record<string, string>; label?: string }) => void;
   removeServer: (id: string) => void;
-  setActiveServer: (id: string) => void;
+  setActiveServer: (id: string, options?: { auto?: boolean }) => void;
   getActiveServerUrl: () => string;
   clearStatuses: () => void;
 }
@@ -69,6 +71,7 @@ export const useServerStore = create<ServerStore>()(
     (set, get) => ({
       servers: [createDefaultServer()],
       activeServerId: DEFAULT_SERVER_ID,
+      userSelected: false,
       serverVersion: 0,
       urlVersion: 0,
 
@@ -155,10 +158,15 @@ export const useServerStore = create<ServerStore>()(
         });
       },
 
-      setActiveServer: (id: string) => {
+      setActiveServer: (id: string, options?: { auto?: boolean }) => {
         const state = get();
         if (state.activeServerId === id) return; // no-op
-        set({ activeServerId: id, serverVersion: state.serverVersion + 1 });
+        set({
+          activeServerId: id,
+          serverVersion: state.serverVersion + 1,
+          // Mark userSelected unless this is an auto-switch (e.g. from useSandbox)
+          ...(options?.auto ? {} : { userSelected: true }),
+        });
       },
 
       getActiveServerUrl: () => {
@@ -176,6 +184,7 @@ export const useServerStore = create<ServerStore>()(
       partialize: (state) => ({
         servers: state.servers,
         activeServerId: state.activeServerId,
+        userSelected: state.userSelected,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
