@@ -129,6 +129,7 @@ export function UserMenu({ user }: UserMenuProps) {
     { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
     { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
     { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
+    { icon: MessageSquare, label: 'Channels', href: '/channels' },
     { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
   ];
 

@@ -11,10 +11,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
-// ─── Schema ──────────────────────────────────────────────────────────────────
 export const kortixSchema = pgSchema('kortix');
 
-// ─── Enums ───────────────────────────────────────────────────────────────────
 export const sandboxStatusEnum = kortixSchema.enum('sandbox_status', [
   'provisioning',
   'active',
@@ -59,7 +57,40 @@ export const deploymentSourceEnum = kortixSchema.enum('deployment_source', [
   'tar',
 ]);
 
-// ─── Sandboxes ───────────────────────────────────────────────────────────────
+export const channelTypeEnum = kortixSchema.enum('channel_type', [
+  'telegram',
+  'slack',
+  'discord',
+  'whatsapp',
+  'teams',
+  'voice',
+  'email',
+  'sms',
+]);
+
+export const sessionStrategyEnum = kortixSchema.enum('session_strategy', [
+  'single',
+  'per-thread',
+  'per-user',
+  'per-message',
+]);
+
+export interface ChannelCredentials {
+  [key: string]: unknown;
+}
+
+export interface ChannelPlatformConfig {
+  groups?: { enabled?: boolean; allowList?: string[]; [key: string]: unknown };
+  dm?: { enabled?: boolean; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+export interface ChannelPlatformUser {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
 export const sandboxes = kortixSchema.table(
   'sandboxes',
   {
@@ -87,7 +118,6 @@ export const sandboxes = kortixSchema.table(
   ],
 );
 
-// ─── Triggers ────────────────────────────────────────────────────────────────
 export const triggers = kortixSchema.table(
   'triggers',
   {
@@ -121,7 +151,6 @@ export const triggers = kortixSchema.table(
   ],
 );
 
-// ─── Executions ──────────────────────────────────────────────────────────────
 export const executions = kortixSchema.table(
   'executions',
   {
@@ -149,7 +178,6 @@ export const executions = kortixSchema.table(
   ],
 );
 
-// ─── Deployments ─────────────────────────────────────────────────────────────
 export const deployments = kortixSchema.table(
   'deployments',
   {
@@ -189,11 +217,103 @@ export const deployments = kortixSchema.table(
   ],
 );
 
-// ─── Relations ───────────────────────────────────────────────────────────────
+export const channelConfigs = kortixSchema.table(
+  'channel_configs',
+  {
+    channelConfigId: uuid('channel_config_id').defaultRandom().primaryKey(),
+    sandboxId: uuid('sandbox_id')
+      .notNull()
+      .references(() => sandboxes.sandboxId, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').notNull(),
+    channelType: channelTypeEnum('channel_type').notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    enabled: boolean('enabled').default(true).notNull(),
+    credentials: jsonb('credentials').default({}).$type<ChannelCredentials>(),
+    platformConfig: jsonb('platform_config').default({}).$type<ChannelPlatformConfig>(),
+    sessionStrategy: sessionStrategyEnum('session_strategy').default('per-user').notNull(),
+    systemPrompt: text('system_prompt'),
+    agentName: varchar('agent_name', { length: 255 }),
+    metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_channel_configs_sandbox').on(table.sandboxId),
+    index('idx_channel_configs_account').on(table.accountId),
+    index('idx_channel_configs_type').on(table.channelType),
+    index('idx_channel_configs_enabled').on(table.enabled),
+  ],
+);
+
+export const channelSessions = kortixSchema.table(
+  'channel_sessions',
+  {
+    channelSessionId: uuid('channel_session_id').defaultRandom().primaryKey(),
+    channelConfigId: uuid('channel_config_id')
+      .notNull()
+      .references(() => channelConfigs.channelConfigId, { onDelete: 'cascade' }),
+    strategyKey: varchar('strategy_key', { length: 512 }).notNull(),
+    sessionId: text('session_id').notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).defaultNow().notNull(),
+    metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_channel_sessions_config').on(table.channelConfigId),
+    index('idx_channel_sessions_key').on(table.strategyKey),
+  ],
+);
+
+export const channelMessages = kortixSchema.table(
+  'channel_messages',
+  {
+    channelMessageId: uuid('channel_message_id').defaultRandom().primaryKey(),
+    channelConfigId: uuid('channel_config_id')
+      .notNull()
+      .references(() => channelConfigs.channelConfigId, { onDelete: 'cascade' }),
+    direction: varchar('direction', { length: 10 }).notNull(), // 'inbound' | 'outbound'
+    externalId: text('external_id'),
+    sessionId: text('session_id'),
+    chatType: varchar('chat_type', { length: 20 }), // 'dm' | 'group' | 'channel'
+    content: text('content'),
+    attachments: jsonb('attachments').default([]).$type<unknown[]>(),
+    platformUser: jsonb('platform_user').$type<ChannelPlatformUser>(),
+    metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_channel_messages_config').on(table.channelConfigId),
+    index('idx_channel_messages_session').on(table.sessionId),
+    index('idx_channel_messages_created').on(table.createdAt),
+  ],
+);
+
+export const channelIdentityMap = kortixSchema.table(
+  'channel_identity_map',
+  {
+    channelIdentityId: uuid('channel_identity_id').defaultRandom().primaryKey(),
+    channelConfigId: uuid('channel_config_id')
+      .notNull()
+      .references(() => channelConfigs.channelConfigId, { onDelete: 'cascade' }),
+    platformUserId: text('platform_user_id').notNull(),
+    platformUserName: text('platform_user_name'),
+    kortixUserId: uuid('kortix_user_id'),
+    allowed: boolean('allowed').default(true).notNull(),
+    metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_channel_identity_config').on(table.channelConfigId),
+    index('idx_channel_identity_platform_user').on(table.platformUserId),
+  ],
+);
+
 export const sandboxesRelations = relations(sandboxes, ({ many }) => ({
   triggers: many(triggers),
   executions: many(executions),
   deployments: many(deployments),
+  channelConfigs: many(channelConfigs),
 }));
 
 export const triggersRelations = relations(triggers, ({ one, many }) => ({
@@ -219,5 +339,36 @@ export const deploymentsRelations = relations(deployments, ({ one }) => ({
   sandbox: one(sandboxes, {
     fields: [deployments.sandboxId],
     references: [sandboxes.sandboxId],
+  }),
+}));
+
+export const channelConfigsRelations = relations(channelConfigs, ({ one, many }) => ({
+  sandbox: one(sandboxes, {
+    fields: [channelConfigs.sandboxId],
+    references: [sandboxes.sandboxId],
+  }),
+  sessions: many(channelSessions),
+  messages: many(channelMessages),
+  identities: many(channelIdentityMap),
+}));
+
+export const channelSessionsRelations = relations(channelSessions, ({ one }) => ({
+  channelConfig: one(channelConfigs, {
+    fields: [channelSessions.channelConfigId],
+    references: [channelConfigs.channelConfigId],
+  }),
+}));
+
+export const channelMessagesRelations = relations(channelMessages, ({ one }) => ({
+  channelConfig: one(channelConfigs, {
+    fields: [channelMessages.channelConfigId],
+    references: [channelConfigs.channelConfigId],
+  }),
+}));
+
+export const channelIdentityMapRelations = relations(channelIdentityMap, ({ one }) => ({
+  channelConfig: one(channelConfigs, {
+    fields: [channelIdentityMap.channelConfigId],
+    references: [channelConfigs.channelConfigId],
   }),
 }));

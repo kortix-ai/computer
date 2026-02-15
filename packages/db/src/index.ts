@@ -10,19 +10,34 @@ export {
   sandboxStatusEnum,
   executionStatusEnum,
   sessionModeEnum,
-  // Enums
   deploymentStatusEnum,
   deploymentSourceEnum,
+  channelTypeEnum,
+  sessionStrategyEnum,
   // Kortix tables
   sandboxes,
   triggers,
   executions,
   deployments,
+  channelConfigs,
+  channelSessions,
+  channelMessages,
+  channelIdentityMap,
   // Relations
   sandboxesRelations,
   triggersRelations,
   executionsRelations,
   deploymentsRelations,
+  channelConfigsRelations,
+  channelSessionsRelations,
+  channelMessagesRelations,
+  channelIdentityMapRelations,
+} from './schema/kortix';
+
+export type {
+  ChannelCredentials,
+  ChannelPlatformConfig,
+  ChannelPlatformUser,
 } from './schema/kortix';
 
 // Public/basejump tables
@@ -46,4 +61,12 @@ export type {
   SandboxSelect,
   TriggerSelect,
   ExecutionSelect,
+  ChannelConfig,
+  ChannelSession,
+  ChannelMessage,
+  ChannelIdentity,
+  NewChannelConfig,
+  NewChannelSession,
+  NewChannelMessage,
+  NewChannelIdentity,
 } from './types';

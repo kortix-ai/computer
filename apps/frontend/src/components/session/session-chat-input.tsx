@@ -249,31 +249,42 @@ function VariantSelector({
 
 const AUTO_COMPACT_THRESHOLD = 0.9;
 
-function TokenProgress({ messages, sessionId }: { messages: MessageWithParts[] | undefined; sessionId?: string }) {
+function TokenProgress({ messages, sessionId, models, selectedModel }: { messages: MessageWithParts[] | undefined; sessionId?: string; models?: FlatModel[]; selectedModel?: { providerID: string; modelID: string } | null }) {
   const summarize = useSummarizeOpenCodeSession();
   const autoCompactTriggered = useRef(false);
   const [isCompacting, setIsCompacting] = useState(false);
 
-  const totalTokens = useMemo(() => {
-    if (!messages) return { input: 0, output: 0 };
-    let input = 0;
-    let output = 0;
-    for (const msg of messages) {
+  // Use the LAST assistant message's input tokens as the context window fill level.
+  // Each API call's input tokens represent the full prompt size (all prior context),
+  // so the last one reflects the current context window usage — not a cumulative sum.
+  const contextTokens = useMemo(() => {
+    if (!messages) return 0;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
       if (msg.info.role === 'assistant') {
         const tokens = (msg.info as any).tokens;
-        if (tokens) {
-          input += tokens.input || 0;
-          output += tokens.output || 0;
+        if (tokens && (tokens.input || 0) > 0) {
+          return tokens.input as number;
         }
       }
     }
-    return { input, output };
+    return 0;
   }, [messages]);
 
-  const total = totalTokens.input + totalTokens.output;
+  // Use the actual model's context window instead of a hardcoded value
+  const contextLimit = useMemo(() => {
+    if (selectedModel && models) {
+      const model = models.find(
+        (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID
+      );
+      if (model?.contextWindow && model.contextWindow > 0) {
+        return model.contextWindow;
+      }
+    }
+    return 200000; // fallback
+  }, [models, selectedModel]);
 
-  const contextLimit = 200000;
-  const ratio = total > 0 ? Math.min(total / contextLimit, 1) : 0;
+  const ratio = contextTokens > 0 ? Math.min(contextTokens / contextLimit, 1) : 0;
 
   // Reset auto-compact flag if ratio drops below threshold (e.g. after compaction)
   useEffect(() => {
@@ -308,7 +319,7 @@ function TokenProgress({ messages, sessionId }: { messages: MessageWithParts[] |
     }
   }, [ratio, sessionId, isCompacting, summarize]);
 
-  if (total === 0) return null;
+  if (contextTokens === 0) return null;
 
   const circumference = 2 * Math.PI * 7;
   const offset = circumference * (1 - ratio);
@@ -342,9 +353,7 @@ function TokenProgress({ messages, sessionId }: { messages: MessageWithParts[] |
       </TooltipTrigger>
       <TooltipContent side="top">
         <div className="text-xs font-mono space-y-1">
-          <div>Total: {(total / 1000).toFixed(1)}k tokens</div>
-          <div>Input: {(totalTokens.input / 1000).toFixed(1)}k</div>
-          <div>Output: {(totalTokens.output / 1000).toFixed(1)}k</div>
+          <div>Context: {(contextTokens / 1000).toFixed(1)}k / {(contextLimit / 1000).toFixed(0)}k tokens</div>
           <div className="text-muted-foreground">{Math.round(ratio * 100)}% of context used</div>
           {isCompacting && (
             <div className="text-blue-500 font-sans pt-0.5">
@@ -1203,7 +1212,7 @@ export function SessionChatInput({
                     </Tooltip>
                   )}
 
-                  <TokenProgress messages={messages} sessionId={sessionId} />
+                  <TokenProgress messages={messages} sessionId={sessionId} models={models} selectedModel={selectedModel} />
 
                   <VoiceRecorder
                     onTranscription={handleTranscription}

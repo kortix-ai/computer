@@ -66,3 +66,18 @@ export class ExecutionError extends Error {
     this.name = 'ExecutionError';
   }
 }
+
+// ─── Channel Errors ──────────────────────────────────────────────────────────
+
+export class ChannelError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ChannelError';
+  }
+}
+
+export class WebhookVerificationError extends HTTPException {
+  constructor(message: string = 'Webhook verification failed') {
+    super(401, { message });
+  }
+}

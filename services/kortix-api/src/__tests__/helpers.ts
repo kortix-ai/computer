@@ -15,7 +15,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
-import { createDb, type Database, sandboxes, triggers, executions, deployments } from '@kortix/db';
+import { createDb, type Database, sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap } from '@kortix/db';
 import { BillingError } from '../errors';
 import type { AuthVariables } from '../types';
 
@@ -167,6 +167,8 @@ export interface TestAppOptions {
   mountPlatform?: boolean;
   /** Whether to mount deployment routes (requires DATABASE_URL). Default: false */
   mountDeployments?: boolean;
+  /** Whether to mount channel routes (requires DATABASE_URL). Default: false */
+  mountChannels?: boolean;
 }
 
 /**
@@ -298,6 +300,23 @@ export function createTestApp(opts: TestAppOptions = {}) {
     }
   }
 
+  // ─── Channel routes (module-level db — requires DATABASE_URL) ─────────
+  if (opts.mountChannels && hasDb) {
+    try {
+      const { createChannelsRouter } = require('../channels/routes/channels');
+      const { ChannelEngineImpl } = require('../channels/core/engine');
+
+      // Use empty adapter map in tests to avoid real HTTP calls
+      // (e.g. Telegram validateCredentials calls api.telegram.org)
+      const adapters = new Map();
+      const engine = new ChannelEngineImpl(adapters);
+      const channelsRouter = createChannelsRouter(engine);
+      app.route('/v1/channels', channelsRouter);
+    } catch (e) {
+      console.warn('[test] Failed to mount channel routes:', e);
+    }
+  }
+
   // ─── Error handler (matches production) ────────────────────────────────
   app.onError((err, c) => {
     if (err instanceof BillingError) {
@@ -335,10 +354,16 @@ export function createTestApp(opts: TestAppOptions = {}) {
 
 /**
  * Delete all test data from kortix schema tables.
- * Order: executions → triggers → sandboxes (FK constraints).
+ * Order respects FK constraints: children before parents.
  */
 export async function cleanupTestData(): Promise<void> {
   const db = getTestDb();
+  // Channel tables (children of channelConfigs, which is child of sandboxes)
+  await db.delete(channelIdentityMap).execute();
+  await db.delete(channelMessages).execute();
+  await db.delete(channelSessions).execute();
+  await db.delete(channelConfigs).execute();
+  // Original tables
   await db.delete(deployments).execute();
   await db.delete(executions).execute();
   await db.delete(triggers).execute();
