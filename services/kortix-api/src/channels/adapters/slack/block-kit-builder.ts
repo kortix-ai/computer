@@ -11,7 +11,16 @@ interface SlackBlock {
   [key: string]: unknown;
 }
 
-export function buildBlockKitMessage(markdown: string, sessionUrl?: string): SlackBlock[] {
+export interface UsageMetadata {
+  modelName?: string;
+  durationMs?: number;
+}
+
+export function buildBlockKitMessage(
+  markdown: string,
+  sessionUrl?: string,
+  usageMeta?: UsageMetadata,
+): SlackBlock[] {
   const blocks: SlackBlock[] = [];
 
   const segments = splitIntoSegments(markdown);
@@ -25,37 +34,47 @@ export function buildBlockKitMessage(markdown: string, sessionUrl?: string): Sla
     }
   }
 
-  if (sessionUrl) {
+  const footerElements = buildFooterElements(sessionUrl, usageMeta);
+  if (footerElements.length > 0) {
     blocks.push({ type: 'divider' });
-    blocks.push({
-      type: 'context',
-      elements: [
-        {
-          type: 'mrkdwn',
-          text: `<${sessionUrl}|View full session>`,
-        },
-      ],
-    });
+    blocks.push({ type: 'context', elements: footerElements });
   }
 
-  if (blocks.length === 0 || (blocks.length <= 2 && sessionUrl)) {
+  if (blocks.length === 0 || (blocks.length <= 2 && footerElements.length > 0)) {
     const fallback = markdownToSlack(markdown);
     return [
       {
         type: 'section',
         text: { type: 'mrkdwn', text: truncateText(fallback) },
       },
-      ...(sessionUrl ? [
+      ...(footerElements.length > 0 ? [
         { type: 'divider' },
-        {
-          type: 'context',
-          elements: [{ type: 'mrkdwn', text: `<${sessionUrl}|View full session>` }],
-        },
+        { type: 'context', elements: footerElements },
       ] : []),
     ];
   }
 
   return blocks;
+}
+
+function buildFooterElements(
+  sessionUrl?: string,
+  usageMeta?: UsageMetadata,
+): Array<{ type: string; text: string }> {
+  const elements: Array<{ type: string; text: string }> = [];
+
+  if (usageMeta?.modelName || usageMeta?.durationMs) {
+    const parts: string[] = [];
+    if (usageMeta.modelName) parts.push(usageMeta.modelName);
+    if (usageMeta.durationMs) parts.push(`${(usageMeta.durationMs / 1000).toFixed(1)}s`);
+    elements.push({ type: 'mrkdwn', text: `\u26a1 ${parts.join(' \u00b7 ')}` });
+  }
+
+  if (sessionUrl) {
+    elements.push({ type: 'mrkdwn', text: `<${sessionUrl}|View full session>` });
+  }
+
+  return elements;
 }
 
 interface Segment {

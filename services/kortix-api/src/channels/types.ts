@@ -59,6 +59,8 @@ export interface AgentResponse {
   content: string;
   sessionId: string;
   truncated?: boolean;
+  modelName?: string;
+  durationMs?: number;
 }
 
 export interface ChannelCapabilities {
