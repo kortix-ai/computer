@@ -6,6 +6,7 @@ import { channelConfigs, channelMessages, sandboxes, accountUser } from '@kortix
 import { NotFoundError, ValidationError } from '../../errors';
 import type { AppEnv } from '../../types';
 import type { ChannelEngineImpl } from '../core/engine';
+import { encryptCredentials, decryptCredentials } from '../lib/credentials';
 
 const CHANNEL_TYPES = [
   'telegram',
@@ -88,6 +89,8 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       }
     }
 
+    const encryptedCreds = await encryptCredentials(parsed.data.credentials);
+
     const [config] = await db
       .insert(channelConfigs)
       .values({
@@ -96,7 +99,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
         channelType: parsed.data.channel_type,
         name: parsed.data.name,
         enabled: parsed.data.enabled,
-        credentials: parsed.data.credentials,
+        credentials: encryptedCreds,
         platformConfig: parsed.data.platform_config,
         sessionStrategy: parsed.data.session_strategy,
         systemPrompt: parsed.data.system_prompt ?? null,
@@ -201,7 +204,9 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
     if (parsed.data.enabled !== undefined) updateData.enabled = parsed.data.enabled;
-    if (parsed.data.credentials !== undefined) updateData.credentials = parsed.data.credentials;
+    if (parsed.data.credentials !== undefined) {
+      updateData.credentials = await encryptCredentials(parsed.data.credentials);
+    }
     if (parsed.data.platform_config !== undefined) updateData.platformConfig = parsed.data.platform_config;
     if (parsed.data.session_strategy !== undefined) updateData.sessionStrategy = parsed.data.session_strategy;
     if (parsed.data.system_prompt !== undefined) updateData.systemPrompt = parsed.data.system_prompt;

@@ -16,6 +16,7 @@ import { config } from '../../../config';
 import { db } from '../../../shared/db';
 import { channelConfigs, sandboxes } from '@kortix/db';
 import { eq } from 'drizzle-orm';
+import { encryptCredentials } from '../../lib/credentials';
 
 export class SlackAdapter extends BaseAdapter {
   readonly type = 'slack' as const;
@@ -351,6 +352,14 @@ export class SlackAdapter extends BaseAdapter {
 
     try {
       const teamName = data.team?.name || 'Slack';
+      const rawCreds = {
+        botToken: data.access_token,
+        botUserId: data.bot_user_id || authResult.user_id,
+        teamId: data.team?.id || authResult.team_id,
+        teamName,
+      };
+      const encryptedCreds = await encryptCredentials(rawCreds);
+
       await db
         .insert(channelConfigs)
         .values({
@@ -359,12 +368,7 @@ export class SlackAdapter extends BaseAdapter {
           channelType: 'slack',
           name: `${teamName} Slack`,
           enabled: true,
-          credentials: {
-            botToken: data.access_token,
-            botUserId: data.bot_user_id || authResult.user_id,
-            teamId: data.team?.id || authResult.team_id,
-            teamName,
-          },
+          credentials: encryptedCreds,
           sessionStrategy: 'per-user',
           metadata: {},
         });
