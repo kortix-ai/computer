@@ -73,6 +73,15 @@ preflight() {
 
 # ─── Add to PATH ─────────────────────────────────────────────────────────────
 setup_path() {
+  # 1. Try to symlink into /usr/local/bin (works immediately, no shell restart)
+  if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+    ln -sf "$INSTALL_DIR/kortix" /usr/local/bin/kortix 2>/dev/null && {
+      success "Linked 'kortix' → /usr/local/bin/kortix"
+      return
+    }
+  fi
+
+  # 2. Fallback: add to shell rc
   local shell_rc=""
   case "${SHELL:-}" in
     */zsh)  shell_rc="$HOME/.zshrc" ;;
@@ -280,6 +289,12 @@ case "${1:-help}" in
       echo "  ${G}Images removed.${N}"
     else
       echo "  ${D}Keeping images.${N}"
+    fi
+
+    # Remove /usr/local/bin symlink (if created by setup_path)
+    if [ -L "/usr/local/bin/kortix" ]; then
+      rm -f /usr/local/bin/kortix 2>/dev/null || true
+      echo "  ${G}Removed /usr/local/bin/kortix symlink.${N}"
     fi
 
     # Remove PATH entry from shell rc files

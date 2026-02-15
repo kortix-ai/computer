@@ -9,7 +9,7 @@ import {
 import type { ChannelConfig } from '@kortix/db';
 
 import type { ChannelAdapter } from '../adapters/adapter';
-import type { ChannelType, NormalizedMessage, AgentResponse, SandboxTarget } from '../types';
+import type { ChannelType, NormalizedMessage, AgentResponse, SandboxTarget, SessionStrategy } from '../types';
 import { SandboxConnector } from './sandbox-connector';
 import { SessionManager } from './session-manager';
 import { MessageQueue } from './queue';
@@ -203,6 +203,15 @@ export class ChannelEngineImpl {
     } catch (err) {
       console.error(`[CHANNELS] Failed to log ${direction} message:`, err);
     }
+  }
+
+  async resetSession(
+    configId: string,
+    channelType: string,
+    strategy: SessionStrategy,
+    message: NormalizedMessage,
+  ): Promise<void> {
+    await this.sessionManager.invalidateSession(configId, channelType, strategy, message);
   }
 
   cleanup(): void {

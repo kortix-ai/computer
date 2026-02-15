@@ -93,13 +93,12 @@ describe('/v1/setup', () => {
       expect(res.status).toBe(200);
     });
 
-    it('has llm, tools, sandbox groups', async () => {
+    it('has llm and tools groups', async () => {
       const app = createSetupTestApp();
       const res = await app.request('/v1/setup/schema');
       const data = await res.json();
       expect(data.llm).toBeDefined();
       expect(data.tools).toBeDefined();
-      expect(data.sandbox).toBeDefined();
     });
 
     it('llm group has at least 4 providers', async () => {

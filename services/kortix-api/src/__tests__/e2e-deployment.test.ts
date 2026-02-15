@@ -392,8 +392,6 @@ describe('Deployment — Sandbox Dockerfile Validation', () => {
 
     // Verify the critical vars are present
     const expectedVars = [
-      'OPENCODE_SERVER_USERNAME',
-      'OPENCODE_SERVER_PASSWORD',
       'KORTIX_API_URL',
       'KORTIX_TOKEN',
       'SANDBOX_ID',
@@ -531,8 +529,6 @@ describe('Deployment — LocalDockerProvider (mocked)', () => {
       'DISPLAY=',
       'LSS_DIR=',
       'KORTIX_WORKSPACE=',
-      'OPENCODE_SERVER_USERNAME=',
-      'OPENCODE_SERVER_PASSWORD=',
       'KORTIX_API_URL=',
       'KORTIX_TOKEN=',
       'SANDBOX_ID=',
@@ -651,8 +647,6 @@ describe.skipIf(!HAS_DOCKER)('Deployment — Docker Compose Validation', () => {
       writeFileSync(
         sandboxEnvFile,
         [
-          'OPENCODE_SERVER_USERNAME=admin',
-          'OPENCODE_SERVER_PASSWORD=test',
           'KORTIX_API_URL=http://localhost:8008',
           'KORTIX_TOKEN=test',
           'SANDBOX_ID=test',

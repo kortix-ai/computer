@@ -27,7 +27,7 @@ import {
 import { useServerStore } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
 import { useAuth } from '@/components/AuthProvider';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 const SANDBOX_SERVER_ID = 'cloud-sandbox';
 
@@ -91,8 +91,6 @@ function registerSandboxServer(sandbox: SandboxInfo) {
 
 export function useSandbox() {
   const { user } = useAuth();
-  const registeredRef = useRef(false);
-
   const query = useQuery({
     queryKey: ['platform', 'sandbox'],
     queryFn: async () => {
@@ -105,18 +103,12 @@ export function useSandbox() {
     refetchOnWindowFocus: false,
   });
 
-  // Register sandbox in server store when data arrives
+  // Register/update sandbox in server store whenever data changes
   useEffect(() => {
-    if (query.data && !registeredRef.current) {
+    if (query.data) {
       registerSandboxServer(query.data);
-      registeredRef.current = true;
     }
   }, [query.data]);
-
-  // Reset registration flag when user changes
-  useEffect(() => {
-    registeredRef.current = false;
-  }, [user?.id]);
 
   return {
     sandbox: query.data ?? null,

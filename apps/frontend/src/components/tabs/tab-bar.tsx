@@ -193,7 +193,7 @@ function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) 
         : item('Pin tab', 'pin', <Pin className="h-3.5 w-3.5 text-muted-foreground" />)
       }
       <div className="my-1 h-px bg-border/60" />
-      {!tab.pinned && item('Close', 'close', <X className="h-3.5 w-3.5 text-muted-foreground" />, 'Ctrl+W')}
+      {!tab.pinned && item('Close', 'close', <X className="h-3.5 w-3.5 text-muted-foreground" />, `${useUserPreferencesStore.getState().getModifierLabel()}+W`)}
       {item('Close others', 'closeOthers', <XCircle className="h-3.5 w-3.5 text-muted-foreground" />)}
       {item('Close to the right', 'closeRight', <ArrowRightToLine className="h-3.5 w-3.5 text-muted-foreground" />)}
       <div className="my-1 h-px bg-border/60" />
@@ -913,21 +913,102 @@ export function TabBar() {
     setDragSide(null);
   }, []);
 
-  // Keyboard shortcuts — respects user preference for modifier key (Cmd vs Ctrl)
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts — full browser-style tab keybinds
+  // Respects user preference for modifier key (Cmd vs Ctrl)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
+    /** Navigate to a tab, updating URL appropriately based on tab type */
+    const navigateToTab = (tab: Tab) => {
+      setActiveTab(tab.id);
+      if (tab.type === 'session' || tab.type === 'file' || tab.type === 'preview' || tab.type === 'terminal') {
+        window.history.pushState(null, '', tab.href);
+      } else {
+        router.push(tab.href);
+      }
+    };
+
+    /** Switch to the tab at the given offset from the active tab (+1 = next, -1 = prev) */
+    const cycleTab = (direction: 1 | -1) => {
+      const { tabOrder: order, tabs: allTabs, activeTabId: active } = useTabStore.getState();
+      if (order.length === 0) return;
+      const currentIdx = active ? order.indexOf(active) : -1;
+      // Wrap around: last → first, first → last
+      const nextIdx = (currentIdx + direction + order.length) % order.length;
+      const targetTab = allTabs[order[nextIdx]];
+      if (targetTab) navigateToTab(targetTab);
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const { keyboard } = useUserPreferencesStore.getState().preferences;
       const tabMod = keyboard.tabSwitchModifier;
       const closeMod = keyboard.closeTabModifier;
 
-      // Check if the correct modifier is held for tab switching
-      const tabModHeld = tabMod === 'meta' ? e.metaKey : e.ctrlKey;
-      const tabModOther = tabMod === 'meta' ? e.ctrlKey : e.metaKey;
-      // Reject if alt is held or the "other" modifier is also held
+      // Resolve which modifier the user chose
+      const modHeld = tabMod === 'meta' ? e.metaKey : e.ctrlKey;
+      const modOther = tabMod === 'meta' ? e.ctrlKey : e.metaKey;
+      const closeModHeld = closeMod === 'meta' ? e.metaKey : e.ctrlKey;
+      const closeModOther = closeMod === 'meta' ? e.ctrlKey : e.metaKey;
+
+      // ── New tab: Modifier + T ────────────────────────────────────────
+      if (modHeld && !modOther && !e.shiftKey && !e.altKey && e.code === 'KeyT') {
+        e.preventDefault();
+        router.push('/dashboard');
+        return;
+      }
+
+      // ── Reopen closed tab: Modifier + Shift + T ─────────────────────
+      if (modHeld && !modOther && e.shiftKey && !e.altKey && e.code === 'KeyT') {
+        e.preventDefault();
+        const reopened = useTabStore.getState().reopenLastClosedTab();
+        if (reopened) navigateToTab(reopened);
+        return;
+      }
+
+      // ── Close tab: Modifier + W ─────────────────────────────────────
+      if (closeModHeld && !closeModOther && !e.shiftKey && !e.altKey && e.code === 'KeyW') {
+        e.preventDefault();
+        const { activeTabId: active, tabs: allTabs } = useTabStore.getState();
+        if (active && allTabs[active] && !allTabs[active].pinned) {
+          handleClose(active);
+        }
+        return;
+      }
+
+      // Skip remaining shortcuts if alt is held (except Option+Arrow which needs alt)
+      // ── Next tab: Modifier + Option + → (ArrowRight) ────────────────
+      if (modHeld && !modOther && !e.shiftKey && e.altKey && e.code === 'ArrowRight') {
+        e.preventDefault();
+        cycleTab(1);
+        return;
+      }
+
+      // ── Prev tab: Modifier + Option + ← (ArrowLeft) ────────────────
+      if (modHeld && !modOther && !e.shiftKey && e.altKey && e.code === 'ArrowLeft') {
+        e.preventDefault();
+        cycleTab(-1);
+        return;
+      }
+
+      // All remaining shortcuts reject alt
       if (e.altKey) return;
 
-      // Tab switching: Modifier + 1-9
-      if (tabModHeld && !tabModOther) {
+      // ── Next tab: Modifier + Shift + ] (BracketRight) ───────────────
+      if (modHeld && !modOther && e.shiftKey && e.code === 'BracketRight') {
+        e.preventDefault();
+        cycleTab(1);
+        return;
+      }
+
+      // ── Prev tab: Modifier + Shift + [ (BracketLeft) ────────────────
+      if (modHeld && !modOther && e.shiftKey && e.code === 'BracketLeft') {
+        e.preventDefault();
+        cycleTab(-1);
+        return;
+      }
+
+      // ── Tab switching: Modifier + 1-9 ───────────────────────────────
+      if (modHeld && !modOther && !e.shiftKey) {
         const digitMatch = e.code.match(/^Digit(\d)$/);
         if (digitMatch) {
           const num = parseInt(digitMatch[1], 10);
@@ -937,30 +1018,11 @@ export function TabBar() {
             const idx = num === 9 ? order.length - 1 : num - 1;
             if (idx >= 0 && idx < order.length) {
               const targetTab = allTabs[order[idx]];
-              if (targetTab) {
-                setActiveTab(targetTab.id);
-                if (targetTab.type === 'session' || targetTab.type === 'file' || targetTab.type === 'preview' || targetTab.type === 'terminal') {
-                  window.history.pushState(null, '', targetTab.href);
-                } else {
-                  router.push(targetTab.href);
-                }
-              }
+              if (targetTab) navigateToTab(targetTab);
             }
             return;
           }
         }
-      }
-
-      // Close tab: Modifier + W
-      const closeModHeld = closeMod === 'meta' ? e.metaKey : e.ctrlKey;
-      const closeModOther = closeMod === 'meta' ? e.ctrlKey : e.metaKey;
-      if (closeModHeld && !closeModOther && e.code === 'KeyW') {
-        e.preventDefault();
-        const { activeTabId: active, tabs: allTabs } = useTabStore.getState();
-        if (active && allTabs[active] && !allTabs[active].pinned) {
-          handleClose(active);
-        }
-        return;
       }
     };
 

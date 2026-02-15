@@ -126,6 +126,24 @@ export class SessionManager {
       );
   }
 
+  async invalidateSession(
+    configId: string,
+    channelType: string,
+    strategy: SessionStrategy,
+    message: NormalizedMessage,
+  ): Promise<void> {
+    const key = this.buildKey(configId, channelType, strategy, message);
+    this.cache.delete(key);
+    await db
+      .delete(channelSessions)
+      .where(
+        and(
+          eq(channelSessions.channelConfigId, configId),
+          eq(channelSessions.strategyKey, key),
+        ),
+      );
+  }
+
   cleanup(): void {
     const now = Date.now();
     for (const [key, entry] of this.cache) {

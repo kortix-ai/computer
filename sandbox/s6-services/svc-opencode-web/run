@@ -11,7 +11,5 @@ chown -R abc:abc /workspace/.local/share/opencode
 exec s6-setuidgid abc \
   env HOME=/workspace \
       OPENCODE_CONFIG_DIR=/opt/opencode \
-      OPENCODE_SERVER_USERNAME= \
-      OPENCODE_SERVER_PASSWORD= \
       PATH="/opt/bun/bin:/usr/local/bin:/usr/bin:/bin" \
   opencode web --port 3111 --hostname 0.0.0.0

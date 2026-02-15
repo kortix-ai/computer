@@ -469,14 +469,14 @@ export function AgentModelSelector({
                     <Tooltip>
                       <TooltipTrigger asChild>
                           <Link
-                            href="/settings/env-manager"
+                            href="/settings/providers"
                             className="h-6 w-6 p-0 flex items-center justify-center"
                           >
                             <KeyRound className="h-3.5 w-3.5" />
                           </Link>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="text-xs">
-                          Local .Env Manager
+                          Providers
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip>

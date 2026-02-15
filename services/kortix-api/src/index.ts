@@ -17,6 +17,7 @@ import { channelsApp, startChannelService, stopChannelService, getChannelService
 import { daytonaProxyApp } from './daytona-proxy';
 import { deploymentsApp } from './deployments';
 import { setupApp } from './setup';
+import { providersApp } from './providers/routes';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -139,7 +140,8 @@ app.route('/v1/deployments', deploymentsApp); // /v1/deployments/*
 app.route('/', channelsApp);                 // /v1/channels/*, /webhooks/*
 // Setup routes — local-only. Provides .env management and system status.
 if (config.isLocal()) {
-  app.route('/v1/setup', setupApp);          // /v1/setup/status, /v1/setup/env, /v1/setup/schema, /v1/setup/health
+  app.route('/v1/setup', setupApp);          // /v1/setup/status, /v1/setup/env, /v1/setup/schema, /v1/setup/health, /v1/setup/onboarding-*
+  app.route('/v1/providers', providersApp);   // /v1/providers, /v1/providers/schema, /v1/providers/:id/connect, /v1/providers/:id/disconnect, /v1/providers/health
 }
 
 // Daytona Proxy is cloud-only (requires Daytona API). In local mode the catch-all
