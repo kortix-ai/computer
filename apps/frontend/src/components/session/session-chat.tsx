@@ -368,13 +368,21 @@ function DebugView({ messages }: { messages: MessageWithParts[] | undefined }) {
     <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-relaxed bg-black/5 dark:bg-white/5">
       {messages.map((msg) => (
         <details key={msg.info.id} className="mb-3 border border-border/40 rounded-lg overflow-hidden">
-          <summary className="px-3 py-2 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors flex items-center gap-2">
+          <summary className={cn(
+            "px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors flex items-center gap-2",
+            (msg.info as any).error ? 'bg-red-500/20' : 'bg-muted/30',
+          )}>
             <span className={cn(
               'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase',
               msg.info.role === 'user' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500',
             )}>
               {msg.info.role}
             </span>
+            {(msg.info as any).error && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/30 text-red-500">
+                ERROR: {(msg.info as any).error?.name}
+              </span>
+            )}
             <span className="text-muted-foreground truncate">{msg.info.id}</span>
             <span className="ml-auto text-muted-foreground/60">{msg.parts.length} parts</span>
           </summary>
@@ -2924,9 +2932,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
         messages={messages}
         sessionId={sessionId}
-        onTogglePanel={handleTogglePanel}
-        isPanelOpen={isSidePanelOpen}
-        hasToolCalls={hasToolCalls}
         onFileSearch={handleFileSearch}
         providers={providers}
       />
