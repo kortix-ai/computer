@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
-import { useSessionErrorStore } from '@/stores/opencode-session-error-store';
 import { useServerStore } from '@/stores/server-store';
 import { getClient, resetClient } from '@/lib/opencode-sdk';
 import { logger } from '@/lib/logger';
@@ -35,8 +34,6 @@ export function useOpenCodeEventStream() {
   const addQuestion = useOpenCodePendingStore((s) => s.addQuestion);
   const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
   const clearPending = useOpenCodePendingStore((s) => s.clear);
-  const addSessionError = useSessionErrorStore((s) => s.addError);
-  const clearSessionErrors = useSessionErrorStore((s) => s.clearAll);
   const serverVersion = useServerStore((s) => s.serverVersion);
   const abortRef = useRef<AbortController | null>(null);
   const prevServerVersionRef = useRef(serverVersion);
@@ -54,7 +51,6 @@ export function useOpenCodeEventStream() {
       resetClient();
       clearStatuses({});
       clearPending();
-      clearSessionErrors();
       queryClient.removeQueries({ queryKey: opcodeKeys.all });
     }
 
@@ -259,10 +255,12 @@ export function useOpenCodeEventStream() {
         }
 
         // ---- Session errors ----
+        // NOTE: session.error is only used for browser notifications.
+        // The actual error data arrives via message.updated with AssistantMessage.error set,
+        // which is rendered inline by TurnErrorDisplay (matching SolidJS reference).
         case 'session.error': {
           const props = event.properties as { sessionID?: string; error?: any };
           if (props.sessionID && props.error) {
-            addSessionError(props.sessionID, props.error);
             // Fire browser notification for errors
             const errorTitle = props.error?.name || props.error?.data?.message || 'An error occurred';
             notifySessionError(
@@ -483,7 +481,7 @@ export function useOpenCodeEventStream() {
     // reconnection → cache invalidation cascades (the "random loading" bug).
     // The SDK's getClient() auto-detects URL changes via URL comparison,
     // so it handles URL updates lazily on next API call.
-  }, [queryClient, setStatus, clearStatuses, addPermission, removePermission, addQuestion, removeQuestion, clearPending, addSessionError, clearSessionErrors, serverVersion]);
+  }, [queryClient, setStatus, clearStatuses, addPermission, removePermission, addQuestion, removeQuestion, clearPending, serverVersion]);
 }
 
 // Use the correct key reference
