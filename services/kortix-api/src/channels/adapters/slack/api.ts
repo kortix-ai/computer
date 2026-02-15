@@ -93,4 +93,53 @@ export class SlackApi {
     });
     return res.json() as Promise<SlackUserInfo>;
   }
+
+  async addReaction(channel: string, timestamp: string, name: string): Promise<{ ok: boolean; error?: string }> {
+    const res = await fetch(`${SLACK_API}/reactions.add`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.botToken}`,
+      },
+      body: JSON.stringify({ channel, timestamp, name }),
+    });
+    return res.json() as Promise<{ ok: boolean; error?: string }>;
+  }
+
+  async removeReaction(channel: string, timestamp: string, name: string): Promise<{ ok: boolean; error?: string }> {
+    const res = await fetch(`${SLACK_API}/reactions.remove`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.botToken}`,
+      },
+      body: JSON.stringify({ channel, timestamp, name }),
+    });
+    return res.json() as Promise<{ ok: boolean; error?: string }>;
+  }
+
+  async conversationsReplies(
+    channel: string,
+    ts: string,
+    limit = 20,
+  ): Promise<{ ok: boolean; messages?: SlackReplyMessage[]; error?: string }> {
+    const params = new URLSearchParams({ channel, ts, limit: String(limit) });
+    const res = await fetch(`${SLACK_API}/conversations.replies?${params}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.botToken}`,
+      },
+    });
+    return res.json() as Promise<{ ok: boolean; messages?: SlackReplyMessage[]; error?: string }>;
+  }
+}
+
+export interface SlackReplyMessage {
+  type: string;
+  user?: string;
+  bot_id?: string;
+  text?: string;
+  ts: string;
+  thread_ts?: string;
+  subtype?: string;
 }

@@ -22,6 +22,12 @@ export interface Attachment {
   size?: number;
 }
 
+export interface ThreadMessage {
+  sender: string;
+  text: string;
+  isBot?: boolean;
+}
+
 export interface NormalizedMessage {
   externalId: string;
   channelType: ChannelType;
@@ -38,6 +44,8 @@ export interface NormalizedMessage {
   groupId?: string;
   isMention?: boolean;
   raw?: unknown;
+  /** Previous messages in the thread, for context */
+  threadContext?: ThreadMessage[];
 }
 
 export interface AgentResponse {

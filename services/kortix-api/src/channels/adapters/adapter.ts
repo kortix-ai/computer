@@ -25,6 +25,7 @@ export interface ChannelAdapter {
   ): Promise<void>;
 
   sendTypingIndicator?(config: ChannelConfig, message: NormalizedMessage): Promise<void>;
+  removeTypingIndicator?(config: ChannelConfig, message: NormalizedMessage): Promise<void>;
   onChannelCreated?(config: ChannelConfig): Promise<void>;
   onChannelRemoved?(config: ChannelConfig): Promise<void>;
   validateCredentials?(credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }>;
@@ -58,6 +59,7 @@ export abstract class BaseAdapter implements ChannelAdapter {
   }
 
   async sendTypingIndicator(_config: ChannelConfig, _message: NormalizedMessage): Promise<void> {}
+  async removeTypingIndicator(_config: ChannelConfig, _message: NormalizedMessage): Promise<void> {}
   async onChannelCreated(_config: ChannelConfig): Promise<void> {}
   async onChannelRemoved(_config: ChannelConfig): Promise<void> {}
   async validateCredentials(_credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }> {

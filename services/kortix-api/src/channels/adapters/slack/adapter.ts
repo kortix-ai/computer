@@ -19,7 +19,7 @@ export class SlackAdapter extends BaseAdapter {
     textChunkLimit: 4000,
     supportsRichText: true,
     supportsEditing: true,
-    supportsTypingIndicator: false,
+    supportsTypingIndicator: true,
     supportsAttachments: true,
     connectionType: 'webhook',
   };
@@ -66,6 +66,34 @@ export class SlackAdapter extends BaseAdapter {
         console.error(`[SLACK] postMessage failed: ${result.error}`);
       }
     }
+  }
+
+  private static PROGRESS_EMOJI = 'hourglass_flowing_sand';
+
+  override async sendTypingIndicator(channelConfig: ChannelConfig, message: NormalizedMessage): Promise<void> {
+    const botToken = this.getBotToken(channelConfig);
+    if (!botToken) return;
+
+    const rawPayload = message.raw as Record<string, unknown> | undefined;
+    const event = rawPayload?.event as Record<string, unknown> | undefined;
+    const channel = event?.channel as string;
+    if (!channel) return;
+
+    const api = new SlackApi(botToken);
+    await api.addReaction(channel, message.externalId, SlackAdapter.PROGRESS_EMOJI);
+  }
+
+  override async removeTypingIndicator(channelConfig: ChannelConfig, message: NormalizedMessage): Promise<void> {
+    const botToken = this.getBotToken(channelConfig);
+    if (!botToken) return;
+
+    const rawPayload = message.raw as Record<string, unknown> | undefined;
+    const event = rawPayload?.event as Record<string, unknown> | undefined;
+    const channel = event?.channel as string;
+    if (!channel) return;
+
+    const api = new SlackApi(botToken);
+    await api.removeReaction(channel, message.externalId, SlackAdapter.PROGRESS_EMOJI);
   }
 
   override async onChannelRemoved(channelConfig: ChannelConfig): Promise<void> {
@@ -122,7 +150,7 @@ export class SlackAdapter extends BaseAdapter {
     }
 
     const state = JSON.stringify({ sandboxId, accountId: sandbox.accountId });
-    const scopes = 'chat:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history';
+    const scopes = 'chat:write,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history';
 
     const slackUrl = new URL('https://slack.com/oauth/v2/authorize');
     slackUrl.searchParams.set('client_id', clientId);

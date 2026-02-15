@@ -3,10 +3,11 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '../../../shared/db';
 import { channelConfigs } from '@kortix/db';
 import type { ChannelConfig } from '@kortix/db';
-import type { NormalizedMessage, ChatType } from '../../types';
+import type { NormalizedMessage, ChatType, ThreadMessage } from '../../types';
 import type { ChannelEngine } from '../adapter';
 import { WebhookVerificationError } from '../../../errors';
 import { config as appConfig } from '../../../config';
+import { SlackApi } from './api';
 
 interface SlackUrlVerification {
   type: 'url_verification';
@@ -166,7 +167,19 @@ export async function handleSlackWebhook(
     raw: eventPayload,
   };
 
-  engine.processMessage(normalized).catch((err) => {
+  // Fire-and-forget: fetch thread context (if in thread) then process
+  (async () => {
+    if (event.thread_ts && event.channel) {
+      normalized.threadContext = await fetchThreadContext(
+        channelConfig,
+        event.channel,
+        event.thread_ts,
+        event.ts || '',
+        botUserId,
+      );
+    }
+    await engine.processMessage(normalized);
+  })().catch((err) => {
     console.error('[SLACK] Failed to process message:', err);
   });
 
@@ -192,6 +205,44 @@ async function findConfigByTeamId(teamId: string): Promise<ChannelConfig | null>
   }
 
   return null;
+}
+
+async function fetchThreadContext(
+  channelConfig: ChannelConfig,
+  channel: string,
+  threadTs: string,
+  currentTs: string,
+  botUserId?: string,
+): Promise<ThreadMessage[]> {
+  try {
+    const credentials = channelConfig.credentials as Record<string, unknown>;
+    const botToken = credentials?.botToken as string | undefined;
+    if (!botToken) return [];
+
+    const api = new SlackApi(botToken);
+    const result = await api.conversationsReplies(channel, threadTs, 30);
+    if (!result.ok || !result.messages) return [];
+
+    const context: ThreadMessage[] = [];
+    for (const msg of result.messages) {
+      // Skip the current message (will be sent as the main content)
+      if (msg.ts === currentTs) continue;
+      if (!msg.text) continue;
+
+      const isBot = !!(msg.bot_id || msg.subtype === 'bot_message');
+      const isSelf = isBot && botUserId && msg.user === botUserId;
+
+      context.push({
+        sender: isSelf ? 'assistant' : (msg.user || 'unknown'),
+        text: msg.text,
+        isBot,
+      });
+    }
+    return context;
+  } catch (err) {
+    console.warn('[SLACK] Failed to fetch thread context:', err);
+    return [];
+  }
 }
 
 function detectChatType(channelType?: string): ChatType {

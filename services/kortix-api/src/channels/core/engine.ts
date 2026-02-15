@@ -90,41 +90,53 @@ export class ChannelEngineImpl {
       });
     }
 
-    const ready = await connector.isReady();
-    if (!ready) {
-      console.log(`[CHANNELS] Sandbox ${config.sandboxId} offline, queuing message`);
-      try {
-        await this.queue.enqueue(config.sandboxId, message, config, connector);
-      } catch (err) {
-        console.error(`[CHANNELS] Queue processing failed:`, err);
+    const removeReaction = () => {
+      if (adapter.removeTypingIndicator) {
+        adapter.removeTypingIndicator(config, message).catch((err) => {
+          console.warn(`[CHANNELS] Remove typing indicator failed:`, err);
+        });
       }
-      return;
-    }
-
-    const sessionId = await this.sessionManager.resolve(config, message, connector);
-
-    const prompt = this.buildPrompt(config, message);
-
-    let responseText: string;
-    try {
-      const model = this.resolveModel(config);
-      responseText = await connector.prompt(sessionId, prompt, config.agentName ?? undefined, model);
-    } catch (err) {
-      console.error(`[CHANNELS] Agent prompt failed:`, err);
-      throw new ChannelError(`Failed to get response from agent: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    const chunks = this.chunkResponse(responseText, adapter.capabilities.textChunkLimit);
-
-    const agentResponse: AgentResponse = {
-      content: responseText,
-      sessionId,
-      truncated: chunks.length > 1,
     };
 
-    await adapter.sendResponse(config, message, agentResponse);
+    try {
+      const ready = await connector.isReady();
+      if (!ready) {
+        console.log(`[CHANNELS] Sandbox ${config.sandboxId} offline, queuing message`);
+        try {
+          await this.queue.enqueue(config.sandboxId, message, config, connector);
+        } catch (err) {
+          console.error(`[CHANNELS] Queue processing failed:`, err);
+        }
+        return;
+      }
 
-    await this.logMessage(config, message, 'outbound', responseText, sessionId);
+      const sessionId = await this.sessionManager.resolve(config, message, connector);
+
+      const prompt = this.buildPrompt(config, message);
+
+      let responseText: string;
+      try {
+        const model = this.resolveModel(config);
+        responseText = await connector.prompt(sessionId, prompt, config.agentName ?? undefined, model);
+      } catch (err) {
+        console.error(`[CHANNELS] Agent prompt failed:`, err);
+        throw new ChannelError(`Failed to get response from agent: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      const chunks = this.chunkResponse(responseText, adapter.capabilities.textChunkLimit);
+
+      const agentResponse: AgentResponse = {
+        content: responseText,
+        sessionId,
+        truncated: chunks.length > 1,
+      };
+
+      await adapter.sendResponse(config, message, agentResponse);
+
+      await this.logMessage(config, message, 'outbound', responseText, sessionId);
+    } finally {
+      removeReaction();
+    }
   }
 
   private resolveModel(config: ChannelConfig): { providerID: string; modelID: string } {
@@ -154,6 +166,14 @@ export class ChannelEngineImpl {
     parts.push(
       `[Channel: ${config.channelType} | Chat: ${message.chatType} | User: ${message.platformUser.name}]`,
     );
+
+    if (message.threadContext && message.threadContext.length > 0) {
+      const threadLines = message.threadContext.map((m) => {
+        const role = m.isBot ? 'Kortix' : m.sender;
+        return `${role}: ${m.text}`;
+      });
+      parts.push(`--- Thread context ---\n${threadLines.join('\n')}\n--- End thread context ---`);
+    }
 
     parts.push(message.content);
 
