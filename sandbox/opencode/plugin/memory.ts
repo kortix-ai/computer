@@ -70,8 +70,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 		}
 	}
 
-	log("info", "[mem] Plugin loading...")
-
 	// Initialize SQLite database
 	let db: Database
 	try {
@@ -88,7 +86,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 		log("warn", `[mem] LSS mem directory creation failed: ${err}`)
 	}
 
-	log("info", `[mem] Plugin ready (db + LSS)`)
+	log("info", "[mem] Init: ready")
 
 	// ── Session State ──────────────────────────────────────────────────
 	// In-memory state for the current session (persists across tool calls
@@ -99,6 +97,10 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	let promptCount = 0
 	let observationCount = 0
 
+	// Cached context block — generated once on session start, injected into system prompt
+	let cachedContextBlock: string = ""
+	let contextInjectedForSession = false
+
 	// Track all files touched in this session for summary generation
 	const sessionFilesRead = new Set<string>()
 	const sessionFilesModified = new Set<string>()
@@ -107,16 +109,16 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	// tool.execute.after only has output/metadata, NOT the original args.
 	const pendingToolArgs = new Map<string, Record<string, unknown>>()
 
-	// ── Summary Timer State ───────────────────────────────────────────
-	// 30-minute debounce: summary only fires after sustained inactivity.
-	// Any user activity (chat.message) cancels and reschedules the timer.
-	const SUMMARY_DEBOUNCE_MS = 30 * 60 * 1000 // 30 minutes
-	let summaryTimer: ReturnType<typeof setTimeout> | null = null
+	// ── Summary Interval State ───────────────────────────────────────
+	// Hourly periodic job: summarizes all observations since last summarized_at.
+	// Runs continuously while a session is active. Does not depend on idle events.
+	const SUMMARY_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
+	let summaryInterval: ReturnType<typeof setInterval> | null = null
 
-	function clearSummaryTimer(): void {
-		if (summaryTimer !== null) {
-			clearTimeout(summaryTimer)
-			summaryTimer = null
+	function clearSummaryInterval(): void {
+		if (summaryInterval !== null) {
+			clearInterval(summaryInterval)
+			summaryInterval = null
 		}
 	}
 
@@ -152,7 +154,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					filesRead: existingSummary.filesRead,
 					filesModified: existingSummary.filesModified,
 				}
-				log("info", `[mem] Incremental summary: ${observations.length} new observations`)
 			} else {
 				// Fresh: get all observations
 				observations = getObservationsBySessionId(db, sessionId)
@@ -160,7 +161,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					if (markComplete) completeSession(db, sessionId)
 					return
 				}
-				log("info", `[mem] Fresh summary from ${observations.length} observations`)
 			}
 
 			// AI summary generation (incremental or fresh)
@@ -185,7 +185,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				// Non-critical: LSS indexing is best-effort
 			}
 
-			log("info", `[mem]   └─ Summary saved: "${(summaryFields.completed || "").slice(0, 80)}"`)
+			log("info", `[mem] Summary: "${(summaryFields.completed || "").slice(0, 80)}"`)
 
 			if (markComplete) {
 				completeSession(db, sessionId)
@@ -196,26 +196,17 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	}
 
 	/**
-	 * Schedule summary generation after SUMMARY_DEBOUNCE_MS of inactivity.
-	 * Clears any existing timer before scheduling a new one.
+	 * Start the hourly summary interval for a session.
+	 * Clears any existing interval before starting a new one.
+	 * Periodic runs use markComplete=false (don't end the session).
 	 */
-	function scheduleSummaryTimer(sessionId: string): void {
-		clearSummaryTimer()
-		log("info", `[mem] ⏱️ Summary timer scheduled (${SUMMARY_DEBOUNCE_MS / 1000}s)`)
-		summaryTimer = setTimeout(() => {
-			summaryTimer = null
-			log("info", `[mem] ⏱️ Summary timer fired`)
-			generateSummaryForSession(sessionId, true).then(() => {
-				// Reset state after completed summary
-				currentSessionId = null
-				promptCount = 0
-				observationCount = 0
-				sessionFilesRead.clear()
-				sessionFilesModified.clear()
-			}).catch((err) => {
-				log("warn", `[mem] ⚠ Summary timer callback failed: ${err}`)
+	function startSummaryInterval(sessionId: string): void {
+		clearSummaryInterval()
+		summaryInterval = setInterval(() => {
+			generateSummaryForSession(sessionId, false).catch((err) => {
+				log("warn", `[mem] Summary interval failed: ${err}`)
 			})
-		}, SUMMARY_DEBOUNCE_MS)
+		}, SUMMARY_INTERVAL_MS)
 	}
 
 	// ── Helper: Get project ID ─────────────────────────────────────────
@@ -329,7 +320,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						dateStart: args.date_start,
 						dateEnd: args.date_end,
 					})
-					log("info", `[mem] 🔍 mem_search: "${args.query}" → ${results.totalEstimate} results`)
 					context.metadata({ title: `Search: "${args.query}" (${results.totalEstimate} results)` })
 					return formatSearchResults(results)
 				},
@@ -365,7 +355,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						args.depth_before,
 						args.depth_after,
 					)
-					log("info", `[mem] 📅 mem_timeline: #${args.anchor} → ${result.observations.length} entries`)
 					context.metadata({ title: `Timeline around #${args.anchor}` })
 					return formatTimeline(result)
 				},
@@ -388,7 +377,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				},
 				async execute(args, context) {
 					const observations = getObservationsByIds(db, args.ids)
-					log("info", `[mem] 📋 mem_get: [${args.ids.join(",")}] → ${observations.length} observations`)
 					context.metadata({
 						title: `Fetched ${observations.length} observations`,
 					})
@@ -442,7 +430,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						promptNumber: null,
 					})
 
-					log("info", `[mem] 💾 mem_save: #${id} "${title}"`)
 					context.metadata({ title: `Saved: ${title}` })
 					return `Observation #${id} saved: "${title}"`
 				},
@@ -473,14 +460,11 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				const capturedArgs = pendingToolArgs.get(input.callID) ?? {}
 				pendingToolArgs.delete(input.callID)
 
-				log("info", `[mem] ⤳ tool.execute.after: ${input.tool}`)
-
 				// Ensure session exists
 				if (!currentSessionId) {
 					currentSessionId = input.sessionID
 					const projectId = await resolveProjectId()
 					createSession(db, currentSessionId, projectId)
-					log("info", `[mem]   └─ Session created: ${currentSessionId?.slice(0, 12)}...`)
 				}
 
 				// Build raw tool data with REAL args from tool.execute.before
@@ -515,7 +499,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					for (const f of observation.filesRead) sessionFilesRead.add(f)
 					for (const f of observation.filesModified) sessionFilesModified.add(f)
 
-					log("info", `[mem]   └─ Observation #${obsId} saved: [${observation.type}] "${observation.title}"`)
+					log("info", `[mem] PostToolUse: #${obsId} [${observation.type}] "${observation.title}"`)
 
 					// Fire-and-forget: AI enrichment (non-blocking)
 					// After enrichment succeeds, re-write the companion file with AI-enhanced data
@@ -535,28 +519,21 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 			}
 		},
 
-		// ── HOOK: chat.message (Cancel timer on user activity) ─────────
+		// ── HOOK: chat.message (Session init + prompt counting) ─────────
 
 		"chat.message": async (input) => {
 			try {
-				// User is active — cancel any pending summary timer
-				if (summaryTimer !== null) {
-					clearSummaryTimer()
-					log("info", `[mem] 💬 User active — cancelled summary timer`)
-				}
-
 				// Initialize session if not yet set (e.g., first message)
 				if (!currentSessionId && input.sessionID) {
 					currentSessionId = input.sessionID
 					const projectId = await resolveProjectId()
 					createSession(db, currentSessionId, projectId)
-					log("info", `[mem] 💬 Session created: ${currentSessionId.slice(0, 12)}...`)
 				}
 
 				// Increment prompt count
 				if (currentSessionId) {
 					promptCount = incrementPromptCount(db, currentSessionId)
-					log("info", `[mem] 💬 Prompt #${promptCount}`)
+					log("info", `[mem] UserPrompt: #${promptCount}`)
 				}
 			} catch (err) {
 				log("warn", `[mem] ⚠ chat.message error: ${err}`)
@@ -573,11 +550,10 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					const sessionID = info?.id as string | undefined
 					if (!sessionID) return
 
-					// If a timer is pending for the old session, fire it immediately
-					if (summaryTimer !== null && currentSessionId) {
+					// If an interval is running for the old session, stop it and fire final summary
+					if (summaryInterval !== null && currentSessionId) {
 						const oldSessionId = currentSessionId
-						clearSummaryTimer()
-						log("info", `[mem] ⚡ New session starting — firing summary for old session ${oldSessionId.slice(0, 12)}...`)
+						clearSummaryInterval()
 						// Fire-and-forget: generate summary for old session without blocking new session init
 						generateSummaryForSession(oldSessionId, true).catch((err) => {
 							log("warn", `[mem] ⚠ Old session summary failed: ${err}`)
@@ -593,41 +569,32 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					const projectId = info?.projectID ?? (await resolveProjectId())
 					if (projectId) currentProjectId = projectId
 					createSession(db, sessionID, currentProjectId)
+					cachedContextBlock = generateContextBlock(db, currentProjectId ?? undefined)
+					contextInjectedForSession = false
 
-					log("info", `[mem] ⚡ Session created: ${sessionID.slice(0, 12)}...`)
+					log("info", `[mem] SessionStart: ${sessionID.slice(0, 12)}...`)
+					// Start hourly summary interval for this session
+					startSummaryInterval(sessionID)
 				}
 
 				// Note: prompt counting moved to chat.message hook (fires once per user message).
 				// session.updated and session.status fire many times per prompt and are not reliable.
 
-				// Session idle — schedule summary timer (debounced, NOT immediate)
-				if (event.type === "session.idle") {
-					const sessionID = (event as any).properties?.sessionID as string | undefined
-					if (!sessionID) return
-
-					log("info", `[mem] ⚡ Session idle: ${sessionID.slice(0, 12)}...`)
-
-					// Only process if this is our current active session
-					if (sessionID !== currentSessionId) return
-
-					const session = getSession(db, sessionID)
-					if (!session || session.status === "completed") return
-
-					// Schedule the 30-minute debounce timer instead of generating immediately
-					scheduleSummaryTimer(sessionID)
-				}
-
-				// Session deleted — cancel timer, reset state
+				// Session deleted — cancel interval, fire final summary, reset state
 				if (event.type === "session.deleted") {
 					const sessionID = (event as any).properties?.sessionID ?? (event as any).properties?.info?.id
 					if (sessionID === currentSessionId) {
-						clearSummaryTimer()
+						clearSummaryInterval()
+						// Fire final summary before cleanup
+						generateSummaryForSession(sessionID, true).catch(() => {})
 						currentSessionId = null
 						promptCount = 0
 						observationCount = 0
 						sessionFilesRead.clear()
 						sessionFilesModified.clear()
-						log("info", `[mem] ⚡ Session deleted: ${sessionID?.slice(0, 12)}...`)
+						cachedContextBlock = ""
+						contextInjectedForSession = false
+						log("info", `[mem] SessionEnd: ${sessionID?.slice(0, 12)}...`)
 					}
 				}
 			} catch (err) {
@@ -641,13 +608,18 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 
 		"experimental.chat.system.transform": async (_input, output) => {
 			try {
-				const context = generateContextBlock(db, currentProjectId ?? undefined)
-				if (context) {
-					output.system.push(context)
-					log("info", `[mem] 💉 Context injected (~${context.length} chars)`)
+				if (!cachedContextBlock) {
+					cachedContextBlock = generateContextBlock(db, currentProjectId ?? undefined)
+				}
+				if (cachedContextBlock) {
+					output.system.push(cachedContextBlock)
+					if (!contextInjectedForSession) {
+						log("info", `[mem] ContextInjection: ~${cachedContextBlock.length} chars`)
+						contextInjectedForSession = true
+					}
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ Context injection error: ${err}`)
+				log("warn", `[mem] Context injection error: ${err}`)
 			}
 		},
 
@@ -659,7 +631,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				const context = generateContextBlock(db, currentProjectId ?? undefined, 15, 3)
 				if (context) {
 					output.context.push(context)
-					log("info", `[mem] 🗜️ Compaction context injected (~${context.length} chars)`)
 				}
 			} catch (err) {
 				log("warn", `[mem] ⚠ Compaction injection error: ${err}`)

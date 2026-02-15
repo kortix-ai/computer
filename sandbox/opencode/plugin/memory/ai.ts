@@ -242,7 +242,6 @@ export async function compressObservationAsync(
 			filesModified: mergedFilesModified,
 		})
 
-		log("info", `[mem:ai] Enriched #${obsId}: "${compressed.title}"`)
 	} catch (err) {
 		log("warn", `[mem:ai] Compression failed for #${obsId}: ${err}`)
 	}
@@ -329,7 +328,6 @@ export async function generateSessionSummaryAsync(
 			return fallbackSummary(observations, existingSummary)
 		}
 
-		log("info", `[mem:ai] Summary generated (${isIncremental ? "incremental" : "fresh"})`)
 		return parsed
 	} catch (err) {
 		log("warn", `[mem:ai] Summary generation failed: ${err}`)
