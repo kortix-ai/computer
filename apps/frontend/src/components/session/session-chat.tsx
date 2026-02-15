@@ -125,8 +125,7 @@ import {
   getAnsweredQuestionParts,
   getTurnStatus,
   getTurnCost,
-  classifyTurnError,
-  type SessionErrorDisplay,
+  getTurnError,
   getRetryInfo,
   getPermissionForTool,
   getQuestionForTool,
@@ -146,10 +145,10 @@ import { ToolPartRenderer } from '@/components/session/tool-renderers';
 import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
 import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
-import { SessionErrorBanner, TurnErrorDisplay } from '@/components/session/session-error-banner';
+import { TurnErrorDisplay } from '@/components/session/session-error-banner';
 import { useTabStore } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
-import { useSessionErrorStore } from '@/stores/opencode-session-error-store';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '@/lib/api/billing';
 import { invalidateAccountState } from '@/hooks/billing/use-account-state';
@@ -1347,8 +1346,8 @@ function SessionTurn({
     [allParts, working],
   );
 
-  // Turn error — classified for rich display
-  const turnError = useMemo(() => classifyTurnError(turn), [turn]);
+  // Turn error — derived directly from message data (same approach as SolidJS reference)
+  const turnError = useMemo(() => getTurnError(turn), [turn]);
 
   // Shell mode detection
   const shellModePart = useMemo(() => getShellModePart(turn), [turn]);
@@ -1485,7 +1484,7 @@ function SessionTurn({
           defaultOpen
         />
         {turnError && (
-          <TurnErrorDisplay error={turnError} className="mt-2" />
+          <TurnErrorDisplay errorText={turnError} className="mt-2" />
         )}
       </div>
     );
@@ -1732,7 +1731,7 @@ function SessionTurn({
 
           {/* Error at bottom of steps */}
           {turnError && (
-            <TurnErrorDisplay error={turnError} />
+            <TurnErrorDisplay errorText={turnError} />
           )}
         </div>
       )}
@@ -1800,19 +1799,12 @@ function SessionTurn({
         </div>
       )}
 
-      {/* Streaming text when working and steps not expanded */}
-      {working && !stepsExpanded && lastTextPart?.text?.trim() && (
-        <div className="mt-3">
-          <div className="text-sm">
-            <SandboxUrlDetector content={lastTextPart.text} isStreaming={true} />
-          </div>
-        </div>
-      )}
+      {/* Streaming text is only visible inside expanded steps (matching SolidJS reference) */}
 
 
       {/* Error shown outside steps when collapsed */}
       {turnError && !stepsExpanded && (
-        <TurnErrorDisplay error={turnError} />
+        <TurnErrorDisplay errorText={turnError} />
       )}
 
       {/* Standalone permission (no tool ref) */}
@@ -2361,40 +2353,20 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     [messages],
   );
 
-  // ---- Hydrate session errors from AssistantMessage.error ----
-  // Errors can arrive via two channels: `session.error` SSE events (stored
-  // directly in the error store) and `AssistantMessage.error` fields (stored
-  // on messages in React Query cache). On initial load or SSE reconnection,
-  // `session.error` events from before the SSE connection may have been missed.
-  // This effect scans messages for errors and populates the store as a fallback,
-  // using the message ID as a dedup key to avoid duplicating SSE-sourced errors.
-  const addErrorIfNew = useSessionErrorStore((s) => s.addErrorIfNew);
-  useEffect(() => {
-    if (!messages || messages.length === 0) return;
-    for (const msg of messages) {
-      if (msg.info.role === 'assistant') {
-        const info = msg.info as any;
-        if (info.error) {
-          addErrorIfNew(info.sessionID || sessionId, info.error, info.id);
-        }
-      }
-    }
-  }, [messages, sessionId, addErrorIfNew]);
-
   // ============================================================================
   // Expanded state management (keyed by user message ID)
   // ============================================================================
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  // Auto-expand last turn when session is busy
+  // Auto-expand last turn when session is busy (use isBusy to avoid race with SSE sessionStatus)
   useEffect(() => {
     if (!messages || messages.length === 0) return;
     const lastUserId = [...messages].reverse().find((m) => m.info.role === 'user')?.info.id;
-    if (lastUserId && sessionStatus?.type !== 'idle') {
+    if (lastUserId && (sessionStatus?.type !== 'idle' || isBusy)) {
       setExpanded((prev) => ({ ...prev, [lastUserId]: true }));
     }
-  }, [sessionStatus, messages]);
+  }, [sessionStatus, messages, isBusy]);
 
   // Reset on session change
   useEffect(() => {
@@ -2490,22 +2462,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     await unrevertSession.mutateAsync(sessionId);
   }, [sessionId, unrevertSession]);
 
-  // ---- Session error dismissal on session change ----
-  const dismissSessionErrors = useSessionErrorStore((s) => s.dismissSessionErrors);
 
-  // ---- Error action handler (for banner action buttons) ----
-  const handleErrorAction = useCallback(
-    (display: SessionErrorDisplay) => {
-      // "Check settings" → could navigate to settings (no-op for now, dismiss the error)
-      // "Compact session" → trigger compaction (handled via the header menu)
-      // For now, dismiss the error — specific actions can be wired later.
-      if (display.actionLabel === 'Compact session') {
-        // Auto-scroll to the compact button in the header would be ideal,
-        // but for now just dismiss so the user can use the header compact menu.
-      }
-    },
-    [],
-  );
 
   // ============================================================================
   // Send / Stop / Command handlers
@@ -2668,12 +2625,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           onUnrevert={handleUnrevert}
         />
       )}
-
-      {/* Session error banner — shown when session.error events arrive */}
-      <SessionErrorBanner
-        sessionId={sessionId}
-        onErrorAction={handleErrorAction}
-      />
 
       {/* Debug mode toggle — floating, only visible when ?debug is in URL */}
       {isDebugEnabled && hasMessages && (
