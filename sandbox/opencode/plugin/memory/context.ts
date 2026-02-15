@@ -57,7 +57,11 @@ export function generateContextBlock(
 		"<mem-context>",
 		"# Recent Observation Memory",
 		"",
-		"This is your automatic observation history. Use `mem_search`, `mem_timeline`, and `mem_get` tools to explore past work in detail.",
+		"This is your automatic observation history. You have 4 memory tools available:",
+		"- `mem_search(query)` — Search past observations (semantic + keyword). Always start here.",
+		"- `mem_timeline(anchor=ID)` — Get chronological context around an observation.",
+		"- `mem_get(ids=[...])` — Fetch full details for specific observation IDs.",
+		"- `mem_save(text, title?, type?)` — Manually save important findings to memory.",
 		"",
 	]
 
