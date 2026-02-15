@@ -445,6 +445,14 @@ export function computeStatusFromPart(part: Part | undefined): string | undefine
         return 'Running commands...';
       case 'apply_patch':
         return 'Applying patches...';
+      case 'prune':
+        return 'Pruning context...';
+      case 'distill':
+        return 'Distilling context...';
+      case 'compress':
+        return 'Compressing context...';
+      case 'context_info':
+        return 'Updating context info...';
       default:
         return `Running ${part.tool}...`;
     }
@@ -556,7 +564,7 @@ export function getChildSessionToolParts(
 // Tool part filtering
 // ============================================================================
 
-const HIDDEN_TOOLS = new Set(['todoread']);
+const HIDDEN_TOOLS = new Set(['todoread', 'context_info']);
 
 export function shouldShowToolPart(part: ToolPart): boolean {
   return !HIDDEN_TOOLS.has(part.tool);
@@ -640,6 +648,14 @@ export function getToolInfo(tool: string, input: Record<string, any> = {}): Tool
       return { icon: 'check-square', title: 'Todos (read)' };
     case 'question':
       return { icon: 'message-circle', title: 'Questions' };
+    case 'prune':
+      return { icon: 'scissors', title: 'DCP Prune', subtitle: input.reason };
+    case 'distill':
+      return { icon: 'scissors', title: 'DCP Distill' };
+    case 'compress':
+      return { icon: 'scissors', title: 'DCP Compress', subtitle: input.topic };
+    case 'context_info':
+      return { icon: 'scissors', title: 'Context Info' };
     case 'pty_spawn':
       return { icon: 'terminal', title: 'Spawn', subtitle: input.title || input.command };
     case 'pty_read':

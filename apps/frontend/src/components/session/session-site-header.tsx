@@ -168,31 +168,28 @@ export function SessionSiteHeader({
                 </Button>
               </SharePopover>
 
-              {/* Panel toggle */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onToggleSidePanel}
-                    disabled={!canOpenSidePanel}
-                    className="h-9 w-9 cursor-pointer"
-                  >
-                    {isSidePanelOpen ? (
-                      <PanelRightClose className="h-4 w-4" />
-                    ) : (
-                      <PanelRightOpen className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={4}>
-                  <p>
-                    {!canOpenSidePanel
-                      ? 'No tools yet'
-                      : `${isSidePanelOpen ? 'Close' : 'Open'} Actions`}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
+              {/* Panel toggle — hidden until there are actions to show */}
+              {canOpenSidePanel && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onToggleSidePanel}
+                      className="h-9 w-9 cursor-pointer"
+                    >
+                      {isSidePanelOpen ? (
+                        <PanelRightClose className="h-4 w-4" />
+                      ) : (
+                        <PanelRightOpen className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={4}>
+                    <p>{isSidePanelOpen ? 'Close' : 'Open'} Actions</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </TooltipProvider>
           </div>
         </div>

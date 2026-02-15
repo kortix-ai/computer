@@ -539,8 +539,63 @@ function parseAttr(attrs: string, name: string): string | undefined {
   return m ? unescapeXml(m[1]) : undefined;
 }
 
+// Legacy DCP format: "▣ DCP | ~12.5K tokens saved total" (pre-XML version)
+const DCP_LEGACY_REGEX = /^▣ DCP \| ~([\d.]+K?) tokens saved total/;
+const DCP_LEGACY_PRUNING_REGEX = /▣ Pruning \(~([\d.]+K?) tokens(?:, distilled ([\d.]+K?) tokens)?\)(?:\s*—\s*(.+))?/;
+const DCP_LEGACY_ITEM_REGEX = /→\s+(\S+?):\s+(.+)/g;
+
+function parseLegacyDCPNotification(text: string): DCPNotification | null {
+  const headerMatch = text.match(DCP_LEGACY_REGEX);
+  if (!headerMatch) return null;
+
+  const tokenStr = headerMatch[1];
+  const tokensSaved = tokenStr.endsWith('K')
+    ? Math.round(parseFloat(tokenStr.slice(0, -1)) * 1000)
+    : parseInt(tokenStr, 10);
+
+  const pruningMatch = text.match(DCP_LEGACY_PRUNING_REGEX);
+  let batchSaved = 0;
+  let extractedTokens = 0;
+  let reason: string | undefined;
+  if (pruningMatch) {
+    const batchStr = pruningMatch[1];
+    batchSaved = batchStr.endsWith('K')
+      ? Math.round(parseFloat(batchStr.slice(0, -1)) * 1000)
+      : parseInt(batchStr, 10);
+    if (pruningMatch[2]) {
+      const extStr = pruningMatch[2];
+      extractedTokens = extStr.endsWith('K')
+        ? Math.round(parseFloat(extStr.slice(0, -1)) * 1000)
+        : parseInt(extStr, 10);
+    }
+    reason = pruningMatch[3]?.trim();
+  }
+
+  const items: DCPPrunedItem[] = [];
+  let itemMatch;
+  DCP_LEGACY_ITEM_REGEX.lastIndex = 0;
+  while ((itemMatch = DCP_LEGACY_ITEM_REGEX.exec(text)) !== null) {
+    items.push({ tool: itemMatch[1], description: itemMatch[2].trim() });
+  }
+
+  // Check for compress format
+  const isCompress = text.includes('▣ Compressing');
+
+  return {
+    type: isCompress ? 'compress' : 'prune',
+    tokensSaved,
+    batchSaved,
+    prunedCount: items.length,
+    extractedTokens,
+    reason,
+    items,
+  };
+}
+
 function parseDCPNotifications(text: string): { cleanText: string; notifications: DCPNotification[] } {
   const notifications: DCPNotification[] = [];
+
+  // First try XML format
   const cleanText = text.replace(DCP_TAG_REGEX, (_, attrs: string, body: string) => {
     const type = (parseAttr(attrs, 'type') || 'prune') as 'prune' | 'compress';
     const tokensSaved = parseInt(parseAttr(attrs, 'tokens-saved') || '0', 10);
@@ -584,6 +639,15 @@ function parseDCPNotifications(text: string): { cleanText: string; notifications
     });
     return '';
   }).trim();
+
+  // If no XML notifications found, try legacy format
+  if (notifications.length === 0 && cleanText) {
+    const legacy = parseLegacyDCPNotification(cleanText);
+    if (legacy) {
+      notifications.push(legacy);
+      return { cleanText: '', notifications };
+    }
+  }
 
   return { cleanText, notifications };
 }
