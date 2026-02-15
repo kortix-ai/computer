@@ -93,16 +93,19 @@ export function UserMenu({ user }: UserMenuProps) {
   const t = useTranslations('sidebar');
   const router = useRouter();
   const { isMobile } = useSidebar();
-  const { data: accountState } = useAccountState({ enabled: true });
+  const isLocal = isLocalMode();
+  const { data: accountState } = useAccountState({ enabled: !isLocal });
   const [showSettingsModal, setShowSettingsModal] = React.useState(false);
   const [showPlanModal, setShowPlanModal] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab>('general');
   const { isOpen: isReferralDialogOpen, openDialog: openReferralDialog, closeDialog: closeReferralDialog } = useReferralDialog();
   const { theme, setTheme } = useTheme();
 
-  const isFreeTier = accountState?.subscription?.tier_key === 'free' ||
+  const isFreeTier = !isLocal && (
+    accountState?.subscription?.tier_key === 'free' ||
     accountState?.tier?.name === 'free' ||
-    !accountState?.subscription?.tier_key;
+    !accountState?.subscription?.tier_key
+  );
 
   const openSettings = (tab: SettingsTab) => {
     setSettingsTab(tab);
@@ -119,19 +122,25 @@ export function UserMenu({ user }: UserMenuProps) {
   const getInitials = (name: string) =>
     name.split(' ').map((p) => p.charAt(0)).join('').toUpperCase().substring(0, 2);
 
-  // Data-driven menu items
-  const generalItems: MenuItemConfig[] = [
-    { icon: Zap, label: 'Plan', onClick: () => { trackCtaUpgrade(); setShowPlanModal(true); } },
-    { icon: LifeBuoy, label: 'Support', href: '/support' },
-    { icon: CreditCard, label: 'Billing', onClick: () => openSettings('billing') },
-    { icon: TrendingDown, label: 'Usage', onClick: () => openSettings('usage') },
-    { icon: Plug, label: 'Integrations', href: '/settings/credentials' },
-    { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
-    { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
-    { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
-    { icon: MessageSquare, label: 'Channels', href: '/channels' },
-    { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
-  ];
+  // Data-driven menu items — cloud-only items filtered out in local mode
+  const generalItems: MenuItemConfig[] = isLocal
+    ? [
+        { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
+        { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
+        { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
+      ]
+    : [
+        { icon: Zap, label: 'Plan', onClick: () => { trackCtaUpgrade(); setShowPlanModal(true); } },
+        { icon: LifeBuoy, label: 'Support', href: '/support' },
+        { icon: CreditCard, label: 'Billing', onClick: () => openSettings('billing') },
+        { icon: TrendingDown, label: 'Usage', onClick: () => openSettings('usage') },
+        { icon: Plug, label: 'Integrations', href: '/settings/credentials' },
+        { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
+        { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
+        { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
+        { icon: MessageSquare, label: 'Channels', href: '/channels' },
+        { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
+      ];
 
   const adminItems: MenuItemConfig[] = [
     { icon: MessageSquare, label: 'User Feedback', href: '/admin/feedback' },
@@ -176,9 +185,9 @@ export function UserMenu({ user }: UserMenuProps) {
     <>
       <SidebarMenu>
         <SidebarMenuItem className="relative">
-          {/* Referral + Upgrade above user card */}
-          <div className="absolute bottom-full left-0 right-0 mb-2 px-0 group-data-[collapsible=icon]:hidden z-50 flex flex-col gap-2">
-            {!isLocalMode() && (
+          {/* Referral + Upgrade above user card (cloud only) */}
+          {!isLocal && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 px-0 group-data-[collapsible=icon]:hidden z-50 flex flex-col gap-2">
               <SpotlightCard className="bg-zinc-200/60 dark:bg-zinc-800/60 backdrop-blur-md cursor-pointer">
                 <div onClick={openReferralDialog} className="flex items-center gap-3 px-3 py-2.5">
                   <Heart className="h-4 w-4 text-zinc-700 dark:text-zinc-300 flex-shrink-0" />
@@ -189,18 +198,18 @@ export function UserMenu({ user }: UserMenuProps) {
                   <ChevronRight className="h-4 w-4 text-zinc-500 flex-shrink-0" />
                 </div>
               </SpotlightCard>
-            )}
-            {isFreeTier && (
-              <Button
-                onClick={() => { trackCtaUpgrade(); setShowPlanModal(true); }}
-                variant="default"
-                size="lg"
-                className="w-full"
-              >
-                {t('upgrade')}
-              </Button>
-            )}
-          </div>
+              {isFreeTier && (
+                <Button
+                  onClick={() => { trackCtaUpgrade(); setShowPlanModal(true); }}
+                  variant="default"
+                  size="lg"
+                  className="w-full"
+                >
+                  {t('upgrade')}
+                </Button>
+              )}
+            </div>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -267,11 +276,15 @@ export function UserMenu({ user }: UserMenuProps) {
                 </>
               )}
 
-              <DropdownMenuSeparator className="my-1" />
-              <DropdownMenuItem onClick={handleLogout} className="gap-2 p-2">
-                <LogOut className="h-4 w-4" />
-                <span>{t('logout')}</span>
-              </DropdownMenuItem>
+              {!isLocal && (
+                <>
+                  <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuItem onClick={handleLogout} className="gap-2 p-2">
+                    <LogOut className="h-4 w-4" />
+                    <span>{t('logout')}</span>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>

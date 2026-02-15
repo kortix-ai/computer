@@ -341,10 +341,15 @@ function ProjectsFlyout() {
 // ============================================================================
 
 function UserProfileSection({ user }: { user: { name: string; email: string; avatar: string; isAdmin?: boolean } }) {
-  const { data: accountState } = useAccountState({ enabled: true });
   const isLocal = isLocalMode();
-  const planName = accountStateSelectors.planName(accountState);
+  const { data: accountState } = useAccountState({ enabled: !isLocal });
 
+  // In local mode, skip cloud plan info entirely
+  if (isLocal) {
+    return <UserMenu user={{ ...user, planName: 'Local', planIcon: undefined }} />;
+  }
+
+  const planName = accountStateSelectors.planName(accountState);
   return <UserMenu user={{ ...user, planName, planIcon: getPlanIcon(planName, isLocal) ?? undefined }} />;
 }
 
@@ -376,19 +381,22 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const { data: adminRoleData } = useAdminRole();
   const isAdmin = adminRoleData?.isAdmin ?? false;
 
+  const isLocal = isLocalMode();
+
   const [user, setUser] = useState<{
     name: string;
     email: string;
     avatar: string;
     isAdmin?: boolean;
-  }>({
-    name: 'Loading...',
-    email: '',
-    avatar: '',
-    isAdmin: false,
-  });
+  }>(() =>
+    isLocal
+      ? { name: 'Local User', email: '', avatar: '', isAdmin: false }
+      : { name: 'Loading...', email: '', avatar: '', isAdmin: false },
+  );
 
   useEffect(() => {
+    if (isLocal) return; // No Supabase auth in local mode
+
     const fetchUserData = async () => {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
@@ -402,7 +410,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       }
     };
     fetchUserData();
-  }, [isAdmin]);
+  }, [isAdmin, isLocal]);
 
   const createSession = useCreateOpenCodeSession();
 
