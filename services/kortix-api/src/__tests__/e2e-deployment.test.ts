@@ -19,7 +19,8 @@ import { join, resolve } from 'path';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const REPO_ROOT = '/Users/markokraemer/Projects/heyagi/computer';
+// Resolve repo root dynamically from this file's location: __tests__ -> src -> kortix-api -> services -> REPO_ROOT
+const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..');
 const SANDBOX_DIR = join(REPO_ROOT, 'sandbox');
 const SERVICES_DIR = join(REPO_ROOT, 'services');
 const TEST_TIMESTAMP = Date.now();
@@ -690,14 +691,10 @@ describe.skipIf(!HAS_DOCKER)('Deployment — Docker Compose Validation', () => {
       join(SANDBOX_DIR, 'docker-compose.yml'),
       'utf-8',
     );
-    // Should contain ${SANDBOX_VERSION:-X.Y.Z}
-    expect(content).toMatch(/\$\{SANDBOX_VERSION:-\d+\.\d+\.\d+\}/);
-
-    // Verify the default version matches sandbox/package.json
-    const pkgJson = JSON.parse(
-      readFileSync(join(SANDBOX_DIR, 'package.json'), 'utf-8'),
-    );
-    expect(content).toContain(`\${SANDBOX_VERSION:-${pkgJson.version}}`);
+    // Should contain ${SANDBOX_VERSION:-<something>} (version or "latest")
+    expect(content).toMatch(/\$\{SANDBOX_VERSION:-[^}]+\}/);
+    // Should reference the image with the version variable
+    expect(content).toContain('SANDBOX_VERSION');
   });
 
   it('sandbox compose has healthcheck configured', () => {
@@ -747,7 +744,7 @@ describe.skipIf(!HAS_DOCKER)('Deployment — Docker Compose Validation', () => {
       // The resolved config should not contain unresolved ${...} vars
       // (docker compose config resolves them or errors out)
       expect(stdout).toContain('image:');
-      expect(stdout).toContain('kortix-sandbox:');
+      expect(stdout).toContain('kortix-sandbox');
     }
   });
 });

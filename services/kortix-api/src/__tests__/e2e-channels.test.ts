@@ -35,8 +35,8 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
   beforeAll(async () => {
     await cleanupTestData();
 
-    // Create a sandbox to attach channels to
-    const res = await jsonPost(app, '/v1/sandboxes', {
+    // Create a sandbox to attach channels to (via cron sandboxes route)
+    const res = await jsonPost(app, '/v1/cron/sandboxes', {
       name: 'channel-test-sandbox',
       base_url: 'http://localhost:9999',
       auth_token: 'test-token',
@@ -308,10 +308,11 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
     });
 
     it('Deleting sandbox cascades to channel configs', async () => {
-      // Create a new sandbox with a channel
-      const sbRes = await jsonPost(app, '/v1/sandboxes', {
+      // Create a new sandbox with a channel (via cron sandboxes route)
+      const sbRes = await jsonPost(app, '/v1/cron/sandboxes', {
         name: 'cascade-test',
         base_url: 'http://localhost:7777',
+        status: 'active',
       });
       const sbBody = await sbRes.json();
       const cascadeSandboxId = sbBody.data.sandboxId;
@@ -325,7 +326,7 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
       const cascadeChannelId = chBody.data.channelConfigId;
 
       // Delete the sandbox
-      await jsonDelete(app, `/v1/sandboxes/${cascadeSandboxId}`);
+      await jsonDelete(app, `/v1/cron/sandboxes/${cascadeSandboxId}`);
 
       // Channel should be gone (cascade delete)
       const getRes = await jsonGet(app, `/v1/channels/${cascadeChannelId}`);

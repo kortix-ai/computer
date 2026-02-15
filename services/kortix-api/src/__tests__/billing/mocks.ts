@@ -112,12 +112,10 @@ export function registerGlobalMocks() {
       mockRegistry.upsertCustomer ? mockRegistry.upsertCustomer(data) : undefined,
   }));
 
-  mock.module('../../billing/services/credits', () => ({
-    grantCredits: async (...args: any[]) =>
-      mockRegistry.grantCredits ? mockRegistry.grantCredits(...args) : undefined,
-    resetExpiringCredits: async (...args: any[]) =>
-      mockRegistry.resetExpiringCredits ? mockRegistry.resetExpiringCredits(...args) : undefined,
-  }));
+  // NOTE: The credits service mock is NOT registered here.
+  // credits.test.ts needs the REAL credits module (with mocked deps).
+  // Other billing test files that need to stub grantCredits/resetExpiringCredits
+  // should call registerCreditsMock() separately.
 
 
   mock.module('../../billing/repositories/account-deletion', () => ({
@@ -131,6 +129,28 @@ export function registerGlobalMocks() {
       mockRegistry.markDeletionCompleted ? mockRegistry.markDeletionCompleted(id) : undefined,
     getScheduledDeletions: async () =>
       mockRegistry.getScheduledDeletions ? mockRegistry.getScheduledDeletions() : [],
+  }));
+}
+
+// ─── Credits Service Mock (separate from registerGlobalMocks) ────────────────
+// Call this from test files that need grantCredits/resetExpiringCredits to be
+// stubbed (webhooks, subscriptions, yearly-rotation). Do NOT call from credits.test.ts.
+
+let _creditsMockRegistered = false;
+export function registerCreditsMock() {
+  if (_creditsMockRegistered) return;
+  _creditsMockRegistered = true;
+
+  mock.module('../../billing/services/credits', () => ({
+    calculateTokenCost: () => 0,
+    getBalance: async () => ({ balance: 0, expiring: 0, nonExpiring: 0, daily: 0 }),
+    getCreditSummary: async () => ({ total: 0, daily: 0, monthly: 0, extra: 0, canRun: true }),
+    deductCredits: async () => ({ success: true, cost: 0, newBalance: 0, transactionId: 'tx_mock' }),
+    refreshDailyCredits: async () => null,
+    grantCredits: async (...args: any[]) =>
+      mockRegistry.grantCredits ? mockRegistry.grantCredits(...args) : undefined,
+    resetExpiringCredits: async (...args: any[]) =>
+      mockRegistry.resetExpiringCredits ? mockRegistry.resetExpiringCredits(...args) : undefined,
   }));
 }
 

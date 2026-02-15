@@ -3,11 +3,13 @@ import {
   createMockCreditAccount,
   mockRegistry,
   registerGlobalMocks,
+  registerCreditsMock,
   resetMockRegistry,
 } from './mocks';
 
-// Register global mocks once
+// Register global mocks + credits service mock (stubs grantCredits/resetExpiringCredits)
 registerGlobalMocks();
+registerCreditsMock();
 
 // ─── Track calls ──────────────────────────────────────────────────────────────
 

@@ -294,7 +294,7 @@ export function createTestApp(opts: TestAppOptions = {}) {
   if (opts.mountDeployments && hasDb) {
     try {
       const { deploymentsRouter } = require('../deployments/routes/deployments');
-      app.route('/v1/deployments/', deploymentsRouter);
+      app.route('/v1/deployments', deploymentsRouter);
     } catch (e) {
       console.warn('[test] Failed to mount deployment routes:', e);
     }

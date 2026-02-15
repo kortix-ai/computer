@@ -5,11 +5,13 @@ import {
   createMockStripeClient,
   mockRegistry,
   registerGlobalMocks,
+  registerCreditsMock,
   resetMockRegistry,
 } from './mocks';
 
-// Register global mocks once
+// Register global mocks + credits service mock (stubs grantCredits/resetExpiringCredits)
 registerGlobalMocks();
+registerCreditsMock();
 
 // ─── Track calls ──────────────────────────────────────────────────────────────
 
@@ -499,12 +501,25 @@ describe('cancelFreeSubscriptionForUpgrade', () => {
     expect(cancelledId).toBe('sub_old_free');
   });
 
-  test('does not throw when cancel fails', async () => {
+  test('does not throw when cancel fails with 404 (resource_missing)', async () => {
     mockRegistry.stripeClient.subscriptions.cancel = async () => {
-      throw new Error('Stripe error');
+      const err: any = new Error('No such subscription');
+      err.code = 'resource_missing';
+      err.statusCode = 404;
+      throw err;
     };
 
-    // Should not throw
+    // Should not throw — 404/resource_missing is silently ignored
     await cancelFreeSubscriptionForUpgrade('sub_old_free', 'acc_test_123');
+  });
+
+  test('re-throws non-404 cancel errors', async () => {
+    mockRegistry.stripeClient.subscriptions.cancel = async () => {
+      throw new Error('Stripe internal error');
+    };
+
+    await expect(
+      cancelFreeSubscriptionForUpgrade('sub_old_free', 'acc_test_123')
+    ).rejects.toThrow('Stripe internal error');
   });
 });
