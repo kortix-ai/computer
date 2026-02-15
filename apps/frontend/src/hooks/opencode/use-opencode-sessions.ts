@@ -851,8 +851,74 @@ export function useDeletePart() {
 
 export async function findOpenCodeFiles(query: string): Promise<string[]> {
   const client = getClient();
-  const result = await client.find.files({ query, limit: 20 });
-  return unwrap(result);
+  const normalizedQuery = query.trim();
+
+  const readEntries = async (request: Promise<{ data?: unknown; error?: unknown }>): Promise<string[]> => {
+    try {
+      const result = await request;
+      const entries = unwrap(result);
+      if (!Array.isArray(entries)) return [];
+      const normalized: string[] = [];
+      for (const entry of entries) {
+        if (typeof entry === 'string' && entry.length > 0) {
+          normalized.push(entry);
+          continue;
+        }
+
+        if (entry && typeof entry === 'object') {
+          const maybePath = (entry as { path?: unknown }).path;
+          const maybeType = (entry as { type?: unknown }).type;
+          if (typeof maybePath === 'string' && maybePath.length > 0) {
+            if (maybeType === 'directory' && !maybePath.endsWith('/')) {
+              normalized.push(`${maybePath}/`);
+            } else {
+              normalized.push(maybePath);
+            }
+          }
+        }
+      }
+      return normalized;
+    } catch {
+      return [];
+    }
+  };
+
+  const [strictFiles, broadResults] = await Promise.all([
+    readEntries(client.find.files({ query: normalizedQuery, type: 'file', limit: 80 })),
+    readEntries(client.find.files({ query: normalizedQuery, limit: 80 })),
+  ]);
+
+  const fileMatches = new Set<string>();
+  const directoryMatches: string[] = [];
+
+  for (const entry of [...strictFiles, ...broadResults]) {
+    if (entry.endsWith('/')) {
+      directoryMatches.push(entry);
+      continue;
+    }
+    fileMatches.add(entry);
+  }
+
+  if (fileMatches.size < 20 && normalizedQuery.length > 0 && directoryMatches.length > 0) {
+    const expandedDirs = directoryMatches.slice(0, 6);
+    const dirChildren = await Promise.all(
+      expandedDirs.map(async (dir) => {
+        const path = dir.endsWith('/') ? dir.slice(0, -1) : dir;
+        const children = await readEntries(client.file.list({ path }));
+        return children
+          .filter((child) => !child.endsWith('/'))
+          .filter((child) => child.toLowerCase().includes(normalizedQuery.toLowerCase()));
+      }),
+    );
+
+    for (const group of dirChildren) {
+      for (const child of group) {
+        fileMatches.add(child);
+      }
+    }
+  }
+
+  return Array.from(fileMatches).slice(0, 20);
 }
 
 // ============================================================================
