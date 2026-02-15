@@ -5,11 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { ArrowRight, Key, CheckCircle, Loader2, Save, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { LocalEnvManager } from '@/components/env-manager/local-env-manager';
 import { Button } from '@/components/ui/button';
 import { backendApi } from '@/lib/api-client';
+import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
+import { useTabStore } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -269,10 +273,45 @@ interface SetupOverlayProps {
 
 export function SetupOverlay({ onComplete }: SetupOverlayProps) {
   const [step, setStep] = useState<'welcome' | 'keys'>('welcome');
+  const createSession = useCreateOpenCodeSession();
 
   const handleWelcomeDone = useCallback(() => {
     setStep('keys');
   }, []);
+
+  const handleKeysDone = useCallback(async () => {
+    // 1. Dismiss the overlay immediately
+    onComplete();
+
+    // 2. Create a regular onboarding session in the background
+    try {
+      const session = await createSession.mutateAsync({ title: 'Kortix Onboarding' });
+
+      // 3. Open as a normal tab
+      useTabStore.getState().openTab({
+        id: session.id,
+        title: 'Kortix Onboarding',
+        type: 'session',
+        href: `/sessions/${session.id}`,
+        serverId: useServerStore.getState().activeServerId,
+      });
+
+      // 4. Store the initial prompt + agent so the session page sends it
+      sessionStorage.setItem(
+        `opencode_pending_prompt:${session.id}`,
+        'Hey! I just installed Kortix.',
+      );
+      sessionStorage.setItem(
+        `opencode_pending_options:${session.id}`,
+        JSON.stringify({ agent: 'kortix-onboarding' }),
+      );
+
+      // 5. Navigate to the session tab
+      window.history.pushState(null, '', `/sessions/${session.id}`);
+    } catch {
+      toast.warning('Failed to start onboarding session');
+    }
+  }, [onComplete, createSession]);
 
   return (
     <AnimatePresence mode="wait">
@@ -280,7 +319,7 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
         <WelcomeStep key="welcome" onDone={handleWelcomeDone} />
       )}
       {step === 'keys' && (
-        <ApiKeysStep key="keys" onDone={onComplete} />
+        <ApiKeysStep key="keys" onDone={handleKeysDone} />
       )}
     </AnimatePresence>
   );

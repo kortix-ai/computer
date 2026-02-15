@@ -383,7 +383,6 @@ export default function DashboardLayoutContent({
           <SetupOverlay
             onComplete={() => {
               setShowSetupOverlay(false);
-              router.push('/onboarding');
             }}
           />
         </Suspense>
