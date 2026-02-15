@@ -121,6 +121,9 @@ dmypy.json
 cython_debug/
 .pybuilder/
 target/
+computer.excalidraw
+flow-orchestrator.excalidraw
+mem-hook-flow.excalidraw
 
 # Claude
 CLAUDE.md
