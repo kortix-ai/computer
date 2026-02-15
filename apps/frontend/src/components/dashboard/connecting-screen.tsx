@@ -73,6 +73,7 @@ export function ConnectingScreen() {
               label={serverLabel}
               url={serverUrl}
               reconnectAttempts={reconnectAttempts}
+              provider={activeServer?.provider}
             />
           )}
 
@@ -205,11 +206,15 @@ function UnreachableState({
   label,
   url,
   reconnectAttempts,
+  provider,
 }: {
   label: string;
   url: string;
   reconnectAttempts: number;
+  provider?: string;
 }) {
+  const isLocalDocker = provider === 'local_docker';
+
   return (
     <>
       <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted/50 border border-border/50">
@@ -217,14 +222,23 @@ function UnreachableState({
       </div>
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-foreground">
-          Instance Unreachable
+          {isLocalDocker ? 'Local Sandbox Unreachable' : 'Instance Unreachable'}
         </h2>
         {url && (
           <p className="text-sm text-muted-foreground font-mono">{url}</p>
         )}
         <p className="text-sm text-muted-foreground/70">
-          Unable to reach <span className="font-medium text-foreground/80">{label}</span>.
-          It may be starting up or temporarily unavailable.
+          {isLocalDocker ? (
+            <>
+              Unable to reach the local Docker sandbox.
+              Make sure Docker is running and the container has started.
+            </>
+          ) : (
+            <>
+              Unable to reach <span className="font-medium text-foreground/80">{label}</span>.
+              It may be starting up or temporarily unavailable.
+            </>
+          )}
         </p>
       </div>
       <div className="flex items-center gap-3 text-xs text-muted-foreground/60">

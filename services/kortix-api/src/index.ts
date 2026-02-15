@@ -15,6 +15,7 @@ import { platformApp } from './platform';
 import { cronApp, startScheduler, stopScheduler, getSchedulerStatus } from './cron';
 import { daytonaProxyApp } from './daytona-proxy';
 import { deploymentsApp } from './deployments';
+import { setupApp } from './setup';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -80,6 +81,50 @@ app.get('/v1/system/status', (c) => {
   });
 });
 
+// ─── Stub Endpoints ─────────────────────────────────────────────────────────
+// These endpoints are called by the frontend but were never implemented.
+// Adding proper stubs stops 404 noise and provides correct responses.
+
+// POST /v1/prewarm — no-op pre-warm. Frontend fires this on login.
+app.post('/v1/prewarm', (c) => {
+  return c.json({ success: true });
+});
+
+// GET /v1/accounts — returns user's accounts (Basejump-compatible shape).
+// In local mode: mock personal account. In cloud: would query Supabase.
+app.get('/v1/accounts', async (c) => {
+  if (config.isLocal()) {
+    return c.json([
+      {
+        account_id: '00000000-0000-0000-0000-000000000000',
+        name: 'Local User',
+        slug: 'local',
+        personal_account: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        account_role: 'owner',
+        is_primary_owner: true,
+      },
+    ]);
+  }
+  // Cloud mode: requires auth
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  // Return empty array — proper account management can be added later
+  return c.json([]);
+});
+
+// GET /v1/user-roles — returns admin role status.
+// In local mode: always non-admin. In cloud: could check DB.
+app.get('/v1/user-roles', (c) => {
+  if (config.isLocal()) {
+    return c.json({ isAdmin: true, role: 'admin' });
+  }
+  return c.json({ isAdmin: false, role: null });
+});
+
 // ─── Mount Sub-Services ─────────────────────────────────────────────────────
 // All services follow the pattern: /v1/{serviceName}/...
 
@@ -88,6 +133,11 @@ app.route('/v1/billing', billingApp);   // /v1/billing/account-state, /v1/billin
 app.route('/v1/platform', platformApp); // /v1/platform/providers, /v1/platform/sandbox/*, /v1/platform/sandbox/version
 app.route('/v1/cron', cronApp);         // /v1/cron/sandboxes/*, /v1/cron/triggers/*, /v1/cron/executions/*
 app.route('/v1/deployments', deploymentsApp); // /v1/deployments/*
+// Setup routes — local-only. Provides .env management and system status.
+if (config.isLocal()) {
+  app.route('/v1/setup', setupApp);          // /v1/setup/status, /v1/setup/env, /v1/setup/schema, /v1/setup/health
+}
+
 // Daytona Proxy is cloud-only (requires Daytona API). In local mode the catch-all
 // /:sandboxId/:port/* pattern would intercept every unmatched request and throw
 // "Invalid port" errors for unmatched paths.
@@ -157,6 +207,7 @@ console.log(`
 ║    /v1/platform   (sandbox lifecycle)                      ║
 ║    /v1/cron       (scheduled triggers)                     ║
 ║    /v1/deployments (deploy lifecycle)                      ║
+║    /v1/setup      (local setup & env management)           ║
 ║    /v1/preview    (sandbox preview proxy)                  ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║

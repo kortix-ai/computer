@@ -40,17 +40,28 @@ const SANDBOX_SERVER_ID = 'cloud-sandbox';
  */
 function registerSandboxServer(sandbox: SandboxInfo) {
   const store = useServerStore.getState();
-  const url = getSandboxUrl(sandbox);
+
+  let url: string;
+  try {
+    url = getSandboxUrl(sandbox);
+  } catch (err) {
+    console.warn('[useSandbox] Cannot build sandbox URL, skipping registration:', err);
+    return;
+  }
+
   const mappedPorts = extractMappedPorts(sandbox);
+  const label = sandbox.name || (sandbox.provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
   const existing = store.servers.find((s) => s.id === SANDBOX_SERVER_ID);
 
   if (existing) {
-    // Silently update URL / mappedPorts — no serverVersion bump.
+    // Silently update URL / mappedPorts / provider / sandboxId — no serverVersion bump.
     // This avoids nuking the SSE stream and query caches on port changes.
     store.updateServerSilent(SANDBOX_SERVER_ID, {
       url,
       label: sandbox.name || existing.label,
       mappedPorts,
+      provider: sandbox.provider,
+      sandboxId: sandbox.sandbox_id,
     });
   } else {
     // Add new server entry for the sandbox
@@ -60,7 +71,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
         ...state.servers,
         {
           id: SANDBOX_SERVER_ID,
-          label: sandbox.name || (sandbox.provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox'),
+          label,
           url,
           provider: sandbox.provider,
           sandboxId: sandbox.sandbox_id,

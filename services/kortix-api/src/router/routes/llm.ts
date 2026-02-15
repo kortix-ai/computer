@@ -74,9 +74,9 @@ llm.post('/chat/completions', async (c) => {
         usage.completionTokens,
         cost,
         request.session_id
-      );
+      ).catch((err) => console.error(`[LLM] Failed to deduct credits for ${request.model}:`, err));
       console.log(`[LLM] Stream complete: ${usage.promptTokens}/${usage.completionTokens} tokens, cost=$${cost.toFixed(6)}`);
-    });
+    }).catch((err) => console.error(`[LLM] Failed to get stream usage for billing:`, err));
 
     // Return SSE stream
     return streamSSE(c, async (sseStream) => {

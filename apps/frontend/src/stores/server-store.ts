@@ -38,11 +38,11 @@ interface ServerStore {
   addServer: (label: string, url: string) => ServerEntry;
   updateServer: (id: string, updates: Partial<Pick<ServerEntry, 'label' | 'url'>>) => void;
   /**
-   * Silently update a server's URL and/or ports without triggering a full
-   * reconnect (no serverVersion bump). Only bumps urlVersion so the
-   * connection monitor re-verifies.
+   * Silently update a server's URL, ports, provider, and/or sandboxId
+   * without triggering a full reconnect (no serverVersion bump). Only
+   * bumps urlVersion so the connection monitor re-verifies.
    */
-  updateServerSilent: (id: string, updates: Partial<Pick<ServerEntry, 'url'>> & { mappedPorts?: Record<string, string>; label?: string }) => void;
+  updateServerSilent: (id: string, updates: Partial<Pick<ServerEntry, 'url' | 'provider' | 'sandboxId'>> & { mappedPorts?: Record<string, string>; label?: string }) => void;
   removeServer: (id: string) => void;
   setActiveServer: (id: string) => void;
   getActiveServerUrl: () => string;
@@ -114,8 +114,10 @@ export const useServerStore = create<ServerStore>()(
         const portsChanged =
           updates.mappedPorts != null &&
           JSON.stringify(existing.mappedPorts) !== JSON.stringify(updates.mappedPorts);
+        const providerChanged = updates.provider != null && updates.provider !== existing.provider;
+        const sandboxIdChanged = updates.sandboxId != null && updates.sandboxId !== existing.sandboxId;
 
-        if (!urlChanged && !portsChanged && !updates.label) return; // nothing to do
+        if (!urlChanged && !portsChanged && !updates.label && !providerChanged && !sandboxIdChanged) return;
 
         set((state) => ({
           servers: state.servers.map((s) =>
@@ -125,6 +127,8 @@ export const useServerStore = create<ServerStore>()(
                   ...(updates.url ? { url: updates.url.replace(/\/+$/, '') } : {}),
                   ...(updates.label ? { label: updates.label } : {}),
                   ...(updates.mappedPorts ? { mappedPorts: updates.mappedPorts } : {}),
+                  ...(updates.provider != null ? { provider: updates.provider } : {}),
+                  ...(updates.sandboxId != null ? { sandboxId: updates.sandboxId } : {}),
                 }
               : s,
           ),

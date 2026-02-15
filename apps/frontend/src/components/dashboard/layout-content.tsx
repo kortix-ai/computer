@@ -1,19 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Suspense, lazy } from 'react';
-import { useAccounts } from '@/hooks/account';
 import { useAuth } from '@/components/AuthProvider';
 import { useSystemStatusQuery } from '@/hooks/edge-flags';
 import { useRouter } from 'next/navigation';
-import { useApiHealth } from '@/hooks/usage/use-health';
 import { useAdminRole } from '@/hooks/admin';
 import { usePresence } from '@/hooks/use-presence';
 import { featureFlags } from '@/lib/feature-flags';
+import { isLocalMode } from '@/lib/config';
 
 import { useProjects } from '@/hooks/threads/use-project';
-import { useIsMobile } from '@/hooks/utils';
 import { AppProviders } from '@/components/layout/app-providers';
 import { backendApi } from '@/lib/api-client';
 import { AnnouncementDialog } from '../announcements/announcement-dialog';
@@ -264,19 +262,16 @@ export default function DashboardLayoutContent({
   
   usePresence(threadId);
   
-  const { data: accounts } = useAccounts({ enabled: !!user });
-  const personalAccount = accounts?.find((account) => account.personal_account);
   const router = useRouter();
-  const isMobile = useIsMobile();
   const { data: systemStatus, isLoading: systemStatusLoading } = useSystemStatusQuery();
   const maintenanceNotice = systemStatus?.maintenanceNotice;
   const technicalIssue = systemStatus?.technicalIssue;
   const statusUpdatedAt = systemStatus?.updatedAt;
-  const {
-    data: healthData,
-    isLoading: isCheckingHealth,
-    error: healthError,
-  } = useApiHealth();
+  // NOTE: useApiHealth was removed from the layout guards. Its momentary
+  // failures were unmounting the ENTIRE component tree (including session
+  // tabs and chat input), causing the "random refresh/flicker" bug.
+  // Sandbox reachability is handled by ConnectingScreen (overlay, not
+  // early return), which never unmounts children.
 
   const { data: projects } = useProjects();
   const { data: adminRoleData, isLoading: isCheckingAdminRole } = useAdminRole();
@@ -288,26 +283,40 @@ export default function DashboardLayoutContent({
     }
   }, [user])
 
-  // Debug: uncomment to inspect mobile layout prefetch data
-  // useEffect(() => {
-  //   if (isMobile) {
-  //     console.log('Mobile Layout - Prefetched data:', {
-  //       projects: projects?.length || 0,
-  //       accounts: accounts?.length || 0,
-  //       user: !!user
-  //     });
-  //   }
-  // }, [isMobile, projects, accounts, user]);
-
-  // API health is now managed by useApiHealth hook
-  const isApiHealthy = healthData?.status === 'ok' && !healthError;
-
   // Check authentication status
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/auth');
     }
   }, [user, isLoading, router]);
+
+  // Hard gate: redirect to /setup if onboarding not complete (local mode only)
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  useEffect(() => {
+    if (!isLocalMode()) {
+      setOnboardingChecked(true);
+      return;
+    }
+
+    const checkOnboarding = async () => {
+      try {
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const res = await fetch(`${backendUrl}/setup/onboarding-status`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.complete) {
+            router.replace('/setup');
+            return;
+          }
+        }
+      } catch {
+        // Backend not reachable — don't block, let them in
+      }
+      setOnboardingChecked(true);
+    };
+    checkOnboarding();
+  }, [router]);
 
   const isMaintenanceActive = (() => {
     if (!maintenanceNotice?.enabled || !maintenanceNotice.startTime || !maintenanceNotice.endTime) {
@@ -329,7 +338,7 @@ export default function DashboardLayoutContent({
     return now < start && now < end;
   })();
 
-  if (isLoading) {
+  if (isLoading || !onboardingChecked) {
     return <DashboardSkeleton />;
   }
 
@@ -338,15 +347,6 @@ export default function DashboardLayoutContent({
   }
 
   if (isMaintenanceActive && !systemStatusLoading && !isCheckingAdminRole && !isAdmin) {
-    return (
-      <Suspense fallback={<DashboardSkeleton />}>
-        <MaintenancePage />
-      </Suspense>
-    );
-  }
-
-  // Show maintenance page if API is not healthy
-  if (!isCheckingHealth && !isCheckingAdminRole && (!isApiHealthy || healthError) && !isAdmin) {
     return (
       <Suspense fallback={<DashboardSkeleton />}>
         <MaintenancePage />

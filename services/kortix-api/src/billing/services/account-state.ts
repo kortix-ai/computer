@@ -113,6 +113,62 @@ export async function buildAccountState(accountId: string): Promise<AccountState
   return buildMinimalAccountState(accountId);
 }
 
+/**
+ * Returns a mock account state for local mode (no database).
+ * Presents the user as an "ultra" tier with unlimited credits so
+ * no billing UI or limits block the local experience.
+ */
+export function buildLocalAccountState(): AccountStateResponse {
+  return {
+    credits: {
+      total: 999999,
+      daily: 999999,
+      monthly: 999999,
+      extra: 0,
+      can_run: true,
+      daily_refresh: null,
+    },
+    subscription: {
+      tier_key: 'ultra',
+      tier_display_name: 'Local (Unlimited)',
+      status: 'active',
+      billing_period: null,
+      provider: 'stripe',
+      subscription_id: null,
+      current_period_end: null,
+      cancel_at_period_end: false,
+      is_trial: false,
+      trial_status: null,
+      trial_ends_at: null,
+      is_cancelled: false,
+      cancellation_effective_date: null,
+      has_scheduled_change: false,
+      scheduled_change: null,
+      commitment: { has_commitment: false, can_cancel: true, commitment_type: null, months_remaining: null, commitment_end_date: null },
+      can_purchase_credits: false,
+    },
+    models: getModelsForTier('ultra'),
+    limits: {
+      projects: { current: 0, max: 999, can_create: true, tier_name: 'ultra' },
+      threads: { current: 0, max: 999, can_create: true, tier_name: 'ultra' },
+      concurrent_runs: { running_count: 0, limit: 999, can_start: true, tier_name: 'ultra' },
+      ai_worker_count: { current_count: 0, limit: 999, can_create: true, tier_name: 'ultra' },
+      custom_mcp_count: { current_count: 0, limit: 999, can_create: true, tier_name: 'ultra' },
+      trigger_count: {
+        scheduled: { current_count: 0, limit: 999, can_create: true },
+        app: { current_count: 0, limit: 999, can_create: true },
+        tier_name: 'ultra',
+      },
+    },
+    tier: {
+      name: 'ultra',
+      display_name: 'Local (Unlimited)',
+      monthly_credits: 999999,
+      can_purchase_credits: false,
+    },
+  };
+}
+
 function extractCommitment(sub: Awaited<ReturnType<typeof getSubscriptionInfo>>): CommitmentInfo {
   if (!sub?.commitmentType || !sub.commitmentEndDate) {
     return { has_commitment: false, can_cancel: true, commitment_type: null, months_remaining: null, commitment_end_date: null };

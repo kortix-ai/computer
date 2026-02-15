@@ -62,7 +62,14 @@ export async function apiKeyAuth(c: Context, next: Next) {
     return;
   }
 
-  // Fallback: treat token as account_id directly (backward compat)
+  // No valid token format matched — reject
+  if (config.DATABASE_URL) {
+    throw new HTTPException(401, {
+      message: 'Invalid token format. Use sk_ (API key) or sbt_ (sandbox token)',
+    });
+  }
+
+  // Fallback: treat token as account_id directly (only when no DB — local dev)
   c.set('accountId', token);
   await next();
 }
