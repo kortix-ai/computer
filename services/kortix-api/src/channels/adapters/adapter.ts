@@ -4,6 +4,7 @@ import type {
   ChannelCapabilities,
   NormalizedMessage,
   AgentResponse,
+  SessionStrategy,
 } from '../types';
 import type { ChannelConfig } from '@kortix/db';
 
@@ -31,6 +32,7 @@ export interface ChannelAdapter {
 
 export interface ChannelEngine {
   processMessage(message: NormalizedMessage): Promise<void>;
+  resetSession(configId: string, channelType: string, strategy: SessionStrategy, message: NormalizedMessage): Promise<void>;
 }
 
 export abstract class BaseAdapter implements ChannelAdapter {

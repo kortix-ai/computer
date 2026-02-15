@@ -160,7 +160,7 @@ preview.all('/:sandboxId/:port/*', async (c) => {
   // 1. Verify ownership (cached after first check)
   const allowed = await verifyOwnership(sandboxId, userId);
   if (!allowed) {
-    throw new HTTPException(403, { message: 'Not authorized to access this sandbox' });
+    throw new HTTPException(403, { message: "Not authorized to access this sandbox, userId: " + userId + ", sandboxId: " + sandboxId });
   }
 
   // 2. Read body once up front (needed across retries)

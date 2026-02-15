@@ -3,8 +3,9 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '../../../shared/db';
 import { channelConfigs } from '@kortix/db';
 import type { ChannelConfig } from '@kortix/db';
-import type { NormalizedMessage, ChatType } from '../../types';
+import type { NormalizedMessage, ChatType, SessionStrategy } from '../../types';
 import type { ChannelEngine } from '../adapter';
+import { TelegramApi } from './api';
 import { WebhookVerificationError } from '../../../errors';
 
 interface TelegramUpdate {
@@ -90,6 +91,41 @@ export async function handleTelegramWebhook(
   }
 
   const chatType = detectChatType(telegramMsg);
+  const botUsername = (config.credentials as Record<string, unknown>)?.botUsername as string | undefined;
+
+  if (content.trim() === '/new' || content.trim() === `/new@${botUsername}`) {
+    const botToken = (config.credentials as Record<string, unknown>)?.botToken as string;
+    if (botToken) {
+      const strategy = config.sessionStrategy as SessionStrategy;
+      const tempMessage: NormalizedMessage = {
+        externalId: String(telegramMsg.message_id),
+        channelType: 'telegram',
+        channelConfigId: config.channelConfigId,
+        chatType,
+        content: '',
+        attachments: [],
+        platformUser: { id: String(telegramMsg.from?.id ?? telegramMsg.chat.id), name: '' },
+        threadId: telegramMsg.message_thread_id ? String(telegramMsg.message_thread_id) : undefined,
+        groupId: chatType !== 'dm' ? String(telegramMsg.chat.id) : undefined,
+      };
+      await engine.resetSession(config.channelConfigId, config.channelType, strategy, tempMessage);
+      const api = new TelegramApi(botToken);
+      await api.sendMessage({ chat_id: telegramMsg.chat.id, text: 'Session reset — next message starts a fresh conversation.' });
+    }
+    return c.json({ ok: true });
+  }
+
+  if (content.trim() === '/help' || content.trim() === `/help@${botUsername}`) {
+    const botToken = (config.credentials as Record<string, unknown>)?.botToken as string;
+    if (botToken) {
+      const api = new TelegramApi(botToken);
+      await api.sendMessage({
+        chat_id: telegramMsg.chat.id,
+        text: 'Available commands:\n/new — Start a fresh conversation\n/help — Show this message',
+      });
+    }
+    return c.json({ ok: true });
+  }
 
   if (chatType === 'group') {
     const botId = (config.credentials as Record<string, unknown>)?.botId as number | undefined;
