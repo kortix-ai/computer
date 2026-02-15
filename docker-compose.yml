@@ -12,7 +12,6 @@ services:
     restart: unless-stopped
 
   kortix-api:
-    image: kortixmarko/kortix-api:latest
     build:
       context: .
       dockerfile: services/Dockerfile
