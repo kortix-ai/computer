@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Mail, Smartphone, MessageSquare, CreditCard, Star, Settings as SettingsIcon } from 'lucide-react';
+import { Bell, Mail, Smartphone, MessageSquare, CreditCard, Star, Settings as SettingsIcon, Globe, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ShieldCheck, Volume2, EyeOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from '@/lib/toast';
 import { notificationAPI, type NotificationSettings } from '@/lib/api/notifications';
 import { isCloudMode } from '@/lib/config';
+import { useWebNotificationStore } from '@/stores/web-notification-store';
+import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 
 export function NotificationSettingsPanel() {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
@@ -71,23 +73,31 @@ export function NotificationSettingsPanel() {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Notification Settings</CardTitle>
-          <CardDescription>Loading...</CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Notification Settings</CardTitle>
+            <CardDescription>Loading...</CardDescription>
+          </CardHeader>
+        </Card>
+        <BrowserNotificationSettings />
+      </div>
     );
   }
 
   if (!settings) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Notification Settings</CardTitle>
-          <CardDescription>Failed to load settings</CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="space-y-6">
+        {isCloudMode() && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Failed to load settings</CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+        <BrowserNotificationSettings />
+      </div>
     );
   }
 
@@ -282,7 +292,244 @@ export function NotificationSettingsPanel() {
           </Button>
         </CardContent>
       </Card>
+
+      <BrowserNotificationSettings />
     </div>
   );
 }
 
+// ============================================================================
+// Browser (Web) Notification Settings
+// ============================================================================
+
+export function BrowserNotificationSettings() {
+  const permission = useWebNotificationStore((s) => s.permission);
+  const preferences = useWebNotificationStore((s) => s.preferences);
+  const toggleEnabled = useWebNotificationStore((s) => s.toggleEnabled);
+  const setPreference = useWebNotificationStore((s) => s.setPreference);
+  const syncPermission = useWebNotificationStore((s) => s.syncPermission);
+
+  // Sync permission on mount (in case user changed it in browser settings)
+  useEffect(() => {
+    syncPermission();
+  }, [syncPermission]);
+
+  const supported = isNotificationSupported();
+
+  const sendTestBrowserNotification = () => {
+    sendWebNotification({
+      type: 'completion',
+      title: 'Test Browser Notification',
+      body: 'Browser notifications are working correctly!',
+      tag: 'test',
+    });
+  };
+
+  if (!supported) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Browser Notifications
+          </CardTitle>
+          <CardDescription>
+            Your browser does not support web notifications.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Browser Notifications
+          </CardTitle>
+          <CardDescription>
+            Get notified in your browser when tasks complete, errors occur, or Kortix needs your input
+            {permission === 'denied' && (
+              <span className="block mt-1 text-destructive text-xs">
+                Browser notifications are blocked. Please allow them in your browser settings.
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Master toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <Label htmlFor="web-notif-enabled" className="font-medium">
+                  Enable Browser Notifications
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {permission === 'granted'
+                    ? 'Permission granted'
+                    : permission === 'denied'
+                      ? 'Permission denied by browser'
+                      : 'Will request permission when enabled'}
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="web-notif-enabled"
+              checked={preferences.enabled}
+              onCheckedChange={() => toggleEnabled()}
+              disabled={permission === 'denied'}
+            />
+          </div>
+
+          {preferences.enabled && (
+            <>
+              <Separator />
+
+              {/* Task completions */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="web-notif-completion" className="font-medium">
+                      Task Completions
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When a session finishes its task
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="web-notif-completion"
+                  checked={preferences.onCompletion}
+                  onCheckedChange={(checked) => setPreference('onCompletion', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Errors */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="web-notif-error" className="font-medium">
+                      Errors
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When a session encounters an error
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="web-notif-error"
+                  checked={preferences.onError}
+                  onCheckedChange={(checked) => setPreference('onError', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Questions */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="web-notif-question" className="font-medium">
+                      Questions
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When Kortix needs your input to continue
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="web-notif-question"
+                  checked={preferences.onQuestion}
+                  onCheckedChange={(checked) => setPreference('onQuestion', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Permission requests */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="web-notif-permission" className="font-medium">
+                      Permission Requests
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When Kortix needs permission to use a tool
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="web-notif-permission"
+                  checked={preferences.onPermission}
+                  onCheckedChange={(checked) => setPreference('onPermission', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Only when tab hidden */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <EyeOff className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="web-notif-hidden" className="font-medium">
+                      Only When Tab is Hidden
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Only show browser notifications when you&apos;re on another tab
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="web-notif-hidden"
+                  checked={preferences.onlyWhenHidden}
+                  onCheckedChange={(checked) => setPreference('onlyWhenHidden', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Sound */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Volume2 className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="web-notif-sound" className="font-medium">
+                      Notification Sound
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Play a sound when a notification is sent
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="web-notif-sound"
+                  checked={preferences.playSound}
+                  onCheckedChange={(checked) => setPreference('playSound', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Test button */}
+              <div className="pt-1">
+                <Button onClick={sendTestBrowserNotification} variant="outline" size="sm">
+                  Send Test Browser Notification
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

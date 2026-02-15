@@ -17,6 +17,7 @@ import { backendApi } from '@/lib/api-client';
 import { AnnouncementDialog } from '../announcements/announcement-dialog';
 import { NovuInboxProvider } from '../notifications/novu-inbox-provider';
 import { useOpenCodeEventStream } from '@/hooks/opencode/use-opencode-events';
+import { useWebNotifications } from '@/hooks/use-web-notifications';
 import { useSandbox } from '@/hooks/platform/use-sandbox';
 import { useSandboxConnection } from '@/hooks/platform/use-sandbox-connection';
 import { useConnectionToasts } from '@/components/dashboard/connecting-screen';
@@ -26,6 +27,12 @@ import { cn } from '@/lib/utils';
 
 function OpenCodeEventStreamProvider() {
   useOpenCodeEventStream();
+  return null;
+}
+
+/** Monitors session status transitions and fires browser notifications. Renders nothing. */
+function WebNotificationProvider() {
+  useWebNotifications();
   return null;
 }
 
@@ -375,6 +382,7 @@ export default function DashboardLayoutContent({
       <SandboxInitProvider />
       <SandboxConnectionProvider />
       <OpenCodeEventStreamProvider />
+      <WebNotificationProvider />
       <Suspense fallback={null}>
         <ConnectingScreen />
       </Suspense>
