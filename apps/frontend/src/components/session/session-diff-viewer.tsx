@@ -19,25 +19,79 @@ import { useOpenCodeSessionDiff, useOpenCodeMessages } from '@/hooks/opencode/us
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createTwoFilesPatch } from 'diff';
 import type { FileDiff, ApplyPatchFile } from '@/ui/types';
+import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
 
 // ============================================================================
 // Diff line renderer (unified view)
 // ============================================================================
 
-function DiffLines({ patch }: { patch: string }) {
-  const lines = patch.split('\n');
-  // Skip the first 4 header lines from createTwoFilesPatch
-  const diffLines = lines.slice(4);
+function DiffLines({ patch, filename }: { patch: string; filename: string }) {
+  const diffLines = useMemo(() => patch.split('\n').slice(4), [patch]);
+
+  // Extract code content (without +/-/space prefix) for highlighting
+  const codeLines = useMemo(
+    () =>
+      diffLines.map((line) => {
+        if (line.startsWith('@@') || line === '') return '';
+        // Strip the +/-/space prefix
+        return line.length > 0 ? line.substring(1) : '';
+      }),
+    [diffLines],
+  );
+
+  const highlighted = useDiffHighlight(codeLines, filename);
 
   return (
     <pre className="p-3 font-mono text-[11px] leading-[1.6] select-text whitespace-pre-wrap break-all">
       {diffLines.map((line, i) => {
+        const isAdd = line.startsWith('+');
+        const isDel = line.startsWith('-');
+        const isHunk = line.startsWith('@@');
+
         let cls = 'text-muted-foreground/60';
-        if (line.startsWith('+')) cls = 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/5';
-        else if (line.startsWith('-')) cls = 'text-red-600 dark:text-red-400 bg-red-500/5';
-        else if (line.startsWith('@@')) cls = 'text-blue-500/60 text-[10px]';
+        if (isAdd) cls = 'bg-emerald-500/5';
+        else if (isDel) cls = 'bg-red-500/5';
+        else if (isHunk) cls = 'text-blue-500/60 text-[10px]';
+
+        // For hunk headers or empty lines, render plain
+        if (isHunk || line === '') {
+          return (
+            <div key={i} className={cls}>
+              {line || ' '}
+            </div>
+          );
+        }
+
+        const prefix = line[0] || ' ';
+        const highlightedTokens = highlighted?.[i];
+
+        if (highlightedTokens) {
+          const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
+          return (
+            <div key={i} className={cls}>
+              <span
+                className={cn(
+                  isAdd && 'text-emerald-600 dark:text-emerald-400',
+                  isDel && 'text-red-600 dark:text-red-400',
+                )}
+              >
+                {prefix}
+              </span>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </div>
+          );
+        }
+
+        // Fallback: no highlighting available
         return (
-          <div key={i} className={cls}>
+          <div
+            key={i}
+            className={cn(
+              cls,
+              isAdd && 'text-emerald-600 dark:text-emerald-400',
+              isDel && 'text-red-600 dark:text-red-400',
+            )}
+          >
             {line || ' '}
           </div>
         );
@@ -137,45 +191,79 @@ function parsePatchToSideBySide(patch: string): SideBySideLine[] {
   return result;
 }
 
-function SideBySideDiff({ patch }: { patch: string }) {
+function SideBySideDiff({ patch, filename }: { patch: string; filename: string }) {
   const rows = useMemo(() => parsePatchToSideBySide(patch), [patch]);
+
+  // Collect all content lines for highlighting (left + right interleaved)
+  const { leftLines, rightLines } = useMemo(() => {
+    const left: string[] = [];
+    const right: string[] = [];
+    for (const row of rows) {
+      left.push(row.left.content || '');
+      right.push(row.right.content || '');
+    }
+    return { leftLines: left, rightLines: right };
+  }, [rows]);
+
+  const leftHighlighted = useDiffHighlight(leftLines, filename);
+  const rightHighlighted = useDiffHighlight(rightLines, filename);
 
   return (
     <div className="select-text overflow-hidden">
       <table className="w-full font-mono text-[11px] leading-[1.6] border-collapse table-fixed">
         <tbody>
-          {rows.map((row, i) => (
-            <tr key={i}>
-              {/* Left side (old) */}
-              <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
-                {row.left.num ?? ''}
-              </td>
-              <td
-                className={cn(
-                  'px-2 whitespace-pre-wrap break-all border-r border-border/30 w-[calc(50%-2rem)]',
-                  row.left.type === 'deleted' && 'bg-red-500/10 text-red-600 dark:text-red-400',
-                  row.left.type === 'empty' && 'bg-muted/5',
-                  row.left.type === 'unchanged' && 'text-muted-foreground/60',
-                )}
-              >
-                {row.left.content || ' '}
-              </td>
-              {/* Right side (new) */}
-              <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
-                {row.right.num ?? ''}
-              </td>
-              <td
-                className={cn(
-                  'px-2 whitespace-pre-wrap break-all w-[calc(50%-2rem)]',
-                  row.right.type === 'added' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                  row.right.type === 'empty' && 'bg-muted/5',
-                  row.right.type === 'unchanged' && 'text-muted-foreground/60',
-                )}
-              >
-                {row.right.content || ' '}
-              </td>
-            </tr>
-          ))}
+          {rows.map((row, i) => {
+            const leftTokens = leftHighlighted?.[i];
+            const rightTokens = rightHighlighted?.[i];
+            const isLeftHunk = row.left.content.startsWith('@@');
+
+            return (
+              <tr key={i}>
+                {/* Left side (old) */}
+                <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
+                  {row.left.num ?? ''}
+                </td>
+                <td
+                  className={cn(
+                    'px-2 whitespace-pre-wrap break-all border-r border-border/30 w-[calc(50%-2rem)]',
+                    row.left.type === 'deleted' && 'bg-red-500/10',
+                    row.left.type === 'empty' && 'bg-muted/5',
+                    row.left.type === 'unchanged' && 'text-muted-foreground/60',
+                  )}
+                >
+                  {isLeftHunk ? (
+                    <span className="text-blue-500/60 text-[10px]">{row.left.content}</span>
+                  ) : leftTokens && row.left.content ? (
+                    <span dangerouslySetInnerHTML={{ __html: renderHighlightedLine(leftTokens, row.left.content) }} />
+                  ) : (
+                    <span className={cn(row.left.type === 'deleted' && 'text-red-600 dark:text-red-400')}>
+                      {row.left.content || ' '}
+                    </span>
+                  )}
+                </td>
+                {/* Right side (new) */}
+                <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
+                  {row.right.num ?? ''}
+                </td>
+                <td
+                  className={cn(
+                    'px-2 whitespace-pre-wrap break-all w-[calc(50%-2rem)]',
+                    row.right.type === 'added' && 'bg-emerald-500/10',
+                    row.right.type === 'empty' && 'bg-muted/5',
+                    row.right.type === 'unchanged' && 'text-muted-foreground/60',
+                  )}
+                >
+                  {rightTokens && row.right.content ? (
+                    <span dangerouslySetInnerHTML={{ __html: renderHighlightedLine(rightTokens, row.right.content) }} />
+                  ) : (
+                    <span className={cn(row.right.type === 'added' && 'text-emerald-600 dark:text-emerald-400')}>
+                      {row.right.content || ' '}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -274,9 +362,9 @@ function FileDiffCard({ diff, viewMode, isFullscreen }: { diff: FileDiff; viewMo
           isFullscreen ? 'max-h-[calc(100vh-12rem)]' : 'max-h-96',
         )}>
           {viewMode === 'split' ? (
-            <SideBySideDiff patch={patch} />
+            <SideBySideDiff patch={patch} filename={diff.file} />
           ) : (
-            <DiffLines patch={patch} />
+            <DiffLines patch={patch} filename={diff.file} />
           )}
         </div>
       )}

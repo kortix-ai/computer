@@ -26,6 +26,7 @@ import { useFilesStore } from '../store/files-store';
 import { useFileHistory, useFileCommitDiff } from '../hooks/use-file-history';
 import type { GitCommit } from '../types';
 import { createTwoFilesPatch } from 'diff';
+import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -102,24 +103,75 @@ function groupCommitsByDate(commits: GitCommit[]): Array<{ label: string; commit
 // Diff Line Renderer
 // ---------------------------------------------------------------------------
 
-function DiffLines({ patch }: { patch: string }) {
-  const lines = patch.split('\n');
-  // Skip the unified diff header lines (---/+++ and first @@)
-  const startIdx = lines.findIndex((l) => l.startsWith('@@'));
-  const diffLines = startIdx >= 0 ? lines.slice(startIdx) : lines;
+function DiffLines({ patch, filename }: { patch: string; filename: string }) {
+  const diffLines = useMemo(() => {
+    const lines = patch.split('\n');
+    const startIdx = lines.findIndex((l) => l.startsWith('@@'));
+    return startIdx >= 0 ? lines.slice(startIdx) : lines;
+  }, [patch]);
+
+  // Extract code content (without +/-/space prefix) for highlighting
+  const codeLines = useMemo(
+    () =>
+      diffLines.map((line) => {
+        if (line.startsWith('@@') || line.startsWith('+++') || line.startsWith('---') || line === '') return '';
+        return line.length > 0 ? line.substring(1) : '';
+      }),
+    [diffLines],
+  );
+
+  const highlighted = useDiffHighlight(codeLines, filename);
 
   return (
     <pre className="p-3 font-mono text-[11px] leading-[1.6] overflow-x-auto select-text">
       {diffLines.map((line, i) => {
+        const isAdd = line.startsWith('+') && !line.startsWith('+++');
+        const isDel = line.startsWith('-') && !line.startsWith('---');
+        const isHunk = line.startsWith('@@');
+        const isHeader = line.startsWith('+++') || line.startsWith('---');
+
         let cls = 'text-muted-foreground/60';
-        if (line.startsWith('+') && !line.startsWith('+++'))
-          cls = 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/5';
-        else if (line.startsWith('-') && !line.startsWith('---'))
-          cls = 'text-red-600 dark:text-red-400 bg-red-500/5';
-        else if (line.startsWith('@@'))
-          cls = 'text-blue-500/60 text-[10px]';
+        if (isAdd) cls = 'bg-emerald-500/5';
+        else if (isDel) cls = 'bg-red-500/5';
+        else if (isHunk) cls = 'text-blue-500/60 text-[10px]';
+
+        if (isHunk || isHeader || line === '') {
+          return (
+            <div key={i} className={cls}>
+              {line || ' '}
+            </div>
+          );
+        }
+
+        const prefix = line[0] || ' ';
+        const highlightedTokens = highlighted?.[i];
+
+        if (highlightedTokens) {
+          const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
+          return (
+            <div key={i} className={cls}>
+              <span
+                className={cn(
+                  isAdd && 'text-emerald-600 dark:text-emerald-400',
+                  isDel && 'text-red-600 dark:text-red-400',
+                )}
+              >
+                {prefix}
+              </span>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </div>
+          );
+        }
+
         return (
-          <div key={i} className={cls}>
+          <div
+            key={i}
+            className={cn(
+              cls,
+              isAdd && 'text-emerald-600 dark:text-emerald-400',
+              isDel && 'text-red-600 dark:text-red-400',
+            )}
+          >
             {line || ' '}
           </div>
         );
@@ -203,7 +255,7 @@ function CommitDiffDetail({
       {/* Diff content */}
       {patchContent ? (
         <div className="max-h-[400px] overflow-auto">
-          <DiffLines patch={patchContent} />
+          <DiffLines patch={patchContent} filename={filePath} />
         </div>
       ) : (
         <div className="p-4 text-xs text-muted-foreground text-center">

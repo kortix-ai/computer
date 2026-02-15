@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
-import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { CodeHighlight } from '@/components/markdown/unified-markdown';
 import { useOcFileOpen } from './useOcFileOpen';
 
 function getFilename(path: string | undefined): string {
@@ -216,9 +216,10 @@ function SingleFileRow({
       </div>
       {expanded && hasContent && (
         <div className="border-t border-zinc-200 dark:border-zinc-800">
-          <UnifiedMarkdown
-            content={`\`\`\`${ext}\n${output}\n\`\`\``}
-            isStreaming={false}
+          <CodeHighlight
+            code={output}
+            language={ext || 'text'}
+            className="[&>pre]:rounded-none [&>pre]:border-0"
           />
         </div>
       )}

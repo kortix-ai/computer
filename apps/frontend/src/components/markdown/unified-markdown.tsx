@@ -78,6 +78,29 @@ function CopyButton({ code }: { code: string }) {
   );
 }
 
+// Maximum code length for Shiki syntax highlighting (characters).
+// Very large code blocks are expensive to highlight — truncate to keep UI responsive.
+const SHIKI_MAX_LENGTH = 50_000;
+
+// Normalise language aliases that Shiki might not recognise directly
+function normalizeLanguage(lang: string): string {
+  const map: Record<string, string> = {
+    'htm': 'html',
+    'js': 'javascript',
+    'ts': 'typescript',
+    'jsx': 'jsx',
+    'tsx': 'tsx',
+    'py': 'python',
+    'rb': 'ruby',
+    'yml': 'yaml',
+    'sh': 'bash',
+    'shell': 'bash',
+    'zsh': 'bash',
+    'md': 'markdown',
+  };
+  return map[lang.toLowerCase()] || lang.toLowerCase();
+}
+
 // Syntax-highlighted code using Shiki
 function HighlightedCode({ code, language, children }: { code: string; language: string; children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
@@ -86,8 +109,15 @@ function HighlightedCode({ code, language, children }: { code: string; language:
 
   useEffect(() => {
     let cancelled = false;
-    codeToHtml(code, {
-      lang: language,
+
+    const normalizedLang = normalizeLanguage(language);
+    // Truncate very large code to keep Shiki responsive
+    const truncated = code.length > SHIKI_MAX_LENGTH
+      ? code.slice(0, SHIKI_MAX_LENGTH) + '\n// ... (truncated for highlighting)'
+      : code;
+
+    codeToHtml(truncated, {
+      lang: normalizedLang,
       theme,
       transformers: [{
         pre(node) {
@@ -99,7 +129,12 @@ function HighlightedCode({ code, language, children }: { code: string; language:
       }],
     })
       .then((result) => { if (!cancelled) setHtml(result); })
-      .catch(() => { /* fallback to plain text for unknown languages */ });
+      .catch((err) => {
+        // If the specific language grammar isn't available, try 'text' as fallback
+        if (!cancelled) {
+          console.warn(`[HighlightedCode] Shiki failed for lang="${normalizedLang}":`, err?.message || err);
+        }
+      });
     return () => { cancelled = true; };
   }, [code, language, theme]);
 
@@ -191,6 +226,43 @@ function ClickableInlineCode({ children }: { children: React.ReactNode }) {
     <code className="px-1.5 py-0.5 rounded-md text-[13px] font-mono bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/50 text-foreground">
       {children}
     </code>
+  );
+}
+
+/**
+ * Standalone syntax-highlighted code block.
+ *
+ * Renders code directly with Shiki highlighting + copy button, bypassing the
+ * markdown parser entirely. Useful for tool views that display raw file
+ * content where markdown parsing could interfere with the output.
+ */
+export function CodeHighlight({
+  code,
+  language,
+  className,
+}: {
+  code: string;
+  language: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn('relative group', className)}>
+      <pre
+        className={cn(
+          'p-4 rounded-xl overflow-x-auto',
+          'bg-zinc-100 dark:bg-zinc-900',
+          'border border-zinc-200 dark:border-zinc-800',
+          'text-[13px] font-mono leading-relaxed',
+          'text-zinc-800 dark:text-zinc-200',
+          '[&_code]:bg-transparent [&_code]:text-inherit [&_code]:p-0',
+        )}
+      >
+        <HighlightedCode code={code} language={language}>
+          {code}
+        </HighlightedCode>
+      </pre>
+      {code && <CopyButton code={code} />}
+    </div>
   );
 }
 

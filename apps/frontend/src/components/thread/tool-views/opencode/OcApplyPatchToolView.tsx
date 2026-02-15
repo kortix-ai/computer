@@ -8,11 +8,11 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
-  Minus,
   ArrowRight,
   Trash2,
   PenLine,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { ToolViewProps } from '../types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,8 +20,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
-import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import { useOcFileOpen } from './useOcFileOpen';
+import { createTwoFilesPatch } from 'diff';
+import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
 
 interface PatchFile {
   relativePath: string;
@@ -176,12 +177,7 @@ export function OcApplyPatchToolView({
 
                     {/* Expanded diff */}
                     {isExpanded && hasDiff && (
-                      <div className="border-t border-zinc-100 dark:border-zinc-800/30">
-                        <UnifiedMarkdown
-                          content={`\`\`\`diff\n--- a/${file.relativePath}\n+++ b/${file.relativePath}\n${generateSimpleDiff(file.before, file.after)}\n\`\`\``}
-                          isStreaming={false}
-                        />
-                      </div>
+                      <PatchFileDiff before={file.before} after={file.after} filePath={file.relativePath} />
                     )}
                   </div>
                 );
@@ -223,35 +219,88 @@ export function OcApplyPatchToolView({
   );
 }
 
-/** Generate a simple unified diff (line-level) for display */
-function generateSimpleDiff(before: string, after: string): string {
-  if (!before && !after) return '';
-  const oldLines = (before || '').split('\n');
-  const newLines = (after || '').split('\n');
+/** Per-file diff display using proper diff algorithm */
+function PatchFileDiff({ before, after, filePath }: { before: string; after: string; filePath: string }) {
+  const patch = useMemo(() => {
+    return createTwoFilesPatch(
+      `a/${filePath}`, `b/${filePath}`,
+      before || '', after || '',
+      '', '',
+    );
+  }, [before, after, filePath]);
 
-  const lines: string[] = [];
-  const maxLen = Math.max(oldLines.length, newLines.length);
+  const diffLines = useMemo(() => {
+    const lines = patch.split('\n').slice(4); // skip header
+    return lines;
+  }, [patch]);
 
-  // Simple line-by-line comparison (not a real diff algorithm, but good enough for display)
-  let i = 0, j = 0;
-  while (i < oldLines.length || j < newLines.length) {
-    if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
-      lines.push(` ${oldLines[i]}`);
-      i++;
-      j++;
-    } else if (i < oldLines.length && (j >= newLines.length || oldLines[i] !== newLines[j])) {
-      lines.push(`-${oldLines[i]}`);
-      i++;
-    } else if (j < newLines.length) {
-      lines.push(`+${newLines[j]}`);
-      j++;
-    }
-    // Safety: prevent infinite loops
-    if (lines.length > 500) {
-      lines.push('... (truncated)');
-      break;
-    }
-  }
+  // Extract code content (without +/-/space prefix) for highlighting
+  const codeLines = useMemo(
+    () =>
+      diffLines.map((line) => {
+        if (line.startsWith('@@') || line === '') return '';
+        return line.length > 0 ? line.substring(1) : '';
+      }),
+    [diffLines],
+  );
 
-  return lines.join('\n');
+  const highlighted = useDiffHighlight(codeLines, filePath);
+
+  return (
+    <div className="border-t border-zinc-100 dark:border-zinc-800/30 bg-zinc-50/50 dark:bg-zinc-900/30 overflow-auto max-h-96">
+      <pre className="p-3 font-mono text-[11px] leading-[1.6] select-text whitespace-pre-wrap break-all">
+        {diffLines.map((line, i) => {
+          const isAdd = line.startsWith('+');
+          const isDel = line.startsWith('-');
+          const isHunk = line.startsWith('@@');
+
+          let cls = 'text-muted-foreground/60';
+          if (isAdd) cls = 'bg-emerald-500/8';
+          else if (isDel) cls = 'bg-red-500/8';
+          else if (isHunk) cls = 'text-blue-500/60 text-[10px]';
+
+          if (isHunk || line === '') {
+            return (
+              <div key={i} className={cls}>
+                {line || ' '}
+              </div>
+            );
+          }
+
+          const prefix = line[0] || ' ';
+          const highlightedTokens = highlighted?.[i];
+
+          if (highlightedTokens) {
+            const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
+            return (
+              <div key={i} className={cls}>
+                <span
+                  className={cn(
+                    isAdd && 'text-emerald-600 dark:text-emerald-400',
+                    isDel && 'text-red-600 dark:text-red-400',
+                  )}
+                >
+                  {prefix}
+                </span>
+                <span dangerouslySetInnerHTML={{ __html: html }} />
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={i}
+              className={cn(
+                cls,
+                isAdd && 'text-emerald-600 dark:text-emerald-400',
+                isDel && 'text-red-600 dark:text-red-400',
+              )}
+            >
+              {line || ' '}
+            </div>
+          );
+        })}
+      </pre>
+    </div>
+  );
 }

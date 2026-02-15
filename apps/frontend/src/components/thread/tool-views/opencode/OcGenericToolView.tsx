@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
-import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { UnifiedMarkdown, CodeHighlight } from '@/components/markdown/unified-markdown';
 import { useOcFileOpen } from './useOcFileOpen';
 import {
   type OutputSection as OutputSectionType,
@@ -500,9 +500,10 @@ function CodeSection({ label, content, lang }: { label: string; content: string;
       </div>
       {expanded && (
         <div className="border-t border-zinc-200 dark:border-zinc-800">
-          <UnifiedMarkdown
-            content={`\`\`\`${lang}\n${content}\n\`\`\``}
-            isStreaming={false}
+          <CodeHighlight
+            code={content}
+            language={lang || 'text'}
+            className="[&>pre]:rounded-none [&>pre]:border-0"
           />
         </div>
       )}

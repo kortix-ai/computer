@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
-import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { CodeHighlight } from '@/components/markdown/unified-markdown';
 import { useOcFileOpen } from './useOcFileOpen';
 
 function getFilename(path: string | undefined): string {
@@ -81,9 +81,9 @@ export function OcWriteToolView({
         <ScrollArea className="h-full w-full">
           <div className="p-4">
             {content ? (
-              <UnifiedMarkdown
-                content={`\`\`\`${ext}\n${content}\n\`\`\``}
-                isStreaming={false}
+              <CodeHighlight
+                code={content}
+                language={ext || 'text'}
               />
             ) : (
               <div className="text-sm text-muted-foreground">

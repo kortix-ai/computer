@@ -10,6 +10,7 @@ import {
   type ComponentType,
 } from 'react';
 import { createTwoFilesPatch } from 'diff';
+import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
 import {
   Terminal,
   FileCode2,
@@ -307,20 +308,59 @@ function InlineDiffView({
     return createTwoFilesPatch(filename, filename, oldValue || '', newValue || '', '', '');
   }, [oldValue, newValue, filename]);
 
-  if (!patch) return null;
+  const diffLines = useMemo(() => patch.split('\n').slice(4), [patch]);
 
-  const lines = patch.split('\n');
-  const diffLines = lines.slice(4);
+  // Extract code content (without +/-/space prefix) for highlighting
+  const codeLines = useMemo(
+    () =>
+      diffLines.map((line) => {
+        if (line.startsWith('@@') || line === '') return '';
+        return line.length > 0 ? line.substring(1) : '';
+      }),
+    [diffLines],
+  );
+
+  const highlighted = useDiffHighlight(codeLines, filename);
+
+  if (!patch) return null;
 
   return (
     <pre className="p-2 font-mono text-[11px] leading-relaxed overflow-x-auto">
       {diffLines.map((line, i) => {
+        const isAdd = line.startsWith('+');
+        const isDel = line.startsWith('-');
+        const isHunk = line.startsWith('@@');
+
         let cls = 'text-muted-foreground/80';
-        if (line.startsWith('+')) cls = 'text-emerald-500 bg-emerald-500/5';
-        else if (line.startsWith('-')) cls = 'text-red-500 bg-red-500/5';
-        else if (line.startsWith('@@')) cls = 'text-blue-500/70';
+        if (isAdd) cls = 'bg-emerald-500/5';
+        else if (isDel) cls = 'bg-red-500/5';
+        else if (isHunk) cls = 'text-blue-500/70';
+
+        if (isHunk || line === '') {
+          return (
+            <div key={i} className={cls}>
+              {line}
+            </div>
+          );
+        }
+
+        const prefix = line[0] || ' ';
+        const highlightedTokens = highlighted?.[i];
+
+        if (highlightedTokens) {
+          const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
+          return (
+            <div key={i} className={cls}>
+              <span className={cn(isAdd && 'text-emerald-500', isDel && 'text-red-500')}>
+                {prefix}
+              </span>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </div>
+          );
+        }
+
         return (
-          <div key={i} className={cls}>
+          <div key={i} className={cn(cls, isAdd && 'text-emerald-500', isDel && 'text-red-500')}>
             {line}
           </div>
         );
