@@ -139,11 +139,13 @@ export const useServerStore = create<ServerStore>()(
                 }
               : s,
           ),
-          // Only bump urlVersion (not serverVersion) so connection hook re-checks
-          // but SSE stream does NOT reconnect and queries are NOT nuked.
-          ...(isActive && (urlChanged || portsChanged)
-            ? { urlVersion: state.urlVersion + 1 }
-            : {}),
+          // When the sandbox itself changed, force a full reconnect (SSE + queries).
+          // For URL/port-only changes, only bump urlVersion (silent re-verify).
+          ...(isActive && sandboxIdChanged
+            ? { serverVersion: state.serverVersion + 1 }
+            : isActive && (urlChanged || portsChanged)
+              ? { urlVersion: state.urlVersion + 1 }
+              : {}),
         }));
       },
 
