@@ -1,16 +1,14 @@
 /**
  * AI Compression Module for Memory Plugin
  *
- * Provides AI-powered observation compression and session summary generation,
- * matching claude-mem's SDK Agent behavior.
- *
- * Uses OpenCode's `client.session.prompt()` to call the LLM through the same
- * provider/model routing as the rest of the platform (Suna).
+ * Provides AI-powered observation compression and session summary generation.
+ * Calls the LLM directly via the Kortix router (OpenAI-compatible API)
+ * using KORTIX_API_URL and KORTIX_TOKEN env vars.
  *
  * Pattern:
  *   - Per-observation: fire-and-forget async compression (non-blocking)
- *   - Per-session: awaited summary generation on session.idle
- *   - Both use a dedicated worker session with Haiku for cost efficiency
+ *   - Per-session: awaited summary generation on idle timer
+ *   - Uses Claude 3 Haiku for cost efficiency
  */
 
 import type { Database } from "bun:sqlite"
@@ -20,14 +18,6 @@ import { getObservationById, updateObservation } from "./db"
 // =============================================================================
 // TYPES
 // =============================================================================
-
-/** The SDK client type — using `any` to avoid importing the full SDK */
-type Client = {
-	session: {
-		create(opts: any): Promise<any>
-		prompt(opts: any): Promise<any>
-	}
-}
 
 type LogFn = (level: "debug" | "info" | "warn" | "error", message: string) => void
 
@@ -56,7 +46,10 @@ export interface SessionSummaryFields {
 // CONFIGURATION
 // =============================================================================
 
-const MODEL = { providerID: "anthropic", modelID: "claude-3-5-haiku-20241022" }
+const LLM_MODEL = "claude-sonnet-4-5-20250929"
+const LLM_MAX_TOKENS = 2000
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+const ANTHROPIC_VERSION = "2023-06-01"
 
 const COMPRESSION_SYSTEM = `You are a memory compression agent. Given a tool execution record, produce a structured JSON observation.
 
@@ -129,28 +122,58 @@ Rules:
 - Output ONLY the JSON object, no markdown fences, no explanation`
 
 // =============================================================================
-// WORKER SESSION
+// LLM DIRECT CALL (Kortix Router — OpenAI-compatible)
 // =============================================================================
 
-let workerSessionId: string | null = null
-
 /**
- * Get or create a dedicated worker session for AI compression calls.
- * Lazy-initialized on first use.
+ * Call the Anthropic Messages API directly.
+ * Uses ANTHROPIC_API_KEY env var.
+ * Returns the assistant's text response, or null on failure.
  */
-async function getWorkerSession(client: Client, log: LogFn): Promise<string> {
-	if (workerSessionId) return workerSessionId
+async function callLLM(system: string, userMessage: string, log: LogFn): Promise<string | null> {
+	const apiKey = process.env.ANTHROPIC_API_KEY
+
+	if (!apiKey) {
+		log("warn", `[mem:ai] LLM unavailable: ANTHROPIC_API_KEY not set`)
+		return null
+	}
 
 	try {
-		const result = await client.session.create({
-			body: { title: "[mem] Compression Worker" },
+		const response = await fetch(ANTHROPIC_API_URL, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"x-api-key": apiKey,
+				"anthropic-version": ANTHROPIC_VERSION,
+			},
+			body: JSON.stringify({
+				model: LLM_MODEL,
+				max_tokens: LLM_MAX_TOKENS,
+				system,
+				messages: [
+					{ role: "user", content: userMessage },
+				],
+			}),
 		})
-		workerSessionId = (result.data as any)?.id
-		if (!workerSessionId) throw new Error("No session ID returned")
-		log("info", `[mem:ai] Worker session created: ${workerSessionId.slice(0, 12)}...`)
-		return workerSessionId
+
+		if (!response.ok) {
+			const errorText = await response.text().catch(() => "")
+			log("warn", `[mem:ai] Anthropic API error ${response.status}: ${errorText.slice(0, 200)}`)
+			return null
+		}
+
+		const data = await response.json() as any
+		// Anthropic response: { content: [{ type: "text", text: "..." }] }
+		const text = data?.content?.[0]?.text
+		if (!text) {
+			log("warn", `[mem:ai] No text in Anthropic response: ${JSON.stringify(data).slice(0, 200)}`)
+			return null
+		}
+
+		return text.trim()
 	} catch (err) {
-		throw new Error(`Failed to create worker session: ${err}`)
+		log("warn", `[mem:ai] LLM call failed: ${err}`)
+		return null
 	}
 }
 
@@ -166,7 +189,6 @@ async function getWorkerSession(client: Client, log: LogFn): Promise<string> {
  * On failure, the basic observation remains unchanged.
  */
 export async function compressObservationAsync(
-	client: Client,
 	db: Database,
 	obsId: number,
 	raw: {
@@ -177,8 +199,6 @@ export async function compressObservationAsync(
 	},
 	log: LogFn,
 ): Promise<void> {
-	const sessionId = await getWorkerSession(client, log)
-
 	// Build the user message with raw tool data
 	const truncatedOutput = (raw.output || "").slice(0, 2000)
 	const userMessage = [
@@ -191,22 +211,8 @@ export async function compressObservationAsync(
 		.join("\n")
 
 	try {
-		const response = await client.session.prompt({
-			path: { id: sessionId },
-			body: {
-				system: COMPRESSION_SYSTEM,
-				model: MODEL,
-				tools: {},
-				parts: [{ type: "text", text: userMessage }],
-			},
-		})
-
-		// Extract text from response
-		const text = extractResponseText(response)
-		if (!text) {
-			log("warn", `[mem:ai] No text in compression response for #${obsId}`)
-			return
-		}
+		const text = await callLLM(COMPRESSION_SYSTEM, userMessage, log)
+		if (!text) return
 
 		// Parse JSON
 		const compressed = parseCompressedObservation(text)
@@ -236,7 +242,7 @@ export async function compressObservationAsync(
 			filesModified: mergedFilesModified,
 		})
 
-		log("info", `[mem:ai] Enriched observation #${obsId}: "${compressed.title}" (files: R=${mergedFilesRead.length} W=${mergedFilesModified.length})`)
+		log("info", `[mem:ai] Enriched #${obsId}: "${compressed.title}"`)
 	} catch (err) {
 		log("warn", `[mem:ai] Compression failed for #${obsId}: ${err}`)
 	}
@@ -253,10 +259,9 @@ export async function compressObservationAsync(
  *   - **Fresh**: `existingSummary` is null → generates from all observations
  *   - **Incremental**: `existingSummary` provided → merges existing summary with new observations
  *
- * Called when the 1-hour idle timer fires.
+ * Called when the 30-minute idle timer fires.
  */
 export async function generateSessionSummaryAsync(
-	client: Client,
 	db: Database,
 	observations: Observation[],
 	log: LogFn,
@@ -276,8 +281,6 @@ export async function generateSessionSummaryAsync(
 			filesModified: [],
 		}
 	}
-
-	const workerSession = await getWorkerSession(client, log)
 
 	// Build a compact observation list for the prompt
 	const obsList = observations.map((o) => {
@@ -310,35 +313,23 @@ export async function generateSessionSummaryAsync(
 			`EXISTING SUMMARY:\n${existingJson}`,
 			`\nNEW OBSERVATIONS (${observations.length}):\n\n${obsList.slice(0, 6000)}`,
 		].join("\n")
-		log("info", `[mem:ai] Incremental enrichment: ${observations.length} new observations`)
 	} else {
 		userMessage = `Session with ${observations.length} observations:\n\n${obsList.slice(0, 8000)}`
 	}
 
 	try {
-		const response = await client.session.prompt({
-			path: { id: workerSession },
-			body: {
-				system: systemPrompt,
-				model: MODEL,
-				tools: {},
-				parts: [{ type: "text", text: userMessage }],
-			},
-		})
-
-		const text = extractResponseText(response)
+		const text = await callLLM(systemPrompt, userMessage, log)
 		if (!text) {
-			log("warn", `[mem:ai] No text in summary response`)
 			return fallbackSummary(observations, existingSummary)
 		}
 
 		const parsed = parseSummaryJson(text)
 		if (!parsed) {
-			log("warn", `[mem:ai] Failed to parse summary JSON: ${text.slice(0, 100)}`)
+			log("warn", `[mem:ai] Failed to parse summary JSON`)
 			return fallbackSummary(observations, existingSummary)
 		}
 
-		log("info", `[mem:ai] Session summary generated (${isIncremental ? "incremental" : "fresh"}): "${(parsed.completed || "").slice(0, 60)}"`)
+		log("info", `[mem:ai] Summary generated (${isIncremental ? "incremental" : "fresh"})`)
 		return parsed
 	} catch (err) {
 		log("warn", `[mem:ai] Summary generation failed: ${err}`)
@@ -349,23 +340,6 @@ export async function generateSessionSummaryAsync(
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-/**
- * Extract text content from a session.prompt response.
- */
-function extractResponseText(response: any): string | null {
-	try {
-		const parts = response?.data?.parts ?? []
-		for (const part of parts) {
-			if (part.type === "text" && part.text) {
-				return part.text.trim()
-			}
-		}
-		return null
-	} catch {
-		return null
-	}
-}
 
 /**
  * Parse AI response into a compressed observation.

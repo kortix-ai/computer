@@ -70,28 +70,25 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 		}
 	}
 
-	log("info", "Memory plugin loading...")
+	log("info", "[mem] Plugin loading...")
 
 	// Initialize SQLite database
 	let db: Database
 	try {
 		db = initMemDb()
-		log("info", "[mem] ✦ Database initialized at ~/.kortix/mem.db")
 	} catch (err) {
-		log("error", `[mem] ✦ FAILED to initialize database: ${err}`)
-		// Return empty plugin — graceful degradation
+		log("error", `[mem] FAILED to initialize database: ${err}`)
 		return {}
 	}
 
 	// Initialize LSS companion file directory for semantic search indexing
 	try {
 		ensureMemDir()
-		log("info", "[mem] ✦ LSS mem directory ready at ~/.kortix/mem/")
 	} catch (err) {
-		log("warn", `[mem] ✦ LSS mem directory creation failed (non-critical): ${err}`)
+		log("warn", `[mem] LSS mem directory creation failed: ${err}`)
 	}
 
-	log("info", `[mem] ✦ Plugin ready — directory: ${directory}`)
+	log("info", `[mem] Plugin ready (db + LSS)`)
 
 	// ── Session State ──────────────────────────────────────────────────
 	// In-memory state for the current session (persists across tool calls
@@ -111,9 +108,9 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	const pendingToolArgs = new Map<string, Record<string, unknown>>()
 
 	// ── Summary Timer State ───────────────────────────────────────────
-	// 1-hour debounce: summary only fires after sustained inactivity.
+	// 30-minute debounce: summary only fires after sustained inactivity.
 	// Any user activity (chat.message) cancels and reschedules the timer.
-	const SUMMARY_DEBOUNCE_MS = 60 * 60 * 1000 // 1 hour
+	const SUMMARY_DEBOUNCE_MS = 30 * 60 * 1000 // 30 minutes
 	let summaryTimer: ReturnType<typeof setTimeout> | null = null
 
 	function clearSummaryTimer(): void {
@@ -143,11 +140,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				// Incremental: only fetch observations created after the last summary
 				observations = getObservationsBySessionIdSince(db, sessionId, existingSummary.summarizedAt)
 				if (observations.length === 0) {
-					log("info", `[mem]   └─ No new observations since last summary, skipping`)
-					if (markComplete) {
-						completeSession(db, sessionId)
-						log("info", `[mem]   └─ Session marked COMPLETED (no new work)`)
-					}
+					if (markComplete) completeSession(db, sessionId)
 					return
 				}
 				existingFields = {
@@ -159,24 +152,20 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					filesRead: existingSummary.filesRead,
 					filesModified: existingSummary.filesModified,
 				}
-				log("info", `[mem]   └─ Incremental enrichment: ${observations.length} new observations (since ${new Date(existingSummary.summarizedAt).toISOString()})`)
+				log("info", `[mem] Incremental summary: ${observations.length} new observations`)
 			} else {
 				// Fresh: get all observations
 				observations = getObservationsBySessionId(db, sessionId)
 				if (observations.length === 0) {
-					log("info", `[mem]   └─ No observations in session, skipping summary`)
-					if (markComplete) {
-						completeSession(db, sessionId)
-						log("info", `[mem]   └─ Session marked COMPLETED (empty session)`)
-					}
+					if (markComplete) completeSession(db, sessionId)
 					return
 				}
-				log("info", `[mem]   └─ Fresh summary from ${observations.length} observations`)
+				log("info", `[mem] Fresh summary from ${observations.length} observations`)
 			}
 
 			// AI summary generation (incremental or fresh)
 			const summaryFields = await generateSessionSummaryAsync(
-				client, db, observations, log, existingFields,
+				db, observations, log, existingFields,
 			)
 
 			const summary = {
@@ -196,15 +185,13 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				// Non-critical: LSS indexing is best-effort
 			}
 
-			log("info", `[mem]   └─ SUMMARY SAVED: "${(summaryFields.completed || "").slice(0, 80)}"`)
-			log("info", `[mem]   └─ Journal entry written to ~/.kortix/journal/`)
+			log("info", `[mem]   └─ Summary saved: "${(summaryFields.completed || "").slice(0, 80)}"`)
 
 			if (markComplete) {
 				completeSession(db, sessionId)
-				log("info", `[mem]   └─ Session marked COMPLETED`)
 			}
 		} catch (err) {
-			log("warn", `[mem] ⚠ Summary generation error for session ${sessionId.slice(0, 12)}...: ${err}`)
+			log("warn", `[mem] Summary generation error: ${err}`)
 		}
 	}
 
@@ -214,10 +201,10 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	 */
 	function scheduleSummaryTimer(sessionId: string): void {
 		clearSummaryTimer()
-		log("info", `[mem] ⏱️ Scheduling summary timer (${SUMMARY_DEBOUNCE_MS / 1000}s) for session ${sessionId.slice(0, 12)}...`)
+		log("info", `[mem] ⏱️ Summary timer scheduled (${SUMMARY_DEBOUNCE_MS / 1000}s)`)
 		summaryTimer = setTimeout(() => {
 			summaryTimer = null
-			log("info", `[mem] ⏱️ Summary timer fired for session ${sessionId.slice(0, 12)}...`)
+			log("info", `[mem] ⏱️ Summary timer fired`)
 			generateSummaryForSession(sessionId, true).then(() => {
 				// Reset state after completed summary
 				currentSessionId = null
@@ -334,7 +321,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						.describe("End date (YYYY-MM-DD)"),
 				},
 				async execute(args, context) {
-					log("info", `[mem] 🔍 mem_search: query="${args.query}" limit=${args.limit ?? 20} type=${args.type ?? "all"}`)
 					const results = searchObservations(db, {
 						query: args.query,
 						limit: args.limit,
@@ -343,7 +329,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						dateStart: args.date_start,
 						dateEnd: args.date_end,
 					})
-					log("info", `[mem]   └─ Found ${results.totalEstimate} results (returning ${results.observations.length})`)
+					log("info", `[mem] 🔍 mem_search: "${args.query}" → ${results.totalEstimate} results`)
 					context.metadata({ title: `Search: "${args.query}" (${results.totalEstimate} results)` })
 					return formatSearchResults(results)
 				},
@@ -373,14 +359,13 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						.describe("Observations after anchor (default 5, max 20)"),
 				},
 				async execute(args, context) {
-					log("info", `[mem] 📅 mem_timeline: anchor=#${args.anchor} before=${args.depth_before ?? 5} after=${args.depth_after ?? 5}`)
 					const result = getTimelineAround(
 						db,
 						args.anchor,
 						args.depth_before,
 						args.depth_after,
 					)
-					log("info", `[mem]   └─ Timeline: ${result.observations.length} entries (anchor at index ${result.anchorIndex})`)
+					log("info", `[mem] 📅 mem_timeline: #${args.anchor} → ${result.observations.length} entries`)
 					context.metadata({ title: `Timeline around #${args.anchor}` })
 					return formatTimeline(result)
 				},
@@ -402,9 +387,8 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						.describe("Array of observation IDs to fetch"),
 				},
 				async execute(args, context) {
-					log("info", `[mem] 📋 mem_get: ids=[${args.ids.join(", ")}]`)
 					const observations = getObservationsByIds(db, args.ids)
-					log("info", `[mem]   └─ Fetched ${observations.length}/${args.ids.length} observations`)
+					log("info", `[mem] 📋 mem_get: [${args.ids.join(",")}] → ${observations.length} observations`)
 					context.metadata({
 						title: `Fetched ${observations.length} observations`,
 					})
@@ -440,9 +424,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					const title =
 						args.title || args.text.slice(0, 80).replace(/\n/g, " ").trim()
 					const type = (args.type || "discovery") as any
-
-					log("info", `[mem] 💾 mem_save: type=${type} title="${title}"`)
-
 					const projectId = await resolveProjectId()
 
 					const id = insertObservation(db, {
@@ -461,7 +442,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						promptNumber: null,
 					})
 
-					log("info", `[mem]   └─ Saved as observation #${id}`)
+					log("info", `[mem] 💾 mem_save: #${id} "${title}"`)
 					context.metadata({ title: `Saved: ${title}` })
 					return `Observation #${id} saved: "${title}"`
 				},
@@ -486,24 +467,20 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 
 		"tool.execute.after": async (input, output) => {
 			try {
-				if (SKIP_TOOLS.has(input.tool)) {
-					log("debug", `[mem] ⤳ tool.execute.after SKIPPED: ${input.tool} (in skip list)`)
-					return
-				}
+				if (SKIP_TOOLS.has(input.tool)) return
 
 				// Look up captured args from tool.execute.before
 				const capturedArgs = pendingToolArgs.get(input.callID) ?? {}
 				pendingToolArgs.delete(input.callID)
 
-				log("info", `[mem] ⤳ tool.execute.after: ${input.tool} (session=${input.sessionID?.slice(0, 8)}..., call=${input.callID?.slice(0, 8)}...)`)
-				log("debug", `[mem]   args=${JSON.stringify(capturedArgs).slice(0, 200)} title=${output.title}`)
+				log("info", `[mem] ⤳ tool.execute.after: ${input.tool}`)
 
 				// Ensure session exists
 				if (!currentSessionId) {
 					currentSessionId = input.sessionID
 					const projectId = await resolveProjectId()
 					createSession(db, currentSessionId, projectId)
-					log("info", `[mem]   └─ Created session: ${currentSessionId?.slice(0, 12)}... (project=${projectId ?? "none"})`)
+					log("info", `[mem]   └─ Session created: ${currentSessionId?.slice(0, 12)}...`)
 				}
 
 				// Build raw tool data with REAL args from tool.execute.before
@@ -538,16 +515,11 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					for (const f of observation.filesRead) sessionFilesRead.add(f)
 					for (const f of observation.filesModified) sessionFilesModified.add(f)
 
-					const filesInfo = [
-						...observation.filesRead.map((f: string) => `R:${f}`),
-						...observation.filesModified.map((f: string) => `W:${f}`),
-					].slice(0, 3).join(", ")
-
-					log("info", `[mem]   └─ Observation #${obsId} saved: [${observation.type}] "${observation.title}"${filesInfo ? ` (${filesInfo})` : ""} — total: ${observationCount}`)
+					log("info", `[mem]   └─ Observation #${obsId} saved: [${observation.type}] "${observation.title}"`)
 
 					// Fire-and-forget: AI enrichment (non-blocking)
 					// After enrichment succeeds, re-write the companion file with AI-enhanced data
-					compressObservationAsync(client, db, obsId, raw, log).then(() => {
+					compressObservationAsync(db, obsId, raw, log).then(() => {
 						try {
 							const enrichedObs = getObservationById(db, obsId)
 							if (enrichedObs) writeObservationFile(enrichedObs)
@@ -557,8 +529,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					}).catch((err) => {
 						log("warn", `[mem:ai] Compression failed for #${obsId}: ${err}`)
 					})
-				} else {
-					log("debug", `[mem]   └─ No observation extracted from ${input.tool}`)
 				}
 			} catch (err) {
 				log("warn", `[mem] ⚠ tool.execute.after FAILED for ${input.tool}: ${err}`)
@@ -580,17 +550,16 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					currentSessionId = input.sessionID
 					const projectId = await resolveProjectId()
 					createSession(db, currentSessionId, projectId)
-					log("info", `[mem] 💬 Session initialized from chat.message: ${currentSessionId.slice(0, 12)}...`)
+					log("info", `[mem] 💬 Session created: ${currentSessionId.slice(0, 12)}...`)
 				}
 
-				// Increment prompt count — chat.message fires once per actual user message,
-				// unlike session.updated/session.status which fire many times per prompt.
+				// Increment prompt count
 				if (currentSessionId) {
 					promptCount = incrementPromptCount(db, currentSessionId)
-					log("info", `[mem] 💬 Prompt count: ${promptCount} (session=${currentSessionId.slice(0, 12)}...)`)
+					log("info", `[mem] 💬 Prompt #${promptCount}`)
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ chat.message handler error: ${err}`)
+				log("warn", `[mem] ⚠ chat.message error: ${err}`)
 			}
 		},
 
@@ -598,8 +567,6 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 
 		event: async ({ event }: { event: Event }) => {
 			try {
-				log("debug", `[mem] ⚡ event: ${event.type}`)
-
 				// Session created — initialize tracking
 				if (event.type === "session.created") {
 					const info = (event as any).properties?.info
@@ -627,7 +594,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					if (projectId) currentProjectId = projectId
 					createSession(db, sessionID, currentProjectId)
 
-					log("info", `[mem] ⚡ SESSION CREATED: ${sessionID.slice(0, 12)}... (project=${currentProjectId ?? "global"})`)
+					log("info", `[mem] ⚡ Session created: ${sessionID.slice(0, 12)}...`)
 				}
 
 				// Note: prompt counting moved to chat.message hook (fires once per user message).
@@ -638,21 +605,15 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					const sessionID = (event as any).properties?.sessionID as string | undefined
 					if (!sessionID) return
 
-					log("info", `[mem] ⚡ SESSION IDLE: ${sessionID.slice(0, 12)}...`)
+					log("info", `[mem] ⚡ Session idle: ${sessionID.slice(0, 12)}...`)
 
-					// Only process if this is our current session
-					if (sessionID !== currentSessionId) {
-						log("debug", `[mem]   └─ Ignoring idle for non-current session`)
-						return
-					}
+					// Only process if this is our current active session
+					if (sessionID !== currentSessionId) return
 
 					const session = getSession(db, sessionID)
-					if (!session || session.status === "completed") {
-						log("debug", `[mem]   └─ Session already completed or not found, skipping`)
-						return
-					}
+					if (!session || session.status === "completed") return
 
-					// Schedule the 1-hour debounce timer instead of generating immediately
+					// Schedule the 30-minute debounce timer instead of generating immediately
 					scheduleSummaryTimer(sessionID)
 				}
 
@@ -666,7 +627,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						observationCount = 0
 						sessionFilesRead.clear()
 						sessionFilesModified.clear()
-						log("info", `[mem] ⚡ SESSION DELETED: ${sessionID?.slice(0, 12)}... — timer cancelled, state reset`)
+						log("info", `[mem] ⚡ Session deleted: ${sessionID?.slice(0, 12)}...`)
 					}
 				}
 			} catch (err) {
@@ -683,10 +644,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				const context = generateContextBlock(db, currentProjectId ?? undefined)
 				if (context) {
 					output.system.push(context)
-					const lineCount = context.split("\n").length
-					log("info", `[mem] 💉 Context injected into system prompt: ${lineCount} lines (~${context.length} chars)`)
-				} else {
-					log("debug", `[mem] 💉 No context to inject (empty database)`)
+					log("info", `[mem] 💉 Context injected (~${context.length} chars)`)
 				}
 			} catch (err) {
 				log("warn", `[mem] ⚠ Context injection error: ${err}`)
@@ -701,9 +659,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				const context = generateContextBlock(db, currentProjectId ?? undefined, 15, 3)
 				if (context) {
 					output.context.push(context)
-					log("info", `[mem] 🗜️ Compaction: injected ${context.split("\n").length} lines of observation context (session=${input.sessionID.slice(0, 12)}...)`)
-				} else {
-					log("debug", `[mem] 🗜️ Compaction: no context to inject`)
+					log("info", `[mem] 🗜️ Compaction context injected (~${context.length} chars)`)
 				}
 			} catch (err) {
 				log("warn", `[mem] ⚠ Compaction injection error: ${err}`)
