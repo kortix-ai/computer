@@ -122,7 +122,6 @@ import {
   getHiddenToolParts,
   isToolPartHidden,
   getAnsweredQuestionParts,
-  unwrapError,
   getTurnStatus,
   getTurnCost,
   classifyTurnError,

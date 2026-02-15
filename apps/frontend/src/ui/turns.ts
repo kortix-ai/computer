@@ -877,3 +877,170 @@ export function allDescendantIds(
   }
   return result;
 }
+
+// ============================================================================
+// Session error classification & display helpers
+// ============================================================================
+
+/**
+ * Known SDK error names emitted via `session.error` events or
+ * `AssistantMessage.error`. Used for type-specific UI treatment.
+ */
+export type SessionErrorName =
+  | 'ProviderAuthError'
+  | 'UnknownError'
+  | 'MessageOutputLengthError'
+  | 'MessageAbortedError'
+  | 'ContextOverflowError'
+  | 'APIError';
+
+/** Severity level determines banner colour and icon. */
+export type ErrorSeverity = 'critical' | 'warning' | 'info';
+
+/** Display metadata for a session error. */
+export interface SessionErrorDisplay {
+  /** Short, user-friendly title */
+  title: string;
+  /** Longer description explaining what happened and what to do */
+  description: string;
+  /** Severity for styling (colour / icon) */
+  severity: ErrorSeverity;
+  /** Suggested action label, if any */
+  actionLabel?: string;
+  /** Whether the error is auto-retryable by the server */
+  isRetryable: boolean;
+}
+
+/**
+ * Classify a raw error object into display-friendly metadata.
+ *
+ * Handles all six SDK error variants and falls back gracefully
+ * for unknown shapes.
+ */
+export function classifySessionError(error: unknown): SessionErrorDisplay {
+  if (!error || typeof error !== 'object') {
+    return {
+      title: 'An error occurred',
+      description: unwrapError(error),
+      severity: 'warning',
+      isRetryable: false,
+    };
+  }
+
+  const err = error as { name?: string; data?: Record<string, unknown> };
+  const name = err.name;
+  const data = err.data || {};
+  const message = (data.message as string) || '';
+
+  switch (name) {
+    case 'ProviderAuthError': {
+      const providerID = (data.providerID as string) || 'provider';
+      return {
+        title: 'Authentication failed',
+        description: message || `Failed to authenticate with ${providerID}. Please check your API key or credentials.`,
+        severity: 'critical',
+        actionLabel: 'Check settings',
+        isRetryable: false,
+      };
+    }
+
+    case 'ContextOverflowError':
+      return {
+        title: 'Context limit exceeded',
+        description: message || 'The conversation exceeded the model\'s context window. Try compacting the session or starting a new one.',
+        severity: 'warning',
+        actionLabel: 'Compact session',
+        isRetryable: false,
+      };
+
+    case 'MessageOutputLengthError':
+      return {
+        title: 'Output too long',
+        description: message || 'The model\'s response exceeded the maximum output length. The response was truncated.',
+        severity: 'warning',
+        isRetryable: false,
+      };
+
+    case 'MessageAbortedError':
+      return {
+        title: 'Message aborted',
+        description: message || 'The message was aborted before completion.',
+        severity: 'info',
+        isRetryable: false,
+      };
+
+    case 'APIError': {
+      const statusCode = data.statusCode as number | undefined;
+      const isRetryable = (data.isRetryable as boolean) || false;
+
+      // Rate limiting
+      if (statusCode === 429) {
+        return {
+          title: 'Rate limited',
+          description: message || 'Too many requests. The server will retry automatically.',
+          severity: 'warning',
+          isRetryable: true,
+        };
+      }
+
+      // Server errors
+      if (statusCode && statusCode >= 500) {
+        return {
+          title: 'Provider error',
+          description: message || `The API provider returned an error (${statusCode}). ${isRetryable ? 'Retrying automatically.' : 'Please try again.'}`,
+          severity: 'critical',
+          isRetryable,
+        };
+      }
+
+      // Auth errors
+      if (statusCode === 401 || statusCode === 403) {
+        return {
+          title: 'Authorization error',
+          description: message || 'Your API key may be invalid or expired. Please check your credentials.',
+          severity: 'critical',
+          actionLabel: 'Check settings',
+          isRetryable: false,
+        };
+      }
+
+      return {
+        title: 'API error',
+        description: message || 'An API error occurred. Please try again.',
+        severity: isRetryable ? 'warning' : 'critical',
+        isRetryable,
+      };
+    }
+
+    case 'UnknownError':
+      return {
+        title: 'Unexpected error',
+        description: message || 'An unexpected error occurred. Please try again.',
+        severity: 'critical',
+        isRetryable: false,
+      };
+
+    default:
+      // Fallback for unrecognised shapes
+      return {
+        title: name ? `Error: ${name}` : 'An error occurred',
+        description: message || unwrapError(error),
+        severity: 'warning',
+        isRetryable: false,
+      };
+  }
+}
+
+/**
+ * Classify an `AssistantMessage.error` (turn-level error) the same way.
+ * This replaces the old plain-text `getTurnError` for richer display.
+ */
+export function classifyTurnError(turn: Turn): SessionErrorDisplay | undefined {
+  for (const msg of turn.assistantMessages) {
+    const info = msg.info as AssistantMessage;
+    if (info.error) {
+      return classifySessionError(info.error);
+    }
+  }
+  return undefined;
+}

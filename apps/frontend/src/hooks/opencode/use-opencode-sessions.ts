@@ -771,6 +771,81 @@ export function useUnshareSession() {
 }
 
 // ============================================================================
+// Part Edit / Delete Hooks
+// ============================================================================
+
+/**
+ * Update a message part (e.g. edit text content).
+ * Uses `client.part.update()` — available in SDK v2.
+ * SSE `message.part.updated` events handle cache updates automatically.
+ */
+export function useUpdatePart() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      messageId,
+      partId,
+      part,
+    }: {
+      sessionId: string;
+      messageId: string;
+      partId: string;
+      part: Partial<Part>;
+    }) => {
+      const client = getClient();
+      const result = await client.part.update({
+        sessionID: sessionId,
+        messageID: messageId,
+        partID: partId,
+        part: part as Part,
+      });
+      return unwrap(result) as Part;
+    },
+    onSuccess: (_data, variables) => {
+      // SSE handles incremental cache update via message.part.updated,
+      // but invalidate as fallback in case SSE is disconnected.
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
+    },
+  });
+}
+
+/**
+ * Delete a message part.
+ * Uses `client.part.delete()` — available in SDK v2.
+ * SSE `message.part.removed` events handle cache updates automatically.
+ */
+export function useDeletePart() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      messageId,
+      partId,
+    }: {
+      sessionId: string;
+      messageId: string;
+      partId: string;
+    }) => {
+      const client = getClient();
+      const result = await client.part.delete({
+        sessionID: sessionId,
+        messageID: messageId,
+        partID: partId,
+      });
+      return unwrap(result);
+    },
+    onSuccess: (_data, variables) => {
+      // SSE handles incremental cache update via message.part.removed,
+      // but invalidate as fallback in case SSE is disconnected.
+      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
+    },
+  });
+}
+
+// ============================================================================
 // File Search (direct SDK call, not a hook)
 // ============================================================================
 
