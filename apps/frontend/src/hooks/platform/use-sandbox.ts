@@ -31,6 +31,13 @@ import { useEffect, useRef } from 'react';
 const SANDBOX_SERVER_ID = 'cloud-sandbox';
 
 /**
+ * Module-level flag to track whether we've already auto-switched to the
+ * sandbox server in this browser session. Survives component remounts
+ * (unlike a useRef), preventing accidental server switches mid-session.
+ */
+let hasAutoSwitchedToSandbox = false;
+
+/**
  * Register (or update) the sandbox as a server entry in the server store
  * and set it as the active server if no other server is active.
  *
@@ -81,9 +88,12 @@ function registerSandboxServer(sandbox: SandboxInfo) {
     }));
   }
 
-  // Auto-switch to sandbox if user is still on the default localhost server
-  // (means they haven't manually selected something else)
-  if (store.activeServerId === 'default') {
+  // Auto-switch to sandbox ONLY on the very first registration in this browser
+  // session, and ONLY if the user is still on the default localhost server
+  // (meaning they haven't manually selected any instance yet).
+  // This prevents mid-session server switches that disrupt ongoing AI responses.
+  if (!hasAutoSwitchedToSandbox && store.activeServerId === 'default') {
+    hasAutoSwitchedToSandbox = true;
     store.setActiveServer(SANDBOX_SERVER_ID);
   }
 }
