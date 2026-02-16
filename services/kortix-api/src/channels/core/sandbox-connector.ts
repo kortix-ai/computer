@@ -528,14 +528,25 @@ export class SandboxConnector {
       }
 
       const data = await res.json();
-      return Array.isArray(data) ? data : (data.providers || []);
+      // Response shape: { providers: [{ id, name, models: { [key]: { id, name, ... } } }] }
+      const rawProviders: unknown[] = Array.isArray(data) ? data : (data.providers || []);
+
+      return rawProviders.map((p: any) => {
+        const modelsMap = p.models || {};
+        // models is a map { [key]: { id, name, ... } }, convert to array
+        const models = Object.values(modelsMap).map((m: any) => ({
+          id: m.id || '',
+          name: m.name || m.id || '',
+        }));
+        return { id: p.id || '', name: p.name || p.id || '', models };
+      });
     } catch (err) {
       console.warn('[SANDBOX-CONNECTOR] listProviders error:', err);
       return [];
     }
   }
 
-  async listAgents(): Promise<Array<{ name: string; description?: string; isDefault?: boolean }>> {
+  async listAgents(): Promise<Array<{ name: string; description?: string; mode?: string }>> {
     try {
       const { url, headers } = await this.getEndpoint();
       const res = await fetch(`${url}/agent`, {
@@ -550,7 +561,13 @@ export class SandboxConnector {
       }
 
       const data = await res.json();
-      return Array.isArray(data) ? data : (data.agents || []);
+      // Response shape: Agent[] with { name, description, mode: "subagent"|"primary"|"all", ... }
+      const agents: unknown[] = Array.isArray(data) ? data : (data.agents || Object.values(data));
+      return agents.map((a: any) => ({
+        name: a.name || '',
+        description: a.description,
+        mode: a.mode,
+      }));
     } catch (err) {
       console.warn('[SANDBOX-CONNECTOR] listAgents error:', err);
       return [];
