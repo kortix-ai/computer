@@ -36,6 +36,34 @@ const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
   : undefined
 app.use('*', cors(corsOrigins ? { origin: corsOrigins } : undefined))
 
+// ─── OpenCode readiness tracking ─────────────────────────────────────────────
+let openCodeReady = false
+let openCodeLastCheck = 0
+const OPENCODE_CHECK_INTERVAL = 5_000 // recheck every 5s when not ready
+
+async function checkOpenCodeReady(): Promise<boolean> {
+  if (openCodeReady) return true
+  const now = Date.now()
+  if (now - openCodeLastCheck < OPENCODE_CHECK_INTERVAL) return false
+  openCodeLastCheck = now
+  try {
+    const res = await fetch(`http://${config.OPENCODE_HOST}:${config.OPENCODE_PORT}/session`, {
+      signal: AbortSignal.timeout(3_000),
+    })
+    if (res.ok) {
+      openCodeReady = true
+      console.log('[Kortix Master] OpenCode is ready')
+      // Consume body to free connection
+      await res.arrayBuffer()
+      return true
+    }
+  } catch {}
+  return false
+}
+
+// Fire initial check in background
+checkOpenCodeReady()
+
 // Health check — includes current sandbox version
 app.get('/kortix/health', async (c) => {
   let version = '0.0.0'
@@ -46,7 +74,8 @@ app.get('/kortix/health', async (c) => {
       version = data.version || '0.0.0'
     }
   } catch {}
-  return c.json({ status: 'ok', version, build: '0.4.11', activeWs: activeConnections })
+  await checkOpenCodeReady()
+  return c.json({ status: 'ok', version, build: '0.4.11', activeWs: activeConnections, opencode: openCodeReady })
 })
 
 // Port mappings — returns container→host port map so the frontend

@@ -97,10 +97,10 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
       headers: responseHeaders,
     })
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
       return c.json({ error: 'Upstream request timed out', port, details: `Service on port ${port} did not respond within 30s` }, 504)
     }
-    console.error(`[Kortix Master] Port proxy error (port ${port}):`, error)
+    console.error(`[Kortix Master] Port proxy error (port ${port}): ${error instanceof Error ? error.message : String(error)}`)
     return c.json(
       {
         error: 'Failed to connect to service',

@@ -73,15 +73,17 @@ export async function proxyToOpenCode(c: Context): Promise<Response> {
       headers: response.headers,
     })
   } catch (error) {
-    // Don't log abort errors (expected on timeout or client disconnect)
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    // Handle abort/timeout errors cleanly (Bun throws TimeoutError for AbortSignal.timeout,
+    // AbortError for manual controller.abort())
+    if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
       if (!acceptsSSE) {
-        return c.json({ error: 'Upstream request timed out', details: 'OpenCode did not respond within 30s' }, 504)
+        return c.json({ error: 'OpenCode not responding', details: `${url.pathname} timed out after ${FETCH_TIMEOUT_MS / 1000}s — OpenCode may still be starting` }, 504)
       }
       // SSE client disconnected — just return empty response (connection is already gone)
       return new Response(null, { status: 499 })
     }
-    console.error('[Kortix Master] Proxy error:', error)
+    // Log only the message, not the entire DOMException object
+    console.error(`[Kortix Master] Proxy error for ${url.pathname}: ${error instanceof Error ? error.message : String(error)}`)
     return c.json({ error: 'Failed to proxy to OpenCode', details: String(error) }, 502)
   }
 }
