@@ -22,6 +22,7 @@ import {
   rewriteLocalhostUrl,
   type DetectedLocalhostUrl,
 } from '@/lib/utils/sandbox-url';
+import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-url';
 
 interface SandboxUrlDetectorProps {
   content: string;
@@ -78,6 +79,9 @@ function InlineIframePreview({
   proxyUrl: string;
   port: number;
 }) {
+  // Inject auth token for cloud preview proxy URLs
+  const authenticatedUrl = useAuthenticatedPreviewUrl(proxyUrl);
+
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -189,7 +193,7 @@ function InlineIframePreview({
         <iframe
           key={refreshKey}
           ref={iframeRef}
-          src={proxyUrl}
+          src={authenticatedUrl}
           title={`Preview :${port}`}
           className="w-full h-full border-0 bg-white"
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"

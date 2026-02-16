@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useTabStore } from '@/stores/tab-store';
+import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-url';
 
 interface PreviewTabContentProps {
   tabId: string;
@@ -29,8 +30,11 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Extract metadata from tab
-  const previewUrl = (tab?.metadata?.url as string) || '';
+  const rawPreviewUrl = (tab?.metadata?.url as string) || '';
   const port = (tab?.metadata?.port as number) || 0;
+
+  // Inject auth token for cloud preview proxy URLs
+  const previewUrl = useAuthenticatedPreviewUrl(rawPreviewUrl);
 
   /** Clear any pending load timeout. */
   const clearLoadTimeout = useCallback(() => {
@@ -74,15 +78,15 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     return clearLoadTimeout;
   }, [isLoading, refreshKey, clearLoadTimeout]);
 
-  // Display URL (strip protocol for cleaner look)
+  // Display URL (strip protocol and auth token for cleaner look)
   const displayUrl = useMemo(() => {
     try {
-      const u = new URL(previewUrl);
+      const u = new URL(rawPreviewUrl);
       return `${u.host}${u.pathname}${u.search}`;
     } catch {
-      return previewUrl;
+      return rawPreviewUrl;
     }
-  }, [previewUrl]);
+  }, [rawPreviewUrl]);
 
   if (!tab || !previewUrl) {
     return (
