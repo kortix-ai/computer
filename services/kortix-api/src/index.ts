@@ -32,6 +32,7 @@ app.use(
       'https://www.kortix.com',
       'https://kortix.com',
       'https://dev.kortix.com',
+      'https://new-dev.kortix.com',
       'https://staging.kortix.com',
       'https://kortix.cloud',
       'https://www.kortix.cloud',
