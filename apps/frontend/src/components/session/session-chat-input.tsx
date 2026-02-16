@@ -1127,11 +1127,15 @@ export function SessionChatInput({
       }
     }
 
-    // Prompt history: Up arrow at the start of input
+    // Prompt history: Up arrow
+    // For single-line text, trigger from any cursor position.
+    // For multi-line text, only trigger when the cursor is at the very start
+    // so the user can still navigate between lines with arrow keys.
     if (e.key === 'ArrowUp' && slashFilter === null) {
       const ta = e.currentTarget;
+      const isSingleLine = !ta.value.includes('\n');
       const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
-      if (atStart && historyRef.current.length > 0) {
+      if ((isSingleLine || atStart) && historyRef.current.length > 0) {
         e.preventDefault();
         if (historyIndexRef.current === -1) {
           draftRef.current = text;
@@ -1145,10 +1149,12 @@ export function SessionChatInput({
     }
 
     // Prompt history: Down arrow
+    // Same logic: single-line triggers from anywhere, multi-line only at end.
     if (e.key === 'ArrowDown' && slashFilter === null && historyIndexRef.current >= 0) {
       const ta = e.currentTarget;
+      const isSingleLine = !ta.value.includes('\n');
       const atEnd = ta.selectionStart === ta.value.length;
-      if (atEnd) {
+      if (isSingleLine || atEnd) {
         e.preventDefault();
         if (historyIndexRef.current < historyRef.current.length - 1) {
           historyIndexRef.current++;
