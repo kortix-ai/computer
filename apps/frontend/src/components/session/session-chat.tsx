@@ -2266,9 +2266,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [pendingSendInFlight]);
 
   // Stale session watchdog: when the session has been busy for a while, do a
-  // direct status check every 30s. If the server reports idle but our store
-  // still shows busy, force the status to idle — recovering from a silently
-  // dropped SSE stream or missed event.
+  // direct status check. If the server reports idle (or doesn't include the
+  // session at all — meaning it's idle), force the status to idle — recovering
+  // from a silently dropped SSE stream or missed event.
+  // First check after 5s, then every 15s.
   useEffect(() => {
     if (!isServerBusy) return;
 
@@ -2281,6 +2282,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           const serverStatus = statuses[sessionId];
           if (serverStatus) {
             useOpenCodeSessionStatusStore.getState().setStatus(sessionId, serverStatus);
+          } else {
+            // Server didn't include this session — it's idle
+            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, { type: 'idle' });
           }
         }
       } catch {
@@ -2288,9 +2292,40 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       }
     };
 
-    const interval = setInterval(check, 30_000);
-    return () => clearInterval(interval);
+    // First check after 5s, then every 15s
+    const initialTimer = setTimeout(() => {
+      check();
+    }, 5_000);
+    const interval = setInterval(check, 15_000);
+    return () => { clearTimeout(initialTimer); clearInterval(interval); };
   }, [isServerBusy, sessionId]);
+
+  // Message-based idle detection: if the last assistant message has
+  // time.completed set, the server has finished generating. If our session
+  // status still says busy, the SSE idle event was missed — force idle.
+  useEffect(() => {
+    if (!isServerBusy || !messages || messages.length === 0) return;
+    // Find the last assistant message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.info.role === 'assistant') {
+        const assistantInfo = msg.info as any;
+        if (assistantInfo.time?.completed) {
+          // The server marked the message as completed but we never got the
+          // idle event — force the session to idle after a short grace period
+          // to avoid racing with a status event that's still in flight.
+          const timer = setTimeout(() => {
+            const currentStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
+            if (currentStatus?.type === 'busy' || currentStatus?.type === 'retry') {
+              useOpenCodeSessionStatusStore.getState().setStatus(sessionId, { type: 'idle' });
+            }
+          }, 2_000);
+          return () => clearTimeout(timer);
+        }
+        break; // only check the last assistant message
+      }
+    }
+  }, [isServerBusy, messages, sessionId]);
 
   // Clear pending user message when server acknowledges (status becomes busy)
   // or when new messages arrive from the server
