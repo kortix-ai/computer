@@ -12,8 +12,8 @@ import {
   FolderOpen,
   ListTree,
   ChevronDown,
-  TerminalSquare,
   Search,
+  Blocks,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -612,6 +612,19 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
           />
+          <div className="w-6 border-t border-sidebar-border my-1" />
+          <CollapsedIconButton
+            icon={<Blocks className="h-[18px] w-[18px]" />}
+            label="Workspace"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/workspace',
+                title: 'Workspace',
+                type: 'page',
+                href: '/workspace',
+              }, router);
+            }}
+          />
         </div>
 
         {/* --- Expanded layout --- */}
@@ -678,6 +691,30 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             </button>
 
             {/* Sessions — expandable, default open */}
+          </nav>
+
+          {/* Workspace link */}
+          <nav className="flex-shrink-0 px-3 space-y-1">
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/workspace',
+                  title: 'Workspace',
+                  type: 'page',
+                  href: '/workspace',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className={cn(
+                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer',
+                (pathname === '/workspace' || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <Blocks className="h-[18px] w-[18px] flex-shrink-0" />
+              <span>Workspace</span>
+            </button>
           </nav>
 
           <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">

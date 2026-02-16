@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sparkles, Search, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -17,6 +18,7 @@ import {
   type Skill,
   type SkillFilterTab,
 } from '../types';
+import { openTabAndNavigate } from '@/stores/tab-store';
 
 // ---------------------------------------------------------------------------
 // Skills List (main content component for the skills page)
@@ -24,6 +26,7 @@ import {
 
 export function SkillList() {
   const { data: skills, isLoading, error } = useSkills();
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<SkillFilterTab>('all');
 
@@ -69,6 +72,17 @@ export function SkillList() {
 
   const handleEdit = (skill: Skill) => openEditEditor(skill);
   const handleDelete = (skill: Skill) => openDeleteDialog(skill);
+  const handleNavigate = (skill: Skill) => {
+    openTabAndNavigate(
+      {
+        id: `page:/skills/${encodeURIComponent(skill.name)}`,
+        title: skill.name,
+        type: 'page',
+        href: `/skills/${encodeURIComponent(skill.name)}`,
+      },
+      router,
+    );
+  };
 
   return (
     <>
@@ -85,12 +99,10 @@ export function SkillList() {
                 files).
               </p>
             </div>
-            {/* TODO: re-enable when skills CRUD is ready
             <Button onClick={openCreateEditor} size="sm" className="gap-1.5">
               <Plus className="h-4 w-4" />
               New Skill
             </Button>
-            */}
           </div>
 
           {/* Content */}
@@ -197,6 +209,7 @@ export function SkillList() {
                       skill={skill}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      onNavigate={handleNavigate}
                     />
                   ))}
                 </div>

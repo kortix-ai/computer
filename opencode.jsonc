@@ -3,6 +3,15 @@
   "permission": "allow",
   "autoupdate": false,
   "model": "kortix/kortix/basic",
+  "default_agent": "kortix-main",
+  "agent": {
+    // Disable all built-in agents -- Kortix provides its own
+    "build": { "disable": true },
+    "plan": { "disable": true },
+    "explore": { "disable": true },
+    "general": { "disable": true }
+    // compaction, title, summary are hidden infra agents -- leave them
+  },
   "provider": {
     "kortix": {
       "npm": "@ai-sdk/openai-compatible",

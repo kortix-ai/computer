@@ -20,11 +20,11 @@ export function SessionWelcome() {
         />
       </div>
 
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <p className="text-2xl sm:text-3xl font-medium text-muted-foreground tracking-tight">
           Welcome to your Kortix
         </p>
-      </div>
+      </div> */}
     </div>
   );
 }
