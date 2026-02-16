@@ -466,7 +466,7 @@ export function InstanceManagerDialog({
           url,
           label,
           provider: sandbox.provider,
-          sandboxId: sandbox.sandbox_id,
+          sandboxId: sandbox.external_id,
           mappedPorts: extractMappedPorts(sandbox),
         });
       } else {
@@ -478,7 +478,7 @@ export function InstanceManagerDialog({
               label,
               url,
               provider: sandbox.provider,
-              sandboxId: sandbox.sandbox_id,
+              sandboxId: sandbox.external_id,
               mappedPorts: extractMappedPorts(sandbox),
             },
           ],
