@@ -84,7 +84,7 @@ ENV AGENT_BROWSER_PRIMARY_SESSION=kortix
 ENV AGENT_BROWSER_STREAM_PORT=9223
 ENV AGENT_BROWSER_PROFILE=/workspace/.browser-profile
 ENV AGENT_BROWSER_SOCKET_DIR=/workspace/.agent-browser
-ENV AGENT_BROWSER_ARGS="--no-sandbox,--disable-setuid-sandbox,--disable-gpu,--disable-dev-shm-usage,--disable-blink-features=AutomationControlled,--disable-features=VizDisplayCompositor,--window-size=1920,1080"
+ENV AGENT_BROWSER_ARGS="--no-sandbox,--disable-setuid-sandbox,--disable-gpu,--disable-dev-shm-usage,--disable-blink-features=AutomationControlled,--disable-features=VizDisplayCompositor"
 ENV AGENT_BROWSER_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 # ── Agent Browser Viewer (watch the browser session from your Mac) ───────────
