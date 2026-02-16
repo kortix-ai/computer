@@ -8,6 +8,8 @@ const BLOCKED_PORTS = new Set([
   config.PORT,  // kortix-master itself (default 8000)
 ])
 
+const FETCH_TIMEOUT_MS = 30_000
+
 /**
  * Dynamic port proxy: /proxy/:port/*
  *
@@ -15,12 +17,6 @@ const BLOCKED_PORTS = new Set([
  * This enables the frontend to access any service the agent starts
  * (e.g. dev servers on port 3000, 8080, 5173, etc.) without needing
  * those ports individually exposed in docker-compose.
- *
- * In cloud mode, the frontend accesses this via:
- *   https://kortix.cloud/{sandboxId}/8000/proxy/{port}/{path}
- *
- * In local mode:
- *   http://localhost:8000/proxy/{port}/{path}
  */
 proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
   const portStr = c.req.param('port')
@@ -52,16 +48,20 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
   // Set correct Host for the upstream service
   headers.set('Host', `localhost:${port}`)
 
+  // Detect SSE requests
+  const acceptsSSE = (c.req.header('accept') || '').includes('text/event-stream')
+
   try {
     const response = await fetch(targetUrl, {
       method: c.req.method,
       headers,
       body: c.req.method !== 'GET' && c.req.method !== 'HEAD'
-        ? await c.req.raw.clone().arrayBuffer()
+        ? await c.req.raw.arrayBuffer()
         : undefined,
       // @ts-ignore - Bun supports duplex
       duplex: 'half',
       redirect: 'manual',
+      signal: acceptsSSE ? undefined : AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
 
     // Rewrite Location headers so redirects go through the proxy too
@@ -97,6 +97,9 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
       headers: responseHeaders,
     })
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return c.json({ error: 'Upstream request timed out', port, details: `Service on port ${port} did not respond within 30s` }, 504)
+    }
     console.error(`[Kortix Master] Port proxy error (port ${port}):`, error)
     return c.json(
       {
