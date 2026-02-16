@@ -220,13 +220,20 @@ export async function handleSlackWebhook(
     return c.json({ ok: true });
   }
 
-  if (event.subtype) {
+  // Allow file_share subtype through; drop everything else
+  if (event.subtype && event.subtype !== 'file_share') {
     return c.json({ ok: true });
   }
 
+  const hasFiles = event.files && event.files.length > 0;
   let content = event.text || '';
-  if (!content) {
+  if (!content && !hasFiles) {
     return c.json({ ok: true });
+  }
+  // If files are attached but no text, give the agent context about the upload
+  if (!content && hasFiles) {
+    const fileNames = event.files!.map((f) => f.name).join(', ');
+    content = `[User uploaded: ${fileNames}]`;
   }
 
   const channelConfig = await findConfigByTeamId(eventPayload.team_id);
