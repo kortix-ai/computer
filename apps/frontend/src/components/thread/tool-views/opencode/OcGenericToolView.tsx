@@ -54,21 +54,6 @@ function pickToolIcon(name: string) {
   return Wrench;
 }
 
-/** Pick a color theme based on tool name */
-function pickToolColor(name: string): { iconColor: string; bg: string } {
-  const lower = name.toLowerCase();
-  if (lower.includes('patch') || lower.includes('diff')) {
-    return {
-      iconColor: 'text-blue-500 dark:text-blue-400',
-      bg: 'bg-gradient-to-b from-blue-100 to-blue-50 shadow-inner dark:from-blue-800/40 dark:to-blue-900/60',
-    };
-  }
-  return {
-    iconColor: 'text-orange-500 dark:text-orange-400',
-    bg: 'bg-gradient-to-b from-orange-100 to-orange-50 shadow-inner dark:from-orange-800/40 dark:to-orange-900/60',
-  };
-}
-
 /** Detect the best extension hint for a patch / multiline value */
 function detectLang(key: string, val: string): string {
   const lower = key.toLowerCase();
@@ -103,7 +88,6 @@ export function OcGenericToolView({
 
   const title = humanizeToolName(ocState?.title || ocTool);
   const ToolIcon = pickToolIcon(ocTool);
-  const colors = pickToolColor(ocTool);
 
   const { toDisplayPath } = useOcFileOpen();
 
@@ -134,18 +118,14 @@ export function OcGenericToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={ToolIcon}
-        iconColor={colors.iconColor}
-        bgColor={colors.bg}
         title={title}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={ToolIcon}
@@ -193,13 +173,13 @@ export function OcGenericToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               Completed
             </Badge>
           )
@@ -449,8 +429,8 @@ function SimpleArgsSection({
   toDisplayPath: (p: string) => string;
 }) {
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+    <div className="rounded-lg border border-border overflow-hidden bg-card">
+      <div className="divide-y divide-border">
         {entries.map(([key, val]) => {
           // Convert absolute file paths in arg values to relative display paths
           const displayVal = isAbsolutePath(val) ? toDisplayPath(val as string) : (typeof val === 'string' ? val : JSON.stringify(val));
@@ -480,9 +460,9 @@ function CodeSection({ label, content, lang }: { label: string; content: string;
     .trim();
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
+    <div className="rounded-lg border border-border overflow-hidden bg-card">
       <div
-        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? (
@@ -499,7 +479,7 @@ function CodeSection({ label, content, lang }: { label: string; content: string;
         </span>
       </div>
       {expanded && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800">
+        <div className="border-t border-border">
           <CodeHighlight
             code={content}
             language={lang || 'text'}

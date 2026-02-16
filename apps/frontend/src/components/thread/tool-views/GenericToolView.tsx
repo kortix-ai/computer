@@ -206,13 +206,13 @@ export function GenericToolView({
     console.warn('GenericToolView: toolCall is undefined or missing function_name. Tool views should use structured props.');
     return (
       <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-        <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4">
-          <CardTitle className="text-base font-medium text-zinc-900 dark:text-zinc-100">
+        <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4">
+          <CardTitle className="text-base font-medium text-foreground">
             Tool View Error
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             This tool view requires structured metadata. Please update the component to use toolCall and toolResult props.
           </p>
         </CardContent>
@@ -225,14 +225,14 @@ export function GenericToolView({
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="relative p-2 rounded-lg border bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 flex-shrink-0">
+            <div className="relative p-2 rounded-lg border bg-muted border-border flex-shrink-0">
               <AppIcon toolCall={toolCall} size={20} className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <CardTitle className="text-base font-medium text-zinc-900 dark:text-zinc-100 truncate">
+              <CardTitle className="text-base font-medium text-foreground truncate">
                 {toolTitle}
               </CardTitle>
             </div>
@@ -264,7 +264,7 @@ export function GenericToolView({
                 {/* Input section */}
                 {formattedAssistantContent && (
                   <div className="space-y-2">
-                    <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                    <div className="text-sm font-medium text-foreground flex items-center justify-between">
                       <div className="flex items-center">Input</div>
                       <Button
                         variant="ghost"
@@ -282,7 +282,7 @@ export function GenericToolView({
                         {typeof parsedAssistantContent === 'object' && parsedAssistantContent !== null ? (
                           <SmartJsonViewer data={parsedAssistantContent} />
                         ) : (
-                          <pre className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words font-mono">
+                          <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
                             {formattedAssistantContent}
                           </pre>
                         )}
@@ -298,7 +298,7 @@ export function GenericToolView({
             <div className="p-4 space-y-4">
               {formattedAssistantContent && (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                  <div className="text-sm font-medium text-foreground flex items-center justify-between">
                     <div className="flex items-center">
                       Input
                     </div>
@@ -322,7 +322,7 @@ export function GenericToolView({
                       {typeof parsedAssistantContent === 'object' && parsedAssistantContent !== null ? (
                         <SmartJsonViewer data={parsedAssistantContent} />
                       ) : (
-                        <pre className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words font-mono">
+                        <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
                           {formattedAssistantContent}
                           {isAssistantAnimating && <span className="animate-pulse text-muted-foreground">▌</span>}
                         </pre>
@@ -334,7 +334,7 @@ export function GenericToolView({
 
               {formattedToolContent && (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                  <div className="text-sm font-medium text-foreground flex items-center justify-between">
                     <div className="flex items-center">
                       Output
                     </div>
@@ -370,7 +370,7 @@ export function GenericToolView({
                             <UnifiedMarkdown content={content} isStreaming={false} />
                           </div>
                         ) : (
-                          <pre className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words font-mono">
+                          <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
                             {formattedToolContent}
                           </pre>
                         );
@@ -382,22 +382,22 @@ export function GenericToolView({
             </div>
           </ScrollArea>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-white to-zinc-50 dark:from-zinc-950 dark:to-zinc-900">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-zinc-100 to-zinc-50 shadow-inner dark:from-zinc-800/40 dark:to-zinc-900/60">
-              <Wrench className="h-10 w-10 text-zinc-400 dark:text-zinc-600" />
+          <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-background to-muted/50">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-muted to-muted/50 shadow-inner">
+              <Wrench className="h-10 w-10 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
+            <h3 className="text-xl font-semibold mb-2 text-foreground">
               No Content Available
             </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md">
+            <p className="text-sm text-muted-foreground text-center max-w-md">
               This tool execution did not produce any input or output content to display.
             </p>
           </div>
         )}
       </CardContent>
 
-      <div className="px-4 py-2 h-10 bg-gradient-to-r from-zinc-50/90 to-zinc-100/90 dark:from-zinc-900/90 dark:to-zinc-800/90 backdrop-blur-sm border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center gap-4">
-        <div className="h-full flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+      <div className="px-4 py-2 h-10 bg-gradient-to-r bg-muted/50 backdrop-blur-sm border-t border-border flex justify-between items-center gap-4">
+        <div className="h-full flex items-center gap-2 text-sm text-muted-foreground">
           {!isStreaming && (formattedAssistantContent || formattedToolContent || isError) && (
             isError ? (
               <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
@@ -405,7 +405,7 @@ export function GenericToolView({
                 Failed
               </Badge>
             ) : (
-              <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
+              <Badge variant="outline" className="h-6 py-0.5 bg-muted">
                 <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
                 Completed
               </Badge>
@@ -413,7 +413,7 @@ export function GenericToolView({
           )}
         </div>
 
-        <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
           <Clock className="h-3.5 w-3.5" />
           {toolTimestamp && !isStreaming
             ? formatTimestamp(toolTimestamp)

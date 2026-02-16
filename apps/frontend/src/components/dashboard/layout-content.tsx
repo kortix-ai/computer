@@ -388,31 +388,12 @@ export default function DashboardLayoutContent({
           />
         </Suspense>
       )}
+      {/* Fixed overlay banners — outside document flow, won't affect layout */}
+      <Suspense fallback={null}>
+        <DashboardPromoBanner />
+      </Suspense>
+
       <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
-        {technicalIssue?.enabled && technicalIssue.message && (
-          <Suspense fallback={null}>
-            <TechnicalIssueBanner 
-              message={technicalIssue.message}
-              statusUrl={technicalIssue.statusUrl}
-              updatedAt={statusUpdatedAt}
-            />
-          </Suspense>
-        )}
-        
-        {isMaintenanceScheduled && maintenanceNotice?.startTime && maintenanceNotice?.endTime && (
-          <Suspense fallback={null}>
-            <MaintenanceCountdownBanner 
-              startTime={maintenanceNotice.startTime}
-              endTime={maintenanceNotice.endTime}
-              updatedAt={statusUpdatedAt}
-            />
-          </Suspense>
-        )}
-        
-        {/* Site-wide promo banner for free tier users */}
-        <Suspense fallback={null}>
-          <DashboardPromoBanner />
-        </Suspense>
         <Suspense fallback={null}>
           <AnnouncementDialog />
         </Suspense>
@@ -429,21 +410,38 @@ export default function DashboardLayoutContent({
         <Suspense fallback={null}>
           <PresentationViewerWrapper />
         </Suspense>
-        {/* Kortix App announcement banners */}
-        <Suspense fallback={null}>
-          <KortixAppBanners disableMobileAdvertising={featureFlags.disableMobileAdvertising} />
-        </Suspense>
-        {/* Tutorials banner for new users */}
-        <Suspense fallback={null}>
-          <TutorialsBanner />
-        </Suspense>
-        {/* Mobile app install interstitial - shown on actual mobile devices */}
-        {!featureFlags.disableMobileAdvertising ? (
-          <Suspense fallback={null}>
-            <MobileAppInterstitial />
-          </Suspense>
-        ) : null}
       </div>
+
+      {/* Fixed-position notification toasts — rendered outside main flex to not affect layout */}
+      {technicalIssue?.enabled && technicalIssue.message && (
+        <Suspense fallback={null}>
+          <TechnicalIssueBanner 
+            message={technicalIssue.message}
+            statusUrl={technicalIssue.statusUrl}
+            updatedAt={statusUpdatedAt}
+          />
+        </Suspense>
+      )}
+      {isMaintenanceScheduled && maintenanceNotice?.startTime && maintenanceNotice?.endTime && (
+        <Suspense fallback={null}>
+          <MaintenanceCountdownBanner 
+            startTime={maintenanceNotice.startTime}
+            endTime={maintenanceNotice.endTime}
+            updatedAt={statusUpdatedAt}
+          />
+        </Suspense>
+      )}
+      <Suspense fallback={null}>
+        <KortixAppBanners disableMobileAdvertising={featureFlags.disableMobileAdvertising} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <TutorialsBanner />
+      </Suspense>
+      {!featureFlags.disableMobileAdvertising ? (
+        <Suspense fallback={null}>
+          <MobileAppInterstitial />
+        </Suspense>
+      ) : null}
     </AppProviders>
     </NovuInboxProvider>
   );

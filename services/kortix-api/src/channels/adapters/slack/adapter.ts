@@ -221,32 +221,55 @@ export class SlackAdapter extends BaseAdapter {
     files: FileOutput[],
   ): Promise<void> {
     const botToken = this.getBotToken(channelConfig);
-    if (!botToken) return;
+    if (!botToken) {
+      console.warn('[SLACK] sendFiles: no bot token, skipping');
+      return;
+    }
 
     const rawPayload = message.raw as Record<string, unknown> | undefined;
     const event = rawPayload?.event as Record<string, unknown> | undefined;
-    const channel = event?.channel as string;
-    if (!channel) return;
+    const channel = (event?.channel as string) || (rawPayload?.channelId as string);
+    if (!channel) {
+      console.warn('[SLACK] sendFiles: no channel in event payload, skipping');
+      return;
+    }
 
     const api = new SlackApi(botToken);
-    const threadTs = message.threadId || message.externalId;
+    // For slash commands, externalId is synthetic (cmd-*) and not a valid Slack ts
+    const isSlashCommand = rawPayload?._slackCommand === true;
+    const threadTs = message.threadId || (isSlashCommand ? undefined : message.externalId);
+
+    console.log(`[SLACK] sendFiles: ${files.length} file(s) to channel=${channel} thread=${threadTs}`);
 
     for (const file of files) {
       try {
-        const fileRes = await fetch(file.url);
-        if (!fileRes.ok) {
-          console.error(`[SLACK] Failed to download file ${file.name}: ${fileRes.status}`);
-          continue;
+        let fileBuffer: Buffer;
+        if (file.content) {
+          fileBuffer = file.content;
+        } else {
+          console.log(`[SLACK] Downloading file from URL: ${file.url.slice(0, 120)}`);
+          const fileRes = await fetch(file.url);
+          if (!fileRes.ok) {
+            console.error(`[SLACK] Failed to download file ${file.name}: ${fileRes.status}`);
+            continue;
+          }
+          fileBuffer = Buffer.from(await fileRes.arrayBuffer());
         }
-        const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
 
-        await api.filesUploadV2({
+        console.log(`[SLACK] Uploading file to Slack: ${file.name} (${fileBuffer.length} bytes)`);
+        const result = await api.filesUploadV2({
           channel,
           threadTs,
           filename: file.name,
           content: fileBuffer,
           title: file.name,
         });
+
+        if (!result.ok) {
+          console.error(`[SLACK] filesUploadV2 failed for ${file.name}: ${result.error}`);
+        } else {
+          console.log(`[SLACK] File uploaded to Slack: ${file.name}`);
+        }
       } catch (err) {
         console.error(`[SLACK] Failed to upload file ${file.name}:`, err);
       }

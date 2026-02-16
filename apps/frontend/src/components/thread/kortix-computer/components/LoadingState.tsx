@@ -12,19 +12,31 @@ interface LoadingStateProps {
   isMobile: boolean;
 }
 
-export const LoadingState = memo(function LoadingState({ 
-  agentName, 
-  onClose, 
-  isMobile 
+function LoadingSkeleton() {
+  return (
+    <div className="flex-1 p-4 overflow-auto">
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-20 w-full rounded-md" />
+        <Skeleton className="h-40 w-full rounded-md" />
+        <Skeleton className="h-20 w-full rounded-md" />
+      </div>
+    </div>
+  );
+}
+
+export const LoadingState = memo(function LoadingState({
+  agentName,
+  onClose,
+  isMobile,
 }: LoadingStateProps) {
   const { activeView, setActiveView } = useKortixComputerStore();
-  
+
   if (isMobile) {
     return (
       <DrawerContent
         className="h-[85vh]"
         onKeyDown={(e) => {
-          // Prevent Escape / Esc from dismissing the Drawer (Kortix Computer).
           if (e.key === 'Escape' || e.key === 'Esc') {
             e.preventDefault();
             e.stopPropagation();
@@ -38,44 +50,22 @@ export const LoadingState = memo(function LoadingState({
           currentView={activeView}
           onViewChange={setActiveView}
         />
-
-        <div className="flex-1 p-4 overflow-auto">
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-32" />
-            <Skeleton className="h-20 w-full rounded-md" />
-            <Skeleton className="h-40 w-full rounded-md" />
-            <Skeleton className="h-20 w-full rounded-md" />
-          </div>
-        </div>
+        <LoadingSkeleton />
       </DrawerContent>
     );
   }
 
+  // Desktop: render inline (container is provided by parent layout)
   return (
-    <div className="fixed inset-0 z-30 pointer-events-none">
-      <div className="p-4 h-full flex items-stretch justify-end pointer-events-auto">
-        <div className="border rounded-2xl flex flex-col shadow-2xl bg-background w-[90%] sm:w-[450px] md:w-[500px] lg:w-[550px] xl:w-[650px]">
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex flex-col h-full">
-              <PanelHeader
-                agentName={agentName}
-                onClose={onClose}
-                onMaximize={() => {}}
-                currentView={activeView}
-                onViewChange={setActiveView}
-              />
-              <div className="flex-1 p-4 overflow-auto">
-                <div className="space-y-4">
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-20 w-full rounded-md" />
-                  <Skeleton className="h-40 w-full rounded-md" />
-                  <Skeleton className="h-20 w-full rounded-md" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="flex flex-col h-full bg-card rounded-2xl border overflow-hidden">
+      <PanelHeader
+        agentName={agentName}
+        onClose={onClose}
+        onMaximize={() => {}}
+        currentView={activeView}
+        onViewChange={setActiveView}
+      />
+      <LoadingSkeleton />
     </div>
   );
 });

@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
-import { WebSearchLoadingState } from '../web-search-tool/WebSearchLoadingState';
+import { WebSearchLoadingState } from '../shared/WebSearchLoadingState';
 
 // ============================================================================
 // Types & Parsing
@@ -203,7 +203,7 @@ export function OcWebSearchToolView({
   if (isStreaming && !toolResult) {
     return (
       <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-        <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+        <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
           <div className="flex flex-row items-center justify-between">
             <ToolViewIconTitle icon={Search} title="Web Search" subtitle={query} />
           </div>
@@ -220,11 +220,11 @@ export function OcWebSearchToolView({
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle icon={Search} title="Web Search" subtitle={query} />
           {queryResults.length > 0 && (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0 ml-2">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted flex-shrink-0 ml-2">
               <Globe className="h-3 w-3 mr-1 opacity-70" />
               {queryResults.length > 1
                 ? `${queryResults.length} queries`
@@ -237,7 +237,7 @@ export function OcWebSearchToolView({
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         {queryResults.length > 0 ? (
           <ScrollArea className="h-full w-full">
-            <div className="p-4 space-y-3">
+            <div className="p-3 space-y-3">
               {queryResults.map((qr, qi) => {
                 const isMulti = queryResults.length > 1;
                 const isExpanded = expandedQuery === qi;
@@ -272,7 +272,7 @@ export function OcWebSearchToolView({
 
                     {/* Answer + Sources */}
                     {(!isMulti || isExpanded) && (
-                      <div className="p-4">
+                      <div className="p-3">
                         {/* AI Answer */}
                         {qr.answer && (
                           <div className="mb-4">
@@ -354,7 +354,7 @@ export function OcWebSearchToolView({
           </ScrollArea>
         ) : output && !isError ? (
           <ScrollArea className="h-full w-full">
-            <div className="p-4 text-sm text-muted-foreground whitespace-pre-wrap">
+            <div className="p-3 text-sm text-muted-foreground whitespace-pre-wrap">
               {output.slice(0, 2000)}
             </div>
           </ScrollArea>
@@ -378,13 +378,13 @@ export function OcWebSearchToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : totalSources > 0 ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-zinc-600 dark:text-zinc-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-muted-foreground" />
               {totalSources} {totalSources === 1 ? 'source' : 'sources'}
             </Badge>
           ) : null

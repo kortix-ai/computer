@@ -20,9 +20,17 @@ COPY --chown=nextjs:nodejs apps/frontend/.next/standalone ./
 COPY --chown=nextjs:nodejs apps/frontend/.next/static ./apps/frontend/.next/static
 COPY --chown=nextjs:nodejs apps/frontend/public ./apps/frontend/public
 
+# Copy entrypoint script (needs to run as root for VPS URL rewriting)
+COPY apps/frontend/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# In local mode (no KORTIX_PUBLIC_URL), runs as nextjs user via CMD.
+# In VPS mode, entrypoint does sed as root, then exec's node as nextjs.
 USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "apps/frontend/server.js"]
+
+# Use entrypoint for VPS URL rewriting support
+ENTRYPOINT ["/docker-entrypoint.sh"]

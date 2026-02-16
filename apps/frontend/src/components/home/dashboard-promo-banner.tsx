@@ -60,28 +60,28 @@ export function DashboardPromoBanner() {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
+        initial={{ opacity: 0, y: -32 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="relative z-50 shrink-0"
+        exit={{ opacity: 0, y: -32 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="fixed top-0 left-0 right-0 z-[200] pointer-events-none"
       >
-        <div className="relative border-b border-border/40 bg-background/95 backdrop-blur-md">
-          <div className="px-4 py-2">
+        <div className="pointer-events-auto border-b border-border/40 bg-background/95 backdrop-blur-md shadow-sm">
+          <div className="px-4 py-1.5">
             <div className="flex items-center justify-center gap-3 sm:gap-4">
-              {/* Content - simplified */}
+              {/* Content */}
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs sm:text-sm font-medium text-foreground">
                   <span className="text-primary">{promo.promoCode}</span>
-                  <span className="text-muted-foreground mx-1.5">·</span>
+                  <span className="text-muted-foreground mx-1.5">&middot;</span>
                   30% off + 2X credits
                 </span>
               </div>
 
-              <span className="text-muted-foreground/50 hidden sm:inline">·</span>
+              <span className="text-muted-foreground/50 hidden sm:inline">&middot;</span>
               
-              {/* Countdown - simplified */}
+              {/* Countdown */}
               <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
                 {promo.timeLabel}
               </span>
@@ -99,7 +99,7 @@ export function DashboardPromoBanner() {
               {/* Close */}
               <button
                 onClick={handleDismiss}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground/60 hover:text-muted-foreground"
+                className="ml-1 p-1 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground/60 hover:text-muted-foreground"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -111,4 +111,3 @@ export function DashboardPromoBanner() {
     </AnimatePresence>
   );
 }
-

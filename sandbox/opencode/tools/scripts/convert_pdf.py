@@ -8,12 +8,24 @@ at 1920x1080 via Playwright Chromium, merges into a single PDF.
 
 import asyncio
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
 
 from playwright.async_api import async_playwright
 from PyPDF2 import PdfWriter, PdfReader
+
+
+def find_chromium() -> str | None:
+    """Auto-detect Chromium executable path for the current platform."""
+    env_path = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+    for p in ("/usr/bin/chromium-browser", "/usr/bin/chromium"):
+        if os.path.isfile(p):
+            return p
+    return None
 
 
 async def render_slide_to_pdf(
@@ -129,21 +141,25 @@ async def convert(presentation_dir: str, output_path: str) -> dict:
 
     slides_info.sort(key=lambda s: s["number"])
 
+    launch_opts: dict = {
+        "headless": True,
+        "args": [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--force-device-scale-factor=1",
+        ],
+    }
+    chromium = find_chromium()
+    if chromium:
+        launch_opts["executable_path"] = chromium
+
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                executable_path="/Users/markokraemer/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--force-device-scale-factor=1",
-                ],
-            )
+            browser = await p.chromium.launch(**launch_opts)
 
             try:
                 sem = asyncio.Semaphore(5)

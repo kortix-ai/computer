@@ -13,11 +13,11 @@ import {
   ListTree,
   ChevronDown,
   TerminalSquare,
+  Search,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
 import { SessionList } from '@/components/sidebar/session-list';
-import { ProjectSelector } from '@/components/sidebar/project-selector';
 
 import { UserMenu } from '@/components/sidebar/user-menu';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
@@ -55,7 +55,7 @@ import { isLocalMode } from '@/lib/config';
 import { useAccountState, accountStateSelectors } from '@/hooks/billing';
 import { getPlanIcon } from '@/components/billing/plan-utils';
 import { useCreateOpenCodeSession, useOpenCodeSessions, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
-import { useTabStore } from '@/stores/tab-store';
+import { useTabStore, openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
@@ -122,9 +122,9 @@ function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center justify-center h-10 w-10 rounded-xl cursor-pointer',
+        'flex items-center justify-center w-full py-2.5 rounded-xl cursor-pointer',
         'transition-all duration-150 ease-out',
-        'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+        'text-sidebar-foreground hover:bg-sidebar-accent',
         disabled && 'opacity-50 cursor-not-allowed',
       )}
     >
@@ -200,24 +200,20 @@ function SessionsFlyout() {
 
   const handleClick = (sessionId: string) => {
     const session = rootSessions.find((s) => s.id === sessionId);
-    useTabStore.getState().openTab({
+    openTabAndNavigate({
       id: sessionId,
       title: session?.title || 'Session',
       type: 'session',
       href: `/sessions/${sessionId}`,
       serverId: useServerStore.getState().activeServerId,
     });
-    // Use pushState for pre-mounted session tabs (instant switch, no re-mount)
-    window.history.pushState(null, '', `/sessions/${sessionId}`);
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new CustomEvent('focus-session-textarea'));
-    });
+
   };
 
   return (
     <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
       {rootSessions.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-muted-foreground/60">
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           No sessions yet
         </div>
       ) : (
@@ -230,19 +226,19 @@ function SessionsFlyout() {
               onClick={() => handleClick(session.id)}
               className={cn(
                 'flex items-center gap-3 w-full px-3.5 py-2 text-sm cursor-pointer',
-                'transition-all duration-150 ease-out',
+                'transition-colors duration-150',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
               )}
             >
               <ThreadIcon
                 iconName={(session as any).icon}
                 className={cn(
                   'flex-shrink-0',
-                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground',
                 )}
-                size={18}
+                size={16}
               />
               <span className="flex-1 truncate text-left">{session.title || 'Untitled'}</span>
               {pendingCount > 0 && (
@@ -287,13 +283,12 @@ function ProjectsFlyout() {
   };
 
   const handleClick = (projectId: string, name: string) => {
-    useTabStore.getState().openTab({
+    openTabAndNavigate({
       id: `page:/projects/${projectId}`,
       title: name,
       type: 'project',
       href: `/projects/${projectId}`,
-    });
-    router.push(`/projects/${projectId}`);
+    }, router);
   };
 
   const activeProjectId = React.useMemo(() => {
@@ -304,7 +299,7 @@ function ProjectsFlyout() {
   return (
     <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
       {sortedProjects.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-muted-foreground/60">
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           No projects detected
         </div>
       ) : (
@@ -317,18 +312,18 @@ function ProjectsFlyout() {
               onClick={() => handleClick(project.id, name)}
               className={cn(
                 'flex items-center gap-3 w-full px-3.5 py-2 text-sm cursor-pointer',
-                'transition-all duration-150 ease-out',
+                'transition-colors duration-150',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
               )}
             >
               <FolderOpen
                 className={cn(
                   'flex-shrink-0',
-                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground',
                 )}
-                size={18}
+                size={16}
                 style={project.icon?.color ? { color: project.icon.color } : undefined}
               />
               <span className="flex-1 truncate text-left">{name}</span>
@@ -422,16 +417,13 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     posthog.capture('new_task_clicked', { source: 'new_session_button' });
     try {
       const session = await createSession.mutateAsync();
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: session.id,
         title: 'New session',
         type: 'session',
         href: `/sessions/${session.id}`,
         serverId: useServerStore.getState().activeServerId,
       });
-      // Use pushState (like handleActivate in tab-bar) so the pre-mounted
-      // session tab becomes visible without a full Next.js navigation.
-      window.history.pushState(null, '', `/sessions/${session.id}`);
       // Focus the textarea in the newly visible session tab
       requestAnimationFrame(() => {
         window.dispatchEvent(new CustomEvent('focus-session-textarea'));
@@ -524,16 +516,12 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               <Link href="/dashboard" onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                useTabStore.getState().openTab({
+                openTabAndNavigate({
                   id: 'page:/dashboard',
                   title: 'Dashboard',
                   type: 'dashboard',
                   href: '/dashboard',
-                });
-                router.push('/dashboard');
-                requestAnimationFrame(() => {
-                  window.dispatchEvent(new CustomEvent('focus-session-textarea'));
-                });
+                }, router);
                 if (isMobile) setOpenMobile(false);
               }} className="flex items-center justify-center group-hover/collapsed:hidden">
                 <KortixLogo
@@ -543,7 +531,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 />
               </Link>
               {/* Chevron — shows on hover */}
-              <ChevronRight className="h-4 w-4 text-muted-foreground/50 hidden group-hover/collapsed:block" />
+              <ChevronRight className="h-4 w-4 text-sidebar-foreground hidden group-hover/collapsed:block" />
             </div>
           )}
 
@@ -554,16 +542,12 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           )}>
             <Link href="/dashboard" onClick={(e) => {
               e.preventDefault();
-              useTabStore.getState().openTab({
+              openTabAndNavigate({
                 id: 'page:/dashboard',
                 title: 'Dashboard',
                 type: 'dashboard',
                 href: '/dashboard',
-              });
-              router.push('/dashboard');
-              requestAnimationFrame(() => {
-                window.dispatchEvent(new CustomEvent('focus-session-textarea'));
-              });
+              }, router);
               if (isMobile) setOpenMobile(false);
             }} className="flex items-center">
               <KortixLogo
@@ -576,14 +560,14 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
           <button
             className={cn(
-              'flex items-center justify-center h-8 w-8 rounded-lg transition-all duration-150 ease-out cursor-pointer',
-              'text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent/50',
+              'flex items-center justify-center h-7 w-7 rounded-lg transition-colors duration-150 cursor-pointer',
+        'text-sidebar-foreground hover:bg-sidebar-accent',
               state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
             onClick={() => isMobile ? setOpenMobile(false) : setOpen(false)}
             aria-label="Collapse sidebar"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
         </div>
       </SidebarHeader>
@@ -592,14 +576,31 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative overflow-visible">
         {/* --- Collapsed: 3 icon buttons — New Chat, Projects, Sessions --- */}
         <div className={cn(
-          'absolute inset-0 px-2 pt-3 space-y-0.5 flex flex-col items-center transition-opacity duration-150 ease-out overflow-visible',
-          state === 'collapsed' ? 'opacity-100 pointer-events-auto delay-100' : 'opacity-0 pointer-events-none delay-0'
+          'absolute inset-0 px-3 pt-3 space-y-1 flex flex-col items-center overflow-visible',
+          state === 'collapsed' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}>
           <CollapsedIconButton
             icon={<SquarePen className="h-[18px] w-[18px]" />}
             label="New session"
             onClick={handleNewSession}
             disabled={createSession.isPending}
+          />
+          <CollapsedIconButton
+            icon={<Search className="h-[18px] w-[18px]" />}
+            label="Search"
+            onClick={() => {
+              const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent);
+              document.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                  key: 'k',
+                  code: 'KeyK',
+                  metaKey: isMac,
+                  ctrlKey: !isMac,
+                  bubbles: true,
+                  cancelable: true,
+                }),
+              );
+            }}
           />
           <CollapsedIconButton
             icon={<FolderOpen className="h-[18px] w-[18px]" />}
@@ -615,44 +616,77 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
         {/* --- Expanded layout --- */}
         <div className={cn(
-          'flex flex-col h-full min-h-0 transition-opacity duration-150 ease-out',
-          state === 'collapsed' ? 'opacity-0 pointer-events-none delay-0' : 'opacity-100 pointer-events-auto delay-100'
+          'flex flex-col h-full min-h-0',
+          state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
         )}>
-          {/* Pinned: New session + Projects (always visible) */}
-          <div className="flex-shrink-0">
-            {/* New session + Open terminal buttons */}
-            <div className="px-2 pt-1 pb-1 flex items-center gap-1">
-              <button
-                onClick={handleNewSession}
-                disabled={createSession.isPending}
-                className={cn(
-                  'flex items-center gap-3 flex-1 min-w-0 px-3 py-2 rounded-lg text-sm cursor-pointer',
-                  'transition-all duration-150 ease-out',
-                  'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                  'disabled:opacity-50 disabled:cursor-not-allowed',
-                )}
-              >
-                <SquarePen className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" />
-                <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
-              </button>
-            </div>
+          {/* Navigation */}
+          <nav className="flex-shrink-0 px-3 pt-3 pb-2 space-y-1">
+            {/* New session */}
+            <button
+              onClick={handleNewSession}
+              disabled={createSession.isPending}
+              className={cn(
+                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm cursor-pointer',
+                'transition-colors duration-150',
+                'text-sidebar-foreground hover:bg-sidebar-accent',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+              )}
+            >
+              <SquarePen className="h-[18px] w-[18px] flex-shrink-0" />
+              <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
+            </button>
 
-            {/* Projects accordion */}
-            <ProjectSelector
-              selectedProjectId={selectedProjectId}
-              onProjectChange={setSelectedProjectId}
-            />
-          </div>
+            {/* Search */}
+            <button
+              onClick={() => {
+                const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent);
+                document.dispatchEvent(
+                  new KeyboardEvent('keydown', {
+                    key: 'k',
+                    code: 'KeyK',
+                    metaKey: isMac,
+                    ctrlKey: !isMac,
+                    bubbles: true,
+                    cancelable: true,
+                  }),
+                );
+              }}
+              className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+            >
+              <Search className="h-[18px] w-[18px] flex-shrink-0" />
+              <span className="flex-1 text-left">Search</span>
+              <kbd className="text-[11px] text-muted-foreground">
+                {typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '\u2318K' : 'Ctrl K'}
+              </kbd>
+            </button>
 
-          {/* Sessions accordion (scrolls independently) */}
+            {/* Projects */}
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/projects',
+                  title: 'Projects',
+                  type: 'project',
+                  href: '/projects',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+            >
+              <FolderOpen className="h-[18px] w-[18px] flex-shrink-0" />
+              <span>Projects</span>
+            </button>
+
+            {/* Sessions — expandable, default open */}
+          </nav>
+
           <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
-            <div className="px-5 pt-1 flex-shrink-0">
+            <div className="px-3 flex-shrink-0">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full py-1.5 group cursor-pointer">
-                  <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                    Sessions
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground/40 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                <button className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
+                  <ListTree className="h-[18px] w-[18px] flex-shrink-0" />
+                  <span className="flex-1 text-left">Sessions</span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
                 </button>
               </CollapsibleTrigger>
             </div>
@@ -664,7 +698,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       </SidebarContent>
 
       {/* ====== FOOTER ====== */}
-      <SidebarFooter className="px-3 pb-3 pt-0">
+      <SidebarFooter className="px-3 pb-3 pt-0 group-data-[collapsible=icon]:px-0">
         <UserProfileSection user={user} />
       </SidebarFooter>
 

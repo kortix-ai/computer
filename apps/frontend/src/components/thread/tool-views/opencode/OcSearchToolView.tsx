@@ -186,19 +186,15 @@ export function OcSearchToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={Search}
-        iconColor="text-amber-500 dark:text-amber-400"
-        bgColor="bg-gradient-to-b from-amber-100 to-amber-50 shadow-inner dark:from-amber-800/40 dark:to-amber-900/60"
         title={toolLabel}
         subtitle={subtitle}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2 overflow-hidden">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2 overflow-hidden">
         <div className="flex flex-row items-center justify-between min-w-0 overflow-hidden">
           <ToolViewIconTitle
             icon={Search}
@@ -230,11 +226,11 @@ export function OcSearchToolView({
               onFileClick={(fp) => openFile(fp)}
             />
           ) : output ? (
-            <div className="p-4">
+            <div className="p-3">
               <UnifiedMarkdown content={String(output)} isStreaming={false} />
             </div>
           ) : (
-            <div className="p-4">
+            <div className="p-3">
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <FolderOpen className="h-8 w-8 mb-2 opacity-40" />
                 <span className="text-sm">No results found</span>
@@ -253,7 +249,7 @@ export function OcSearchToolView({
           (isError ? (
             <Badge
               variant="outline"
-              className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground"
+              className="h-6 py-0.5 bg-muted text-muted-foreground"
             >
               <AlertCircle className="h-3 w-3" />
               Failed
@@ -261,9 +257,9 @@ export function OcSearchToolView({
           ) : (
             <Badge
               variant="outline"
-              className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900"
+              className="h-6 py-0.5 bg-muted"
             >
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               Done
             </Badge>
           ))}
@@ -293,7 +289,7 @@ function FilePathList({
         return (
           <div
             key={i}
-            className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors group"
+            className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-muted transition-colors group"
             onClick={() => onFileClick(fp)}
             title={dp}
           >
@@ -341,11 +337,11 @@ function GrepResultList({
         return (
           <div
             key={i}
-            className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950"
+            className="rounded-lg border border-border overflow-hidden bg-card"
           >
             {/* File header row */}
             <div
-              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors group"
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors group"
               onClick={() => setExpandedIndex(isExpanded ? null : i)}
             >
               {isExpanded ? (
@@ -381,11 +377,11 @@ function GrepResultList({
 
             {/* Expanded match list */}
             {isExpanded && (
-              <div className="border-t border-zinc-200 dark:border-zinc-800">
+              <div className="border-t border-border">
                 {group.matches.map((match, j) => (
                   <div
                     key={j}
-                    className="flex items-start gap-0 border-b last:border-b-0 border-zinc-100 dark:border-zinc-800/60"
+                    className="flex items-start gap-0 border-b last:border-b-0 border-border/60"
                   >
                     <span className="text-[11px] font-mono text-amber-600/70 dark:text-amber-400/50 w-12 text-right pr-3 py-1.5 flex-shrink-0 select-none">
                       {match.line}

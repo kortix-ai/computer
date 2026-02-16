@@ -14,7 +14,7 @@
  */
 
 import { useWebNotificationStore } from '@/stores/web-notification-store';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { toast as sonnerToast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -113,15 +113,15 @@ function playNotificationPing() {
 function navigateToSession(sessionId: string, sessionTitle?: string) {
   try {
     const href = `/sessions/${sessionId}`;
-    // Open/activate the tab in the tab store
-    useTabStore.getState().openTab({
+    // Open/activate the tab in the tab store + pushState
+    openTabAndNavigate({
       id: sessionId,
       title: sessionTitle || 'Session',
       type: 'session',
       href,
       serverId: useServerStore.getState().activeServerId,
     });
-    // Use location.assign for a reliable navigation that always works,
+    // Also use location.assign for a reliable navigation that always works,
     // even when triggered from a native notification click while the
     // browser is in the background.
     if (window.location.pathname !== href) {

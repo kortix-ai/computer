@@ -23,10 +23,8 @@ import { PanelHeader } from './components/PanelHeader';
 import { NavigationControls } from './components/NavigationControls';
 import { EmptyState } from './components/EmptyState';
 import { LoadingState } from './components/LoadingState';
-import { AppDock } from './components/Dock';
 import { SandboxDesktop } from './components/Desktop';
-import { useServerStore } from '@/stores/server-store';
-import { getToolNumber } from '@/hooks/messages/tool-tracking';
+
 
 export interface ToolCallInput {
   toolCall: ToolCallData;
@@ -589,210 +587,50 @@ export const KortixComputer = memo(function KortixComputer({
     );
   };
 
-  const renderContent = () => {
-    return (
-      <div className="flex flex-col h-full max-h-full max-w-full overflow-hidden min-w-0" style={{ contain: 'strict' }}>
-        {!isMobile && !hideTopBar && (
-          <PanelHeader
-            agentName={agentName}
-            onClose={handleClose}
-            onMaximize={handleMaximize}
-            isStreaming={isStreaming && activeView === 'tools'}
-            variant="motion"
-            currentView={activeView}
-            onViewChange={setActiveView}
-            showFilesTab={true}
-            isMaximized={isMaximized}
-            isExpanded={isExpanded}
-            onToggleExpand={toggleExpanded}
-            isSuiteMode={isSuiteMode}
-            onToggleSuiteMode={() => {
-              if (isSuiteMode) {
-                // Exit suite mode - restore previous size
-                if (preSuiteSize !== null && sidePanelRef?.current) {
-                  sidePanelRef.current.resize(preSuiteSize);
-                }
-                setPreSuiteSize(null);
-                setIsSuiteMode(false);
-              } else {
-                // Enter suite mode - save current size and maximize
-                if (sidePanelRef?.current) {
-                  const currentSize = sidePanelRef.current.getSize();
-                  setPreSuiteSize(currentSize);
-                  sidePanelRef.current.resize(70); // Max size from ResizablePanel config
-                }
-                setIsSuiteMode(true);
+  const renderContent = () => (
+    <div className="flex flex-col h-full max-h-full max-w-full overflow-hidden min-w-0" style={{ contain: 'strict' }}>
+      {!isMobile && !hideTopBar && (
+        <PanelHeader
+          agentName={agentName}
+          onClose={handleClose}
+          onMaximize={handleMaximize}
+          isStreaming={isStreaming && activeView === 'tools'}
+          variant="motion"
+          currentView={activeView}
+          onViewChange={setActiveView}
+          showFilesTab={true}
+          isMaximized={isMaximized}
+          isExpanded={isExpanded}
+          onToggleExpand={toggleExpanded}
+          isSuiteMode={isSuiteMode}
+          onToggleSuiteMode={() => {
+            if (isSuiteMode) {
+              if (preSuiteSize !== null && sidePanelRef?.current) {
+                sidePanelRef.current.resize(preSuiteSize);
               }
-            }}
-          />
-        )}
-        <div className="flex-1 overflow-hidden max-w-full max-h-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
-          {renderToolsView()}
-        </div>
+              setPreSuiteSize(null);
+              setIsSuiteMode(false);
+            } else {
+              if (sidePanelRef?.current) {
+                const currentSize = sidePanelRef.current.getSize();
+                setPreSuiteSize(currentSize);
+                sidePanelRef.current.resize(70);
+              }
+              setIsSuiteMode(true);
+            }
+          }}
+        />
+      )}
+      <div className="flex-1 overflow-hidden max-w-full max-h-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
+        {renderToolsView()}
       </div>
-    );
-  };
+    </div>
+  );
 
-  if (isMobile) {
-    const handleDrawerKeyDown = (e: React.KeyboardEvent) => {
-      // Vaul drawers are dismissible by Escape by default.
-      // Prevent Escape / Esc from closing the Kortix Computer.
-      if (e.key === 'Escape' || e.key === 'Esc') {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
+  // --- Shared navigation element (avoids 3x duplication) ---
+  const showNav = activeView === 'tools' && (displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0));
 
-    return (
-      <Drawer
-        open={isOpen}
-        onOpenChange={(open) => !open && handleClose()}
-        // Never allow Esc/Escape to dismiss the Kortix Computer.
-        // (Users commonly hit Escape in editors / sandbox UIs.)
-        dismissible={false}
-      >
-        <DrawerContent
-          className="h-[90dvh] max-h-[90dvh] overflow-hidden flex flex-col"
-          style={{ contain: 'strict' }}
-          onKeyDown={handleDrawerKeyDown}
-        >
-          <PanelHeader
-            agentName={agentName}
-            onClose={handleClose}
-            variant="drawer"
-            currentView={activeView}
-            onViewChange={setActiveView}
-            showFilesTab={true}
-          />
-
-          <div className="flex-1 flex flex-col overflow-hidden max-w-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
-            {renderToolsView()}
-          </div>
-
-          {activeView === 'tools' && (displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
-            <div className="flex-shrink-0 pb-[env(safe-area-inset-bottom,0px)]">
-              <NavigationControls
-                displayIndex={displayIndex}
-                displayTotalCalls={displayTotalCalls}
-                safeInternalIndex={safeInternalIndex}
-                latestIndex={latestIndex}
-                isLiveMode={isLiveMode}
-                agentStatus={agentStatus}
-                onPrevious={navigateToPrevious}
-                onNext={navigateToNext}
-                onSliderChange={handleSliderChange}
-                onJumpToLive={jumpToLive}
-                onJumpToLatest={jumpToLatest}
-                isMobile={true}
-              />
-            </div>
-          )}
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-
-  if (compact) {
-    const compactNav = activeView === 'tools' && (displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
-      <NavigationControls
-        displayIndex={displayIndex}
-        displayTotalCalls={displayTotalCalls}
-        safeInternalIndex={safeInternalIndex}
-        latestIndex={latestIndex}
-        isLiveMode={isLiveMode}
-        agentStatus={agentStatus}
-        onPrevious={navigateToPrevious}
-        onNext={navigateToNext}
-        onSliderChange={handleSliderChange}
-        onJumpToLive={jumpToLive}
-        onJumpToLatest={jumpToLatest}
-        isMobile={false}
-      />
-    );
-
-    const compactDockNav = activeView === 'tools' && isMaximized ? (
-      <AppDock
-        toolCalls={toolCallSnapshots.map(s => s.toolCall)}
-        currentIndex={safeInternalIndex}
-        onNavigate={handleDockNavigate}
-        onPrevious={navigateToPrevious}
-        onNext={navigateToNext}
-        latestIndex={latestIndex}
-        agentStatus={agentStatus}
-        isLiveMode={isLiveMode}
-        onJumpToLive={jumpToLive}
-        onJumpToLatest={jumpToLatest}
-      />
-    ) : null;
-
-    if (isMaximized) {
-      if (typeof document === 'undefined') return null;
-      
-      return createPortal(
-        <div className="fixed inset-0 z-[9999] bg-background">
-          <SandboxDesktop
-            toolCalls={toolCallSnapshots.map(s => s.toolCall)}
-            currentIndex={safeInternalIndex}
-            onNavigate={handleDockNavigate}
-            onPrevious={navigateToPrevious}
-            onNext={navigateToNext}
-            latestIndex={latestIndex}
-            agentStatus={agentStatus}
-            isLiveMode={isLiveMode}
-            onJumpToLive={jumpToLive}
-            onJumpToLatest={jumpToLatest}
-            project={project}
-            messages={messages}
-            onFileClick={onFileClick}
-            streamingText={streamingText}
-            onClose={() => setIsMaximized(false)}
-            currentView={activeView}
-            onViewChange={setActiveView}
-            isStreaming={isStreaming}
-            project_id={projectId ?? ''}
-          />
-        </div>,
-        document.body
-      );
-    }
-
-    return (
-      <AnimatePresence mode="wait">
-        {isOpen && (
-          <motion.div
-            key="sidepanel"
-            layoutId={FLOATING_LAYOUT_ID}
-            initial={disableInitialAnimation ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{
-              opacity: { duration: disableInitialAnimation ? 0 : 0.15 },
-              layout: {
-                type: "spring",
-                stiffness: 400,
-                damping: 35
-              }
-            }}
-            className="m-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] border rounded-3xl flex flex-col z-30 overflow-hidden"
-            style={{
-              contain: 'strict',
-            }}
-          >
-            <div className="flex-1 flex flex-col overflow-hidden bg-card max-w-full max-h-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
-              {renderContent()}
-            </div>
-            {compactNav}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
-  }
-
-  if (!isOpen) {
-    return null;
-  }
-
-  const desktopNav = activeView === 'tools' && (displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
+  const navElement = showNav ? (
     <NavigationControls
       displayIndex={displayIndex}
       displayTotalCalls={displayTotalCalls}
@@ -805,28 +643,14 @@ export const KortixComputer = memo(function KortixComputer({
       onSliderChange={handleSliderChange}
       onJumpToLive={jumpToLive}
       onJumpToLatest={jumpToLatest}
-      isMobile={false}
-    />
-  );
-
-  const dockNav = activeView === 'tools' && isMaximized ? (
-    <AppDock
-      toolCalls={toolCallSnapshots.map(s => s.toolCall)}
-      currentIndex={safeInternalIndex}
-      onNavigate={handleDockNavigate}
-      onPrevious={navigateToPrevious}
-      onNext={navigateToNext}
-      latestIndex={latestIndex}
-      agentStatus={agentStatus}
-      isLiveMode={isLiveMode}
-      onJumpToLive={jumpToLive}
-      onJumpToLatest={jumpToLatest}
+      isMobile={isMobile}
     />
   ) : null;
 
+  // --- Shared maximized portal (avoids 2x duplication) ---
   if (isMaximized) {
     if (typeof document === 'undefined') return null;
-    
+
     return createPortal(
       <div className="fixed inset-0 z-[9999] bg-background">
         <SandboxDesktop
@@ -855,33 +679,87 @@ export const KortixComputer = memo(function KortixComputer({
     );
   }
 
+  // --- Mobile: drawer ---
+  if (isMobile) {
+    return (
+      <Drawer
+        open={isOpen}
+        onOpenChange={(open) => !open && handleClose()}
+        dismissible={false}
+      >
+        <DrawerContent
+          className="h-[90dvh] max-h-[90dvh] overflow-hidden flex flex-col"
+          style={{ contain: 'strict' }}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (e.key === 'Escape' || e.key === 'Esc') {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+        >
+          <PanelHeader
+            agentName={agentName}
+            onClose={handleClose}
+            variant="drawer"
+            currentView={activeView}
+            onViewChange={setActiveView}
+            showFilesTab={true}
+          />
+          <div className="flex-1 overflow-hidden min-w-0 min-h-0" style={{ contain: 'strict' }}>
+            {renderToolsView()}
+          </div>
+          {navElement && (
+            <div className="flex-shrink-0 pb-[env(safe-area-inset-bottom,0px)]">
+              {navElement}
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // --- Compact: floating panel with animation ---
+  if (compact) {
+    return (
+      <AnimatePresence mode="wait">
+        {isOpen && (
+          <motion.div
+            key="sidepanel"
+            layoutId={FLOATING_LAYOUT_ID}
+            initial={disableInitialAnimation ? { opacity: 1 } : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              opacity: { duration: disableInitialAnimation ? 0 : 0.15 },
+              layout: { type: "spring", stiffness: 400, damping: 35 }
+            }}
+            className="m-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] border rounded-2xl flex flex-col z-30 overflow-hidden bg-card"
+            style={{ contain: 'strict' }}
+          >
+            {renderContent()}
+            {navElement}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
+
+  // --- Desktop: resizable panel ---
+  if (!isOpen) return null;
+
   return (
-    <motion.div
-      key="sidepanel-resizable"
-      layoutId="kortix-computer-window"
-      initial={{ opacity: 1 }}
-      animate={{ opacity: 1 }}
-      transition={{
-        layout: {
-          type: "spring",
-          stiffness: 400,
-          damping: 30
-        },
-        opacity: {
-          duration: 0.2
-        }
-      }}
+    <div
       className={cn(
-      "h-full w-full max-w-full max-h-full flex flex-col bg-card overflow-hidden min-w-0 min-h-0",
-      isExpanded ? "rounded-none border-0" : "border rounded-3xl"
-    )}
+        "h-full w-full flex flex-col bg-card overflow-hidden min-w-0 min-h-0",
+        isExpanded ? "rounded-none border-0" : "border rounded-2xl"
+      )}
       style={{ contain: 'strict' }}
     >
       {headerSlot}
-      <div className="flex-1 flex flex-col overflow-hidden max-w-full max-h-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
+      <div className="flex-1 overflow-hidden min-w-0 min-h-0" style={{ contain: 'strict' }}>
         {renderContent()}
       </div>
-      {desktopNav}
-    </motion.div>
+      {navElement}
+    </div>
   );
 });

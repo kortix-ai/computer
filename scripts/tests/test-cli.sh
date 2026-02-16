@@ -55,6 +55,33 @@ for cmd in start stop restart logs status update setup; do
   fi
 done
 
+# --- CLI has new VPS-aware commands ---
+if grep -q 'reconfigure)' "$TMP_CLI"; then
+  pass "CLI has 'reconfigure' command"
+else
+  fail "CLI has 'reconfigure' command"
+fi
+
+if grep -q 'credentials)' "$TMP_CLI"; then
+  pass "CLI has 'credentials' command"
+else
+  fail "CLI has 'credentials' command"
+fi
+
+# --- CLI has mode detection ---
+if grep -q '_mode()' "$TMP_CLI"; then
+  pass "CLI has mode detection (_mode function)"
+else
+  fail "CLI has mode detection (_mode function)"
+fi
+
+# --- CLI has URL helper ---
+if grep -q '_url()' "$TMP_CLI"; then
+  pass "CLI has URL helper (_url function)"
+else
+  fail "CLI has URL helper (_url function)"
+fi
+
 # --- CLI has help/default case ---
 if grep -q '\*)' "$TMP_CLI"; then
   pass "CLI has help/default handler"
@@ -95,6 +122,20 @@ if ! grep -q 'declare -A' "$TMP_CLI"; then
   pass "CLI has no declare -A (bash 3.x safe)"
 else
   fail "CLI has no declare -A (bash 3.x safe)"
+fi
+
+# --- VPS mode: start command shows domain-based URL ---
+if grep -q 'vps.*Dashboard\|Dashboard.*_url' "$TMP_CLI" || grep -q '_url' "$TMP_CLI"; then
+  pass "CLI start shows domain URL in VPS mode"
+else
+  fail "CLI start shows domain URL in VPS mode"
+fi
+
+# --- Uninstall handles firewall cleanup ---
+if grep -q 'ufw.*delete\|Remove firewall' "$TMP_CLI"; then
+  pass "CLI uninstall handles firewall cleanup"
+else
+  fail "CLI uninstall handles firewall cleanup"
 fi
 
 # Clean up

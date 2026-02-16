@@ -80,7 +80,7 @@ export function useRemovePty() {
   return useMutation({
     mutationFn: async (id: string) => {
       const client = getClient();
-      const result = await client.pty.remove({ id } as any);
+      const result = await client.pty.remove({ ptyID: id } as any);
       unwrap(result);
     },
     onSuccess: () => {
@@ -101,7 +101,7 @@ export function useUpdatePty() {
       size?: { rows: number; cols: number };
     }) => {
       const client = getClient();
-      const result = await client.pty.update({ id, title, size } as any);
+      const result = await client.pty.update({ ptyID: id, title, size } as any);
       return unwrap(result);
     },
   });

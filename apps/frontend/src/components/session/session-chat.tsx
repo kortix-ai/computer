@@ -150,7 +150,7 @@ import { RevertBanner, ConfirmDialog } from '@/components/session/message-action
 import { TurnErrorDisplay } from '@/components/session/session-error-banner';
 import { ConnectProviderDialog } from '@/components/session/model-selector';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -2457,7 +2457,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
       // Open the forked session in a new tab and navigate
       const title = forkedSession.title || 'Forked session';
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: forkedSession.id,
         title,
         type: 'session',
@@ -2468,7 +2468,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       // Store fork origin in localStorage (survives refresh) so the forked
       // session can show the "Forked from" indicator.
       localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
-      router.push(`/sessions/${forkedSession.id}`);
     },
     [sessionId, forkSession, router],
   );
@@ -2631,7 +2630,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           onToggleSidePanel={handleTogglePanel}
           isSidePanelOpen={isSidePanelOpen}
           canOpenSidePanel={hasToolCalls}
-          isCompacting={!!session?.time?.compacting}
         />
       )}
 
@@ -2853,7 +2851,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           </div>
         </div>
       ) : (
-        <SessionWelcome showPrompts onPromptSelect={handleSend} />
+        <SessionWelcome />
       )}
 
       {/* Queued messages popup — expandable/collapsible above input */}

@@ -255,7 +255,7 @@ export function ManageModelsDialog({
         <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 space-y-4 mt-2">
           {grouped.map(([providerID, providerModels]) => (
             <div key={providerID}>
-              <div className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-1 pb-1.5">
+              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pb-1.5">
                 {PROVIDER_LABELS[providerID] || providerModels[0]?.providerName || providerID}
               </div>
               <div className="space-y-0.5">
@@ -265,7 +265,7 @@ export function ManageModelsDialog({
                   return (
                     <div
                       key={`${model.providerID}:${model.modelID}`}
-                      className="flex items-center justify-between gap-3 px-2 py-2 rounded-lg hover:bg-muted/40 transition-colors cursor-pointer"
+                       className="flex items-center justify-between gap-3 px-2 py-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
                       onClick={() => modelStore.setVisibility(key, !visible)}
                     >
                       <span className="text-sm truncate">{model.modelName}</span>
@@ -450,10 +450,10 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 h-10 px-2.5 bg-transparent border-[1.5px] border-border rounded-2xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
                 {current && (
-                  <InlineModelIcon providerID={current.providerID} modelID={current.modelID} size={18} />
+                  <InlineModelIcon providerID={current.providerID} modelID={current.modelID} size={14} />
                 )}
                 <span className="truncate max-w-[120px]">{displayName}</span>
                 <ChevronUp className={cn('size-3 transition-transform', open && 'rotate-180')} />
@@ -482,7 +482,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full h-7 pl-7 pr-6 rounded-md text-xs bg-muted/50 border border-border/40 focus:outline-none focus:border-border placeholder:text-muted-foreground/50 transition-colors"
+                  className="w-full h-7 pl-7 pr-6 rounded-md text-xs bg-muted border border-border focus:outline-none focus:border-border placeholder:text-muted-foreground transition-colors"
                 />
                 {search && (
                   <button
@@ -502,7 +502,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                       setOpen(false);
                       setConnectProviderOpen(true);
                     }}
-                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer flex-shrink-0"
+                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
@@ -517,7 +517,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                       setOpen(false);
                       setManageModelsOpen(true);
                     }}
-                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer flex-shrink-0"
+                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
                   >
                     <SlidersHorizontal className="h-3.5 w-3.5" />
                   </button>
@@ -532,7 +532,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                 grouped.map((group) => (
                   <div key={group.providerID}>
                     {/* Provider group header */}
-                    <div className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider px-2 pt-2 pb-1">
+                    <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 pt-2 pb-1">
                       {group.providerName}
                     </div>
                     {group.models.map((model) => {
@@ -552,9 +552,9 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                               type="button"
                               className={cn(
                                 'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[13px] transition-colors cursor-pointer',
-                                isHighlighted && !isSelected && 'bg-accent/60',
+                                isHighlighted && !isSelected && 'bg-accent',
                                 isSelected && 'bg-accent',
-                                !isSelected && !isHighlighted && 'hover:bg-accent/40',
+                                !isSelected && !isHighlighted && 'hover:bg-accent',
                               )}
                               onClick={() => handleSelect(model)}
                               onMouseEnter={() => setHighlightedIndex(idx)}

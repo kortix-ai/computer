@@ -22,6 +22,7 @@ const AnnouncementDialog = lazy(() => import('@/components/announcements/announc
 const RouteChangeTracker = lazy(() => import('@/components/analytics/route-change-tracker').then(mod => ({ default: mod.RouteChangeTracker })));
 const AuthEventTracker = lazy(() => import('@/components/analytics/auth-event-tracker').then(mod => ({ default: mod.AuthEventTracker })));
 const CookieVisibility = lazy(() => import('@/components/cookie-visibility').then(mod => ({ default: mod.CookieVisibility })));
+const LocalhostLinkInterceptor = lazy(() => import('@/components/localhost-link-interceptor').then(mod => ({ default: mod.LocalhostLinkInterceptor })));
 
 
 export const viewport: Viewport = {
@@ -274,6 +275,9 @@ export default function RootLayout({
           </Suspense>
           <Suspense fallback={null}>
             <CookieVisibility />
+          </Suspense>
+          <Suspense fallback={null}>
+            <LocalhostLinkInterceptor />
           </Suspense>
         </ThemeProvider>
       </body>

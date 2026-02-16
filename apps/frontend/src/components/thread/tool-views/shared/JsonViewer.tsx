@@ -34,15 +34,15 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
     if (obj === undefined) return <span className="text-gray-500">undefined</span>;
     
     if (typeof obj === 'string') {
-      return <span className="text-zinc-600 dark:text-zinc-400">"{obj}"</span>;
+      return <span className="text-muted-foreground">"{obj}"</span>;
     }
     
     if (typeof obj === 'number') {
-      return <span className="text-zinc-600 dark:text-zinc-400">{obj}</span>;
+      return <span className="text-muted-foreground">{obj}</span>;
     }
     
     if (typeof obj === 'boolean') {
-      return <span className="text-zinc-600 dark:text-zinc-400">{obj.toString()}</span>;
+      return <span className="text-muted-foreground">{obj.toString()}</span>;
     }
     
     if (Array.isArray(obj)) {
@@ -118,7 +118,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
           title="Copy to clipboard"
         >
           {copied ? (
-            <Check className="h-3 w-3 text-zinc-500" />
+            <Check className="h-3 w-3 text-muted-foreground" />
           ) : (
             <Copy className="h-3 w-3" />
           )}

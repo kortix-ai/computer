@@ -59,7 +59,7 @@ import { useFileSearch, useTextSearch, useLssSearch } from '@/features/files';
 import type { FindMatch } from '@/features/files';
 import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { THEMES, getThemeById } from '@/lib/themes';
@@ -476,13 +476,12 @@ export function CommandPalette() {
     setIsCreating(true);
     try {
       const session = await createSession.mutateAsync();
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: session.id,
         title: 'New session',
         type: 'session',
         href: `/sessions/${session.id}`,
       });
-      window.history.pushState(null, '', `/sessions/${session.id}`);
       requestAnimationFrame(() => {
         window.dispatchEvent(new CustomEvent('focus-session-textarea'));
       });
@@ -499,13 +498,12 @@ export function CommandPalette() {
       const type = path.startsWith('/settings') || path === '/configuration'
         ? 'settings' as const
         : 'page' as const;
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: `page:${path}`,
         title: label || path.split('/').pop() || '',
         type,
         href: path,
-      });
-      router.push(path);
+      }, router);
       close();
     },
     [router, close],
@@ -513,13 +511,12 @@ export function CommandPalette() {
 
   const handleSelectSession = useCallback(
     (sessionId: string, title?: string) => {
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: sessionId,
         title: title || 'Session',
         type: 'session',
         href: `/sessions/${sessionId}`,
       });
-      router.push(`/sessions/${sessionId}`);
       close();
     },
     [router, close],
@@ -530,13 +527,12 @@ export function CommandPalette() {
       const fileName = filePath.split('/').pop() || filePath;
       const tabId = `file:${filePath}`;
       const href = `/files/${encodeURIComponent(filePath)}`;
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: tabId,
         title: fileName,
         type: 'file',
         href,
       });
-      window.history.pushState(null, '', href);
       close();
     },
     [close],

@@ -6,7 +6,7 @@ import { FolderOpen, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import type { Project } from '@/hooks/opencode/use-opencode-sessions';
 import {
   Collapsible,
@@ -59,13 +59,12 @@ export function ProjectSelector({
 
   const handleProjectClick = (projectId: string, projectName: string) => {
     onProjectChange(projectId);
-    useTabStore.getState().openTab({
+    openTabAndNavigate({
       id: `page:/projects/${projectId}`,
       title: projectName,
       type: 'project',
       href: `/projects/${projectId}`,
-    });
-    router.push(`/projects/${projectId}`);
+    }, router);
     if (isMobile) setOpenMobile(false);
   };
 
@@ -91,16 +90,16 @@ export function ProjectSelector({
               onClick={() => handleProjectClick(project.id, getProjectDisplayName(project))}
               className={cn(
                 'flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-sm cursor-pointer',
-                'transition-all duration-150 ease-out',
+                'transition-colors duration-150',
                 activeProjectId === project.id
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground'
               )}
             >
               <FolderOpen
                 className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  activeProjectId === project.id ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/60',
+                  activeProjectId === project.id ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/50',
                 )}
                 style={project.icon?.color ? { color: project.icon.color } : undefined}
               />
