@@ -120,19 +120,24 @@ export function rewriteLocalhostUrl(
     return `${base}/proxy/${port}${path}`;
   }
 
-  // Local mode: use kortix-master's proxy endpoint
-  // If mappedPorts is available, look up the host port for container port 8000
-  // (that's where kortix-master listens inside the container).
-  // Otherwise fall back to the container port for backwards compat (single-sandbox).
+  // Local mode: use kortix-master's proxy endpoint.
+  // serverUrl typically already points to Kortix Master (e.g. http://localhost:14000
+  // when Docker maps host 14000 → container 8000). Only override the port when:
+  //   1. mappedPorts explicitly has a Kortix Master host port, OR
+  //   2. serverUrl points directly to OpenCode (port 4096), not Kortix Master
   try {
     const url = new URL(serverUrl);
-    const masterHostPort = mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER] ?? SANDBOX_PORTS.KORTIX_MASTER;
-    url.port = masterHostPort;
-    const base = url.origin;
-    return `${base}/proxy/${port}${path}`;
+    if (mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER]) {
+      // Multi-sandbox Docker: use the explicit host port for Kortix Master
+      url.port = mappedPorts[SANDBOX_PORTS.KORTIX_MASTER];
+    } else if (url.port === '4096') {
+      // Direct OpenCode connection (no Docker): switch to Kortix Master container port
+      url.port = SANDBOX_PORTS.KORTIX_MASTER;
+    }
+    // Otherwise, serverUrl already points to Kortix Master — keep its port as-is
+    return `${url.origin}/proxy/${port}${path}`;
   } catch {
-    const masterHostPort = mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER] ?? SANDBOX_PORTS.KORTIX_MASTER;
-    return `http://localhost:${masterHostPort}/proxy/${port}${path}`;
+    return `${serverUrl}/proxy/${port}${path}`;
   }
 }
 

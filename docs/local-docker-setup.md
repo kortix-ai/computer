@@ -20,6 +20,33 @@ The installer script (`scripts/get-kortix.sh`) writes `~/.kortix/docker-compose.
 
 ## Building Docker Images
 
+### Build order & parallelism
+
+The three images have different build characteristics:
+
+| Image | Build time | Bottleneck | Depends on host build? |
+|---|---|---|---|
+| Frontend | ~30s host build + ~10s Docker | Next.js standalone build (host) | YES — must `pnpm run build` first |
+| API | ~20-30s | `pnpm install` inside Docker | No |
+| Sandbox | ~2-5min | Large image, many layers (~4GB) | No |
+
+**Key insight:** API and Sandbox Docker builds do NOT depend on the frontend host build. Start all three simultaneously for maximum parallelism:
+
+```
+Timeline (optimised):
+───────────────────────────────────────────────────────────
+ T=0   Frontend host build (pnpm run build)
+       API Docker build ──────────┐
+       Sandbox Docker build ──────┼── run in parallel
+ T=30s Frontend host build done   │
+       Frontend Docker build ─────┘
+ T=40s Frontend Docker image ready
+ T=30s API Docker image ready
+ T=3m  Sandbox Docker image ready
+───────────────────────────────────────────────────────────
+ Push all 3 in parallel immediately after each finishes
+```
+
 ### Frontend (2-step: host build + Docker package)
 
 The frontend CANNOT be built inside Docker — Next.js standalone builds OOM on 8GB Docker Desktop VMs due to multi-stage layer duplication + 3GB JS heap. Instead:
@@ -64,7 +91,7 @@ cd /path/to/computer
 docker build --build-arg SERVICE=kortix-api -f services/Dockerfile -t kortixmarko/kortix-api:latest .
 ```
 
-Straightforward Bun image. No special considerations.
+Straightforward Bun image. No special considerations. Can be built **in parallel** with the frontend host build and sandbox build.
 
 ### Sandbox
 
@@ -73,7 +100,7 @@ cd /path/to/computer
 docker build -f sandbox/Dockerfile -t kortixmarko/sandbox:latest .
 ```
 
-Large image (~4GB) with s6-overlay, OpenCode, browser tools, etc. Takes a few minutes.
+Large image (~4GB) with s6-overlay, OpenCode, browser tools, etc. Takes a few minutes. Can be built **in parallel** with the frontend host build and API build.
 
 ---
 
@@ -85,9 +112,74 @@ docker push kortixmarko/kortix-api:latest
 docker push kortixmarko/sandbox:latest
 ```
 
-All three can be pushed in parallel. Sandbox is the largest (~4GB, takes longest).
+All three can be pushed in parallel. Sandbox is the largest (~4GB, takes longest). Push each image as soon as its build finishes — don't wait for all three.
 
 Requires `docker login` with the `kortixmarko` Docker Hub credentials.
+
+---
+
+## AI Agent Build Workflow (PTY-based)
+
+When using an AI coding agent (OpenCode, Claude Code, etc.) to build and push, use **PTY sessions** for all long-running processes. This avoids blocking on `sleep` or timeouts and maximises parallelism.
+
+### Key principles
+
+1. **Never sleep/poll.** Use `pty_spawn` with `notifyOnExit=true` — the agent gets a notification the moment a process exits, with exit code and last output line.
+2. **Parallelise everything independent.** API build, Sandbox build, and Frontend host build have no dependencies between them — spawn all three simultaneously.
+3. **Chain dependents sequentially.** Frontend Docker build depends on the host build finishing first. Wait for the PTY exit notification, then spawn the Docker build.
+4. **Push as soon as ready.** Each image can be pushed the moment its build exits successfully — don't wait for all three.
+5. **Use `pty_read` with `pattern`** to check build status without reading thousands of lines of Docker output. Filter for `error`, `tagged`, `Pushed`, `digest`, etc.
+
+### Optimal PTY flow
+
+```
+Phase 1 — Build (3 parallel PTY sessions):
+  pty_spawn: Frontend host build    (pnpm run build)       notifyOnExit=true
+  pty_spawn: API Docker build       (docker build ...)     notifyOnExit=true
+  pty_spawn: Sandbox Docker build   (docker build ...)     notifyOnExit=true
+
+  → Agent continues working on other tasks
+  → Each PTY notifies on exit with exit code
+
+Phase 2 — Frontend Docker build (triggered by Phase 1 notification):
+  [Frontend host build exits 0]
+  pty_spawn: Frontend Docker build  (docker build --no-cache ...) notifyOnExit=true
+
+Phase 3 — Push (each triggered by its build completing):
+  [API build exits 0]     → pty_spawn: docker push kortixmarko/kortix-api:latest
+  [Sandbox build exits 0] → pty_spawn: docker push kortixmarko/sandbox:latest
+  [Frontend Docker exits 0] → pty_spawn: docker push kortixmarko/kortix-frontend:latest
+
+  All pushes run in parallel with notifyOnExit=true.
+
+Phase 4 — Restart (after all pushes complete):
+  cd ~/.kortix && docker compose down && docker compose up -d
+```
+
+### PTY commands reference
+
+```bash
+# Spawn a build (returns immediately, runs in background)
+pty_spawn command="docker" args=["build", ...] title="API Build" notifyOnExit=true
+
+# Check progress without blocking (pattern-filtered)
+pty_read id="pty_xxx" pattern="error|tagged|DONE" ignoreCase=true
+
+# Read the tail of output
+pty_read id="pty_xxx" offset=<totalLines - 20>
+
+# List all sessions and their status
+pty_list
+
+# Clean up finished sessions
+pty_kill id="pty_xxx" cleanup=true
+```
+
+### Error handling
+
+- If a build exits non-zero, use `pty_read` with `pattern="error|ERROR|failed"` to find the failure.
+- Frontend Docker build failures are almost always cache-related — ensure `--no-cache`.
+- Sandbox build failures are usually network-related (package downloads) — retry.
 
 ---
 
