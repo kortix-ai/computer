@@ -60,7 +60,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
       label: sandbox.name || existing.label,
       mappedPorts,
       provider: sandbox.provider,
-      sandboxId: sandbox.sandbox_id,
+      sandboxId: sandbox.external_id,
     });
   } else {
     // Add new server entry for the sandbox
@@ -73,7 +73,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
           label,
           url,
           provider: sandbox.provider,
-          sandboxId: sandbox.sandbox_id,
+          sandboxId: sandbox.external_id,
           mappedPorts,
         },
       ],

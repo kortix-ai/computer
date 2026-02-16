@@ -17,7 +17,7 @@ platformApp.route('/sandbox/version', versionRouter);
 // Full path: /v1/platform/api-keys/*
 platformApp.route('/api-keys', apiKeysRouter);
 
-// Both local and cloud use the same route prefix.
+// Both local and cloud use the same route prefix. 
 // The implementation differs (Docker vs DB-backed) but the API shape is identical.
 // Full path: /v1/platform/providers, /v1/platform/init, /v1/platform/sandbox/*, etc.
 if (config.isLocal()) {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 import { sandboxes, accountUser } from '@kortix/db';
 import { getDaytona } from '../../shared/daytona';
 import { db } from '../../shared/db';
@@ -67,20 +67,22 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
   if (cached !== null) return cached;
 
   try {
-    // Find sandbox by externalId (the Daytona sandbox ID) in kortix.sandboxes
+    // Find sandbox by externalId (the Daytona sandbox ID) in kortix.sandboxes.
+    // Allow any status except 'pooled' (unassigned) — the auto-wake logic
+    // downstream handles stopped/archived sandboxes gracefully.
     const [sandbox] = await db
       .select({ accountId: sandboxes.accountId })
       .from(sandboxes)
       .where(
         and(
           eq(sandboxes.externalId, sandboxId),
-          eq(sandboxes.status, 'active'),
+          ne(sandboxes.status, 'pooled'),
         )
       )
       .limit(1);
 
     if (!sandbox) {
-      console.warn(`[PREVIEW] No active sandbox found for externalId=${sandboxId}`);
+      console.warn(`[PREVIEW] No sandbox found for externalId=${sandboxId}`);
       setCachedOwnership(sandboxId, userId, false);
       return false;
     }
