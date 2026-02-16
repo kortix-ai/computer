@@ -167,9 +167,6 @@ export class SlackApi {
 
 
   async filesUploadV2(options: SlackFileUploadOptions): Promise<{ ok: boolean; error?: string }> {
-    console.log(`[SLACK API] filesUploadV2: filename=${options.filename} length=${options.content.length} channel=${options.channel}`);
-
-    // Step 1: Get upload URL — must use form-encoded, not JSON
     const getUrlParams = new URLSearchParams();
     getUrlParams.set('filename', options.filename);
     getUrlParams.set('length', String(options.content.length));
@@ -197,7 +194,6 @@ export class SlackApi {
 
     console.log(`[SLACK API] Got upload URL, file_id=${urlData.file_id}`);
 
-    // Step 2: Upload file content to the provided URL
     const uploadRes = await fetch(urlData.upload_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
@@ -210,8 +206,6 @@ export class SlackApi {
     }
 
     console.log(`[SLACK API] Content uploaded, completing for channel=${options.channel} thread=${options.threadTs}`);
-
-    // Step 3: Complete upload and share to channel — uses JSON for the files array
     const channelId = options.channel;
     const completeRes = await fetch(`${SLACK_API}/files.completeUploadExternal`, {
       method: 'POST',

@@ -317,6 +317,12 @@ export class ChannelEngineImpl {
       }
     }
 
+    if (config.channelType === 'slack' || config.channelType === 'telegram') {
+      parts.push(
+        `[Response format: You are responding in a ${config.channelType} channel. Keep responses short and concise — use brief paragraphs, short bullet points, and avoid verbose explanations. No headers unless truly needed. Aim for the minimum words that fully answer the question. When generating files, use the show_user tool to attach them.]`,
+      );
+    }
+
     parts.push(
       `[Channel: ${config.channelType} | Chat: ${message.chatType} | User: ${message.platformUser.name}]`,
     );

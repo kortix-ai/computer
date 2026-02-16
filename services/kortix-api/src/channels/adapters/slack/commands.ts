@@ -1,12 +1,13 @@
 import type { Context } from 'hono';
 import type { ChannelEngine } from '../adapter';
 import type { ChannelConfig } from '@kortix/db';
-import { channelConfigs } from '@kortix/db';
-import { eq } from 'drizzle-orm';
+import { channelConfigs, sandboxes, channelSessions } from '@kortix/db';
+import { eq, and } from 'drizzle-orm';
 import { db } from '../../../shared/db';
 import { verifySlackRequest, findConfigByTeamId } from './utils';
 import { SlackApi } from './api';
-import type { NormalizedMessage } from '../../types';
+import { SandboxConnector } from '../../core/sandbox-connector';
+import type { NormalizedMessage, SandboxTarget } from '../../types';
 
 export async function handleSlackCommand(
   c: Context,
@@ -40,6 +41,7 @@ export async function handleSlackCommand(
   }
 
   const subcommand = parseSubcommand(text);
+  const ctx: CommandContext = { responseUrl, userId, userName, channelId, triggerId };
 
   if (subcommand.type === 'help') {
     return c.json({
@@ -47,6 +49,11 @@ export async function handleSlackCommand(
       text: [
         '*Kortix Slash Commands*',
         '`/kortix <question>` — Ask anything',
+        '`/kortix models` — List available models',
+        '`/kortix agents` — List available agents',
+        '`/kortix status` — Show current session info',
+        '`/kortix share` — Generate a shareable session link',
+        '`/kortix diff` — Show recent git changes',
         '`/kortix digest #channel` — Summarize recent channel activity',
         '`/kortix config prompt <text>` — Set a channel-specific system prompt',
         '`/kortix config prompt clear` — Clear channel prompt',
@@ -57,8 +64,47 @@ export async function handleSlackCommand(
     }, 200);
   }
 
+  if (subcommand.type === 'models') {
+    handleModelsCommand(channelConfig, ctx).catch((err) => {
+      console.error('[SLACK/COMMANDS] Models command failed:', err);
+      postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
+    });
+    return c.json({ response_type: 'ephemeral', text: ':mag: Fetching models...' }, 200);
+  }
+
+  if (subcommand.type === 'agents') {
+    handleAgentsCommand(channelConfig, ctx).catch((err) => {
+      console.error('[SLACK/COMMANDS] Agents command failed:', err);
+      postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
+    });
+    return c.json({ response_type: 'ephemeral', text: ':mag: Fetching agents...' }, 200);
+  }
+
+  if (subcommand.type === 'status') {
+    handleStatusCommand(channelConfig, ctx).catch((err) => {
+      console.error('[SLACK/COMMANDS] Status command failed:', err);
+      postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
+    });
+    return c.json({ response_type: 'ephemeral', text: ':bar_chart: Fetching status...' }, 200);
+  }
+
+  if (subcommand.type === 'share') {
+    handleShareCommand(channelConfig, ctx).catch((err) => {
+      console.error('[SLACK/COMMANDS] Share command failed:', err);
+      postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
+    });
+    return c.json({ response_type: 'ephemeral', text: ':link: Generating share link...' }, 200);
+  }
+
+  if (subcommand.type === 'diff') {
+    handleDiffCommand(channelConfig, ctx).catch((err) => {
+      console.error('[SLACK/COMMANDS] Diff command failed:', err);
+      postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
+    });
+    return c.json({ response_type: 'ephemeral', text: ':file_folder: Fetching diff...' }, 200);
+  }
+
   if (subcommand.type === 'config') {
-    const ctx: CommandContext = { responseUrl, userId, userName, channelId, triggerId };
     handleConfigCommand(channelConfig, subcommand, ctx).catch((err) => {
       console.error('[SLACK/COMMANDS] Config command failed:', err);
       postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
@@ -67,7 +113,6 @@ export async function handleSlackCommand(
   }
 
   if (subcommand.type === 'export') {
-    const ctx: CommandContext = { responseUrl, userId, userName, channelId, triggerId };
     handleExportCommand(channelConfig, ctx).catch((err) => {
       console.error('[SLACK/COMMANDS] Export command failed:', err);
       postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
@@ -82,8 +127,6 @@ export async function handleSlackCommand(
     }, 200);
   }
 
-  const ctx: CommandContext = { responseUrl, userId, userName, channelId, triggerId };
-
   processCommandAsync(engine, channelConfig, subcommand, ctx).catch((err) => {
     console.error('[SLACK/COMMANDS] Async processing failed:', err);
     postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
@@ -96,7 +139,7 @@ export async function handleSlackCommand(
 }
 
 interface Subcommand {
-  type: 'help' | 'digest' | 'prompt' | 'config' | 'export';
+  type: 'help' | 'digest' | 'prompt' | 'config' | 'export' | 'models' | 'agents' | 'status' | 'share' | 'diff';
   prompt: string;
   digestChannel?: string;
   configAction?: 'set' | 'clear' | 'show';
@@ -108,6 +151,26 @@ function parseSubcommand(text: string): Subcommand {
 
   if (lower === 'help' || lower === '') {
     return { type: 'help', prompt: '' };
+  }
+
+  if (lower === 'models') {
+    return { type: 'models', prompt: '' };
+  }
+
+  if (lower === 'agents') {
+    return { type: 'agents', prompt: '' };
+  }
+
+  if (lower === 'status') {
+    return { type: 'status', prompt: '' };
+  }
+
+  if (lower === 'share') {
+    return { type: 'share', prompt: '' };
+  }
+
+  if (lower === 'diff') {
+    return { type: 'diff', prompt: '' };
   }
 
   const digestMatch = text.match(/^digest\s+(?:<#(\w+)\|[^>]*>|<?#?(\S+?)>?)\s*$/i);
@@ -152,6 +215,207 @@ interface CommandContext {
   userName: string;
   channelId: string;
   triggerId: string;
+}
+
+async function resolveSandboxTarget(sandboxId: string): Promise<SandboxTarget | null> {
+  const [sandbox] = await db
+    .select()
+    .from(sandboxes)
+    .where(eq(sandboxes.sandboxId, sandboxId));
+
+  if (!sandbox) return null;
+
+  return {
+    sandboxId: sandbox.sandboxId,
+    baseUrl: sandbox.baseUrl,
+    authToken: sandbox.authToken,
+    provider: sandbox.provider,
+    externalId: sandbox.externalId,
+  };
+}
+
+async function getConnector(channelConfig: ChannelConfig): Promise<SandboxConnector | null> {
+  const target = await resolveSandboxTarget(channelConfig.sandboxId);
+  if (!target) return null;
+  return new SandboxConnector(target);
+}
+
+async function findActiveSessionId(channelConfig: ChannelConfig, userId: string): Promise<string | null> {
+  const sessions = await db
+    .select()
+    .from(channelSessions)
+    .where(eq(channelSessions.channelConfigId, channelConfig.channelConfigId));
+
+  if (sessions.length === 0) return null;
+
+  sessions.sort((a, b) => b.lastUsedAt.getTime() - a.lastUsedAt.getTime());
+  const userSession = sessions.find((s) => s.strategyKey.includes(userId));
+  if (userSession) return userSession.sessionId;
+
+  return sessions[0].sessionId;
+}
+
+async function handleModelsCommand(
+  channelConfig: ChannelConfig,
+  ctx: CommandContext,
+): Promise<void> {
+  const connector = await getConnector(channelConfig);
+  if (!connector) {
+    await postToResponseUrl(ctx.responseUrl, ':x: Sandbox not found.', true);
+    return;
+  }
+
+  const providers = await connector.listProviders();
+  if (providers.length === 0) {
+    await postToResponseUrl(ctx.responseUrl, ':x: No providers available.', true);
+    return;
+  }
+
+  const meta = channelConfig.metadata as Record<string, unknown> | null;
+  const currentModel = (meta?.model as Record<string, unknown>)?.modelID as string | undefined;
+
+  const lines: string[] = ['*Available Models*\n'];
+  for (const provider of providers) {
+    lines.push(`*${provider.name || provider.id}*`);
+    for (const model of provider.models) {
+      const isCurrent = currentModel && model.id === currentModel;
+      const marker = isCurrent ? ' :white_check_mark:' : '';
+      lines.push(`  \`${model.id}\` — ${model.name}${marker}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('_Switch with_ `use <model-name>` _in any channel message._');
+
+  await postToResponseUrl(ctx.responseUrl, lines.join('\n'), true);
+}
+
+async function handleAgentsCommand(
+  channelConfig: ChannelConfig,
+  ctx: CommandContext,
+): Promise<void> {
+  const connector = await getConnector(channelConfig);
+  if (!connector) {
+    await postToResponseUrl(ctx.responseUrl, ':x: Sandbox not found.', true);
+    return;
+  }
+
+  const agents = await connector.listAgents();
+  if (agents.length === 0) {
+    await postToResponseUrl(ctx.responseUrl, ':x: No agents available.', true);
+    return;
+  }
+
+  const currentAgent = channelConfig.agentName || 'default';
+
+  const lines: string[] = ['*Available Agents*\n'];
+  for (const agent of agents) {
+    const isCurrent = agent.name === currentAgent || (agent.isDefault && currentAgent === 'default');
+    const marker = isCurrent ? ' :white_check_mark:' : '';
+    const desc = agent.description ? ` — ${agent.description}` : '';
+    lines.push(`\`${agent.name}\`${desc}${marker}`);
+  }
+
+  lines.push('\n_Switch with_ `use agent <name>` _in any channel message._');
+
+  await postToResponseUrl(ctx.responseUrl, lines.join('\n'), true);
+}
+
+async function handleStatusCommand(
+  channelConfig: ChannelConfig,
+  ctx: CommandContext,
+): Promise<void> {
+  const meta = channelConfig.metadata as Record<string, unknown> | null;
+  const currentModel = (meta?.model as Record<string, unknown>)?.modelID as string | undefined;
+  const currentAgent = channelConfig.agentName || 'default';
+  const strategy = channelConfig.sessionStrategy || 'per-user';
+
+  const sessionId = await findActiveSessionId(channelConfig, ctx.userId);
+
+  const lines: string[] = [
+    '*Session Status*\n',
+    `*Model:* \`${currentModel || 'claude-3-5-haiku-20241022'}\``,
+    `*Agent:* \`${currentAgent}\``,
+    `*Session strategy:* \`${strategy}\``,
+    `*Session ID:* ${sessionId ? `\`${sessionId}\`` : '_none active_'}`,
+  ];
+
+  if (sessionId) {
+    const platformConfig = channelConfig.platformConfig as Record<string, unknown> | null;
+    const webUrl = platformConfig?.webBaseUrl as string | undefined;
+    if (webUrl) {
+      lines.push(`*Web UI:* ${webUrl}/session/${sessionId}`);
+    }
+  }
+
+  await postToResponseUrl(ctx.responseUrl, lines.join('\n'), true);
+}
+
+async function handleShareCommand(
+  channelConfig: ChannelConfig,
+  ctx: CommandContext,
+): Promise<void> {
+  const connector = await getConnector(channelConfig);
+  if (!connector) {
+    await postToResponseUrl(ctx.responseUrl, ':x: Sandbox not found.', true);
+    return;
+  }
+
+  const sessionId = await findActiveSessionId(channelConfig, ctx.userId);
+  if (!sessionId) {
+    await postToResponseUrl(ctx.responseUrl, ':x: No active session to share.', true);
+    return;
+  }
+
+  const result = await connector.shareSession(sessionId);
+  if (!result) {
+    await postToResponseUrl(ctx.responseUrl, ':x: Failed to generate share link.', true);
+    return;
+  }
+
+  await postToResponseUrl(ctx.responseUrl, `:link: *Shared session:* ${result.shareUrl}`);
+}
+
+async function handleDiffCommand(
+  channelConfig: ChannelConfig,
+  ctx: CommandContext,
+): Promise<void> {
+  const connector = await getConnector(channelConfig);
+  if (!connector) {
+    await postToResponseUrl(ctx.responseUrl, ':x: Sandbox not found.', true);
+    return;
+  }
+
+  const sessionId = await findActiveSessionId(channelConfig, ctx.userId);
+  if (!sessionId) {
+    await postToResponseUrl(ctx.responseUrl, ':x: No active session found.', true);
+    return;
+  }
+
+  const diff = await connector.getSessionDiff(sessionId);
+  if (!diff) {
+    await postToResponseUrl(ctx.responseUrl, ':white_check_mark: No changes detected.', true);
+    return;
+  }
+
+  if (diff.length <= 3000) {
+    await postToResponseUrl(ctx.responseUrl, `*Recent Changes*\n\`\`\`\n${diff}\n\`\`\``, true);
+  } else {
+    const credentials = channelConfig.credentials as Record<string, unknown>;
+    const botToken = credentials?.botToken as string;
+    if (!botToken) {
+      await postToResponseUrl(ctx.responseUrl, ':x: Missing bot token for file upload.', true);
+      return;
+    }
+    const api = new SlackApi(botToken);
+    await api.filesUploadV2({
+      channel: ctx.channelId,
+      filename: `diff-${sessionId.slice(0, 8)}.diff`,
+      content: Buffer.from(diff, 'utf-8'),
+      title: 'Session Diff',
+    });
+    await postToResponseUrl(ctx.responseUrl, ':white_check_mark: Diff uploaded as file.', true);
+  }
 }
 
 async function processCommandAsync(
