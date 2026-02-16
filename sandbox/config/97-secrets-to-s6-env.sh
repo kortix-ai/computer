@@ -6,6 +6,8 @@ set -euo pipefail
 
 SECRETS_DIR="${SECRET_DIR_PATH:-/app/secrets}"
 S6_ENV_DIR="/run/s6/container_environment"
+SECRETS_FILE="${SECRETS_DIR}/.secrets.json"
+SEED_FILE="/opt/kortix-master/seed-env.json"
 
 # Secrets directory (Docker volume, default owner is root).
 # chown -R to fix ownership of any pre-existing files (.salt, .secrets.json).
@@ -19,9 +21,25 @@ if [ -d "$S6_ENV_DIR" ]; then
   chmod 755 "$S6_ENV_DIR"
 fi
 
-# If a secrets file already exists, fix its ownership and sync to s6 env.
-SECRETS_FILE="${SECRETS_DIR}/.secrets.json"
+# First run: seed template keys into SecretStore from seed-env.json.
+# Only runs if .secrets.json doesn't exist yet (fresh install).
+if [ ! -f "$SECRETS_FILE" ] && [ -f "$SEED_FILE" ]; then
+  echo "[Kortix] First run — seeding template keys into SecretStore"
+  bun -e "
+    const { SecretStore } = require('/opt/kortix-master/src/services/secret-store.ts');
+    const seed = require('$SEED_FILE');
+    const store = new SecretStore();
+    let n = 0;
+    for (const [k, v] of Object.entries(seed)) {
+      if (k.startsWith('_')) continue;
+      await store.set(k, String(v));
+      n++;
+    }
+    console.log('[Kortix] Seeded ' + n + ' template keys');
+  " || echo "[Kortix] WARN: template key seed failed"
+fi
 
+# Sync secrets into s6 container environment.
 if [ -f "$SECRETS_FILE" ]; then
   chown abc:users "$SECRETS_FILE"
   echo "[Kortix] Syncing secrets into s6 container environment"
