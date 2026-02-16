@@ -985,6 +985,7 @@ export function SessionChatInput({
     setMentionQuery(null);
     setMentionIndex(0);
     setFileResults([]);
+    fileResultsCache.current.clear();
     // Refocus and position cursor after inserted mention
     requestAnimationFrame(() => {
       const ta = textareaRef.current;
