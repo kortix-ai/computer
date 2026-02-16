@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,7 +10,9 @@ import {
   Monitor,
   Globe,
   Search,
+  KeyRound,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -43,6 +45,7 @@ export function SidebarRight() {
     isMobile,
   } = useRightSidebar();
 
+  const router = useRouter();
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
 
   const activeServer = useServerStore((s) => {
@@ -101,31 +104,6 @@ export function SidebarRight() {
     [activeServer, serverUrl, mappedPorts],
   );
 
-  /**
-   * Open an agent-started service (arbitrary port) via the proxy.
-   * Used by sandbox-url-detector when the agent starts a dev server on e.g. port 3000.
-   */
-  const openPreviewTab = useCallback(
-    (port: number, title: string) => {
-      const proxyUrl = getProxyBaseUrl(port, serverUrl, mappedPorts);
-      const tabId = `preview:${port}`;
-      const tabHref = `/preview/${port}`;
-
-      openTabAndNavigate({
-        id: tabId,
-        title,
-        type: 'preview',
-        href: tabHref,
-        metadata: {
-          url: proxyUrl,
-          port,
-          originalUrl: `http://localhost:${port}/`,
-        },
-      });
-    },
-    [serverUrl, mappedPorts],
-  );
-
   const handleOpenDesktop = useCallback(() => {
     const containerPort = SANDBOX_PORTS.DESKTOP;
     const directUrl = activeServer
@@ -156,6 +134,18 @@ export function SidebarRight() {
   const handleOpenAgentBrowser = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');
   }, [openSandboxServiceTab]);
+
+  const handleOpenSecrets = useCallback(() => {
+    openTabAndNavigate(
+      {
+        id: 'settings:secrets',
+        title: 'Secrets Manager',
+        type: 'settings',
+        href: '/settings/credentials',
+      },
+      router,
+    );
+  }, [router]);
 
   if (isMobile) return null;
 
@@ -282,6 +272,19 @@ export function SidebarRight() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    onClick={handleOpenSecrets}
+                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                  >
+                    <KeyRound className="h-[16px] w-[16px]" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Secrets Manager
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
                     onClick={handleOpenDesktop}
                     className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
@@ -330,6 +333,13 @@ export function SidebarRight() {
                 >
                   <TerminalSquare className="h-[16px] w-[16px] flex-shrink-0" />
                   <span>{createPty.isPending ? 'Creating...' : 'New Terminal'}</span>
+                </button>
+                <button
+                  onClick={handleOpenSecrets}
+                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                >
+                  <KeyRound className="h-[16px] w-[16px] flex-shrink-0" />
+                  <span>Secrets Manager</span>
                 </button>
                 <button
                   onClick={handleOpenDesktop}

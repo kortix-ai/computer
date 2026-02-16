@@ -1,17 +1,21 @@
 'use client';
 
 import React from 'react';
-import { Zap } from 'lucide-react';
-import { PageHeader } from '@/components/ui/page-header';
+import { SecretsManager } from '@/components/secrets/secrets-manager';
 
-export default function AppProfilesPage() {
+export default function SecretsPage() {
   return (
-    <div className="container mx-auto max-w-7xl px-3 sm:px-4 py-4 sm:py-8">
-      <div className="space-y-4 sm:space-y-8">
-        <PageHeader icon={Zap}>
-          <span className="text-primary text-lg sm:text-xl">App Credentials</span>
-        </PageHeader>
-        <p className="text-sm text-muted-foreground">No credential integrations configured.</p>
+    <div className="container mx-auto max-w-4xl px-3 sm:px-4 py-4 sm:py-8">
+      <div className="space-y-4 sm:space-y-6">
+        <div>
+          <h1 className="text-lg sm:text-xl font-semibold">Secrets Manager</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage environment variables and API keys for your sandbox.
+          </p>
+        </div>
+        <div className="border rounded-lg overflow-hidden">
+          <SecretsManager />
+        </div>
       </div>
     </div>
   );
