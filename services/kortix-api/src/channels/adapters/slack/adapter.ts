@@ -228,14 +228,16 @@ export class SlackAdapter extends BaseAdapter {
 
     const rawPayload = message.raw as Record<string, unknown> | undefined;
     const event = rawPayload?.event as Record<string, unknown> | undefined;
-    const channel = event?.channel as string;
+    const channel = (event?.channel as string) || (rawPayload?.channelId as string);
     if (!channel) {
       console.warn('[SLACK] sendFiles: no channel in event payload, skipping');
       return;
     }
 
     const api = new SlackApi(botToken);
-    const threadTs = message.threadId || message.externalId;
+    // For slash commands, externalId is synthetic (cmd-*) and not a valid Slack ts
+    const isSlashCommand = rawPayload?._slackCommand === true;
+    const threadTs = message.threadId || (isSlashCommand ? undefined : message.externalId);
 
     console.log(`[SLACK] sendFiles: ${files.length} file(s) to channel=${channel} thread=${threadTs}`);
 

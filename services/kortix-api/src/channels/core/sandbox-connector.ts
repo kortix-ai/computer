@@ -23,7 +23,7 @@ export interface StreamEvent {
   };
 }
 
-const FILE_PRODUCING_TOOLS = new Set(['show-user']);
+const FILE_PRODUCING_TOOLS = new Set(['show_user', 'show-user']);
 const FILE_ITEM_TYPES = new Set(['file', 'image']);
 
 interface ResolvedEndpoint {
@@ -259,7 +259,6 @@ export class SandboxConnector {
               };
             }
 
-            // Intercept file-producing tool completions (e.g. show-user)
             if (part.type === 'tool') {
               const toolName = part.tool as string;
               const callID = (part.callID || part.id) as string;
@@ -328,7 +327,7 @@ export class SandboxConnector {
     const input = state.input as Record<string, unknown> | undefined;
     const output = state.output as string | undefined;
 
-    if (toolName === 'show-user') {
+    if (toolName === 'show_user' || toolName === 'show-user') {
       const itemType = (input?.type as string) || '';
       let filePath: string | undefined;
       let publicUrl: string | undefined;
@@ -394,13 +393,26 @@ export class SandboxConnector {
   async downloadFile(fileUrl: string): Promise<Buffer | null> {
     try {
       if (!fileUrl.startsWith('http')) {
-        const filePath = fileUrl.startsWith('/workspace/')
-          ? fileUrl.slice('/workspace/'.length)
-          : fileUrl.startsWith('/')
-            ? fileUrl.slice(1)
-            : fileUrl;
+        let filePath = fileUrl;
+        for (const prefix of ['/workspace/', '/home/daytona/', '/home/user/']) {
+          if (filePath.startsWith(prefix)) {
+            filePath = filePath.slice(prefix.length);
+            break;
+          }
+        }
+        if (filePath.startsWith('/')) {
+          filePath = filePath.slice(1);
+        }
         console.log(`[SANDBOX-CONNECTOR] Downloading sandbox file via file content API: ${filePath}`);
-        return await this.downloadFileByPath(filePath);
+        const result = await this.downloadFileByPath(filePath);
+        if (result) return result;
+
+        const fileName = fileUrl.split('/').pop();
+        if (fileName && fileName !== filePath) {
+          console.log(`[SANDBOX-CONNECTOR] Retrying with filename only: ${fileName}`);
+          return await this.downloadFileByPath(fileName);
+        }
+        return null;
       }
 
       const { headers } = await this.getEndpoint();
