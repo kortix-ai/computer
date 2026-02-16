@@ -39,9 +39,11 @@ if [ ! -f "$SECRETS_FILE" ] && [ -f "$SEED_FILE" ]; then
   " || echo "[Kortix] WARN: template key seed failed"
 fi
 
+# Fix ownership of any files created by the seed step (e.g. .salt created as root)
+chown -R abc:users "$SECRETS_DIR"
+
 # Sync secrets into s6 container environment.
 if [ -f "$SECRETS_FILE" ]; then
-  chown abc:users "$SECRETS_FILE"
   echo "[Kortix] Syncing secrets into s6 container environment"
   bun "/opt/kortix-master/src/scripts/sync-s6-env.ts" || echo "[Kortix] WARN: secret sync failed"
 else
