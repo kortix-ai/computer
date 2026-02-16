@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { CircleDashed, Terminal } from 'lucide-react';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
@@ -47,19 +47,33 @@ export function TerminalTabContent({ ptyId, tabId, hidden = false }: TerminalTab
   // Find the PTY object for this tab
   const pty = ptys?.find((p) => p.id === ptyId) ?? null;
 
-  // If PTY disappears (killed externally), close the tab
+  // Track whether we've ever seen this PTY in the list.
+  // Prevents auto-closing the tab before the list has had a chance to include
+  // the newly created PTY (race between POST /pty and GET /pty).
+  const hasSeenPty = useRef(false);
+  if (pty) hasSeenPty.current = true;
+
+  // If PTY disappears (killed externally), close the tab — but only if we
+  // previously saw it in the list (avoids race on initial mount).
   useEffect(() => {
-    if (!isLoading && ptys && !pty) {
+    if (!isLoading && ptys && !pty && hasSeenPty.current) {
       useTabStore.getState().closeTab(tabId);
     }
   }, [isLoading, ptys, pty, tabId]);
 
-  // Kill PTY on the server when tab is closed (component unmounts from DOM)
+  // Kill PTY on the server when the tab is ACTUALLY closed (removed from store).
+  // We guard the cleanup by checking whether the tab still exists — this
+  // prevents React Strict Mode double-mounts, Suspense re-suspensions, or
+  // any other transient unmount from prematurely killing the PTY process.
   useEffect(() => {
     const id = ptyId;
+    const tid = tabId;
     return () => {
-      // Remove PTY from the server — this kills the shell process
-      removePty.mutateAsync(id).catch(() => {});
+      // Only kill the PTY if the tab was truly removed from the store.
+      const tabStillExists = !!useTabStore.getState().tabs[tid];
+      if (!tabStillExists) {
+        removePty.mutateAsync(id).catch(() => {});
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ptyId]);

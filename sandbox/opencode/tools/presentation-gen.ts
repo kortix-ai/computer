@@ -459,13 +459,26 @@ function runPythonScript(
   args: string[],
   timeoutMs = 300_000,
 ): string {
-  const cmd = `uv run ${script} ${args.map((a) => `"${a}"`).join(" ")}`;
+  const isLinux = process.platform === "linux";
+  // On Linux (sandbox), Python deps are pre-installed system-wide via Docker,
+  // so run scripts directly with python3. On macOS, use uv to manage the venv.
+  const cmd = isLinux
+    ? `python3 ${script} ${args.map((a) => `"${a}"`).join(" ")}`
+    : `uv run ${script} ${args.map((a) => `"${a}"`).join(" ")}`;
+
+  const env: Record<string, string | undefined> = { ...process.env };
+  if (!isLinux) {
+    // Ensure uv has a writable cache directory
+    env.UV_CACHE_DIR = env.UV_CACHE_DIR ?? join(process.env.HOME ?? "/tmp", ".cache", "uv");
+  }
+
   try {
     const output = execSync(cmd, {
       cwd: SCRIPTS_DIR,
       timeout: timeoutMs,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
+      env,
     });
     return output.trim();
   } catch (e: unknown) {

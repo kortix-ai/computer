@@ -332,19 +332,15 @@ export function OcEditToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={FileCode2}
-        iconColor="text-blue-500 dark:text-blue-400"
-        bgColor="bg-gradient-to-b from-blue-100 to-blue-50 shadow-inner dark:from-blue-800/40 dark:to-blue-900/60"
         title="Editing File"
         subtitle={filename}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={FileCode2}
@@ -405,7 +401,7 @@ export function OcEditToolView({
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
           {hasDiff ? (
-            <div className="bg-zinc-50/50 dark:bg-zinc-900/30">
+            <div className="bg-muted/30">
               {viewMode === 'split' ? (
                 <SideBySideDiffView patch={patch} filename={displayPath || 'file'} />
               ) : (
@@ -413,7 +409,7 @@ export function OcEditToolView({
               )}
             </div>
           ) : (
-            <div className="p-4">
+            <div className="p-3">
               <div className="text-sm text-muted-foreground">
                 File edited: <span className="font-mono text-foreground">{displayPath}</span>
               </div>
@@ -429,13 +425,13 @@ export function OcEditToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               Saved
             </Badge>
           )

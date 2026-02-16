@@ -39,7 +39,7 @@ import { FileBreadcrumbs } from '@/features/files/components/file-breadcrumbs';
 import { FileSearch } from '@/features/files/components/file-search';
 import type { FileNode } from '@/features/files/types';
 import { toast } from '@/lib/toast';
-import { useTabStore } from '@/stores/tab-store';
+import { useTabStore, openTabAndNavigate } from '@/stores/tab-store';
 import { useDiagnosticsStore } from '@/stores/diagnostics-store';
 
 // ============================================================================
@@ -308,14 +308,12 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
       } else if (openFileAsTab) {
         // Open as a tab in the main content area
         const tabId = `file:${node.path}`;
-        useTabStore.getState().openTab({
+        openTabAndNavigate({
           id: tabId,
           title: node.name,
           type: 'file',
           href: `/files/${encodeURIComponent(node.path)}`,
         });
-        // Use pushState to avoid full navigation
-        window.history.pushState(null, '', `/files/${encodeURIComponent(node.path)}`);
       } else {
         const allFiles = fileItems.map((f) => f.path);
         const index = allFiles.indexOf(node.path);

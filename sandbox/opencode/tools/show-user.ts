@@ -6,7 +6,7 @@ import {
   existsSync,
   appendFileSync,
 } from "fs";
-import { resolve, dirname, join } from "path";
+import { resolve, join } from "path";
 import { homedir } from "os";
 
 const SHOW_DIR = join(process.env.HOME || homedir(), ".show-user");
@@ -127,7 +127,6 @@ export default tool({
       return `Error: Invalid action '${action}'. Use 'show', 'list', or 'clear'.`;
     }
 
-    // --- LIST ---
     if (action === "list") {
       const entries = readQueue();
       if (entries.length === 0) {
@@ -144,7 +143,6 @@ export default tool({
       );
     }
 
-    // --- CLEAR ---
     if (action === "clear") {
       clearQueue();
       return JSON.stringify(
@@ -154,13 +152,11 @@ export default tool({
       );
     }
 
-    // --- SHOW ---
     const type = args.type as ShowEntry["type"] | undefined;
     if (!type || !["file", "image", "url", "text", "error"].includes(type)) {
       return `Error: 'type' is required for 'show' action. Use 'file', 'image', 'url', 'text', or 'error'.`;
     }
 
-    // Validate required fields per type
     if ((type === "file" || type === "image") && !args.path) {
       return `Error: 'path' is required when type is '${type}'.`;
     }
@@ -171,7 +167,6 @@ export default tool({
       return `Error: 'content' is required when type is '${type}'.`;
     }
 
-    // Verify file exists for file/image types
     if ((type === "file" || type === "image") && args.path) {
       const absPath = resolve(args.path);
       if (!existsSync(absPath)) {
@@ -179,7 +174,6 @@ export default tool({
       }
     }
 
-    // Parse optional metadata
     let metadata: Record<string, unknown> | undefined;
     if (args.metadata) {
       try {

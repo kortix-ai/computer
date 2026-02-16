@@ -96,6 +96,7 @@ services:
       - SANDBOX_ID=kortix-sandbox
       - PROJECT_ID=local
       - ENV_MODE=local
+      - SANDBOX_PORT_MAP={"8000":"14000","3111":"14001","6080":"14002","6081":"14003","3210":"14004","9223":"14005","9224":"14006"}
     env_file:
       - path: sandbox/.env
         required: false

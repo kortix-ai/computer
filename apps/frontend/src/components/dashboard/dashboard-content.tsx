@@ -12,7 +12,7 @@ import {
   useOpenCodeProviders,
   useOpenCodeCommands,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { SessionChatInput } from '@/components/session/session-chat-input';
 import { SessionWelcome } from '@/components/session/session-welcome';
@@ -62,7 +62,7 @@ export function DashboardContent() {
         createdSessionId = session.id;
 
         // Step 2: Open tab and navigate immediately (optimistic)
-        useTabStore.getState().openTab({
+        openTabAndNavigate({
           id: session.id,
           title: 'New session',
           type: 'session',
@@ -79,11 +79,6 @@ export function DashboardContent() {
         if (Object.keys(options).length > 0) {
           sessionStorage.setItem(`opencode_pending_options:${session.id}`, JSON.stringify(options));
         }
-
-        // Step 4: Activate the session tab via pushState (like handleActivate in tab-bar)
-        // instead of router.push to avoid a full Next.js navigation. The pre-mounted
-        // session component becomes visible instantly.
-        window.history.pushState(null, '', `/sessions/${session.id}`);
         // Reset submitting since the dashboard stays mounted (hidden) with pushState
         setIsSubmitting(false);
         // Focus the textarea in the newly visible session tab
@@ -127,7 +122,7 @@ export function DashboardContent() {
       )}
 
       {/* Welcome hero — identical to session empty state */}
-      <SessionWelcome showPrompts onPromptSelect={handleSend} />
+      <SessionWelcome />
 
       {/* Chat Input — identical to session empty state */}
       <SessionChatInput

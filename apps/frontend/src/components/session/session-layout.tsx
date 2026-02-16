@@ -23,7 +23,7 @@ import {
   adaptMessagesToToolCalls,
   adaptAgentStatus,
 } from '@/lib/adapters/opencode-to-kortix-computer';
-import { X, Maximize2, Minimize2, Activity } from 'lucide-react';
+import { X, Maximize2, Minimize2 } from 'lucide-react';
 
 // ============================================================================
 // Session Layout
@@ -77,23 +77,6 @@ export const SessionLayout = memo(function SessionLayout({
   }, [isActiveTab, sessionId, setActiveSession]);
 
   const hasToolCalls = toolCalls.length > 0;
-
-  // Auto-open the side panel the FIRST time tool calls appear for a session.
-  // Uses a Set to track which sessions have already triggered auto-open,
-  // preventing re-opens on query refetches (e.g. after reconnection) or
-  // when the user has manually closed the panel.
-  const autoOpenedSessionsRef = useRef(new Set<string>());
-
-  useEffect(() => {
-    if (
-      hasToolCalls &&
-      !isMobile &&
-      !autoOpenedSessionsRef.current.has(sessionId)
-    ) {
-      autoOpenedSessionsRef.current.add(sessionId);
-      setIsSidePanelOpen(true);
-    }
-  }, [hasToolCalls, isMobile, sessionId, setIsSidePanelOpen]);
 
   useEffect(() => {
     if (shouldOpenPanel && !isSidePanelOpen) {
@@ -240,26 +223,20 @@ export const SessionLayout = memo(function SessionLayout({
                 sidePanelRef={sidePanelRef}
                 hideTopBar={true}
                 headerSlot={
-                  <div className="flex-shrink-0 h-11 flex items-center justify-between px-4">
-                    <div className="flex items-center gap-1.5">
-                      <Activity className="w-3.5 h-3.5 text-foreground/70" strokeWidth={2.5} />
-                      <span className="text-sm font-medium text-foreground">Actions</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={toggleExpanded}
-                        className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                        title={isExpanded ? 'Collapse' : 'Expand'}
-                      >
-                        {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                      </button>
-                      <button
-                        onClick={handleSidePanelClose}
-                        className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  <div className="flex-shrink-0 h-10 flex items-center justify-end px-3 gap-0.5">
+                    <button
+                      onClick={toggleExpanded}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      title={isExpanded ? 'Collapse' : 'Expand'}
+                    >
+                      {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={handleSidePanelClose}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 }
               />

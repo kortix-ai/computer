@@ -74,19 +74,15 @@ export function OcImageGenToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={config.icon}
-        iconColor="text-purple-500 dark:text-purple-400"
-        bgColor="bg-gradient-to-b from-purple-100 to-purple-50 shadow-inner dark:from-purple-800/40 dark:to-purple-900/60"
         title={config.label}
         subtitle={prompt.slice(0, 80)}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={config.icon}
@@ -98,7 +94,7 @@ export function OcImageGenToolView({
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
-          <div className="p-4 space-y-3">
+          <div className="p-3 space-y-3">
             {/* Image preview */}
             {imageSource && (
               <div className="flex justify-center">
@@ -106,7 +102,7 @@ export function OcImageGenToolView({
                 <img
                   src={imageSource}
                   alt={prompt || 'Generated image'}
-                  className="max-w-full max-h-[400px] rounded-lg border border-zinc-200 dark:border-zinc-800 object-contain"
+                  className="max-w-full max-h-[400px] rounded-lg border border-border object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
               </div>
@@ -114,7 +110,7 @@ export function OcImageGenToolView({
 
             {/* Prompt display */}
             {prompt && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 p-3">
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground mb-1 font-medium">Prompt</p>
                 <p className="text-sm text-foreground">{prompt}</p>
               </div>
@@ -145,13 +141,13 @@ export function OcImageGenToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               {config.label}
             </Badge>
           )

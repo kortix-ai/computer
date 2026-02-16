@@ -2,7 +2,7 @@ import React from 'react';
 import { ToolViewProps } from '../types';
 import { formatTimestamp, getToolTitle } from '../utils';
 import { getToolIcon } from '../../utils';
-import { CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { cn } from '@/lib/utils';
 
@@ -47,20 +47,20 @@ export function ToolViewWrapper({
     <div className={cn("flex flex-col h-full max-w-full overflow-hidden min-w-0", className)}>
       {(headerContent || showStatus) && (
         <div className={cn(
-          "flex items-center p-2 bg-zinc-100 dark:bg-zinc-900 justify-between border-zinc-200 dark:border-zinc-800 max-w-full min-w-0",
+          "flex items-center p-2 bg-muted/50 justify-between border-border max-w-full min-w-0",
           headerClassName
         )}>
           <div className="flex ml-1 items-center min-w-0 flex-1">
-            {Icon && <Icon className="h-4 w-4 mr-2 text-zinc-600 dark:text-zinc-400 flex-shrink-0" />}
-            <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate min-w-0">
+            {Icon && <Icon className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />}
+            <span className="text-xs font-medium text-foreground truncate min-w-0">
               {toolTitle}
             </span>
           </div>
           <div className="flex items-center gap-2">
             {isStreaming && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-                <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-pulse" />
-                <span className="text-[10px] font-medium text-zinc-700 dark:text-zinc-400">Running</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border border-border">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                <span className="text-[10px] font-medium text-muted-foreground">Running</span>
               </div>
             )}
             {headerContent}
@@ -74,10 +74,10 @@ export function ToolViewWrapper({
 
       {(footerContent || showStatus) && (
         <div className={cn(
-          "p-4 border-t border-zinc-200 dark:border-zinc-800",
+          "p-4 border-t border-border",
           footerClassName
         )}>
-          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
             {!isStreaming && showStatus && (
               <div className="flex items-center gap-2">
                 {isSuccess ? (

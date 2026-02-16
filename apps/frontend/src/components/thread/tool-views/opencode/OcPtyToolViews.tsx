@@ -98,8 +98,8 @@ function StatusBadge({ status }: { status: string }) {
         'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium',
         isRunning && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
         isError && 'bg-red-500/10 text-red-600 dark:text-red-400',
-        isCompleted && 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400',
-        !isRunning && !isError && !isCompleted && 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400',
+        isCompleted && 'bg-muted text-muted-foreground',
+        !isRunning && !isError && !isCompleted && 'bg-muted text-muted-foreground',
       )}
     >
       {isRunning && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />}
@@ -201,19 +201,15 @@ export function OcPtySpawnToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={Terminal}
-        iconColor="text-cyan-500 dark:text-cyan-400"
-        bgColor="bg-gradient-to-b from-cyan-100 to-cyan-50 shadow-inner dark:from-cyan-800/40 dark:to-cyan-900/60"
         title="Spawning Process"
         subtitle={title || fullCommand}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={Terminal}
@@ -243,10 +239,10 @@ export function OcPtySpawnToolView({
 
             {/* Command display */}
             {fullCommand && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-zinc-950 dark:bg-zinc-950">
+              <div className="rounded-lg border border-border overflow-hidden bg-zinc-950 dark:bg-zinc-950">
                 <div className="px-3 py-2.5">
                   <pre className="font-mono text-xs text-emerald-400 leading-relaxed">
-                    <span className="text-zinc-500">$ </span>
+                    <span className="text-muted-foreground">$ </span>
                     {fullCommand}
                   </pre>
                 </div>
@@ -254,8 +250,8 @@ export function OcPtySpawnToolView({
             )}
 
             {/* Info section */}
-            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
-              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <div className="rounded-lg border border-border overflow-hidden bg-card">
+              <div className="divide-y divide-border">
                 {workdir && (
                   <InfoRow icon={FolderOpen} label="Working Directory" value={workdir} mono />
                 )}
@@ -295,13 +291,13 @@ export function OcPtySpawnToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               Spawned
             </Badge>
           )
@@ -340,19 +336,15 @@ export function OcPtyReadToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={Terminal}
-        iconColor="text-blue-500 dark:text-blue-400"
-        bgColor="bg-gradient-to-b from-blue-100 to-blue-50 shadow-inner dark:from-blue-800/40 dark:to-blue-900/60"
         title="Reading Terminal"
         subtitle={displayId || undefined}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={Terminal}
@@ -380,12 +372,12 @@ export function OcPtyReadToolView({
             )}
 
             {parsed.content && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-zinc-950 dark:bg-zinc-950">
+              <div className="rounded-lg border border-border overflow-hidden bg-zinc-950 dark:bg-zinc-950">
                 <pre className="p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words">
                   {parsed.content}
                 </pre>
                 {parsed.bufferInfo && (
-                  <div className="px-3 pb-2 text-[10px] text-zinc-500 italic border-t border-zinc-800">
+                  <div className="px-3 pb-2 text-[10px] text-muted-foreground italic border-t border-border">
                     <span className="pt-1.5 inline-block">{parsed.bufferInfo}</span>
                   </div>
                 )}
@@ -408,13 +400,13 @@ export function OcPtyReadToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               Read
             </Badge>
           )
@@ -447,19 +439,15 @@ export function OcPtyWriteToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={Keyboard}
-        iconColor="text-violet-500 dark:text-violet-400"
-        bgColor="bg-gradient-to-b from-violet-100 to-violet-50 shadow-inner dark:from-violet-800/40 dark:to-violet-900/60"
         title="Sending Input"
         subtitle={ptyId || undefined}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={Keyboard}
@@ -482,10 +470,10 @@ export function OcPtyWriteToolView({
             )}
 
             {ptyInput && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-zinc-950 dark:bg-zinc-950">
+              <div className="rounded-lg border border-border overflow-hidden bg-zinc-950 dark:bg-zinc-950">
                 <div className="px-3 py-2.5">
                   <pre className="font-mono text-xs text-amber-400 leading-relaxed">
-                    <span className="text-zinc-500">&gt; </span>
+                    <span className="text-muted-foreground">&gt; </span>
                     {ptyInput}
                   </pre>
                 </div>
@@ -493,7 +481,7 @@ export function OcPtyWriteToolView({
             )}
 
             {ptyId && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
+              <div className="rounded-lg border border-border overflow-hidden bg-card">
                 <InfoRow icon={Hash} label="Terminal ID" value={ptyId} mono />
               </div>
             )}
@@ -514,13 +502,13 @@ export function OcPtyWriteToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               Sent
             </Badge>
           )
@@ -561,19 +549,15 @@ export function OcPtyKillToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={XCircle}
-        iconColor="text-red-500 dark:text-red-400"
-        bgColor="bg-gradient-to-b from-red-100 to-red-50 shadow-inner dark:from-red-800/40 dark:to-red-900/60"
         title="Killing Process"
         subtitle={ptyId || undefined}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={XCircle}
@@ -596,13 +580,13 @@ export function OcPtyKillToolView({
             )}
 
             {ptyId && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
+              <div className="rounded-lg border border-border overflow-hidden bg-card">
                 <InfoRow icon={Hash} label="Terminal ID" value={ptyId} mono />
               </div>
             )}
 
             {cleanOutput && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-zinc-950 dark:bg-zinc-950">
+              <div className="rounded-lg border border-border overflow-hidden bg-zinc-950 dark:bg-zinc-950">
                 <pre className="p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words">
                   {cleanOutput}
                 </pre>
@@ -625,12 +609,12 @@ export function OcPtyKillToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
               <XCircle className="h-3 w-3 text-red-500 dark:text-red-400" />
               Killed
             </Badge>

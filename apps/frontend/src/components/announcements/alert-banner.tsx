@@ -103,7 +103,7 @@ export function AlertBanner({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed bottom-4 right-4 z-[100] w-[340px]"
+        className="fixed bottom-4 right-4 z-[110] w-[340px]"
       >
         <div className="relative bg-muted rounded-xl overflow-hidden border">
           <button

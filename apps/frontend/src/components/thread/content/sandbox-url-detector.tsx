@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { UnifiedMarkdown } from '@/components/markdown';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import {
   detectLocalhostUrls,
@@ -212,7 +212,6 @@ function SandboxPreviewCard({
   detected: DetectedLocalhostUrl;
   proxyUrl: string;
 }) {
-  const openTab = useTabStore((s) => s.openTab);
   const [copied, setCopied] = useState(false);
   const [showInlinePreview, setShowInlinePreview] = useState(false);
   const reachability = usePortReachability(proxyUrl);
@@ -225,7 +224,7 @@ function SandboxPreviewCard({
 
   /** Open (or activate) the preview tab and navigate to it. */
   const navigateToPreviewTab = useCallback(() => {
-    openTab({
+    openTabAndNavigate({
       id: tabId,
       title: `localhost:${detected.port}`,
       type: 'preview',
@@ -236,10 +235,7 @@ function SandboxPreviewCard({
         originalUrl: detected.originalUrl,
       },
     });
-    // pushState so the tab is actually visible — openTab sets activeTabId
-    // but doesn't change the URL, so the SessionTabsContainer won't show it.
-    window.history.pushState(null, '', tabHref);
-  }, [detected, proxyUrl, openTab, tabId, tabHref]);
+  }, [detected, proxyUrl, tabId, tabHref]);
 
   const handleOpenExternal = useCallback(() => {
     window.open(proxyUrl, '_blank', 'noopener,noreferrer');

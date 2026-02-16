@@ -62,6 +62,14 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs =
 async function fetchMasterJson<T>(path: string, init: RequestInit = {}, timeoutMs = 5000): Promise<T> {
   const candidates = getMasterUrlCandidates();
   let lastErr: unknown = null;
+
+  // Inject INTERNAL_SERVICE_KEY for sandbox auth (VPS mode)
+  const serviceKey = process.env.INTERNAL_SERVICE_KEY;
+  if (serviceKey) {
+    const existingHeaders = init.headers ? Object.fromEntries(new Headers(init.headers as HeadersInit).entries()) : {};
+    init = { ...init, headers: { ...existingHeaders, 'Authorization': `Bearer ${serviceKey}` } };
+  }
+
   for (const base of candidates) {
     const url = `${base}${path}`;
     try {

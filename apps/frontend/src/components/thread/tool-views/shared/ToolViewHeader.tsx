@@ -31,20 +31,20 @@ export function ToolViewHeader({
 }: ToolViewHeaderProps) {
   return (
     <CardHeader className={cn(
-      "h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2",
+      "h-14 bg-muted/50 backdrop-blur-sm border-b border-border p-2 px-4 space-y-2",
       className
     )}>
       <div className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="relative p-2 rounded-lg border bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 flex-shrink-0">
-            <Icon className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
+          <div className="relative p-2 rounded-lg border bg-muted border-border flex-shrink-0">
+            <Icon className="w-5 h-5 text-muted-foreground" />
           </div>
           <div className="min-w-0 flex-1">
-            <CardTitle className="text-base font-medium text-zinc-900 dark:text-zinc-100 truncate">
+            <CardTitle className="text-base font-medium text-foreground truncate">
               {title}
             </CardTitle>
             {subtitle && (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {subtitle}
               </p>
             )}

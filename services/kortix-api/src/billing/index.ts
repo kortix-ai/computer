@@ -14,26 +14,14 @@ const billingApp = new Hono();
 billingApp.route('/webhooks', webhooksRouter);
 
 // Auth for all billing routes except webhooks
-billingApp.use('/account-state/*', supabaseAuth);
-billingApp.use('/account/*', supabaseAuth);
-billingApp.use('/create-*', supabaseAuth);
-billingApp.use('/confirm-*', supabaseAuth);
-billingApp.use('/cancel-*', supabaseAuth);
-billingApp.use('/reactivate-*', supabaseAuth);
-billingApp.use('/schedule-*', supabaseAuth);
-billingApp.use('/sync-*', supabaseAuth);
-billingApp.use('/proration-*', supabaseAuth);
-billingApp.use('/checkout-*', supabaseAuth);
-billingApp.use('/purchase-*', supabaseAuth);
-billingApp.use('/transactions*', supabaseAuth);
-billingApp.use('/credit-*', supabaseAuth);
-billingApp.use('/deduct', supabaseAuth);
-billingApp.use('/deduct-*', supabaseAuth);
-billingApp.use('/tier-*', supabaseAuth);
-billingApp.use('/usage-*', supabaseAuth);
-billingApp.use('/trial/*', supabaseAuth);
-billingApp.use('/setup/*', supabaseAuth);
-billingApp.use('/cron/*', supabaseAuth);
+// Note: Hono wildcards only work after '/' (e.g. '/path/*'), NOT as globs (e.g. '/path-*').
+// Using a single catch-all that skips webhook routes (they verify signatures internally).
+billingApp.use('*', async (c, next) => {
+  if (c.req.path.includes('/webhooks')) {
+    return next();
+  }
+  return supabaseAuth(c, next);
+});
 
 // Setup initialize endpoint
 billingApp.post('/setup/initialize', async (c: any) => {

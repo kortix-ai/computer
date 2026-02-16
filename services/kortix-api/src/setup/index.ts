@@ -69,6 +69,13 @@ async function fetchMasterJson<T>(path: string, init: RequestInit = {}, timeoutM
   const candidates = getMasterUrlCandidates();
   let lastErr: unknown = null;
 
+  // Inject INTERNAL_SERVICE_KEY for sandbox auth (VPS mode)
+  const serviceKey = process.env.INTERNAL_SERVICE_KEY;
+  if (serviceKey) {
+    const existingHeaders = init.headers ? Object.fromEntries(new Headers(init.headers as HeadersInit).entries()) : {};
+    init = { ...init, headers: { ...existingHeaders, 'Authorization': `Bearer ${serviceKey}` } };
+  }
+
   for (const base of candidates) {
     const url = `${base}${path}`;
     try {
@@ -397,11 +404,26 @@ setupApp.get('/health', async (c) => {
 setupApp.get('/onboarding-status', async (c) => {
   const repoRoot = findRepoRoot();
 
-  // Repo/dev mode: reads from repo .env
+  // Repo/dev mode: check repo .env first, then fall back to sandbox secret store.
+  // The onboarding-complete tool writes to the sandbox secret store, so we need
+  // to check both sources.
   if (repoRoot) {
     const rootEnv = parseEnvFile(resolve(repoRoot, '.env'));
-    const complete = rootEnv['ONBOARDING_COMPLETE'] === 'true';
-    return c.json({ complete });
+    if (rootEnv['ONBOARDING_COMPLETE'] === 'true') {
+      return c.json({ complete: true });
+    }
+    // Fallback: check sandbox secret store (the onboarding tool writes here)
+    try {
+      const sandboxEnv = await getSandboxEnv();
+      if (sandboxEnv['ONBOARDING_COMPLETE'] === 'true') {
+        // Sync it back to repo .env so future checks are fast
+        writeEnvFile(resolve(repoRoot, '.env'), { ONBOARDING_COMPLETE: 'true' });
+        return c.json({ complete: true });
+      }
+    } catch {
+      // Sandbox not reachable — use repo .env result only
+    }
+    return c.json({ complete: false });
   }
 
   // Installed/local Docker mode: read from sandbox secret store

@@ -382,6 +382,36 @@ export const useTabStore = create<TabState>()(
 );
 
 // ============================================================================
+// Utility: open + navigate in one shot
+// ============================================================================
+
+/** Tab types rendered via pre-mounted CSS show/hide (use pushState, not router). */
+const PRE_MOUNTED_TAB_TYPES: ReadonlySet<TabType> = new Set(['session', 'file', 'preview', 'terminal']);
+
+/**
+ * Open (or activate) a tab AND navigate the browser to it.
+ *
+ * Pre-mounted types (session, file, preview, terminal) use `history.pushState`
+ * so the component stays mounted. Other types require a Next.js `router` for
+ * full page navigation.
+ *
+ * Prefer this over calling `openTab()` + manual `pushState`/`router.push`
+ * separately — it guarantees the newly opened tab is always visible.
+ */
+export function openTabAndNavigate(
+  tabInput: Omit<Tab, 'openedAt'>,
+  router?: { push: (url: string) => void },
+) {
+  useTabStore.getState().openTab(tabInput);
+  if (typeof window === 'undefined') return;
+  if (PRE_MOUNTED_TAB_TYPES.has(tabInput.type)) {
+    window.history.pushState(null, '', tabInput.href);
+  } else if (router) {
+    router.push(tabInput.href);
+  }
+}
+
+// ============================================================================
 // Keep per-server tab cache in sync
 // ============================================================================
 // Whenever the tab state changes, persist it to the per-server cache for the

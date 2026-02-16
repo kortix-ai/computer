@@ -121,19 +121,15 @@ export function OcPresentationGenToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={Presentation}
-        iconColor="text-violet-500 dark:text-violet-400"
-        bgColor="bg-gradient-to-b from-violet-100 to-violet-50 shadow-inner dark:from-violet-800/40 dark:to-violet-900/60"
         title={actionLabel}
         subtitle={subtitle}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={ActionIcon}
@@ -145,7 +141,7 @@ export function OcPresentationGenToolView({
               href={parsed.viewer_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex-shrink-0 ml-2"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 ml-2"
             >
               <ExternalLink className="w-3 h-3" />
               Open
@@ -156,7 +152,7 @@ export function OcPresentationGenToolView({
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
-          <div className="p-4 space-y-3">
+          <div className="p-3 space-y-3">
             {/* Error */}
             {isError && (
               <div className="flex items-start gap-2.5 text-muted-foreground">
@@ -168,7 +164,7 @@ export function OcPresentationGenToolView({
             {/* Success: Create Slide */}
             {parsed?.success && action === 'create_slide' && (
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 font-semibold text-lg flex-shrink-0">
                     {parsed.slide_number || '?'}
                   </div>
@@ -185,7 +181,7 @@ export function OcPresentationGenToolView({
                       )}
                     </p>
                   </div>
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                 </div>
 
                 {parsed.slide_file && (
@@ -204,7 +200,7 @@ export function OcPresentationGenToolView({
                     href={parsed.viewer_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors"
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50 hover:bg-muted transition-colors"
                   >
                     <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex-shrink-0">
                       <Eye className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -226,7 +222,7 @@ export function OcPresentationGenToolView({
 
             {/* Success: Export */}
             {parsed?.success && (action === 'export_pdf' || action === 'export_pptx') && (
-              <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
                 <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex-shrink-0">
                   <Download className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
@@ -238,14 +234,14 @@ export function OcPresentationGenToolView({
                     {parsed.presentation_name || presentationName}
                   </p>
                 </div>
-                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
               </div>
             )}
 
             {/* Success: Validate Slide */}
             {parsed?.success && action === 'validate_slide' && (
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 font-semibold text-lg flex-shrink-0">
                     {parsed.slide_number || slideNumber || '?'}
                   </div>
@@ -264,15 +260,15 @@ export function OcPresentationGenToolView({
                       </p>
                     )}
                   </div>
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                 </div>
               </div>
             )}
 
             {/* Success: Generic (list, delete, etc.) */}
             {parsed?.success && !['create_slide', 'validate_slide', 'preview', 'export_pdf', 'export_pptx'].includes(action) && (
-              <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
-                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
+                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                 <p className="text-sm text-foreground">
                   {parsed.message || `${actionLabel} completed`}
                 </p>
@@ -296,13 +292,13 @@ export function OcPresentationGenToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               {actionLabel}
             </Badge>
           )
