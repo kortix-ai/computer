@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import { useDiagnosticsStore } from '@/stores/diagnostics-store';
 import { useServerStore } from '@/stores/server-store';
 import { getClient, resetClient } from '@/lib/opencode-sdk';
 import { logger } from '@/lib/logger';
@@ -52,6 +53,7 @@ export function useOpenCodeEventStream() {
       resetClient();
       clearStatuses({});
       clearPending();
+      useDiagnosticsStore.getState().clearAll();
       queryClient.removeQueries({ queryKey: opcodeKeys.all });
     }
 
@@ -204,6 +206,23 @@ export function useOpenCodeEventStream() {
           const part = (event.properties as any).part as Part;
           if (!part?.sessionID || !part?.messageID) break;
           updatePartInCache(part);
+
+          // Extract diagnostics from tool part metadata if present
+          const partMeta = (part as any).metadata;
+          if (partMeta?.diagnostics && typeof partMeta.diagnostics === 'object') {
+            const diagsByFile = partMeta.diagnostics as Record<string, any[]>;
+            const validEntries: Record<string, any[]> = {};
+            let hasValid = false;
+            for (const [file, diags] of Object.entries(diagsByFile)) {
+              if (Array.isArray(diags) && diags.length > 0) {
+                validEntries[file] = diags;
+                hasValid = true;
+              }
+            }
+            if (hasValid) {
+              useDiagnosticsStore.getState().setFromLspEvent(validEntries);
+            }
+          }
           break;
         }
 
@@ -389,6 +408,42 @@ export function useOpenCodeEventStream() {
         // ---- LSP updated ----
         case 'lsp.updated': {
           queryClient.invalidateQueries({ queryKey: ['opencode', 'lsp'] });
+          // Push diagnostics data into the diagnostics store if the event
+          // contains file-keyed diagnostic arrays.
+          const lspProps = event.properties as Record<string, unknown>;
+          if (lspProps) {
+            // The lsp.updated event may carry diagnostics as
+            // { [filePath]: Diagnostic[] } in its properties.
+            const diagEntries: Record<string, any[]> = {};
+            let hasDiags = false;
+            for (const [key, value] of Object.entries(lspProps)) {
+              if (Array.isArray(value)) {
+                diagEntries[key] = value;
+                hasDiags = true;
+              }
+            }
+            if (hasDiags) {
+              useDiagnosticsStore.getState().setFromLspEvent(diagEntries);
+            }
+          }
+          break;
+        }
+
+        // ---- LSP client diagnostics (per-file notification) ----
+        case 'lsp.client.diagnostics': {
+          // This event signals diagnostics changed for a specific file.
+          // The properties contain { serverID, path } and potentially
+          // inline diagnostic data.
+          const diagProps = event.properties as Record<string, unknown>;
+          const diagPath = diagProps?.path as string | undefined;
+          if (diagPath) {
+            const diagnostics = diagProps?.diagnostics;
+            if (Array.isArray(diagnostics)) {
+              useDiagnosticsStore.getState().setFromLspEvent({
+                [diagPath]: diagnostics,
+              });
+            }
+          }
           break;
         }
 

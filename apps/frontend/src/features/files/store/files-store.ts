@@ -40,15 +40,19 @@ interface FilesStoreState {
   selectedCommitHash: string | null;
   /** Clipboard item for copy/cut operations */
   clipboard: ClipboardItem | null;
+  /** Target line number to scroll to after opening a file (1-indexed, null = none) */
+  targetLine: number | null;
 }
 
 interface FilesStoreActions {
   /** Navigate to a directory */
   navigateToPath: (path: string) => void;
   /** Open a file in the viewer */
-  openFile: (filePath: string) => void;
+  openFile: (filePath: string, targetLine?: number) => void;
   /** Open a file and set the navigation list */
   openFileWithList: (filePath: string, fileList: string[], index: number) => void;
+  /** Clear the target line after the viewer has scrolled to it */
+  clearTargetLine: () => void;
   /** Go back from viewer to browser */
   goBackToBrowser: () => void;
   /** Navigate to next file in the list */
@@ -99,6 +103,7 @@ const initialState: FilesStoreState = {
   historyFilePath: null,
   selectedCommitHash: null,
   clipboard: null,
+  targetLine: null,
 };
 
 export const useFilesStore = create<FilesStore>()((set, get) => ({
@@ -112,14 +117,19 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
     });
   },
 
-  openFile: (filePath: string) => {
+  openFile: (filePath: string, targetLine?: number) => {
     set({
       selectedFilePath: filePath,
       view: 'viewer',
       filePathList: [filePath],
       currentFileIndex: 0,
       isSearchOpen: false,
+      targetLine: targetLine ?? null,
     });
+  },
+
+  clearTargetLine: () => {
+    set({ targetLine: null });
   },
 
   openFileWithList: (filePath: string, fileList: string[], index: number) => {
