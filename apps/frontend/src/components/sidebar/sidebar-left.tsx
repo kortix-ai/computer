@@ -124,7 +124,7 @@ function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: 
       className={cn(
         'flex items-center justify-center h-10 w-10 rounded-xl cursor-pointer',
         'transition-all duration-150 ease-out',
-        'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+        'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent',
         disabled && 'opacity-50 cursor-not-allowed',
       )}
     >
@@ -213,7 +213,7 @@ function SessionsFlyout() {
   return (
     <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
       {rootSessions.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-muted-foreground/60">
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           No sessions yet
         </div>
       ) : (
@@ -229,14 +229,14 @@ function SessionsFlyout() {
                 'transition-colors duration-150',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground',
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
               )}
             >
               <ThreadIcon
                 iconName={(session as any).icon}
                 className={cn(
                   'flex-shrink-0',
-                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/50',
+                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground',
                 )}
                 size={16}
               />
@@ -299,7 +299,7 @@ function ProjectsFlyout() {
   return (
     <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
       {sortedProjects.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-muted-foreground/60">
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           No projects detected
         </div>
       ) : (
@@ -315,13 +315,13 @@ function ProjectsFlyout() {
                 'transition-colors duration-150',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground',
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
               )}
             >
               <FolderOpen
                 className={cn(
                   'flex-shrink-0',
-                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground/50',
+                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground',
                 )}
                 size={16}
                 style={project.icon?.color ? { color: project.icon.color } : undefined}
@@ -531,7 +531,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 />
               </Link>
               {/* Chevron — shows on hover */}
-              <ChevronRight className="h-4 w-4 text-muted-foreground/50 hidden group-hover/collapsed:block" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground hidden group-hover/collapsed:block" />
             </div>
           )}
 
@@ -561,7 +561,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           <button
             className={cn(
               'flex items-center justify-center h-7 w-7 rounded-lg transition-colors duration-150 cursor-pointer',
-              'text-muted-foreground/30 hover:text-muted-foreground hover:bg-sidebar-accent/40',
+              'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent',
               state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
             onClick={() => isMobile ? setOpenMobile(false) : setOpen(false)}
@@ -576,8 +576,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative overflow-visible">
         {/* --- Collapsed: 3 icon buttons — New Chat, Projects, Sessions --- */}
         <div className={cn(
-          'absolute inset-0 px-2 pt-3 space-y-0.5 flex flex-col items-center transition-opacity duration-150 ease-out overflow-visible',
-          state === 'collapsed' ? 'opacity-100 pointer-events-auto delay-100' : 'opacity-0 pointer-events-none delay-0'
+          'absolute inset-0 px-2 pt-3 space-y-0.5 flex flex-col items-center overflow-visible',
+          state === 'collapsed' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}>
           <CollapsedIconButton
             icon={<SquarePen className="h-[18px] w-[18px]" />}
@@ -599,8 +599,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
         {/* --- Expanded layout --- */}
         <div className={cn(
-          'flex flex-col h-full min-h-0 transition-opacity duration-150 ease-out',
-          state === 'collapsed' ? 'opacity-0 pointer-events-none delay-0' : 'opacity-100 pointer-events-auto delay-100'
+          'flex flex-col h-full min-h-0',
+          state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
         )}>
           {/* Navigation */}
           <nav className="flex-shrink-0 px-3 pt-3 pb-2 space-y-1">
@@ -638,7 +638,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             >
               <Search className="h-[18px] w-[18px] flex-shrink-0" />
               <span className="flex-1 text-left">Search</span>
-              <kbd className="text-[11px] text-muted-foreground/50">
+              <kbd className="text-[11px] text-muted-foreground">
                 {typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '\u2318K' : 'Ctrl K'}
               </kbd>
             </button>
@@ -669,7 +669,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 <button className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
                   <ListTree className="h-[18px] w-[18px] flex-shrink-0" />
                   <span className="flex-1 text-left">Sessions</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground/40 transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
                 </button>
               </CollapsibleTrigger>
             </div>

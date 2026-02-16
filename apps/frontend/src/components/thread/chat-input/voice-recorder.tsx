@@ -140,24 +140,18 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = memo(function VoiceRe
     };
 
     const getButtonClass = () => {
-        switch (state) {
-            case 'recording':
-                return '';
-            case 'processing':
-                return '';
-            default:
-                return '';
-        }
+        if (state === 'recording') return 'text-red-500 hover:text-red-600';
+        return '';
     };
 
     const getIcon = () => {
         switch (state) {
             case 'recording':
-                return <Square className="h-5 w-5" />;
+                return <Square className="h-4 w-4" />;
             case 'processing':
                 return <KortixLoader size="small" />;
             default:
-                return <Mic className="h-5 w-5" />;
+                return <Mic className="h-4 w-4" />;
         }
     };
 
@@ -171,7 +165,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = memo(function VoiceRe
                     onClick={handleClick}
                     onContextMenu={handleRightClick}
                     disabled={disabled || state === 'processing'}
-                    className={`h-10 px-2 py-2 bg-transparent border-[1.5px] border-border rounded-2xl text-muted-foreground hover:text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors ${getButtonClass()}`}
+                    className={`h-8 w-8 p-0 bg-transparent border-none rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center justify-center transition-colors ${getButtonClass()}`}
                 >
                     {getIcon()}
                 </Button>
