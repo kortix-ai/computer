@@ -1,12 +1,16 @@
 import type { Context } from 'hono';
-import type { NormalizedMessage, ChatType, ThreadMessage, Attachment } from '../../types';
+import type { NormalizedMessage, ChatType, ThreadMessage, Attachment, SandboxTarget } from '../../types';
 import type { ChannelEngine } from '../adapter';
 import type { ChannelConfig } from '@kortix/db';
+import { sandboxes } from '@kortix/db';
+import { eq } from 'drizzle-orm';
+import { db } from '../../../shared/db';
 import { WebhookVerificationError } from '../../../errors';
 import { config as appConfig } from '../../../config';
 import { verifySlackSignature, findConfigByTeamId } from './utils';
-import { parseCommand } from './command-parser';
+import { parseCommand, fuzzyMatchModel } from './command-parser';
 import { SlackApi } from './api';
+import { SandboxConnector } from '../../core/sandbox-connector';
 import { handleReactionAdded } from './reactions';
 
 interface SlackUrlVerification {
@@ -304,6 +308,42 @@ export async function handleSlackWebhook(
     }
   }
 
+  if (parsed.type === 'set_model_fuzzy' && parsed.modelQuery) {
+    (async () => {
+      try {
+        const target = await resolveSandboxTarget(channelConfig.sandboxId);
+        if (!target) {
+          confirmCommandInThread(channelConfig, event, ':x: Sandbox not found.');
+          return;
+        }
+        const connector = new SandboxConnector(target);
+        const providers = await connector.listProviders();
+        const match = fuzzyMatchModel(parsed.modelQuery!, providers);
+
+        if (match) {
+          normalized.overrides = { model: match };
+          confirmCommandInThread(channelConfig, event, `Model switched to *${match.modelID}* (${match.providerID}).`);
+          if (parsed.remainingText) {
+            normalized.content = parsed.remainingText;
+            await engine.processMessage(normalized);
+          }
+        } else {
+          confirmCommandInThread(
+            channelConfig,
+            event,
+            `:x: Model "${parsed.modelQuery}" not found. Use \`/kortix models\` to see available models.`,
+          );
+        }
+      } catch (err) {
+        console.error('[SLACK] Fuzzy model resolution failed:', err);
+        confirmCommandInThread(channelConfig, event, ':x: Failed to resolve model.');
+      }
+    })().catch((err) => {
+      console.error('[SLACK] Fuzzy model resolution error:', err);
+    });
+    return c.json({ ok: true });
+  }
+
   if (parsed.type === 'set_agent' && parsed.agentName) {
     normalized.overrides = { agentName: parsed.agentName };
     if (!parsed.remainingText) {
@@ -340,6 +380,23 @@ export async function handleSlackWebhook(
   });
 
   return c.json({ ok: true });
+}
+
+async function resolveSandboxTarget(sandboxId: string): Promise<SandboxTarget | null> {
+  const [sandbox] = await db
+    .select()
+    .from(sandboxes)
+    .where(eq(sandboxes.sandboxId, sandboxId));
+
+  if (!sandbox) return null;
+
+  return {
+    sandboxId: sandbox.sandboxId,
+    baseUrl: sandbox.baseUrl,
+    authToken: sandbox.authToken,
+    provider: sandbox.provider,
+    externalId: sandbox.externalId,
+  };
 }
 
 async function handleSessionReset(
