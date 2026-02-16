@@ -808,7 +808,24 @@ export function SessionChatInput({
   // Default autoFocus: true on desktop, false on mobile
   const shouldAutoFocus = autoFocus ?? (typeof window !== 'undefined' && window.innerWidth >= 640);
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  // Focus the textarea on mount (client-side navigations).
+  // The HTML autoFocus attribute only fires on initial DOM mount, not on
+  // subsequent client-side route changes. This effect ensures the textarea
+  // is focused whenever the component mounts or becomes visible.
+  useEffect(() => {
+    if (!shouldAutoFocus) return;
+    // Use requestAnimationFrame to ensure the element is laid out and visible
+    // before focusing (avoids race with tab panels and route transitions).
+    const raf = requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el && el.offsetParent !== null) {
+        el.focus();
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [shouldAutoFocus]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     const newFiles: AttachedFile[] = [];
@@ -818,15 +835,15 @@ export function SessionChatInput({
     }
     setAttachedFiles((prev) => [...prev, ...newFiles]);
     e.target.value = '';
-  }
+  };
 
-  function removeAttachedFile(index: number) {
+  const removeAttachedFile = (index: number) => {
     setAttachedFiles((prev) => {
       const removed = prev[index];
       if (removed) URL.revokeObjectURL(removed.localUrl);
       return prev.filter((_, i) => i !== index);
     });
-  }
+  };
 
   const filteredCommands = useMemo(() => {
     if (slashFilter === null) return [];
@@ -967,14 +984,14 @@ export function SessionChatInput({
     }
   }, [text, isBusy, disabled, onSend, attachedFiles, sessionId, enqueue]);
 
-  function handleSelectCommand(cmd: Command) {
+  const handleSelectCommand = (cmd: Command) => {
     onCommand?.(cmd);
     setText('');
     setSlashFilter(null);
     setSlashIndex(0);
-  }
+  };
 
-  function handleSelectMention(item: MentionItem) {
+  const handleSelectMention = (item: MentionItem) => {
     if (!mentionQuery) return;
     const before = text.slice(0, mentionQuery.triggerPos);
     const after = text.slice(mentionQuery.triggerPos + 1 + mentionQuery.query.length); // +1 for '@'
@@ -1002,7 +1019,7 @@ export function SessionChatInput({
         }
       }
     });
-  }
+  };
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     // @ mention popover keyboard navigation

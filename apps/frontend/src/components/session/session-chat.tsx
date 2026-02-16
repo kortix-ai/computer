@@ -2288,47 +2288,32 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     working: isBusy,
   });
 
-  // Scroll to bottom when switching between session tabs
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    // Use instant scroll (no smooth) so it feels like switching to a tab already at the bottom
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Scroll to bottom after messages are rendered on initial session open.
-  // The loading guard (early return above) unmounts the scroll container while
-  // loading, so we cannot rely on loading-state transitions — the ref is null
-  // at that point. Instead we watch `messages` and fire once per session when
-  // content first becomes available in the DOM.
+  // Scroll to bottom when switching session tabs or on initial message load.
+  // Uses scrollToBottom() from the hook so the programmatic-scroll guard works
+  // correctly and doesn't interfere with user-intent detection.
   const initialScrollDoneRef = useRef<string | null>(null);
   useEffect(() => {
+    // Reset on session change so we scroll on first render of new session
     if (initialScrollDoneRef.current !== sessionId) {
       initialScrollDoneRef.current = null;
     }
   }, [sessionId]);
 
+  const messageCount = messages?.length ?? 0;
   useEffect(() => {
     if (initialScrollDoneRef.current === sessionId) return;
-    if (!messages || messages.length === 0) return;
+    if (messageCount === 0) return;
     initialScrollDoneRef.current = sessionId;
-
-    const scrollDown = () => {
-      const el = scrollRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    };
 
     // Staggered attempts: the scroll container mounts after this render,
     // then message components (markdown, code blocks) render asynchronously.
-    requestAnimationFrame(scrollDown);
-    const t1 = setTimeout(scrollDown, 150);
-    const t2 = setTimeout(scrollDown, 500);
-    const t3 = setTimeout(scrollDown, 1000);
+    // All go through scrollToBottom() which marks them as programmatic.
+    scrollToBottom();
+    const t1 = setTimeout(scrollToBottom, 150);
+    const t2 = setTimeout(scrollToBottom, 500);
 
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [messages, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [messageCount, sessionId, scrollToBottom]);
 
   // ---- Pending permissions & questions ----
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);
