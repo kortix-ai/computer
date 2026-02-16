@@ -40,6 +40,7 @@ import { FileSearch } from '@/features/files/components/file-search';
 import type { FileNode } from '@/features/files/types';
 import { toast } from '@/lib/toast';
 import { useTabStore } from '@/stores/tab-store';
+import { useDiagnosticsStore } from '@/stores/diagnostics-store';
 
 // ============================================================================
 // Panel type
@@ -262,6 +263,43 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
     if (!files) return [];
     return files.map((f) => f.name);
   }, [files]);
+
+  // Build per-entry diagnostic counts from the diagnostics store.
+  const diagByFile = useDiagnosticsStore((s) => s.byFile);
+  const diagnosticCountsMap = useMemo(() => {
+    const map = new Map<string, { errors: number; warnings: number }>();
+    if (!files || Object.keys(diagByFile).length === 0) return map;
+
+    for (const node of files) {
+      let errors = 0;
+      let warnings = 0;
+
+      if (node.type === 'file') {
+        const diags = diagByFile[node.path];
+        if (diags) {
+          for (const d of diags) {
+            if (d.severity === 1) errors++;
+            else if (d.severity === 2) warnings++;
+          }
+        }
+      } else {
+        const prefix = node.path.endsWith('/') ? node.path : node.path + '/';
+        for (const [filePath, diags] of Object.entries(diagByFile)) {
+          if (filePath.startsWith(prefix) || filePath === node.path) {
+            for (const d of diags) {
+              if (d.severity === 1) errors++;
+              else if (d.severity === 2) warnings++;
+            }
+          }
+        }
+      }
+
+      if (errors > 0 || warnings > 0) {
+        map.set(node.path, { errors, warnings });
+      }
+    }
+    return map;
+  }, [files, diagByFile]);
 
   const handleFileClick = useCallback(
     (node: FileNode) => {
@@ -646,6 +684,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
                     isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}
+                    diagnosticCounts={diagnosticCountsMap.get(node.path)}
                   />
                 ))}
 
@@ -664,6 +703,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
                     isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}
+                    diagnosticCounts={diagnosticCountsMap.get(node.path)}
                   />
                 ))}
 
