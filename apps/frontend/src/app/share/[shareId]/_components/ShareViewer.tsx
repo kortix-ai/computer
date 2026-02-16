@@ -59,32 +59,22 @@ interface ShareData {
 }
 
 // ============================================================================
-// Data fetching — uses the standard OpenCode session & message APIs
+// Data fetching — calls the server-side API route which proxies to the
+// OpenCode server running inside the owning user's sandbox.
 // ============================================================================
 
-const OPENCODE_BASE_URL = (process.env.NEXT_PUBLIC_OPENCODE_URL || 'http://localhost:4096').replace(/\/+$/, '');
-
 async function fetchShareData(shareId: string): Promise<ShareData> {
-  const sessionsRes = await fetch(`${OPENCODE_BASE_URL}/session`, {
+  const res = await fetch(`/api/share/${encodeURIComponent(shareId)}`, {
     headers: { 'Accept': 'application/json' },
   });
-  if (!sessionsRes.ok) throw new Error('Failed to load sessions');
-  const contentType = sessionsRes.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) throw new Error('Unexpected response from server');
 
-  const sessions: SessionInfo[] = await sessionsRes.json();
-  const session = sessions.find((s) => s.id.endsWith(shareId) && s.share?.url);
-  if (!session) throw new Error('Share not found');
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Failed to load share (${res.status})`);
+  }
 
-  const messagesRes = await fetch(`${OPENCODE_BASE_URL}/session/${session.id}/message`, {
-    headers: { 'Accept': 'application/json' },
-  });
-  if (!messagesRes.ok) throw new Error('Failed to load messages');
-  const msgContentType = messagesRes.headers.get('content-type') || '';
-  if (!msgContentType.includes('application/json')) throw new Error('Unexpected response from server');
-
-  const messages: MessageWithParts[] = await messagesRes.json();
-  return { session, messages };
+  const data = await res.json();
+  return { session: data.session, messages: data.messages };
 }
 
 // ============================================================================
