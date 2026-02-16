@@ -46,8 +46,8 @@ export function SkillCard({ skill, onEdit, onDelete }: SkillCardProps) {
   const meta = SOURCE_META[source];
   const SourceIcon = SOURCE_ICONS[source];
 
-  // Project and global skills are editable/deletable (external are read-only)
-  const isEditable = source === 'project' || source === 'global';
+  // TODO: re-enable when skills CRUD is ready
+  const isEditable = false;
 
   return (
     <Collapsible open={expanded} onOpenChange={setExpanded}>

@@ -85,10 +85,12 @@ export function SkillList() {
                 files).
               </p>
             </div>
+            {/* TODO: re-enable when skills CRUD is ready
             <Button onClick={openCreateEditor} size="sm" className="gap-1.5">
               <Plus className="h-4 w-4" />
               New Skill
             </Button>
+            */}
           </div>
 
           {/* Content */}
@@ -107,19 +109,9 @@ export function SkillList() {
             <div className="rounded-lg border border-dashed p-12 text-center">
               <Sparkles className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">No skills found</p>
-              <p className="text-xs text-muted-foreground/60 mt-1 mb-4">
-                Create a new skill or add SKILL.md files to .opencode/skills/ to
-                get started.
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Add SKILL.md files to .opencode/skills/ to get started.
               </p>
-              <Button
-                onClick={openCreateEditor}
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Create your first skill
-              </Button>
             </div>
           ) : (
             <>
