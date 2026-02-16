@@ -21,9 +21,6 @@ import {
   Menu,
   PanelRightClose,
   PanelRightOpen,
-  Layers,
-  Loader2,
-  Upload,
   FileDown,
   MoreHorizontal,
   GitCompareArrows,
@@ -31,9 +28,7 @@ import {
   Sparkles,
   Settings,
 } from 'lucide-react';
-import { CompactDialog } from '@/components/session/compact-dialog';
 import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
-import { SharePopover } from '@/components/session/share-popover';
 import { DiffDialog } from '@/components/session/diff-dialog';
 import { TodoDialog } from '@/components/session/todo-dialog';
 import { InitProjectDialog } from '@/components/session/init-project-dialog';
@@ -47,7 +42,6 @@ interface SessionSiteHeaderProps {
   isSidePanelOpen?: boolean;
   isMobileView?: boolean;
   canOpenSidePanel?: boolean;
-  isCompacting?: boolean;
 }
 
 export function SessionSiteHeader({
@@ -57,9 +51,7 @@ export function SessionSiteHeader({
   isSidePanelOpen = false,
   isMobileView,
   canOpenSidePanel = true,
-  isCompacting = false,
 }: SessionSiteHeaderProps) {
-  const [compactOpen, setCompactOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
   const [todoOpen, setTodoOpen] = useState(false);
@@ -75,27 +67,24 @@ export function SessionSiteHeader({
 
   return (
     <>
-      <header className="bg-background sticky top-0 z-20 w-full flex-shrink-0 border-b border-border/40">
-        <div className="h-12 sm:h-14 flex items-center justify-between px-3 sm:px-4 gap-2">
-          {/* Left: menu + title */}
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+      {/* Floating actions in top-right corner */}
+      <div className="absolute top-0 right-0 left-0 z-20 pointer-events-none">
+        <div className="flex items-center justify-between px-3 sm:px-4 pt-2">
+          {/* Left: mobile menu only */}
+          <div className="flex items-center pointer-events-auto">
             {isMobile && (
               <button
                 onClick={handleOpenMenu}
-                className="flex items-center justify-center h-9 w-9 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 active:bg-accent transition-colors touch-manipulation"
+                className="flex items-center justify-center h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors touch-manipulation"
                 aria-label="Open menu"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-4 w-4" />
               </button>
             )}
-
-            <div className="min-w-0 flex items-center gap-2">
-              <span className="text-sm font-medium truncate">{sessionTitle}</span>
-            </div>
           </div>
 
           {/* Right: actions */}
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-0.5 pointer-events-auto">
             <TooltipProvider delayDuration={300}>
               {/* LSP Diagnostics badge */}
               <DiagnosticsBadge />
@@ -108,7 +97,7 @@ export function SessionSiteHeader({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-9 w-9 cursor-pointer text-muted-foreground hover:text-foreground"
+                        className="h-8 w-8 cursor-pointer text-muted-foreground hover:text-foreground"
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
@@ -140,19 +129,6 @@ export function SessionSiteHeader({
                     Export transcript
                   </DropdownMenuItem>
 
-                  {/* Compact */}
-                  <DropdownMenuItem
-                    onClick={() => setCompactOpen(true)}
-                    disabled={isCompacting}
-                  >
-                    {isCompacting ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Layers className="mr-2 h-4 w-4" />
-                    )}
-                    {isCompacting ? 'Compacting...' : 'Compact session'}
-                  </DropdownMenuItem>
-
                   <DropdownMenuSeparator />
 
                   {/* Settings */}
@@ -181,7 +157,7 @@ export function SessionSiteHeader({
                 </Button>
               </SharePopover> */}
 
-              {/* Panel toggle — hidden until there are actions to show */}
+              {/* Panel toggle */}
               {canOpenSidePanel && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -189,7 +165,7 @@ export function SessionSiteHeader({
                       variant="ghost"
                       size="icon"
                       onClick={onToggleSidePanel}
-                      className="h-9 w-9 cursor-pointer"
+                      className="h-8 w-8 cursor-pointer text-muted-foreground hover:text-foreground"
                     >
                       {isSidePanelOpen ? (
                         <PanelRightClose className="h-4 w-4" />
@@ -206,14 +182,9 @@ export function SessionSiteHeader({
             </TooltipProvider>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Dialogs */}
-      <CompactDialog
-        sessionId={sessionId}
-        open={compactOpen}
-        onOpenChange={setCompactOpen}
-      />
       <ExportTranscriptDialog
         sessionId={sessionId}
         open={exportOpen}

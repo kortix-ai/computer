@@ -81,7 +81,7 @@ function ProjectHeader({ project }: { project: Project }) {
   return (
     <div className="space-y-4">
       <Link
-        href="/dashboard"
+        href="/projects"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="size-3.5" />
@@ -578,10 +578,10 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         <FolderOpen className="size-10 text-muted-foreground/30" />
         <p className="text-sm text-muted-foreground">Project not found</p>
         <Link
-          href="/dashboard"
+          href="/projects"
           className="text-sm text-foreground hover:underline"
         >
-          Back to dashboard
+          Back to projects
         </Link>
       </div>
     );

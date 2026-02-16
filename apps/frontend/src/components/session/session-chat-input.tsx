@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Tooltip,
   TooltipContent,
@@ -163,17 +162,17 @@ function AgentSelector({
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-300 capitalize cursor-pointer",
-          flash && "bg-primary/15 text-foreground ring-1 ring-primary/30",
+          "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200 capitalize cursor-pointer",
+          flash && "bg-primary/10 text-foreground",
         )}
       >
         <span className="truncate max-w-[80px]">{displayName}</span>
-        <ChevronDown className={cn('size-3 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('size-3 opacity-50 transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[160px]">
-          <div className="max-h-48 overflow-y-auto py-1">
+        <div className="absolute bottom-full left-0 mb-1.5 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[160px]">
+          <div className="max-h-48 overflow-y-auto p-1">
             {agents.map((agent) => {
               const isSelected = selectedAgent === agent.name || (!selectedAgent && agent === agents[0]);
               return (
@@ -184,8 +183,8 @@ function AgentSelector({
                     setOpen(false);
                   }}
                   className={cn(
-                    'w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted/60 transition-colors capitalize cursor-pointer',
-                    isSelected && 'bg-muted/40',
+                    'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] hover:bg-muted transition-colors capitalize cursor-pointer',
+                    isSelected && 'bg-muted',
                   )}
                 >
                   <span className="flex-1 text-left truncate">{agent.name}</span>
@@ -233,7 +232,10 @@ function VariantSelector({
         <button
           type="button"
           onClick={cycle}
-          className="inline-flex items-center h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer capitalize"
+          className={cn(
+            "inline-flex items-center gap-1 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer capitalize",
+            selectedVariant && "text-foreground",
+          )}
         >
           {displayName}
         </button>
@@ -340,7 +342,7 @@ function TokenProgress({ messages, sessionId, models, selectedModel }: { message
       <TooltipTrigger asChild>
         <div className="relative size-6 flex items-center justify-center cursor-default">
           <svg className="size-5 -rotate-90" viewBox="0 0 18 18">
-            <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted/30" />
+            <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted" />
             <circle
               cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2"
               strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
@@ -541,7 +543,7 @@ function SlashCommandPopover({
             }}
             className={cn(
               'w-full flex flex-col gap-0.5 px-3 py-2 text-left transition-colors cursor-pointer rounded-lg mx-0',
-              i === selectedIndex ? 'bg-muted/60' : 'hover:bg-muted/40',
+              i === selectedIndex ? 'bg-muted' : 'hover:bg-muted',
             )}
           >
             <span className="font-mono text-sm text-foreground">/{cmd.name}</span>
@@ -603,7 +605,7 @@ function MentionPopover({
       <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
         {agents.length > 0 && (
           <>
-            <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">Modes</div>
+            <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Modes</div>
             {agents.map((item) => {
               const idx = globalIndex++;
               return (
@@ -613,12 +615,12 @@ function MentionPopover({
                   onMouseDown={(e) => { e.preventDefault(); onSelect(item); }}
                   className={cn(
                     'w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors cursor-pointer',
-                    idx === selectedIndex ? 'bg-muted/60' : 'hover:bg-muted/40',
+                    idx === selectedIndex ? 'bg-muted' : 'hover:bg-muted',
                   )}
                 >
                   <span className="size-4 rounded flex items-center justify-center bg-purple-500/15 text-purple-500 text-[10px] font-bold shrink-0">@</span>
                   <span className="truncate capitalize">{item.label}</span>
-                  {item.description && <span className="text-muted-foreground/60 truncate text-xs">{item.description}</span>}
+                  {item.description && <span className="text-muted-foreground truncate text-xs">{item.description}</span>}
                 </button>
               );
             })}
@@ -626,7 +628,7 @@ function MentionPopover({
         )}
         {files.length > 0 && (
           <>
-            <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">Files</div>
+            <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Files</div>
             {files.map((item) => {
               const idx = globalIndex++;
               return (
@@ -636,7 +638,7 @@ function MentionPopover({
                   onMouseDown={(e) => { e.preventDefault(); onSelect(item); }}
                   className={cn(
                     'w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors cursor-pointer',
-                    idx === selectedIndex ? 'bg-muted/60' : 'hover:bg-muted/40',
+                    idx === selectedIndex ? 'bg-muted' : 'hover:bg-muted',
                   )}
                 >
                   <FileCode className="size-3.5 text-blue-500 shrink-0" />
@@ -648,7 +650,7 @@ function MentionPopover({
         )}
         {/* Loading indicator while searching for files */}
         {loading && files.length === 0 && (
-          <div className="px-3 py-2 flex items-center gap-2 text-muted-foreground/60">
+          <div className="px-3 py-2 flex items-center gap-2 text-muted-foreground">
             <Loader2 className="size-3.5 animate-spin" />
             <span className="text-xs">Searching files...</span>
           </div>
@@ -1266,200 +1268,196 @@ export function SessionChatInput({
   }, [text, mentions]);
 
   return (
-    <div className="mx-auto w-full max-w-4xl relative shrink-0">
-      <Card className="shadow-none w-full max-w-4xl mx-auto bg-transparent border-none overflow-visible py-0 pb-4 rounded-3xl relative z-10">
-        <div className="w-full text-sm flex flex-col justify-between items-start rounded-lg overflow-visible">
-          <CardContent className="w-full p-1.5 pb-2 bg-card border border-border/50 rounded-[24px] overflow-visible shadow-sm shadow-black/[0.03] dark:shadow-white/[0.02]">
-            <div className="relative flex flex-col w-full h-full gap-2 justify-between overflow-visible">
-              {/* Slash command popover */}
-              {slashFilter !== null && filteredCommands.length > 0 && (
-                <SlashCommandPopover
-                  commands={commands}
-                  filter={slashFilter}
-                  selectedIndex={slashIndex}
-                  onSelect={handleSelectCommand}
-                />
+    <div className="mx-auto w-full max-w-4xl relative shrink-0 px-2 sm:px-4 pb-6">
+      <div className="w-full bg-card border border-border rounded-[24px] shadow-sm shadow-black/[0.03] dark:shadow-white/[0.02] overflow-visible relative z-10">
+        <div className="relative flex flex-col w-full gap-2 overflow-visible">
+          {/* Slash command popover */}
+          {slashFilter !== null && filteredCommands.length > 0 && (
+            <SlashCommandPopover
+              commands={commands}
+              filter={slashFilter}
+              selectedIndex={slashIndex}
+              onSelect={handleSelectCommand}
+            />
+          )}
+
+          {/* @ Mention popover */}
+          {mentionQuery !== null && (mentionItems.length > 0 || fileSearchLoading) && (
+            <MentionPopover
+              items={mentionItems}
+              selectedIndex={mentionIndex}
+              onSelect={handleSelectMention}
+              loading={fileSearchLoading}
+            />
+          )}
+
+          {/* Attached files preview */}
+          <AttachmentPreview files={attachedFiles} onRemove={removeAttachedFile} />
+
+          <div className="flex flex-col gap-1 px-3.5">
+            <div className="relative w-full">
+              {text.trim().length === 0 && (
+                <div
+                  aria-hidden
+                  className={cn(
+                    'absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground pointer-events-none transition-all duration-200',
+                    showAnimatedPlaceholder ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-0.5',
+                  )}
+                >
+                  {placeholderVariants[placeholderIndex]}
+                </div>
               )}
-
-              {/* @ Mention popover */}
-              {mentionQuery !== null && (mentionItems.length > 0 || fileSearchLoading) && (
-                <MentionPopover
-                  items={mentionItems}
-                  selectedIndex={mentionIndex}
-                  onSelect={handleSelectMention}
-                  loading={fileSearchLoading}
-                />
-              )}
-
-              {/* Attached files preview */}
-              <AttachmentPreview files={attachedFiles} onRemove={removeAttachedFile} />
-
-              <div className="flex flex-col gap-1 px-2">
-                <div className="relative w-full">
-                  {text.trim().length === 0 && (
-                    <div
-                      aria-hidden
+              {/* Highlight overlay — mirrors textarea text with colored mention spans */}
+              {highlightSegments && (
+                <div
+                  ref={highlightRef}
+                  aria-hidden
+                  className="absolute inset-0 pointer-events-none px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto text-[16px] sm:text-[15px] whitespace-pre-wrap break-words text-foreground"
+                  style={{ wordBreak: 'break-word', lineHeight: 'normal' }}
+                >
+                  {highlightSegments.map((seg, i) => (
+                    <span
+                      key={i}
                       className={cn(
-                        'absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground/50 pointer-events-none transition-all duration-200',
-                        showAnimatedPlaceholder ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-0.5',
+                        seg.kind === 'file' && 'text-blue-500 font-medium',
+                        seg.kind === 'agent' && 'text-purple-500 font-medium',
                       )}
                     >
-                      {placeholderVariants[placeholderIndex]}
-                    </div>
-                  )}
-                  {/* Highlight overlay — mirrors textarea text with colored mention spans */}
-                  {highlightSegments && (
-                    <div
-                      ref={highlightRef}
-                      aria-hidden
-                      className="absolute inset-0 pointer-events-none px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto text-[16px] sm:text-[15px] whitespace-pre-wrap break-words text-foreground"
-                      style={{ wordBreak: 'break-word', lineHeight: 'normal' }}
-                    >
-                      {highlightSegments.map((seg, i) => (
-                        <span
-                          key={i}
-                          className={cn(
-                            seg.kind === 'file' && 'text-blue-500 font-medium',
-                            seg.kind === 'agent' && 'text-purple-500 font-medium',
-                          )}
-                        >
-                          {seg.text}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <textarea
-                    ref={textareaRef}
-                    value={text}
-                    onChange={handleInput}
-                    onKeyDown={handleKeyDown}
-                    onScroll={() => {
-                      // Sync highlight overlay scroll with textarea scroll
-                      if (highlightRef.current && textareaRef.current) {
-                        highlightRef.current.scrollTop = textareaRef.current.scrollTop;
-                      }
-                    }}
-                    placeholder=""
-                    rows={1}
-                    disabled={disabled}
-                    className={cn(
-                      'relative w-full bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-[24px] text-[16px] sm:text-[15px] outline-none placeholder:text-muted-foreground/50 disabled:opacity-50',
-                      highlightSegments && 'caret-foreground text-transparent',
-                    )}
-                    autoFocus={shouldAutoFocus}
-                  />
+                      {seg.text}
+                    </span>
+                  ))}
                 </div>
-              </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                value={text}
+                onChange={handleInput}
+                onKeyDown={handleKeyDown}
+                onScroll={() => {
+                  if (highlightRef.current && textareaRef.current) {
+                    highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+                  }
+                }}
+                placeholder=""
+                rows={1}
+                disabled={disabled}
+                className={cn(
+                  'relative w-full bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-[24px] text-[16px] sm:text-[15px] outline-none placeholder:text-muted-foreground disabled:opacity-50',
+                  highlightSegments && 'caret-foreground text-transparent',
+                )}
+                autoFocus={shouldAutoFocus}
+              />
+            </div>
+          </div>
 
-              {/* Bottom toolbar */}
-              <div className="flex items-center justify-between mt-0 mb-1 px-1.5 sm:px-2 gap-1 sm:gap-1.5 overflow-visible">
-                {/* LEFT: Attach + Agent + Model + Variant */}
-                <div className="flex items-center gap-0.5 min-w-0">
-                  {/* File attach button */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,.pdf,.txt,.md,.json,.csv,.xml,.yaml,.yml,.toml,.js,.ts,.jsx,.tsx,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.css,.html,.vue,.svelte,.log,.sql,.zip,.tar,.gz,.rar"
-                    multiple
-                    className="hidden"
-                    onChange={handleFileSelect}
-                  />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center justify-center h-10 w-10 p-0 bg-transparent border-[1.5px] border-border rounded-2xl text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
-                      >
-                        <Paperclip className="h-4 w-4" strokeWidth={2} />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p>Attach files</p>
-                    </TooltipContent>
-                  </Tooltip>
+          {/* Bottom toolbar */}
+          <div className="flex items-center justify-between mb-1.5 pl-2 pr-1.5 gap-1 overflow-visible">
+            {/* LEFT: Attach + Agent + Model + Variant */}
+            <div className="flex items-center gap-0 min-w-0 overflow-visible">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf,.txt,.md,.json,.csv,.xml,.yaml,.yml,.toml,.js,.ts,.jsx,.tsx,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.css,.html,.vue,.svelte,.log,.sql,.zip,.tar,.gz,.rar"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    <Paperclip className="h-4 w-4" strokeWidth={2} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>Attach files</p>
+                </TooltipContent>
+              </Tooltip>
 
-                  {agents.length > 0 && onAgentChange && (
-                    <AgentSelector
-                      agents={agents}
-                      selectedAgent={selectedAgent}
-                      onSelect={onAgentChange}
-                    />
-                  )}
-                  {models.length > 0 && onModelChange && (
-                    <ModelSelector
-                      models={models}
-                      selectedModel={selectedModel}
-                      onSelect={onModelChange}
-                      providers={providers}
-                    />
-                  )}
-                  {variants.length > 0 && onVariantChange && (
-                    <VariantSelector
-                      variants={variants}
-                      selectedVariant={selectedVariant}
-                      onSelect={onVariantChange}
-                    />
-                  )}
-                </div>
+              <div className="w-px h-4 bg-border mx-1" />
 
-                {/* RIGHT: TokenProgress + Voice + Submit/Stop */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <TokenProgress messages={messages} sessionId={sessionId} models={models} selectedModel={selectedModel} />
+              {agents.length > 0 && onAgentChange && (
+                <AgentSelector
+                  agents={agents}
+                  selectedAgent={selectedAgent}
+                  onSelect={onAgentChange}
+                />
+              )}
+              {models.length > 0 && onModelChange && (
+                <ModelSelector
+                  models={models}
+                  selectedModel={selectedModel}
+                  onSelect={onModelChange}
+                  providers={providers}
+                />
+              )}
+              {variants.length > 0 && onVariantChange && (
+                <VariantSelector
+                  variants={variants}
+                  selectedVariant={selectedVariant}
+                  onSelect={onVariantChange}
+                />
+              )}
+            </div>
 
-                  <VoiceRecorder
-                    onTranscription={handleTranscription}
-                    disabled={disabled || isBusy}
-                  />
+            {/* RIGHT: TokenProgress + Voice + Submit/Stop */}
+            <div className="flex items-center gap-0 shrink-0">
+              <TokenProgress messages={messages} sessionId={sessionId} models={models} selectedModel={selectedModel} />
 
-                  {isBusy && onStop && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          onClick={onStop}
-                          className="flex-shrink-0 self-end border-[1.5px] border-border rounded-2xl w-10 h-10"
-                        >
-                          <div className="min-h-[14px] min-w-[14px] w-[14px] h-[14px] rounded-sm bg-current" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top"><p>Stop</p></TooltipContent>
-                    </Tooltip>
-                  )}
-                  {isBusy && text.trim() ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          onClick={handleSubmit}
-                          variant="outline"
-                          className="flex-shrink-0 self-end border-[1.5px] border-border rounded-2xl w-10 h-10"
-                        >
-                          <ListPlus className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top"><p>Add to queue</p></TooltipContent>
-                    </Tooltip>
-                  ) : !isBusy && (
+              <VoiceRecorder
+                onTranscription={handleTranscription}
+                disabled={disabled || isBusy}
+              />
+
+              {isBusy && onStop && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
                       size="sm"
-                      disabled={!text.trim() || disabled}
-                      onClick={handleSubmit}
-                      className="flex-shrink-0 self-end border-[1.5px] border-border rounded-2xl w-10 h-10"
+                      onClick={onStop}
+                      className="flex-shrink-0 h-8 w-8 rounded-full p-0"
                     >
-                      {disabled ? (
-                        <div className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <ArrowUp className="size-4" />
-                      )}
+                      <div className="w-3 h-3 rounded-[3px] bg-current" />
                     </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>Stop</p></TooltipContent>
+                </Tooltip>
+              )}
+              {isBusy && text.trim() ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={handleSubmit}
+                      variant="ghost"
+                      className="flex-shrink-0 h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <ListPlus className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>Add to queue</p></TooltipContent>
+                </Tooltip>
+              ) : !isBusy && (
+                <Button
+                  size="sm"
+                  disabled={!text.trim() || disabled}
+                  onClick={handleSubmit}
+                  className="flex-shrink-0 h-8 w-8 rounded-full p-0"
+                >
+                  {disabled ? (
+                    <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <ArrowUp className="size-4" />
                   )}
-                </div>
-              </div>
+                </Button>
+              )}
             </div>
-          </CardContent>
+          </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
