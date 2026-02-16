@@ -5,6 +5,10 @@
 # ║  Runs all test suites:                                                     ║
 # ║    1. Installer structure (test-install.sh)                                ║
 # ║    2. Embedded CLI (test-cli.sh)                                           ║
+# ║    3. Security features (test-security.sh)                                 ║
+# ║                                                                            ║
+# ║  For VPS E2E tests, run separately:                                        ║
+# ║    bash test-vps-e2e.sh <domain> [user] [password]                         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -euo pipefail
@@ -35,6 +39,7 @@ printf "${BOLD}${CYAN}  Kortix — Full Test Suite${NC}\n"
 
 run_suite "Installer Structure" "bash $SCRIPT_DIR/test-install.sh"
 run_suite "Embedded CLI"        "bash $SCRIPT_DIR/test-cli.sh"
+run_suite "Security Features"   "bash $SCRIPT_DIR/test-security.sh"
 
 echo ""
 printf "${BOLD}  Results: ${GREEN}%d passed${NC}" "$PASSED"
@@ -43,5 +48,11 @@ if [ "$FAILED" -gt 0 ]; then
 fi
 printf " (of %d)\n" "$TOTAL"
 echo ""
+
+if [ "$FAILED" -gt 0 ]; then
+  echo "  ${BOLD}Note:${NC} VPS E2E tests are separate. Run on the VPS:"
+  echo "    bash scripts/tests/test-vps-e2e.sh <domain> [user] [password]"
+  echo ""
+fi
 
 exit "$FAILED"

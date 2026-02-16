@@ -28,7 +28,13 @@ await secretStore.loadIntoProcessEnv()
 
 // Global middleware
 app.use('*', logger())
-app.use('*', cors())
+
+// CORS: restrict to allowed origins when CORS_ALLOWED_ORIGINS is set (VPS mode),
+// otherwise allow all (local mode, backwards compatible).
+const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  : undefined
+app.use('*', cors(corsOrigins ? { origin: corsOrigins } : undefined))
 
 // Health check — includes current sandbox version
 app.get('/kortix/health', async (c) => {

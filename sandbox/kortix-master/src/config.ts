@@ -33,6 +33,9 @@ export const config = {
   SANDBOX_ID: process.env.SANDBOX_ID || '',
   PROJECT_ID: process.env.PROJECT_ID || '',
 
+  // Security: internal service-to-service auth (VPS mode)
+  INTERNAL_SERVICE_KEY: process.env.INTERNAL_SERVICE_KEY || '',
+
   // Container-port → host-port mappings (set by docker-compose)
   PORT_MAP: parsePortMap(),
 }
