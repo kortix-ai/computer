@@ -115,7 +115,7 @@ prompt_mode() {
   echo "  ${BOLD}Where are you running Kortix?${NC}"
   echo ""
   echo "    ${CYAN}1${NC}) Local machine ${DIM}(laptop/desktop — no public access)${NC}"
-  echo "    ${CYAN}2${NC}) VPS / Server  ${DIM}(Hetzner, EC2, DigitalOcean, etc.)${NC}"
+  echo "    ${CYAN}2${NC}) VPS / Server  ${DIM}(Hetzner, EC2, DigitalOcean, etc.)${NC} ${YELLOW}[EXPERIMENTAL]${NC}"
   echo ""
   printf "  Choice [1]: "
   read -r mode_choice
