@@ -366,12 +366,16 @@ function PermissionsSection({
   >;
   const isGlobalMode = typeof permission === 'string';
   const globalAction = isGlobalMode ? (permission as string) : 'ask';
+  // Resolve the wildcard fallback: permission["*"] acts as the default for all tools
+  const wildcardAction = !isGlobalMode && typeof (permission as Record<string, any>)['*'] === 'string'
+    ? (permission as Record<string, any>)['*']
+    : 'ask';
 
   const getAction = (key: string): string => {
     if (isGlobalMode) return globalAction;
     const val = (permission as Record<string, any>)[key];
     if (typeof val === 'string') return val;
-    return 'ask';
+    return wildcardAction;
   };
 
   const setAction = (key: string, action: string) => {
