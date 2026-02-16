@@ -85,10 +85,21 @@ chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix 2>/dev/null || t
 echo "[sandbox-postinstall] Checking pip packages..."
 pip3 install --break-system-packages -q \
   'local-semantic-search' \
-  'playwright==1.58.0' \
   'pypdf2==3.0.1' \
   'python-pptx==1.0.2' \
   'pillow==12.1.0' \
+  'greenlet' 'pyee' 'typing-extensions' \
   2>/dev/null || true
+
+# playwright: no musl-native wheels — force-install manylinux wheel (Python API is pure Python)
+ARCH=$(uname -m)
+if [ "$ARCH" = "x86_64" ]; then PW_PLAT=manylinux1_x86_64;
+else PW_PLAT=manylinux_2_17_aarch64; fi
+SITE=$(python3 -c "import site; print(site.getsitepackages()[0])")
+pip3 install --platform "$PW_PLAT" --only-binary :all: \
+  --no-deps --target /tmp/pw 'playwright==1.58.0' 2>/dev/null \
+  && cp -r /tmp/pw/playwright* "$SITE/" 2>/dev/null \
+  && rm -rf /tmp/pw \
+  || true
 
 echo "[sandbox-postinstall] Done."

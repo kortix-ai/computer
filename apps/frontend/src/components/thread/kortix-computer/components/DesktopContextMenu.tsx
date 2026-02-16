@@ -12,37 +12,46 @@ import {
 import { 
   RefreshCw, 
   FolderPlus, 
+  FilePlus,
   Upload, 
   Download,
   Info,
   Folder,
   Globe,
   TerminalSquare,
+  Clipboard,
 } from 'lucide-react';
+import { useFilesStore } from '@/features/files/store/files-store';
 
 interface DesktopContextMenuProps {
   children: React.ReactNode;
   onRefresh?: () => void;
   onNewFolder?: () => void;
+  onNewFile?: () => void;
   onUpload?: () => void;
   onDownloadAll?: () => void;
   onOpenFiles?: () => void;
   onOpenBrowser?: () => void;
   onOpenTerminal?: () => void;
   onShowInfo?: () => void;
+  onPaste?: () => void;
 }
 
 export const DesktopContextMenu = memo(function DesktopContextMenu({
   children,
   onRefresh,
   onNewFolder,
+  onNewFile,
   onUpload,
   onDownloadAll,
   onOpenFiles,
   onOpenBrowser,
   onOpenTerminal,
   onShowInfo,
+  onPaste,
 }: DesktopContextMenuProps) {
+  const clipboard = useFilesStore((s) => s.clipboard);
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -72,6 +81,16 @@ export const DesktopContextMenu = memo(function DesktopContextMenu({
         </ContextMenuItem>
         
         <ContextMenuSeparator className="bg-border/50" />
+
+        {onNewFile && (
+          <ContextMenuItem 
+            onClick={onNewFile}
+            className="focus:bg-background/10 focus:backdrop-blur-xl rounded-lg gap-2"
+          >
+            <FilePlus className="h-4 w-4" />
+            New File
+          </ContextMenuItem>
+        )}
         
         <ContextMenuItem 
           onClick={onNewFolder}
@@ -81,6 +100,20 @@ export const DesktopContextMenu = memo(function DesktopContextMenu({
           New Folder
           <ContextMenuShortcut>⇧⌘N</ContextMenuShortcut>
         </ContextMenuItem>
+
+        {clipboard && onPaste && (
+          <>
+            <ContextMenuSeparator className="bg-border/50" />
+            <ContextMenuItem 
+              onClick={onPaste}
+              className="focus:bg-background/10 focus:backdrop-blur-xl rounded-lg gap-2"
+            >
+              <Clipboard className="h-4 w-4" />
+              Paste ({clipboard.operation === 'cut' ? 'Move' : 'Copy'})
+              <ContextMenuShortcut>⌘V</ContextMenuShortcut>
+            </ContextMenuItem>
+          </>
+        )}
         
         <ContextMenuSeparator className="bg-border/50" />
     

@@ -21,6 +21,7 @@ export { OcTaskToolView } from './OcTaskToolView';
 export { OcTodoToolView } from './OcTodoToolView';
 export { OcGenericToolView } from './OcGenericToolView';
 export { OcQuestionToolView } from './OcQuestionToolView';
+export { OcMemSearchToolView } from './OcMemSearchToolView';
 export { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
@@ -40,6 +41,7 @@ import { OcTaskToolView } from './OcTaskToolView';
 import { OcTodoToolView } from './OcTodoToolView';
 import { OcGenericToolView } from './OcGenericToolView';
 import { OcQuestionToolView } from './OcQuestionToolView';
+import { OcMemSearchToolView } from './OcMemSearchToolView';
 import { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 /**
@@ -115,6 +117,14 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
 
   // Question tool — formatted Q&A display
   'oc-question': OcQuestionToolView,
+
+  // Memory search (observations)
+  'oc-mem-search': OcMemSearchToolView,
+  'oc-mem_search': OcMemSearchToolView,
+  'oc-memory-search': OcMemSearchToolView,
+  'oc-memory_search': OcMemSearchToolView,
+  'oc-memory-read': OcMemSearchToolView,
+  'oc-memory_read': OcMemSearchToolView,
 
   // MCP tools and other unknown tools will fall through to the
   // registry's default (GenericToolView). The OcGenericToolView

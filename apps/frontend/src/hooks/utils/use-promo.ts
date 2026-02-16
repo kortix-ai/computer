@@ -22,28 +22,8 @@ const getEndOfCurrentMonthUTC = (): number => {
   return Date.UTC(year, month + 1, 0, 23, 59, 59, 999);
 };
 
-const PROMOS: PromoConfig[] = [
-  {
-    id: 'welcome-bonus',
-    promoCode: 'KORTIX2026',
-    badgeLabel: 'Happy New Year Offer',
-    description: '30% OFF + 2X Credits',
-    // Active from now until end of current month
-    startDate: Date.UTC(2025, 0, 1, 0, 0, 0), // Always active (start from beginning of 2025)
-    endDate: getEndOfCurrentMonthUTC(), // End of current month
-    priority: 150, // Lower than KORTIX26 but higher than other promos
-  },
-  {
-    id: 'holiday-2025',
-    promoCode: 'XMAS50',
-    badgeLabel: 'Holiday Special',
-    description: 'Use code {code} to get {discount}',
-    // Dec 24, 2025 00:00:00 PST through Dec 25, 2025 23:59:59 PST
-    startDate: Date.UTC(2025, 11, 24, 8, 0, 0), // 00:00 PST => 08:00 UTC
-    endDate: Date.UTC(2025, 11, 26, 7, 59, 59), // 23:59 PST => 07:59 UTC next day
-    priority: 50,
-  },
-];
+// No active promos — array kept for future use.
+const PROMOS: PromoConfig[] = [];
 
 export interface PromoState {
   isActive: boolean;

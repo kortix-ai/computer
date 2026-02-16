@@ -223,12 +223,15 @@ export function FileViewer() {
   const nextFile = useFilesStore((s) => s.nextFile);
   const prevFile = useFilesStore((s) => s.prevFile);
   const openHistory = useFilesStore((s) => s.openHistory);
+  const targetLine = useFilesStore((s) => s.targetLine);
+  const clearTargetLine = useFilesStore((s) => s.clearTargetLine);
 
   // Text content (for code/text files, CSV, images)
   const { data: fileContent, isLoading, error, refetch } = useFileContent(selectedFilePath);
 
   const [editedContent, setEditedContent] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const codeContainerRef = useRef<HTMLDivElement>(null);
 
   const fileName = selectedFilePath?.split('/').pop() || '';
   const language = getLanguageFromExt(fileName);
@@ -236,6 +239,38 @@ export function FileViewer() {
   const [isEditing, setIsEditing] = useState(false);
   const [highlightedHtml, setHighlightedHtml] = useState<string>('');
   const { resolvedTheme } = useTheme();
+
+  // Scroll to target line when set (after Shiki render completes)
+  useEffect(() => {
+    if (!targetLine || !codeContainerRef.current || !highlightedHtml) return;
+    // Shiki renders lines as <span class="line"> inside <pre><code>
+    // Use a small delay to ensure the DOM has been painted
+    const timer = setTimeout(() => {
+      const container = codeContainerRef.current;
+      if (!container) return;
+      // Try Shiki line spans first
+      const lines = container.querySelectorAll('.line');
+      if (lines.length > 0) {
+        const lineIdx = Math.max(0, targetLine - 1);
+        const target = lines[Math.min(lineIdx, lines.length - 1)];
+        if (target) {
+          target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          // Briefly highlight the line
+          (target as HTMLElement).style.backgroundColor = 'rgba(255, 200, 0, 0.15)';
+          setTimeout(() => {
+            (target as HTMLElement).style.backgroundColor = '';
+          }, 2000);
+        }
+      } else {
+        // Fallback: estimate line position for plain <pre> content
+        // Assume ~20px per line (text-sm leading-relaxed)
+        const scrollTarget = Math.max(0, (targetLine - 1)) * 20;
+        container.scrollTop = Math.max(0, scrollTarget - container.clientHeight / 2);
+      }
+      clearTargetLine();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [targetLine, highlightedHtml, clearTargetLine]);
 
   // Binary blob for PDF, DOCX, video, audio, PPTX
   const { blobUrl, blob: docxBlob, blobLoading, blobError } = useBinaryBlob(selectedFilePath, fileCategory);
@@ -576,6 +611,7 @@ export function FileViewer() {
                 />
               ) : (
                 <div
+                  ref={codeContainerRef}
                   className="w-full h-full overflow-auto cursor-text"
                   onDoubleClick={() => setIsEditing(true)}
                 >

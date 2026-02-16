@@ -2,6 +2,21 @@ import { create } from 'zustand';
 
 export type FilesView = 'browser' | 'viewer' | 'history';
 
+/** Clipboard operation type for copy/cut */
+export type ClipboardOperation = 'copy' | 'cut';
+
+/** Clipboard item representing a file or directory */
+export interface ClipboardItem {
+  /** Relative path of the item */
+  path: string;
+  /** Name of the item */
+  name: string;
+  /** Whether it's a file or directory */
+  type: 'file' | 'directory';
+  /** The operation (copy or cut/move) */
+  operation: ClipboardOperation;
+}
+
 interface FilesStoreState {
   /** Which view is active: directory browser or file viewer */
   view: FilesView;
@@ -23,15 +38,21 @@ interface FilesStoreState {
   historyFilePath: string | null;
   /** Currently selected commit hash in the history panel */
   selectedCommitHash: string | null;
+  /** Clipboard item for copy/cut operations */
+  clipboard: ClipboardItem | null;
+  /** Target line number to scroll to after opening a file (1-indexed, null = none) */
+  targetLine: number | null;
 }
 
 interface FilesStoreActions {
   /** Navigate to a directory */
   navigateToPath: (path: string) => void;
   /** Open a file in the viewer */
-  openFile: (filePath: string) => void;
+  openFile: (filePath: string, targetLine?: number) => void;
   /** Open a file and set the navigation list */
   openFileWithList: (filePath: string, fileList: string[], index: number) => void;
+  /** Clear the target line after the viewer has scrolled to it */
+  clearTargetLine: () => void;
   /** Go back from viewer to browser */
   goBackToBrowser: () => void;
   /** Navigate to next file in the list */
@@ -58,6 +79,12 @@ interface FilesStoreActions {
   selectCommit: (commitHash: string | null) => void;
   /** Close the history view (go back to viewer or browser) */
   closeHistory: () => void;
+  /** Copy a file/directory to clipboard */
+  copyToClipboard: (path: string, name: string, type: 'file' | 'directory') => void;
+  /** Cut a file/directory to clipboard */
+  cutToClipboard: (path: string, name: string, type: 'file' | 'directory') => void;
+  /** Clear clipboard */
+  clearClipboard: () => void;
   /** Reset all state */
   reset: () => void;
 }
@@ -75,6 +102,8 @@ const initialState: FilesStoreState = {
   unsavedFileState: {},
   historyFilePath: null,
   selectedCommitHash: null,
+  clipboard: null,
+  targetLine: null,
 };
 
 export const useFilesStore = create<FilesStore>()((set, get) => ({
@@ -88,14 +117,19 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
     });
   },
 
-  openFile: (filePath: string) => {
+  openFile: (filePath: string, targetLine?: number) => {
     set({
       selectedFilePath: filePath,
       view: 'viewer',
       filePathList: [filePath],
       currentFileIndex: 0,
       isSearchOpen: false,
+      targetLine: targetLine ?? null,
     });
+  },
+
+  clearTargetLine: () => {
+    set({ targetLine: null });
   },
 
   openFileWithList: (filePath: string, fileList: string[], index: number) => {
@@ -202,6 +236,18 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
       historyFilePath: null,
       selectedCommitHash: null,
     });
+  },
+
+  copyToClipboard: (path, name, type) => {
+    set({ clipboard: { path, name, type, operation: 'copy' } });
+  },
+
+  cutToClipboard: (path, name, type) => {
+    set({ clipboard: { path, name, type, operation: 'cut' } });
+  },
+
+  clearClipboard: () => {
+    set({ clipboard: null });
   },
 
   reset: () => {

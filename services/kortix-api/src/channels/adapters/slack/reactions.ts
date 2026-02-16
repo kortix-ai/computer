@@ -26,6 +26,8 @@ const reactionHandlers: Record<string, ReactionHandler> = {
   repeat: handleRetry,
   arrows_counterclockwise: handleRetry,
   memo: handleSaveToMemory,
+  brain: handleSaveToMemory,
+  scroll: handleSummarizeThread,
 };
 
 export async function handleReactionAdded(
@@ -35,15 +37,11 @@ export async function handleReactionAdded(
 ): Promise<void> {
   const handler = reactionHandlers[event.reaction];
   if (!handler) return;
-
-  // Only handle reactions on messages (not files, etc.)
   if (event.item.type !== 'message') return;
-
   await handler(event, config, engine);
 }
 
 function getThreadTs(event: ReactionEvent): string {
-  // The reacted message ts is used as thread_ts to reply in the same thread
   return event.item.ts;
 }
 
@@ -57,7 +55,6 @@ async function findPrecedingUserMessage(
   const result = await api.conversationsReplies(channel, threadTs, 50);
   if (!result.ok || !result.messages) return null;
 
-  // Find the bot message index, then walk backwards to find the preceding user message
   const messages = result.messages;
   let botIdx = -1;
   for (let i = 0; i < messages.length; i++) {
@@ -92,7 +89,6 @@ async function handleRetry(
   const channel = event.item.channel;
   const threadTs = getThreadTs(event);
 
-  // Find the user message that preceded the bot's response
   const userMessage = await findPrecedingUserMessage(
     api, channel, threadTs, event.item.ts, botUserId,
   );
@@ -135,30 +131,18 @@ async function handleSaveToMemory(
 ): Promise<void> {
   const credentials = config.credentials as Record<string, unknown>;
   const botToken = credentials?.botToken as string;
-  const botUserId = credentials?.botUserId as string | undefined;
   if (!botToken) return;
 
   const api = new SlackApi(botToken);
   const channel = event.item.channel;
   const threadTs = getThreadTs(event);
 
-  // Fetch the message that was reacted to
   const result = await api.conversationsReplies(channel, threadTs, 50);
   if (!result.ok || !result.messages) return;
 
   const reactedMessage = result.messages.find((m) => m.ts === event.item.ts);
   if (!reactedMessage?.text) return;
 
-  // Check if the reacted message is from the bot
-  const isFromBot = !!(
-    reactedMessage.bot_id ||
-    reactedMessage.subtype === 'bot_message' ||
-    (botUserId && reactedMessage.user === botUserId)
-  );
-
-  if (!isFromBot) return;
-
-  // Send a "save to memory" instruction to the agent
   const normalized: NormalizedMessage = {
     externalId: event.event_ts,
     channelType: 'slack',
@@ -175,6 +159,54 @@ async function handleSaveToMemory(
     raw: {
       event: { channel },
       _saveToMemory: true,
+    },
+  };
+
+  await engine.processMessage(normalized);
+}
+
+async function handleSummarizeThread(
+  event: ReactionEvent,
+  config: ChannelConfig,
+  engine: ChannelEngine,
+): Promise<void> {
+  const credentials = config.credentials as Record<string, unknown>;
+  const botToken = credentials?.botToken as string;
+  if (!botToken) return;
+
+  const api = new SlackApi(botToken);
+  const channel = event.item.channel;
+  const threadTs = getThreadTs(event);
+
+  const result = await api.conversationsReplies(channel, threadTs, 100);
+  if (!result.ok || !result.messages || result.messages.length === 0) return;
+
+  const threadText = result.messages
+    .filter((m) => m.text)
+    .map((m) => {
+      const sender = m.bot_id || m.subtype === 'bot_message' ? 'Bot' : (m.user || 'Unknown');
+      return `[${sender}]: ${m.text}`;
+    })
+    .join('\n');
+
+  if (!threadText) return;
+
+  const normalized: NormalizedMessage = {
+    externalId: event.event_ts,
+    channelType: 'slack',
+    channelConfigId: config.channelConfigId,
+    chatType: 'group',
+    content: `Summarize this Slack thread concisely. Highlight key points, decisions, and action items:\n\n${threadText}`,
+    attachments: [],
+    platformUser: {
+      id: event.user,
+      name: event.user,
+    },
+    threadId: threadTs,
+    groupId: channel,
+    raw: {
+      event: { channel },
+      _summarizeThread: true,
     },
   };
 

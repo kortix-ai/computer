@@ -8,10 +8,25 @@ Outputs JSON with pass/fail and measurements.
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+
+
+def find_chromium() -> str | None:
+    """Auto-detect Chromium executable path for the current platform."""
+    # 1. Explicit env var override
+    env_path = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+    # 2. System chromium (Linux sandbox / Alpine)
+    for p in ("/usr/bin/chromium-browser", "/usr/bin/chromium"):
+        if os.path.isfile(p):
+            return p
+    # 3. Let Playwright use its own bundled chromium (macOS after `playwright install`)
+    return None
 
 
 async def validate(slide_path: str) -> dict:
@@ -20,12 +35,16 @@ async def validate(slide_path: str) -> dict:
     if not html_path.exists():
         return {"success": False, "error": f"File not found: {html_path}"}
 
+    launch_opts: dict = {
+        "headless": True,
+        "args": ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+    }
+    chromium = find_chromium()
+    if chromium:
+        launch_opts["executable_path"] = chromium
+
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            executable_path="/Users/markokraemer/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-            headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
-        )
+        browser = await p.chromium.launch(**launch_opts)
         try:
             page = await browser.new_page(viewport={"width": 1920, "height": 1080})
             await page.goto(f"file://{html_path}", wait_until="networkidle", timeout=30000)

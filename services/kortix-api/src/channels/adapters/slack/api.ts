@@ -1,7 +1,5 @@
 const SLACK_API = 'https://slack.com/api';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
 export interface SlackPostMessageOptions {
   channel: string;
   text: string;
@@ -54,6 +52,15 @@ export interface SlackReplyMessage {
   ts: string;
   thread_ts?: string;
   subtype?: string;
+  files?: Array<{
+    id: string;
+    name: string;
+    mimetype: string;
+    filetype: string;
+    url_private: string;
+    url_private_download?: string;
+    size: number;
+  }>;
 }
 
 export interface SlackFileUploadOptions {
@@ -72,8 +79,6 @@ export interface SlackConversationMessage {
   ts: string;
   subtype?: string;
 }
-
-// ─── API Client ─────────────────────────────────────────────────────────────
 
 export class SlackApi {
   private botToken: string;
@@ -162,13 +167,17 @@ export class SlackApi {
 
 
   async filesUploadV2(options: SlackFileUploadOptions): Promise<{ ok: boolean; error?: string }> {
+    const getUrlParams = new URLSearchParams();
+    getUrlParams.set('filename', options.filename);
+    getUrlParams.set('length', String(options.content.length));
+
     const getUrlRes = await fetch(`${SLACK_API}/files.getUploadURLExternal`, {
       method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify({
-        filename: options.filename,
-        length: options.content.length,
-      }),
+      headers: {
+        Authorization: `Bearer ${this.botToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: getUrlParams,
     });
 
     const urlData = (await getUrlRes.json()) as {
@@ -183,6 +192,8 @@ export class SlackApi {
       return { ok: false, error: urlData.error || 'Failed to get upload URL' };
     }
 
+    console.log(`[SLACK API] Got upload URL, file_id=${urlData.file_id}`);
+
     const uploadRes = await fetch(urlData.upload_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
@@ -190,9 +201,11 @@ export class SlackApi {
     });
 
     if (!uploadRes.ok) {
+      console.error(`[SLACK API] File content upload failed: ${uploadRes.status}`);
       return { ok: false, error: `Upload failed: ${uploadRes.status}` };
     }
 
+    console.log(`[SLACK API] Content uploaded, completing for channel=${options.channel} thread=${options.threadTs}`);
     const channelId = options.channel;
     const completeRes = await fetch(`${SLACK_API}/files.completeUploadExternal`, {
       method: 'POST',
@@ -207,7 +220,11 @@ export class SlackApi {
       }),
     });
 
-    return completeRes.json() as Promise<{ ok: boolean; error?: string }>;
+    const result = (await completeRes.json()) as { ok: boolean; error?: string };
+    if (!result.ok) {
+      console.error(`[SLACK API] completeUploadExternal failed: ${result.error}`);
+    }
+    return result;
   }
 
   async chatUnfurl(

@@ -794,6 +794,10 @@ export function TabBar() {
       } else {
         router.push(href);
       }
+      // Focus the textarea in the activated tab (session or dashboard)
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('focus-session-textarea'));
+      });
     },
     [setActiveTab, router]
   );

@@ -2,11 +2,13 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { X, Smartphone, Monitor } from 'lucide-react';
+import { X, Smartphone, Monitor, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isElectron } from '@/lib/utils/is-electron';
 import { featureFlags } from '@/lib/feature-flags';
 import { AppDownloadQR, APP_DOWNLOAD_URL } from '@/components/common/app-download-qr';
+import { useWebNotificationStore } from '@/stores/web-notification-store';
+import { isNotificationSupported } from '@/lib/web-notifications';
 
 const MOBILE_STORAGE_KEY = 'kortix-mobile-banner-dismissed';
 const DESKTOP_STORAGE_KEY = 'kortix-desktop-banner-dismissed';
@@ -95,6 +97,14 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
   const [desktopVisible, setDesktopVisible] = useState(true);
   const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>('mac');
 
+  // Notification prompt state
+  const notifEnabled = useWebNotificationStore((s) => s.preferences.enabled);
+  const notifPromptDismissed = useWebNotificationStore((s) => s.promptDismissed);
+  const notifPermission = useWebNotificationStore((s) => s.permission);
+  const toggleNotifEnabled = useWebNotificationStore((s) => s.toggleEnabled);
+  const dismissNotifPrompt = useWebNotificationStore((s) => s.dismissPrompt);
+  const showNotifPrompt = !notifEnabled && !notifPromptDismissed && isNotificationSupported() && notifPermission !== 'denied';
+
   useEffect(() => {
     setMounted(true);
     setDesktopPlatform(detectDesktopPlatform());
@@ -113,6 +123,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
     setDesktopVisible(!desktopDismissed && !isElectron());
     
     // Show banners after a short delay if at least one is not dismissed
+    // (notification prompt visibility is handled reactively via showNotifPrompt)
     if ((!mobileDismissed && !disableMobileAdvertising) || (!desktopDismissed && !isElectron())) {
       const timer = setTimeout(() => {
         setIsVisible(true);
@@ -120,6 +131,16 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
       return () => clearTimeout(timer);
     }
   }, [disableMobileAdvertising]);
+
+  // Also show the popup if only the notification prompt should appear
+  useEffect(() => {
+    if (showNotifPrompt && !isVisible && mounted) {
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [showNotifPrompt, isVisible, mounted]);
 
   const handleCloseMobile = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -151,7 +172,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
   const desktopPlatformLabel = desktopPlatform === 'windows' ? 'Windows' : 'Mac (M series)';
 
   if (!mounted || !isVisible) return null;
-  if (!mobileVisible && !desktopVisible) return null;
+  if (!mobileVisible && !desktopVisible && !showNotifPrompt) return null;
 
   const showBothBanners = mobileVisible && desktopVisible;
 
@@ -359,6 +380,53 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
                           Intel Mac? Download here
                         </button>
                       )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Notification Prompt */}
+              {showNotifPrompt && (
+                <motion.div
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: (mobileVisible || desktopVisible) ? 0.2 : 0 }}
+                >
+                  <div className="relative bg-white dark:bg-[#2a2a2a] rounded-xl shadow-xl overflow-hidden border border-border/60 dark:border-[#232324]">
+                    {/* Close button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissNotifPrompt();
+                      }}
+                      className="absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center rounded-full bg-black/10 hover:bg-black/20 dark:bg-black/80 dark:hover:bg-black transition-colors"
+                    >
+                      <X className="h-3 w-3 text-foreground dark:text-white" />
+                    </button>
+
+                    <div className="p-4 bg-muted/50 dark:bg-[#161618]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Bell className="h-4 w-4 text-foreground dark:text-white" />
+                        <h3 className="text-foreground dark:text-white text-sm font-semibold">
+                          Stay in the loop
+                        </h3>
+                      </div>
+                      <p className="text-muted-foreground dark:text-white/60 text-xs leading-relaxed mb-3">
+                        Want to know when tasks finish or need your input? Enable push notifications to stay updated.
+                      </p>
+
+                      <button
+                        onClick={async () => {
+                          await toggleNotifEnabled();
+                          dismissNotifPrompt();
+                        }}
+                        className="w-full h-10 bg-black dark:bg-white rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity cursor-pointer"
+                      >
+                        <Bell className="h-4 w-4 text-white dark:text-black" />
+                        <span className="text-[11px] font-semibold text-white dark:text-black">
+                          Enable Notifications
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </motion.div>

@@ -13,3 +13,6 @@
 # Whitelist public directory
 !apps/frontend/public
 !apps/frontend/public/**
+
+# Whitelist entrypoint script (VPS URL rewriting)
+!apps/frontend/docker-entrypoint.sh

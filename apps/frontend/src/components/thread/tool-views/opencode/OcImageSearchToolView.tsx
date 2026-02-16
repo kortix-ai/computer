@@ -163,25 +163,21 @@ export function OcImageSearchToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={ImageIcon}
-        iconColor="text-violet-500 dark:text-violet-400"
-        bgColor="bg-gradient-to-b from-violet-100 to-violet-50 shadow-inner dark:from-violet-800/40 dark:to-violet-900/60"
         title="Image Search"
         subtitle={query || 'Searching...'}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle icon={ImageIcon} title="Image Search" subtitle={headerSubtitle} />
           {totalImages > 0 && (
             <Badge
               variant="outline"
-              className="h-5 py-0 text-[10px] bg-zinc-50 dark:bg-zinc-900 text-muted-foreground"
+              className="h-5 py-0 text-[10px] bg-muted text-muted-foreground"
             >
               {totalImages} image{totalImages !== 1 ? 's' : ''}
             </Badge>
@@ -308,7 +304,7 @@ export function OcImageSearchToolView({
                             href={imageUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="group relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 hover:border-violet-300 dark:hover:border-violet-700 transition-colors shadow-sm hover:shadow-md"
+                            className="group relative overflow-hidden rounded-lg border border-border bg-muted hover:border-violet-300 dark:hover:border-violet-700 transition-colors shadow-sm hover:shadow-md"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -399,14 +395,14 @@ export function OcImageSearchToolView({
           (isError ? (
             <Badge
               variant="outline"
-              className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground"
+              className="h-6 py-0.5 bg-muted text-muted-foreground"
             >
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : totalImages > 0 ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               {isBatch && batchItems.length > 1
                 ? `${batchItems.length} queries, ${totalImages} images`
                 : `${totalImages} image${totalImages !== 1 ? 's' : ''}`

@@ -4,6 +4,7 @@ import { createAdapters } from './adapters/registry';
 import { ChannelEngineImpl } from './core/engine';
 import { createChannelsRouter } from './routes/channels';
 import { webhooksRouter } from './routes/webhooks';
+import { filesRouter } from './routes/files';
 import { startChannels, stopChannels, getChannelsStatus } from './core/lifecycle';
 import { config } from '../config';
 
@@ -14,6 +15,7 @@ const channelsApp = new Hono();
 
 channelsApp.use('/v1/channels/*', supabaseAuth);
 channelsApp.route('/v1/channels', createChannelsRouter(engine));
+channelsApp.route('/v1/files', filesRouter);
 
 for (const [type, adapter] of adapters) {
   console.log(`[CHANNELS] Registering routes for ${type} adapter`);

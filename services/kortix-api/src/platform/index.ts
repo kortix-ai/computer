@@ -5,12 +5,17 @@ import { localAccountRouter } from './routes/account-local';
 import { localSandboxRouter } from './routes/sandbox-local';
 import { cloudSandboxRouter } from './routes/sandbox-cloud';
 import { versionRouter } from './routes/version';
+import { apiKeysRouter } from './routes/api-keys';
 
 const platformApp = new Hono();
 
 // Sandbox version (no auth — npm registry lookup)
 // Full path: /v1/platform/sandbox/version
 platformApp.route('/sandbox/version', versionRouter);
+
+// API key management (sandbox-scoped, DB-backed)
+// Full path: /v1/platform/api-keys/*
+platformApp.route('/api-keys', apiKeysRouter);
 
 // Both local and cloud use the same route prefix.
 // The implementation differs (Docker vs DB-backed) but the API shape is identical.

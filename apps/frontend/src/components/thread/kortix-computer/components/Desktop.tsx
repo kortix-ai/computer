@@ -1053,7 +1053,6 @@ export const SandboxDesktop = memo(function SandboxDesktop({
             onViewChange={onViewChange}
             showFilesTab={false}
             isMaximized={true}
-            hideViewToggle={true}
           />
         </div>
 

@@ -38,6 +38,10 @@ import {
   CheckCircle,
   AlertTriangle,
   Scissors,
+  Brain,
+  Hash,
+  Clock,
+  FileIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -46,7 +50,7 @@ import {
   hasStructuredContent,
   parseStructuredOutput,
 } from '@/lib/utils/structured-output';
-import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import { UnifiedMarkdown, HighlightedCode } from '@/components/markdown/unified-markdown';
 import {
   Collapsible,
   CollapsibleContent,
@@ -721,14 +725,13 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
     return parseStructuredOutput(normalized);
   }, [strippedOutput, sessionMeta]);
 
-  const { commandBlock, outputBlock } = useMemo(() => {
-    const cmd = `\`\`\`bash\n$ ${command}\n\`\`\``;
-    if (!strippedOutput || sessionMeta || structuredSections) return { commandBlock: cmd, outputBlock: '' };
-
+  const outputBlock = useMemo(() => {
+    if (!strippedOutput || sessionMeta || structuredSections) return '';
     const { content, lang } = formatBashOutput(strippedOutput);
-    const out = `\`\`\`${lang}\n${content}\n\`\`\``;
-    return { commandBlock: cmd, outputBlock: out };
-  }, [command, strippedOutput, sessionMeta, structuredSections]);
+    return `\`\`\`${lang}\n${content}\n\`\`\``;
+  }, [strippedOutput, sessionMeta, structuredSections]);
+
+  const hasOutput = !!sessionMeta || !!structuredSections || !!outputBlock;
 
   return (
     <BasicTool
@@ -738,15 +741,31 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       forceOpen={forceOpen}
       locked={locked}
     >
-      <div data-scrollable className="p-2 max-h-96 overflow-auto space-y-2">
-        <UnifiedMarkdown content={commandBlock} isStreaming={false} />
-        {sessionMeta ? (
-          <SessionMetadataList sessions={sessionMeta} />
-        ) : structuredSections ? (
-          <StructuredOutput sections={structuredSections} />
-        ) : outputBlock ? (
-          <UnifiedMarkdown content={outputBlock} isStreaming={status === 'running'} />
-        ) : null}
+      <div data-scrollable className="max-h-96 overflow-auto">
+        {/* Command */}
+        <div className="px-3 py-2.5 [&_code]:text-[12px] [&_code]:leading-relaxed [&_code]:whitespace-pre-wrap [&_code]:break-words [&_pre]:contents">
+          <HighlightedCode code={`$ ${command}`} language="bash">
+            {`$ ${command}`}
+          </HighlightedCode>
+        </div>
+        {/* Output */}
+        {hasOutput && (
+          <div className="border-t border-border/30">
+            {sessionMeta ? (
+              <div className="p-2">
+                <SessionMetadataList sessions={sessionMeta} />
+              </div>
+            ) : structuredSections ? (
+              <div className="p-2">
+                <StructuredOutput sections={structuredSections} />
+              </div>
+            ) : outputBlock ? (
+              <div className="p-2 [&_.kortix-markdown]:text-xs [&_.relative.group]:my-0 [&_pre]:my-0 [&_pre]:border-0 [&_pre]:bg-transparent [&_pre]:p-0 [&_pre]:rounded-none [&_pre]:text-[12px]">
+                <UnifiedMarkdown content={outputBlock} isStreaming={status === 'running'} />
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </BasicTool>
   );
@@ -2961,6 +2980,184 @@ ToolRegistry.register('memory-search', MemorySearchTool);
 ToolRegistry.register('memory_search', MemorySearchTool);
 ToolRegistry.register('memory-read', MemorySearchTool);
 ToolRegistry.register('memory_read', MemorySearchTool);
+
+// ============================================================================
+// MemSearchTool — renders the markdown-table observation output from
+// the "mem-search" / "mem_search" tool (different from memory-search)
+// ============================================================================
+
+interface Observation {
+  id: string;
+  time: string;
+  type: string;
+  title: string;
+  files: string;
+}
+
+/** Parse the markdown-table output produced by the mem search tool. */
+function parseObservationTable(output: string): { total: number; observations: Observation[] } | null {
+  if (!output) return null;
+  // Extract "Found N observations" header
+  const headerMatch = output.match(/Found\s+(\d+)\s+observations/i);
+  const total = headerMatch ? parseInt(headerMatch[1], 10) : 0;
+
+  // Parse markdown table rows: | #71 | Feb 16 05:14 | 🔵 | Some title |  |
+  const observations: Observation[] = [];
+  const lines = output.split('\n');
+  for (const line of lines) {
+    // Skip header / separator rows
+    if (!line.startsWith('|')) continue;
+    const cells = line.split('|').map((c) => c.trim()).filter(Boolean);
+    if (cells.length < 4) continue;
+    // Skip the header row (contains "ID")
+    if (cells[0] === 'ID') continue;
+    // Skip separator rows (all dashes)
+    if (/^-+$/.test(cells[0])) continue;
+
+    observations.push({
+      id: cells[0] || '',
+      time: cells[1] || '',
+      type: cells[2] || '',
+      title: cells[3] || '',
+      files: cells[4] || '',
+    });
+  }
+
+  if (observations.length === 0) return null;
+  return { total, observations };
+}
+
+/** Map the emoji type indicator to a readable label + pill styling. */
+function observationTypeInfo(type: string): { label: string; bg: string; text: string; dot: string } {
+  const t = type.trim();
+  if (t.includes('🔵') || t.includes('💠'))
+    return { label: 'Research',  bg: 'bg-blue-500/10',    text: 'text-blue-400',    dot: 'bg-blue-400' };
+  if (t.includes('🟣') || t.includes('💜'))
+    return { label: 'Analysis',  bg: 'bg-purple-500/10',  text: 'text-purple-400',  dot: 'bg-purple-400' };
+  if (t.includes('🟢') || t.includes('💚'))
+    return { label: 'Success',   bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400' };
+  if (t.includes('🔴') || t.includes('❤️'))
+    return { label: 'Error',     bg: 'bg-red-500/10',     text: 'text-red-400',     dot: 'bg-red-400' };
+  if (t.includes('🟡') || t.includes('💛'))
+    return { label: 'Warning',   bg: 'bg-amber-500/10',   text: 'text-amber-400',   dot: 'bg-amber-400' };
+  if (t.includes('🟠') || t.includes('🧡'))
+    return { label: 'Build',     bg: 'bg-orange-500/10',  text: 'text-orange-400',  dot: 'bg-orange-400' };
+  if (t.includes('🏗') || t.includes('🔨'))
+    return { label: 'Build',     bg: 'bg-orange-500/10',  text: 'text-orange-400',  dot: 'bg-orange-400' };
+  return { label: 'Note', bg: 'bg-muted/40', text: 'text-muted-foreground', dot: 'bg-muted-foreground/50' };
+}
+
+function MemSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const query = (input.query as string) || (input.search as string) || '';
+
+  const parsed = useMemo(() => parseObservationTable(output), [output]);
+  const observations = parsed?.observations ?? [];
+  const hasResults = observations.length > 0;
+
+  const triggerBadge = status === 'completed'
+    ? hasResults
+      ? `${parsed?.total ?? observations.length} found`
+      : 'no results'
+    : undefined;
+
+  return (
+    <BasicTool
+      icon={<Brain className="size-3.5 flex-shrink-0" />}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Mem Search</span>
+          <span className="text-muted-foreground text-xs truncate font-mono">{query}</span>
+          {triggerBadge && (
+            <span className={cn(
+              'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
+              hasResults ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
+            )}>
+              {triggerBadge}
+            </span>
+          )}
+        </div>
+      }
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {status === 'completed' && parsed ? (
+        <div data-scrollable className="max-h-[400px] overflow-auto">
+          <div className="px-3 pb-2.5">
+            {/* Section label */}
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5 mt-1">
+              Observations
+            </div>
+
+            {/* Observation list */}
+            <div className="space-y-0.5">
+              {observations.map((obs, i) => {
+                const typeInfo = observationTypeInfo(obs.type);
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2.5 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
+                  >
+                    {/* Type dot */}
+                    <div className={cn('size-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5', typeInfo.bg)}>
+                      <span className={cn('size-2 rounded-full', typeInfo.dot)} />
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-medium text-foreground line-clamp-2">
+                        {obs.title}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground/50 font-mono">
+                          {obs.id}
+                        </span>
+                        <span className="text-muted-foreground/20">·</span>
+                        <span className="text-[10px] text-muted-foreground/50">
+                          {obs.time}
+                        </span>
+                        <span className="text-muted-foreground/20">·</span>
+                        <span className={cn('text-[10px] font-medium', typeInfo.text)}>
+                          {typeInfo.label}
+                        </span>
+                        {obs.files.trim() && (
+                          <>
+                            <span className="text-muted-foreground/20">·</span>
+                            <span className="text-[10px] text-muted-foreground/40 font-mono truncate">
+                              {obs.files}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            {parsed.total > observations.length && (
+              <div className="mt-2 pt-1.5 border-t border-border/20">
+                <span className="text-[10px] text-muted-foreground/40">
+                  Showing {observations.length} of {parsed.total} observations
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : status === 'completed' && output ? (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+        </div>
+      ) : null}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('mem-search', MemSearchTool);
+ToolRegistry.register('mem_search', MemSearchTool);
 
 // ============================================================================
 // DCP Tools (distill, compress, prune, context_info)

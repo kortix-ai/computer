@@ -12,6 +12,7 @@ import {
   LogOut,
   Settings,
   SlidersHorizontal,
+  Sparkles,
   Sun,
   Moon,
   Plug,
@@ -46,7 +47,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { createClient } from '@/lib/supabase/client';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { useTheme } from 'next-themes';
 import { Palette } from 'lucide-react';
 import { isLocalMode } from '@/lib/config';
@@ -132,6 +133,7 @@ export function UserMenu({ user }: UserMenuProps) {
         { icon: Plug, label: 'Providers', onClick: () => openSettings('providers') },
         { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
         { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
+        { icon: Sparkles, label: 'Skills', href: '/skills' },
         { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
       ]
     : [
@@ -144,6 +146,7 @@ export function UserMenu({ user }: UserMenuProps) {
         { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
         { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
         { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
+        { icon: Sparkles, label: 'Skills', href: '/skills' },
         { icon: MessageSquare, label: 'Channels', href: '/channels' },
         { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
       ];
@@ -160,13 +163,12 @@ export function UserMenu({ user }: UserMenuProps) {
 
   const handleMenuNav = (href: string, label: string) => {
     const type = href.startsWith('/settings') ? 'settings' as const : 'page' as const;
-    useTabStore.getState().openTab({
+    openTabAndNavigate({
       id: `page:${href}`,
       title: label,
       type,
       href,
-    });
-    router.push(href);
+    }, router);
   };
 
   const renderMenuItem = (item: MenuItemConfig) => {
@@ -221,7 +223,7 @@ export function UserMenu({ user }: UserMenuProps) {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="bg-transparent hover:bg-transparent data-[state=open]:bg-transparent border-[1.5px] border-border h-[64px] p-3 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!h-10 group-data-[collapsible=icon]:!w-10 group-data-[collapsible=icon]:border-0"
+                className="bg-transparent hover:bg-transparent data-[state=open]:bg-transparent border-[1.5px] border-border h-[64px] p-3 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!h-10 group-data-[collapsible=icon]:!w-10 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:!mx-auto"
               >
                 <Avatar className="h-10 w-10 rounded-full flex-shrink-0">
                   <AvatarImage src={user.avatar} alt={user.name} />

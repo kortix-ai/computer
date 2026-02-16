@@ -95,11 +95,15 @@ import { LanguageSwitcher } from './language-switcher';
 import { useTranslations } from 'next-intl';
 import { ReferralsTab } from '@/components/referrals/referrals-tab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Keyboard, Receipt, Palette } from 'lucide-react';
+import { Keyboard, Receipt, Palette, CheckCircle2, HelpCircle, ShieldCheck, Volume2, EyeOff, Globe } from 'lucide-react';
 import { useUserPreferencesStore, type TabSwitchModifier } from '@/stores/user-preferences-store';
 import CreditTransactions from '@/components/billing/credit-transactions';
 import { AppearanceTab } from '@/components/settings/appearance-tab';
-type TabId = 'general' | 'appearance' | 'plan' | 'billing' | 'transactions' | 'usage' | 'providers' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
+import { useWebNotificationStore } from '@/stores/web-notification-store';
+import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
+import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
+import { previewSound } from '@/lib/sounds';
+type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'usage' | 'providers' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
 
 interface Tab {
     id: TabId;
@@ -129,7 +133,9 @@ export function UserSettingsModal({
     const tabs: Tab[] = [
         { id: 'general', label: 'General', icon: Settings },
         { id: 'appearance', label: 'Appearance', icon: Palette },
-        { id: 'providers' as TabId, label: 'Providers', icon: Plug },
+        { id: 'sounds', label: 'Sounds', icon: Volume2 },
+        { id: 'notifications', label: 'Notifications', icon: Bell },
+        ...(isLocal ? [{ id: 'providers' as TabId, label: 'Providers', icon: Plug }] : []),
         { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
         { id: 'plan', label: 'Plan', icon: Zap },
         { id: 'billing', label: 'Billing', icon: CreditCard },
@@ -221,6 +227,8 @@ export function UserSettingsModal({
                             <div className="w-full max-w-full">
                                 {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
                                 {activeTab === 'appearance' && <div className="p-6"><AppearanceTab /></div>}
+                                {activeTab === 'sounds' && <SoundsTab />}
+                                {activeTab === 'notifications' && <NotificationsTab />}
                                 {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
                                 {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
                                 {activeTab === 'transactions' && <TransactionsTab />}
@@ -276,6 +284,8 @@ export function UserSettingsModal({
                         <div className="flex-1 overflow-y-auto min-h-0 w-full max-w-full">
                             {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
                             {activeTab === 'appearance' && <div className="p-6 h-full"><AppearanceTab /></div>}
+                            {activeTab === 'sounds' && <SoundsTab />}
+                            {activeTab === 'notifications' && <NotificationsTab />}
                             {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
                             {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
                             {activeTab === 'transactions' && <TransactionsTab />}
@@ -890,17 +900,262 @@ function KeyboardShortcutsTab() {
     );
 }
 
+// Sounds Tab
+function SoundsTab() {
+    const preferences = useSoundStore((s) => s.preferences);
+    const setPack = useSoundStore((s) => s.setPack);
+    const setVolume = useSoundStore((s) => s.setVolume);
+    const setEventEnabled = useSoundStore((s) => s.setEventEnabled);
+
+    const packs: { id: SoundPack; label: string; description: string }[] = [
+        { id: 'off', label: 'Off', description: 'All sounds disabled' },
+        { id: 'opencode', label: 'OpenCode', description: 'Default sound pack' },
+        { id: 'kortix', label: 'Kortix', description: 'Kortix branded sounds' },
+    ];
+
+    const events: { id: SoundEvent; label: string; description: string }[] = [
+        { id: 'completion', label: 'Task Completion', description: 'When AI finishes a task' },
+        { id: 'error', label: 'Error', description: 'When a session encounters an error' },
+        { id: 'notification', label: 'Notification', description: 'Questions and permission requests' },
+        { id: 'send', label: 'Message Sent', description: 'When you send a message' },
+    ];
+
+    return (
+        <div className="p-6 space-y-6">
+            <div>
+                <h3 className="text-lg font-semibold">Sounds</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Choose a sound pack and configure which events play sounds
+                </p>
+            </div>
+
+            {/* Sound Pack Selection */}
+            <div>
+                <h4 className="text-sm font-medium mb-3">Sound Pack</h4>
+                <RadioGroup
+                    value={preferences.pack}
+                    onValueChange={(value) => setPack(value as SoundPack)}
+                    className="space-y-2"
+                >
+                    {packs.map((pack) => (
+                        <label
+                            key={pack.id}
+                            htmlFor={`pack-${pack.id}`}
+                            className={cn(
+                                'flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
+                                preferences.pack === pack.id
+                                    ? 'border-foreground/20 bg-muted/50'
+                                    : 'border-border hover:bg-muted/30',
+                            )}
+                        >
+                            <RadioGroupItem value={pack.id} id={`pack-${pack.id}`} />
+                            <div className="flex-1">
+                                <div className="text-sm font-medium">{pack.label}</div>
+                                <div className="text-xs text-muted-foreground">{pack.description}</div>
+                            </div>
+                        </label>
+                    ))}
+                </RadioGroup>
+            </div>
+
+            {preferences.pack !== 'off' && (
+                <>
+                    {/* Volume */}
+                    <div>
+                        <h4 className="text-sm font-medium mb-3">Volume</h4>
+                        <div className="flex items-center gap-3 px-4">
+                            <Volume2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <input
+                                type="range"
+                                min={0}
+                                max={100}
+                                value={Math.round(preferences.volume * 100)}
+                                onChange={(e) => setVolume(Number(e.target.value) / 100)}
+                                className="flex-1 accent-foreground h-1.5 cursor-pointer"
+                            />
+                            <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">
+                                {Math.round(preferences.volume * 100)}%
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Sound Events */}
+                    <div>
+                        <h4 className="text-sm font-medium mb-3">Sound Events</h4>
+                        <div className="rounded-lg border divide-y">
+                            {events.map((event) => {
+                                const enabled = preferences.events[event.id] !== false;
+                                return (
+                                    <div key={event.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium">{event.label}</div>
+                                            <div className="text-xs text-muted-foreground">{event.description}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                                onClick={() => previewSound(event.id)}
+                                            >
+                                                Preview
+                                            </Button>
+                                            <Switch
+                                                checked={enabled}
+                                                onCheckedChange={(v) => setEventEnabled(event.id, v)}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+// Notifications Tab
+function NotificationsTab() {
+    const permission = useWebNotificationStore((s) => s.permission);
+    const preferences = useWebNotificationStore((s) => s.preferences);
+    const toggleEnabled = useWebNotificationStore((s) => s.toggleEnabled);
+    const setPreference = useWebNotificationStore((s) => s.setPreference);
+    const syncPermission = useWebNotificationStore((s) => s.syncPermission);
+
+    useEffect(() => {
+        syncPermission();
+    }, [syncPermission]);
+
+    const supported = isNotificationSupported();
+
+    const handleTestNotification = () => {
+        sendWebNotification({
+            type: 'completion',
+            title: 'Test Notification',
+            body: 'Notifications are working correctly!',
+            tag: 'test',
+        }, true);
+    };
+
+    return (
+        <div className="p-6 space-y-6">
+            <div>
+                <h3 className="text-lg font-semibold">Notifications</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Configure how and when you receive notifications
+                </p>
+            </div>
+
+            {!supported ? (
+                <div className="rounded-lg border p-4">
+                    <p className="text-sm text-muted-foreground">
+                        Your browser does not support notifications.
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {/* Master toggle */}
+                    <div className="rounded-lg border p-4">
+                        <NotificationToggle
+                            icon={Bell}
+                            label="Enable Notifications"
+                            description={
+                                permission === 'granted'
+                                    ? 'Browser permission granted'
+                                    : permission === 'denied'
+                                        ? 'Blocked by browser — allow in browser settings'
+                                        : 'Will request browser permission when enabled'
+                            }
+                            enabled={preferences.enabled}
+                            onToggle={() => toggleEnabled()}
+                            disabled={permission === 'denied'}
+                        />
+                    </div>
+
+                    {preferences.enabled && (
+                        <>
+                            {/* Notification types */}
+                            <div>
+                                <h4 className="text-sm font-medium mb-3">Notification Types</h4>
+                                <div className="rounded-lg border divide-y">
+                                    <NotificationToggle
+                                        icon={CheckCircle2}
+                                        label="Task Completions"
+                                        description="When a session finishes its task"
+                                        enabled={preferences.onCompletion}
+                                        onToggle={(v) => setPreference('onCompletion', v)}
+                                    />
+                                    <NotificationToggle
+                                        icon={AlertTriangle}
+                                        label="Errors"
+                                        description="When a session encounters an error"
+                                        enabled={preferences.onError}
+                                        onToggle={(v) => setPreference('onError', v)}
+                                    />
+                                    <NotificationToggle
+                                        icon={HelpCircle}
+                                        label="Questions"
+                                        description="When Kortix needs your input to continue"
+                                        enabled={preferences.onQuestion}
+                                        onToggle={(v) => setPreference('onQuestion', v)}
+                                    />
+                                    <NotificationToggle
+                                        icon={ShieldCheck}
+                                        label="Permission Requests"
+                                        description="When Kortix needs permission to use a tool"
+                                        enabled={preferences.onPermission}
+                                        onToggle={(v) => setPreference('onPermission', v)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Behavior */}
+                            <div>
+                                <h4 className="text-sm font-medium mb-3">Behavior</h4>
+                                <div className="rounded-lg border divide-y">
+                                    <NotificationToggle
+                                        icon={EyeOff}
+                                        label="Only When Tab is Hidden"
+                                        description="Only notify when you're on another tab or app"
+                                        enabled={preferences.onlyWhenHidden}
+                                        onToggle={(v) => setPreference('onlyWhenHidden', v)}
+                                    />
+                                    <NotificationToggle
+                                        icon={Volume2}
+                                        label="Notification Sound"
+                                        description="Play a sound when a notification is sent"
+                                        enabled={preferences.playSound}
+                                        onToggle={(v) => setPreference('playSound', v)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Test */}
+                            <Button onClick={handleTestNotification} variant="outline" size="sm">
+                                Send Test Notification
+                            </Button>
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 interface NotificationToggleProps {
     icon: React.ElementType;
     label: string;
     description: string;
     enabled: boolean;
     onToggle: (value: boolean) => void;
+    disabled?: boolean;
 }
 
-function NotificationToggle({ icon: Icon, label, description, enabled, onToggle }: NotificationToggleProps) {
+function NotificationToggle({ icon: Icon, label, description, enabled, onToggle, disabled }: NotificationToggleProps) {
     return (
-        <div className="flex items-start justify-between gap-4 py-3 border-b last:border-0">
+        <div className="flex items-start justify-between gap-4 px-4 py-3">
             <div className="flex items-start gap-3 flex-1">
                 <Icon className="w-4 h-4 text-muted-foreground mt-0.5" />
                 <div className="space-y-0.5 flex-1">
@@ -916,6 +1171,7 @@ function NotificationToggle({ icon: Icon, label, description, enabled, onToggle 
                 id={label}
                 checked={enabled}
                 onCheckedChange={onToggle}
+                disabled={disabled}
             />
         </div>
     );

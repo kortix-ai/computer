@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   ArrowDown,
   ArrowUp,
   Loader2,
@@ -18,6 +19,7 @@ import {
   GitCompareArrows,
   GitFork,
   Layers,
+  ListPlus,
   ListTodo,
   MoreHorizontal,
   Scissors,
@@ -146,12 +148,15 @@ import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
 import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
 import { TurnErrorDisplay } from '@/components/session/session-error-banner';
-import { useTabStore } from '@/stores/tab-store';
+import { ConnectProviderDialog } from '@/components/session/model-selector';
+import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '@/lib/api/billing';
 import { invalidateAccountState } from '@/hooks/billing/use-account-state';
+import { playSound } from '@/lib/sounds';
 
 // ============================================================================
 // Sub-Session / Fork Breadcrumb
@@ -1284,6 +1289,8 @@ interface SessionTurnProps {
   onFork: (messageId: string) => Promise<void>;
   /** Revert the session to before a specific message */
   onRevert: (messageId: string) => Promise<void>;
+  /** Providers data for the Connect Provider dialog */
+  providers?: ProviderListResponse;
 }
 
 function SessionTurn({
@@ -1305,11 +1312,18 @@ function SessionTurn({
   isCompaction,
   onFork,
   onRevert,
+  providers,
 }: SessionTurnProps) {
   const [copied, setCopied] = useState(false);
   const [userCopied, setUserCopied] = useState(false);
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+  const [connectProviderOpen, setConnectProviderOpen] = useState(false);
   const [revertLoading, setRevertLoading] = useState(false);
+
+  // Handler for action buttons on turn errors (e.g. "Check settings" opens provider dialog)
+  const handleTurnErrorAction = useCallback(() => {
+    setConnectProviderOpen(true);
+  }, []);
 
   // Derived state from shared helpers
   const allParts = useMemo(() => collectTurnParts(turn), [turn]);
@@ -1494,6 +1508,11 @@ function SessionTurn({
         {turnError && (
           <TurnErrorDisplay errorText={turnError} className="mt-2" />
         )}
+        <ConnectProviderDialog
+          open={connectProviderOpen}
+          onOpenChange={setConnectProviderOpen}
+          providers={providers}
+        />
       </div>
     );
   }
@@ -1915,6 +1934,13 @@ function SessionTurn({
           />
         </>
       )}
+
+      {/* Connect Provider Dialog — opened from turn error action buttons */}
+      <ConnectProviderDialog
+        open={connectProviderOpen}
+        onOpenChange={setConnectProviderOpen}
+        providers={providers}
+      />
     </div>
   );
 }
@@ -2115,32 +2141,63 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const queueRemove = useMessageQueueStore((s) => s.remove);
   const queueMoveUp = useMessageQueueStore((s) => s.moveUp);
   const queueMoveDown = useMessageQueueStore((s) => s.moveDown);
+  const queueClearSession = useMessageQueueStore((s) => s.clearSession);
+  const [queueExpanded, setQueueExpanded] = useState(true);
 
-  // Track previous busy state to detect idle transitions
-  const prevBusyRef = useRef(isBusy);
+  // Track previous *server* busy state to detect idle transitions.
+  // We use `isServerBusy` (the actual server status) instead of the derived
+  // `isBusy` because `isBusy` includes optimistic client state
+  // (`pendingUserMessage`) which can flicker false before the server has
+  // reported busy via SSE — causing the drain to fire twice.
+  const prevServerBusyRef = useRef(isServerBusy);
+  // Guard against double-drain: tracks whether a drain is already scheduled
+  const drainScheduledRef = useRef(false);
 
-  // Auto-drain: when session transitions from busy → idle, send the next queued message
+  // Auto-drain: when server transitions from busy → idle, send the next queued message
   useEffect(() => {
-    const wasBusy = prevBusyRef.current;
-    prevBusyRef.current = isBusy;
+    const wasBusy = prevServerBusyRef.current;
+    prevServerBusyRef.current = isServerBusy;
 
-    if (wasBusy && !isBusy) {
-      // Session just became idle — check for queued messages
+    if (wasBusy && !isServerBusy) {
+      // Server confirmed idle — check for queued messages
       const sessionQueue = useMessageQueueStore.getState().messages.filter(
         (m) => m.sessionId === sessionId,
       );
       if (sessionQueue.length > 0) {
         // Small delay to let the UI settle before auto-sending
+        drainScheduledRef.current = true;
         const timer = setTimeout(() => {
+          drainScheduledRef.current = false;
           const next = queueDequeue(sessionId);
           if (next) {
             handleSend(next.text, next.files);
           }
         }, 500);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(timer); drainScheduledRef.current = false; };
       }
     }
-  }, [isBusy, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isServerBusy, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fallback drain: when isBusy becomes false and there are queued messages,
+  // drain the queue. This covers cases where the SSE missed the busy event
+  // entirely (e.g. status went undefined → idle, so isServerBusy was never
+  // true and the primary drain above never fires).
+  useEffect(() => {
+    if (isBusy || drainScheduledRef.current) return;
+    const sessionQueue = useMessageQueueStore.getState().messages.filter(
+      (m) => m.sessionId === sessionId,
+    );
+    if (sessionQueue.length === 0) return;
+     drainScheduledRef.current = true;
+    const timer = setTimeout(() => {
+      drainScheduledRef.current = false;
+      const next = queueDequeue(sessionId);
+      if (next) {
+        handleSend(next.text, next.files);
+      }
+    }, 500);
+    return () => { clearTimeout(timer); drainScheduledRef.current = false; };
+  }, [isBusy, queuedMessages.length, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Send now" handler: abort current session + send the queued message
   const handleQueueSendNow = useCallback(
@@ -2209,9 +2266,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [pendingSendInFlight]);
 
   // Stale session watchdog: when the session has been busy for a while, do a
-  // direct status check every 30s. If the server reports idle but our store
-  // still shows busy, force the status to idle — recovering from a silently
-  // dropped SSE stream or missed event.
+  // direct status check. If the server reports idle (or doesn't include the
+  // session at all — meaning it's idle), force the status to idle — recovering
+  // from a silently dropped SSE stream or missed event.
+  // First check after 5s, then every 15s.
   useEffect(() => {
     if (!isServerBusy) return;
 
@@ -2224,6 +2282,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           const serverStatus = statuses[sessionId];
           if (serverStatus) {
             useOpenCodeSessionStatusStore.getState().setStatus(sessionId, serverStatus);
+          } else {
+            // Server didn't include this session — it's idle
+            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, { type: 'idle' });
           }
         }
       } catch {
@@ -2231,9 +2292,40 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       }
     };
 
-    const interval = setInterval(check, 30_000);
-    return () => clearInterval(interval);
+    // First check after 5s, then every 15s
+    const initialTimer = setTimeout(() => {
+      check();
+    }, 5_000);
+    const interval = setInterval(check, 15_000);
+    return () => { clearTimeout(initialTimer); clearInterval(interval); };
   }, [isServerBusy, sessionId]);
+
+  // Message-based idle detection: if the last assistant message has
+  // time.completed set, the server has finished generating. If our session
+  // status still says busy, the SSE idle event was missed — force idle.
+  useEffect(() => {
+    if (!isServerBusy || !messages || messages.length === 0) return;
+    // Find the last assistant message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.info.role === 'assistant') {
+        const assistantInfo = msg.info as any;
+        if (assistantInfo.time?.completed) {
+          // The server marked the message as completed but we never got the
+          // idle event — force the session to idle after a short grace period
+          // to avoid racing with a status event that's still in flight.
+          const timer = setTimeout(() => {
+            const currentStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
+            if (currentStatus?.type === 'busy' || currentStatus?.type === 'retry') {
+              useOpenCodeSessionStatusStore.getState().setStatus(sessionId, { type: 'idle' });
+            }
+          }, 2_000);
+          return () => clearTimeout(timer);
+        }
+        break; // only check the last assistant message
+      }
+    }
+  }, [isServerBusy, messages, sessionId]);
 
   // Clear pending user message when server acknowledges (status becomes busy)
   // or when new messages arrive from the server
@@ -2261,47 +2353,32 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     working: isBusy,
   });
 
-  // Scroll to bottom when switching between session tabs
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    // Use instant scroll (no smooth) so it feels like switching to a tab already at the bottom
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Scroll to bottom after messages are rendered on initial session open.
-  // The loading guard (early return above) unmounts the scroll container while
-  // loading, so we cannot rely on loading-state transitions — the ref is null
-  // at that point. Instead we watch `messages` and fire once per session when
-  // content first becomes available in the DOM.
+  // Scroll to bottom when switching session tabs or on initial message load.
+  // Uses scrollToBottom() from the hook so the programmatic-scroll guard works
+  // correctly and doesn't interfere with user-intent detection.
   const initialScrollDoneRef = useRef<string | null>(null);
   useEffect(() => {
+    // Reset on session change so we scroll on first render of new session
     if (initialScrollDoneRef.current !== sessionId) {
       initialScrollDoneRef.current = null;
     }
   }, [sessionId]);
 
+  const messageCount = messages?.length ?? 0;
   useEffect(() => {
     if (initialScrollDoneRef.current === sessionId) return;
-    if (!messages || messages.length === 0) return;
+    if (messageCount === 0) return;
     initialScrollDoneRef.current = sessionId;
-
-    const scrollDown = () => {
-      const el = scrollRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    };
 
     // Staggered attempts: the scroll container mounts after this render,
     // then message components (markdown, code blocks) render asynchronously.
-    requestAnimationFrame(scrollDown);
-    const t1 = setTimeout(scrollDown, 150);
-    const t2 = setTimeout(scrollDown, 500);
-    const t3 = setTimeout(scrollDown, 1000);
+    // All go through scrollToBottom() which marks them as programmatic.
+    scrollToBottom();
+    const t1 = setTimeout(scrollToBottom, 150);
+    const t2 = setTimeout(scrollToBottom, 500);
 
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [messages, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [messageCount, sessionId, scrollToBottom]);
 
   // ---- Pending permissions & questions ----
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);
@@ -2440,7 +2517,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
       // Open the forked session in a new tab and navigate
       const title = forkedSession.title || 'Forked session';
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: forkedSession.id,
         title,
         type: 'session',
@@ -2451,7 +2528,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       // Store fork origin in localStorage (survives refresh) so the forked
       // session can show the "Forked from" indicator.
       localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
-      router.push(`/sessions/${forkedSession.id}`);
     },
     [sessionId, forkSession, router],
   );
@@ -2472,12 +2548,16 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
 
 
+
   // ============================================================================
   // Send / Stop / Command handlers
   // ============================================================================
 
   const handleSend = useCallback(
     async (text: string, files?: AttachedFile[]) => {
+      // Play send sound
+      playSound('send');
+
       // Optimistic: show message immediately and start polling fallback
       setPendingUserMessage(text);
       setPollingActive(true);
@@ -2609,8 +2689,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           sessionTitle={session?.title || 'Untitled'}
           onToggleSidePanel={handleTogglePanel}
           isSidePanelOpen={isSidePanelOpen}
-          canOpenSidePanel={hasMessages}
-          isCompacting={!!session?.time?.compacting}
+          canOpenSidePanel={hasToolCalls}
         />
       )}
 
@@ -2760,6 +2839,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                         isCompaction={hasCompaction}
                         onFork={handleFork}
                         onRevert={handleRevert}
+                        providers={providers}
                       />
                     </div>
                   );
@@ -2805,84 +2885,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                   </div>
                 )}
 
-                {/* Queued messages preview — shown as dimmed user bubbles below current activity */}
-                {queuedMessages.length > 0 && (
-                  <div className="flex flex-col gap-3 mt-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-px bg-border/40" />
-                      <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                        Queued
-                      </span>
-                      <div className="flex-1 h-px bg-border/40" />
-                    </div>
-                    {queuedMessages.map((qm, idx) => (
-                      <div key={qm.id} className="group/queued flex justify-end opacity-40 hover:opacity-70 transition-opacity">
-                        <div className="flex items-center gap-1.5">
-                          {/* Action buttons — visible on hover */}
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover/queued:opacity-100 transition-opacity shrink-0">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => handleQueueSendNow(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                >
-                                  <Send className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
-                            </Tooltip>
-                            {idx > 0 && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    onClick={() => queueMoveUp(qm.id)}
-                                    className="inline-flex items-center justify-center size-6 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                  >
-                                    <ArrowUp className="size-3" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top"><p className="text-xs">Move up</p></TooltipContent>
-                              </Tooltip>
-                            )}
-                            {idx < queuedMessages.length - 1 && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    onClick={() => queueMoveDown(qm.id)}
-                                    className="inline-flex items-center justify-center size-6 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                  >
-                                    <ArrowDown className="size-3" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top"><p className="text-xs">Move down</p></TooltipContent>
-                              </Tooltip>
-                            )}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => queueRemove(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                                >
-                                  <X className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Remove</p></TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border border-dashed border-border/60 overflow-hidden">
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3 text-muted-foreground">
-                              {qm.text}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+
               </div>
             </div>
           </div>
@@ -2908,7 +2911,131 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           </div>
         </div>
       ) : (
-        <SessionWelcome showPrompts onPromptSelect={handleSend} />
+        <SessionWelcome />
+      )}
+
+      {/* Queued messages popup — expandable/collapsible above input */}
+      {queuedMessages.length > 0 && (
+        <div className="mx-auto w-full max-w-3xl px-2 sm:px-4">
+          <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-sm shadow-sm overflow-hidden mb-1">
+            {/* Header — always visible, acts as toggle */}
+            <button
+              type="button"
+              onClick={() => setQueueExpanded((v) => !v)}
+              className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <ListPlus className="size-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">
+                  Queued
+                </span>
+                <span className="text-[10px] tabular-nums text-muted-foreground/60 bg-muted/60 px-1.5 py-0.5 rounded-md">
+                  {queuedMessages.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
+                      className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="size-3" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p className="text-xs">Clear all</p></TooltipContent>
+                </Tooltip>
+                <ChevronUp className={cn('size-3.5 text-muted-foreground/50 transition-transform', !queueExpanded && 'rotate-180')} />
+              </div>
+            </button>
+
+            {/* Expandable body */}
+            {queueExpanded && (
+              <div className="border-t border-border/40">
+                {/* Max 5 items visible by height (~240px), scroll if more */}
+                <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: '240px' }}>
+                  <div className="flex flex-col gap-0.5 p-1.5">
+                    {queuedMessages.map((qm, idx) => (
+                      <div
+                        key={qm.id}
+                        className="group/queued flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors"
+                      >
+                        {/* Index indicator */}
+                        <span className="text-[10px] tabular-nums text-muted-foreground/40 mt-1 shrink-0 w-4 text-center">
+                          {idx + 1}
+                        </span>
+
+                        {/* Message text */}
+                        <p className="flex-1 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words line-clamp-2 min-w-0">
+                          {qm.text}
+                        </p>
+
+                        {/* Action buttons — visible on hover */}
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover/queued:opacity-100 transition-opacity shrink-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleQueueSendNow(qm.id)}
+                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                              >
+                                <Send className="size-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
+                          </Tooltip>
+                          {idx > 0 && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => queueMoveUp(qm.id)}
+                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                                >
+                                  <ArrowUp className="size-3" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top"><p className="text-xs">Move up</p></TooltipContent>
+                            </Tooltip>
+                          )}
+                          {idx < queuedMessages.length - 1 && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => queueMoveDown(qm.id)}
+                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                                >
+                                  <ArrowDown className="size-3" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top"><p className="text-xs">Move down</p></TooltipContent>
+                            </Tooltip>
+                          )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => queueRemove(qm.id)}
+                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              >
+                                <X className="size-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top"><p className="text-xs">Remove</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Sub-session indicator above input */}

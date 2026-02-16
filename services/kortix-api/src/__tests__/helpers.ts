@@ -15,7 +15,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
-import { createDb, type Database, sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap } from '@kortix/db';
+import { createDb, type Database, sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys } from '@kortix/db';
 import { BillingError } from '../errors';
 import type { AuthVariables } from '../types';
 
@@ -270,6 +270,15 @@ export function createTestApp(opts: TestAppOptions = {}) {
         useAuth: false,
       });
       app.route('/v1/platform/sandbox', sandboxRouter);
+
+      // API key management routes
+      const { createApiKeysRouter } = require('../platform/routes/api-keys');
+      const apiKeysRouter = createApiKeysRouter({
+        db,
+        resolveAccountId: deps.resolveAccountId,
+        useAuth: false,
+      });
+      app.route('/v1/platform/api-keys', apiKeysRouter);
     } catch (e) {
       console.warn('[test] Failed to mount platform routes:', e);
     }
@@ -364,6 +373,7 @@ export async function cleanupTestData(): Promise<void> {
   await db.delete(channelSessions).execute();
   await db.delete(channelConfigs).execute();
   // Original tables
+  await db.delete(kortixApiKeys).execute();
   await db.delete(deployments).execute();
   await db.delete(executions).execute();
   await db.delete(triggers).execute();

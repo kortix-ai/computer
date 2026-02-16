@@ -6,6 +6,23 @@ const envRouter = new Hono()
 const secretStore = new SecretStore()
 
 const S6_ENV_DIR = process.env.S6_ENV_DIR || '/run/s6/container_environment'
+const INTERNAL_SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY || ''
+
+// ─── Internal service auth middleware ────────────────────────────────────────
+// When INTERNAL_SERVICE_KEY is set (VPS mode), require it as a Bearer token.
+// When not set (local mode), allow all requests (backwards compatible).
+envRouter.use('*', async (c, next) => {
+  if (!INTERNAL_SERVICE_KEY) return next()
+
+  const auth = c.req.header('Authorization')
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
+
+  if (token !== INTERNAL_SERVICE_KEY) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  return next()
+})
 
 async function ensureS6EnvDir(): Promise<void> {
   await mkdir(S6_ENV_DIR, { recursive: true, mode: 0o700 })

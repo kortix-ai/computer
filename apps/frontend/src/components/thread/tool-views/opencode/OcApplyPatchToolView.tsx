@@ -44,7 +44,7 @@ function getTypeConfig(type: string) {
     case 'move':
       return { label: 'Moved', icon: ArrowRight, color: 'text-blue-500', bg: 'bg-blue-500/10' };
     default:
-      return { label: type, icon: FileCode2, color: 'text-zinc-500', bg: 'bg-zinc-500/10' };
+      return { label: type, icon: FileCode2, color: 'text-muted-foreground', bg: 'bg-muted' };
   }
 }
 
@@ -91,19 +91,15 @@ export function OcApplyPatchToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={FileCode2}
-        iconColor="text-blue-500 dark:text-blue-400"
-        bgColor="bg-gradient-to-b from-blue-100 to-blue-50 shadow-inner dark:from-blue-800/40 dark:to-blue-900/60"
         title="Applying patches"
         subtitle={files.length > 0 ? `${files.length} files` : undefined}
-        showProgress={true}
       />
     );
   }
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={FileCode2}
@@ -134,10 +130,10 @@ export function OcApplyPatchToolView({
                 const hasDiff = file.type !== 'delete' && (file.before || file.after);
 
                 return (
-                  <div key={i} className={i > 0 ? 'border-t border-zinc-100 dark:border-zinc-800/60' : ''}>
+                  <div key={i} className={i > 0 ? 'border-t border-border/60' : ''}>
                     {/* File header */}
                     <div
-                      className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+                      className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-muted transition-colors"
                       onClick={() => setExpandedFile(isExpanded ? null : i)}
                     >
                       {hasDiff ? (
@@ -189,7 +185,7 @@ export function OcApplyPatchToolView({
               <p className="text-sm">{rawOutput || 'Patch failed'}</p>
             </div>
           ) : rawOutput ? (
-            <div className="p-4">
+            <div className="p-3">
               <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap">{String(rawOutput).slice(0, 2000)}</pre>
             </div>
           ) : null}
@@ -203,13 +199,13 @@ export function OcApplyPatchToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               {files.length} {files.length === 1 ? 'file' : 'files'} patched
             </Badge>
           )
@@ -247,7 +243,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
   const highlighted = useDiffHighlight(codeLines, filePath);
 
   return (
-    <div className="border-t border-zinc-100 dark:border-zinc-800/30 bg-zinc-50/50 dark:bg-zinc-900/30 overflow-auto max-h-96">
+    <div className="border-t border-border/30 bg-muted/30 overflow-auto max-h-96">
       <pre className="p-3 font-mono text-[11px] leading-[1.6] select-text whitespace-pre-wrap break-all">
         {diffLines.map((line, i) => {
           const isAdd = line.startsWith('+');

@@ -161,12 +161,8 @@ export function OcWebFetchToolView({
   if (isStreaming && !toolResult) {
     return (
       <LoadingState
-        icon={Globe}
-        iconColor="text-cyan-500 dark:text-cyan-400"
-        bgColor="bg-gradient-to-b from-cyan-100 to-cyan-50 shadow-inner dark:from-cyan-800/40 dark:to-cyan-900/60"
         title="Fetching URL"
         subtitle={domain + pathname}
-        showProgress={true}
       />
     );
   }
@@ -177,14 +173,14 @@ export function OcWebFetchToolView({
   if (scrapeData && scrapeData.results.length > 0) {
     return (
       <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-        <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+        <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
           <div className="flex flex-row items-center justify-between">
             <ToolViewIconTitle
               icon={Globe}
               title="Web Scrape"
               subtitle={domain || url}
             />
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0 ml-2">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted flex-shrink-0 ml-2">
               <Globe className="h-3 w-3 mr-1 opacity-70" />
               {scrapeData.successful}/{scrapeData.total} pages
             </Badge>
@@ -192,7 +188,7 @@ export function OcWebFetchToolView({
         </CardHeader>
         <CardContent className="p-0 h-full flex-1 overflow-hidden">
           <ScrollArea className="h-full w-full">
-            <div className="p-4 space-y-1.5">
+            <div className="p-3 space-y-1.5">
               {scrapeData.results.map((result, idx) => {
                 const rDomain = getDomain(result.url);
                 const favicon = getFaviconUrl(result.url);
@@ -261,7 +257,7 @@ export function OcWebFetchToolView({
           isStreaming={isStreaming}
         >
           {!isStreaming && (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
               <CheckCircle className="h-3 w-3 text-emerald-500/70" />
               {scrapeData.successful}/{scrapeData.total} scraped
             </Badge>
@@ -273,7 +269,7 @@ export function OcWebFetchToolView({
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={Globe}
@@ -313,7 +309,7 @@ export function OcWebFetchToolView({
                 domain={domain}
               />
             ) : (
-              <div className="flex items-center gap-2.5 py-2 px-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2.5 py-2 px-3 rounded-lg bg-muted/50 border border-border">
                 <Globe className="h-3.5 w-3.5 text-cyan-500 dark:text-cyan-400 flex-shrink-0" />
                 <span className="font-mono text-xs text-muted-foreground truncate">
                   Fetching {url}...
@@ -331,13 +327,13 @@ export function OcWebFetchToolView({
       >
         {!isStreaming && (
           isError ? (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
               Fetched
             </Badge>
           )
@@ -366,7 +362,7 @@ function ErrorDisplay({
           {statusCode ? getStatusLabel(statusCode) : 'Request Failed'}
         </span>
         {statusCode && (
-          <Badge variant="outline" className="h-5 py-0 text-[10px] bg-zinc-50 dark:bg-zinc-900 text-muted-foreground">
+          <Badge variant="outline" className="h-5 py-0 text-[10px] bg-muted text-muted-foreground">
             {statusCode}
           </Badge>
         )}
@@ -402,10 +398,10 @@ function ContentDisplay({
   const lineCount = content.content.split('\n').length;
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
+    <div className="rounded-lg border border-border overflow-hidden bg-card">
       {/* Clickable header row */}
       <div
-        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
         onClick={onToggle}
       >
         {expanded ? (
@@ -427,14 +423,14 @@ function ContentDisplay({
 
       {/* Expandable content */}
       {expanded && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800">
+        <div className="border-t border-border">
           {content.type === 'json' ? (
             <UnifiedMarkdown
               content={`\`\`\`json\n${content.content}\n\`\`\``}
               isStreaming={false}
             />
           ) : (
-            <div className="p-4">
+            <div className="p-3">
               <UnifiedMarkdown content={content.content} isStreaming={false} />
             </div>
           )}

@@ -28,7 +28,7 @@ interface KortixComputerState {
   setActiveView: (view: ViewType) => void;
   
   // For external triggers (clicking file in chat) — delegates to useFilesStore + opens panel
-  openFileInComputer: (filePath: string, filePathList?: string[]) => void;
+  openFileInComputer: (filePath: string, filePathList?: string[], targetLine?: number) => void;
   
   // Open files browser without selecting a file — delegates to useFilesStore + opens panel
   openFileBrowser: () => void;
@@ -91,14 +91,14 @@ export const useKortixComputerStore = create<KortixComputerState>()(
         set({ activeView: finalView });
       },
       
-      openFileInComputer: (filePath: string, filePathList?: string[]) => {
+      openFileInComputer: (filePath: string, filePathList?: string[], targetLine?: number) => {
         // Delegate file state to the unified files store
         const filesStore = useFilesStore.getState();
         if (filePathList && filePathList.length > 0) {
           const index = filePathList.indexOf(filePath);
           filesStore.openFileWithList(filePath, filePathList, Math.max(0, index));
         } else {
-          filesStore.openFile(filePath);
+          filesStore.openFile(filePath, targetLine);
         }
         
         set({

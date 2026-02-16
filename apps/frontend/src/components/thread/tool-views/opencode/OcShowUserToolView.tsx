@@ -40,7 +40,7 @@ export function OcShowUserToolView({
 
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <ToolViewIconTitle
             icon={isImage ? ImageIcon : Eye}
@@ -62,7 +62,7 @@ export function OcShowUserToolView({
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
-          <div className="p-4 space-y-3">
+          <div className="p-3 space-y-3">
             {/* Image preview */}
             {isImage && path && (
               <div className="flex justify-center">
@@ -70,7 +70,7 @@ export function OcShowUserToolView({
                 <img
                   src={path}
                   alt={title || 'Output image'}
-                  className="max-w-full max-h-[400px] rounded-lg border border-zinc-200 dark:border-zinc-800 object-contain"
+                  className="max-w-full max-h-[400px] rounded-lg border border-border object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
               </div>
@@ -83,7 +83,7 @@ export function OcShowUserToolView({
 
             {/* Content */}
             {content && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 p-3">
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
                 <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>
               </div>
             )}
@@ -103,7 +103,7 @@ export function OcShowUserToolView({
 
             {/* File path */}
             {path && !isImage && (
-              <div className="flex items-center gap-2 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/50">
                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-xs text-foreground font-mono truncate">{path}</span>
               </div>
@@ -126,8 +126,8 @@ export function OcShowUserToolView({
         isStreaming={isStreaming}
       >
         {!isStreaming && (
-          <Badge variant="outline" className="h-6 py-0.5 bg-zinc-50 dark:bg-zinc-900">
-            <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+          <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+            <CheckCircle className="h-3 w-3 text-emerald-500" />
             Displayed
           </Badge>
         )}

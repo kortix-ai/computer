@@ -35,6 +35,8 @@ export {
   useFileDelete,
   useFileMkdir,
   useFileRename,
+  useFileCreate,
+  useFileCopy,
 } from './use-file-mutations';
 
 // Git status

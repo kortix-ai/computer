@@ -61,20 +61,20 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
     <div className="p-3">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">
             {results.length} search results
           </span>
         </div>
         {meta?.costDollars?.total && (
-          <div className="text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="text-xs text-muted-foreground">
             Cost: ${meta.costDollars.total}
           </div>
         )}
       </div>
 
       {(meta?.autopromptString || meta?.query) && (
-        <div className="mb-4 p-2 bg-zinc-50 dark:bg-zinc-900 rounded text-xs text-zinc-600 dark:text-zinc-400">
+        <div className="mb-4 p-2 bg-muted rounded text-xs text-muted-foreground">
           <span className="font-medium">Query: </span>
           <span className="italic">{meta.autopromptString || meta.query}</span>
         </div>
@@ -83,14 +83,14 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
       <ScrollArea className="max-h-96">
         <div className="space-y-3">
           {results.map((result, idx) => (
-            <Card key={idx} className="p-3 bg-card border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors">
+            <Card key={idx} className="p-3 bg-card border border-border hover:border-border transition-colors">
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
                   <Badge variant="outline" className="text-xs shrink-0 mt-0.5">
                     {idx + 1}
                   </Badge>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug">
+                    <h4 className="text-sm font-medium text-foreground line-clamp-2 leading-snug">
                       {result.title}
                     </h4>
                   </div>
@@ -99,7 +99,7 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
                     <img
                       src={result.image}
                       alt=""
-                      className="w-16 h-12 object-cover rounded border border-zinc-200 dark:border-zinc-700"
+                      className="w-16 h-12 object-cover rounded border border-border"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -108,7 +108,7 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
                 </div>
 
                 {(result.author || result.date) && (
-                  <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     {result.author && <span>By {result.author}</span>}
                     {result.date && (
                       <span>• {new Date(result.date).toLocaleDateString()}</span>
@@ -129,12 +129,12 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
                         }}
                       />
                     )}
-                    <Globe className="h-3 w-3 text-zinc-500" />
+                    <Globe className="h-3 w-3 text-muted-foreground" />
                     <a
                       href={result.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-zinc-600 dark:text-zinc-400 hover:underline truncate flex-1"
+                      className="text-muted-foreground hover:underline truncate flex-1"
                     >
                       {result.url}
                     </a>
@@ -159,7 +159,7 @@ function SearchResultsRenderer({ data, metadata }: { data: any; metadata?: any }
                 )}
 
                 {result.summary && (
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     {result.summary}
                   </p>
                 )}
@@ -182,17 +182,17 @@ function TableRenderer({ data }: { data: any }) {
     return (
       <div className="p-3">
         <div className="flex items-center gap-2 mb-3">
-          <Table className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <Table className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">
             Table Data ({items.length} rows)
           </span>
         </div>
         <ScrollArea className="max-h-96">
           <table className="w-full text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-700">
+            <thead className="border-b border-border">
               <tr>
                 {headers.map((header, idx) => (
-                  <th key={idx} className="px-3 py-2 text-left font-medium text-zinc-700 dark:text-zinc-300">
+                  <th key={idx} className="px-3 py-2 text-left font-medium text-foreground">
                     {header}
                   </th>
                 ))}
@@ -200,9 +200,9 @@ function TableRenderer({ data }: { data: any }) {
             </thead>
             <tbody>
               {items.map((row, rowIdx) => (
-                <tr key={rowIdx} className="border-b border-zinc-100 dark:border-zinc-800">
+                <tr key={rowIdx} className="border-b border-border">
                   {headers.map((header, cellIdx) => (
-                    <td key={cellIdx} className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                    <td key={cellIdx} className="px-3 py-2 text-muted-foreground">
                       {String(row[header] ?? '')}
                     </td>
                   ))}
@@ -227,13 +227,13 @@ function JsonRenderer({ data }: { data: any }) {
   return (
     <div className="p-3">
       <div className="flex items-center gap-2 mb-3">
-        <Database className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <Database className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-foreground">
           Structured Data
         </span>
       </div>
       <ScrollArea className="max-h-96">
-        <pre className="whitespace-pre-wrap font-mono text-xs text-zinc-700 dark:text-zinc-300">
+        <pre className="whitespace-pre-wrap font-mono text-xs text-foreground">
           {JSON.stringify(data, null, 2)}
         </pre>
       </ScrollArea>
@@ -254,18 +254,18 @@ function KeyValueRenderer({ content }: { content: string }) {
   return (
     <div className="p-3">
       <div className="flex items-center gap-2 mb-3">
-        <Key className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <Key className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-foreground">
           Properties
         </span>
       </div>
       <div className="space-y-2">
         {pairs.map((pair, idx) => (
           <div key={idx} className="flex items-start gap-2 text-sm">
-            <span className="font-medium text-zinc-700 dark:text-zinc-300 min-w-[120px]">
+            <span className="font-medium text-foreground min-w-[120px]">
               {pair.key}:
             </span>
-            <span className="text-zinc-600 dark:text-zinc-400 break-all">
+            <span className="text-muted-foreground break-all">
               {pair.value}
             </span>
           </div>
@@ -282,20 +282,20 @@ function UrlListRenderer({ content }: { content: string }) {
   return (
     <div className="p-3">
       <div className="flex items-center gap-2 mb-3">
-        <Link2 className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <Link2 className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-foreground">
           URLs ({urls.length})
         </span>
       </div>
       <div className="space-y-2">
         {urls.map((url, idx) => (
           <div key={idx} className="flex items-center gap-2">
-            <ExternalLink className="h-3 w-3 text-zinc-500" />
+            <ExternalLink className="h-3 w-3 text-muted-foreground" />
             <a
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-zinc-600 dark:text-zinc-400 hover:underline truncate"
+              className="text-xs text-muted-foreground hover:underline truncate"
             >
               {url}
             </a>
@@ -328,7 +328,7 @@ function TextRenderer({ content }: { content: string }) {
   return (
     <div className="p-3">
       <ScrollArea className="max-h-96">
-        <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
+        <p className="whitespace-pre-wrap text-sm text-foreground">
           {content}
         </p>
       </ScrollArea>
@@ -358,8 +358,8 @@ export function MCPContentRenderer({ detectionResult, rawContent }: MCPContentRe
       return (
         <div className="p-3">
           <div className="flex items-center gap-2 mb-3">
-            <BookOpen className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
               Markdown Content
             </span>
           </div>
@@ -383,13 +383,13 @@ export function MCPContentRenderer({ detectionResult, rawContent }: MCPContentRe
       return (
         <div className="p-3">
           <div className="flex items-center gap-2 mb-3">
-            <FileCode className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <FileCode className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
               Code Output
             </span>
           </div>
           <ScrollArea className="max-h-96">
-            <pre className="whitespace-pre-wrap font-mono text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 p-3 rounded">
+            <pre className="whitespace-pre-wrap font-mono text-xs text-foreground bg-muted p-3 rounded">
               {contentStr}
             </pre>
           </ScrollArea>

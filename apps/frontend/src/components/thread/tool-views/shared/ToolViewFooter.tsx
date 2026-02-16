@@ -37,14 +37,14 @@ export function ToolViewFooter({
 
   return (
     <div className={cn(
-      "px-4 py-2 h-10 bg-gradient-to-r from-zinc-50/90 to-zinc-100/90 dark:from-zinc-900/90 dark:to-zinc-800/90 backdrop-blur-sm border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center gap-4",
+      "px-4 py-2 h-10 bg-muted/50 backdrop-blur-sm border-t border-border flex justify-between items-center gap-4",
       className
     )}>
-      <div className="h-full flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+      <div className="h-full flex items-center gap-2 text-sm text-muted-foreground">
         {children}
       </div>
       {displayTimestamp && (
-        <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
           <Clock className="h-3.5 w-3.5" />
           {displayTimestamp}
         </div>

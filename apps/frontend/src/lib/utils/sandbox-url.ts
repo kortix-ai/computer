@@ -120,19 +120,28 @@ export function rewriteLocalhostUrl(
     return `${base}/proxy/${port}${path}`;
   }
 
-  // Local mode: use kortix-master's proxy endpoint
-  // If mappedPorts is available, look up the host port for container port 8000
-  // (that's where kortix-master listens inside the container).
-  // Otherwise fall back to the container port for backwards compat (single-sandbox).
+  // Local mode: use kortix-master's proxy endpoint.
+  // serverUrl typically already points to Kortix Master (e.g. http://localhost:14000
+  // when Docker maps host 14000 → container 8000). Only override the port when:
+  //   1. mappedPorts explicitly has a Kortix Master host port, OR
+  //   2. serverUrl points directly to OpenCode (port 4096), not Kortix Master
   try {
     const url = new URL(serverUrl);
-    const masterHostPort = mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER] ?? SANDBOX_PORTS.KORTIX_MASTER;
-    url.port = masterHostPort;
-    const base = url.origin;
+    if (mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER]) {
+      // Multi-sandbox Docker: use the explicit host port for Kortix Master
+      url.port = mappedPorts[SANDBOX_PORTS.KORTIX_MASTER];
+      return `${url.origin}/proxy/${port}${path}`;
+    } else if (url.port === '4096') {
+      // Direct OpenCode connection (no Docker): switch to Kortix Master container port
+      url.port = SANDBOX_PORTS.KORTIX_MASTER;
+      return `${url.origin}/proxy/${port}${path}`;
+    }
+    // VPS / reverse-proxy mode: serverUrl has a path (e.g. https://host/server)
+    // url.origin would strip the path, so use the full base URL instead
+    const base = serverUrl.replace(/\/+$/, '');
     return `${base}/proxy/${port}${path}`;
   } catch {
-    const masterHostPort = mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER] ?? SANDBOX_PORTS.KORTIX_MASTER;
-    return `http://localhost:${masterHostPort}/proxy/${port}${path}`;
+    return `${serverUrl.replace(/\/+$/, '')}/proxy/${port}${path}`;
   }
 }
 
@@ -156,4 +165,29 @@ export function isProxiableLocalhostUrl(url: string): boolean {
   if (!match) return false;
   const port = parseInt(match[1], 10);
   return port >= 1 && port <= 65535 && !EXCLUDED_PORTS.has(port);
+}
+
+/**
+ * If the given URL points to localhost:PORT, rewrite it through the sandbox
+ * proxy layer. Returns the original URL unchanged when it doesn't match or
+ * targets an excluded infrastructure port.
+ *
+ * This is the catch-all intended for use inside markdown renderers so that
+ * every `<a href>`, `<img src>`, etc. that references a sandbox service
+ * automatically gets proxied.
+ */
+export function proxyLocalhostUrl(
+  url: string | undefined,
+  serverUrl: string,
+  mappedPorts?: Record<string, string>,
+): string | undefined {
+  if (!url) return url;
+  const match = url.match(
+    /^https?:\/\/(?:localhost|127\.0\.0\.1):(\d{1,5})(\/[^\s)"'<>]*)?$/,
+  );
+  if (!match) return url;
+  const port = parseInt(match[1], 10);
+  if (port < 1 || port > 65535 || EXCLUDED_PORTS.has(port)) return url;
+  const path = match[2] || '/';
+  return rewriteLocalhostUrl(port, path, serverUrl, mappedPorts);
 }

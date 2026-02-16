@@ -16,107 +16,218 @@ echo "  Testing get-kortix.sh structure"
 echo "  ════════════════════════════════"
 echo ""
 
-# --- script exists ---
+# ── Core structure ──
+
 if [ -f "$SCRIPT" ]; then
   pass "get-kortix.sh exists"
 else
   fail "get-kortix.sh exists"
 fi
 
-# --- has banner function ---
 if grep -q 'banner()' "$SCRIPT"; then
   pass "has banner function"
 else
   fail "has banner function"
 fi
 
-# --- has preflight function ---
 if grep -q 'preflight()' "$SCRIPT"; then
   pass "has preflight function"
 else
   fail "has preflight function"
 fi
 
-# --- checks for Docker ---
 if grep -q 'command -v docker' "$SCRIPT"; then
   pass "checks for Docker"
 else
   fail "checks for Docker"
 fi
 
-# --- checks Docker Compose ---
 if grep -q 'docker compose version' "$SCRIPT"; then
   pass "checks Docker Compose v2"
 else
   fail "checks Docker Compose v2"
 fi
 
-# --- does NOT require Git ---
 if ! grep -q 'command -v git' "$SCRIPT"; then
   pass "does not require Git"
 else
   fail "does not require Git"
 fi
 
-# --- no CLI prompts (keys managed via dashboard) ---
-if ! grep -q 'prompt_key\|prompt_secret\|run_setup' "$SCRIPT"; then
-  pass "no CLI key prompts (dashboard manages keys)"
+# ── Mode selection ──
+
+if grep -q 'prompt_mode()' "$SCRIPT"; then
+  pass "has mode selection (local/VPS)"
 else
-  fail "no CLI key prompts (dashboard manages keys)"
+  fail "has mode selection (local/VPS)"
 fi
 
-# --- writes docker-compose.yml ---
-if grep -q 'write_compose()' "$SCRIPT" && grep -q 'docker-compose.yml' "$SCRIPT"; then
+if grep -q 'DEPLOY_MODE.*local\|DEPLOY_MODE.*vps' "$SCRIPT"; then
+  pass "supports local and VPS deploy modes"
+else
+  fail "supports local and VPS deploy modes"
+fi
+
+# ── Compose generation ──
+
+if grep -q 'write_compose_local()' "$SCRIPT" && grep -q 'write_compose_vps()' "$SCRIPT"; then
+  pass "has separate compose templates (local + VPS)"
+else
+  fail "has separate compose templates (local + VPS)"
+fi
+
+if grep -q 'docker-compose.yml' "$SCRIPT"; then
   pass "writes docker-compose.yml"
 else
   fail "writes docker-compose.yml"
 fi
 
-# --- writes .env ---
-if grep -q 'write_env()' "$SCRIPT"; then
-  pass "writes .env file"
+# ── VPS features ──
+
+if grep -q 'write_caddyfile()' "$SCRIPT"; then
+  pass "has Caddyfile generation (VPS)"
 else
-  fail "writes .env file"
+  fail "has Caddyfile generation (VPS)"
 fi
 
-# --- writes CLI helper ---
+if grep -q 'caddy.*alpine\|caddy:2' "$SCRIPT"; then
+  pass "uses Caddy for reverse proxy (VPS)"
+else
+  fail "uses Caddy for reverse proxy (VPS)"
+fi
+
+if grep -q 'basicauth' "$SCRIPT"; then
+  pass "supports basic auth (VPS)"
+else
+  fail "supports basic auth (VPS)"
+fi
+
+if grep -q 'prompt_domain()' "$SCRIPT"; then
+  pass "has domain setup prompt (VPS)"
+else
+  fail "has domain setup prompt (VPS)"
+fi
+
+if grep -q 'tls internal' "$SCRIPT"; then
+  pass "supports IP-only mode with self-signed TLS"
+else
+  fail "supports IP-only mode with self-signed TLS"
+fi
+
+# ── Security features ──
+
+if grep -q 'generate_secrets()' "$SCRIPT"; then
+  pass "has secret generation function"
+else
+  fail "has secret generation function"
+fi
+
+if grep -q 'KORTIX_TOKEN' "$SCRIPT"; then
+  pass "generates KORTIX_TOKEN for secret encryption"
+else
+  fail "generates KORTIX_TOKEN for secret encryption"
+fi
+
+if grep -q 'INTERNAL_SERVICE_KEY' "$SCRIPT"; then
+  pass "generates INTERNAL_SERVICE_KEY for service auth"
+else
+  fail "generates INTERNAL_SERVICE_KEY for service auth"
+fi
+
+if grep -q 'generate_password()' "$SCRIPT"; then
+  pass "has password generation function"
+else
+  fail "has password generation function"
+fi
+
+if grep -q 'chmod 600.*\.env\|chmod 600.*credentials' "$SCRIPT"; then
+  pass "sets secure permissions on secrets (600)"
+else
+  fail "sets secure permissions on secrets (600)"
+fi
+
+if grep -q 'setup_firewall()' "$SCRIPT"; then
+  pass "has firewall setup function"
+else
+  fail "has firewall setup function"
+fi
+
+if grep -q 'ufw.*allow.*22\|ufw.*allow.*80\|ufw.*allow.*443' "$SCRIPT"; then
+  pass "firewall allows SSH, HTTP, HTTPS only"
+else
+  fail "firewall allows SSH, HTTP, HTTPS only"
+fi
+
+# ── VPS compose security ──
+
+if grep -q 'expose:' "$SCRIPT"; then
+  pass "VPS compose uses 'expose' (internal-only ports)"
+else
+  fail "VPS compose uses 'expose' (internal-only ports)"
+fi
+
+if grep -q 'CORS_ALLOWED_ORIGINS' "$SCRIPT"; then
+  pass "VPS compose restricts CORS origins"
+else
+  fail "VPS compose restricts CORS origins"
+fi
+
+if grep -q 'KORTIX_PUBLIC_URL' "$SCRIPT"; then
+  pass "VPS compose sets KORTIX_PUBLIC_URL for frontend"
+else
+  fail "VPS compose sets KORTIX_PUBLIC_URL for frontend"
+fi
+
+# ── CLI features ──
+
 if grep -q 'write_cli()' "$SCRIPT"; then
   pass "writes CLI helper"
 else
   fail "writes CLI helper"
 fi
 
-# --- CLI has start/stop/restart/logs/status/update ---
-for cmd in start stop restart logs status update; do
-  if grep -q "$cmd)" "$SCRIPT"; then
-    pass "CLI has '$cmd' command"
+for cmd in start stop restart logs status update setup; do
+  if grep -q "${cmd})" "$SCRIPT"; then
+    pass "CLI has '${cmd}' command"
   else
-    fail "CLI has '$cmd' command"
+    fail "CLI has '${cmd}' command"
   fi
 done
 
-# --- no declare -A (bash 3.x compat) ---
+if grep -q 'reconfigure)' "$SCRIPT"; then
+  pass "CLI has 'reconfigure' command"
+else
+  fail "CLI has 'reconfigure' command"
+fi
+
+if grep -q 'credentials)' "$SCRIPT"; then
+  pass "CLI has 'credentials' command"
+else
+  fail "CLI has 'credentials' command"
+fi
+
+# ── Compatibility ──
+
 if ! grep -q 'declare -A' "$SCRIPT"; then
   pass "no declare -A (bash 3.x compatible)"
 else
   fail "no declare -A (bash 3.x compatible)"
 fi
 
-# --- no git references ---
 if ! grep -q 'git clone\|git pull' "$SCRIPT"; then
   pass "no git clone/pull (Docker-only)"
 else
   fail "no git clone/pull (Docker-only)"
 fi
 
-# --- uses pre-built images ---
 if grep -q 'kortixmarko/kortix-frontend' "$SCRIPT" && grep -q 'kortixmarko/kortix-api' "$SCRIPT"; then
   pass "uses pre-built Docker images"
 else
   fail "uses pre-built Docker images"
 fi
 
-# --- old scripts deleted ---
+# ── Old scripts deleted ──
+
 if [ ! -f "$ROOT_DIR/scripts/install.sh" ]; then
   pass "install.sh deleted (unified into get-kortix.sh)"
 else

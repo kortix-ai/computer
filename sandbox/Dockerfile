@@ -1,3 +1,21 @@
+# ── Stage 1: Build musl-compatible bun-pty Rust library ─────────────────────
+# bun-pty ships glibc-linked .so files, but our sandbox runs Alpine (musl).
+# Rust's musl target doesn't support cdylib directly, so we:
+#   1. Build a staticlib (.a) on Alpine with Rust
+#   2. Wrap it into a shared library (.so) using gcc
+FROM rust:alpine AS rust-pty-builder
+RUN apk add --no-cache musl-dev gcc git
+RUN git clone --depth 1 https://github.com/sursaone/bun-pty.git /build/bun-pty
+WORKDIR /build/bun-pty/rust-pty
+# Change crate-type from cdylib to staticlib for musl compatibility
+RUN sed -i 's/crate-type = \["cdylib"\]/crate-type = ["staticlib"]/' Cargo.toml
+RUN cargo build --release
+# Wrap the static lib into a shared .so using gcc
+RUN gcc -shared -o /build/librust_pty.so \
+    -Wl,--whole-archive target/release/librust_pty.a -Wl,--no-whole-archive \
+    -lpthread -ldl -lutil -lm
+
+# ── Stage 2: Main image ─────────────────────────────────────────────────────
 FROM lscr.io/linuxserver/webtop:latest
 
 # ── Branding ─────────────────────────────────────────────────────────────────
@@ -16,6 +34,7 @@ RUN apk update \
         curl unzip ca-certificates gnupg \
         gcc g++ musl-dev linux-headers \
         libffi-dev libxml2-dev libxslt-dev \
+        gcompat \
     && rm -rf /var/cache/apk/*
 
 # Install bun to /opt/bun (NOT /workspace which is a volume mount at runtime)
@@ -94,7 +113,33 @@ RUN npm install -g @kortix/opencode-ai@0.2.0 \
 # UID 1000 matches PUID=1000 set in docker-compose (init-adduser remaps abc to this).
 COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
 RUN cd /opt/opencode && bun install
+
+# Replace glibc-linked bun-pty .so with musl-compiled version from builder stage.
+# bun-pty ships .so files compiled against glibc, but Alpine uses musl.
+# We must replace the .so in ALL locations where bun-pty exists:
+#   1. /opt/opencode/node_modules/bun-pty/          (installed by bun install)
+#   2. /opt/bun/install/cache/bun-pty@*/             (Bun's global cache)
+# The workspace copy (/workspace/.cache/opencode/) lives on a Docker volume
+# and is patched at startup by the 96-fix-bun-pty script below.
+COPY --from=rust-pty-builder /build/librust_pty.so /opt/bun-pty-musl/librust_pty.so
+RUN ARCH=$(uname -m) \
+    && for PTY_DIR in \
+         /opt/opencode/node_modules/bun-pty/rust-pty/target/release \
+         /opt/bun/install/cache/bun-pty@*/rust-pty/target/release; do \
+         [ -d "$PTY_DIR" ] || continue; \
+         if [ "$ARCH" = "x86_64" ]; then \
+           cp /opt/bun-pty-musl/librust_pty.so "$PTY_DIR/librust_pty.so"; \
+         else \
+           cp /opt/bun-pty-musl/librust_pty.so "$PTY_DIR/librust_pty_arm64.so"; \
+         fi; \
+       done \
+    && chmod 644 /opt/bun-pty-musl/librust_pty.so
+
 ENV OPENCODE_CONFIG_DIR=/opt/opencode
+# Tell bun-pty to load our musl-compiled .so directly, bypassing its path resolution.
+# This ENV is inherited by ALL processes in the container — including the Go binary's
+# Bun subprocess that actually loads bun-pty at runtime.
+ENV BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so
 
 # Make bun cache writable by any user (abc UID changes at runtime via PUID)
 RUN chmod -R 777 /opt/bun/install
@@ -141,6 +186,8 @@ RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-lss-syn
 
 # ── Container init scripts (s6 cont-init.d) ─────────────────────────────────
 RUN mkdir -p /custom-cont-init.d
+COPY sandbox/config/96-fix-bun-pty.sh /custom-cont-init.d/96-fix-bun-pty
+RUN chmod +x /custom-cont-init.d/96-fix-bun-pty
 COPY sandbox/config/97-secrets-to-s6-env.sh /custom-cont-init.d/97-secrets-to-s6-env
 RUN chmod +x /custom-cont-init.d/97-secrets-to-s6-env
 COPY sandbox/config/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env

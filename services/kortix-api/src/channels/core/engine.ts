@@ -18,6 +18,9 @@ import { RateLimiter } from './rate-limiter';
 import { ChannelError } from '../../errors';
 import { createPermissionRequest } from './pending-permissions';
 import { decryptCredentials } from '../lib/credentials';
+import { getSupabase, isSupabaseConfigured } from '../../shared/supabase';
+
+const STORAGE_BUCKET = 'channel-files';
 
 export class ChannelEngineImpl {
   private adapters: Map<ChannelType, ChannelAdapter>;
@@ -123,6 +126,11 @@ export class ChannelEngineImpl {
       const collectedFiles: FileOutput[] = [];
       const startTime = Date.now();
 
+      // Snapshot existing files before the prompt so we can detect new ones after
+      const filesBefore = new Set(
+        (await connector.getModifiedFiles().catch(() => [])).map((f) => f.path),
+      );
+
       const fileParts = message.attachments
         .filter((a) => a.url)
         .map((a) => ({ type: 'file' as const, mime: a.mimeType || 'application/octet-stream', url: a.url!, filename: a.name }));
@@ -148,10 +156,78 @@ export class ChannelEngineImpl {
 
       await adapter.sendResponse(config, message, agentResponse);
 
+      const uploadedFileNames = new Set<string>();
+
       if (collectedFiles.length > 0 && adapter.sendFiles) {
-        await adapter.sendFiles(config, message, collectedFiles).catch((err) => {
-          console.error('[CHANNELS] File upload failed:', err);
-        });
+        console.log(`[CHANNELS] Strategy 1: ${collectedFiles.length} file(s) from SSE stream`);
+        for (const file of collectedFiles) {
+          if (!file.content) {
+            console.log(`[CHANNELS] Downloading SSE file: name=${file.name} url=${file.url}`);
+            const buffer = await connector.downloadFile(file.url);
+            if (buffer) {
+              console.log(`[CHANNELS] Downloaded: ${file.name} (${buffer.length} bytes)`);
+              file.content = buffer;
+            } else {
+              console.warn(`[CHANNELS] Download failed for ${file.url}, trying by name...`);
+              const fallback = await connector.downloadFileByPath(file.name);
+              if (fallback) {
+                console.log(`[CHANNELS] Fallback download succeeded: ${file.name} (${fallback.length} bytes)`);
+                file.content = fallback;
+              } else {
+                console.error(`[CHANNELS] All download attempts failed for: ${file.name}`);
+              }
+            }
+          }
+          if (file.content) {
+            const publicUrl = await this.uploadToSupabaseStorage(file.name, file.content, file.mimeType);
+            if (publicUrl) {
+              file.url = publicUrl;
+            }
+          }
+        }
+        const downloadedFiles = collectedFiles.filter((f) => f.content);
+        if (downloadedFiles.length > 0) {
+          console.log(`[CHANNELS] Sending ${downloadedFiles.length} SSE file(s) to channel`);
+          await adapter.sendFiles(config, message, downloadedFiles).catch((err) => {
+            console.error('[CHANNELS] File send to channel failed:', err);
+          });
+          for (const f of downloadedFiles) {
+            uploadedFileNames.add(f.name);
+          }
+        }
+      }
+
+      if (adapter.sendFiles) {
+        try {
+          const filesAfter = await connector.getModifiedFiles().catch(() => []);
+          const newFiles: FileOutput[] = [];
+
+          console.log(`[CHANNELS] Strategy 2: git status before=${filesBefore.size} after=${filesAfter.length} already_uploaded=${uploadedFileNames.size}`);
+
+          for (const f of filesAfter) {
+            if (filesBefore.has(f.path)) continue;
+            if (uploadedFileNames.has(f.name)) continue;
+
+            console.log(`[CHANNELS] New file from git status: ${f.path}`);
+            const buffer = await connector.downloadFileByPath(f.path);
+            if (buffer) {
+              console.log(`[CHANNELS] Downloaded: ${f.name} (${buffer.length} bytes)`);
+              const publicUrl = await this.uploadToSupabaseStorage(f.name, buffer);
+              newFiles.push({ name: f.name, url: publicUrl || f.path, content: buffer });
+            } else {
+              console.warn(`[CHANNELS] Failed to download: ${f.path}`);
+            }
+          }
+
+          if (newFiles.length > 0) {
+            console.log(`[CHANNELS] Sending ${newFiles.length} git-detected file(s) to channel`);
+            await adapter.sendFiles(config, message, newFiles).catch((err) => {
+              console.error('[CHANNELS] File send to channel failed:', err);
+            });
+          }
+        } catch (err) {
+          console.warn('[CHANNELS] Strategy 2 (git status) failed:', err);
+        }
       }
 
       await this.logMessage(config, message, 'outbound', responseText, sessionId);
@@ -180,8 +256,13 @@ export class ChannelEngineImpl {
         return responseText;
 
       case 'file':
-        if (event.file && event.file.url) {
-          collectedFiles.push(event.file);
+        if (event.file && (event.file.url || event.file.name)) {
+          console.log(`[CHANNELS] SSE file event: name=${event.file.name} url=${event.file.url}`);
+          collectedFiles.push({
+            name: event.file.name,
+            url: event.file.url || event.file.name,
+            mimeType: event.file.mimeType,
+          });
         }
         return responseText;
 
@@ -234,6 +315,12 @@ export class ChannelEngineImpl {
       if (channelPrompt) {
         parts.push(`[Channel-specific instructions]\n${channelPrompt}`);
       }
+    }
+
+    if (config.channelType === 'slack' || config.channelType === 'telegram') {
+      parts.push(
+        `[Response format: You are responding in a ${config.channelType} channel. Keep responses short and concise — use brief paragraphs, short bullet points, and avoid verbose explanations. No headers unless truly needed. Aim for the minimum words that fully answer the question. When generating files, use the show_user tool to attach them.]`,
+      );
     }
 
     parts.push(
@@ -321,8 +408,57 @@ export class ChannelEngineImpl {
     await this.sessionManager.invalidateSession(configId, channelType, strategy, message);
   }
 
+  private async uploadToSupabaseStorage(
+    fileName: string,
+    content: Buffer,
+    mimeType?: string,
+  ): Promise<string | null> {
+    if (!isSupabaseConfigured()) return null;
+
+    try {
+      const supabase = getSupabase();
+      const uniqueId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const storagePath = `channel/${uniqueId}_${fileName}`;
+      const contentType = mimeType || guessMimeType(fileName);
+
+      const { error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, content, { contentType, upsert: false });
+
+      if (error) {
+        console.error(`[CHANNELS] Supabase upload failed for ${fileName}:`, error.message);
+        return null;
+      }
+
+      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+      console.log(`[CHANNELS] Uploaded to Supabase: ${fileName} -> ${data.publicUrl}`);
+      return data.publicUrl;
+    } catch (err) {
+      console.error(`[CHANNELS] Supabase upload error for ${fileName}:`, err);
+      return null;
+    }
+  }
+
   cleanup(): void {
     this.sessionManager.cleanup();
     this.rateLimiter.cleanup();
   }
+}
+
+function guessMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const mimes: Record<string, string> = {
+    txt: 'text/plain', md: 'text/markdown', html: 'text/html',
+    css: 'text/css', js: 'application/javascript', json: 'application/json',
+    xml: 'application/xml', csv: 'text/csv', pdf: 'application/pdf',
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+    mp3: 'audio/mpeg', mp4: 'video/mp4', wav: 'audio/wav',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    zip: 'application/zip',
+  };
+  return mimes[ext] || 'application/octet-stream';
 }

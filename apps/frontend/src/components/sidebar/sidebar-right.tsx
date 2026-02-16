@@ -26,7 +26,7 @@ import { SidebarFileBrowser } from '@/components/sidebar/sidebar-explorer';
 import { useFilesStore } from '@/features/files/store/files-store';
 import { useServerStore } from '@/stores/server-store';
 import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
-import { useTabStore } from '@/stores/tab-store';
+import { openTabAndNavigate } from '@/stores/tab-store';
 import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
 import { getDirectPortUrl, SANDBOX_PORTS } from '@/lib/platform-client';
 
@@ -58,8 +58,7 @@ export function SidebarRight() {
       const pty = await createPty.mutateAsync({
         env: { TERM: 'xterm-256color', COLORTERM: 'truecolor' },
       });
-      // Open as a tab in the main content area
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: `terminal:${pty.id}`,
         title: pty.title || pty.command || `Terminal`,
         type: 'terminal',
@@ -87,7 +86,7 @@ export function SidebarRight() {
       const tabId = `preview:${containerPort}`;
       const tabHref = `/preview/${containerPort}`;
 
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: tabId,
         title,
         type: 'preview',
@@ -98,7 +97,6 @@ export function SidebarRight() {
           originalUrl: `http://localhost:${containerPort}/`,
         },
       });
-      window.history.pushState(null, '', tabHref);
     },
     [activeServer, serverUrl, mappedPorts],
   );
@@ -113,7 +111,7 @@ export function SidebarRight() {
       const tabId = `preview:${port}`;
       const tabHref = `/preview/${port}`;
 
-      useTabStore.getState().openTab({
+      openTabAndNavigate({
         id: tabId,
         title,
         type: 'preview',
@@ -124,14 +122,36 @@ export function SidebarRight() {
           originalUrl: `http://localhost:${port}/`,
         },
       });
-      window.history.pushState(null, '', tabHref);
     },
     [serverUrl, mappedPorts],
   );
 
   const handleOpenDesktop = useCallback(() => {
-    openSandboxServiceTab(SANDBOX_PORTS.DESKTOP, 'Desktop');
-  }, [openSandboxServiceTab]);
+    const containerPort = SANDBOX_PORTS.DESKTOP;
+    const directUrl = activeServer
+      ? getDirectPortUrl(activeServer, containerPort)
+      : null;
+
+    let url: string;
+    if (directUrl) {
+      // Direct port access — noVNC works natively
+      url = directUrl;
+    } else {
+      // Proxy access — tell noVNC to route its WebSocket through the proxy path
+      const proxyBase = getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, mappedPorts);
+      url = `${proxyBase.replace(/\/$/, '')}/vnc_lite.html?path=proxy/${containerPort}/websockify&autoconnect=true&resize=scale`;
+    }
+
+    const tabId = `preview:${containerPort}`;
+    const tabHref = `/preview/${containerPort}`;
+    openTabAndNavigate({
+      id: tabId,
+      title: 'Desktop',
+      type: 'preview',
+      href: tabHref,
+      metadata: { url, port: parseInt(containerPort, 10), originalUrl: `http://localhost:${containerPort}/` },
+    });
+  }, [activeServer, serverUrl, mappedPorts]);
 
   const handleOpenAgentBrowser = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');
@@ -171,31 +191,31 @@ export function SidebarRight() {
         <div className="bg-sidebar text-sidebar-foreground flex h-full w-full flex-col">
 
           {/* ====== HEADER ====== */}
-          <div className="flex flex-col pt-4 pb-0 transition-[padding] duration-300 ease-out transform-gpu overflow-visible">
+          <div className="flex flex-col pt-4 pb-0 overflow-visible">
             <div className="relative flex h-[32px] items-center px-3 justify-between">
               {/* Collapsed: centered chevron to expand */}
               {state === 'collapsed' && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <button
-                    className="flex items-center justify-center h-8 w-8 rounded-lg cursor-pointer text-muted-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150 ease-out"
+                    <button
+                    className="flex items-center justify-center h-7 w-7 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                     onClick={() => setOpen(true)}
                     aria-label="Expand sidebar"
                   >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-3.5 w-3.5" />
                   </button>
                 </div>
               )}
 
               {/* Expanded: "Explorer" label + collapse chevron */}
               <div className={cn(
-                'flex items-center justify-between w-full transition-opacity duration-200',
+                'flex items-center justify-between w-full',
                 state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100',
               )}>
-                <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none px-1">
+                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider select-none px-1">
                   Explorer
                 </span>
                 <button
-                  className="flex items-center justify-center h-7 w-7 rounded-md transition-all duration-150 ease-out cursor-pointer text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent/30"
+                  className="flex items-center justify-center h-7 w-7 rounded-lg transition-colors duration-150 cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent"
                   onClick={() => setOpen(false)}
                   aria-label="Collapse sidebar"
                 >
@@ -207,25 +227,21 @@ export function SidebarRight() {
 
           {/* ====== CONTENT ====== */}
           <div className={cn(
-            'flex min-h-0 flex-1 flex-col transition-[opacity] duration-300 ease-out transform-gpu relative',
+            'flex min-h-0 flex-1 flex-col relative',
             state === 'collapsed' ? 'overflow-visible' : 'overflow-hidden',
           )}>
             {/* --- Collapsed: icon buttons --- */}
             <div className={cn(
-              'absolute inset-0 px-1 pt-3 space-y-0.5 flex flex-col items-center transition-opacity duration-150 ease-out overflow-visible',
-              state === 'collapsed' ? 'opacity-100 pointer-events-auto delay-100' : 'opacity-0 pointer-events-none delay-0',
+              'absolute inset-0 px-3 pt-3 space-y-0.5 flex flex-col items-center overflow-visible',
+              state === 'collapsed' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
             )}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setOpen(true)}
-                    className={cn(
-                      'flex items-center justify-center h-9 w-9 rounded-xl cursor-pointer',
-                      'transition-all duration-150 ease-out',
-                      'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
-                    )}
+                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <FolderTree className="h-[18px] w-[18px]" />
+                    <FolderTree className="h-[16px] w-[16px]" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -238,13 +254,12 @@ export function SidebarRight() {
                     onClick={handleNewTerminal}
                     disabled={createPty.isPending}
                     className={cn(
-                      'flex items-center justify-center h-9 w-9 rounded-xl cursor-pointer',
-                      'transition-all duration-150 ease-out',
-                      'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+                      'flex items-center justify-center w-full py-2 rounded-xl cursor-pointer',
+                      'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
                       'disabled:opacity-50 disabled:cursor-not-allowed',
                     )}
                   >
-                    <TerminalSquare className="h-[18px] w-[18px]" />
+                    <TerminalSquare className="h-[16px] w-[16px]" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -255,13 +270,9 @@ export function SidebarRight() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => { setOpen(true); setTimeout(() => toggleSearch(), 100); }}
-                    className={cn(
-                      'flex items-center justify-center h-9 w-9 rounded-xl cursor-pointer',
-                      'transition-all duration-150 ease-out',
-                      'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
-                    )}
+                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <Search className="h-[18px] w-[18px]" />
+                    <Search className="h-[16px] w-[16px]" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -272,13 +283,9 @@ export function SidebarRight() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleOpenDesktop}
-                    className={cn(
-                      'flex items-center justify-center h-9 w-9 rounded-xl cursor-pointer',
-                      'transition-all duration-150 ease-out',
-                      'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
-                    )}
+                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <Monitor className="h-[18px] w-[18px]" />
+                    <Monitor className="h-[16px] w-[16px]" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -289,13 +296,9 @@ export function SidebarRight() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleOpenAgentBrowser}
-                    className={cn(
-                      'flex items-center justify-center h-9 w-9 rounded-xl cursor-pointer',
-                      'transition-all duration-150 ease-out',
-                      'text-muted-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
-                    )}
+                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <Globe className="h-[18px] w-[18px]" />
+                    <Globe className="h-[16px] w-[16px]" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -306,52 +309,43 @@ export function SidebarRight() {
 
             {/* --- Expanded content --- */}
             <div className={cn(
-              'flex flex-col h-full transition-opacity duration-150 ease-out',
-              state === 'collapsed' ? 'opacity-0 pointer-events-none delay-0' : 'opacity-100 pointer-events-auto delay-100',
+              'flex flex-col h-full',
+              state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto',
             )}>
               {/* File explorer — the main content */}
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <SidebarFileBrowser openFileAsTab />
               </div>
 
-              {/* Bottom action buttons */}
-              <div className="flex-shrink-0 p-2.5 border-t border-sidebar-border/50 space-y-1.5">
+              {/* Bottom action nav */}
+              <nav className="flex-shrink-0 px-3 py-2 space-y-0.5">
                 <button
                   onClick={handleNewTerminal}
                   disabled={createPty.isPending}
                   className={cn(
-                    'w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg',
-                    'text-xs font-medium transition-all duration-150 ease-out cursor-pointer',
-                    'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40',
+                    'flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm cursor-pointer',
+                    'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                   )}
                 >
-                  <TerminalSquare className="w-3.5 h-3.5" />
+                  <TerminalSquare className="h-[16px] w-[16px] flex-shrink-0" />
                   <span>{createPty.isPending ? 'Creating...' : 'New Terminal'}</span>
                 </button>
                 <button
                   onClick={handleOpenDesktop}
-                  className={cn(
-                    'w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg',
-                    'text-xs font-medium transition-all duration-150 ease-out cursor-pointer',
-                    'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40',
-                  )}
+                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
                 >
-                  <Monitor className="w-3.5 h-3.5" />
+                  <Monitor className="h-[16px] w-[16px] flex-shrink-0" />
                   <span>Desktop</span>
                 </button>
                 <button
                   onClick={handleOpenAgentBrowser}
-                  className={cn(
-                    'w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg',
-                    'text-xs font-medium transition-all duration-150 ease-out cursor-pointer',
-                    'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40',
-                  )}
+                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
                 >
-                  <Globe className="w-3.5 h-3.5" />
+                  <Globe className="h-[16px] w-[16px] flex-shrink-0" />
                   <span>Agent Browser</span>
                 </button>
-              </div>
+              </nav>
             </div>
           </div>
         </div>

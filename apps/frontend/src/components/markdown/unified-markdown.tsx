@@ -11,6 +11,8 @@ import { MermaidRenderer } from '@/components/ui/mermaid-renderer';
 import { isMermaidCode } from '@/lib/mermaid-utils';
 import { autoLinkUrls } from '@kortix/shared';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
+import { useServerStore } from '@/stores/server-store';
+import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
 
 // Helper to check if a URL is internal (same origin)
 function isInternalUrl(href: string | undefined): boolean {
@@ -102,7 +104,7 @@ function normalizeLanguage(lang: string): string {
 }
 
 // Syntax-highlighted code using Shiki
-function HighlightedCode({ code, language, children }: { code: string; language: string; children: React.ReactNode }) {
+export function HighlightedCode({ code, language, children }: { code: string; language: string; children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
   const [html, setHtml] = useState<string | null>(null);
   const theme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
@@ -289,6 +291,17 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   className,
   isStreaming = false,
 }) => {
+  // Resolve the active sandbox server so we can proxy localhost URLs
+  const activeServer = useServerStore((s) =>
+    s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
+  );
+  const serverUrl = activeServer?.url || 'http://localhost:4096';
+  const mappedPorts = activeServer?.mappedPorts;
+
+  /** Rewrite a localhost:PORT URL through the sandbox proxy, or pass through. */
+  const proxy = (url: string | undefined) =>
+    proxyLocalhostUrl(url, serverUrl, mappedPorts);
+
   const safeContent = typeof content === 'string' ? content : (content ? String(content) : '');
   
   if (!safeContent) {
@@ -377,8 +390,13 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
           // LINKS - Subtle, professional styling with Next.js routing
           // ═══════════════════════════════════════════════════════════════
           a: ({ href, children }) => {
-            const isInternal = isInternalUrl(href);
-            const isHashLink = href?.startsWith('#');
+            // Note: localhost:PORT click interception is handled globally by
+            // <LocalhostLinkInterceptor> — no per-link proxy logic needed here.
+            // We still set the proxied href so the browser status bar / hover
+            // tooltip shows the reachable URL.
+            const resolvedHref = proxy(href) ?? href;
+            const isInternal = isInternalUrl(resolvedHref);
+            const isHashLink = resolvedHref?.startsWith('#');
             const linkClassName = cn(
               "font-medium text-foreground",
               "underline decoration-foreground/30 underline-offset-[3px] decoration-[1px]",
@@ -389,8 +407,8 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
               // Hash links use smooth scroll
               return (
                 <a
-                  href={href}
-                  onClick={(e) => handleHashClick(e, href ?? '')}
+                  href={resolvedHref}
+                  onClick={(e) => handleHashClick(e, resolvedHref ?? '')}
                   className={linkClassName}
                 >
                   {children}
@@ -402,7 +420,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
               // Internal links use Next.js Link for client-side navigation
               return (
                 <Link
-                  href={href || '#'}
+                  href={resolvedHref || '#'}
                   className={linkClassName}
                 >
                   {children}
@@ -413,7 +431,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
             // External links open in new tab
             return (
               <a
-                href={href}
+                href={resolvedHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={linkClassName}
@@ -523,11 +541,13 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
           img: ({ src, alt }) => {
             // Don't render img with empty src to avoid browser warning
             if (!src) return null;
+            // Proxy localhost:PORT image sources through the sandbox proxy
+            const resolvedSrc = proxy(src) ?? src;
             return (
               <span className="block my-5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={src}
+                  src={resolvedSrc}
                   alt={alt || ''}
                   className={cn(
                     "max-w-full h-auto rounded-xl",

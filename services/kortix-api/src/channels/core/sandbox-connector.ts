@@ -23,6 +23,9 @@ export interface StreamEvent {
   };
 }
 
+const FILE_PRODUCING_TOOLS = new Set(['show_user', 'show-user']);
+const FILE_ITEM_TYPES = new Set(['file', 'image']);
+
 interface ResolvedEndpoint {
   url: string;
   headers: Record<string, string>;
@@ -178,6 +181,7 @@ export class SandboxConnector {
       });
 
       const assistantMsgIds = new Set<string>();
+      const processedToolCalls = new Set<string>();
       let sawBusy = false;
       let gotText = false;
 
@@ -254,6 +258,26 @@ export class SandboxConnector {
                 },
               };
             }
+
+            if (part.type === 'tool') {
+              const toolName = part.tool as string;
+              const callID = (part.callID || part.id) as string;
+              const state = part.state as Record<string, unknown> | undefined;
+
+              if (
+                FILE_PRODUCING_TOOLS.has(toolName) &&
+                state?.status === 'completed' &&
+                callID &&
+                !processedToolCalls.has(callID)
+              ) {
+                processedToolCalls.add(callID);
+                const fileEvent = this.extractFileFromToolOutput(toolName, state);
+                if (fileEvent) {
+                  console.log(`[SANDBOX-CONNECTOR] File from ${toolName} tool: ${fileEvent.name} (${fileEvent.url})`);
+                  yield { type: 'file', file: fileEvent };
+                }
+              }
+            }
           }
 
           if (evt === 'permission.asked' || evt === 'permission.requested') {
@@ -296,6 +320,58 @@ export class SandboxConnector {
     }
   }
 
+  private extractFileFromToolOutput(
+    toolName: string,
+    state: Record<string, unknown>,
+  ): { name: string; url: string; mimeType?: string } | null {
+    const input = state.input as Record<string, unknown> | undefined;
+    const output = state.output as string | undefined;
+
+    if (toolName === 'show_user' || toolName === 'show-user') {
+      const itemType = (input?.type as string) || '';
+      let filePath: string | undefined;
+      let publicUrl: string | undefined;
+
+      if (output) {
+        try {
+          const parsed = JSON.parse(output);
+          const entry = parsed.entry as Record<string, unknown> | undefined;
+          if (entry) {
+            publicUrl = entry.publicUrl as string | undefined;
+            const entryType = (entry.type as string) || '';
+            if (FILE_ITEM_TYPES.has(entryType) && entry.path) {
+              filePath = entry.path as string;
+            }
+          }
+        } catch {
+        }
+      }
+
+      if (!filePath && FILE_ITEM_TYPES.has(itemType) && input?.path) {
+        filePath = input.path as string;
+      }
+
+      if (publicUrl || filePath) {
+        const name = (filePath || publicUrl || 'file').split('/').pop()?.split('?')[0] || 'file';
+        const url = publicUrl || filePath!;
+        const mimeType = itemType === 'image' ? this.guessImageMime(name) : undefined;
+        console.log(`[SANDBOX-CONNECTOR] show-user file: name=${name} publicUrl=${!!publicUrl} url=${url.slice(0, 120)}`);
+        return { name, url, mimeType };
+      }
+    }
+
+    return null;
+  }
+
+  private guessImageMime(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    const mimes: Record<string, string> = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+    };
+    return mimes[ext] || 'image/png';
+  }
+
   async replyPermission(permissionId: string, approved: boolean): Promise<void> {
     try {
       const { url, headers } = await this.getEndpoint();
@@ -314,6 +390,117 @@ export class SandboxConnector {
     }
   }
 
+  async downloadFile(fileUrl: string): Promise<Buffer | null> {
+    try {
+      if (!fileUrl.startsWith('http')) {
+        let filePath = fileUrl;
+        for (const prefix of ['/workspace/', '/home/daytona/', '/home/user/']) {
+          if (filePath.startsWith(prefix)) {
+            filePath = filePath.slice(prefix.length);
+            break;
+          }
+        }
+        if (filePath.startsWith('/')) {
+          filePath = filePath.slice(1);
+        }
+        console.log(`[SANDBOX-CONNECTOR] Downloading sandbox file via file content API: ${filePath}`);
+        const result = await this.downloadFileByPath(filePath);
+        if (result) return result;
+
+        const fileName = fileUrl.split('/').pop();
+        if (fileName && fileName !== filePath) {
+          console.log(`[SANDBOX-CONNECTOR] Retrying with filename only: ${fileName}`);
+          return await this.downloadFileByPath(fileName);
+        }
+        return null;
+      }
+
+      const { headers } = await this.getEndpoint();
+
+      const res = await fetch(fileUrl, {
+        headers,
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] File download failed: ${res.status} ${fileUrl}`);
+        return null;
+      }
+
+      return Buffer.from(await res.arrayBuffer());
+    } catch (err) {
+      console.warn(`[SANDBOX-CONNECTOR] File download error:`, err);
+      return null;
+    }
+  }
+
+  async getModifiedFiles(): Promise<Array<{ name: string; path: string }>> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/file/status`, {
+        headers,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] file/status failed: ${res.status}`);
+        return [];
+      }
+
+      const data = await res.json();
+      const files: Array<{ name: string; path: string }> = [];
+
+      console.log(`[SANDBOX-CONNECTOR] file/status response:`, JSON.stringify(data).slice(0, 500));
+
+      const entries = Array.isArray(data) ? data : Object.entries(data).map(([path, status]) => ({ path, status }));
+
+      for (const entry of entries) {
+        const filePath = (typeof entry === 'string' ? entry : entry.path || entry.file) as string | undefined;
+        if (!filePath) continue;
+        if (filePath.startsWith('.') || filePath.includes('node_modules') || filePath.includes('/.')) continue;
+        const ext = filePath.split('.').pop()?.toLowerCase() || '';
+        const isOutputFile = /^(md|txt|pdf|html|csv|json|xml|doc|docx|xlsx|pptx|png|jpg|jpeg|gif|svg|mp3|mp4|wav)$/.test(ext);
+        if (!isOutputFile) continue;
+
+        const name = filePath.split('/').pop() || filePath;
+        files.push({ name, path: filePath });
+      }
+
+      return files;
+    } catch (err) {
+      console.warn('[SANDBOX-CONNECTOR] Failed to get modified files:', err);
+      return [];
+    }
+  }
+
+
+  async downloadFileByPath(filePath: string): Promise<Buffer | null> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const params = new URLSearchParams({ path: filePath });
+      const res = await fetch(`${url}/file/content?${params}`, {
+        headers,
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] File read failed: ${res.status} ${filePath}`);
+        return null;
+      }
+
+      const data = await res.json() as { type: string; content: string; encoding?: string };
+
+      if (data.encoding === 'base64') {
+        return Buffer.from(data.content, 'base64');
+      }
+
+      return Buffer.from(data.content, 'utf-8');
+    } catch (err) {
+      console.warn(`[SANDBOX-CONNECTOR] File read error:`, err);
+      return null;
+    }
+  }
+
   async abort(sessionId: string): Promise<void> {
     try {
       const { url, headers } = await this.getEndpoint();
@@ -323,6 +510,96 @@ export class SandboxConnector {
         signal: AbortSignal.timeout(5000),
       });
     } catch {
+    }
+  }
+
+  async listProviders(): Promise<Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }>> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/config/providers`, {
+        method: 'GET',
+        headers,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] listProviders failed: ${res.status}`);
+        return [];
+      }
+
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.providers || []);
+    } catch (err) {
+      console.warn('[SANDBOX-CONNECTOR] listProviders error:', err);
+      return [];
+    }
+  }
+
+  async listAgents(): Promise<Array<{ name: string; description?: string; isDefault?: boolean }>> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/agent`, {
+        method: 'GET',
+        headers,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] listAgents failed: ${res.status}`);
+        return [];
+      }
+
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.agents || []);
+    } catch (err) {
+      console.warn('[SANDBOX-CONNECTOR] listAgents error:', err);
+      return [];
+    }
+  }
+
+  async getSessionDiff(sessionId: string): Promise<string> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/session/${sessionId}/diff`, {
+        method: 'GET',
+        headers,
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] getSessionDiff failed: ${res.status}`);
+        return '';
+      }
+
+      const data = await res.json();
+      return typeof data === 'string' ? data : (data.diff || data.content || JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.warn('[SANDBOX-CONNECTOR] getSessionDiff error:', err);
+      return '';
+    }
+  }
+
+  async shareSession(sessionId: string): Promise<{ shareUrl: string } | null> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/session/${sessionId}/share`, {
+        method: 'POST',
+        headers,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] shareSession failed: ${res.status}`);
+        return null;
+      }
+
+      const data = await res.json() as Record<string, unknown>;
+      const shareUrl = (data.shareUrl || data.share_url || data.url) as string;
+      if (!shareUrl) return null;
+      return { shareUrl };
+    } catch (err) {
+      console.warn('[SANDBOX-CONNECTOR] shareSession error:', err);
+      return null;
     }
   }
 }

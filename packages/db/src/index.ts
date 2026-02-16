@@ -14,6 +14,7 @@ export {
   deploymentSourceEnum,
   channelTypeEnum,
   sessionStrategyEnum,
+  apiKeyStatusEnum,
   // Kortix tables
   sandboxes,
   triggers,
@@ -23,6 +24,7 @@ export {
   channelSessions,
   channelMessages,
   channelIdentityMap,
+  kortixApiKeys,
   // Relations
   sandboxesRelations,
   triggersRelations,
@@ -32,6 +34,7 @@ export {
   channelSessionsRelations,
   channelMessagesRelations,
   channelIdentityMapRelations,
+  kortixApiKeysRelations,
 } from './schema/kortix';
 
 export type {
@@ -69,4 +72,6 @@ export type {
   NewChannelSession,
   NewChannelMessage,
   NewChannelIdentity,
+  KortixApiKey,
+  NewKortixApiKey,
 } from './types';
