@@ -342,6 +342,90 @@ export class SandboxConnector {
     }
   }
 
+  async getCreatedFiles(sessionId: string): Promise<Array<{ name: string; path?: string; url?: string; mimeType?: string }>> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const res = await fetch(`${url}/session/${sessionId}/message`, {
+        headers,
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!res.ok) return [];
+
+      const messages = (await res.json()) as Array<{
+        info: { role: string };
+        parts: Array<Record<string, unknown>>;
+      }>;
+
+      const files: Array<{ name: string; path?: string; url?: string; mimeType?: string }> = [];
+      const seenPaths = new Set<string>();
+
+      for (const msg of messages) {
+        if (msg.info.role !== 'assistant') continue;
+
+        for (const part of msg.parts) {
+          if (part.type === 'file' && part.url) {
+            const name = (part.filename as string) || 'file';
+            if (!seenPaths.has(name)) {
+              seenPaths.add(name);
+              files.push({ name, url: part.url as string, mimeType: part.mime as string });
+            }
+          }
+
+          if (part.type === 'tool') {
+            const state = part.state as Record<string, unknown> | undefined;
+            if (!state || state.status !== 'completed') continue;
+
+            const toolName = (part.tool as string || '').toLowerCase();
+            const input = state.input as Record<string, unknown> | undefined;
+            if (!input) continue;
+
+            const isWriteTool = /write|create_file|save/.test(toolName);
+            if (!isWriteTool) continue;
+
+            const filePath = (input.file_path || input.path || input.filePath) as string | undefined;
+            if (!filePath) continue;
+
+            if (filePath.startsWith('.') || filePath.includes('node_modules')) continue;
+
+            const name = filePath.split('/').pop() || filePath;
+            if (!seenPaths.has(filePath)) {
+              seenPaths.add(filePath);
+              files.push({ name, path: filePath });
+            }
+          }
+        }
+      }
+
+      return files;
+    } catch (err) {
+      console.warn('[SANDBOX-CONNECTOR] Failed to get created files:', err);
+      return [];
+    }
+  }
+
+
+  async downloadFileByPath(filePath: string): Promise<Buffer | null> {
+    try {
+      const { url, headers } = await this.getEndpoint();
+      const params = new URLSearchParams({ path: filePath });
+      const res = await fetch(`${url}/file/content?${params}`, {
+        headers,
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] File read failed: ${res.status} ${filePath}`);
+        return null;
+      }
+
+      return Buffer.from(await res.arrayBuffer());
+    } catch (err) {
+      console.warn(`[SANDBOX-CONNECTOR] File read error:`, err);
+      return null;
+    }
+  }
+
   async abort(sessionId: string): Promise<void> {
     try {
       const { url, headers } = await this.getEndpoint();

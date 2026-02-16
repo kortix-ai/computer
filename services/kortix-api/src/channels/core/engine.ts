@@ -163,6 +163,44 @@ export class ChannelEngineImpl {
         }
       }
 
+      if (adapter.sendFiles) {
+        try {
+          const createdFiles = await connector.getCreatedFiles(sessionId);
+          if (createdFiles.length > 0) {
+            const alreadyUploaded = new Set(collectedFiles.map((f) => f.name));
+            const newFiles: FileOutput[] = [];
+
+            for (const cf of createdFiles) {
+              if (alreadyUploaded.has(cf.name)) continue;
+
+              let buffer: Buffer | null = null;
+              if (cf.path) {
+                buffer = await connector.downloadFileByPath(cf.path);
+              } else if (cf.url) {
+                buffer = await connector.downloadFile(cf.url);
+              }
+
+              if (buffer) {
+                newFiles.push({
+                  name: cf.name,
+                  url: cf.url || cf.path || '',
+                  mimeType: cf.mimeType,
+                  content: buffer,
+                });
+              }
+            }
+
+            if (newFiles.length > 0) {
+              await adapter.sendFiles(config, message, newFiles).catch((err) => {
+                console.error('[CHANNELS] Tool-created file upload failed:', err);
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('[CHANNELS] Failed to check for created files:', err);
+        }
+      }
+
       await this.logMessage(config, message, 'outbound', responseText, sessionId);
     } finally {
       removeReaction();
