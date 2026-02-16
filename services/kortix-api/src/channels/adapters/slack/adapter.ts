@@ -233,12 +233,17 @@ export class SlackAdapter extends BaseAdapter {
 
     for (const file of files) {
       try {
-        const fileRes = await fetch(file.url);
-        if (!fileRes.ok) {
-          console.error(`[SLACK] Failed to download file ${file.name}: ${fileRes.status}`);
-          continue;
+        let fileBuffer: Buffer;
+        if (file.content) {
+          fileBuffer = file.content;
+        } else {
+          const fileRes = await fetch(file.url);
+          if (!fileRes.ok) {
+            console.error(`[SLACK] Failed to download file ${file.name}: ${fileRes.status}`);
+            continue;
+          }
+          fileBuffer = Buffer.from(await fileRes.arrayBuffer());
         }
-        const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
 
         await api.filesUploadV2({
           channel,

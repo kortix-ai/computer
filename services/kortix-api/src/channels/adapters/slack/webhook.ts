@@ -220,7 +220,6 @@ export async function handleSlackWebhook(
     return c.json({ ok: true });
   }
 
-  // Allow file_share subtype through; drop everything else
   if (event.subtype && event.subtype !== 'file_share') {
     return c.json({ ok: true });
   }
@@ -230,7 +229,6 @@ export async function handleSlackWebhook(
   if (!content && !hasFiles) {
     return c.json({ ok: true });
   }
-  // If files are attached but no text, give the agent context about the upload
   if (!content && hasFiles) {
     const fileNames = event.files!.map((f) => f.name).join(', ');
     content = `[User uploaded: ${fileNames}]`;
@@ -447,8 +445,17 @@ async function fetchThreadContext(
     const context: ThreadMessage[] = [];
     const threadFiles: NonNullable<SlackEvent['files']> = [];
 
+    let lastBotTs = '0';
     for (const msg of result.messages) {
-      if (msg.ts !== currentTs && msg.files) {
+      const isBot = !!(msg.bot_id || msg.subtype === 'bot_message');
+      const isSelf = isBot && botUserId && msg.user === botUserId;
+      if (isSelf && msg.ts > lastBotTs) {
+        lastBotTs = msg.ts;
+      }
+    }
+
+    for (const msg of result.messages) {
+      if (msg.ts !== currentTs && msg.files && msg.ts > lastBotTs) {
         threadFiles.push(...msg.files);
       }
 
