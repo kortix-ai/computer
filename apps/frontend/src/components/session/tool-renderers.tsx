@@ -62,8 +62,9 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from '@/components/ui/tooltip';
-import { useRouter } from 'next/navigation';
 import { useOpenCodeMessages } from '@/hooks/opencode/use-opencode-sessions';
+import { openTabAndNavigate } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
 import { QuestionPrompt } from '@/components/session/question-prompt';
@@ -89,6 +90,12 @@ import {
   getChildSessionToolParts,
   getPermissionForTool,
 } from '@/ui';
+
+// ============================================================================
+// Shared CSS overrides — strip CodeBlock's nested border/bg/padding inside
+// the BasicTool body wrapper to avoid the double-border look.
+// ============================================================================
+const MD_FLUSH_CLASSES = '[&_.relative.group]:my-0 [&_pre]:my-0 [&_pre]:border-0 [&_pre]:bg-transparent [&_pre]:p-0 [&_pre]:rounded-none [&_pre]:text-[12px] [&_code]:text-[12px]';
 
 // ============================================================================
 // Tool Registry
@@ -286,7 +293,7 @@ export function BasicTool({
 
       {children && (
         <CollapsibleContent>
-          <div className="mt-1.5 mb-2 rounded-lg bg-muted/30 border border-border/30 text-xs overflow-hidden">
+          <div className="mt-1.5 mb-2 rounded-lg bg-muted/20 border border-border/30 text-xs overflow-hidden">
             {children}
           </div>
         </CollapsibleContent>
@@ -655,7 +662,6 @@ function SessionMetadataList({
 }: {
   sessions: ParsedSessionMeta[];
 }) {
-  const router = useRouter();
   return (
     <div className="flex flex-col gap-1 p-1.5">
       <div className="px-1.5 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -664,7 +670,15 @@ function SessionMetadataList({
       {sessions.map((s) => (
         <button
           key={s.id}
-          onClick={() => router.push(`/sessions/${s.id}`)}
+          onClick={() =>
+            openTabAndNavigate({
+              id: s.id,
+              title: s.title || 'Session',
+              type: 'session',
+              href: `/sessions/${s.id}`,
+              serverId: useServerStore.getState().activeServerId,
+            })
+          }
           className={cn(
             'flex items-start gap-2.5 px-2.5 py-2 rounded-md text-left w-full',
             'hover:bg-muted/60 transition-colors group cursor-pointer',
@@ -760,7 +774,7 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                 <StructuredOutput sections={structuredSections} />
               </div>
             ) : outputBlock ? (
-              <div className="p-2 [&_.kortix-markdown]:text-xs [&_.relative.group]:my-0 [&_pre]:my-0 [&_pre]:border-0 [&_pre]:bg-transparent [&_pre]:p-0 [&_pre]:rounded-none [&_pre]:text-[12px]">
+              <div className={`p-2 ${MD_FLUSH_CLASSES}`}>
                 <UnifiedMarkdown content={outputBlock} isStreaming={status === 'running'} />
               </div>
             ) : null}
@@ -806,13 +820,15 @@ function PtySpawnTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       forceOpen={forceOpen}
       locked={locked}
     >
-      <div className="p-2.5 space-y-2">
+      <div className="space-y-0">
         {command && (
-          <div className="font-mono text-[11px] text-foreground/80 bg-muted/40 rounded px-2 py-1.5 break-all">
-            <span className="text-muted-foreground/60">$ </span>{command}
+          <div className="px-3 py-2.5 [&_code]:text-[12px] [&_code]:leading-relaxed [&_code]:whitespace-pre-wrap [&_code]:break-words [&_pre]:contents">
+            <HighlightedCode code={`$ ${command}`} language="bash">
+              {`$ ${command}`}
+            </HighlightedCode>
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-t border-border/20">
           {processStatus && (
             <span className={cn(
               'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium',
@@ -948,10 +964,10 @@ function PtyWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       locked={locked}
     >
       {ptyInput && (
-        <div className="p-2.5">
-          <div className="font-mono text-[11px] text-foreground/80 bg-muted/40 rounded px-2 py-1.5 break-all">
-            <span className="text-muted-foreground/60">&gt; </span>{ptyInput}
-          </div>
+        <div className="px-3 py-2.5">
+          <pre className="font-mono text-[12px] leading-relaxed text-foreground/90 whitespace-pre-wrap break-all">
+            <span className="text-muted-foreground/60 select-none">&gt; </span>{ptyInput}
+          </pre>
         </div>
       )}
     </BasicTool>
@@ -1034,7 +1050,7 @@ function EditTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       locked={locked}
     >
       {hasDiff && (
-        <div className="max-h-96 overflow-auto rounded border border-border/30">
+        <div data-scrollable className="max-h-96 overflow-auto">
           <InlineDiffView oldValue={before} newValue={after} filename={filename} />
         </div>
       )}
@@ -1078,8 +1094,10 @@ function WriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       locked={locked}
     >
       {content && (
-        <div className="max-h-96 overflow-auto">
-          <UnifiedMarkdown content={`\`\`\`${ext}\n${content}\n\`\`\``} isStreaming={false} />
+        <div data-scrollable className={`max-h-96 overflow-auto ${MD_FLUSH_CLASSES}`}>
+          <div className="p-2">
+            <UnifiedMarkdown content={`\`\`\`${ext}\n${content}\n\`\`\``} isStreaming={false} />
+          </div>
         </div>
       )}
       <DiagnosticsDisplay diagnostics={diagnostics} />
@@ -1218,7 +1236,7 @@ function InlineGrepResults({ groups, onFileClick, toDisplayPath }: { groups: Gre
   const [expandedIndex, setExpandedIndex] = useState<number | null>(groups.length === 1 ? 0 : null);
 
   return (
-    <div className="py-1 px-2 space-y-1">
+    <div className="py-0.5">
       {groups.map((group, i) => {
         const dp = toDisplayPath(group.filePath);
         const name = getFilename(dp);
@@ -1226,16 +1244,15 @@ function InlineGrepResults({ groups, onFileClick, toDisplayPath }: { groups: Gre
         const isExpanded = expandedIndex === i;
 
         return (
-          <div key={i} className="rounded-md border border-border/30 overflow-hidden">
+          <div key={i}>
             <div
-              className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors group"
+              className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors group"
               onClick={() => setExpandedIndex(isExpanded ? null : i)}
             >
-              {isExpanded ? (
-                <ChevronDown className="size-3 text-muted-foreground flex-shrink-0" />
-              ) : (
-                <ChevronRight className="size-3 text-muted-foreground flex-shrink-0" />
-              )}
+              <ChevronRight className={cn(
+                'size-3 text-muted-foreground flex-shrink-0 transition-transform',
+                isExpanded && 'rotate-90',
+              )} />
               <FileText className="size-3 text-muted-foreground/50 flex-shrink-0" />
               <span className="text-[11px] min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
                 <span
@@ -1247,10 +1264,10 @@ function InlineGrepResults({ groups, onFileClick, toDisplayPath }: { groups: Gre
                 </span>
                 {dir && <span className="text-muted-foreground/40 truncate text-[10px]">{dir}</span>}
               </span>
-              <span className="text-[10px] text-muted-foreground flex-shrink-0">{group.matches.length}</span>
+              <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">{group.matches.length}</span>
             </div>
             {isExpanded && (
-              <div className="border-t border-border/20">
+              <div className="border-t border-border/20 bg-muted/10">
                 {group.matches.map((match, j) => (
                   <div
                     key={j}
@@ -1297,7 +1314,7 @@ function GlobTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
           <InlineFileList paths={filePaths} onFileClick={(fp) => openFileWithList(fp, filePaths)} toDisplayPath={toDisplayPath} />
         </div>
       ) : output ? (
-        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
           <UnifiedMarkdown content={output} isStreaming={false} />
         </div>
       ) : null}
@@ -1331,7 +1348,7 @@ function GrepTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
           <InlineGrepResults groups={grepResult.groups} onFileClick={(fp) => openFile(fp)} toDisplayPath={toDisplayPath} />
         </div>
       ) : output ? (
-        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
           <UnifiedMarkdown content={output} isStreaming={false} />
         </div>
       ) : null}
@@ -1362,7 +1379,7 @@ function ListTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
           <InlineFileList paths={filePaths} onFileClick={(fp) => openFileWithList(fp, filePaths)} toDisplayPath={toDisplayPath} />
         </div>
       ) : output ? (
-        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
           <UnifiedMarkdown content={output} isStreaming={false} />
         </div>
       ) : null}
@@ -1402,7 +1419,7 @@ function WebFetchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       locked={locked}
     >
       {output && (
-        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
           <UnifiedMarkdown content={output} isStreaming={false} />
         </div>
       )}
@@ -1725,7 +1742,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
           })}
         </div>
       ) : output ? (
-        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
           <UnifiedMarkdown content={output} isStreaming={status === 'running'} />
         </div>
       ) : null}
@@ -1894,7 +1911,7 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
           </div>
         </div>
       ) : output ? (
-        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
           <UnifiedMarkdown content={output} isStreaming={status === 'running'} />
         </div>
       ) : null}
@@ -1999,7 +2016,7 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
           </div>
         </div>
       ) : output ? (
-        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
           <UnifiedMarkdown content={output} isStreaming={status === 'running'} />
         </div>
       ) : null}
@@ -2335,7 +2352,6 @@ ToolRegistry.register('show-user', ShowUserTool);
 
 // --- Task (sub-agent) — Slack-thread-style inline card ---
 function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissionReply }: ToolProps) {
-  const router = useRouter();
   const input = partInput(part);
   const status = partStatus(part);
   const childSessionId = getChildSessionId(part);
@@ -2379,9 +2395,16 @@ function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissio
 
   const handleOpenThread = useCallback(() => {
     if (childSessionId) {
-      router.push(`/sessions/${childSessionId}`);
+      openTabAndNavigate({
+        id: childSessionId,
+        title: description || 'Sub-agent',
+        type: 'session',
+        href: `/sessions/${childSessionId}`,
+        parentSessionId: sessionId,
+        serverId: useServerStore.getState().activeServerId,
+      });
     }
-  }, [childSessionId, router]);
+  }, [childSessionId, description, sessionId]);
 
   // Permission mode — render the child tool that needs attention inline
   if (hasChildPermission) {
@@ -2637,15 +2660,20 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       locked={locked}
     >
       {todos.length > 0 && (
-        <div className="p-2 space-y-1">
+        <div className="px-3 py-2.5 space-y-1.5">
           {todos.map((todo: Record<string, unknown>, i: number) => (
-            <label key={i} className="flex items-start gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={todo.status === 'completed'}
-                readOnly
-                className="mt-0.5 rounded border-border accent-primary"
-              />
+            <label key={i} className="flex items-start gap-2.5 text-xs cursor-default">
+              <span className={cn(
+                'mt-0.5 size-3.5 rounded flex-shrink-0 flex items-center justify-center border',
+                todo.status === 'completed'
+                  ? 'bg-emerald-500/15 border-emerald-500/30'
+                  : todo.status === 'in_progress'
+                    ? 'bg-primary/10 border-primary/30'
+                    : 'border-border/60',
+              )}>
+                {todo.status === 'completed' && <Check className="size-2.5 text-emerald-500" />}
+                {todo.status === 'in_progress' && <Loader2 className="size-2.5 text-primary animate-spin" />}
+              </span>
               <span
                 className={cn(
                   'leading-relaxed',
@@ -2808,7 +2836,7 @@ function ApplyPatchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 
               {/* File diff */}
               {file.type !== 'delete' && (file.before || file.after) && (
-                <div className="max-h-72 overflow-auto rounded border border-border/30">
+                <div data-scrollable className="max-h-72 overflow-auto rounded-md bg-muted/10">
                   <InlineDiffView
                     oldValue={file.before}
                     newValue={file.after}
@@ -2906,10 +2934,10 @@ function MemorySearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
               {results.map((result, i) => (
                 <div
                   key={i}
-                  className="rounded-md border border-border/30 bg-background/50 overflow-hidden"
+                  className="rounded-md bg-muted/10 overflow-hidden"
                 >
                   {/* Result header */}
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 border-b border-border/20 bg-muted/20">
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 border-b border-border/20">
                     <BookOpen className="size-3 text-muted-foreground/60 flex-shrink-0" />
                     {result.source && (
                       <span className="text-[10px] font-mono text-muted-foreground truncate">

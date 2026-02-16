@@ -2,8 +2,9 @@
 
 import React, { useMemo } from 'react';
 import { Terminal, CheckCircle, AlertCircle, Clock, Info, MessageCircle, ExternalLink } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { ToolViewProps } from '../types';
+import { openTabAndNavigate } from '@/stores/tab-store';
+import { useServerStore } from '@/stores/server-store';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -134,7 +135,6 @@ function formatSessionTime(timestamp: number): string {
 }
 
 function SessionMetadataList({ sessions }: { sessions: ParsedSessionMeta[] }) {
-  const router = useRouter();
   return (
     <div className="flex flex-col gap-1 py-1">
       <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -143,7 +143,15 @@ function SessionMetadataList({ sessions }: { sessions: ParsedSessionMeta[] }) {
       {sessions.map((s) => (
         <button
           key={s.id}
-          onClick={() => router.push(`/sessions/${s.id}`)}
+          onClick={() =>
+            openTabAndNavigate({
+              id: s.id,
+              title: s.title || 'Session',
+              type: 'session',
+              href: `/sessions/${s.id}`,
+              serverId: useServerStore.getState().activeServerId,
+            })
+          }
           className={cn(
             'flex items-start gap-2.5 px-3 py-2 rounded-md text-left w-full',
             'hover:bg-muted/60 transition-colors group cursor-pointer',

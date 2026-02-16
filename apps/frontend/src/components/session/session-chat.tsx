@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import {
   ChevronDown,
   ChevronRight,
@@ -175,7 +175,6 @@ function SubSessionBar({
   isCompacting?: boolean;
 }) {
   const { data: parentSession } = useOpenCodeSession(parentID);
-  const router = useRouter();
 
   // Dialog states for actions menu
   const [diffOpen, setDiffOpen] = useState(false);
@@ -186,9 +185,15 @@ function SubSessionBar({
 
   const handleBackToParent = useCallback(() => {
     if (parentSession) {
-      router.push(`/sessions/${parentSession.id}`);
+      openTabAndNavigate({
+        id: parentSession.id,
+        title: parentSession.title || 'Parent session',
+        type: 'session',
+        href: `/sessions/${parentSession.id}`,
+        serverId: useServerStore.getState().activeServerId,
+      });
     }
-  }, [parentSession, router]);
+  }, [parentSession]);
 
   const parentTitle = parentSession?.title || 'Parent session';
   const isFork = variant === 'fork';
@@ -302,7 +307,6 @@ function SubSessionBar({
 // Sub-session indicator shown above the chat input
 function SubSessionInputBanner({ parentID, variant = 'thread' }: { parentID: string; variant?: 'thread' | 'fork' }) {
   const { data: parentSession } = useOpenCodeSession(parentID);
-  const router = useRouter();
   const isForkVariant = variant === 'fork';
 
   return (
@@ -316,7 +320,16 @@ function SubSessionInputBanner({ parentID, variant = 'thread' }: { parentID: str
         {isForkVariant ? 'Continuing in fork' : 'Replying in thread'}
       </span>
       <button
-        onClick={() => parentSession && router.push(`/sessions/${parentSession.id}`)}
+        onClick={() =>
+          parentSession &&
+          openTabAndNavigate({
+            id: parentSession.id,
+            title: parentSession.title || 'Parent session',
+            type: 'session',
+            href: `/sessions/${parentSession.id}`,
+            serverId: useServerStore.getState().activeServerId,
+          })
+        }
         className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors ml-auto flex items-center gap-1 cursor-pointer"
       >
         <ArrowUpLeft className="size-3" />
@@ -332,7 +345,6 @@ function SubSessionInputBanner({ parentID, variant = 'thread' }: { parentID: str
 
 function ForkContextDivider({ parentID }: { parentID: string }) {
   const { data: parentSession } = useOpenCodeSession(parentID);
-  const router = useRouter();
   const parentTitle = parentSession?.title || 'Parent session';
 
   return (
@@ -341,7 +353,16 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            onClick={() => parentSession && router.push(`/sessions/${parentSession.id}`)}
+            onClick={() =>
+              parentSession &&
+              openTabAndNavigate({
+                id: parentSession.id,
+                title: parentSession.title || 'Parent session',
+                type: 'session',
+                href: `/sessions/${parentSession.id}`,
+                serverId: useServerStore.getState().activeServerId,
+              })
+            }
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
           >
             <GitFork className="size-3 text-muted-foreground/60" />
@@ -1981,7 +2002,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const forkSession = useForkSession();
   const revertSession = useRevertSession();
   const unrevertSession = useUnrevertSession();
-  const router = useRouter();
 
   // ---- Billing: query client for invalidation ----
   const queryClient = useQueryClient();
@@ -2510,9 +2530,24 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
   const handleFork = useCallback(
     async (messageId: string) => {
+      // The server's fork copies all messages BEFORE the given messageID
+      // (exclusive: msg.id >= messageID → break). Since the user clicks
+      // "Fork from here" on an assistant response and expects that response
+      // to be included, we pass the ID of the first message AFTER the
+      // assistant message as the cut-off. If the assistant message is the
+      // last one in the session, we omit messageID entirely to copy everything.
+      let forkAtMessageId: string | undefined;
+      if (messages) {
+        const idx = messages.findIndex((m) => m.info.id === messageId);
+        if (idx >= 0 && idx < messages.length - 1) {
+          forkAtMessageId = messages[idx + 1].info.id;
+        }
+        // else: last message — omit messageID to copy all
+      }
+
       const forkedSession = await forkSession.mutateAsync({
         sessionId,
-        messageId,
+        messageId: forkAtMessageId,
       });
 
       // Open the forked session in a new tab and navigate
@@ -2529,7 +2564,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       // session can show the "Forked from" indicator.
       localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
     },
-    [sessionId, forkSession, router],
+    [sessionId, forkSession, messages],
   );
 
   const handleRevert = useCallback(
@@ -2736,7 +2771,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         <div className="relative flex-1 min-h-0">
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full"
+            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full [scroll-behavior:auto]"
           >
             <div
               ref={contentRef}

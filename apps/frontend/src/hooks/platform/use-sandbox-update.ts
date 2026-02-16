@@ -16,6 +16,23 @@ import {
 } from '@/lib/platform-client';
 import { useSandbox } from './use-sandbox';
 
+/**
+ * Compare two semver-like version strings (e.g. "0.4.11" vs "0.4.12").
+ * Returns true when `latest` is strictly greater than `current`.
+ */
+function isNewerVersion(current: string, latest: string): boolean {
+  const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
+  const c = parse(current);
+  const l = parse(latest);
+  for (let i = 0; i < Math.max(c.length, l.length); i++) {
+    const cv = c[i] ?? 0;
+    const lv = l[i] ?? 0;
+    if (lv > cv) return true;
+    if (lv < cv) return false;
+  }
+  return false;
+}
+
 export function useSandboxUpdate(currentVersion: string | null) {
   const { sandbox } = useSandbox();
 
@@ -29,7 +46,8 @@ export function useSandboxUpdate(currentVersion: string | null) {
   });
 
   const latestVersion = latestQuery.data?.version ?? null;
-  const updateAvailable = !!(currentVersion && latestVersion && currentVersion !== latestVersion);
+  // Only show update when the latest version is strictly newer (not a downgrade)
+  const updateAvailable = !!(currentVersion && latestVersion && isNewerVersion(currentVersion, latestVersion));
 
   // Trigger the update — passes target version to sandbox
   const updateMutation = useMutation({
