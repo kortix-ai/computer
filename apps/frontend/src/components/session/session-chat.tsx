@@ -2530,9 +2530,24 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
   const handleFork = useCallback(
     async (messageId: string) => {
+      // The server's fork copies all messages BEFORE the given messageID
+      // (exclusive: msg.id >= messageID → break). Since the user clicks
+      // "Fork from here" on an assistant response and expects that response
+      // to be included, we pass the ID of the first message AFTER the
+      // assistant message as the cut-off. If the assistant message is the
+      // last one in the session, we omit messageID entirely to copy everything.
+      let forkAtMessageId: string | undefined;
+      if (messages) {
+        const idx = messages.findIndex((m) => m.info.id === messageId);
+        if (idx >= 0 && idx < messages.length - 1) {
+          forkAtMessageId = messages[idx + 1].info.id;
+        }
+        // else: last message — omit messageID to copy all
+      }
+
       const forkedSession = await forkSession.mutateAsync({
         sessionId,
-        messageId,
+        messageId: forkAtMessageId,
       });
 
       // Open the forked session in a new tab and navigate
@@ -2549,7 +2564,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       // session can show the "Forked from" indicator.
       localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
     },
-    [sessionId, forkSession],
+    [sessionId, forkSession, messages],
   );
 
   const handleRevert = useCallback(
