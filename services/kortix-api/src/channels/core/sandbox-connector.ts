@@ -331,27 +331,33 @@ export class SandboxConnector {
     if (toolName === 'show-user') {
       const itemType = (input?.type as string) || '';
       let filePath: string | undefined;
+      let publicUrl: string | undefined;
 
-      if (FILE_ITEM_TYPES.has(itemType) && input?.path) {
-        filePath = input.path as string;
-      }
-
-      if (!filePath && output) {
+      if (output) {
         try {
           const parsed = JSON.parse(output);
           const entry = parsed.entry as Record<string, unknown> | undefined;
-          const entryType = (entry?.type as string) || '';
-          if (FILE_ITEM_TYPES.has(entryType) && entry?.path) {
-            filePath = entry.path as string;
+          if (entry) {
+            publicUrl = entry.publicUrl as string | undefined;
+            const entryType = (entry.type as string) || '';
+            if (FILE_ITEM_TYPES.has(entryType) && entry.path) {
+              filePath = entry.path as string;
+            }
           }
         } catch {
         }
       }
 
-      if (filePath) {
-        const name = filePath.split('/').pop() || 'file';
+      if (!filePath && FILE_ITEM_TYPES.has(itemType) && input?.path) {
+        filePath = input.path as string;
+      }
+
+      if (publicUrl || filePath) {
+        const name = (filePath || publicUrl || 'file').split('/').pop()?.split('?')[0] || 'file';
+        const url = publicUrl || filePath!;
         const mimeType = itemType === 'image' ? this.guessImageMime(name) : undefined;
-        return { name, url: filePath, mimeType };
+        console.log(`[SANDBOX-CONNECTOR] show-user file: name=${name} publicUrl=${!!publicUrl} url=${url.slice(0, 120)}`);
+        return { name, url, mimeType };
       }
     }
 
