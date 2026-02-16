@@ -14,6 +14,8 @@ import {
   Download, 
   Trash2,
   Copy,
+  ClipboardCopy,
+  Scissors,
   Info,
   FolderOpen,
 } from 'lucide-react';
@@ -28,6 +30,8 @@ interface FileContextMenuProps {
   onDownload?: () => void;
   onDelete?: () => void;
   onCopyPath?: () => void;
+  onCopy?: () => void;
+  onCut?: () => void;
   onGetInfo?: () => void;
   onOpenChange?: (open: boolean) => void;
 }
@@ -40,6 +44,8 @@ export const FileContextMenu = memo(function FileContextMenu({
   onDownload,
   onDelete,
   onCopyPath,
+  onCopy,
+  onCut,
   onGetInfo,
   onOpenChange,
 }: FileContextMenuProps) {
@@ -79,6 +85,30 @@ export const FileContextMenu = memo(function FileContextMenu({
           Get Info
           <ContextMenuShortcut>⌘I</ContextMenuShortcut>
         </ContextMenuItem>
+
+        <ContextMenuSeparator />
+
+        {onCopy && (
+          <ContextMenuItem 
+            onClick={onCopy}
+            className="focus:bg-background/10 focus:backdrop-blur-xl rounded-lg"
+          >
+            <ClipboardCopy className="h-4 w-4 text-muted-foreground" />
+            Copy
+            <ContextMenuShortcut>⌘C</ContextMenuShortcut>
+          </ContextMenuItem>
+        )}
+
+        {onCut && (
+          <ContextMenuItem 
+            onClick={onCut}
+            className="focus:bg-background/10 focus:backdrop-blur-xl rounded-lg"
+          >
+            <Scissors className="h-4 w-4 text-muted-foreground" />
+            Cut
+            <ContextMenuShortcut>⌘X</ContextMenuShortcut>
+          </ContextMenuItem>
+        )}
 
         {onCopyPath && (
           <ContextMenuItem 

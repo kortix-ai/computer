@@ -35,6 +35,8 @@ interface WebNotificationState {
   permission: WebNotificationPermission;
   /** User preferences for web notifications */
   preferences: WebNotificationPreferences;
+  /** Whether the user has dismissed the notification enable prompt */
+  promptDismissed: boolean;
 
   /** Sync the permission state from the browser Notification API */
   syncPermission: () => void;
@@ -47,6 +49,8 @@ interface WebNotificationState {
   ) => void;
   /** Toggle the master enabled switch (also requests permission if needed) */
   toggleEnabled: () => Promise<void>;
+  /** Dismiss the notification enable prompt */
+  dismissPrompt: () => void;
 }
 
 const DEFAULT_PREFERENCES: WebNotificationPreferences = {
@@ -66,6 +70,7 @@ export const useWebNotificationStore = create<WebNotificationState>()(
         ? (Notification.permission as WebNotificationPermission)
         : 'default'),
       preferences: DEFAULT_PREFERENCES,
+      promptDismissed: false,
 
       syncPermission: () => {
         if (typeof Notification === 'undefined') return;
@@ -109,11 +114,16 @@ export const useWebNotificationStore = create<WebNotificationState>()(
           }));
         }
       },
+
+      dismissPrompt: () => {
+        set({ promptDismissed: true });
+      },
     }),
     {
       name: 'kortix-web-notifications',
       partialize: (state) => ({
         preferences: state.preferences,
+        promptDismissed: state.promptDismissed,
       }),
       onRehydrateStorage: () => (state) => {
         // After hydration, sync the actual browser permission

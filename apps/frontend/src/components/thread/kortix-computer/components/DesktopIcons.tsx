@@ -7,6 +7,7 @@ import { getFileIcon, FolderIcon } from './Icons';
 import { FileContextMenu } from './FileContextMenu';
 import { ContextMenuTrigger } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
+import { useFilesStore } from '@/features/files/store/files-store';
 
 interface DesktopFile {
   name: string;
@@ -60,6 +61,19 @@ export const DesktopIcons = memo(function DesktopIcons({
   const [newFolderName, setNewFolderName] = useState('New Folder');
   const inputRef = useRef<HTMLInputElement>(null);
   const wasCreatingRef = useRef(false);
+  const clipboard = useFilesStore((s) => s.clipboard);
+  const copyToClipboard = useFilesStore((s) => s.copyToClipboard);
+  const cutToClipboard = useFilesStore((s) => s.cutToClipboard);
+
+  const handleCopyItem = useCallback((file: DesktopFile) => {
+    copyToClipboard(file.path, file.name, file.is_dir ? 'directory' : 'file');
+    toast.success(`Copied "${file.name}" to clipboard`);
+  }, [copyToClipboard]);
+
+  const handleCutItem = useCallback((file: DesktopFile) => {
+    cutToClipboard(file.path, file.name, file.is_dir ? 'directory' : 'file');
+    toast.success(`Cut "${file.name}" to clipboard`);
+  }, [cutToClipboard]);
 
   useEffect(() => {
     // Only run when transitioning from false to true
@@ -143,6 +157,8 @@ export const DesktopIcons = memo(function DesktopIcons({
             onDownload={() => onFileDownload?.(file.path)}
             onDelete={onFileDelete ? () => onFileDelete(file.path) : undefined}
             onCopyPath={() => handleCopyPath(file.path)}
+            onCopy={() => handleCopyItem(file)}
+            onCut={() => handleCutItem(file)}
             onGetInfo={() => onGetFileInfo?.(file)}
             onOpenChange={(open) => setActiveContextPath(open ? file.path : null)}
           >
@@ -156,7 +172,8 @@ export const DesktopIcons = memo(function DesktopIcons({
                   "flex flex-col items-center justify-start gap-1.5 p-2 rounded-xl pointer-events-auto w-[84px]",
                   "hover:bg-white/10 active:bg-white/20 backdrop-blur-sm",
                   "transition-all duration-100 cursor-default select-none group",
-                  activeContextPath === file.path && "bg-white/20 ring-2 ring-white/30"
+                  activeContextPath === file.path && "bg-white/20 ring-2 ring-white/30",
+                  clipboard?.operation === 'cut' && clipboard.path === file.path && "opacity-40"
                 )}
                 drag
                 dragMomentum={false}

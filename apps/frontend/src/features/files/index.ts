@@ -38,6 +38,8 @@ export {
   deleteFile,
   mkdirFile,
   renameFile,
+  createFile,
+  copyFile,
   type UploadResult,
 } from './api/opencode-files';
 
@@ -63,6 +65,8 @@ export {
   useFileDelete,
   useFileMkdir,
   useFileRename,
+  useFileCreate,
+  useFileCopy,
   useFileHistory,
   useFileCommitDiff,
   useFileAtCommit,
@@ -74,7 +78,12 @@ export {
 } from './hooks';
 
 // Store
-export { useFilesStore, type FilesView } from './store/files-store';
+export {
+  useFilesStore,
+  type FilesView,
+  type ClipboardOperation,
+  type ClipboardItem,
+} from './store/files-store';
 
 // Components
 export {

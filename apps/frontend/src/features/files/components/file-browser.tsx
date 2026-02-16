@@ -8,6 +8,8 @@ import {
   ServerOff,
   Upload,
   FolderPlus,
+  FilePlus,
+  Clipboard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,15 +32,83 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useFilesStore } from '../store/files-store';
 import { useFileList, useServerHealth, useGitStatus, buildGitStatusMap } from '../hooks';
-import { useFileUpload, useFileDelete, useFileMkdir, useFileRename } from '../hooks/use-file-mutations';
+import {
+  useFileUpload,
+  useFileDelete,
+  useFileMkdir,
+  useFileRename,
+  useFileCreate,
+  useFileCopy,
+} from '../hooks/use-file-mutations';
 import { downloadFile } from '../api/opencode-files';
 import { useServerStore } from '@/stores/server-store';
 import type { FileNode } from '../types';
 import { FileBreadcrumbs } from './file-breadcrumbs';
-import { FileTreeItem } from './file-tree-item';
+import { FileTreeItem, DRAG_MIME } from './file-tree-item';
 import { FileSearch } from './file-search';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+
+/** Drop target for the ".." (parent directory) row */
+function ParentDropTarget({
+  currentPath,
+  onClick,
+  onDropMove,
+}: {
+  currentPath: string;
+  onClick: () => void;
+  onDropMove: (sourcePath: string, targetDirPath: string) => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const counterRef = useRef(0);
+
+  const parentPath = useMemo(() => {
+    const parts = currentPath.split('/').filter(Boolean);
+    parts.pop();
+    return parts.length > 0 ? parts.join('/') : '.';
+  }, [currentPath]);
+
+  return (
+    <button
+      onClick={onClick}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDragEnter={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+        e.preventDefault();
+        counterRef.current++;
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => {
+        counterRef.current--;
+        if (counterRef.current <= 0) {
+          counterRef.current = 0;
+          setIsDragOver(false);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        counterRef.current = 0;
+        setIsDragOver(false);
+        const sourcePath = e.dataTransfer.getData(DRAG_MIME);
+        if (!sourcePath) return;
+        onDropMove(sourcePath, parentPath === '.' ? '' : parentPath);
+      }}
+      className={cn(
+        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer',
+        'hover:bg-muted/80 text-muted-foreground',
+        isDragOver && 'bg-primary/15 ring-1 ring-primary/40',
+      )}
+    >
+      <FolderUp className="h-4 w-4 shrink-0" />
+      <span>..</span>
+    </button>
+  );
+}
 
 export function FileBrowser() {
   const currentPath = useFilesStore((s) => s.currentPath);
@@ -49,6 +119,12 @@ export function FileBrowser() {
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
   const openHistory = useFilesStore((s) => s.openHistory);
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
+
+  // Clipboard
+  const clipboard = useFilesStore((s) => s.clipboard);
+  const copyToClipboard = useFilesStore((s) => s.copyToClipboard);
+  const cutToClipboard = useFilesStore((s) => s.cutToClipboard);
+  const clearClipboard = useFilesStore((s) => s.clearClipboard);
 
   const { data: health, isLoading: isHealthLoading } = useServerHealth();
   const {
@@ -69,18 +145,27 @@ export function FileBrowser() {
   const deleteMutation = useFileDelete();
   const mkdirMutation = useFileMkdir();
   const renameMutation = useFileRename();
+  const createMutation = useFileCreate();
+  const copyMutation = useFileCopy();
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const fileCreateInputRef = useRef<HTMLInputElement>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Folder creation state
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+
+  // File creation state
+  const [isCreatingFile, setIsCreatingFile] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
 
   // Auto-focus and select all text when folder input appears
   useEffect(() => {
     if (isCreatingFolder) {
-      // Double rAF to ensure React has flushed the value to the DOM
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const el = folderInputRef.current;
@@ -92,6 +177,22 @@ export function FileBrowser() {
       });
     }
   }, [isCreatingFolder]);
+
+  // Auto-focus and select file name (before extension) when file input appears
+  useEffect(() => {
+    if (isCreatingFile) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = fileCreateInputRef.current;
+          if (el) {
+            el.focus();
+            const dotIdx = el.value.lastIndexOf('.');
+            el.setSelectionRange(0, dotIdx > 0 ? dotIdx : el.value.length);
+          }
+        });
+      });
+    }
+  }, [isCreatingFile]);
 
   // All sibling names in current directory (for duplicate detection)
   const siblingNames = useMemo(() => {
@@ -105,6 +206,13 @@ export function FileBrowser() {
     const name = newFolderName.trim().toLowerCase();
     return files.some((f) => f.name.toLowerCase() === name);
   }, [isCreatingFolder, newFolderName, files]);
+
+  // Check if file name already exists
+  const fileNameExists = useMemo(() => {
+    if (!isCreatingFile || !newFileName.trim() || !files) return false;
+    const name = newFileName.trim().toLowerCase();
+    return files.some((f) => f.name.toLowerCase() === name);
+  }, [isCreatingFile, newFileName, files]);
 
   // Separate dirs and files, sorted
   const { dirs, fileItems } = useMemo(() => {
@@ -243,6 +351,153 @@ export function FileBrowser() {
     }
   }, [mkdirMutation, currentPath, newFolderName]);
 
+  // Create file
+  const handleCreateFile = useCallback(async () => {
+    if (!newFileName.trim()) {
+      setIsCreatingFile(false);
+      return;
+    }
+
+    const filePath =
+      currentPath === '.' || currentPath === ''
+        ? newFileName.trim()
+        : `${currentPath}/${newFileName.trim()}`;
+
+    try {
+      await createMutation.mutateAsync({ filePath });
+      toast.success(`Created file: ${newFileName.trim()}`);
+    } catch (err) {
+      toast.error(`Failed to create file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsCreatingFile(false);
+      setNewFileName('');
+    }
+  }, [createMutation, currentPath, newFileName]);
+
+  // Copy/Cut handlers for items
+  const handleCopy = useCallback(
+    (node: FileNode) => {
+      copyToClipboard(node.path, node.name, node.type);
+      toast.success(`Copied "${node.name}" to clipboard`);
+    },
+    [copyToClipboard],
+  );
+
+  const handleCut = useCallback(
+    (node: FileNode) => {
+      cutToClipboard(node.path, node.name, node.type);
+      toast.success(`Cut "${node.name}" to clipboard`);
+    },
+    [cutToClipboard],
+  );
+
+  // Drag-and-drop move handler: move sourcePath into targetDirPath
+  const handleDropMove = useCallback(
+    async (sourcePath: string, targetDirPath: string) => {
+      const sourceName = sourcePath.split('/').pop() || '';
+      const destPath = targetDirPath ? `${targetDirPath}/${sourceName}` : sourceName;
+
+      if (sourcePath === destPath) return;
+
+      try {
+        await renameMutation.mutateAsync({ from: sourcePath, to: destPath });
+        toast.success(`Moved "${sourceName}" to ${targetDirPath.split('/').pop() || 'root'}`);
+      } catch (err) {
+        toast.error(`Failed to move: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    },
+    [renameMutation],
+  );
+
+  // Paste handler
+  const handlePaste = useCallback(async () => {
+    if (!clipboard) return;
+
+    const destDir = currentPath === '.' || currentPath === '' ? '' : currentPath;
+
+    // Generate a unique name if there's a conflict
+    let destName = clipboard.name;
+    if (files) {
+      const existingNames = new Set(files.map((f) => f.name.toLowerCase()));
+      if (existingNames.has(destName.toLowerCase())) {
+        if (clipboard.operation === 'copy') {
+          // Generate "name (copy)", "name (copy 2)", etc.
+          const ext = destName.includes('.') ? destName.substring(destName.lastIndexOf('.')) : '';
+          const baseName = ext ? destName.substring(0, destName.lastIndexOf('.')) : destName;
+          let counter = 0;
+          let candidate = `${baseName} (copy)${ext}`;
+          while (existingNames.has(candidate.toLowerCase())) {
+            counter++;
+            candidate = `${baseName} (copy ${counter + 1})${ext}`;
+          }
+          destName = candidate;
+        } else {
+          // For move/cut, if source and dest dirs are the same, the item is already there
+          const sourceDir = clipboard.path.substring(0, clipboard.path.lastIndexOf('/')) || '.';
+          const normalizedSourceDir = sourceDir === '' ? '.' : sourceDir;
+          const normalizedDestDir = destDir === '' ? '.' : destDir;
+          if (normalizedSourceDir === normalizedDestDir) {
+            toast.error('Item is already in this directory');
+            return;
+          }
+        }
+      }
+    }
+
+    const destPath = destDir ? `${destDir}/${destName}` : destName;
+
+    try {
+      if (clipboard.operation === 'copy') {
+        if (clipboard.type === 'file') {
+          await copyMutation.mutateAsync({
+            sourcePath: clipboard.path,
+            destPath,
+          });
+          toast.success(`Copied "${clipboard.name}" here`);
+        } else {
+          // For directories, use rename to copy (mkdir + read+upload is complex)
+          // We'll use the rename API but since it's a copy, we need a different approach.
+          // For now, create the directory at dest (the copy of directory contents
+          // would require recursive read+upload, which the API doesn't natively support).
+          // Best approach: create empty dir with same name for copy
+          await mkdirMutation.mutateAsync({ dirPath: destPath });
+          toast.success(`Created copy of folder "${clipboard.name}" here (empty)`);
+          toast('Note: directory contents are not copied', { description: 'Copy individual files to move them.' });
+        }
+      } else {
+        // Cut = move via rename
+        await renameMutation.mutateAsync({ from: clipboard.path, to: destPath });
+        toast.success(`Moved "${clipboard.name}" here`);
+        clearClipboard();
+      }
+    } catch (err) {
+      toast.error(`Failed to paste: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, [clipboard, currentPath, files, copyMutation, renameMutation, mkdirMutation, clearClipboard]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when user is typing in inputs
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      const isMod = e.metaKey || e.ctrlKey;
+
+      // Ctrl/Cmd + V: Paste
+      if (isMod && e.key === 'v' && clipboard) {
+        e.preventDefault();
+        handlePaste();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [clipboard, handlePaste]);
+
   // Server not reachable
   if (!isHealthLoading && !health?.healthy) {
     return (
@@ -270,7 +525,7 @@ export function FileBrowser() {
   }
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div ref={containerRef} className="flex flex-col h-full relative">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b shrink-0">
         <FileBreadcrumbs />
@@ -290,6 +545,19 @@ export function FileBrowser() {
             size="icon"
             className="h-7 w-7"
             onClick={() => {
+              setIsCreatingFile(true);
+              setNewFileName('untitled.txt');
+            }}
+            disabled={createMutation.isPending}
+            title="New file"
+          >
+            <FilePlus className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => {
               setIsCreatingFolder(true);
               setNewFolderName('New Folder');
             }}
@@ -298,6 +566,18 @@ export function FileBrowser() {
           >
             <FolderPlus className="h-3.5 w-3.5" />
           </Button>
+          {clipboard && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-primary"
+              onClick={handlePaste}
+              disabled={copyMutation.isPending || renameMutation.isPending}
+              title={`Paste "${clipboard.name}" (${clipboard.operation})`}
+            >
+              <Clipboard className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -361,18 +641,13 @@ export function FileBrowser() {
           <ContextMenu>
             <ContextMenuTrigger asChild>
               <div className="p-1.5 min-h-full">
-                {/* Go up */}
+                {/* Go up — also a drop target for moving items to parent */}
                 {currentPath !== '.' && currentPath !== '' && (
-                  <button
+                  <ParentDropTarget
+                    currentPath={currentPath}
                     onClick={handleNavigateUp}
-                    className={cn(
-                      'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer',
-                      'hover:bg-muted/80 text-muted-foreground',
-                    )}
-                  >
-                    <FolderUp className="h-4 w-4 shrink-0" />
-                    <span>..</span>
-                  </button>
+                    onDropMove={handleDropMove}
+                  />
                 )}
 
                 {/* New folder inline input */}
@@ -415,6 +690,46 @@ export function FileBrowser() {
                   </div>
                 )}
 
+                {/* New file inline input */}
+                {isCreatingFile && (
+                  <div className="flex flex-col gap-0.5 px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <FilePlus className="h-4 w-4 text-green-400 shrink-0" />
+                      <input
+                        type="text"
+                        ref={fileCreateInputRef}
+                        value={newFileName}
+                        onChange={(e) => setNewFileName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !fileNameExists) handleCreateFile();
+                          if (e.key === 'Escape') {
+                            setIsCreatingFile(false);
+                            setNewFileName('');
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!fileNameExists) handleCreateFile();
+                          else {
+                            setIsCreatingFile(false);
+                            setNewFileName('');
+                          }
+                        }}
+                        className={cn(
+                          'flex-1 text-sm bg-transparent border rounded px-1.5 py-0.5 outline-none selection:bg-primary/15 selection:text-foreground',
+                          fileNameExists
+                            ? 'border-red-500/60'
+                            : 'border-primary',
+                        )}
+                      />
+                    </div>
+                    {fileNameExists && (
+                      <p className="text-[11px] text-red-400 pl-6">
+                        A file or folder with that name already exists
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Directories first */}
                 {dirs.map((node) => (
                   <FileTreeItem
@@ -423,8 +738,12 @@ export function FileBrowser() {
                     onClick={() => handleFileClick(node)}
                     onRename={handleRename}
                     onDelete={handleDelete}
+                    onCopy={handleCopy}
+                    onCut={handleCut}
+                    onDropMove={handleDropMove}
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
+                    isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}
                   />
                 ))}
 
@@ -438,13 +757,17 @@ export function FileBrowser() {
                     onRename={handleRename}
                     onDelete={handleDelete}
                     onHistory={handleHistory}
+                    onCopy={handleCopy}
+                    onCut={handleCut}
+                    onDropMove={handleDropMove}
                     siblingNames={siblingNames}
                     gitStatus={gitStatusMap.get(node.path)}
+                    isCut={clipboard?.operation === 'cut' && clipboard.path === node.path}
                   />
                 ))}
 
                 {/* Empty directory */}
-                {files.length === 0 && !isCreatingFolder && (
+                {files.length === 0 && !isCreatingFolder && !isCreatingFile && (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <p className="text-sm text-muted-foreground">
                       Empty directory
@@ -455,15 +778,19 @@ export function FileBrowser() {
             </ContextMenuTrigger>
             <ContextMenuContent className="w-48">
               <ContextMenuItem
-                onClick={handleUpload}
-                disabled={uploadMutation.isPending}
+                onClick={() => {
+                  setTimeout(() => {
+                    setNewFileName('untitled.txt');
+                    setIsCreatingFile(true);
+                  }, 100);
+                }}
+                disabled={createMutation.isPending}
               >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload File
+                <FilePlus className="mr-2 h-4 w-4" />
+                New File
               </ContextMenuItem>
               <ContextMenuItem
                 onClick={() => {
-                  // Small delay to let context menu fully close before input mounts
                   setTimeout(() => {
                     setNewFolderName('New Folder');
                     setIsCreatingFolder(true);
@@ -475,6 +802,29 @@ export function FileBrowser() {
                 New Folder
               </ContextMenuItem>
               <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={handleUpload}
+                disabled={uploadMutation.isPending}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload File
+              </ContextMenuItem>
+              {clipboard && (
+                <>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={handlePaste}
+                    disabled={copyMutation.isPending || renameMutation.isPending}
+                  >
+                    <Clipboard className="mr-2 h-4 w-4" />
+                    Paste{' '}
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {clipboard.operation === 'cut' ? 'Move' : 'Copy'}
+                    </span>
+                  </ContextMenuItem>
+                </>
+              )}
+              <ContextMenuSeparator />
               <ContextMenuItem onClick={() => refetch()}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh
@@ -483,6 +833,22 @@ export function FileBrowser() {
           </ContextMenu>
         )}
       </div>
+
+      {/* Clipboard indicator bar */}
+      {clipboard && (
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-t bg-muted/30 text-xs text-muted-foreground shrink-0">
+          <span className="truncate">
+            {clipboard.operation === 'cut' ? 'Moving' : 'Copying'}:{' '}
+            <span className="font-medium text-foreground">{clipboard.name}</span>
+          </span>
+          <button
+            onClick={clearClipboard}
+            className="text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>

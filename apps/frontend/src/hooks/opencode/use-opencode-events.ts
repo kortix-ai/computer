@@ -11,6 +11,7 @@ import {
   notifySessionError,
   notifyQuestion,
   notifyPermissionRequest,
+  notifyTaskComplete,
 } from '@/lib/web-notifications';
 import { opencodeKeys } from './use-opencode-sessions';
 import { ptyKeys } from './use-opencode-pty';
@@ -82,9 +83,9 @@ export function useOpenCodeEventStream() {
     const coalesced = new Map<string, number>();
 
     function getCoalesceKey(event: OpenCodeEvent): string | undefined {
-      if (event.type === 'session.status') {
-        return `session.status:${(event.properties as any)?.sessionID}`;
-      }
+      // NOTE: session.status events are NOT coalesced — they represent
+      // important state transitions (busy → idle) that must all be processed
+      // for notification detection to work correctly.
       if (event.type === 'message.part.updated') {
         const part = (event.properties as any)?.part;
         return `message.part.updated:${part?.messageID}:${part?.id}`;
@@ -241,7 +242,17 @@ export function useOpenCodeEventStream() {
         case 'session.status': {
           const { sessionID, status } = event.properties as any;
           if (sessionID && status) {
+            // Detect busy/retry → idle transition BEFORE updating the store
+            // (coalescing can drop intermediate busy events, so we check here)
+            const prevStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionID];
             setStatus(sessionID, status);
+            if (
+              status.type === 'idle' &&
+              prevStatus &&
+              prevStatus.type !== 'idle'
+            ) {
+              notifyTaskComplete(sessionID, getSessionTitle(sessionID));
+            }
           }
           break;
         }
@@ -249,7 +260,11 @@ export function useOpenCodeEventStream() {
         case 'session.idle': {
           const sessionID = (event.properties as any).sessionID;
           if (sessionID) {
+            const prevStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionID];
             setStatus(sessionID, { type: 'idle' });
+            if (prevStatus && prevStatus.type !== 'idle') {
+              notifyTaskComplete(sessionID, getSessionTitle(sessionID));
+            }
           }
           break;
         }
