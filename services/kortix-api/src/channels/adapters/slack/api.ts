@@ -1,7 +1,5 @@
 const SLACK_API = 'https://slack.com/api';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
 export interface SlackPostMessageOptions {
   channel: string;
   text: string;
@@ -54,6 +52,15 @@ export interface SlackReplyMessage {
   ts: string;
   thread_ts?: string;
   subtype?: string;
+  files?: Array<{
+    id: string;
+    name: string;
+    mimetype: string;
+    filetype: string;
+    url_private: string;
+    url_private_download?: string;
+    size: number;
+  }>;
 }
 
 export interface SlackFileUploadOptions {
@@ -72,8 +79,6 @@ export interface SlackConversationMessage {
   ts: string;
   subtype?: string;
 }
-
-// ─── API Client ─────────────────────────────────────────────────────────────
 
 export class SlackApi {
   private botToken: string;

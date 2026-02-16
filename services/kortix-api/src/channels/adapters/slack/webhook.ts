@@ -220,13 +220,20 @@ export async function handleSlackWebhook(
     return c.json({ ok: true });
   }
 
-  if (event.subtype) {
+  // Allow file_share subtype through; drop everything else
+  if (event.subtype && event.subtype !== 'file_share') {
     return c.json({ ok: true });
   }
 
+  const hasFiles = event.files && event.files.length > 0;
   let content = event.text || '';
-  if (!content) {
+  if (!content && !hasFiles) {
     return c.json({ ok: true });
+  }
+  // If files are attached but no text, give the agent context about the upload
+  if (!content && hasFiles) {
+    const fileNames = event.files!.map((f) => f.name).join(', ');
+    content = `[User uploaded: ${fileNames}]`;
   }
 
   const channelConfig = await findConfigByTeamId(eventPayload.team_id);
@@ -308,23 +315,27 @@ export async function handleSlackWebhook(
   }
 
   (async () => {
-    if (event.files && event.files.length > 0) {
-      const credentials = channelConfig.credentials as Record<string, unknown>;
-      const botToken = credentials?.botToken as string;
-      if (botToken) {
-        normalized.attachments = await downloadSlackFiles(event.files, botToken);
-      }
+    const credentials = channelConfig.credentials as Record<string, unknown>;
+    const botToken = credentials?.botToken as string;
+
+    if (event.files && event.files.length > 0 && botToken) {
+      normalized.attachments = await downloadSlackFiles(event.files, botToken);
     }
 
     if (event.thread_ts && event.channel) {
-      normalized.threadContext = await fetchThreadContext(
+      const threadResult = await fetchThreadContext(
         channelConfig,
         event.channel,
         event.thread_ts,
         event.ts || '',
         botUserId,
       );
+      normalized.threadContext = threadResult.messages;
+      if (normalized.attachments.length === 0 && threadResult.files.length > 0 && botToken) {
+        normalized.attachments = await downloadSlackFiles(threadResult.files, botToken);
+      }
     }
+
     await engine.processMessage(normalized);
   })().catch((err) => {
     console.error('[SLACK] Failed to process message:', err);
@@ -412,24 +423,35 @@ function confirmCommandInThread(
   });
 }
 
+interface ThreadContextResult {
+  messages: ThreadMessage[];
+  files: NonNullable<SlackEvent['files']>;
+}
+
 async function fetchThreadContext(
   channelConfig: ChannelConfig,
   channel: string,
   threadTs: string,
   currentTs: string,
   botUserId?: string,
-): Promise<ThreadMessage[]> {
+): Promise<ThreadContextResult> {
   try {
     const credentials = channelConfig.credentials as Record<string, unknown>;
     const botToken = credentials?.botToken as string | undefined;
-    if (!botToken) return [];
+    if (!botToken) return { messages: [], files: [] };
 
     const api = new SlackApi(botToken);
     const result = await api.conversationsReplies(channel, threadTs, 30);
-    if (!result.ok || !result.messages) return [];
+    if (!result.ok || !result.messages) return { messages: [], files: [] };
 
     const context: ThreadMessage[] = [];
+    const threadFiles: NonNullable<SlackEvent['files']> = [];
+
     for (const msg of result.messages) {
+      if (msg.ts !== currentTs && msg.files) {
+        threadFiles.push(...msg.files);
+      }
+
       if (msg.ts === currentTs) continue;
       if (!msg.text) continue;
 
@@ -442,10 +464,10 @@ async function fetchThreadContext(
         isBot,
       });
     }
-    return context;
+    return { messages: context, files: threadFiles };
   } catch (err) {
     console.warn('[SLACK] Failed to fetch thread context:', err);
-    return [];
+    return { messages: [], files: [] };
   }
 }
 
