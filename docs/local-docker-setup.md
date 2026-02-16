@@ -104,7 +104,53 @@ Large image (~4GB) with s6-overlay, OpenCode, browser tools, etc. Takes a few mi
 
 ---
 
+## Multi-Platform Builds (amd64 + arm64)
+
+**Critical:** All images MUST be built for both `linux/amd64` and `linux/arm64`. If you only build for one platform, Docker Desktop will use **qemu emulation** on the other — running at ~10-20% speed, causing services to hang and timeout.
+
+### One-time setup
+
+```bash
+# Create a buildx builder that supports multi-platform
+docker buildx create --name multiarch --use --bootstrap
+```
+
+### Build & push multi-platform (build + push in one step)
+
+`docker buildx build --platform` builds natively for each arch and pushes a multi-arch manifest. Docker Hub then serves the correct image per platform automatically.
+
+```bash
+cd /path/to/computer
+
+# Sandbox (multi-platform, builds Rust + Node for each arch natively)
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -f sandbox/Dockerfile -t kortixmarko/sandbox:latest --push .
+
+# API
+docker buildx build --platform linux/amd64,linux/arm64 \
+  --build-arg SERVICE=kortix-api \
+  -f services/Dockerfile -t kortixmarko/kortix-api:latest --push .
+
+# Frontend (after host build)
+docker buildx build --platform linux/amd64,linux/arm64 --no-cache \
+  -f apps/frontend/Dockerfile -t kortixmarko/kortix-frontend:latest --push .
+```
+
+> **Note:** `--push` is required because multi-platform images can't be loaded into the local Docker daemon (they contain multiple architectures). The images go directly to Docker Hub. To test locally, build for your platform only with `docker build` (no buildx).
+
+### Local-only build (single platform, for dev/testing)
+
+```bash
+docker build -f sandbox/Dockerfile -t kortixmarko/sandbox:latest .
+```
+
+This builds for your host platform only. Fast, but the image won't work on other architectures.
+
+---
+
 ## Pushing to Docker Hub
+
+When using `docker buildx build --push`, images are pushed automatically during build. For single-platform builds:
 
 ```bash
 docker push kortixmarko/kortix-frontend:latest
