@@ -37,6 +37,7 @@ const LOCALHOST_URL_REGEX =
  * by the sandbox infrastructure (VNC, OpenCode Web, presentation viewer, etc.)
  */
 const EXCLUDED_PORTS = new Set([
+  3000,  // Next.js default dev port (the frontend itself)
   4096,  // OpenCode API (proxied by Kortix Master)
   parseInt(SANDBOX_PORTS.KORTIX_MASTER, 10),  // Kortix Master itself
 ]);
@@ -159,12 +160,25 @@ export function getProxyBaseUrl(
 
 /**
  * Check if a URL is a localhost URL that we can proxy.
+ * Excludes infrastructure ports AND the current app's own port so we never
+ * rewrite the frontend's own navigation links.
  */
 export function isProxiableLocalhostUrl(url: string): boolean {
   const match = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1):(\d{1,5})/);
   if (!match) return false;
   const port = parseInt(match[1], 10);
-  return port >= 1 && port <= 65535 && !EXCLUDED_PORTS.has(port);
+  if (port < 1 || port > 65535 || EXCLUDED_PORTS.has(port)) return false;
+
+  // Never proxy URLs that point at the app itself
+  if (typeof window !== 'undefined') {
+    try {
+      const appOrigin = window.location.origin;
+      const urlOrigin = new URL(url).origin;
+      if (urlOrigin === appOrigin) return false;
+    } catch { /* invalid URL, fall through */ }
+  }
+
+  return true;
 }
 
 /**
@@ -182,12 +196,13 @@ export function proxyLocalhostUrl(
   mappedPorts?: Record<string, string>,
 ): string | undefined {
   if (!url) return url;
+  // Don't rewrite URLs pointing at the app itself
+  if (!isProxiableLocalhostUrl(url)) return url;
   const match = url.match(
     /^https?:\/\/(?:localhost|127\.0\.0\.1):(\d{1,5})(\/[^\s)"'<>]*)?$/,
   );
   if (!match) return url;
   const port = parseInt(match[1], 10);
-  if (port < 1 || port > 65535 || EXCLUDED_PORTS.has(port)) return url;
   const path = match[2] || '/';
   return rewriteLocalhostUrl(port, path, serverUrl, mappedPorts);
 }
