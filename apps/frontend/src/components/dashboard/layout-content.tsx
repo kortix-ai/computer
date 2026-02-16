@@ -381,13 +381,9 @@ export default function DashboardLayoutContent({
           <SetupOverlay
             onComplete={() => {
               setShowSetupOverlay(false);
-              // Persist onboarding completion server-side so it doesn't show again
-              const backendUrl =
-                process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-              fetch(`${backendUrl}/setup/onboarding-complete`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-              }).catch(() => {});
+              // NOTE: Do NOT set ONBOARDING_COMPLETE here — only the onboarding
+              // agent's onboarding_complete tool should persist that flag.
+              // Setting it here would mark onboarding done before the agent runs.
             }}
           />
         </Suspense>
