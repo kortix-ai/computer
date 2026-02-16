@@ -168,24 +168,30 @@ export class ChannelEngineImpl {
         }
       }
 
-      // Detect new files created during the prompt by diffing against snapshot
       if (adapter.sendFiles) {
         try {
           const filesAfter = await connector.getModifiedFiles().catch(() => []);
           const newFiles: FileOutput[] = [];
           const alreadyUploaded = new Set(collectedFiles.map((f) => f.name));
 
-          for (const f of filesAfter) {
-            if (filesBefore.has(f.path)) continue; // existed before prompt
-            if (alreadyUploaded.has(f.name)) continue; // already uploaded via SSE
+          console.log(`[CHANNELS] File detection: before=${filesBefore.size} after=${filesAfter.length} sse=${collectedFiles.length}`);
 
+          for (const f of filesAfter) {
+            if (filesBefore.has(f.path)) continue;
+            if (alreadyUploaded.has(f.name)) continue;
+
+            console.log(`[CHANNELS] New file detected: ${f.path}`);
             const buffer = await connector.downloadFileByPath(f.path);
             if (buffer) {
+              console.log(`[CHANNELS] Downloaded file: ${f.name} (${buffer.length} bytes)`);
               newFiles.push({ name: f.name, url: f.path, content: buffer });
+            } else {
+              console.warn(`[CHANNELS] Failed to download file: ${f.path}`);
             }
           }
 
           if (newFiles.length > 0) {
+            console.log(`[CHANNELS] Uploading ${newFiles.length} file(s) to channel`);
             await adapter.sendFiles(config, message, newFiles).catch((err) => {
               console.error('[CHANNELS] File upload failed:', err);
             });
