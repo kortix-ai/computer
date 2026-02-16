@@ -1,6 +1,6 @@
 {
   "name": "@kortix/sandbox",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "description": "Kortix sandbox runtime — kortix-master, opencode config/agents/skills, and dependencies",
   "private": false,
   "scripts": {
