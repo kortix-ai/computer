@@ -8,6 +8,7 @@ import {
   jsonb,
   integer,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -73,6 +74,12 @@ export const sessionStrategyEnum = kortixSchema.enum('session_strategy', [
   'per-thread',
   'per-user',
   'per-message',
+]);
+
+export const apiKeyStatusEnum = kortixSchema.enum('api_key_status', [
+  'active',
+  'revoked',
+  'expired',
 ]);
 
 export interface ChannelCredentials {
@@ -309,11 +316,39 @@ export const channelIdentityMap = kortixSchema.table(
   ],
 );
 
+// ─── API Keys (sandbox-scoped) ──────────────────────────────────────────────
+
+export const kortixApiKeys = kortixSchema.table(
+  'api_keys',
+  {
+    keyId: uuid('key_id').defaultRandom().primaryKey(),
+    sandboxId: uuid('sandbox_id')
+      .notNull()
+      .references(() => sandboxes.sandboxId, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').notNull(),
+    publicKey: varchar('public_key', { length: 64 }).notNull(),
+    secretKeyHash: varchar('secret_key_hash', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    description: text('description'),
+    status: apiKeyStatusEnum('status').default('active').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_kortix_api_keys_public_key').on(table.publicKey),
+    index('idx_kortix_api_keys_secret_hash').on(table.secretKeyHash),
+    index('idx_kortix_api_keys_sandbox').on(table.sandboxId),
+    index('idx_kortix_api_keys_account').on(table.accountId),
+  ],
+);
+
 export const sandboxesRelations = relations(sandboxes, ({ many }) => ({
   triggers: many(triggers),
   executions: many(executions),
   deployments: many(deployments),
   channelConfigs: many(channelConfigs),
+  apiKeys: many(kortixApiKeys),
 }));
 
 export const triggersRelations = relations(triggers, ({ one, many }) => ({
@@ -370,5 +405,12 @@ export const channelIdentityMapRelations = relations(channelIdentityMap, ({ one 
   channelConfig: one(channelConfigs, {
     fields: [channelIdentityMap.channelConfigId],
     references: [channelConfigs.channelConfigId],
+  }),
+}));
+
+export const kortixApiKeysRelations = relations(kortixApiKeys, ({ one }) => ({
+  sandbox: one(sandboxes, {
+    fields: [kortixApiKeys.sandboxId],
+    references: [sandboxes.sandboxId],
   }),
 }));

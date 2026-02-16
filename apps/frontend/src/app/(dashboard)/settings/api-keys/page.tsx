@@ -50,6 +50,7 @@ import {
   APIKeyResponse,
   APIKeyCreateResponse,
 } from '@/lib/api/api-keys';
+import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 
 interface NewAPIKeyData {
   title: string;
@@ -58,6 +59,7 @@ interface NewAPIKeyData {
 }
 
 export default function APIKeysPage() {
+  const activeSandboxId = useKortixComputerStore((s) => s.currentSandboxId);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyData, setNewKeyData] = useState<NewAPIKeyData>({
     title: '',
@@ -70,24 +72,25 @@ export default function APIKeysPage() {
   const queryClient = useQueryClient();
 
 
-  // Fetch API keys
+  // Fetch API keys (sandbox-scoped)
   const {
     data: apiKeysResponse,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['api-keys'],
-    queryFn: () => apiKeysApi.list(),
+    queryKey: ['api-keys', activeSandboxId],
+    queryFn: () => apiKeysApi.list(activeSandboxId!),
+    enabled: !!activeSandboxId,
   });
 
-  const apiKeys = apiKeysResponse?.data || [];
+  const apiKeys = apiKeysResponse?.data?.data || [];
 
   // Create API key mutation
   const createMutation = useMutation({
     mutationFn: (request: APIKeyCreateRequest) => apiKeysApi.create(request),
     onSuccess: (response) => {
-      if (response.success && response.data) {
-        setCreatedApiKey(response.data);
+      if (response.success && response.data?.data) {
+        setCreatedApiKey(response.data.data);
         setShowCreatedKey(true);
         setIsCreateDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: ['api-keys'] });
@@ -131,7 +134,13 @@ export default function APIKeysPage() {
   });
 
   const handleCreateAPIKey = () => {
+    if (!activeSandboxId) {
+      toast.error('No active sandbox — start a sandbox first');
+      return;
+    }
+
     const request: APIKeyCreateRequest = {
+      sandbox_id: activeSandboxId,
       title: newKeyData.title.trim(),
       description: newKeyData.description.trim() || undefined,
       expires_in_days:

@@ -42,6 +42,9 @@ export async function apiKeyAuth(c: Context, next: Next) {
 
     c.set('accountId', result.accountId);
     c.set('keyId', result.keyId);
+    if (result.sandboxId) {
+      c.set('sandboxId', result.sandboxId);
+    }
     await next();
     return;
   }
