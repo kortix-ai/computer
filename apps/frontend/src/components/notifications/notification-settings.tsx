@@ -322,7 +322,7 @@ export function BrowserNotificationSettings() {
       title: 'Test Browser Notification',
       body: 'Browser notifications are working correctly!',
       tag: 'test',
-    });
+    }, true);
   };
 
   if (!supported) {

@@ -5,6 +5,7 @@ import {
   ArrowUp,
   ChevronDown,
   Check,
+  Loader2,
   Paperclip,
   X,
   FileText,
@@ -34,7 +35,7 @@ import type {
   Command,
   ProviderListResponse,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { useSummarizeOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
+import { useSummarizeOpenCodeSession, findOpenCodeFiles } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 
@@ -574,10 +575,12 @@ function MentionPopover({
   items,
   selectedIndex,
   onSelect,
+  loading,
 }: {
   items: MentionItem[];
   selectedIndex: number;
   onSelect: (item: MentionItem) => void;
+  loading?: boolean;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -587,7 +590,8 @@ function MentionPopover({
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
-  if (items.length === 0) return null;
+  // Show the popover when loading or when there are items
+  if (items.length === 0 && !loading) return null;
 
   const agents = items.filter((i) => i.kind === 'agent');
   const files = items.filter((i) => i.kind === 'file');
@@ -641,6 +645,13 @@ function MentionPopover({
               );
             })}
           </>
+        )}
+        {/* Loading indicator while searching for files */}
+        {loading && files.length === 0 && (
+          <div className="px-3 py-2 flex items-center gap-2 text-muted-foreground/60">
+            <Loader2 className="size-3.5 animate-spin" />
+            <span className="text-xs">Searching files...</span>
+          </div>
         )}
       </div>
     </div>
@@ -731,12 +742,22 @@ export function SessionChatInput({
   const [slashIndex, setSlashIndex] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
+  // File search: use provided callback or fall back to the SDK directly
+  const fileSearchFn = useMemo(() => {
+    if (onFileSearch) return onFileSearch;
+    return async (query: string): Promise<string[]> => {
+      try { return await findOpenCodeFiles(query); } catch { return []; }
+    };
+  }, [onFileSearch]);
+
   // @ mention state
   const [mentionQuery, setMentionQuery] = useState<{ query: string; triggerPos: number } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentions, setMentions] = useState<TrackedMention[]>([]);
   const [fileResults, setFileResults] = useState<string[]>([]);
+  const [fileSearchLoading, setFileSearchLoading] = useState(false);
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fileSearchSeq = useRef(0); // sequence counter to discard stale results
   const placeholderFadeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -814,38 +835,77 @@ export function SessionChatInput({
   }, [commands, slashFilter]);
 
   // Debounced file search for @ mentions
+  // Key fix: do NOT clear previous results between keystrokes — keep them visible
+  // until new results arrive. Merge new results with existing ones that still match
+  // so narrowing the query never drops valid cached results.
   useEffect(() => {
     clearTimeout(fileSearchTimer.current);
-    if (!mentionQuery || !onFileSearch) {
+    if (!mentionQuery) {
       setFileResults([]);
+      setFileSearchLoading(false);
       return;
     }
+    setFileSearchLoading(true);
+    const seq = ++fileSearchSeq.current;
+    const currentQuery = mentionQuery.query;
     fileSearchTimer.current = setTimeout(async () => {
       try {
-        const results = await onFileSearch(mentionQuery.query);
-        setFileResults(results);
+        const results = await fileSearchFn(currentQuery);
+        // Only apply if this is still the latest request
+        if (seq === fileSearchSeq.current) {
+          // Merge: keep existing results that still match the query + add new ones
+          const q = currentQuery.toLowerCase();
+          setFileResults((prev) => {
+            const kept = q.length > 0
+              ? prev.filter((f) => f.toLowerCase().includes(q))
+              : prev;
+            const merged = new Set([...results, ...kept]);
+            return Array.from(merged).slice(0, 20);
+          });
+          setFileSearchLoading(false);
+        }
       } catch {
-        setFileResults([]);
+        if (seq === fileSearchSeq.current) {
+          // On error, keep existing matching results rather than clearing
+          const q = currentQuery.toLowerCase();
+          setFileResults((prev) =>
+            q.length > 0 ? prev.filter((f) => f.toLowerCase().includes(q)) : prev,
+          );
+          setFileSearchLoading(false);
+        }
       }
-    }, 200);
+    }, 150);
     return () => clearTimeout(fileSearchTimer.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mentionQuery?.query, onFileSearch]);
+  }, [mentionQuery?.query, fileSearchFn]);
 
   // Build mention popover items: agents (sync) + files (async)
+  // File results are also filtered client-side against the current query so that
+  // previously fetched results remain visible even if a longer query yields fewer
+  // server-side results (e.g. SDK returns files for "te" but not for "test").
   const mentionItems = useMemo((): MentionItem[] => {
     if (!mentionQuery) return [];
     const q = mentionQuery.query.toLowerCase();
     const agentItems: MentionItem[] = agents
       .filter((a) => a.name.toLowerCase().includes(q))
       .map((a) => ({ kind: 'agent' as const, label: a.name, value: a.name }));
-    const fileItems: MentionItem[] = fileResults.map((f) => ({
+    const filteredFiles = q.length > 0
+      ? fileResults.filter((f) => f.toLowerCase().includes(q))
+      : fileResults;
+    const fileItems: MentionItem[] = filteredFiles.map((f) => ({
       kind: 'file' as const,
       label: f,
       value: f,
     }));
     return [...agentItems, ...fileItems];
   }, [mentionQuery, agents, fileResults]);
+
+  // Clamp mention index when items change to prevent out-of-bounds selection
+  useEffect(() => {
+    if (mentionItems.length > 0) {
+      setMentionIndex((i) => Math.min(i, mentionItems.length - 1));
+    }
+  }, [mentionItems.length]);
 
   const enqueue = useMessageQueueStore((s) => s.enqueue);
 
@@ -927,21 +987,23 @@ export function SessionChatInput({
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     // @ mention popover keyboard navigation
-    if (mentionQuery !== null && mentionItems.length > 0) {
+    if (mentionQuery !== null && (mentionItems.length > 0 || fileSearchLoading)) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setMentionIndex((i) => (i + 1) % mentionItems.length);
+        if (mentionItems.length > 0) setMentionIndex((i) => (i + 1) % mentionItems.length);
         return;
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setMentionIndex((i) => (i - 1 + mentionItems.length) % mentionItems.length);
+        if (mentionItems.length > 0) setMentionIndex((i) => (i - 1 + mentionItems.length) % mentionItems.length);
         return;
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        handleSelectMention(mentionItems[mentionIndex]);
-        return;
+        if (mentionItems.length > 0) {
+          e.preventDefault();
+          handleSelectMention(mentionItems[mentionIndex]);
+          return;
+        }
       }
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -1122,11 +1184,12 @@ export function SessionChatInput({
               )}
 
               {/* @ Mention popover */}
-              {mentionQuery !== null && mentionItems.length > 0 && (
+              {mentionQuery !== null && (mentionItems.length > 0 || fileSearchLoading) && (
                 <MentionPopover
                   items={mentionItems}
                   selectedIndex={mentionIndex}
                   onSelect={handleSelectMention}
+                  loading={fileSearchLoading}
                 />
               )}
 
