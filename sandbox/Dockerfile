@@ -115,21 +115,31 @@ COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
 RUN cd /opt/opencode && bun install
 
 # Replace glibc-linked bun-pty .so with musl-compiled version from builder stage.
-# bun-pty's resolveLibPath() picks librust_pty_arm64.so on arm64, librust_pty.so on x86_64.
-# The Rust builder on Alpine produces a single librust_pty.so regardless of arch, so we
-# copy it to the correct filename based on the target architecture.
-COPY --from=rust-pty-builder /build/librust_pty.so /tmp/librust_pty_musl.so
+# bun-pty ships .so files compiled against glibc, but Alpine uses musl.
+# We must replace the .so in ALL locations where bun-pty exists:
+#   1. /opt/opencode/node_modules/bun-pty/          (installed by bun install)
+#   2. /opt/bun/install/cache/bun-pty@*/             (Bun's global cache)
+# The workspace copy (/workspace/.cache/opencode/) lives on a Docker volume
+# and is patched at startup by the 96-fix-bun-pty script below.
+COPY --from=rust-pty-builder /build/librust_pty.so /opt/bun-pty-musl/librust_pty.so
 RUN ARCH=$(uname -m) \
-    && PTY_DIR=/opt/opencode/node_modules/bun-pty/rust-pty/target/release \
-    && if [ "$ARCH" = "x86_64" ]; then \
-         cp /tmp/librust_pty_musl.so "$PTY_DIR/librust_pty.so"; \
-       else \
-         cp /tmp/librust_pty_musl.so "$PTY_DIR/librust_pty_arm64.so"; \
-       fi \
-    && rm /tmp/librust_pty_musl.so \
-    && chown 1000:1000 "$PTY_DIR"/*.so
+    && for PTY_DIR in \
+         /opt/opencode/node_modules/bun-pty/rust-pty/target/release \
+         /opt/bun/install/cache/bun-pty@*/rust-pty/target/release; do \
+         [ -d "$PTY_DIR" ] || continue; \
+         if [ "$ARCH" = "x86_64" ]; then \
+           cp /opt/bun-pty-musl/librust_pty.so "$PTY_DIR/librust_pty.so"; \
+         else \
+           cp /opt/bun-pty-musl/librust_pty.so "$PTY_DIR/librust_pty_arm64.so"; \
+         fi; \
+       done \
+    && chmod 644 /opt/bun-pty-musl/librust_pty.so
 
 ENV OPENCODE_CONFIG_DIR=/opt/opencode
+# Tell bun-pty to load our musl-compiled .so directly, bypassing its path resolution.
+# This ENV is inherited by ALL processes in the container — including the Go binary's
+# Bun subprocess that actually loads bun-pty at runtime.
+ENV BUN_PTY_LIB=/opt/bun-pty-musl/librust_pty.so
 
 # Make bun cache writable by any user (abc UID changes at runtime via PUID)
 RUN chmod -R 777 /opt/bun/install
@@ -176,6 +186,8 @@ RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-lss-syn
 
 # ── Container init scripts (s6 cont-init.d) ─────────────────────────────────
 RUN mkdir -p /custom-cont-init.d
+COPY sandbox/config/96-fix-bun-pty.sh /custom-cont-init.d/96-fix-bun-pty
+RUN chmod +x /custom-cont-init.d/96-fix-bun-pty
 COPY sandbox/config/97-secrets-to-s6-env.sh /custom-cont-init.d/97-secrets-to-s6-env
 RUN chmod +x /custom-cont-init.d/97-secrets-to-s6-env
 COPY sandbox/config/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env
