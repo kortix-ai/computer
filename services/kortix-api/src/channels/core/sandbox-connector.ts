@@ -23,6 +23,9 @@ export interface StreamEvent {
   };
 }
 
+const FILE_PRODUCING_TOOLS = new Set(['show-user']);
+const FILE_ITEM_TYPES = new Set(['file', 'image']);
+
 interface ResolvedEndpoint {
   url: string;
   headers: Record<string, string>;
@@ -178,6 +181,7 @@ export class SandboxConnector {
       });
 
       const assistantMsgIds = new Set<string>();
+      const processedToolCalls = new Set<string>();
       let sawBusy = false;
       let gotText = false;
 
@@ -254,6 +258,27 @@ export class SandboxConnector {
                 },
               };
             }
+
+            // Intercept file-producing tool completions (e.g. show-user)
+            if (part.type === 'tool') {
+              const toolName = part.tool as string;
+              const callID = (part.callID || part.id) as string;
+              const state = part.state as Record<string, unknown> | undefined;
+
+              if (
+                FILE_PRODUCING_TOOLS.has(toolName) &&
+                state?.status === 'completed' &&
+                callID &&
+                !processedToolCalls.has(callID)
+              ) {
+                processedToolCalls.add(callID);
+                const fileEvent = this.extractFileFromToolOutput(toolName, state);
+                if (fileEvent) {
+                  console.log(`[SANDBOX-CONNECTOR] File from ${toolName} tool: ${fileEvent.name} (${fileEvent.url})`);
+                  yield { type: 'file', file: fileEvent };
+                }
+              }
+            }
           }
 
           if (evt === 'permission.asked' || evt === 'permission.requested') {
@@ -294,6 +319,52 @@ export class SandboxConnector {
       clearTimeout(timeout);
       controller.abort();
     }
+  }
+
+  private extractFileFromToolOutput(
+    toolName: string,
+    state: Record<string, unknown>,
+  ): { name: string; url: string; mimeType?: string } | null {
+    const input = state.input as Record<string, unknown> | undefined;
+    const output = state.output as string | undefined;
+
+    if (toolName === 'show-user') {
+      const itemType = (input?.type as string) || '';
+      let filePath: string | undefined;
+
+      if (FILE_ITEM_TYPES.has(itemType) && input?.path) {
+        filePath = input.path as string;
+      }
+
+      if (!filePath && output) {
+        try {
+          const parsed = JSON.parse(output);
+          const entry = parsed.entry as Record<string, unknown> | undefined;
+          const entryType = (entry?.type as string) || '';
+          if (FILE_ITEM_TYPES.has(entryType) && entry?.path) {
+            filePath = entry.path as string;
+          }
+        } catch {
+        }
+      }
+
+      if (filePath) {
+        const name = filePath.split('/').pop() || 'file';
+        const mimeType = itemType === 'image' ? this.guessImageMime(name) : undefined;
+        return { name, url: filePath, mimeType };
+      }
+    }
+
+    return null;
+  }
+
+  private guessImageMime(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    const mimes: Record<string, string> = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+    };
+    return mimes[ext] || 'image/png';
   }
 
   async replyPermission(permissionId: string, approved: boolean): Promise<void> {
@@ -345,10 +416,6 @@ export class SandboxConnector {
     }
   }
 
-  /**
-   * Get files modified/created in the sandbox by checking git status.
-   * Only returns user-facing files (not hidden files, node_modules, etc.)
-   */
   async getModifiedFiles(): Promise<Array<{ name: string; path: string }>> {
     try {
       const { url, headers } = await this.getEndpoint();

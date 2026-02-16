@@ -156,16 +156,31 @@ export class ChannelEngineImpl {
       const uploadedFileNames = new Set<string>();
 
       if (collectedFiles.length > 0 && adapter.sendFiles) {
+        console.log(`[CHANNELS] Strategy 1: ${collectedFiles.length} file(s) from SSE stream`);
         for (const file of collectedFiles) {
           if (!file.content) {
+            console.log(`[CHANNELS] Downloading SSE file: name=${file.name} url=${file.url}`);
             const buffer = await connector.downloadFile(file.url);
-            if (buffer) file.content = buffer;
+            if (buffer) {
+              console.log(`[CHANNELS] Downloaded: ${file.name} (${buffer.length} bytes)`);
+              file.content = buffer;
+            } else {
+              console.warn(`[CHANNELS] Download failed for ${file.url}, trying by name...`);
+              const fallback = await connector.downloadFileByPath(file.name);
+              if (fallback) {
+                console.log(`[CHANNELS] Fallback download succeeded: ${file.name} (${fallback.length} bytes)`);
+                file.content = fallback;
+              } else {
+                console.error(`[CHANNELS] All download attempts failed for: ${file.name}`);
+              }
+            }
           }
         }
         const downloadedFiles = collectedFiles.filter((f) => f.content);
         if (downloadedFiles.length > 0) {
+          console.log(`[CHANNELS] Uploading ${downloadedFiles.length} SSE file(s) to channel`);
           await adapter.sendFiles(config, message, downloadedFiles).catch((err) => {
-            console.error('[CHANNELS] File upload failed:', err);
+            console.error('[CHANNELS] File upload to channel failed:', err);
           });
           for (const f of downloadedFiles) {
             uploadedFileNames.add(f.name);
@@ -177,32 +192,31 @@ export class ChannelEngineImpl {
         try {
           const filesAfter = await connector.getModifiedFiles().catch(() => []);
           const newFiles: FileOutput[] = [];
-          const alreadyUploaded = uploadedFileNames;
 
-          console.log(`[CHANNELS] File detection: before=${filesBefore.size} after=${filesAfter.length} sse=${collectedFiles.length}`);
+          console.log(`[CHANNELS] Strategy 2: git status before=${filesBefore.size} after=${filesAfter.length} already_uploaded=${uploadedFileNames.size}`);
 
           for (const f of filesAfter) {
             if (filesBefore.has(f.path)) continue;
-            if (alreadyUploaded.has(f.name)) continue;
+            if (uploadedFileNames.has(f.name)) continue;
 
-            console.log(`[CHANNELS] New file detected: ${f.path}`);
+            console.log(`[CHANNELS] New file from git status: ${f.path}`);
             const buffer = await connector.downloadFileByPath(f.path);
             if (buffer) {
-              console.log(`[CHANNELS] Downloaded file: ${f.name} (${buffer.length} bytes)`);
+              console.log(`[CHANNELS] Downloaded: ${f.name} (${buffer.length} bytes)`);
               newFiles.push({ name: f.name, url: f.path, content: buffer });
             } else {
-              console.warn(`[CHANNELS] Failed to download file: ${f.path}`);
+              console.warn(`[CHANNELS] Failed to download: ${f.path}`);
             }
           }
 
           if (newFiles.length > 0) {
-            console.log(`[CHANNELS] Uploading ${newFiles.length} file(s) to channel`);
+            console.log(`[CHANNELS] Uploading ${newFiles.length} git-detected file(s) to channel`);
             await adapter.sendFiles(config, message, newFiles).catch((err) => {
-              console.error('[CHANNELS] File upload failed:', err);
+              console.error('[CHANNELS] File upload to channel failed:', err);
             });
           }
         } catch (err) {
-          console.warn('[CHANNELS] Failed to detect new files:', err);
+          console.warn('[CHANNELS] Strategy 2 (git status) failed:', err);
         }
       }
 
@@ -232,8 +246,13 @@ export class ChannelEngineImpl {
         return responseText;
 
       case 'file':
-        if (event.file && event.file.url) {
-          collectedFiles.push(event.file);
+        if (event.file && (event.file.url || event.file.name)) {
+          console.log(`[CHANNELS] SSE file event: name=${event.file.name} url=${event.file.url}`);
+          collectedFiles.push({
+            name: event.file.name,
+            url: event.file.url || event.file.name,
+            mimeType: event.file.mimeType,
+          });
         }
         return responseText;
 
