@@ -300,7 +300,9 @@ async function handleAgentsCommand(
     return;
   }
 
-  const agents = await connector.listAgents();
+  const allAgents = await connector.listAgents();
+  // Filter out subagents — only show primary and "all" mode agents
+  const agents = allAgents.filter((a) => a.mode !== 'subagent');
   if (agents.length === 0) {
     await postToResponseUrl(ctx.responseUrl, ':x: No agents available.', true);
     return;
@@ -310,7 +312,7 @@ async function handleAgentsCommand(
 
   const lines: string[] = ['*Available Agents*\n'];
   for (const agent of agents) {
-    const isCurrent = agent.name === currentAgent || (agent.isDefault && currentAgent === 'default');
+    const isCurrent = agent.name === currentAgent;
     const marker = isCurrent ? ' :white_check_mark:' : '';
     const desc = agent.description ? ` — ${agent.description}` : '';
     lines.push(`\`${agent.name}\`${desc}${marker}`);
