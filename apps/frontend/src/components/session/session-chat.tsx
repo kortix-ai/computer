@@ -2143,16 +2143,20 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const queueClearSession = useMessageQueueStore((s) => s.clearSession);
   const [queueExpanded, setQueueExpanded] = useState(true);
 
-  // Track previous busy state to detect idle transitions
-  const prevBusyRef = useRef(isBusy);
+  // Track previous *server* busy state to detect idle transitions.
+  // We use `isServerBusy` (the actual server status) instead of the derived
+  // `isBusy` because `isBusy` includes optimistic client state
+  // (`pendingUserMessage`) which can flicker false before the server has
+  // reported busy via SSE — causing the drain to fire twice.
+  const prevServerBusyRef = useRef(isServerBusy);
 
-  // Auto-drain: when session transitions from busy → idle, send the next queued message
+  // Auto-drain: when server transitions from busy → idle, send the next queued message
   useEffect(() => {
-    const wasBusy = prevBusyRef.current;
-    prevBusyRef.current = isBusy;
+    const wasBusy = prevServerBusyRef.current;
+    prevServerBusyRef.current = isServerBusy;
 
-    if (wasBusy && !isBusy) {
-      // Session just became idle — check for queued messages
+    if (wasBusy && !isServerBusy) {
+      // Server confirmed idle — check for queued messages
       const sessionQueue = useMessageQueueStore.getState().messages.filter(
         (m) => m.sessionId === sessionId,
       );
@@ -2167,7 +2171,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         return () => clearTimeout(timer);
       }
     }
-  }, [isBusy, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isServerBusy, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Send now" handler: abort current session + send the queued message
   const handleQueueSendNow = useCallback(

@@ -831,9 +831,18 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             <p className="text-xs text-muted-foreground/60 mt-1">Start a new session to get going</p>
           </div>
         ) : filteredRootSessions.length === 0 && searchQuery ? (
-          <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
-            <Search className="h-6 w-6 text-muted-foreground/30 mb-2" />
-            <p className="text-xs text-muted-foreground">No sessions match &ldquo;{searchQuery}&rdquo;</p>
+          <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+            <Search className="h-8 w-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">No results found</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              No sessions match &ldquo;{searchQuery}&rdquo;
+            </p>
+            <button
+              onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+              className="mt-3 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+            >
+              Clear search
+            </button>
           </div>
         ) : (
           <div className="space-y-0.5">
