@@ -149,9 +149,18 @@ export class ChannelEngineImpl {
       await adapter.sendResponse(config, message, agentResponse);
 
       if (collectedFiles.length > 0 && adapter.sendFiles) {
-        await adapter.sendFiles(config, message, collectedFiles).catch((err) => {
-          console.error('[CHANNELS] File upload failed:', err);
-        });
+        for (const file of collectedFiles) {
+          if (!file.content) {
+            const buffer = await connector.downloadFile(file.url);
+            if (buffer) file.content = buffer;
+          }
+        }
+        const downloadedFiles = collectedFiles.filter((f) => f.content);
+        if (downloadedFiles.length > 0) {
+          await adapter.sendFiles(config, message, downloadedFiles).catch((err) => {
+            console.error('[CHANNELS] File upload failed:', err);
+          });
+        }
       }
 
       await this.logMessage(config, message, 'outbound', responseText, sessionId);

@@ -18,6 +18,7 @@ export interface FileOutput {
   name: string;
   url: string;
   mimeType?: string;
+  content?: Buffer;
 }
 
 export interface ChannelAdapter {
@@ -42,14 +43,12 @@ export interface ChannelAdapter {
   onChannelRemoved?(config: ChannelConfig): Promise<void>;
   validateCredentials?(credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }>;
 
-  /** Send a permission request UI (e.g. Approve/Reject buttons) to the user */
   sendPermissionRequest?(
     config: ChannelConfig,
     message: NormalizedMessage,
     permission: PermissionRequest,
   ): Promise<void>;
 
-  /** Upload files to the channel (e.g. images, PDFs produced by the agent) */
   sendFiles?(
     config: ChannelConfig,
     message: NormalizedMessage,
