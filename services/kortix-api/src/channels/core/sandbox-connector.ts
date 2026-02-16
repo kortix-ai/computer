@@ -362,17 +362,14 @@ export class SandboxConnector {
       const data = await res.json();
       const files: Array<{ name: string; path: string }> = [];
 
-      // file/status returns an object or array of file statuses
+      console.log(`[SANDBOX-CONNECTOR] file/status response:`, JSON.stringify(data).slice(0, 500));
+
       const entries = Array.isArray(data) ? data : Object.entries(data).map(([path, status]) => ({ path, status }));
 
       for (const entry of entries) {
         const filePath = (typeof entry === 'string' ? entry : entry.path || entry.file) as string | undefined;
         if (!filePath) continue;
-
-        // Skip hidden files, configs, and system directories
         if (filePath.startsWith('.') || filePath.includes('node_modules') || filePath.includes('/.')) continue;
-
-        // Only include files that look like user-facing output
         const ext = filePath.split('.').pop()?.toLowerCase() || '';
         const isOutputFile = /^(md|txt|pdf|html|csv|json|xml|doc|docx|xlsx|pptx|png|jpg|jpeg|gif|svg|mp3|mp4|wav)$/.test(ext);
         if (!isOutputFile) continue;
@@ -403,7 +400,13 @@ export class SandboxConnector {
         return null;
       }
 
-      return Buffer.from(await res.arrayBuffer());
+      const data = await res.json() as { type: string; content: string; encoding?: string };
+
+      if (data.encoding === 'base64') {
+        return Buffer.from(data.content, 'base64');
+      }
+
+      return Buffer.from(data.content, 'utf-8');
     } catch (err) {
       console.warn(`[SANDBOX-CONNECTOR] File read error:`, err);
       return null;
