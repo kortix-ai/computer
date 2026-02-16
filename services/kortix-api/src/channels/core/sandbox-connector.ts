@@ -314,6 +314,34 @@ export class SandboxConnector {
     }
   }
 
+  async downloadFile(fileUrl: string): Promise<Buffer | null> {
+    try {
+      const { url: baseUrl, headers } = await this.getEndpoint();
+
+      let resolvedUrl = fileUrl;
+      if (fileUrl.startsWith('/')) {
+        resolvedUrl = `${baseUrl}${fileUrl}`;
+      } else if (!fileUrl.startsWith('http')) {
+        resolvedUrl = `${baseUrl}/${fileUrl}`;
+      }
+
+      const res = await fetch(resolvedUrl, {
+        headers,
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[SANDBOX-CONNECTOR] File download failed: ${res.status} ${resolvedUrl}`);
+        return null;
+      }
+
+      return Buffer.from(await res.arrayBuffer());
+    } catch (err) {
+      console.warn(`[SANDBOX-CONNECTOR] File download error:`, err);
+      return null;
+    }
+  }
+
   async abort(sessionId: string): Promise<void> {
     try {
       const { url, headers } = await this.getEndpoint();
