@@ -6,13 +6,11 @@ import {
   existsSync,
   appendFileSync,
 } from "fs";
-import { resolve, dirname, join, extname } from "path";
+import { resolve, join } from "path";
 import { homedir } from "os";
 
 const SHOW_DIR = join(process.env.HOME || homedir(), ".show-user");
 const QUEUE_FILE = `${SHOW_DIR}/queue.jsonl`;
-const KORTIX_API_URL = process.env.KORTIX_API_URL || "";
-const SANDBOX_ID = process.env.SANDBOX_ID || "";
 
 interface ShowEntry {
   id: string;
@@ -22,55 +20,8 @@ interface ShowEntry {
   description?: string;
   path?: string;
   url?: string;
-  publicUrl?: string;
   content?: string;
   metadata?: Record<string, unknown>;
-}
-
-async function uploadFileToStorage(
-  filePath: string,
-): Promise<string | null> {
-  if (!KORTIX_API_URL || !SANDBOX_ID) {
-    return null;
-  }
-
-  try {
-    const fileContent = readFileSync(filePath);
-    const contentBase64 = fileContent.toString("base64");
-    const fileName = filePath.split("/").pop() || "file";
-
-    let apiBase = KORTIX_API_URL;
-    const routerIdx = apiBase.indexOf("/v1/router");
-    if (routerIdx !== -1) {
-      apiBase = apiBase.slice(0, routerIdx);
-    }
-    apiBase = apiBase.replace(/\/$/, "");
-    const uploadUrl = `${apiBase}/v1/files/upload`;
-
-    const res = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sandboxId: SANDBOX_ID,
-        fileName,
-        contentBase64,
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      console.error(
-        `[show-user] File upload failed: ${res.status} ${errText}`,
-      );
-      return null;
-    }
-
-    const data = (await res.json()) as { publicUrl?: string };
-    return data.publicUrl || null;
-  } catch (err) {
-    console.error(`[show-user] File upload error:`, err);
-    return null;
-  }
 }
 
 function ensureShowDir(): void {
@@ -232,15 +183,6 @@ export default tool({
       }
     }
 
-    let publicUrl: string | undefined;
-    if ((type === "file" || type === "image") && args.path) {
-      const absPath = resolve(args.path);
-      publicUrl = (await uploadFileToStorage(absPath)) || undefined;
-      if (publicUrl) {
-        console.log(`[show-user] Uploaded to storage: ${publicUrl}`);
-      }
-    }
-
     const entry: ShowEntry = {
       id: generateId(),
       timestamp: new Date().toISOString(),
@@ -249,7 +191,6 @@ export default tool({
       ...(args.description && { description: args.description }),
       ...(args.path && { path: resolve(args.path) }),
       ...(args.url && { url: args.url }),
-      ...(publicUrl && { publicUrl }),
       ...(args.content && { content: args.content }),
       ...(metadata && { metadata }),
     };

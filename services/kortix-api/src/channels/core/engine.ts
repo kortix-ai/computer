@@ -18,6 +18,9 @@ import { RateLimiter } from './rate-limiter';
 import { ChannelError } from '../../errors';
 import { createPermissionRequest } from './pending-permissions';
 import { decryptCredentials } from '../lib/credentials';
+import { getSupabase, isSupabaseConfigured } from '../../shared/supabase';
+
+const STORAGE_BUCKET = 'channel-files';
 
 export class ChannelEngineImpl {
   private adapters: Map<ChannelType, ChannelAdapter>;
@@ -175,12 +178,18 @@ export class ChannelEngineImpl {
               }
             }
           }
+          if (file.content) {
+            const publicUrl = await this.uploadToSupabaseStorage(file.name, file.content, file.mimeType);
+            if (publicUrl) {
+              file.url = publicUrl;
+            }
+          }
         }
         const downloadedFiles = collectedFiles.filter((f) => f.content);
         if (downloadedFiles.length > 0) {
-          console.log(`[CHANNELS] Uploading ${downloadedFiles.length} SSE file(s) to channel`);
+          console.log(`[CHANNELS] Sending ${downloadedFiles.length} SSE file(s) to channel`);
           await adapter.sendFiles(config, message, downloadedFiles).catch((err) => {
-            console.error('[CHANNELS] File upload to channel failed:', err);
+            console.error('[CHANNELS] File send to channel failed:', err);
           });
           for (const f of downloadedFiles) {
             uploadedFileNames.add(f.name);
@@ -203,16 +212,17 @@ export class ChannelEngineImpl {
             const buffer = await connector.downloadFileByPath(f.path);
             if (buffer) {
               console.log(`[CHANNELS] Downloaded: ${f.name} (${buffer.length} bytes)`);
-              newFiles.push({ name: f.name, url: f.path, content: buffer });
+              const publicUrl = await this.uploadToSupabaseStorage(f.name, buffer);
+              newFiles.push({ name: f.name, url: publicUrl || f.path, content: buffer });
             } else {
               console.warn(`[CHANNELS] Failed to download: ${f.path}`);
             }
           }
 
           if (newFiles.length > 0) {
-            console.log(`[CHANNELS] Uploading ${newFiles.length} git-detected file(s) to channel`);
+            console.log(`[CHANNELS] Sending ${newFiles.length} git-detected file(s) to channel`);
             await adapter.sendFiles(config, message, newFiles).catch((err) => {
-              console.error('[CHANNELS] File upload to channel failed:', err);
+              console.error('[CHANNELS] File send to channel failed:', err);
             });
           }
         } catch (err) {
@@ -392,8 +402,57 @@ export class ChannelEngineImpl {
     await this.sessionManager.invalidateSession(configId, channelType, strategy, message);
   }
 
+  private async uploadToSupabaseStorage(
+    fileName: string,
+    content: Buffer,
+    mimeType?: string,
+  ): Promise<string | null> {
+    if (!isSupabaseConfigured()) return null;
+
+    try {
+      const supabase = getSupabase();
+      const uniqueId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const storagePath = `channel/${uniqueId}_${fileName}`;
+      const contentType = mimeType || guessMimeType(fileName);
+
+      const { error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, content, { contentType, upsert: false });
+
+      if (error) {
+        console.error(`[CHANNELS] Supabase upload failed for ${fileName}:`, error.message);
+        return null;
+      }
+
+      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+      console.log(`[CHANNELS] Uploaded to Supabase: ${fileName} -> ${data.publicUrl}`);
+      return data.publicUrl;
+    } catch (err) {
+      console.error(`[CHANNELS] Supabase upload error for ${fileName}:`, err);
+      return null;
+    }
+  }
+
   cleanup(): void {
     this.sessionManager.cleanup();
     this.rateLimiter.cleanup();
   }
+}
+
+function guessMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const mimes: Record<string, string> = {
+    txt: 'text/plain', md: 'text/markdown', html: 'text/html',
+    css: 'text/css', js: 'application/javascript', json: 'application/json',
+    xml: 'application/xml', csv: 'text/csv', pdf: 'application/pdf',
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+    mp3: 'audio/mpeg', mp4: 'video/mp4', wav: 'audio/wav',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    zip: 'application/zip',
+  };
+  return mimes[ext] || 'application/octet-stream';
 }
