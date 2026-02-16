@@ -2691,6 +2691,37 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 }
 ToolRegistry.register('todowrite', TodoWriteTool);
 
+// --- Session Context ---
+function SessionContextTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const metadata = partMetadata(part);
+  const status = partStatus(part);
+
+  const mode = String(metadata.mode || input.mode || 'summary');
+  const sessionTitle = String(metadata.sessionTitle || '');
+  const modeLabels: Record<string, string> = { summary: 'Summary', messages: 'Messages', diffs: 'Diffs', todo: 'Todos' };
+  const subtitle = sessionTitle
+    ? `${sessionTitle} — ${modeLabels[mode] || mode}`
+    : modeLabels[mode] || mode;
+
+  return (
+    <BasicTool
+      icon={<BookOpen className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Session Context', subtitle }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {status === 'completed' && (
+        <div className="px-3 py-2.5 text-xs text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap">
+          {partOutput(part).slice(0, 2000)}
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('session_context', SessionContextTool);
+
 // --- Question ---
 function QuestionSkeletonOptions() {
   return (

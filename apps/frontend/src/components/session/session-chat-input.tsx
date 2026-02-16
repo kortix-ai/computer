@@ -18,6 +18,7 @@ import {
   Archive,
   Database,
   ListPlus,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -34,11 +35,24 @@ import type {
   Command,
   ProviderListResponse,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { useSummarizeOpenCodeSession, findOpenCodeFiles } from '@/hooks/opencode/use-opencode-sessions';
+import { useSummarizeOpenCodeSession, findOpenCodeFiles, useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
+import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 
 export type { ProviderListResponse };
+
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+}
 
 // ============================================================================
 // Flat model list helper
@@ -562,15 +576,16 @@ function SlashCommandPopover({
 // ============================================================================
 
 export interface MentionItem {
-  kind: 'file' | 'agent';
+  kind: 'file' | 'agent' | 'session';
   label: string;
   value: string;
   description?: string;
 }
 
-interface TrackedMention {
-  kind: 'file' | 'agent';
+export interface TrackedMention {
+  kind: 'file' | 'agent' | 'session';
   label: string;
+  value?: string; // session ID for session mentions
 }
 
 function MentionPopover({
@@ -596,6 +611,7 @@ function MentionPopover({
   if (items.length === 0 && !loading) return null;
 
   const agents = items.filter((i) => i.kind === 'agent');
+  const sessions = items.filter((i) => i.kind === 'session');
   const files = items.filter((i) => i.kind === 'file');
 
   let globalIndex = 0;
@@ -621,6 +637,29 @@ function MentionPopover({
                   <span className="size-4 rounded flex items-center justify-center bg-purple-500/15 text-purple-500 text-[10px] font-bold shrink-0">@</span>
                   <span className="truncate capitalize">{item.label}</span>
                   {item.description && <span className="text-muted-foreground truncate text-xs">{item.description}</span>}
+                </button>
+              );
+            })}
+          </>
+        )}
+        {sessions.length > 0 && (
+          <>
+            <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Sessions</div>
+            {sessions.map((item) => {
+              const idx = globalIndex++;
+              return (
+                <button
+                  key={`session-${item.value}`}
+                  data-mention-index={idx}
+                  onMouseDown={(e) => { e.preventDefault(); onSelect(item); }}
+                  className={cn(
+                    'w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors cursor-pointer',
+                    idx === selectedIndex ? 'bg-muted' : 'hover:bg-muted',
+                  )}
+                >
+                  <MessageSquare className="size-3.5 text-emerald-500 shrink-0" />
+                  <span className="truncate text-xs">{item.label}</span>
+                  {item.description && <span className="text-muted-foreground truncate text-xs ml-auto">{item.description}</span>}
                 </button>
               );
             })}
@@ -679,7 +718,7 @@ function loadPromptHistory(key: string): string[] {
 // ============================================================================
 
 export interface SessionChatInputProps {
-  onSend: (text: string, files?: AttachedFile[]) => void | Promise<void>;
+  onSend: (text: string, files?: AttachedFile[], mentions?: TrackedMention[]) => void | Promise<void>;
   isBusy?: boolean;
   onStop?: () => void;
   agents?: Agent[];
@@ -745,6 +784,7 @@ export function SessionChatInput({
       'Ask to compact this session when context is full',
       'Ask for changed files and diffs',
       'Mention multiple files like @README.md @src/app.tsx',
+      'Reference past sessions with @session-name',
     ],
     [placeholder],
   );
@@ -779,6 +819,9 @@ export function SessionChatInput({
   // never loses results even if the API returns empty for the longer query.
   const fileResultsCache = useRef<Set<string>>(new Set());
   const placeholderFadeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Sessions for @ mention search
+  const { data: allSessions } = useOpenCodeSessions();
 
   useEffect(() => {
     if (text.trim().length > 0) {
@@ -974,7 +1017,7 @@ export function SessionChatInput({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentionQuery?.query, fileSearchFn]);
 
-  // Build mention popover items: agents (sync) + files (async)
+  // Build mention popover items: agents (sync) + sessions (sync) + files (async)
   // File results are also filtered client-side against the current query so that
   // previously fetched results remain visible even if a longer query yields fewer
   // server-side results (e.g. SDK returns files for "te" but not for "test").
@@ -984,6 +1027,29 @@ export function SessionChatInput({
     const agentItems: MentionItem[] = agents
       .filter((a) => a.name.toLowerCase().includes(q))
       .map((a) => ({ kind: 'agent' as const, label: a.name, value: a.name }));
+
+    // Session items: filter by title or changed file paths, exclude current/child/archived
+    const sessionItems: MentionItem[] = (allSessions ?? [])
+      .filter((s: Session) => {
+        if (s.parentID || s.time.archived) return false;
+        if (s.id === sessionId) return false;
+        const title = (s.title || '').toLowerCase();
+        if (title.includes(q)) return true;
+        // Also match against file paths in summary diffs
+        const diffs = s.summary?.diffs;
+        if (Array.isArray(diffs)) {
+          return diffs.some((d: any) => (d.file || '').toLowerCase().includes(q));
+        }
+        return false;
+      })
+      .slice(0, 5)
+      .map((s: Session) => {
+        const ago = formatRelativeTime(s.time.updated);
+        const files = s.summary?.files;
+        const desc = files ? `${ago} - ${files} file${files === 1 ? '' : 's'} changed` : ago;
+        return { kind: 'session' as const, label: s.title, value: s.id, description: desc };
+      });
+
     const filteredFiles = q.length > 0
       ? fileResults.filter((f) => f.toLowerCase().includes(q))
       : fileResults;
@@ -992,8 +1058,8 @@ export function SessionChatInput({
       label: f,
       value: f,
     }));
-    return [...agentItems, ...fileItems];
-  }, [mentionQuery, agents, fileResults]);
+    return [...agentItems, ...sessionItems, ...fileItems];
+  }, [mentionQuery, agents, allSessions, sessionId, fileResults]);
 
   // Clamp mention index when items change to prevent out-of-bounds selection
   useEffect(() => {
@@ -1011,8 +1077,9 @@ export function SessionChatInput({
     // Push to prompt history (persisted to localStorage)
     pushHistory(trimmed);
 
-    // Snapshot files before clearing
+    // Snapshot files and mentions before clearing
     const filesToSend = attachedFiles.length > 0 ? [...attachedFiles] : undefined;
+    const mentionsToSend = mentions.length > 0 ? [...mentions] : undefined;
 
     // Optimistically clear input
     setText('');
@@ -1035,12 +1102,12 @@ export function SessionChatInput({
     }
 
     try {
-      await onSend(trimmed, filesToSend);
+      await onSend(trimmed, filesToSend, mentionsToSend);
     } catch {
       // Restore the text so the user can retry
       setText(trimmed);
     }
-  }, [text, isBusy, disabled, onSend, attachedFiles, sessionId, enqueue, pushHistory]);
+  }, [text, isBusy, disabled, onSend, attachedFiles, mentions, sessionId, enqueue, pushHistory]);
 
   const handleSelectCommand = (cmd: Command) => {
     onCommand?.(cmd);
@@ -1056,7 +1123,7 @@ export function SessionChatInput({
     const inserted = `@${item.label} `;
     const newText = before + inserted + after;
     setText(newText);
-    setMentions((prev) => [...prev, { kind: item.kind, label: item.label }]);
+    setMentions((prev) => [...prev, { kind: item.kind, label: item.label, ...(item.kind === 'session' ? { value: item.value } : {}) }]);
     setMentionQuery(null);
     setMentionIndex(0);
     setFileResults([]);
@@ -1244,7 +1311,7 @@ export function SessionChatInput({
   const highlightSegments = useMemo(() => {
     if (mentions.length === 0 || !text) return null;
     // Collect all mention ranges sorted by position
-    const ranges: { start: number; end: number; kind: 'file' | 'agent' }[] = [];
+    const ranges: { start: number; end: number; kind: 'file' | 'agent' | 'session' }[] = [];
     for (const m of mentions) {
       const needle = `@${m.label}`;
       const idx = text.indexOf(needle);
@@ -1255,7 +1322,7 @@ export function SessionChatInput({
     if (ranges.length === 0) return null;
     ranges.sort((a, b) => a.start - b.start || b.end - a.end);
 
-    const segs: { text: string; kind?: 'file' | 'agent' }[] = [];
+    const segs: { text: string; kind?: 'file' | 'agent' | 'session' }[] = [];
     let last = 0;
     for (const r of ranges) {
       if (r.start < last) continue;
@@ -1321,6 +1388,7 @@ export function SessionChatInput({
                       className={cn(
                         seg.kind === 'file' && 'text-blue-500 font-medium',
                         seg.kind === 'agent' && 'text-purple-500 font-medium',
+                        seg.kind === 'session' && 'text-emerald-500 font-medium',
                       )}
                     >
                       {seg.text}

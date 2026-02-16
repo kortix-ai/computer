@@ -872,10 +872,13 @@ function PermissionsTab({
 
   const actions = ['allow', 'ask', 'deny'] as const;
 
+  // Resolve the wildcard fallback: permission["*"] acts as the default for all tools
+  const wildcardAction = typeof permission['*'] === 'string' ? permission['*'] : 'ask';
+
   const getAction = (key: string): string => {
     const val = permission[key];
     if (typeof val === 'string') return val;
-    return 'ask';
+    return wildcardAction;
   };
 
   const setAction = (key: string, action: string) => {
@@ -885,7 +888,7 @@ function PermissionsTab({
   // Bash is special — can be a string or a map
   const bashPermission = permission.bash;
   const bashIsSimple = typeof bashPermission === 'string' || bashPermission == null;
-  const bashAction = bashIsSimple ? (bashPermission ?? 'ask') : 'custom';
+  const bashAction = bashIsSimple ? (bashPermission ?? wildcardAction) : 'custom';
 
   return (
     <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">

@@ -204,6 +204,11 @@ export function getToolIconKey(toolName: string | undefined): ToolIconKey {
     case 'validate_slide':
       return 'presentation';
 
+    // Session context (cross-session references)
+    case 'session_context':
+    case 'session-context':
+      return 'book-open';
+
     // Research
     case 'get-paper-details':
     case 'get-author-details':

@@ -40,7 +40,30 @@ export function useUpdateOpenCodeConfig() {
       const result = await client.config.update({ config } as any);
       return unwrap(result) as Config;
     },
-    onSuccess: () => {
+    onMutate: async (config) => {
+      // Cancel in-flight refetches so they don't overwrite optimistic update
+      await queryClient.cancelQueries({ queryKey: configKeys.all });
+      const previous = queryClient.getQueryData<Config>(configKeys.all);
+      if (previous) {
+        // Optimistically merge the draft into the cached config
+        queryClient.setQueryData<Config>(configKeys.all, {
+          ...previous,
+          ...config,
+          permission: typeof config.permission !== 'undefined'
+            ? config.permission
+            : previous.permission,
+        } as Config);
+      }
+      return { previous };
+    },
+    onError: (_err, _config, context) => {
+      // Roll back to previous cache on failure
+      if (context?.previous) {
+        queryClient.setQueryData(configKeys.all, context.previous);
+      }
+    },
+    onSettled: () => {
+      // Always refetch to get the authoritative server state
       queryClient.invalidateQueries({ queryKey: configKeys.all });
     },
   });

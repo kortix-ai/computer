@@ -3,7 +3,6 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { HTTPException } from 'hono/http-exception';
-
 import { config } from './config';
 import { BillingError } from './errors';
 

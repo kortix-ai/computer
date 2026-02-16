@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import type { NormalizedMessage, ChatType, ThreadMessage, Attachment, SandboxTarget } from '../../types';
 import type { ChannelEngine } from '../adapter';
 import type { ChannelConfig } from '@kortix/db';
-import { sandboxes } from '@kortix/db';
+import { sandboxes, channelConfigs } from '@kortix/db';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../shared/db';
 import { WebhookVerificationError } from '../../../errors';
@@ -301,9 +301,12 @@ export async function handleSlackWebhook(
   };
 
   if (parsed.type === 'set_model' && parsed.model) {
+    persistModelChoice(channelConfig, parsed.model).catch((err) => {
+      console.error('[SLACK] Failed to persist model choice:', err);
+    });
     normalized.overrides = { model: parsed.model };
     if (!parsed.remainingText) {
-      confirmCommandInThread(channelConfig, event, `Model switched to *${parsed.model.modelID}* for this conversation.`);
+      confirmCommandInThread(channelConfig, event, `Model switched to *${parsed.model.modelID}*.`);
       return c.json({ ok: true });
     }
   }
@@ -321,6 +324,7 @@ export async function handleSlackWebhook(
         const match = fuzzyMatchModel(parsed.modelQuery!, providers);
 
         if (match) {
+          await persistModelChoice(channelConfig, match);
           normalized.overrides = { model: match };
           confirmCommandInThread(channelConfig, event, `Model switched to *${match.modelID}* (${match.providerID}).`);
           if (parsed.remainingText) {
@@ -380,6 +384,19 @@ export async function handleSlackWebhook(
   });
 
   return c.json({ ok: true });
+}
+
+async function persistModelChoice(
+  channelConfig: ChannelConfig,
+  model: { providerID: string; modelID: string },
+): Promise<void> {
+  const meta = (channelConfig.metadata as Record<string, unknown>) ?? {};
+  meta.model = model;
+  await db
+    .update(channelConfigs)
+    .set({ metadata: meta })
+    .where(eq(channelConfigs.channelConfigId, channelConfig.channelConfigId));
+  console.log(`[SLACK] Persisted model choice: ${model.providerID}/${model.modelID} for config ${channelConfig.channelConfigId}`);
 }
 
 async function resolveSandboxTarget(sandboxId: string): Promise<SandboxTarget | null> {

@@ -22,6 +22,7 @@ export { OcTodoToolView } from './OcTodoToolView';
 export { OcGenericToolView } from './OcGenericToolView';
 export { OcQuestionToolView } from './OcQuestionToolView';
 export { OcMemSearchToolView } from './OcMemSearchToolView';
+export { OcSessionContextToolView } from './OcSessionContextToolView';
 export { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
@@ -42,6 +43,7 @@ import { OcTodoToolView } from './OcTodoToolView';
 import { OcGenericToolView } from './OcGenericToolView';
 import { OcQuestionToolView } from './OcQuestionToolView';
 import { OcMemSearchToolView } from './OcMemSearchToolView';
+import { OcSessionContextToolView } from './OcSessionContextToolView';
 import { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 /**
@@ -117,6 +119,10 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
 
   // Question tool — formatted Q&A display
   'oc-question': OcQuestionToolView,
+
+  // Session context (cross-session references)
+  'oc-session-context': OcSessionContextToolView,
+  'oc-session_context': OcSessionContextToolView,
 
   // Memory search (observations)
   'oc-mem-search': OcMemSearchToolView,

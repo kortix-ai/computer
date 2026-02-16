@@ -447,6 +447,14 @@ export function useOpenCodeEventStream() {
           break;
         }
 
+        // ---- MCP tools changed ----
+        case 'mcp.tools.changed': {
+          // MCP server tools were added/removed/changed — refresh status + tool lists
+          queryClient.invalidateQueries({ queryKey: opencodeKeys.mcpStatus() });
+          queryClient.invalidateQueries({ queryKey: opencodeKeys.toolIds() });
+          break;
+        }
+
         // ---- PTY events ----
         case 'pty.created':
         case 'pty.updated':

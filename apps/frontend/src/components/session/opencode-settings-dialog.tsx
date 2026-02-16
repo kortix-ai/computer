@@ -11,6 +11,13 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronRight,
+  Server,
+  Plus,
+  AlertCircle,
+  Plug,
+  Power,
+  Wrench,
+  X,
 } from 'lucide-react';
 import {
   Dialog,
@@ -46,6 +53,16 @@ import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 import { ConnectProviderContent } from '@/components/providers/connect-provider-content';
+import {
+  useOpenCodeMcpStatus,
+  useAddMcpServer,
+  useConnectMcpServer,
+  useDisconnectMcpServer,
+  useMcpAuthStart,
+  useMcpAuthCallback,
+} from '@/hooks/opencode/use-opencode-mcp';
+import type { McpStatus } from '@/hooks/opencode/use-opencode-mcp';
+import { toast } from '@/lib/toast';
 
 // ============================================================================
 // Constants
@@ -349,12 +366,16 @@ function PermissionsSection({
   >;
   const isGlobalMode = typeof permission === 'string';
   const globalAction = isGlobalMode ? (permission as string) : 'ask';
+  // Resolve the wildcard fallback: permission["*"] acts as the default for all tools
+  const wildcardAction = !isGlobalMode && typeof (permission as Record<string, any>)['*'] === 'string'
+    ? (permission as Record<string, any>)['*']
+    : 'ask';
 
   const getAction = (key: string): string => {
     if (isGlobalMode) return globalAction;
     const val = (permission as Record<string, any>)[key];
     if (typeof val === 'string') return val;
-    return 'ask';
+    return wildcardAction;
   };
 
   const setAction = (key: string, action: string) => {
@@ -508,6 +529,583 @@ function PermissionsSection({
 }
 
 // ============================================================================
+// MCP Servers Tab
+// ============================================================================
+
+type McpView = { type: 'list' } | { type: 'add' } | { type: 'auth'; name: string };
+
+function StatusBadge({ status }: { status: McpStatus }) {
+  const s = status.status;
+  if (s === 'connected') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        connected
+      </span>
+    );
+  }
+  if (s === 'disabled') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
+        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+        disconnected
+      </span>
+    );
+  }
+  if (s === 'needs_auth' || s === 'needs_client_registration') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        needs auth
+      </span>
+    );
+  }
+  // failed
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-600 dark:text-red-400">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+      error
+    </span>
+  );
+}
+
+function McpServersSection() {
+  const { data: mcpStatus, isLoading } = useOpenCodeMcpStatus();
+  const { data: toolIds } = useOpenCodeToolIds();
+  const addMutation = useAddMcpServer();
+  const connectMutation = useConnectMcpServer();
+  const disconnectMutation = useDisconnectMcpServer();
+  const authStartMutation = useMcpAuthStart();
+  const authCallbackMutation = useMcpAuthCallback();
+
+  const [view, setView] = useState<McpView>({ type: 'list' });
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  // Add form state
+  const [addForm, setAddForm] = useState({
+    name: '',
+    transportType: 'stdio' as 'stdio' | 'http',
+    command: '',
+    url: '',
+    envPairs: [] as Array<{ key: string; value: string }>,
+  });
+  const [addError, setAddError] = useState('');
+
+  // Auth state
+  const [authUrl, setAuthUrl] = useState('');
+  const [authCode, setAuthCode] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  const servers = useMemo(() => {
+    if (!mcpStatus) return [];
+    return Object.entries(mcpStatus).map(([name, status]) => ({ name, status }));
+  }, [mcpStatus]);
+
+  // Derive tools-per-server from tool IDs (tools prefixed with mcp_ or containing _mcp_)
+  const serverTools = useMemo(() => {
+    if (!toolIds) return {} as Record<string, string[]>;
+    const result: Record<string, string[]> = {};
+    for (const id of toolIds) {
+      // MCP tool IDs follow the pattern: mcp_{serverName}_{toolName}
+      const match = id.match(/^mcp_([^_]+)_(.+)$/);
+      if (match) {
+        const serverName = match[1];
+        if (!result[serverName]) result[serverName] = [];
+        result[serverName].push(match[2]);
+      }
+    }
+    return result;
+  }, [toolIds]);
+
+  const handleAddServer = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setAddError('');
+
+    if (!addForm.name.trim()) {
+      setAddError('Server name is required');
+      return;
+    }
+
+    if (addForm.transportType === 'stdio' && !addForm.command.trim()) {
+      setAddError('Command is required for stdio transport');
+      return;
+    }
+
+    if (addForm.transportType === 'http' && !addForm.url.trim()) {
+      setAddError('URL is required for HTTP transport');
+      return;
+    }
+
+    if (addForm.transportType === 'http' && !/^https?:\/\//.test(addForm.url.trim())) {
+      setAddError('URL must start with http:// or https://');
+      return;
+    }
+
+    const envMap: Record<string, string> = {};
+    for (const pair of addForm.envPairs) {
+      if (pair.key.trim()) {
+        envMap[pair.key.trim()] = pair.value;
+      }
+    }
+
+    try {
+      await addMutation.mutateAsync({
+        name: addForm.name.trim(),
+        type: addForm.transportType === 'stdio' ? 'local' : 'remote',
+        ...(addForm.transportType === 'stdio'
+          ? { command: addForm.command.trim().split(/\s+/), env: envMap }
+          : { url: addForm.url.trim() }),
+      });
+      toast.info(`MCP server "${addForm.name.trim()}" added`);
+      setAddForm({ name: '', transportType: 'stdio', command: '', url: '', envPairs: [] });
+      setView({ type: 'list' });
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : String(err));
+    }
+  }, [addForm, addMutation]);
+
+  const handleConnect = useCallback(async (name: string) => {
+    try {
+      await connectMutation.mutateAsync(name);
+      toast.info(`MCP server "${name}" connected`);
+    } catch (err) {
+      toast.warning(`Failed to connect "${name}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [connectMutation]);
+
+  const handleDisconnect = useCallback(async (name: string) => {
+    try {
+      await disconnectMutation.mutateAsync(name);
+      toast.info(`MCP server "${name}" disconnected`);
+    } catch (err) {
+      toast.warning(`Failed to disconnect "${name}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [disconnectMutation]);
+
+  const handleAuthStart = useCallback(async (name: string) => {
+    setAuthError('');
+    setAuthCode('');
+    setAuthUrl('');
+    setView({ type: 'auth', name });
+    try {
+      const result = await authStartMutation.mutateAsync(name);
+      setAuthUrl(result.authorizationUrl);
+      window.open(result.authorizationUrl, '_blank');
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : String(err));
+    }
+  }, [authStartMutation]);
+
+  const handleAuthCallback = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (view.type !== 'auth') return;
+    if (!authCode.trim()) {
+      setAuthError('Authorization code is required');
+      return;
+    }
+    try {
+      await authCallbackMutation.mutateAsync({ name: view.name, code: authCode.trim() });
+      toast.info(`MCP server "${view.name}" authorized`);
+      setView({ type: 'list' });
+      setAuthCode('');
+      setAuthUrl('');
+      setAuthError('');
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : String(err));
+    }
+  }, [view, authCode, authCallbackMutation]);
+
+  const addEnvPair = useCallback(() => {
+    setAddForm((f) => ({ ...f, envPairs: [...f.envPairs, { key: '', value: '' }] }));
+  }, []);
+
+  const removeEnvPair = useCallback((index: number) => {
+    setAddForm((f) => ({ ...f, envPairs: f.envPairs.filter((_, i) => i !== index) }));
+  }, []);
+
+  const updateEnvPair = useCallback((index: number, field: 'key' | 'value', val: string) => {
+    setAddForm((f) => ({
+      ...f,
+      envPairs: f.envPairs.map((p, i) => (i === index ? { ...p, [field]: val } : p)),
+    }));
+  }, []);
+
+  // ---- Auth view ----
+  if (view.type === 'auth') {
+    return (
+      <div className="space-y-4 overflow-y-auto pr-1">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { setView({ type: 'list' }); setAuthError(''); }}
+            className="p-1.5 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <ChevronRight className="h-4 w-4 rotate-180" />
+          </button>
+          <h3 className="text-sm font-semibold">Authorize: {view.name}</h3>
+        </div>
+
+        {authStartMutation.isPending && !authUrl && (
+          <div className="flex items-center gap-3 py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Starting authorization...</span>
+          </div>
+        )}
+
+        {authUrl && (
+          <form onSubmit={handleAuthCallback} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Visit the{' '}
+              <a href={authUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                authorization page
+              </a>{' '}
+              and paste the code below.
+            </p>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Authorization Code</label>
+              <Input
+                placeholder="Paste code here..."
+                value={authCode}
+                onChange={(e) => setAuthCode(e.target.value)}
+                autoFocus
+              />
+            </div>
+            {authError && (
+              <p className="text-sm text-destructive flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                {authError}
+              </p>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              disabled={authCallbackMutation.isPending}
+              className="h-8 px-4 text-xs"
+            >
+              {authCallbackMutation.isPending ? (
+                <><Loader2 className="h-3 w-3 animate-spin mr-1.5" />Authorizing...</>
+              ) : (
+                'Submit'
+              )}
+            </Button>
+          </form>
+        )}
+
+        {authError && !authUrl && (
+          <div className="space-y-3">
+            <p className="text-sm text-destructive flex items-center gap-1.5">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+              {authError}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleAuthStart(view.name)}
+              className="h-8 px-3 text-xs"
+            >
+              Try again
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---- Add form view ----
+  if (view.type === 'add') {
+    return (
+      <div className="space-y-4 overflow-y-auto pr-1">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { setView({ type: 'list' }); setAddError(''); }}
+            className="p-1.5 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <ChevronRight className="h-4 w-4 rotate-180" />
+          </button>
+          <h3 className="text-sm font-semibold">Add MCP Server</h3>
+        </div>
+
+        <form onSubmit={handleAddServer} className="space-y-4">
+          {/* Name */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Server Name</label>
+            <Input
+              placeholder="my-server"
+              value={addForm.name}
+              onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+              autoFocus
+            />
+          </div>
+
+          {/* Transport Type */}
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground mb-1 block">Transport Type</label>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setAddForm((f) => ({ ...f, transportType: 'stdio' }))}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+                  addForm.transportType === 'stdio'
+                    ? 'bg-primary/10 text-primary border border-primary/20'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent',
+                )}
+              >
+                Stdio (command)
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddForm((f) => ({ ...f, transportType: 'http' }))}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+                  addForm.transportType === 'http'
+                    ? 'bg-primary/10 text-primary border border-primary/20'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent',
+                )}
+              >
+                HTTP (URL)
+              </button>
+            </div>
+          </div>
+
+          {/* Transport-specific fields */}
+          {addForm.transportType === 'stdio' ? (
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Command</label>
+              <Input
+                placeholder="npx -y @modelcontextprotocol/server-github"
+                value={addForm.command}
+                onChange={(e) => setAddForm((f) => ({ ...f, command: e.target.value }))}
+              />
+              <p className="text-[11px] text-muted-foreground/60 mt-1">
+                Full command with arguments, space-separated
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">URL</label>
+              <Input
+                placeholder="https://mcp.example.com/sse"
+                value={addForm.url}
+                onChange={(e) => setAddForm((f) => ({ ...f, url: e.target.value }))}
+              />
+            </div>
+          )}
+
+          {/* Environment Variables */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-muted-foreground">Environment Variables</label>
+              <button
+                type="button"
+                onClick={addEnvPair}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                <Plus className="h-3 w-3" />
+                Add
+              </button>
+            </div>
+            {addForm.envPairs.length > 0 && (
+              <div className="space-y-2">
+                {addForm.envPairs.map((pair, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input
+                      placeholder="KEY"
+                      value={pair.key}
+                      onChange={(e) => updateEnvPair(i, 'key', e.target.value)}
+                      className="flex-1 font-mono text-xs"
+                    />
+                    <Input
+                      placeholder="value"
+                      value={pair.value}
+                      onChange={(e) => updateEnvPair(i, 'value', e.target.value)}
+                      className="flex-1 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeEnvPair(i)}
+                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer flex-shrink-0"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {addError && (
+            <p className="text-sm text-destructive flex items-center gap-1.5">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+              {addError}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            size="sm"
+            disabled={addMutation.isPending}
+            className="h-8 px-4 text-xs"
+          >
+            {addMutation.isPending ? (
+              <><Loader2 className="h-3 w-3 animate-spin mr-1.5" />Adding...</>
+            ) : (
+              'Add Server'
+            )}
+          </Button>
+        </form>
+      </div>
+    );
+  }
+
+  // ---- List view ----
+  return (
+    <div className="space-y-4 overflow-y-auto pr-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Servers ({servers.length})
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-2.5 text-xs gap-1.5"
+          onClick={() => { setView({ type: 'add' }); setAddError(''); }}
+        >
+          <Plus className="h-3 w-3" />
+          Add Server
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : servers.length > 0 ? (
+        <div className="space-y-2">
+          {servers.map(({ name, status }) => {
+            const isExp = expanded === name;
+            const tools = serverTools[name] ?? [];
+            const isConnected = status.status === 'connected';
+            const needsAuth = status.status === 'needs_auth' || status.status === 'needs_client_registration';
+            const isFailed = status.status === 'failed';
+            const isToggling =
+              (connectMutation.isPending && connectMutation.variables === name) ||
+              (disconnectMutation.isPending && disconnectMutation.variables === name);
+
+            return (
+              <div
+                key={name}
+                className="rounded-xl border border-border/50 bg-card overflow-hidden"
+              >
+                {/* Server header */}
+                <div className="flex items-center gap-3 px-3 py-2.5">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted/50 flex-shrink-0">
+                    <Server className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {name}
+                      </span>
+                      <StatusBadge status={status} />
+                    </div>
+                    {tools.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {tools.length} tool{tools.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {isFailed && 'error' in status && (
+                      <p className="text-xs text-red-500/80 truncate mt-0.5">
+                        {(status as any).error}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Auth button for servers needing authentication */}
+                    {needsAuth && (
+                      <button
+                        onClick={() => handleAuthStart(name)}
+                        disabled={authStartMutation.isPending}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Authorize"
+                      >
+                        <Plug className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+
+                    {/* Connect / Disconnect toggle */}
+                    <button
+                      onClick={() => isConnected ? handleDisconnect(name) : handleConnect(name)}
+                      disabled={isToggling}
+                      className={cn(
+                        'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors cursor-pointer disabled:opacity-50',
+                        isConnected
+                          ? 'text-muted-foreground hover:text-red-500 hover:bg-red-500/10'
+                          : 'text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10',
+                      )}
+                      title={isConnected ? 'Disconnect' : 'Connect'}
+                    >
+                      {isToggling ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : isConnected ? (
+                        <Power className="h-3.5 w-3.5" />
+                      ) : (
+                        <Plug className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tools expand/collapse */}
+                {tools.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setExpanded(isExp ? null : name)}
+                      className="flex items-center gap-1 px-3 pb-2 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      {isExp ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                      {isExp ? 'Hide tools' : 'Show tools'}
+                    </button>
+
+                    {isExp && (
+                      <div className="border-t border-border/30 max-h-40 overflow-y-auto">
+                        {tools.map((tool) => (
+                          <div
+                            key={tool}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted/30"
+                          >
+                            <Wrench className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span className="font-mono truncate">{tool}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Server className="h-6 w-6 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">No MCP servers configured</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">
+            Add an MCP server to extend available tools
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Main Dialog
 // ============================================================================
 
@@ -584,6 +1182,10 @@ export function OpenCodeSettingsDialog({
                   <Shield className="h-3.5 w-3.5" />
                   Permissions
                 </TabsTrigger>
+                <TabsTrigger value="mcp" className="flex-1 gap-1.5">
+                  <Server className="h-3.5 w-3.5" />
+                  MCP Servers
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -606,6 +1208,10 @@ export function OpenCodeSettingsDialog({
                   config={config}
                   onDraft={onDraft}
                 />
+              </TabsContent>
+
+              <TabsContent value="mcp" className="mt-0 h-full">
+                <McpServersSection />
               </TabsContent>
             </div>
 

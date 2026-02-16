@@ -29,6 +29,8 @@ import {
   Trash2,
   Undo2,
   X,
+  MessageSquare,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -138,7 +140,7 @@ import {
   hasDiffs,
 } from '@/ui';
 
-import { SessionChatInput, type AttachedFile } from '@/components/session/session-chat-input';
+import { SessionChatInput, type AttachedFile, type TrackedMention } from '@/components/session/session-chat-input';
 import { uploadFile } from '@/features/files/api/opencode-files';
 import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
 import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
@@ -456,32 +458,58 @@ function DebugView({ messages }: { messages: MessageWithParts[] | undefined }) {
 // ============================================================================
 
 function HighlightMentions({ text, agentNames, onFileClick }: { text: string; agentNames?: string[]; onFileClick?: (path: string) => void }) {
+  // Strip session ref XML before processing mentions
+  const { cleanText, sessions } = useMemo(() => parseSessionReferences(text), [text]);
+
   const segments = useMemo(() => {
-    if (!text) return [{ text, type: undefined as 'file' | 'agent' | undefined }];
+    if (!cleanText) return [{ text: cleanText, type: undefined as 'file' | 'agent' | undefined }];
     const agentSet = new Set(agentNames || []);
     const mentionRegex = /@(\S+)/g;
     const detected: { start: number; end: number; type: 'file' | 'agent' }[] = [];
     let match: RegExpExecArray | null;
-    while ((match = mentionRegex.exec(text)) !== null) {
+    while ((match = mentionRegex.exec(cleanText)) !== null) {
       const name = match[1];
       const type = agentSet.has(name) ? 'agent' as const : 'file' as const;
       detected.push({ start: match.index, end: match.index + match[0].length, type });
     }
-    if (detected.length === 0) return [{ text, type: undefined as 'file' | 'agent' | undefined }];
+    if (detected.length === 0) return [{ text: cleanText, type: undefined as 'file' | 'agent' | undefined }];
     const result: { text: string; type?: 'file' | 'agent' }[] = [];
     let lastIndex = 0;
     for (const ref of detected) {
       if (ref.start < lastIndex) continue;
-      if (ref.start > lastIndex) result.push({ text: text.slice(lastIndex, ref.start) });
-      result.push({ text: text.slice(ref.start, ref.end), type: ref.type });
+      if (ref.start > lastIndex) result.push({ text: cleanText.slice(lastIndex, ref.start) });
+      result.push({ text: cleanText.slice(ref.start, ref.end), type: ref.type });
       lastIndex = ref.end;
     }
-    if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
+    if (lastIndex < cleanText.length) result.push({ text: cleanText.slice(lastIndex) });
     return result;
-  }, [text, agentNames]);
+  }, [cleanText, agentNames]);
 
   return (
     <>
+      {sessions.length > 0 && (
+        <span className="flex gap-1.5 flex-wrap mb-1.5">
+          {sessions.map((s) => (
+            <button
+              key={s.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                openTabAndNavigate({
+                  id: s.id,
+                  title: s.title || 'Session',
+                  type: 'session',
+                  href: `/sessions/${s.id}`,
+                  serverId: useServerStore.getState().activeServerId,
+                });
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+            >
+              <MessageSquare className="size-2.5 text-emerald-500 shrink-0" />
+              <span className="text-[11px] text-emerald-400 font-medium truncate max-w-[180px]">{s.title}</span>
+            </button>
+          ))}
+        </span>
+      )}
       {segments.map((seg, i) =>
         seg.type === 'file' && onFileClick ? (
           <span
@@ -526,6 +554,26 @@ function parseFileReferences(text: string): { cleanText: string; files: ParsedFi
     return '';
   }).trim();
   return { cleanText, files };
+}
+
+// ============================================================================
+// Parse <session_ref> XML tags from session mention text parts
+// ============================================================================
+
+interface ParsedSessionRef {
+  id: string;
+  title: string;
+}
+
+function parseSessionReferences(text: string): { cleanText: string; sessions: ParsedSessionRef[] } {
+  const sessions: ParsedSessionRef[] = [];
+  let cleaned = text.replace(/<session_ref\s+id="([^"]*?)"\s+title="([^"]*?)"\s*\/>/g, (_, id, title) => {
+    sessions.push({ id, title });
+    return '';
+  });
+  // Strip the instruction header text
+  cleaned = cleaned.replace(/\n*Referenced sessions \(use the session_context tool to fetch details when needed\):\n?/g, '').trim();
+  return { cleanText: cleaned, sessions };
 }
 
 // ============================================================================
@@ -1038,11 +1086,12 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
     [message.parts],
   );
 
-  // Extract text from sticky parts, parse out <file> XML references
+  // Extract text from sticky parts, parse out <file> and <session_ref> XML references
   // Filter out both synthetic AND ignored parts from user-visible text
   const textParts = stickyParts.filter(isTextPart).filter((p) => (p as TextPart).text?.trim() && !(p as TextPart).synthetic && !(p as any).ignored);
   const rawText = textParts.map((p) => (p as TextPart).text).join('\n');
-  const { cleanText: text, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
+  const { cleanText: textAfterFiles, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
+  const { cleanText: text, sessions: sessionRefs } = useMemo(() => parseSessionReferences(textAfterFiles), [textAfterFiles]);
 
   // Extract DCP notifications from ignored text parts (DCP plugin sends ignored user messages)
   const ignoredTextParts = stickyParts.filter(isTextPart).filter((p) => (p as any).ignored && (p as TextPart).text?.trim());
@@ -1142,7 +1191,7 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
   }, [text, filesWithSource, agentParts, agentNames]);
 
   // If the message is purely DCP notifications (no real user content), render only the cards
-  const hasUserContent = !!(text || uploadedFiles.length > 0 || attachments.length > 0);
+  const hasUserContent = !!(text || uploadedFiles.length > 0 || sessionRefs.length > 0 || attachments.length > 0);
 
   if (!hasUserContent && dcpNotifications.length > 0) {
     return (
@@ -1201,6 +1250,32 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
                 <FileText className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* Referenced session chips */}
+        {sessionRefs.length > 0 && (
+          <div className="flex gap-2 p-3 pb-0 flex-wrap">
+            {sessionRefs.map((s) => (
+              <button
+                key={s.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openTabAndNavigate({
+                    id: s.id,
+                    title: s.title || 'Session',
+                    type: 'session',
+                    href: `/sessions/${s.id}`,
+                    serverId: useServerStore.getState().activeServerId,
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer group/chip"
+              >
+                <MessageSquare className="size-3 text-emerald-500 shrink-0" />
+                <span className="text-xs text-emerald-400 font-medium truncate max-w-[200px] group-hover/chip:underline">{s.title}</span>
+                <ExternalLink className="size-2.5 text-emerald-500/50 shrink-0" />
+              </button>
             ))}
           </div>
         )}
@@ -2589,7 +2664,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // ============================================================================
 
   const handleSend = useCallback(
-    async (text: string, files?: AttachedFile[]) => {
+    async (text: string, files?: AttachedFile[], mentions?: TrackedMention[]) => {
       // Play send sound
       playSound('send');
 
@@ -2634,6 +2709,18 @@ export function SessionChat({ sessionId }: SessionChatProps) {
             text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
           });
         }
+      }
+
+      // Append session reference hints for @session mentions
+      const sessionMentions = mentions?.filter((m) => m.kind === 'session' && m.value);
+      if (sessionMentions && sessionMentions.length > 0) {
+        const refs = sessionMentions
+          .map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
+          .join('\n');
+        parts.push({
+          type: 'text',
+          text: `\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`,
+        });
       }
 
       try {
