@@ -316,22 +316,25 @@ export class SandboxConnector {
 
   async downloadFile(fileUrl: string): Promise<Buffer | null> {
     try {
-      const { url: baseUrl, headers } = await this.getEndpoint();
-
-      let resolvedUrl = fileUrl;
-      if (fileUrl.startsWith('/')) {
-        resolvedUrl = `${baseUrl}${fileUrl}`;
-      } else if (!fileUrl.startsWith('http')) {
-        resolvedUrl = `${baseUrl}/${fileUrl}`;
+      if (!fileUrl.startsWith('http')) {
+        const filePath = fileUrl.startsWith('/workspace/')
+          ? fileUrl.slice('/workspace/'.length)
+          : fileUrl.startsWith('/')
+            ? fileUrl.slice(1)
+            : fileUrl;
+        console.log(`[SANDBOX-CONNECTOR] Downloading sandbox file via file content API: ${filePath}`);
+        return await this.downloadFileByPath(filePath);
       }
 
-      const res = await fetch(resolvedUrl, {
+      const { headers } = await this.getEndpoint();
+
+      const res = await fetch(fileUrl, {
         headers,
         signal: AbortSignal.timeout(30000),
       });
 
       if (!res.ok) {
-        console.warn(`[SANDBOX-CONNECTOR] File download failed: ${res.status} ${resolvedUrl}`);
+        console.warn(`[SANDBOX-CONNECTOR] File download failed: ${res.status} ${fileUrl}`);
         return null;
       }
 

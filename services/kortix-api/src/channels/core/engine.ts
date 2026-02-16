@@ -153,6 +153,8 @@ export class ChannelEngineImpl {
 
       await adapter.sendResponse(config, message, agentResponse);
 
+      const uploadedFileNames = new Set<string>();
+
       if (collectedFiles.length > 0 && adapter.sendFiles) {
         for (const file of collectedFiles) {
           if (!file.content) {
@@ -165,6 +167,9 @@ export class ChannelEngineImpl {
           await adapter.sendFiles(config, message, downloadedFiles).catch((err) => {
             console.error('[CHANNELS] File upload failed:', err);
           });
+          for (const f of downloadedFiles) {
+            uploadedFileNames.add(f.name);
+          }
         }
       }
 
@@ -172,7 +177,7 @@ export class ChannelEngineImpl {
         try {
           const filesAfter = await connector.getModifiedFiles().catch(() => []);
           const newFiles: FileOutput[] = [];
-          const alreadyUploaded = new Set(collectedFiles.map((f) => f.name));
+          const alreadyUploaded = uploadedFileNames;
 
           console.log(`[CHANNELS] File detection: before=${filesBefore.size} after=${filesAfter.length} sse=${collectedFiles.length}`);
 
