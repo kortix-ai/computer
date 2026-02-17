@@ -65,6 +65,34 @@ if [ -d "$PKG_DIR/config" ] && [ -d "/custom-cont-init.d" ]; then
   chmod +x /custom-cont-init.d/98-kortix-env /custom-cont-init.d/99-customize 2>/dev/null || true
 fi
 
+# ── OpenCode CLI binary ──────────────────────────────────────────────────────
+# Update the globally-installed CLI to the version declared in this package.
+# This mirrors the Dockerfile's install logic: install the meta-package, then
+# force-install the musl variant and symlink it over the glibc binary.
+CLI_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').dependencies['@kortix/opencode-ai'] || '')" 2>/dev/null || echo "")
+if [ -n "$CLI_VERSION" ]; then
+  CURRENT_CLI=$(opencode --version 2>/dev/null || echo "none")
+  if [ "$CURRENT_CLI" != "$CLI_VERSION" ]; then
+    echo "[sandbox-postinstall] Updating OpenCode CLI: $CURRENT_CLI -> $CLI_VERSION..."
+    npm install -g "@kortix/opencode-ai@$CLI_VERSION" 2>/dev/null || true
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "x86_64" ]; then
+      npm install -g "@kortix/opencode-ai-linux-x64-musl@$CLI_VERSION" --force 2>/dev/null || true
+      MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-x64-musl/bin/opencode
+      GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-x64/bin/opencode
+      [ -f "$MUSL_BIN" ] && [ -f "$GLIBC_BIN" ] && ln -sf "$MUSL_BIN" "$GLIBC_BIN"
+    else
+      npm install -g "@kortix/opencode-ai-linux-arm64-musl@$CLI_VERSION" --force 2>/dev/null || true
+      MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-arm64-musl/bin/opencode
+      GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-arm64/bin/opencode
+      [ -f "$MUSL_BIN" ] && [ -f "$GLIBC_BIN" ] && ln -sf "$MUSL_BIN" "$GLIBC_BIN"
+    fi
+    echo "[sandbox-postinstall] CLI updated to $(opencode --version 2>/dev/null || echo 'unknown')"
+  else
+    echo "[sandbox-postinstall] CLI already at $CLI_VERSION, skipping"
+  fi
+fi
+
 # ── Agent browser patches ────────────────────────────────────────────────────
 if [ -f "$PKG_DIR/patch-agent-browser.js" ]; then
   echo "[sandbox-postinstall] Applying agent-browser patches..."
