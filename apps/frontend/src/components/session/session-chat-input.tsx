@@ -3,8 +3,10 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ArrowUp,
+  ArrowUpLeft,
   ChevronDown,
   Check,
+  GitFork,
   Loader2,
   Paperclip,
   X,
@@ -138,8 +140,14 @@ function AgentSelector({
 }) {
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const prevAgentRef = useRef(selectedAgent);
+
+  const primaryAgents = useMemo(() => agents.filter((a) => a.mode !== 'subagent'), [agents]);
+  const subAgents = useMemo(() => agents.filter((a) => a.mode === 'subagent'), [agents]);
+  const allOrdered = useMemo(() => [...primaryAgents, ...subAgents], [primaryAgents, subAgents]);
 
   // Flash highlight when agent changes (e.g. via Tab cycling)
   useEffect(() => {
@@ -151,11 +159,11 @@ function AgentSelector({
     prevAgentRef.current = selectedAgent;
   }, [selectedAgent]);
 
-  // Update ref after flash starts
   useEffect(() => {
     prevAgentRef.current = selectedAgent;
   }, [selectedAgent]);
 
+  // Close on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -168,47 +176,150 @@ function AgentSelector({
     }
   }, [open]);
 
-  const currentAgent = agents.find((a) => a.name === selectedAgent);
-  const displayName = currentAgent?.name || agents[0]?.name || 'Agent';
+  // Reset focus index when opening
+  useEffect(() => {
+    if (open) {
+      const idx = allOrdered.findIndex((a) => a.name === selectedAgent);
+      setFocusedIndex(idx >= 0 ? idx : 0);
+    }
+  }, [open, allOrdered, selectedAgent]);
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (!open || focusedIndex < 0) return;
+    const el = listRef.current?.querySelector(`[data-agent-index="${focusedIndex}"]`) as HTMLElement | null;
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [focusedIndex, open]);
+
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!open) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedIndex((prev) => Math.min(prev + 1, allOrdered.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (focusedIndex >= 0 && focusedIndex < allOrdered.length) {
+        onSelect(allOrdered[focusedIndex].name);
+        setOpen(false);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+    }
+  }, [open, focusedIndex, allOrdered, onSelect]);
+
+  const currentAgent = agents.find((a) => a.name === selectedAgent) || agents[0];
+  const displayName = currentAgent?.name || 'Agent';
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200 capitalize cursor-pointer",
-          flash && "bg-primary/10 text-foreground",
-        )}
-      >
-        <span className="truncate max-w-[80px]">{displayName}</span>
-        <ChevronDown className={cn('size-3 opacity-50 transition-transform', open && 'rotate-180')} />
-      </button>
+    <div className="relative" ref={ref} onKeyDown={handleKeyDown}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className={cn(
+              "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200 capitalize cursor-pointer",
+              flash && "bg-primary/10 text-foreground",
+              open && "bg-muted text-foreground",
+            )}
+          >
+            <span className="truncate max-w-[100px]">{displayName}</span>
+            <ChevronDown className={cn('size-3 opacity-50 transition-transform duration-200', open && 'rotate-180')} />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <p>Switch agent <kbd className="ml-1 px-1.5 py-0.5 rounded bg-foreground/10 text-[10px] font-mono">Tab</kbd></p>
+        </TooltipContent>
+      </Tooltip>
 
       {open && (
-        <div className="absolute bottom-full left-0 mb-1.5 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[160px]">
-          <div className="max-h-48 overflow-y-auto p-1">
-            {agents.map((agent) => {
+        <div className="absolute bottom-full left-0 mb-1.5 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[240px] max-w-[320px] animate-in fade-in-0 slide-in-from-bottom-2 duration-150">
+          <div ref={listRef} className="max-h-[320px] overflow-y-auto p-1">
+            {/* Primary agents */}
+            {primaryAgents.length > 0 && (
+              <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Agents</div>
+            )}
+            {primaryAgents.map((agent) => {
+              const globalIdx = allOrdered.indexOf(agent);
               const isSelected = selectedAgent === agent.name || (!selectedAgent && agent === agents[0]);
+              const isFocused = focusedIndex === globalIdx;
               return (
                 <button
                   key={agent.name}
+                  data-agent-index={globalIdx}
                   onClick={() => {
                     onSelect(agent.name);
                     setOpen(false);
                   }}
+                  onMouseEnter={() => setFocusedIndex(globalIdx)}
                   className={cn(
-                    'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] hover:bg-muted transition-colors capitalize cursor-pointer',
-                    isSelected && 'bg-muted',
+                    'w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group',
+                    isFocused ? 'bg-muted' : 'hover:bg-muted',
+                    isSelected && !isFocused && 'bg-muted/50',
                   )}
                 >
-                  <span className="flex-1 text-left truncate">{agent.name}</span>
-                  {isSelected && (
-                    <Check className="size-3.5 text-foreground shrink-0" />
-                  )}
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium truncate capitalize">{agent.name}</span>
+                      {isSelected && <Check className="size-3 text-foreground shrink-0" />}
+                    </div>
+                    {agent.description && (
+                      <p className="text-[11px] text-muted-foreground leading-snug mt-0.5 line-clamp-1">{agent.description}</p>
+                    )}
+                  </div>
                 </button>
               );
             })}
+
+            {/* Sub-agents */}
+            {subAgents.length > 0 && (
+              <>
+                {primaryAgents.length > 0 && <div className="mx-2 my-1 border-t border-border" />}
+                <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Sub-agents</div>
+                {subAgents.map((agent) => {
+                  const globalIdx = allOrdered.indexOf(agent);
+                  const isSelected = selectedAgent === agent.name;
+                  const isFocused = focusedIndex === globalIdx;
+                  return (
+                    <button
+                      key={agent.name}
+                      data-agent-index={globalIdx}
+                      onClick={() => {
+                        onSelect(agent.name);
+                        setOpen(false);
+                      }}
+                      onMouseEnter={() => setFocusedIndex(globalIdx)}
+                      className={cn(
+                        'w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group',
+                        isFocused ? 'bg-muted' : 'hover:bg-muted',
+                        isSelected && !isFocused && 'bg-muted/50',
+                      )}
+                    >
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium truncate capitalize">{agent.name}</span>
+                          {isSelected && <Check className="size-3 text-foreground shrink-0" />}
+                        </div>
+                        {agent.description && (
+                          <p className="text-[11px] text-muted-foreground leading-snug mt-0.5 line-clamp-1">{agent.description}</p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+
+          {/* Footer hint */}
+          <div className="border-t border-border px-2.5 py-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+            <span><kbd className="px-1.5 py-0.5 rounded bg-foreground/10 font-mono">↑↓</kbd> navigate</span>
+            <span><kbd className="px-1.5 py-0.5 rounded bg-foreground/10 font-mono">Tab</kbd> cycle</span>
           </div>
         </div>
       )}
@@ -766,6 +877,13 @@ export interface SessionChatInputProps {
   onFileSearch?: (query: string) => Promise<string[]>;
   /** Full provider list response (for connect/manage provider dialogs) */
   providers?: ProviderListResponse;
+
+  /** Thread/fork context — renders an inline indicator inside the input card */
+  threadContext?: {
+    variant: 'thread' | 'fork';
+    parentTitle: string;
+    onBackToParent: () => void;
+  };
 }
 
 export function SessionChatInput({
@@ -791,6 +909,7 @@ export function SessionChatInput({
 
   onFileSearch,
   providers,
+  threadContext,
 }: SessionChatInputProps) {
   const placeholderVariants = useMemo(
     () => [
@@ -1404,6 +1523,24 @@ export function SessionChatInput({
               loading={fileSearchLoading}
               anchorRef={cardRef}
             />
+          )}
+
+          {/* Sub-session context — integrated inside the input card */}
+          {threadContext && (
+            <button
+              onClick={threadContext.onBackToParent}
+              className={cn(
+                'flex items-center gap-2 mx-3 mt-3 mb-0 px-3 py-2 rounded-xl',
+                'bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer group',
+              )}
+            >
+              <ArrowUpLeft className="size-3.5 text-muted-foreground group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
+              <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
+                {threadContext.variant === 'fork' ? 'Fork of' : 'Sub-session of'}
+                {' '}
+                <span className="text-foreground/80 font-medium">{threadContext.parentTitle}</span>
+              </span>
+            </button>
           )}
 
           {/* Attached files preview */}

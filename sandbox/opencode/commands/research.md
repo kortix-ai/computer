@@ -23,7 +23,7 @@ Send `@kortix-research` a detailed, self-contained prompt that includes:
 - User preferences if relevant
 - Instruction to create a research working directory at `research/{topic-slug}/`
 - Instruction to save the final report to `workspace/.kortix/memory/research-{topic-slug}.md`
-- Instruction to load the `kortix-deep-research` skill first
+- Instruction to load the `deep-research` skill first
 
 ## After research completes
 
