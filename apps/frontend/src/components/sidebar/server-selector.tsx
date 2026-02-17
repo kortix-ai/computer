@@ -708,9 +708,9 @@ export function InstanceManagerDialog({
             <div className="flex flex-col gap-3">
               {/* URL */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground">
+                <span className="text-[11px] font-medium text-muted-foreground">
                   Instance Address
-                </label>
+                </span>
                 <input
                   ref={urlInputRef}
                   placeholder="http://localhost:4096"
@@ -726,9 +726,9 @@ export function InstanceManagerDialog({
 
               {/* Label */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground">
+                <span className="text-[11px] font-medium text-muted-foreground">
                   Display Name <span className="text-muted-foreground/40">(optional)</span>
-                </label>
+                </span>
                 <input
                   placeholder="My dev instance"
                   value={formLabel}

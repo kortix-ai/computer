@@ -238,9 +238,9 @@ export default function SkillDetailPage() {
               {/* Description */}
               {isEditing ? (
                 <div className="mt-4">
-                  <label className="text-xs font-medium text-muted-foreground/80 uppercase tracking-wider mb-1.5 block">
+                  <span className="text-xs font-medium text-muted-foreground/80 uppercase tracking-wider mb-1.5 block">
                     Description
-                  </label>
+                  </span>
                   <Textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}

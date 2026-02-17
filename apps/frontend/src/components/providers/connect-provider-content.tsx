@@ -487,24 +487,24 @@ export function ConnectProviderContent({
           </p>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Provider ID</label>
+              <span className="text-xs text-muted-foreground mb-1 block">Provider ID</span>
               <Input placeholder="my-provider" value={customForm.providerID} onChange={(e) => setCustomForm((f) => ({ ...f, providerID: e.target.value }))} />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Display Name</label>
+              <span className="text-xs text-muted-foreground mb-1 block">Display Name</span>
               <Input placeholder="My Provider" value={customForm.name} onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Base URL</label>
+              <span className="text-xs text-muted-foreground mb-1 block">Base URL</span>
               <Input placeholder="https://api.example.com/v1" value={customForm.baseURL} onChange={(e) => setCustomForm((f) => ({ ...f, baseURL: e.target.value }))} />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">API Key (optional)</label>
+              <span className="text-xs text-muted-foreground mb-1 block">API Key (optional)</span>
               <Input placeholder="sk-..." type="password" value={customForm.apiKey} onChange={(e) => setCustomForm((f) => ({ ...f, apiKey: e.target.value }))} />
               <p className="text-[11px] text-muted-foreground/60 mt-1">Use {'{env:VAR_NAME}'} to read from environment</p>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Models</label>
+              <span className="text-xs text-muted-foreground mb-1 block">Models</span>
               <div className="flex gap-2">
                 <Input placeholder="Model ID" value={customForm.modelId} onChange={(e) => setCustomForm((f) => ({ ...f, modelId: e.target.value }))} className="flex-1" />
                 <Input placeholder="Display Name" value={customForm.modelName} onChange={(e) => setCustomForm((f) => ({ ...f, modelName: e.target.value }))} className="flex-1" />
@@ -583,7 +583,7 @@ export function ConnectProviderContent({
                 {' '}and paste the code below to connect {selectedProviderData?.name || view.providerID}.
               </p>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Authorization code</label>
+                <span className="text-xs text-muted-foreground mb-1 block">Authorization code</span>
                 <Input placeholder="Enter code..." type="text" value={oauthCode} onChange={(e) => setOauthCode(e.target.value)} />
               </div>
               {error && <p className="text-sm text-destructive flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}</p>}

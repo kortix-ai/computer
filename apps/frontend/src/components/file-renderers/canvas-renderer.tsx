@@ -1990,7 +1990,7 @@ function FrameFloatingToolbar({
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground uppercase">Width</label>
+                    <span className="text-[10px] text-muted-foreground uppercase">Width</span>
                     <input
                       type="number"
                       value={tempWidth}
@@ -2002,7 +2002,7 @@ function FrameFloatingToolbar({
                   </div>
                   <X className="h-3 w-3 text-muted-foreground mt-4" />
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground uppercase">Height</label>
+                    <span className="text-[10px] text-muted-foreground uppercase">Height</span>
                     <input
                       type="number"
                       value={tempHeight}
@@ -2333,7 +2333,7 @@ function MultiSelectToolbar({
           <div className="space-y-4">
             {/* Image order preview */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Image order (click arrows to swap)</label>
+              <span className="text-xs font-medium text-muted-foreground">Image order (click arrows to swap)</span>
               <div className="flex items-center gap-2 overflow-x-auto py-2">
                 {orderedElements.map((el, idx) => (
                   <div key={el.id} className="flex items-center gap-1">
@@ -2375,7 +2375,7 @@ function MultiSelectToolbar({
 
             {/* Merge prompt */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">How should these images be merged?</label>
+              <span className="text-xs font-medium text-muted-foreground">How should these images be merged?</span>
               <Textarea
                 value={mergePrompt}
                 onChange={(e) => setMergePrompt(e.target.value)}
