@@ -87,9 +87,12 @@ export const QuickLaunch = memo(function QuickLaunch({
     }
   }, [isOpen]);
 
-  useEffect(() => {
+  // Reset selection when query changes — computed during render
+  const prevQueryRef = useRef(query);
+  if (prevQueryRef.current !== query) {
+    prevQueryRef.current = query;
     setSelectedIndex(0);
-  }, [query]);
+  }
 
   const handleSelect = useCallback((index: number) => {
     const item = allResults[index];

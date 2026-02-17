@@ -58,12 +58,12 @@ export default function ThreadUsage() {
   };
 
   const handlePrevPage = () => {
-    setOffset(Math.max(0, offset - limit));
+    setOffset(prev => Math.max(0, prev - limit));
   };
 
   const handleNextPage = () => {
     if (data?.pagination.has_more) {
-      setOffset(offset + limit);
+      setOffset(prev => prev + limit);
     }
   };
 

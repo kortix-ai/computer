@@ -78,6 +78,109 @@ import { cn } from '@/lib/utils';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { exportDocument, type ExportFormat } from '@/lib/utils/document-export';
 
+function ToolbarButton({
+  onClick,
+  isActive = false,
+  disabled = false,
+  icon: Icon,
+  tooltip,
+  shortcut,
+}: {
+  onClick: () => void;
+  isActive?: boolean;
+  disabled?: boolean;
+  icon: React.ElementType;
+  tooltip: string;
+  shortcut?: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          onClick={onClick}
+          disabled={disabled}
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'h-8 w-8 p-0',
+            isActive && 'bg-accent text-accent-foreground'
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="flex items-center gap-2">
+        <span>{tooltip}</span>
+        {shortcut && (
+          <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded font-mono">
+            {shortcut}
+          </kbd>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function MarkdownSaveButton({
+  onSave,
+  saveState,
+  hasChanges,
+}: {
+  onSave?: () => void;
+  saveState: string;
+  hasChanges: boolean;
+}) {
+  if (!onSave) return null;
+
+  switch (saveState) {
+    case 'saving':
+      return (
+        <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2">
+          <KortixLoader size="small" />
+          <span className="text-xs">Saving</span>
+        </Button>
+      );
+    case 'saved':
+      return (
+        <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2 text-green-600">
+          <Check className="h-4 w-4" />
+          <span className="text-xs">Saved</span>
+        </Button>
+      );
+    case 'error':
+      return (
+        <Button variant="ghost" size="sm" onClick={onSave} className="gap-1.5 h-8 px-2 text-red-500 hover:bg-red-50 hover:text-red-600">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-xs">Retry</span>
+        </Button>
+      );
+    default:
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onSave} 
+              disabled={!hasChanges}
+              className="gap-1.5 h-8 px-2"
+            >
+              <Save className="h-4 w-4" />
+              <span className="text-xs">Save</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {hasChanges ? (
+              <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
+            ) : (
+              'No changes to save'
+            )}
+          </TooltipContent>
+        </Tooltip>
+      );
+  }
+}
+
 interface MarkdownToolbarProps {
   editor: Editor;
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
@@ -261,47 +364,6 @@ export function MarkdownToolbar({
     }
   }, [editor, fileName]);
 
-  const ToolbarButton = ({
-    onClick,
-    isActive = false,
-    disabled = false,
-    icon: Icon,
-    tooltip,
-    shortcut,
-  }: {
-    onClick: () => void;
-    isActive?: boolean;
-    disabled?: boolean;
-    icon: React.ElementType;
-    tooltip: string;
-    shortcut?: string;
-  }) => (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          onClick={onClick}
-          disabled={disabled}
-          variant="ghost"
-          size="sm"
-          className={cn(
-            'h-8 w-8 p-0',
-            isActive && 'bg-accent text-accent-foreground'
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="flex items-center gap-2">
-        <span>{tooltip}</span>
-        {shortcut && (
-          <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded font-mono">
-            {shortcut}
-          </kbd>
-        )}
-      </TooltipContent>
-    </Tooltip>
-  );
-
   const insertLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href;
     const url = window.prompt('Enter URL:', previousUrl);
@@ -445,65 +507,13 @@ export function MarkdownToolbar({
   }, [editor]);
 
 
-  const SaveButton = () => {
-    if (!onSave) return null;
-
-    switch (saveState) {
-      case 'saving':
-        return (
-          <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2">
-            <KortixLoader size="small" />
-            <span className="text-xs">Saving</span>
-          </Button>
-        );
-      case 'saved':
-        return (
-          <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2 text-green-600">
-            <Check className="h-4 w-4" />
-            <span className="text-xs">Saved</span>
-          </Button>
-        );
-      case 'error':
-        return (
-          <Button variant="ghost" size="sm" onClick={onSave} className="gap-1.5 h-8 px-2 text-red-500 hover:bg-red-50 hover:text-red-600">
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-xs">Retry</span>
-          </Button>
-        );
-      default:
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={onSave} 
-                disabled={!hasChanges}
-                className="gap-1.5 h-8 px-2"
-              >
-                <Save className="h-4 w-4" />
-                <span className="text-xs">Save</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {hasChanges ? (
-                <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
-              ) : (
-                'No changes to save'
-              )}
-            </TooltipContent>
-          </Tooltip>
-        );
-    }
-  };
-
   const toolbarContent = (
     <>
       {/* Save/Discard - Left side, only in main toolbar when actions not hidden */}
       {!isBubbleMenu && !isFloatingMenu && !hideActions && (
         <>
           <div className="flex items-center gap-1 shrink-0">
-            <SaveButton />
+            <MarkdownSaveButton onSave={onSave} saveState={saveState} hasChanges={hasChanges} />
             {hasChanges && onDiscard && (
               <Tooltip>
                 <TooltipTrigger asChild>

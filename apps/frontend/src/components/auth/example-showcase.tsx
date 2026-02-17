@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import Image from 'next/image';
 import { Computer, CornerDownLeft, Paperclip, Mic, Zap, FolderOpen, Globe, Presentation, BarChart3, FileText, Search, Image as ImageIcon, ChevronRight, File, Database } from 'lucide-react';
@@ -225,14 +225,16 @@ export function ExampleShowcase() {
     };
   }, [activeExample, AUTOPLAY_DURATION]);
 
-  // Step progression
-  useEffect(() => {
+  // Step progression — reset when example changes, computed during render
+  const prevActiveExampleRef = useRef(activeExample);
+  if (prevActiveExampleRef.current !== activeExample) {
+    prevActiveExampleRef.current = activeExample;
     setCurrentStepIndex(0);
     setAiText('');
     setSelectedView('terminal');
     setCurrentSlide(0);
     setDisplayedContent(null);
-  }, [activeExample]);
+  }
 
   // Animate through steps
   useEffect(() => {

@@ -288,11 +288,13 @@ export function FileViewer() {
     setEditedContent(null);
   }
 
-  // Reset editing mode when file changes
-  useEffect(() => {
+  // Reset editing mode when file changes — computed during render
+  const prevSelectedFilePathRef = useRef(selectedFilePath);
+  if (prevSelectedFilePathRef.current !== selectedFilePath) {
+    prevSelectedFilePathRef.current = selectedFilePath;
     setIsEditing(false);
     setHighlightedHtml('');
-  }, [selectedFilePath]);
+  }
 
   // Syntax highlight with Shiki
   const shikiTheme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';

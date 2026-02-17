@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { Textarea } from "./textarea";
 import { Input } from "./input";
 import { cn, truncateString } from "@/lib/utils";
@@ -25,10 +25,11 @@ export const EditableText: React.FC<EditableTextProps> = ({
   }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(value);
-  
-    useEffect(() => {
+    const prevValueRef = useRef(value);
+    if (prevValueRef.current !== value) {
+      prevValueRef.current = value;
       setEditValue(value);
-    }, [value]);
+    }
   
     const handleSave = () => {
       onSave(editValue);

@@ -33,10 +33,12 @@ export function FileSearch() {
     enabled: debouncedQuery.length > 0,
   });
 
-  // Reset selection when results change
-  useEffect(() => {
+  // Reset selection when results change — computed during render
+  const prevResultsRef = useRef(results);
+  if (prevResultsRef.current !== results) {
+    prevResultsRef.current = results;
     setSelectedIndex(0);
-  }, [results]);
+  }
 
   const handleSelect = useCallback(
     (path: string) => {

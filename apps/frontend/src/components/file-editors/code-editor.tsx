@@ -25,6 +25,87 @@ import {
 // Using type assertion because TypeScript types are incomplete
 const langsTyped = langs as Record<string, (() => any) | undefined>;
 
+function CodeEditorSaveButton({
+  readOnly,
+  onSave,
+  saveState,
+  handleSave,
+  hasChanges,
+}: {
+  readOnly?: boolean;
+  onSave?: () => void;
+  saveState: string;
+  handleSave: () => void;
+  hasChanges: boolean;
+}) {
+  if (readOnly || !onSave) return null;
+  
+  switch (saveState) {
+    case 'saving':
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled
+          className="gap-1.5 h-7 px-2 text-xs"
+        >
+          <KortixLoader size="small" />
+          <span className="hidden sm:inline">Saving</span>
+        </Button>
+      );
+    case 'saved':
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled
+          className="gap-1.5 h-7 px-2 text-xs text-green-600"
+        >
+          <Check className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Saved</span>
+        </Button>
+      );
+    case 'error':
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSave}
+          className="gap-1.5 h-7 px-2 text-xs text-red-500 hover:bg-red-50 hover:text-red-600"
+        >
+          <AlertCircle className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Retry</span>
+        </Button>
+      );
+    default:
+      return (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSave}
+                disabled={!hasChanges}
+                className="gap-1.5 h-7 px-2 text-xs"
+              >
+                <Save className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Save</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {hasChanges ? (
+                <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
+              ) : (
+                'No changes to save'
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+  }
+}
+
 // Debug: uncomment to inspect available CodeMirror languages
 // if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 //   const availableLangs = Object.keys(langsTyped).filter(
@@ -517,75 +598,6 @@ export function CodeEditor({
     return exts;
   }, [langExtension]);
 
-  const SaveButton = () => {
-    if (readOnly || !onSave) return null;
-    
-    switch (saveState) {
-      case 'saving':
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled
-            className="gap-1.5 h-7 px-2 text-xs"
-          >
-            <KortixLoader size="small" />
-            <span className="hidden sm:inline">Saving</span>
-          </Button>
-        );
-      case 'saved':
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled
-            className="gap-1.5 h-7 px-2 text-xs text-green-600"
-          >
-            <Check className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Saved</span>
-          </Button>
-        );
-      case 'error':
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSave}
-            className="gap-1.5 h-7 px-2 text-xs text-red-500 hover:bg-red-50 hover:text-red-600"
-          >
-            <AlertCircle className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Retry</span>
-          </Button>
-        );
-      default:
-        return (
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-          <Button
-                  variant="ghost"
-            size="sm"
-            onClick={handleSave}
-                  disabled={!hasChanges}
-                  className="gap-1.5 h-7 px-2 text-xs"
-          >
-            <Save className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Save</span>
-          </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {hasChanges ? (
-                  <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
-                ) : (
-                  'No changes to save'
-                )}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-    }
-  };
-
   return (
     <div 
       className={cn(
@@ -602,7 +614,13 @@ export function CodeEditor({
         <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30 flex-shrink-0 max-w-full min-w-0">
           {/* Left: Save/Discard/Unsaved */}
           <div className="flex items-center gap-1 min-w-0">
-            <SaveButton />
+            <CodeEditorSaveButton
+              readOnly={readOnly}
+              onSave={onSave}
+              saveState={saveState}
+              handleSave={handleSave}
+              hasChanges={hasChanges}
+            />
             {hasChanges && (
               <TooltipProvider delayDuration={300}>
                 <Tooltip>

@@ -24,6 +24,35 @@ const formatDate = (date: Date, locale: string = 'en-us'): string => {
   })
 }
 
+function PresetButton({
+  preset,
+  label,
+  isSelected,
+  onSetPreset,
+}: {
+  preset: string
+  label: string
+  isSelected: boolean
+  onSetPreset: (preset: string) => void
+}): React.JSX.Element {
+  return (
+    <Button
+      className={cn(isSelected && 'pointer-events-none')}
+      variant="ghost"
+      onClick={() => {
+        onSetPreset(preset)
+      }}
+    >
+      <>
+        <span className={cn('pr-2 opacity-0', isSelected && 'opacity-70')}>
+          <CheckIcon width={18} height={18} />
+        </span>
+        {label}
+      </>
+    </Button>
+  )
+}
+
 const getDateAdjustedForTimezone = (dateInput: Date | string): Date => {
   if (typeof dateInput === 'string') {
     const parts = dateInput.split('-').map((part) => parseInt(part, 10))
@@ -185,31 +214,6 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range])
 
-  const PresetButton = ({
-    preset,
-    label,
-    isSelected
-  }: {
-    preset: string
-    label: string
-    isSelected: boolean
-  }): React.JSX.Element => (
-    <Button
-      className={cn(isSelected && 'pointer-events-none')}
-      variant="ghost"
-      onClick={() => {
-        setPreset(preset)
-      }}
-    >
-      <>
-        <span className={cn('pr-2 opacity-0', isSelected && 'opacity-70')}>
-          <CheckIcon width={18} height={18} />
-        </span>
-        {label}
-      </>
-    </Button>
-  )
-
   return (
     <Popover
       modal={true}
@@ -284,6 +288,7 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
                     preset={preset.name}
                     label={preset.label}
                     isSelected={selectedPreset === preset.name}
+                    onSetPreset={setPreset}
                   />
                 ))}
               </div>

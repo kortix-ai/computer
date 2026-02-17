@@ -199,10 +199,13 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
   ), [setupSteps, profileMappings, customMcpConfigs]);
 
   const handleStepComplete = useCallback(() => {
-    if (currentStep < setupSteps.length - 1) {
-      setTimeout(() => setCurrentStep(currentStep + 1), 500);
-    }
-  }, [currentStep, setupSteps.length]);
+    setCurrentStep(prev => {
+      if (prev < setupSteps.length - 1) {
+        setTimeout(() => setCurrentStep(p => p + 1), 500);
+      }
+      return prev;
+    });
+  }, [setupSteps.length]);
 
   const renderPasteStep = () => (
     <div className="space-y-6 min-w-0">

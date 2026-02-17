@@ -86,7 +86,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
       }
 
       // Advance to next tab
-      setTab(tab + 1);
+      setTab(prev => prev + 1);
       setEditing(false);
     },
     [answers, customInputs, tab, isSingle, request.id, onReply],
