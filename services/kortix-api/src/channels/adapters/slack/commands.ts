@@ -336,7 +336,7 @@ async function handleStatusCommand(
 
   const lines: string[] = [
     '*Session Status*\n',
-    `*Model:* \`${currentModel || 'claude-3-5-haiku-20241022'}\``,
+    `*Model:* \`${currentModel || 'kortix/power'}\``,
     `*Agent:* \`${currentAgent}\``,
     `*Session strategy:* \`${strategy}\``,
     `*Session ID:* ${sessionId ? `\`${sessionId}\`` : '_none active_'}`,

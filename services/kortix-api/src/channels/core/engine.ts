@@ -126,7 +126,6 @@ export class ChannelEngineImpl {
       const collectedFiles: FileOutput[] = [];
       const startTime = Date.now();
 
-      // Snapshot existing files before the prompt so we can detect new ones after
       const filesBefore = new Set(
         (await connector.getModifiedFiles().catch(() => [])).map((f) => f.path),
       );
@@ -298,7 +297,7 @@ export class ChannelEngineImpl {
       }
     }
 
-    return { providerID: 'anthropic', modelID: 'claude-3-5-haiku-20241022' };
+    return { providerID: 'kortix', modelID: 'kortix/power' };
   }
 
   private buildPrompt(config: ChannelConfig, message: NormalizedMessage): string {
