@@ -42,6 +42,7 @@ import {
   Hash,
   Clock,
   FileIcon,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -716,6 +717,112 @@ function SessionMetadataList({
   );
 }
 
+// --- Session messages rich rendering ---
+
+interface ParsedSessionMessage {
+  index: number;
+  role: string;
+  cost: number;
+  content: string;
+  tools?: string;
+}
+
+function parseSessionMessagesOutput(output: string): ParsedSessionMessage[] | null {
+  const trimmed = output.trim();
+  if (!trimmed.includes('--- Msg ')) return null;
+
+  const msgRegex = /---\s*Msg\s+(\d+)\s+\[(\w+)\]\s+cost=\$?([\d.]+)\s*---/g;
+  const matches = [...trimmed.matchAll(msgRegex)];
+  if (matches.length < 1) return null;
+
+  const messages: ParsedSessionMessage[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const start = m.index! + m[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : trimmed.length;
+    const rawContent = trimmed.slice(start, end).trim();
+
+    const toolsMatch = rawContent.match(/^\s*Tools used:\s*(.+)$/m);
+    const content = rawContent.replace(/^\s*Tools used:\s*.+$/m, '').trim();
+
+    messages.push({
+      index: parseInt(m[1], 10),
+      role: m[2].toLowerCase(),
+      cost: parseFloat(m[3]),
+      content,
+      tools: toolsMatch?.[1],
+    });
+  }
+
+  return messages.length > 0 ? messages : null;
+}
+
+function InlineSessionMessagesList({ messages }: { messages: ParsedSessionMessage[] }) {
+  return (
+    <div className="flex flex-col gap-1 p-1.5">
+      <div className="px-1.5 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        {messages.length} message{messages.length !== 1 ? 's' : ''}
+      </div>
+      {messages.map((msg) => (
+        <div
+          key={msg.index}
+          className={cn(
+            'rounded-md border overflow-hidden',
+            msg.role === 'user' ? 'border-border/60' : 'border-border/40',
+          )}
+        >
+          <div className={cn(
+            'flex items-center gap-2 px-2.5 py-1',
+            msg.role === 'user' ? 'bg-muted/50' : 'bg-card',
+          )}>
+            <span className={cn(
+              'text-[10px] font-semibold uppercase tracking-wide',
+              msg.role === 'user' ? 'text-blue-500' : 'text-emerald-500',
+            )}>
+              {msg.role}
+            </span>
+            <span className="text-[10px] text-muted-foreground/50 ml-auto">#{msg.index}</span>
+            {msg.cost > 0 && (
+              <span className="text-[10px] text-muted-foreground/50">${msg.cost.toFixed(4)}</span>
+            )}
+          </div>
+          <div className="px-2.5 py-1.5">
+            <div className="text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+              {msg.content.slice(0, 800)}
+              {msg.content.length > 800 && (
+                <span className="text-muted-foreground/50"> ... (truncated)</span>
+              )}
+            </div>
+            {msg.tools && (
+              <div className="mt-1 flex items-center gap-1 flex-wrap">
+                {msg.tools.split(',').map((t, i) => {
+                  const trimmedTool = t.trim();
+                  const nameMatch = trimmedTool.match(/^(\w+)\s*\((\w+)\)/);
+                  const name = nameMatch?.[1] || trimmedTool;
+                  const toolStatus = nameMatch?.[2] || '';
+                  return (
+                    <span
+                      key={i}
+                      className={cn(
+                        'text-[9px] px-1 py-0.5 rounded border',
+                        toolStatus === 'completed'
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-muted/50 border-border/50 text-muted-foreground',
+                      )}
+                    >
+                      {name}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const input = partInput(part);
   const metadata = partMetadata(part);
@@ -731,21 +838,27 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
     [strippedOutput],
   );
 
+  // Try to detect session messages output (--- Msg N [ROLE] cost=$X.XXXX ---)
+  const sessionMessages = useMemo(
+    () => (sessionMeta ? null : parseSessionMessagesOutput(strippedOutput)),
+    [strippedOutput, sessionMeta],
+  );
+
   // Try to detect structured log-like output (warnings, tracebacks, etc.)
   const structuredSections = useMemo(() => {
-    if (sessionMeta || !strippedOutput) return null;
+    if (sessionMeta || sessionMessages || !strippedOutput) return null;
     const normalized = normalizeToolOutput(strippedOutput);
     if (!hasStructuredContent(normalized)) return null;
     return parseStructuredOutput(normalized);
-  }, [strippedOutput, sessionMeta]);
+  }, [strippedOutput, sessionMeta, sessionMessages]);
 
   const outputBlock = useMemo(() => {
-    if (!strippedOutput || sessionMeta || structuredSections) return '';
+    if (!strippedOutput || sessionMeta || sessionMessages || structuredSections) return '';
     const { content, lang } = formatBashOutput(strippedOutput);
     return `\`\`\`${lang}\n${content}\n\`\`\``;
-  }, [strippedOutput, sessionMeta, structuredSections]);
+  }, [strippedOutput, sessionMeta, sessionMessages, structuredSections]);
 
-  const hasOutput = !!sessionMeta || !!structuredSections || !!outputBlock;
+  const hasOutput = !!sessionMeta || !!sessionMessages || !!structuredSections || !!outputBlock;
 
   return (
     <BasicTool
@@ -768,6 +881,10 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
             {sessionMeta ? (
               <div className="p-2">
                 <SessionMetadataList sessions={sessionMeta} />
+              </div>
+            ) : sessionMessages ? (
+              <div className="p-2">
+                <InlineSessionMessagesList messages={sessionMessages} />
               </div>
             ) : structuredSections ? (
               <div className="p-2">
@@ -2721,6 +2838,140 @@ function SessionContextTool({ part, defaultOpen, forceOpen, locked }: ToolProps)
   );
 }
 ToolRegistry.register('session_context', SessionContextTool);
+
+// --- Skill ---
+function SkillToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const metadata = partMetadata(part);
+  const output = partOutput(part);
+
+  const skillName = String(metadata.name || input.name || 'Skill');
+  const skillDir = String(metadata.dir || '');
+  const subtitle = skillDir || undefined;
+
+  return (
+    <BasicTool
+      icon={<BookOpen className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Skill', subtitle: skillName }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {output && (
+        <div data-scrollable className={`p-2 max-h-48 overflow-auto ${MD_FLUSH_CLASSES}`}>
+          <UnifiedMarkdown content={output.slice(0, 2000)} isStreaming={false} />
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('skill', SkillToolRenderer);
+
+// --- Code Search ---
+function CodesearchToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+
+  const query = String(input.query || '');
+
+  return (
+    <BasicTool
+      icon={<Globe className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Code Search', subtitle: query || undefined }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {output && (
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
+          <UnifiedMarkdown content={output.slice(0, 3000)} isStreaming={false} />
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('codesearch', CodesearchToolRenderer);
+
+// --- Batch ---
+function BatchToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const metadata = partMetadata(part);
+  const status = partStatus(part);
+
+  const totalCalls = (metadata.totalCalls as number) || 0;
+  const successful = (metadata.successful as number) || 0;
+  const failed = (metadata.failed as number) || 0;
+  const details = (Array.isArray(metadata.details) ? metadata.details : []) as Array<{ tool: string; success: boolean }>;
+
+  const toolCalls = details.length > 0
+    ? details
+    : (Array.isArray(input.tool_calls) ? input.tool_calls as Array<{ tool: string }> : []).map((c) => ({ tool: c.tool, success: true }));
+
+  const subtitle = totalCalls > 0
+    ? `${successful}/${totalCalls} passed`
+    : `${toolCalls.length} tool${toolCalls.length !== 1 ? 's' : ''}`;
+
+  return (
+    <BasicTool
+      icon={<Layers className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Batch', subtitle }}
+      defaultOpen={defaultOpen ?? (failed > 0)}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {toolCalls.length > 0 && (
+        <div className="px-3 py-2 space-y-1">
+          {toolCalls.map((call: { tool: string; success?: boolean }, i: number) => (
+            <div key={i} className="flex items-center gap-2 text-xs">
+              {status === 'running' || status === 'pending' ? (
+                <Loader2 className="size-2.5 text-muted-foreground animate-spin shrink-0" />
+              ) : call.success !== false ? (
+                <Check className="size-2.5 text-emerald-500 shrink-0" />
+              ) : (
+                <CircleAlert className="size-2.5 text-red-500 shrink-0" />
+              )}
+              <span className="font-mono truncate">{call.tool}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('batch', BatchToolRenderer);
+
+// --- Plan (Enter/Exit) ---
+function PlanToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const status = partStatus(part);
+
+  const toolName = (part as any).tool || '';
+  const isExit = toolName === 'plan_exit';
+  const subtitle = isExit ? 'Plan -> Build' : 'Build -> Plan';
+
+  return (
+    <BasicTool
+      icon={<SquareKanban className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: isExit ? 'Switch to Build' : 'Switch to Plan', subtitle }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {status === 'completed' && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          {isExit ? 'Switched to build agent.' : 'Switched to plan agent.'}
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          User declined the switch.
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('plan_exit', PlanToolRenderer);
+ToolRegistry.register('plan_enter', PlanToolRenderer);
 
 // --- Question ---
 function QuestionSkeletonOptions() {
