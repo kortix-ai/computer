@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// === Request Schemas (Router) ===
+// === Request Schemas (Router) === 
 
 export const WebSearchRequestSchema = z.object({
   query: z.string().min(1, 'Query is required'),
