@@ -93,6 +93,127 @@ interface ParsedSessionMeta {
   summary?: { additions: number; deletions: number; files: number };
 }
 
+// --- Session messages rich rendering ---
+
+interface ParsedSessionMessage {
+  index: number;
+  role: string;
+  cost: number;
+  content: string;
+  tools?: string;
+}
+
+function parseSessionMessagesOutput(output: string): ParsedSessionMessage[] | null {
+  const trimmed = output.trim();
+  // Must have at least one "--- Msg N [ROLE] ---" block
+  if (!trimmed.includes('--- Msg ')) return null;
+
+  const msgRegex = /---\s*Msg\s+(\d+)\s+\[(\w+)\]\s+cost=\$?([\d.]+)\s*---/g;
+  const matches = [...trimmed.matchAll(msgRegex)];
+  if (matches.length < 1) return null;
+
+  const messages: ParsedSessionMessage[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const start = m.index! + m[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : trimmed.length;
+    const rawContent = trimmed.slice(start, end).trim();
+
+    // Extract "Tools used: ..." line if present
+    const toolsMatch = rawContent.match(/^\s*Tools used:\s*(.+)$/m);
+    const content = rawContent.replace(/^\s*Tools used:\s*.+$/m, '').trim();
+
+    messages.push({
+      index: parseInt(m[1], 10),
+      role: m[2].toLowerCase(),
+      cost: parseFloat(m[3]),
+      content,
+      tools: toolsMatch?.[1],
+    });
+  }
+
+  return messages.length > 0 ? messages : null;
+}
+
+function SessionMessagesList({ messages }: { messages: ParsedSessionMessage[] }) {
+  return (
+    <div className="flex flex-col gap-2 py-1">
+      <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        {messages.length} message{messages.length !== 1 ? 's' : ''}
+      </div>
+      {messages.map((msg) => (
+        <div
+          key={msg.index}
+          className={cn(
+            'rounded-lg border overflow-hidden',
+            msg.role === 'user'
+              ? 'border-border/60'
+              : 'border-border/40',
+          )}
+        >
+          {/* Message header */}
+          <div className={cn(
+            'flex items-center gap-2 px-3 py-1.5',
+            msg.role === 'user'
+              ? 'bg-muted/50'
+              : 'bg-card',
+          )}>
+            <span className={cn(
+              'text-[10px] font-semibold uppercase tracking-wide',
+              msg.role === 'user' ? 'text-blue-500' : 'text-emerald-500',
+            )}>
+              {msg.role}
+            </span>
+            <span className="text-[10px] text-muted-foreground/50 ml-auto">
+              #{msg.index}
+            </span>
+            {msg.cost > 0 && (
+              <span className="text-[10px] text-muted-foreground/50">
+                ${msg.cost.toFixed(4)}
+              </span>
+            )}
+          </div>
+
+          {/* Message content */}
+          <div className="px-3 py-2">
+            <div className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+              {msg.content.slice(0, 1500)}
+              {msg.content.length > 1500 && (
+                <span className="text-muted-foreground/50">... (truncated)</span>
+              )}
+            </div>
+            {msg.tools && (
+              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                {msg.tools.split(',').map((t, i) => {
+                  const trimmed = t.trim();
+                  const nameMatch = trimmed.match(/^(\w+)\s*\((\w+)\)/);
+                  const name = nameMatch?.[1] || trimmed;
+                  const status = nameMatch?.[2] || '';
+                  return (
+                    <span
+                      key={i}
+                      className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded border',
+                        status === 'completed'
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-muted/50 border-border/50 text-muted-foreground',
+                      )}
+                    >
+                      {name}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Session metadata rich rendering ---
+
 function parseSessionMetadataOutput(output: string): ParsedSessionMeta[] | null {
   const trimmed = output.trim();
   if (!trimmed.includes('===') || !trimmed.includes('"id"')) return null;
@@ -216,16 +337,21 @@ export function OcBashToolView({
 
   const isError = toolResult?.success === false || !!toolResult?.error;
 
-  // Try to detect session metadata for rich rendering
+  // Try to detect session metadata or messages for rich rendering
   const sessionMeta = useMemo(
     () => parseSessionMetadataOutput(cleanOutput),
     [cleanOutput],
   );
 
+  const sessionMessages = useMemo(
+    () => !sessionMeta ? parseSessionMessagesOutput(cleanOutput) : null,
+    [cleanOutput, sessionMeta],
+  );
+
   // Format output with proper syntax highlighting
   const { commandBlock, outputBlock } = useMemo(() => {
     const cmd = `\`\`\`bash\n$ ${command}\n\`\`\``;
-    if (!cleanOutput || sessionMeta) return { commandBlock: cmd, outputBlock: '' };
+    if (!cleanOutput || sessionMeta || sessionMessages) return { commandBlock: cmd, outputBlock: '' };
     const { content, lang } = formatOutputContent(cleanOutput);
     const out = `\`\`\`${lang}\n${content}\n\`\`\``;
     return { commandBlock: cmd, outputBlock: out };
@@ -259,6 +385,8 @@ export function OcBashToolView({
 
             {sessionMeta ? (
               <SessionMetadataList sessions={sessionMeta} />
+            ) : sessionMessages ? (
+              <SessionMessagesList messages={sessionMessages} />
             ) : outputBlock ? (
               <UnifiedMarkdown content={outputBlock} isStreaming={false} />
             ) : null}

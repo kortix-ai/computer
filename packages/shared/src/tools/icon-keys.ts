@@ -209,6 +209,27 @@ export function getToolIconKey(toolName: string | undefined): ToolIconKey {
     case 'session-context':
       return 'book-open';
 
+    // Skill loading
+    case 'skill':
+      return 'book-open';
+
+    // Code search
+    case 'codesearch':
+    case 'code-search':
+    case 'code_search':
+      return 'globe';
+
+    // Batch execution
+    case 'batch':
+      return 'list';
+
+    // Plan tools (agent switching)
+    case 'plan_exit':
+    case 'plan-exit':
+    case 'plan_enter':
+    case 'plan-enter':
+      return 'list-todo';
+
     // Research
     case 'get-paper-details':
     case 'get-author-details':

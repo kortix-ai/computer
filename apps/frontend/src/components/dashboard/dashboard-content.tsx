@@ -11,6 +11,7 @@ import {
   useOpenCodeAgents,
   useOpenCodeProviders,
   useOpenCodeCommands,
+  useExecuteOpenCodeCommand,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
@@ -34,6 +35,7 @@ export function DashboardContent() {
   const { setOpen: setSidebarOpenState, setOpenMobile } = useSidebar();
   const createSession = useCreateOpenCodeSession();
   const sendMessage = useSendOpenCodeMessage();
+  const executeCommand = useExecuteOpenCodeCommand();
 
   // Data
   const { data: agents } = useOpenCodeAgents();
@@ -99,8 +101,22 @@ export function DashboardContent() {
   );
 
   const handleCommand = useCallback(
-    (cmd: Command) => { },
-    [],
+    async (cmd: Command, args?: string) => {
+      try {
+        const session = await createSession.mutateAsync();
+        openTabAndNavigate({
+          id: session.id,
+          title: cmd.name,
+          type: 'session',
+          href: `/sessions/${session.id}`,
+          serverId: useServerStore.getState().activeServerId,
+        });
+        executeCommand.mutate({ sessionId: session.id, command: cmd.name, args });
+      } catch {
+        toast.warning('Failed to execute command');
+      }
+    },
+    [createSession, executeCommand],
   );
 
   return (

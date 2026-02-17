@@ -19,6 +19,7 @@ import {
   Database,
   ListPlus,
   MessageSquare,
+  Terminal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -509,7 +510,7 @@ function AttachmentPreview({
 }
 
 // ============================================================================
-// Slash Command Popover
+// Slash Command Popover — uses fixed positioning to escape overflow-hidden ancestors
 // ============================================================================
 
 function SlashCommandPopover({
@@ -517,11 +518,13 @@ function SlashCommandPopover({
   filter,
   selectedIndex,
   onSelect,
+  anchorRef,
 }: {
   commands: Command[];
   filter: string;
   selectedIndex: number;
   onSelect: (command: Command) => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const filtered = useMemo(() => {
@@ -545,8 +548,17 @@ function SlashCommandPopover({
 
   if (filtered.length === 0) return null;
 
+  // Read position synchronously from the anchor ref — fixed positioning
+  // escapes overflow-hidden ancestors without needing a portal.
+  const el = anchorRef.current;
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-1 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+    <div
+      className="fixed z-[9999] bg-popover border border-border rounded-xl shadow-lg overflow-hidden"
+      style={{ bottom: window.innerHeight - r.top + 4, left: r.left, width: r.width }}
+    >
       <div ref={scrollRef} className="max-h-64 overflow-y-auto py-1">
         {filtered.map((cmd, i) => (
           <button
@@ -593,11 +605,13 @@ function MentionPopover({
   selectedIndex,
   onSelect,
   loading,
+  anchorRef,
 }: {
   items: MentionItem[];
   selectedIndex: number;
   onSelect: (item: MentionItem) => void;
   loading?: boolean;
+  anchorRef: React.RefObject<HTMLElement | null>;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -607,8 +621,12 @@ function MentionPopover({
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
-  // Show the popover when loading or when there are items
-  if (items.length === 0 && !loading) return null;
+  const visible = items.length > 0 || !!loading;
+  if (!visible) return null;
+
+  const el = anchorRef.current;
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
 
   const agents = items.filter((i) => i.kind === 'agent');
   const sessions = items.filter((i) => i.kind === 'session');
@@ -617,7 +635,10 @@ function MentionPopover({
   let globalIndex = 0;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-1 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+    <div
+      className="fixed z-[9999] bg-popover border border-border rounded-xl shadow-lg overflow-hidden"
+      style={{ bottom: window.innerHeight - r.top + 4, left: r.left, width: r.width }}
+    >
       <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
         {agents.length > 0 && (
           <>
@@ -725,7 +746,7 @@ export interface SessionChatInputProps {
   selectedAgent?: string | null;
   onAgentChange?: (agentName: string | null | undefined) => void;
   commands?: Command[];
-  onCommand?: (command: Command) => void;
+  onCommand?: (command: Command, args?: string) => void;
   models?: FlatModel[];
   selectedModel?: { providerID: string; modelID: string } | null;
   onModelChange?: (model: { providerID: string; modelID: string } | null) => void;
@@ -794,8 +815,10 @@ export function SessionChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [slashFilter, setSlashFilter] = useState<string | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
+  const [stagedCommand, setStagedCommand] = useState<Command | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
   // File search: use provided callback or fall back to the SDK directly
@@ -1071,6 +1094,16 @@ export function SessionChatInput({
   const enqueue = useMessageQueueStore((s) => s.enqueue);
 
   const handleSubmit = useCallback(async () => {
+    // If a command is staged, execute it with the current text as args
+    if (stagedCommand) {
+      const args = text.trim();
+      onCommand?.(stagedCommand, args || undefined);
+      setText('');
+      setStagedCommand(null);
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
 
@@ -1107,13 +1140,16 @@ export function SessionChatInput({
       // Restore the text so the user can retry
       setText(trimmed);
     }
-  }, [text, isBusy, disabled, onSend, attachedFiles, mentions, sessionId, enqueue, pushHistory]);
+  }, [text, isBusy, disabled, onSend, onCommand, stagedCommand, attachedFiles, mentions, sessionId, enqueue, pushHistory]);
 
   const handleSelectCommand = (cmd: Command) => {
-    onCommand?.(cmd);
+    // Stage the command — show an args input instead of executing immediately
+    setStagedCommand(cmd);
     setText('');
     setSlashFilter(null);
     setSlashIndex(0);
+    // Focus textarea for args input
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleSelectMention = (item: MentionItem) => {
@@ -1147,6 +1183,14 @@ export function SessionChatInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Staged command: Escape cancels, Enter submits (handled by normal submit flow)
+    if (stagedCommand && e.key === 'Escape') {
+      e.preventDefault();
+      setStagedCommand(null);
+      setText('');
+      return;
+    }
+
     // @ mention popover keyboard navigation
     if (mentionQuery !== null && (mentionItems.length > 0 || fileSearchLoading)) {
       if (e.key === 'ArrowDown') {
@@ -1255,13 +1299,15 @@ export function SessionChatInput({
     const val = e.target.value;
     setText(val);
 
-    // Slash command detection
-    const match = val.match(/^\/(\S*)$/);
-    if (match) {
-      setSlashFilter(match[1]);
-      setSlashIndex(0);
-    } else {
-      setSlashFilter(null);
+    // Slash command detection (disabled while a command is staged)
+    if (!stagedCommand) {
+      const match = val.match(/^\/(\S*)$/);
+      if (match) {
+        setSlashFilter(match[1]);
+        setSlashIndex(0);
+      } else {
+        setSlashFilter(null);
+      }
     }
 
     // @ mention detection: walk backwards from cursor to find @
@@ -1336,34 +1382,57 @@ export function SessionChatInput({
 
   return (
     <div className="mx-auto w-full max-w-4xl relative shrink-0 px-2 sm:px-4 pb-6">
-      <div className="w-full bg-card border border-border rounded-[24px] shadow-sm shadow-black/[0.03] dark:shadow-white/[0.02] overflow-visible relative z-10">
+      <div ref={cardRef} className="w-full bg-card border border-border rounded-[24px] shadow-sm shadow-black/[0.03] dark:shadow-white/[0.02] overflow-visible relative z-10">
         <div className="relative flex flex-col w-full gap-2 overflow-visible">
-          {/* Slash command popover */}
+          {/* Slash command popover (portalled to body to escape overflow-hidden ancestors) */}
           {slashFilter !== null && filteredCommands.length > 0 && (
             <SlashCommandPopover
               commands={commands}
               filter={slashFilter}
               selectedIndex={slashIndex}
               onSelect={handleSelectCommand}
+              anchorRef={cardRef}
             />
           )}
 
-          {/* @ Mention popover */}
+          {/* @ Mention popover (portalled to body to escape overflow-hidden ancestors) */}
           {mentionQuery !== null && (mentionItems.length > 0 || fileSearchLoading) && (
             <MentionPopover
               items={mentionItems}
               selectedIndex={mentionIndex}
               onSelect={handleSelectMention}
               loading={fileSearchLoading}
+              anchorRef={cardRef}
             />
           )}
 
           {/* Attached files preview */}
           <AttachmentPreview files={attachedFiles} onRemove={removeAttachedFile} />
 
+          {/* Staged command badge */}
+          {stagedCommand && (
+            <div className="flex items-center gap-2 px-4 pt-3 pb-0">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 border border-border/50">
+                <Terminal className="size-3 text-muted-foreground" />
+                <span className="font-mono text-xs font-medium text-foreground">/{stagedCommand.name}</span>
+                <button
+                  type="button"
+                  onClick={() => { setStagedCommand(null); setText(''); }}
+                  className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Cancel command"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+              {stagedCommand.description && (
+                <span className="text-xs text-muted-foreground truncate">{stagedCommand.description}</span>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-col gap-1 px-3.5">
             <div className="relative w-full">
-              {text.trim().length === 0 && (
+              {text.trim().length === 0 && !stagedCommand && (
                 <div
                   aria-hidden
                   className={cn(
@@ -1372,6 +1441,14 @@ export function SessionChatInput({
                   )}
                 >
                   {placeholderVariants[placeholderIndex]}
+                </div>
+              )}
+              {text.trim().length === 0 && stagedCommand && (
+                <div
+                  aria-hidden
+                  className="absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground/50 pointer-events-none"
+                >
+                  Enter details and press Enter, or press Esc to cancel
                 </div>
               )}
               {/* Highlight overlay — mirrors textarea text with colored mention spans */}
