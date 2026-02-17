@@ -128,6 +128,10 @@ mkdir -p /opt/kortix
 PKG_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').version)" 2>/dev/null || echo "0.0.0")
 echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /opt/kortix/.version
 
+# ── Changelog ────────────────────────────────────────────────────────────────
+# Deploy changelog for kortix-master to serve at /kortix/health
+cp "$PKG_DIR/CHANGELOG.json" /opt/kortix/CHANGELOG.json 2>/dev/null || true
+
 # ── Fix ownership ────────────────────────────────────────────────────────────
 chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix 2>/dev/null || true
 

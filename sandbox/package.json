@@ -25,7 +25,8 @@
     "config/",
     "browser-viewer/",
     "postinstall.sh",
-    "patch-agent-browser.js"
+    "patch-agent-browser.js",
+    "CHANGELOG.json"
   ],
   "dependencies": {
     "@kortix/opencode-ai": "0.3.0",

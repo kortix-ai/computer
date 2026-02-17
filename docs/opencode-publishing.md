@@ -1,5 +1,7 @@
 # OpenCode Publishing Guide
 
+> **For unified releases (CLI + SDK + Sandbox + GitHub Release), use the [release script](./releasing.md).** The manual steps below are for individual component publishing only.
+
 How the Kortix fork of OpenCode is built, published, and deployed into the sandbox.
 
 ## Architecture

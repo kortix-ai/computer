@@ -1,0 +1,72 @@
+[
+  {
+    "version": "0.5.0",
+    "date": "2026-02-17",
+    "title": "Unified versioning & upstream sync",
+    "description": "Synced with OpenCode upstream v1.2.6, unified all dependency versioning into sandbox/package.json, added changelog system so users see what changed before updating.",
+    "changes": [
+      { "type": "feature", "text": "Changelog system — see what's new before updating" },
+      { "type": "feature", "text": "Live update now also updates CLI binary and agent-browser" },
+      { "type": "feature", "text": "Python dependencies managed centrally via package.json" },
+      { "type": "feature", "text": "Unified release script — one command publishes everything" },
+      { "type": "improvement", "text": "All versions read from sandbox/package.json (single source of truth)" },
+      { "type": "improvement", "text": "Dockerfile and postinstall.sh both read versions from package.json" },
+      { "type": "fix", "text": "Fixed s6 service path in postinstall (s6-rc.d not services.d)" },
+      { "type": "fix", "text": "Removed stale build version from health endpoint" },
+      { "type": "fix", "text": "Fixed agent-browser version conflict (aligned to ^0.10.0)" },
+      { "type": "upstream", "text": "Synced with OpenCode v1.2.6 (Database/Drizzle migration, 145 commits)" }
+    ]
+  },
+  {
+    "version": "0.4.16",
+    "date": "2026-02-16",
+    "title": "Stability & pip dependency management",
+    "description": "Bug fixes, branding polish, added centralized pip package management to postinstall.",
+    "changes": [
+      { "type": "improvement", "text": "Pip packages managed via postinstall.sh" },
+      { "type": "fix", "text": "Various stability fixes" }
+    ]
+  },
+  {
+    "version": "0.4.0",
+    "date": "2026-02-10",
+    "title": "Browser automation & skills system",
+    "description": "Added agent-browser integration, skills framework, secret store, and LSS semantic search.",
+    "changes": [
+      { "type": "feature", "text": "Agent browser integration for web automation" },
+      { "type": "feature", "text": "Skills framework for extensible agent capabilities" },
+      { "type": "feature", "text": "Secret store for secure credential management" },
+      { "type": "feature", "text": "Local semantic search (LSS) integration" },
+      { "type": "feature", "text": "s6-overlay service management" }
+    ]
+  },
+  {
+    "version": "0.3.0",
+    "date": "2026-02-05",
+    "title": "Live update system",
+    "description": "Introduced the sandbox live update system with kortix-master proxy and s6 service management.",
+    "changes": [
+      { "type": "feature", "text": "Sandbox live update system via npm" },
+      { "type": "feature", "text": "kortix-master proxy server" },
+      { "type": "feature", "text": "Environment variable management" }
+    ]
+  },
+  {
+    "version": "0.2.0",
+    "date": "2026-02-01",
+    "title": "Project scanning",
+    "description": "Added Project.scan() for automatic git repo discovery in workspace.",
+    "changes": [
+      { "type": "feature", "text": "Project.scan() — automatic git repo discovery" }
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-01-15",
+    "title": "Initial release",
+    "description": "First sandbox release with basic OpenCode integration.",
+    "changes": [
+      { "type": "feature", "text": "Initial sandbox release with OpenCode integration" }
+    ]
+  }
+]

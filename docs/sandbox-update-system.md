@@ -2,6 +2,22 @@
 
 How running sandboxes are remotely updated without rebuilding the Docker image.
 
+> **Releasing a new version?** See [docs/releasing.md](./releasing.md) for the unified release process.
+
+---
+
+## Changelog
+
+Every release includes a structured changelog at `sandbox/CHANGELOG.json`. It is:
+
+- Bundled in the `@kortix/sandbox` npm package
+- Deployed to `/opt/kortix/CHANGELOG.json` by `postinstall.sh`
+- Served by kortix-master at `GET /kortix/health` (current version's entry)
+- Served by the platform API at `GET /v1/platform/sandbox/version` (latest version's entry)
+- Shown in the frontend update UI ("What's new in vX.Y.Z")
+
+To add a changelog entry, edit `sandbox/CHANGELOG.json` before running the release script. The release script validates that an entry exists for the target version.
+
 ---
 
 ## Overview

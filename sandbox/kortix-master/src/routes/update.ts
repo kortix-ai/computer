@@ -3,6 +3,18 @@ import { Hono } from 'hono';
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const VERSION_FILE = '/opt/kortix/.version';
+const CHANGELOG_FILE = '/opt/kortix/CHANGELOG.json';
+
+async function getChangelog(version: string) {
+  try {
+    const file = Bun.file(CHANGELOG_FILE);
+    if (await file.exists()) {
+      const entries = await file.json();
+      return entries.find((e: any) => e.version === version) ?? null;
+    }
+  } catch {}
+  return null;
+}
 
 /**
  * Services to restart after update. Order matters:
@@ -130,10 +142,12 @@ updateRouter.post('/', async (c) => {
     console.log(`[Update] User triggered: ${currentVersion} -> ${targetVersion}`);
     const update = await performUpdate(targetVersion);
 
+    const changelog = update.success ? await getChangelog(targetVersion) : null;
     return c.json({
       success: update.success,
       previousVersion: currentVersion,
       currentVersion: update.success ? targetVersion : currentVersion,
+      changelog,
       output: update.output,
     });
   } catch (e) {
