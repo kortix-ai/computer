@@ -23,6 +23,10 @@ export { OcGenericToolView } from './OcGenericToolView';
 export { OcQuestionToolView } from './OcQuestionToolView';
 export { OcMemSearchToolView } from './OcMemSearchToolView';
 export { OcSessionContextToolView } from './OcSessionContextToolView';
+export { OcSkillToolView } from './OcSkillToolView';
+export { OcCodesearchToolView } from './OcCodesearchToolView';
+export { OcBatchToolView } from './OcBatchToolView';
+export { OcPlanToolView } from './OcPlanToolView';
 export { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
@@ -44,6 +48,10 @@ import { OcGenericToolView } from './OcGenericToolView';
 import { OcQuestionToolView } from './OcQuestionToolView';
 import { OcMemSearchToolView } from './OcMemSearchToolView';
 import { OcSessionContextToolView } from './OcSessionContextToolView';
+import { OcSkillToolView } from './OcSkillToolView';
+import { OcCodesearchToolView } from './OcCodesearchToolView';
+import { OcBatchToolView } from './OcBatchToolView';
+import { OcPlanToolView } from './OcPlanToolView';
 import { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 /**
@@ -123,6 +131,21 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   // Session context (cross-session references)
   'oc-session-context': OcSessionContextToolView,
   'oc-session_context': OcSessionContextToolView,
+
+  // Skill loading (SKILL.md knowledge modules)
+  'oc-skill': OcSkillToolView,
+
+  // Code search (external API search)
+  'oc-codesearch': OcCodesearchToolView,
+
+  // Batch execution (parallel tool calls)
+  'oc-batch': OcBatchToolView,
+
+  // Plan tools (agent switching)
+  'oc-plan_exit': OcPlanToolView,
+  'oc-plan-exit': OcPlanToolView,
+  'oc-plan_enter': OcPlanToolView,
+  'oc-plan-enter': OcPlanToolView,
 
   // Memory search (observations)
   'oc-mem-search': OcMemSearchToolView,

@@ -31,6 +31,7 @@ import {
   X,
   MessageSquare,
   ExternalLink,
+  Terminal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -2116,6 +2117,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // ---- Polling fallback & optimistic send ----
   const [pollingActive, setPollingActive] = useState(false);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<{ name: string; description?: string } | null>(null);
   // Track whether we're retrying a failed send (keeps loader visible)
   const [isRetrying, setIsRetrying] = useState(false);
   // Track whether a pending prompt send is in flight (dashboard→session flow).
@@ -2454,12 +2456,14 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     // Server reported busy → it received our prompt, real messages incoming
     if (isServerBusy) {
       setPendingUserMessage(null);
+      setPendingCommand(null);
       return;
     }
     // New messages arrived from server → clear optimistic display
     const len = messages?.length || 0;
     if (len > prevMsgLenRef.current) {
       setPendingUserMessage(null);
+      setPendingCommand(null);
     }
   }, [isServerBusy, messages?.length, pendingUserMessage]);
 
@@ -2577,6 +2581,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     setExpanded({});
     setPollingActive(false);
     setPendingUserMessage(null);
+    setPendingCommand(null);
     setPendingSendInFlight(false);
     setIsRetrying(false);
     lastSendTimeRef.current = 0;
@@ -2770,10 +2775,26 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [sessionId, abortSession]);
 
   const handleCommand = useCallback(
-    (cmd: Command) => {
-      executeCommand.mutate({ sessionId, command: cmd.name });
+    (cmd: Command, args?: string) => {
+      playSound('send');
+      const label = args ? `/${cmd.name} ${args}` : `/${cmd.name}`;
+      setPendingCommand({ name: cmd.name, description: args || cmd.description });
+      setPendingUserMessage(label);
+      setPollingActive(true);
+      lastSendTimeRef.current = Date.now();
+      executeCommand.mutate(
+        { sessionId, command: cmd.name, args },
+        {
+          onError: () => {
+            setPendingCommand(null);
+            setPendingUserMessage(null);
+            setPollingActive(false);
+          },
+        },
+      );
+      requestAnimationFrame(() => scrollToBottom());
     },
-    [sessionId, executeCommand],
+    [sessionId, executeCommand, scrollToBottom],
   );
 
   const handleFileSearch = useCallback(async (query: string): Promise<string[]> => {
@@ -2991,16 +3012,32 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                   );
                 })}
 
-                {/* Optimistic user message for in-session sends */}
+                {/* Optimistic user message / command for in-session sends */}
                 {pendingUserMessage && !showOptimistic && (
                   <>
-                    <div className="flex justify-end">
-                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
-                          <HighlightMentions text={pendingUserMessage} agentNames={agentNames} onFileClick={openFileInComputer} />
-                        </p>
+                    {pendingCommand ? (
+                      /* Command execution card — distinct from regular user messages */
+                      <div className="flex justify-center">
+                        <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-border/60 bg-muted/40">
+                          <Terminal className="size-3.5 text-muted-foreground shrink-0" />
+                          <span className="font-mono text-sm text-foreground">/{pendingCommand.name}</span>
+                          {pendingCommand.description && (
+                            <>
+                              <span className="text-border">|</span>
+                              <span className="text-xs text-muted-foreground">{pendingCommand.description}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex justify-end">
+                        <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
+                            <HighlightMentions text={pendingUserMessage} agentNames={agentNames} onFileClick={openFileInComputer} />
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
