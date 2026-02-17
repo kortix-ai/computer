@@ -54,6 +54,11 @@ export interface ChannelAdapter {
     message: NormalizedMessage,
     files: FileOutput[],
   ): Promise<void>;
+
+  sendUnlinkedMessage?(
+    config: ChannelConfig,
+    message: NormalizedMessage,
+  ): Promise<void>;
 }
 
 export interface ChannelEngine {

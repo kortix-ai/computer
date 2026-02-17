@@ -229,8 +229,7 @@ export const channelConfigs = kortixSchema.table(
   {
     channelConfigId: uuid('channel_config_id').defaultRandom().primaryKey(),
     sandboxId: uuid('sandbox_id')
-      .notNull()
-      .references(() => sandboxes.sandboxId, { onDelete: 'cascade' }),
+      .references(() => sandboxes.sandboxId, { onDelete: 'set null' }),
     accountId: uuid('account_id').notNull(),
     channelType: channelTypeEnum('channel_type').notNull(),
     name: varchar('name', { length: 255 }).notNull(),

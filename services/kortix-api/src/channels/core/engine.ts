@@ -59,6 +59,16 @@ export class ChannelEngineImpl {
 
     config.credentials = await decryptCredentials(config.credentials as Record<string, unknown>);
 
+    if (!config.sandboxId) {
+      const adapter = this.adapters.get(config.channelType as ChannelType);
+      if (adapter?.sendUnlinkedMessage) {
+        await adapter.sendUnlinkedMessage(config, message);
+      } else {
+        console.warn(`[CHANNELS] Channel ${config.channelConfigId} has no linked instance`);
+      }
+      return;
+    }
+
     const rateResult = this.rateLimiter.check(config.channelConfigId, message.platformUser.id);
     if (!rateResult.allowed) {
       console.warn(`[CHANNELS] Rate limited: config=${config.channelConfigId} user=${message.platformUser.id}`);
@@ -81,9 +91,15 @@ export class ChannelEngineImpl {
       return;
     }
 
-    const target = await this.resolveSandbox(config.sandboxId);
+    if (!config.sandboxId) {
+      console.error(`[CHANNELS] No sandbox linked for config: ${config.channelConfigId}`);
+      return;
+    }
+
+    const sandboxId = config.sandboxId;
+    const target = await this.resolveSandbox(sandboxId);
     if (!target) {
-      console.error(`[CHANNELS] Sandbox not found: ${config.sandboxId}`);
+      console.error(`[CHANNELS] Sandbox not found: ${sandboxId}`);
       return;
     }
 
@@ -108,9 +124,9 @@ export class ChannelEngineImpl {
     try {
       const ready = await connector.isReady();
       if (!ready) {
-        console.log(`[CHANNELS] Sandbox ${config.sandboxId} offline, queuing message`);
+        console.log(`[CHANNELS] Sandbox ${sandboxId} offline, queuing message`);
         try {
-          await this.queue.enqueue(config.sandboxId, message, config, connector);
+          await this.queue.enqueue(sandboxId, message, config, connector);
         } catch (err) {
           console.error(`[CHANNELS] Queue processing failed:`, err);
         }

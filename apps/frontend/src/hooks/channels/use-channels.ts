@@ -17,7 +17,7 @@ export type SessionStrategy = 'single' | 'per-thread' | 'per-user' | 'per-messag
 
 export interface ChannelConfig {
   channelConfigId: string;
-  sandboxId: string;
+  sandboxId: string | null;
   accountId: string;
   channelType: ChannelType;
   name: string;
@@ -48,7 +48,7 @@ export interface ChannelMessage {
 }
 
 export interface CreateChannelData {
-  sandbox_id: string;
+  sandbox_id?: string | null;
   channel_type: ChannelType;
   name: string;
   enabled?: boolean;
@@ -61,6 +61,7 @@ export interface CreateChannelData {
 }
 
 export interface UpdateChannelData {
+  sandbox_id?: string | null;
   name?: string;
   enabled?: boolean;
   credentials?: Record<string, unknown>;
@@ -146,6 +147,22 @@ const disableChannel = async (id: string): Promise<ChannelConfig> => {
   return response.data!.data;
 };
 
+const linkChannel = async ({ id, sandboxId }: { id: string; sandboxId: string }): Promise<ChannelConfig> => {
+  const response = await backendApi.post<ApiSingleResponse>(`/channels/${id}/link`, { sandbox_id: sandboxId });
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to link channel');
+  }
+  return response.data!.data;
+};
+
+const unlinkChannel = async (id: string): Promise<ChannelConfig> => {
+  const response = await backendApi.post<ApiSingleResponse>(`/channels/${id}/unlink`);
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to unlink channel');
+  }
+  return response.data!.data;
+};
+
 const fetchChannelMessages = async (id: string, limit = 50, offset = 0): Promise<ChannelMessage[]> => {
   const response = await backendApi.get<ApiMessagesResponse>(
     `/channels/${id}/messages?limit=${limit}&offset=${offset}`,
@@ -219,6 +236,30 @@ export const useToggleChannel = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['channels'] });
+    },
+  });
+};
+
+export const useLinkChannel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: linkChannel,
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ['channels'] });
+      queryClient.invalidateQueries({ queryKey: ['channel', updated.channelConfigId] });
+    },
+  });
+};
+
+export const useUnlinkChannel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: unlinkChannel,
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ['channels'] });
+      queryClient.invalidateQueries({ queryKey: ['channel', updated.channelConfigId] });
     },
   });
 };
