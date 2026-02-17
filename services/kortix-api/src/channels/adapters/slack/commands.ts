@@ -67,7 +67,6 @@ export async function handleSlackCommand(
         '`/kortix status` — Show current session info',
         '`/kortix share` — Generate a shareable session link',
         '`/kortix diff` — Show recent git changes',
-        '`/kortix digest #channel` — Summarize recent channel activity',
         '`/kortix export` — Export last 24h of channel messages as markdown',
         '`/kortix link` — Link or change the connected instance',
         '',
@@ -95,9 +94,6 @@ export async function handleSlackCommand(
         '*Bookmarks*',
         '`/kortix bookmark <url> [title]` — Add a channel bookmark',
         '`/kortix bookmarks` — List channel bookmarks',
-        '',
-        '*Reminders*',
-        '`/kortix remind [@user] <time>: <message>` — Set a reminder',
         '',
         '*Config*',
         '`/kortix config prompt <text>` — Set a channel-specific system prompt',
@@ -260,14 +256,6 @@ export async function handleSlackCommand(
     return c.json({ response_type: 'ephemeral', text: ':bookmark: Fetching bookmarks...' }, 200);
   }
 
-  if (subcommand.type === 'remind') {
-    handleRemindCommand(channelConfig, subcommand, ctx).catch((err) => {
-      console.error('[SLACK/COMMANDS] Remind command failed:', err);
-      postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
-    });
-    return c.json({ response_type: 'ephemeral', text: ':bell: Setting reminder...' }, 200);
-  }
-
   if (!subcommand.prompt) {
     return c.json({
       response_type: 'ephemeral',
@@ -287,10 +275,9 @@ export async function handleSlackCommand(
 }
 
 interface Subcommand {
-  type: 'help' | 'digest' | 'prompt' | 'config' | 'export' | 'models' | 'agents' | 'status' | 'share' | 'diff' | 'link'
-    | 'search' | 'find' | 'whois' | 'channel' | 'dm' | 'pin' | 'unpin' | 'pins' | 'team' | 'bookmark' | 'bookmarks' | 'remind';
+  type: 'help' | 'prompt' | 'config' | 'export' | 'models' | 'agents' | 'status' | 'share' | 'diff' | 'link'
+    | 'search' | 'find' | 'whois' | 'channel' | 'dm' | 'pin' | 'unpin' | 'pins' | 'team' | 'bookmark' | 'bookmarks';
   prompt: string;
-  digestChannel?: string;
   configAction?: 'set' | 'clear' | 'show';
   configPromptText?: string;
   searchQuery?: string;
@@ -302,9 +289,6 @@ interface Subcommand {
   teamHandle?: string;
   bookmarkUrl?: string;
   bookmarkTitle?: string;
-  reminderTarget?: string;
-  reminderTime?: string;
-  reminderText?: string;
 }
 
 function parseSubcommand(text: string): Subcommand {
@@ -336,16 +320,6 @@ function parseSubcommand(text: string): Subcommand {
 
   if (lower === 'link') {
     return { type: 'link', prompt: '' };
-  }
-
-  const digestMatch = text.match(/^digest\s+(?:<#(\w+)\|[^>]*>|<?#?(\S+?)>?)\s*$/i);
-  if (digestMatch) {
-    const channelRef = digestMatch[1] || digestMatch[2];
-    return {
-      type: 'digest',
-      prompt: text,
-      digestChannel: channelRef,
-    };
   }
 
   if (lower.startsWith('config ')) {
@@ -448,39 +422,6 @@ function parseSubcommand(text: string): Subcommand {
     return { type: 'help', prompt: '' };
   }
   if (lower === 'bookmarks') return { type: 'bookmarks', prompt: '' };
-
-  // remind [@user] <time>: <message>
-  if (lower.startsWith('remind ')) {
-    const rest = text.slice(7).trim();
-    let target: string | undefined;
-    let remaining = rest;
-
-    const userMatch = remaining.match(/^<@(\w+)(?:\|[^>]*)?>?\s+/);
-    if (userMatch) {
-      target = userMatch[1];
-      remaining = remaining.slice(userMatch[0].length);
-    }
-
-    const colonIdx = remaining.indexOf(':');
-    if (colonIdx !== -1) {
-      const time = remaining.slice(0, colonIdx).trim();
-      const msg = remaining.slice(colonIdx + 1).trim();
-      if (time && msg) return { type: 'remind', prompt: '', reminderTarget: target, reminderTime: time, reminderText: msg };
-    }
-
-    // Fallback: try "in X unit" pattern
-    const inMatch = remaining.match(/^(in\s+\d+\s+\w+)\s+([\s\S]*)/i);
-    if (inMatch) {
-      return { type: 'remind', prompt: '', reminderTarget: target, reminderTime: inMatch[1], reminderText: inMatch[2].trim() };
-    }
-
-    // Last resort: first token is time, rest is message
-    const spaceIdx = remaining.indexOf(' ');
-    if (spaceIdx > 0) {
-      return { type: 'remind', prompt: '', reminderTarget: target, reminderTime: remaining.slice(0, spaceIdx), reminderText: remaining.slice(spaceIdx + 1).trim() };
-    }
-    return { type: 'help', prompt: '' };
-  }
 
   return { type: 'prompt', prompt: text };
 }
@@ -732,11 +673,7 @@ async function processCommandAsync(
   subcommand: Subcommand,
   ctx: CommandContext,
 ): Promise<void> {
-  let promptContent = subcommand.prompt;
-
-  if (subcommand.type === 'digest' && subcommand.digestChannel) {
-    promptContent = await buildDigestPrompt(channelConfig, subcommand.digestChannel);
-  }
+  const promptContent = subcommand.prompt;
 
   const message: NormalizedMessage = {
     externalId: `cmd-${Date.now()}`,
@@ -757,54 +694,6 @@ async function processCommandAsync(
   };
 
   await engine.processMessage(message);
-}
-
-async function buildDigestPrompt(
-  channelConfig: ChannelConfig,
-  channelId: string,
-): Promise<string> {
-  const credentials = channelConfig.credentials as Record<string, unknown>;
-  const botToken = credentials?.botToken as string;
-  if (!botToken) {
-    return 'Unable to fetch channel history: missing bot token.';
-  }
-
-  const api = new SlackApi(botToken);
-
-  // If channelId is a name (not starting with C/G), resolve it to an ID
-  if (!/^[CG]\w+$/.test(channelId)) {
-    const resolved = await resolveChannelId(api, channelId);
-    if (!resolved) {
-      return `Unable to find channel "${channelId}". Make sure the channel exists and the bot has access.`;
-    }
-    channelId = resolved;
-  }
-
-  // Auto-join the target channel so we can read its history
-  await api.conversationsJoin(channelId).catch(() => {});
-
-  const oneDayAgo = String(Math.floor(Date.now() / 1000) - 86400);
-  const result = await api.conversationsHistory(channelId, oneDayAgo, 200);
-
-  if (!result.ok || !result.messages || result.messages.length === 0) {
-    return `Unable to fetch history for channel ${channelId}: ${result.error || 'no messages found'}`;
-  }
-
-  const lines = result.messages
-    .reverse()
-    .filter((m) => !m.subtype)
-    .map((m) => `[${m.user || 'unknown'}]: ${m.text || '(no text)'}`)
-    .join('\n');
-
-  return [
-    `Summarize the following Slack channel conversation from the last 24 hours.`,
-    `Highlight key topics, decisions, action items, and important discussions.`,
-    `Format the summary with clear sections and bullet points.`,
-    '',
-    `--- Channel messages (${result.messages.length} messages) ---`,
-    lines,
-    `--- End of messages ---`,
-  ].join('\n');
 }
 
 async function handleConfigCommand(
@@ -1068,24 +957,6 @@ async function handleChannelCommand(
     }
     await postToResponseUrl(ctx.responseUrl, ':white_check_mark: Channel archived.', true);
   }
-}
-
-async function resolveChannelId(api: SlackApi, name: string): Promise<string | null> {
-  const query = name.replace(/^#/, '').toLowerCase();
-  let cursor: string | undefined;
-
-  do {
-    const result = await api.conversationsList(cursor);
-    if (!result.ok || !result.channels) return null;
-
-    for (const ch of result.channels) {
-      if (ch.name?.toLowerCase() === query) return ch.id;
-    }
-
-    cursor = result.response_metadata?.next_cursor || undefined;
-  } while (cursor);
-
-  return null;
 }
 
 async function resolveUserId(api: SlackApi, target: string): Promise<string | null> {
@@ -1358,34 +1229,6 @@ async function handleBookmarksListCommand(
   }
 
   await postToResponseUrl(ctx.responseUrl, lines.join('\n'), true);
-}
-
-async function handleRemindCommand(
-  channelConfig: ChannelConfig,
-  subcommand: Subcommand,
-  ctx: CommandContext,
-): Promise<void> {
-  const credentials = channelConfig.credentials as Record<string, unknown>;
-  const botToken = credentials?.botToken as string;
-  if (!botToken) {
-    await postToResponseUrl(ctx.responseUrl, ':x: Missing bot token.', true);
-    return;
-  }
-
-  const api = new SlackApi(botToken);
-  const result = await api.remindersAdd(
-    subcommand.reminderText || 'Reminder',
-    subcommand.reminderTime || 'in 1 hour',
-    subcommand.reminderTarget,
-  );
-
-  if (!result.ok) {
-    await postToResponseUrl(ctx.responseUrl, `:x: Failed to set reminder: ${result.error}`, true);
-    return;
-  }
-
-  const target = subcommand.reminderTarget ? `<@${subcommand.reminderTarget}>` : 'you';
-  await postToResponseUrl(ctx.responseUrl, `:bell: Reminder set for ${target}: "${subcommand.reminderText}"`, true);
 }
 
 export async function postToResponseUrl(responseUrl: string, text: string, ephemeral = false): Promise<void> {
