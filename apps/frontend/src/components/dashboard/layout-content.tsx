@@ -22,6 +22,7 @@ import { useConnectionToasts } from '@/components/dashboard/connecting-screen';
 import { TabBar } from '@/components/tabs/tab-bar';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
+import { navigateTo } from '@/lib/utils/navigate';
 
 function OpenCodeEventStreamProvider() {
   useOpenCodeEventStream();
@@ -291,7 +292,7 @@ export default function DashboardLayoutContent({
   // Check authentication status
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/auth');
+      navigateTo(router, '/auth');
     }
   }, [user, isLoading, router]);
 

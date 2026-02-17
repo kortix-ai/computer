@@ -24,6 +24,7 @@ import { isElectron, getAuthOrigin } from '@/lib/utils/is-electron';
 import { ExampleShowcase } from '@/components/auth/example-showcase';
 import { trackSendAuthLink } from '@/lib/analytics/gtm';
 import { backendApi } from '@/lib/api-client';
+import { navigateReplace } from '@/lib/utils/navigate';
 
 // Lazy load heavy components
 const GoogleSignIn = lazy(() => import('@/components/GoogleSignIn'));
@@ -55,7 +56,7 @@ function LoginContent() {
   useEffect(() => {
     // Redirect to dashboard if user is logged in
     if (!isLoading && user) {
-      router.replace(returnUrl || '/dashboard');
+      navigateReplace(router, returnUrl || '/dashboard');
     }
   }, [user, isLoading, router, returnUrl]);
 
@@ -246,7 +247,7 @@ useEffect(() => {
 
       if ('success' in result && result.success) {
         // Full page reload to ensure AuthProvider re-initializes with new session cookies
-        // router.replace() is client-side and won't refresh the AuthProvider state
+        // navigateReplace(router, ) is client-side and won't refresh the AuthProvider state
         const redirectTo = (result as any).redirectTo || '/dashboard';
         const authEvent = (result as any).authEvent || 'login';
         const authMethod = (result as any).authMethod || 'email_otp';

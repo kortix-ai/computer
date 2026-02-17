@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { BackgroundAALChecker } from '@/components/auth/background-aal-checker';
 import { HeroSection } from '@/components/home/hero-section';
+import { navigateReplace } from '@/lib/utils/navigate';
 
 export default function HomeClient() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function HomeClient() {
   // Authenticated users skip the landing page entirely.
   useEffect(() => {
     if (!isLoading && user) {
-      router.replace('/dashboard');
+      navigateReplace(router, '/dashboard');
     }
   }, [user, isLoading, router]);
 

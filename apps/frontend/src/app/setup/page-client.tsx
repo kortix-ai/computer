@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { navigateReplace } from '@/lib/utils/navigate';
 
 /**
  * /setup — redirects to /dashboard.
@@ -12,7 +13,7 @@ export default function SetupPageClient() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/dashboard');
+    navigateReplace(router, '/dashboard');
   }, [router]);
 
   return null;

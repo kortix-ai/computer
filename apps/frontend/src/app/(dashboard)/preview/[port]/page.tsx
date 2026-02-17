@@ -3,6 +3,7 @@
 import { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTabStore } from '@/stores/tab-store';
+import { navigateReplace } from '@/lib/utils/navigate';
 
 /**
  * Preview route handler for /preview/[port].
@@ -34,7 +35,7 @@ export default function PreviewPage({
     } else {
       // No tab for this port - redirect to dashboard
       // The preview tab can only be created with proper sandbox URL context
-      router.replace('/dashboard');
+      navigateReplace(router, '/dashboard');
     }
   }, [port, tabs, setActiveTab, router]);
 

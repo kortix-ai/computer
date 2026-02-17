@@ -16,6 +16,7 @@ import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
 import { useMaintenanceNoticeQuery } from '@/hooks/edge-flags';
 import { useAuth } from '@/components/AuthProvider';
 import { useAdminRole } from '@/hooks/admin';
+import { navigateTo } from '@/lib/utils/navigate';
 
 // Lazy load heavy components
 const MaintenancePage = lazy(() => import('@/components/maintenance/maintenance-page').then(mod => ({ default: mod.MaintenancePage })));
@@ -63,9 +64,9 @@ export default function ActivateTrialPageClient() {
       const hasActiveSubscription = tierKey && tierKey !== 'none';
 
       if (hasActiveTrial || hasActiveSubscription) {
-        router.push('/dashboard');
+        navigateTo(router, '/dashboard');
       } else if (hasUsedTrial) {
-        router.push('/subscription');
+        navigateTo(router, '/subscription');
       }
     }
   }, [accountState, trialStatus, isLoadingSubscription, isLoadingTrial, router]);
@@ -90,7 +91,7 @@ export default function ActivateTrialPageClient() {
     const supabase = createClient();
     await supabase.auth.signOut();
     clearUserLocalStorage();
-    router.push('/auth');
+    navigateTo(router, '/auth');
   };
 
   // Show skeleton immediately for FCP instead of blocking loader

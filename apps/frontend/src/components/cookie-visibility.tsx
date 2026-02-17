@@ -12,10 +12,6 @@ export function CookieVisibility() {
   if (shouldShow) return null;
 
   return (
-    <style jsx global>{`
-      .cky-btn-revisit-wrapper {
-        display: none !important;
-      }
-    `}</style>
+    <style dangerouslySetInnerHTML={{ __html: `.cky-btn-revisit-wrapper { display: none !important; }` }} />
   );
 }

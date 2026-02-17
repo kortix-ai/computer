@@ -12,6 +12,7 @@ import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
 import { useMaintenanceNoticeQuery } from '@/hooks/edge-flags';
 import { useAdminRole } from '@/hooks/admin';
 import { useAccountState } from '@/hooks/billing';
+import { navigateTo } from '@/lib/utils/navigate';
 
 // Lazy load heavy components
 const PricingSection = lazy(() => import('@/components/billing/pricing').then(mod => ({ default: mod.PricingSection })));
@@ -61,7 +62,7 @@ export default function SubscriptionRequiredPageClient() {
 
       // Redirect to dashboard if user has valid subscription/trial/free tier
       if ((hasActiveSubscription && hasValidTier) || (hasActiveTrial && hasValidTier) || isFreeTier) {
-        router.push('/dashboard');
+        navigateTo(router, '/dashboard');
       }
     }
   }, [subscriptionData, isLoadingSubscription, router]);
@@ -76,7 +77,7 @@ export default function SubscriptionRequiredPageClient() {
     const supabase = createClient();
     await supabase.auth.signOut();
     clearUserLocalStorage();
-    router.push('/auth');
+    navigateTo(router, '/auth');
   };
 
   // Show skeleton immediately for FCP instead of blocking loader

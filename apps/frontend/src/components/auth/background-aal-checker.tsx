@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useGetAAL } from '@/hooks/auth';
 import { useAuth } from '@/components/AuthProvider';
+import { navigateTo } from '@/lib/utils/navigate';
 
 interface BackgroundAALCheckerProps {
   children: React.ReactNode;
@@ -52,7 +53,7 @@ export function BackgroundAALChecker({
       // Handle new users who need phone verification enrollment
       if (verification_required) {
         if (current_level === "aal1" && next_level === "aal1") {
-          router.push(redirectTo);
+          navigateTo(router, redirectTo);
           return;
         }
         // If new user has MFA enrolled, follow standard AAL flow below
@@ -64,13 +65,13 @@ export function BackgroundAALChecker({
           // User has MFA enrolled but needs to verify it
           // Only redirect if phone verification is mandatory (respects env var)
           if (verification_required) {
-            router.push(redirectTo);
+            navigateTo(router, redirectTo);
           }
           break;
         
         case 'reauthenticate':
           // User has stale JWT due to MFA changes, force reauthentication
-          router.push('/auth?message=Please sign in again due to security changes');
+          navigateTo(router, '/auth?message=Please sign in again due to security changes');
           break;
         
         case 'none':

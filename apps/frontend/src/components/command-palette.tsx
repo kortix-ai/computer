@@ -709,7 +709,7 @@ export function CommandPalette() {
 
           {/* No results — all fetches done, nothing found */}
           {showNoResults && (
-            <div className="flex flex-col items-center gap-1.5 py-6" cmdk-empty="">
+            <div className="flex flex-col items-center gap-1.5 py-6" data-cmdk-empty="">
               <Search className="h-5 w-5 text-muted-foreground/50" />
               <span className="text-sm text-muted-foreground">
                 No results found for &ldquo;{query.trim()}&rdquo;

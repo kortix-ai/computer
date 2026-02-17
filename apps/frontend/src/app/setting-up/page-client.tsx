@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { navigateTo } from '@/lib/utils/navigate';
 
 // Lazy load heavy components
 const AnimatedBg = lazy(() => import('@/components/ui/animated-bg').then(mod => ({ default: mod.AnimatedBg })));
@@ -60,7 +61,7 @@ export default function SettingUpPageClient() {
             isInitializing.current = false;
             setStatus('success');
             setTimeout(() => {
-              router.push('/dashboard');
+              navigateTo(router, '/dashboard');
             }, 500);
             return;
           }
@@ -76,7 +77,7 @@ export default function SettingUpPageClient() {
               isInitializing.current = false;
               setStatus('success');
               setTimeout(() => {
-                router.push('/dashboard');
+                navigateTo(router, '/dashboard');
               }, 1500);
             },
             onError: (error) => {
@@ -100,7 +101,7 @@ export default function SettingUpPageClient() {
               isInitializing.current = false;
               setStatus('success');
               setTimeout(() => {
-                router.push('/dashboard');
+                navigateTo(router, '/dashboard');
               }, 1500);
             },
             onError: (error) => {
@@ -223,7 +224,7 @@ export default function SettingUpPageClient() {
                     </div>
                   </div>
                   <Button
-                    onClick={() => router.push('/dashboard')}
+                    onClick={() => navigateTo(router, '/dashboard')}
                     className="w-full mt-4"
                     variant="default"
                   >

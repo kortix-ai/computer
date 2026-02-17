@@ -28,6 +28,7 @@ import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode
 import { useServerStore } from '@/stores/server-store';
 import { childMapByParent } from '@/ui';
 import { getClient } from '@/lib/opencode-sdk';
+import { navigateTo } from '@/lib/utils/navigate';
 import {
   Tooltip,
   TooltipContent,
@@ -797,7 +798,7 @@ export function TabBar() {
         // so the pre-mounted session/file/preview/terminal component just becomes visible instantly.
         window.history.pushState(null, '', href);
       } else {
-        router.push(href);
+        navigateTo(router, href);
       }
       // Focus the textarea in the activated tab (session or dashboard)
       requestAnimationFrame(() => {
@@ -818,11 +819,11 @@ export function TabBar() {
           if (nextTab.type === 'session' || nextTab.type === 'file' || nextTab.type === 'preview' || nextTab.type === 'terminal') {
             window.history.pushState(null, '', nextTab.href);
           } else {
-            router.push(nextTab.href);
+            navigateTo(router, nextTab.href);
           }
         }
       } else {
-        router.push('/dashboard');
+        navigateTo(router, '/dashboard');
       }
     },
     [router]
@@ -855,7 +856,7 @@ export function TabBar() {
           break;
         case 'closeAll':
           closeAllTabs();
-          router.push('/dashboard');
+          navigateTo(router, '/dashboard');
           break;
       }
     },
@@ -932,7 +933,7 @@ export function TabBar() {
       if (tab.type === 'session' || tab.type === 'file' || tab.type === 'preview' || tab.type === 'terminal') {
         window.history.pushState(null, '', tab.href);
       } else {
-        router.push(tab.href);
+        navigateTo(router, tab.href);
       }
     };
 
@@ -961,7 +962,7 @@ export function TabBar() {
       // ── New tab: Modifier + T ────────────────────────────────────────
       if (modHeld && !modOther && !e.shiftKey && !e.altKey && e.code === 'KeyT') {
         e.preventDefault();
-        router.push('/dashboard');
+        navigateTo(router, '/dashboard');
         return;
       }
 
@@ -1107,7 +1108,7 @@ export function TabBar() {
   }, [activeTabId, orderedTabs]);
 
   const handleNewTab = useCallback(() => {
-    router.push('/dashboard');
+    navigateTo(router, '/dashboard');
   }, [router]);
 
   // Always render the bar so the bg-sidebar strip above the content curve is consistent
