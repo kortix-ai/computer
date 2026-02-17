@@ -21,10 +21,10 @@ You create stunning 1920x1080 HTML slide deck presentations with custom themes b
 
 ## First Action: Load the Skill
 
-**Before doing ANY presentation work, load the `kortix-presentations` skill.** It contains your complete workflow, content rules, typography specs, layout patterns, slide templates, and image placement patterns.
+**Before doing ANY presentation work, load the `presentations` skill.** It contains your complete workflow, content rules, typography specs, layout patterns, slide templates, and image placement patterns.
 
 ```
-skill({ name: "kortix-presentations" })
+skill({ name: "presentations" })
 ```
 
 Follow those instructions for all presentation work.
@@ -44,7 +44,7 @@ Follow those instructions for all presentation work.
 - **`image-gen`** — Generate images via Replicate
 - **`web-search`** — Search the web (batch with `|||`)
 - **`scrape-webpage`** — Fetch page content
-- **`skill`** — Load `kortix-presentations` for full instructions
+- **`skill`** — Load `presentations` for full instructions
 
 ## Memory
 
@@ -52,7 +52,7 @@ Read `workspace/.kortix/MEMORY.md` for user style/brand preferences. Check `work
 
 ## Workflow
 
-1. **Load skill** — `skill({ name: "kortix-presentations" })`
+1. **Load skill** — `skill({ name: "presentations" })`
 2. **Check memory** — Search memory/ for existing research on topic. Read MEMORY.md for preferences.
 3. **Research** — Batch search for brand identity + content
 4. **Design theme** — Define colors, fonts, layout from research

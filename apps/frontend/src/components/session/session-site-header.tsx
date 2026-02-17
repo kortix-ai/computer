@@ -42,6 +42,8 @@ interface SessionSiteHeaderProps {
   isSidePanelOpen?: boolean;
   isMobileView?: boolean;
   canOpenSidePanel?: boolean;
+  /** Optional element rendered at the leading (left) edge of the header */
+  leadingAction?: React.ReactNode;
 }
 
 export function SessionSiteHeader({
@@ -51,6 +53,7 @@ export function SessionSiteHeader({
   isSidePanelOpen = false,
   isMobileView,
   canOpenSidePanel = true,
+  leadingAction,
 }: SessionSiteHeaderProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
@@ -70,8 +73,9 @@ export function SessionSiteHeader({
       {/* Floating actions in top-right corner */}
       <div className="absolute top-0 right-0 left-0 z-20 pointer-events-none">
         <div className="flex items-center justify-between px-3 sm:px-4 pt-2">
-          {/* Left: mobile menu only */}
-          <div className="flex items-center pointer-events-auto">
+          {/* Left: leading action + mobile menu */}
+          <div className="flex items-center gap-1 pointer-events-auto">
+            {leadingAction}
             {isMobile && (
               <button
                 onClick={handleOpenMenu}
