@@ -1,9 +1,10 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import { Mail, Clock, Shield, ChevronDown, UserX } from 'lucide-react';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { AnimatedBg } from '@/components/ui/animated-bg';
 import { useIsMobile } from '@/hooks/utils';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,7 @@ const FAQItem = ({ question, answer }: { question: string; answer: React.ReactNo
 
 function SupportPageContent() {
   const isMobile = useIsMobile();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const accountDeleteRef = useRef<HTMLElement>(null);
 
   useEffect(() => {

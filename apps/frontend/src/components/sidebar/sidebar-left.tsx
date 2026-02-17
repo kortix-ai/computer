@@ -1,9 +1,11 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import * as React from 'react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Menu,
   ChevronRight,
@@ -407,7 +409,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const isMobile = useIsMobile();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
     const match = typeof window !== 'undefined' && window.location.pathname.match(/^\/projects\/([^/]+)/);

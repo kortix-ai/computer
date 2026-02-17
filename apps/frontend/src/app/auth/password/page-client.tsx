@@ -1,8 +1,9 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import { AlertCircle, ArrowLeft, Lock } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -17,7 +18,7 @@ import { cn } from '@/lib/utils';
 
 function PasswordAuthContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
   const { user, isLoading } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

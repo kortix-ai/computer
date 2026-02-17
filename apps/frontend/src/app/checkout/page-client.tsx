@@ -1,14 +1,15 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Script from 'next/script';
 
 function CheckoutContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const clientSecret = searchParams.get('client_secret');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);

@@ -1,7 +1,9 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import { Suspense, useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { trackRouteChange } from '@/lib/analytics/gtm';
 
 /**
@@ -14,7 +16,7 @@ import { trackRouteChange } from '@/lib/analytics/gtm';
  * automatically tracked on client-side navigation.
  */
 function SearchParamsTracker({ pathname }: { pathname: string | null }) {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const isInitialMount = useRef(true);
   
   useEffect(() => {

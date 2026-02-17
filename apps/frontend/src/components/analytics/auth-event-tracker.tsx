@@ -1,11 +1,13 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import { Suspense, useEffect } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { trackSignUp, trackLogin, AuthMethod } from '@/lib/analytics/gtm';
 
 function AuthEventTrackerInner() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const router = useRouter();
   const pathname = usePathname();
 

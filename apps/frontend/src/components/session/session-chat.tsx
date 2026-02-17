@@ -1,7 +1,8 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   ChevronDown,
@@ -2211,7 +2212,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const local = useOpenCodeLocal({ agents, providers, config });
 
   // ---- URL params ----
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const isDebugEnabled = searchParams.has('debug');
   const pendingPromptHandled = useRef(false);
 

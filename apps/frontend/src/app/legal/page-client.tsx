@@ -1,14 +1,16 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 function LegalContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -1757,7 +1759,7 @@ function LegalContent() {
   );
 }
 
-// Wrap the LegalContent component with Suspense to handle useSearchParams()
+// Wrap the LegalContent component with Suspense to handle useSearchParamsCompat()
 export default function LegalPageClient() {
   return (
     <Suspense

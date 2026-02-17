@@ -1,5 +1,7 @@
 'use client';
 
+
+import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import Link from 'next/link';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useMediaQuery } from '@/hooks/utils';
 import { useState, useEffect, Suspense, lazy, useRef, useSyncExternalStore } from 'react';
 import { signUp, verifyOtp } from './actions';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Mail, MailCheck, Clock, ExternalLink } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useAuth } from '@/components/AuthProvider';
@@ -30,7 +32,7 @@ const AnimatedBg = lazy(() => import('@/components/ui/animated-bg').then(mod => 
 
 function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsCompat();
   const { user, isLoading } = useAuth();
   const mode = searchParams.get('mode');
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
