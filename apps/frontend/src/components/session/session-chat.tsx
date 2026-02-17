@@ -1093,7 +1093,51 @@ function PartActions({
 // User Message Row
 // ============================================================================
 
-function UserMessageRow({ message, agentNames }: { message: MessageWithParts; agentNames?: string[] }) {
+/**
+ * Detect if user message text matches a known command template.
+ * Returns the command name + extracted args, or undefined if no match.
+ * Works by splitting each command template at its first placeholder ($1 or $ARGUMENTS)
+ * and checking if the message text starts with that prefix.
+ */
+function detectCommandFromText(
+  rawText: string,
+  commands?: Command[],
+): { name: string; args?: string } | undefined {
+  if (!commands || !rawText || rawText.length < 50) return undefined;
+
+  for (const cmd of commands) {
+    if (!cmd.template) continue;
+    const tpl = cmd.template;
+
+    // Find the first placeholder position ($1, $2, ..., $ARGUMENTS)
+    const placeholderMatch = tpl.match(/\$(\d+|\bARGUMENTS\b)/);
+    // Use the text before the first placeholder as the prefix to match
+    const prefix = placeholderMatch
+      ? tpl.slice(0, placeholderMatch.index).trimEnd()
+      : tpl.trimEnd();
+
+    // Require a meaningful prefix (at least 20 chars) to avoid false positives
+    if (prefix.length < 20) continue;
+
+    if (rawText.startsWith(prefix)) {
+      // Extract the user's arguments: text after the template prefix (approximate)
+      // For templates ending with the placeholder, the args are what comes after the prefix
+      let args: string | undefined;
+      if (placeholderMatch) {
+        const afterPrefix = rawText.slice(prefix.length).trim();
+        // The args are at the end; try to extract the last meaningful section
+        const lastNewlineBlock = afterPrefix.split('\n\n').pop()?.trim();
+        if (lastNewlineBlock && lastNewlineBlock.length < 200) {
+          args = lastNewlineBlock;
+        }
+      }
+      return { name: cmd.name, args };
+    }
+  }
+  return undefined;
+}
+
+function UserMessageRow({ message, agentNames, commandInfo, commands }: { message: MessageWithParts; agentNames?: string[]; commandInfo?: { name: string; args?: string }; commands?: Command[] }) {
   const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
   const { attachments, stickyParts } = useMemo(
     () => splitUserParts(message.parts),
@@ -1106,6 +1150,12 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
   const rawText = textParts.map((p) => (p as TextPart).text).join('\n');
   const { cleanText: textAfterFiles, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
   const { cleanText: text, sessions: sessionRefs } = useMemo(() => parseSessionReferences(textAfterFiles), [textAfterFiles]);
+
+  // Resolve effective command info: use runtime-tracked info or fall back to template matching
+  const effectiveCommandInfo = useMemo(
+    () => commandInfo ?? detectCommandFromText(rawText, commands),
+    [commandInfo, rawText, commands],
+  );
 
   // Extract DCP notifications from ignored text parts (DCP plugin sends ignored user messages)
   const ignoredTextParts = stickyParts.filter(isTextPart).filter((p) => (p as any).ignored && (p as TextPart).text?.trim());
@@ -1229,6 +1279,32 @@ function UserMessageRow({ message, agentNames }: { message: MessageWithParts; ag
         {dcpNotifications.map((n, i) => (
           <DCPNotificationCard key={i} notification={n} />
         ))}
+      </div>
+    );
+  }
+
+  // Command messages: render as a centered pill instead of the raw template text
+  if (effectiveCommandInfo) {
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-border/60 bg-muted/40">
+          <Terminal className="size-3.5 text-muted-foreground shrink-0" />
+          <span className="font-mono text-sm text-foreground">/{effectiveCommandInfo.name}</span>
+          {effectiveCommandInfo.args && (
+            <>
+              <span className="text-border">|</span>
+              <span className="text-xs text-muted-foreground truncate max-w-[300px]">{effectiveCommandInfo.args}</span>
+            </>
+          )}
+        </div>
+        {/* DCP notifications from ignored parts */}
+        {dcpNotifications.length > 0 && (
+          <div className="flex flex-col gap-1.5 w-full mt-1">
+            {dcpNotifications.map((n, i) => (
+              <DCPNotificationCard key={i} notification={n} />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -1412,6 +1488,10 @@ interface SessionTurnProps {
   onRevert: (messageId: string) => Promise<void>;
   /** Providers data for the Connect Provider dialog */
   providers?: ProviderListResponse;
+  /** Map of user message IDs to command info for rendering command pills */
+  commandMessages?: Map<string, { name: string; args?: string }>;
+  /** Available commands for template prefix matching (page refresh detection) */
+  commands?: Command[];
 }
 
 function SessionTurn({
@@ -1434,6 +1514,8 @@ function SessionTurn({
   onFork,
   onRevert,
   providers,
+  commandMessages,
+  commands,
 }: SessionTurnProps) {
   const [copied, setCopied] = useState(false);
   const [userCopied, setUserCopied] = useState(false);
@@ -1668,7 +1750,12 @@ function SessionTurn({
     <div className="space-y-3 group/turn">
       <div>
         {/* User message */}
-        <UserMessageRow message={turn.userMessage} agentNames={agentNames} />
+        <UserMessageRow
+          message={turn.userMessage}
+          agentNames={agentNames}
+          commandInfo={commandMessages?.get(turn.userMessage.info.id)}
+          commands={commands}
+        />
         {/* User message actions — copy, edit, delete */}
         {userMessageText && (
           <div className="flex justify-end mt-1 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
@@ -2118,6 +2205,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const [pollingActive, setPollingActive] = useState(false);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [pendingCommand, setPendingCommand] = useState<{ name: string; description?: string } | null>(null);
+  // Map of user message IDs → command info, so UserMessageRow can render
+  // a compact command pill instead of the raw expanded template text.
+  const commandMessagesRef = useRef<Map<string, { name: string; args?: string }>>(new Map());
+  // Stash the pending command info so we can associate it with the user message
+  // even if the busy signal arrives before the message list updates.
+  const pendingCommandStashRef = useRef<{ name: string; args?: string } | null>(null);
   // Track whether we're retrying a failed send (keeps loader visible)
   const [isRetrying, setIsRetrying] = useState(false);
   // Track whether a pending prompt send is in flight (dashboard→session flow).
@@ -2449,7 +2542,9 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [isServerBusy, messages, sessionId]);
 
   // Clear pending user message when server acknowledges (status becomes busy)
-  // or when new messages arrive from the server
+  // or when new messages arrive from the server.
+  // When a command was pending, associate the newest user message with the
+  // command info so UserMessageRow can render a nice pill instead of raw template text.
   const prevMsgLenRef = useRef(messages?.length || 0);
   useEffect(() => {
     if (!pendingUserMessage) return;
@@ -2466,6 +2561,23 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       setPendingCommand(null);
     }
   }, [isServerBusy, messages?.length, pendingUserMessage]);
+
+  // Associate stashed command info with the newest user message when messages arrive.
+  // Runs separately so it captures the mapping even if busy fires before messages update.
+  useEffect(() => {
+    const stash = pendingCommandStashRef.current;
+    if (!stash || !messages) return;
+    const len = messages.length;
+    if (len <= prevMsgLenRef.current) return;
+    // Find the last user message — the one just created by the command
+    for (let i = len - 1; i >= 0; i--) {
+      if (messages[i].info.role === 'user') {
+        commandMessagesRef.current.set(messages[i].info.id, stash);
+        pendingCommandStashRef.current = null;
+        break;
+      }
+    }
+  }, [messages]);
 
   useEffect(() => {
     prevMsgLenRef.current = messages?.length || 0;
@@ -2779,6 +2891,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       playSound('send');
       const label = args ? `/${cmd.name} ${args}` : `/${cmd.name}`;
       setPendingCommand({ name: cmd.name, description: args || cmd.description });
+      pendingCommandStashRef.current = { name: cmd.name, args: args || cmd.description };
       setPendingUserMessage(label);
       setPollingActive(true);
       lastSendTimeRef.current = Date.now();
@@ -3007,6 +3120,8 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                         onFork={handleFork}
                         onRevert={handleRevert}
                         providers={providers}
+                        commandMessages={commandMessagesRef.current}
+                        commands={commands}
                       />
                     </div>
                   );
