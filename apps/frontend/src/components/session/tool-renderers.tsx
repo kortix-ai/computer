@@ -210,7 +210,7 @@ function BasicTool({
   locked,
   onSubtitleClick,
 }: BasicToolProps) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(() => defaultOpen);
 
   useEffect(() => {
     if (forceOpen) setOpen(true);

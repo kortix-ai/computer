@@ -24,7 +24,7 @@ export const EditableText: React.FC<EditableTextProps> = ({
     disabled = false
   }) => {
     const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(value);
+    const [editValue, setEditValue] = useState(() => value);
     const prevValueRef = useRef(value);
     if (prevValueRef.current !== value) {
       prevValueRef.current = value;

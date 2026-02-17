@@ -394,7 +394,7 @@ export function CodeEditor({
   const { resolvedTheme } = useTheme();
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [localContent, setLocalContent] = useState(content);
+  const [localContent, setLocalContent] = useState(() => content);
   // Use originalContent if provided, otherwise fall back to content (for backwards compatibility)
   const savedContent = useRef<string>(originalContent ?? content);
   const editorContainerRef = useRef<HTMLDivElement>(null);

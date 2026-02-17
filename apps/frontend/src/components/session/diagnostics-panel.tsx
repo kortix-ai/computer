@@ -147,7 +147,7 @@ function FileGroupSection({
   defaultExpanded: boolean;
   onDiagnosticClick: (diagnostic: LspDiagnostic) => void;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(() => defaultExpanded);
   const filename = getFilename(group.file);
   const directory = getDirectory(group.file);
 

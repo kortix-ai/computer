@@ -575,7 +575,7 @@ export const CodeBlockContent = ({
   ...props
 }: CodeBlockContentProps) => {
   const [highlightedCode, setHighlightedCode] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(syntaxHighlighting);
+  const [isLoading, setIsLoading] = useState(() => syntaxHighlighting);
 
   useEffect(() => {
     if (!syntaxHighlighting) {

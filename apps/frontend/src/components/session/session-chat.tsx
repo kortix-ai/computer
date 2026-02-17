@@ -901,7 +901,7 @@ function EditPartDialog({
   onSave: (text: string) => void;
   loading?: boolean;
 }) {
-  const [text, setText] = useState(initialText);
+  const [text, setText] = useState(() => initialText);
 
   // Reset text when dialog opens with new content
   useEffect(() => {

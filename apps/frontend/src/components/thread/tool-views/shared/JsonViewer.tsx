@@ -16,7 +16,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   defaultExpanded = false, 
   className = "" 
 }) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isExpanded, setIsExpanded] = useState(() => defaultExpanded);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {

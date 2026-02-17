@@ -161,7 +161,7 @@ const MINUTE_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
   const [state, setState] = useState<ScheduleState>(() => cronToState(value) ?? DEFAULT_STATE);
   const [showCron, setShowCron] = useState(false);
-  const [rawCron, setRawCron] = useState(value);
+  const [rawCron, setRawCron] = useState(() => value);
   const [isCustom, setIsCustom] = useState(() => cronToState(value) === null);
 
   useEffect(() => {

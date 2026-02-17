@@ -13,8 +13,7 @@ import { trackRouteChange } from '@/lib/analytics/gtm';
  * This solves the SPA tracking problem where page views aren't
  * automatically tracked on client-side navigation.
  */
-function RouteChangeTrackerInner() {
-  const pathname = usePathname();
+function SearchParamsTracker({ pathname }: { pathname: string | null }) {
   const searchParams = useSearchParams();
   const isInitialMount = useRef(true);
   
@@ -40,9 +39,10 @@ function RouteChangeTrackerInner() {
 }
 
 export function RouteChangeTracker() {
+  const pathname = usePathname();
   return (
     <Suspense>
-      <RouteChangeTrackerInner />
+      <SearchParamsTracker pathname={pathname} />
     </Suspense>
   );
 }

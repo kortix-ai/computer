@@ -127,7 +127,7 @@ export function UserSettingsModal({
 }: UserSettingsModalProps) {
     const router = useRouter();
     const isMobile = useIsMobile();
-    const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
+    const [activeTab, setActiveTab] = useState<TabId>(() => defaultTab);
     const [showPlanModal, setShowPlanModal] = useState(false);
     const isLocal = isLocalMode();
     const tabs: Tab[] = [

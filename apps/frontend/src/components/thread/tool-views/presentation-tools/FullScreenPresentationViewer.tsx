@@ -57,7 +57,7 @@ export function FullScreenPresentationViewer({
   initialSlide = 1,
 }: FullScreenPresentationViewerProps) {
   const [metadata, setMetadata] = useState<PresentationMetadata | null>(null);
-  const [currentSlide, setCurrentSlide] = useState(initialSlide);
+  const [currentSlide, setCurrentSlide] = useState(() => initialSlide);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
