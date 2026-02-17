@@ -2829,7 +2829,9 @@ useEffect(() => {
         }
       };
 
-      container.addEventListener('wheel', handler, { passive: false });
+      // Non-passive wheel listener for zoom/pan preventDefault
+      const addListener = container.addEventListener.bind(container);
+      addListener('wheel', handler, { passive: false });
 
       // Store handler ref for cleanup
       (container as HTMLDivElement & { _wheelHandler?: (e: WheelEvent) => void })._wheelHandler = handler;

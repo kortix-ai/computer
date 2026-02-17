@@ -157,6 +157,11 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
     [isMulti, answers, customInputs, tab, pick],
   );
 
+  const handleFormSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    handleCustomSubmit(inputRef.current?.value ?? '');
+  }, [handleCustomSubmit]);
+
   const submit = useCallback(() => {
     setReplying(true);
     const finalAnswers = questions.map((_, i) => answers[i] ?? []);
@@ -302,10 +307,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
               {editing && (
                 <form
                   className="flex items-center gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleCustomSubmit(inputRef.current?.value ?? '');
-                  }}
+                  onSubmit={handleFormSubmit}
                 >
                   <input
                     ref={inputRef}

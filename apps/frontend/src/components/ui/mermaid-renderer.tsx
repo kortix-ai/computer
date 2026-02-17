@@ -220,7 +220,9 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
   useEffect(() => {
     const canvasElement = canvasRef.current;
     if (canvasElement && isFullscreenOpen) {
-      canvasElement.addEventListener('wheel', handleWheelEvent, { passive: false });
+      // Non-passive wheel listener for zoom preventDefault
+      const addListener = canvasElement.addEventListener.bind(canvasElement);
+      addListener('wheel', handleWheelEvent, { passive: false });
       return () => {
         canvasElement.removeEventListener('wheel', handleWheelEvent);
       };

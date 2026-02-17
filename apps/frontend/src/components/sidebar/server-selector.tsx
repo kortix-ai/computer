@@ -441,6 +441,11 @@ export function InstanceManagerDialog({
     setMode('edit');
   }
 
+  function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    handleSave();
+  }
+
   function handleSave() {
     const url = formUrl.trim();
     if (!url) return;
@@ -702,7 +707,7 @@ export function InstanceManagerDialog({
         {/* ---- Add / Edit view ---- */}
         {(mode === 'add' || mode === 'edit') && (
           <form
-            onSubmit={(e) => { e.preventDefault(); handleSave(); }}
+            onSubmit={handleFormSubmit}
             className="flex flex-col gap-4 px-5 pb-5"
           >
             <div className="flex flex-col gap-3">

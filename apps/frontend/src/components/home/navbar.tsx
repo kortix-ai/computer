@@ -106,6 +106,22 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
   // Get the appropriate CTA link based on device type
   const ctaLink = isMobile ? '/app' : '/auth';
 
+  const handleDrawerNavClick = useCallback((href: string) => (e: React.MouseEvent) => {
+    if (!href.startsWith('#')) {
+      setIsDrawerOpen(false);
+      return;
+    }
+    e.preventDefault();
+    if (pathname !== '/') {
+      router.push(`/${href}`);
+      setIsDrawerOpen(false);
+      return;
+    }
+    const element = document.getElementById(href.substring(1));
+    element?.scrollIntoView({ behavior: 'smooth' });
+    setIsDrawerOpen(false);
+  }, [pathname, router]);
+
   // Single unified scroll handler with hysteresis
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
@@ -275,21 +291,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                   >
                     <a
                       href={item.href}
-                      onClick={(e) => {
-                        if (!item.href.startsWith('#')) {
-                          setIsDrawerOpen(false);
-                          return;
-                        }
-                        e.preventDefault();
-                        if (pathname !== '/') {
-                          router.push(`/${item.href}`);
-                          setIsDrawerOpen(false);
-                          return;
-                        }
-                        const element = document.getElementById(item.href.substring(1));
-                        element?.scrollIntoView({ behavior: 'smooth' });
-                        setIsDrawerOpen(false);
-                      }}
+                      onClick={handleDrawerNavClick(item.href)}
                       className={`block py-3 text-4xl font-medium tracking-tight transition-colors ${
                         (item.href.startsWith('#') && pathname === '/' && activeSection === item.href.substring(1)) || (item.href === pathname)
                           ? 'text-foreground'
