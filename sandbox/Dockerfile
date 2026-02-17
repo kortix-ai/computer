@@ -43,30 +43,32 @@ RUN for i in 1 2 3; do curl -fsSL https://bun.sh/install | bash && break || slee
     && test -x /opt/bun/bin/bun \
     && ln -sf /opt/bun/bin/bun /usr/local/bin/bun
 
-# pip packages:
-#   - greenlet, pyee, typing-extensions: native musl builds (playwright deps)
-#   - pypdf2, python-pptx: pure Python, install normally
-#   - playwright: no musl wheels exist — force-install manylinux wheel via --target,
-#     then copy to site-packages (the Python API is pure Python + greenlet)
-#   - pillow: already in base image
-RUN pip3 install --break-system-packages --timeout=120 --retries=3 \
-        greenlet pyee typing-extensions \
-        pypdf2==3.0.1 python-pptx==1.0.2 \
+# pip packages — versions read from sandbox/package.json (single source of truth)
+# COPY is done later for agent-browser; we need it now for pip versions too.
+COPY sandbox/package.json /tmp/sandbox-pkg-versions.json
+RUN PIP_ARGS=$(node -e " \
+      const p=require('/tmp/sandbox-pkg-versions.json'); \
+      const deps=p.kortix?.pythonDependencies||{}; \
+      const args=[]; \
+      for(const[pkg,ver] of Object.entries(deps)){ \
+        if(pkg==='playwright') continue; \
+        args.push(ver==='latest'?pkg:pkg+'=='+ver); \
+      } \
+      console.log(args.join(' '));" 2>/dev/null) \
+    && pip3 install --break-system-packages --timeout=120 --retries=3 $PIP_ARGS \
+    && PW_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.kortix?.pythonDependencies?.playwright||'1.58.0')" 2>/dev/null) \
     && SITE=$(python3 -c "import site; print(site.getsitepackages()[0])") \
     && ARCH=$(uname -m) \
     && if [ "$ARCH" = "x86_64" ]; then PW_PLAT=manylinux1_x86_64; \
        else PW_PLAT=manylinux_2_17_aarch64; fi \
     && pip3 install --platform "$PW_PLAT" --only-binary :all: \
-        --no-deps --target /tmp/pw playwright==1.58.0 \
+        --no-deps --target /tmp/pw "playwright==$PW_VERSION" \
     && cp -r /tmp/pw/playwright* "$SITE/" \
     && rm -rf /tmp/pw \
     && python3 -c "from playwright.sync_api import sync_playwright; print('playwright OK')"
 
 # Install uv (Python package runner) — used by presentation-gen tool scripts
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
-
-# ── LSS (Local Semantic Search + file-watcher sync) ─────────────────────────
-RUN pip3 install --break-system-packages local-semantic-search
 
 # Remove build-only deps to save space (keep runtime libs)
 RUN apk del gcc g++ musl-dev linux-headers python3-dev libffi-dev \
@@ -77,7 +79,7 @@ RUN apk del gcc g++ musl-dev linux-headers python3-dev libffi-dev \
 
 # ── Agent Browser (headless browser automation for AI agents) ────────────────
 # Initial install for Docker image; postinstall.sh handles version updates.
-COPY sandbox/package.json /tmp/sandbox-pkg-versions.json
+# /tmp/sandbox-pkg-versions.json already COPY'd above for pip versions.
 RUN AB_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['agent-browser']||'latest')" 2>/dev/null || echo "latest") \
     && npm install -g "agent-browser@$AB_VERSION"
 COPY sandbox/patch-agent-browser.js /tmp/patch-agent-browser.js

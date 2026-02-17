@@ -132,23 +132,35 @@ echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%S
 chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix 2>/dev/null || true
 
 # ── pip packages ─────────────────────────────────────────────────────────────
-# These are pinned to versions tested with this sandbox release.
+# Versions are read from sandbox/package.json → kortix.pythonDependencies (single source of truth).
 echo "[sandbox-postinstall] Checking pip packages..."
-pip3 install --break-system-packages -q \
-  'local-semantic-search' \
-  'pypdf2==3.0.1' \
-  'python-pptx==1.0.2' \
-  'pillow==12.1.0' \
-  'greenlet' 'pyee' 'typing-extensions' \
-  2>/dev/null || true
+
+# Read python dependency versions from package.json
+PY_DEPS_JSON=$(node -e "const p=require('$PKG_DIR/package.json');console.log(JSON.stringify(p.kortix?.pythonDependencies||{}))" 2>/dev/null || echo "{}")
+
+# Build pip install args from the JSON (skip playwright — handled separately)
+PIP_ARGS=$(node -e "
+  const deps=JSON.parse('$PY_DEPS_JSON');
+  const args=[];
+  for(const[pkg,ver] of Object.entries(deps)){
+    if(pkg==='playwright') continue;
+    args.push(ver==='latest'?pkg:pkg+'=='+ver);
+  }
+  console.log(args.join(' '));
+" 2>/dev/null || echo "")
+
+if [ -n "$PIP_ARGS" ]; then
+  pip3 install --break-system-packages -q $PIP_ARGS 2>/dev/null || true
+fi
 
 # playwright: no musl-native wheels — force-install manylinux wheel (Python API is pure Python)
+PW_VERSION=$(node -e "const p=require('$PKG_DIR/package.json');console.log(p.kortix?.pythonDependencies?.playwright||'1.58.0')" 2>/dev/null || echo "1.58.0")
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then PW_PLAT=manylinux1_x86_64;
 else PW_PLAT=manylinux_2_17_aarch64; fi
 SITE=$(python3 -c "import site; print(site.getsitepackages()[0])")
 pip3 install --platform "$PW_PLAT" --only-binary :all: \
-  --no-deps --target /tmp/pw 'playwright==1.58.0' 2>/dev/null \
+  --no-deps --target /tmp/pw "playwright==$PW_VERSION" 2>/dev/null \
   && cp -r /tmp/pw/playwright* "$SITE/" 2>/dev/null \
   && rm -rf /tmp/pw \
   || true

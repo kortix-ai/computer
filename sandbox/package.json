@@ -34,5 +34,17 @@
   "peerDependencies": {},
   "publishConfig": {
     "access": "public"
+  },
+  "kortix": {
+    "pythonDependencies": {
+      "local-semantic-search": "latest",
+      "pypdf2": "3.0.1",
+      "python-pptx": "1.0.2",
+      "pillow": "12.1.0",
+      "greenlet": "latest",
+      "pyee": "latest",
+      "typing-extensions": "latest",
+      "playwright": "1.58.0"
+    }
   }
 }
