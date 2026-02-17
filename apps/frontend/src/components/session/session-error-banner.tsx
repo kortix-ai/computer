@@ -25,14 +25,14 @@ export function TurnErrorDisplay({ errorText, className }: TurnErrorDisplayProps
   return (
     <div
       className={cn(
-        'flex items-start gap-2.5 px-3 py-2.5 rounded-lg border',
-        'bg-red-500/[0.06] dark:bg-red-500/[0.04]',
-        'border-red-500/20',
+        'flex items-start gap-2 px-3 py-2 rounded-md border',
+        'bg-muted/40 dark:bg-muted/30',
+        'border-border/60',
         className,
       )}
     >
-      <AlertCircle className="size-3.5 mt-0.5 flex-shrink-0 text-red-500" />
-      <p className="text-xs text-red-600 dark:text-red-400 break-words min-w-0">
+      <AlertCircle className="size-3.5 mt-0.5 flex-shrink-0 text-muted-foreground/70" />
+      <p className="text-xs text-muted-foreground break-words min-w-0">
         {errorText}
       </p>
     </div>

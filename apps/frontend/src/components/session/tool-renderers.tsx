@@ -146,7 +146,7 @@ function partOutput(part: ToolPart): string {
     // Strip <bash_metadata> and similar internal XML tags from tool output
     return raw
       .replace(/<bash_metadata>[\s\S]*?<\/bash_metadata>/g, '')
-      .replace(/<\/?(?:system_info|exit_code|stderr_note)>[\s\S]*?(?:<\/\w+>|$)/g, '')
+      .replace(/<\/?(?:system_info|exit_code|stderr_note)>[\s\S]*?(?:<\/\w+>)?$/g, '')
       .trim();
   }
   return '';
@@ -449,16 +449,16 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
             return (
               <div
                 key={i}
-                className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-red-500/5 border border-red-500/15"
+                className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/60"
               >
-                <Ban className="size-3 flex-shrink-0 mt-0.5 text-red-400" />
+                <Ban className="size-3 flex-shrink-0 mt-0.5 text-muted-foreground/70" />
                 <div className="min-w-0 flex-1">
                   {section.errorType && (
-                    <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider">
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                       {section.errorType}
                     </span>
                   )}
-                  <p className="text-[11px] leading-relaxed text-red-600 dark:text-red-400 font-mono break-words">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground font-mono break-words">
                     {section.summary}
                   </p>
                 </div>
@@ -1657,6 +1657,8 @@ function parseWebSearchOutput(output: string | any): WebSearchQueryResult[] {
               title: s.title,
               url: s.url,
               snippet: s.snippet || s.content || s.text || undefined,
+              author: s.author || undefined,
+              publishedDate: s.publishedDate || s.published_date || undefined,
             });
           }
         }
@@ -1963,7 +1965,7 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
           )}
         </div>
       }
-      defaultOpen={defaultOpen || (scrapeData !== null)}
+      defaultOpen={defaultOpen ?? (scrapeData !== null)}
       forceOpen={forceOpen}
       locked={locked}
     >
@@ -2014,7 +2016,7 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
                       </p>
                     )}
                     {!result.success && result.error && (
-                      <p className="text-[10px] text-red-500/70 leading-relaxed line-clamp-2 mt-1 break-words">
+                      <p className="text-[10px] text-muted-foreground/70 leading-relaxed line-clamp-2 mt-1 break-words">
                         {result.error.slice(0, 150)}
                       </p>
                     )}
@@ -2207,6 +2209,7 @@ ToolRegistry.register('image-gen', ImageGenTool);
 function VideoGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const input = partInput(part);
   const output = partOutput(part);
+  const status = partStatus(part);
   const prompt = (input.prompt as string) || '';
 
   return (
@@ -2311,7 +2314,7 @@ function PresentationGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps
             {triggerSubtitle}
           </span>
           {parsed?.success && action === 'create_slide' && parsed.total_slides && (
-            <span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap ml-auto flex-shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground font-mono whitespace-nowrap ml-auto flex-shrink-0">
               {parsed.total_slides} {parsed.total_slides === 1 ? 'slide' : 'slides'}
             </span>
           )}
@@ -2421,7 +2424,7 @@ function PresentationGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps
       {/* Fallback for unrecognized output */}
       {!parsed && output && (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="whitespace-pre-wrap text-[11px] text-muted-foreground font-mono">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       )}
     </BasicTool>
@@ -2625,7 +2628,7 @@ function TaskThreadCard({
       className={cn(
         'rounded-lg border overflow-hidden',
         isError
-          ? 'border-destructive/25'
+          ? 'border-border/60'
           : 'border-border/50',
       )}
     >
@@ -2933,7 +2936,7 @@ function BatchToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) 
               ) : call.success !== false ? (
                 <Check className="size-2.5 text-emerald-500 shrink-0" />
               ) : (
-                <CircleAlert className="size-2.5 text-red-500 shrink-0" />
+                <CircleAlert className="size-2.5 text-muted-foreground shrink-0" />
               )}
               <span className="font-mono truncate">{call.tool}</span>
             </div>
@@ -3187,7 +3190,7 @@ function MemorySearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const triggerBadge = status === 'completed'
     ? hasResults
       ? `${results.length} ${results.length === 1 ? 'result' : 'results'}`
-      : 'no results'
+      : 'empty'
     : undefined;
 
   return (
@@ -3196,9 +3199,7 @@ function MemorySearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       trigger={
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span className="font-medium text-xs text-foreground whitespace-nowrap">Memory Search</span>
-          {query && (
-            <span className="text-muted-foreground text-xs truncate font-mono">{query}</span>
-          )}
+          <span className="text-muted-foreground text-xs truncate font-mono">{query}</span>
           {triggerBadge && (
             <span className={cn(
               'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
@@ -3283,9 +3284,9 @@ function MemorySearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
             </div>
           )}
         </div>
-      ) : output ? (
+      ) : status === 'completed' && output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -3352,7 +3353,7 @@ function observationTypeInfo(type: string): { label: string; bg: string; text: s
   if (t.includes('🟢') || t.includes('💚'))
     return { label: 'Success',   bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400' };
   if (t.includes('🔴') || t.includes('❤️'))
-    return { label: 'Error',     bg: 'bg-red-500/10',     text: 'text-red-400',     dot: 'bg-red-400' };
+    return { label: 'Error',     bg: 'bg-muted/50',       text: 'text-muted-foreground', dot: 'bg-muted-foreground/60' };
   if (t.includes('🟡') || t.includes('💛'))
     return { label: 'Warning',   bg: 'bg-amber-500/10',   text: 'text-amber-400',   dot: 'bg-amber-400' };
   if (t.includes('🟠') || t.includes('🧡'))
@@ -3375,7 +3376,7 @@ function MemSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const triggerBadge = status === 'completed'
     ? hasResults
       ? `${parsed?.total ?? observations.length} found`
-      : 'no results'
+      : 'empty'
     : undefined;
 
   return (
@@ -3465,7 +3466,7 @@ function MemSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         </div>
       ) : status === 'completed' && output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -3742,7 +3743,7 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         </div>
       ) : status === 'completed' && output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -3786,9 +3787,7 @@ function MemSaveTool({ part }: ToolProps) {
       trigger={
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span className="font-medium text-xs text-foreground whitespace-nowrap">Mem Save</span>
-          {displayTitle && (
-            <span className="text-muted-foreground text-xs truncate font-mono">{displayTitle}</span>
-          )}
+          <span className="text-muted-foreground text-xs truncate font-mono">{displayTitle}</span>
           {triggerBadge && (
             <span className={cn(
               'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
@@ -3832,7 +3831,7 @@ function MemSaveTool({ part }: ToolProps) {
         </div>
       ) : status === 'completed' && output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -4014,7 +4013,7 @@ function MemTimelineTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         </div>
       ) : status === 'completed' && output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -4059,7 +4058,7 @@ function DCPPruneTool({ part }: ToolProps) {
     >
       {output ? (
         <div data-scrollable className="p-2 max-h-48 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -4093,7 +4092,7 @@ function DCPDistillTool({ part }: ToolProps) {
     >
       {output ? (
         <div data-scrollable className="p-2 max-h-48 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -4127,7 +4126,7 @@ function DCPCompressTool({ part }: ToolProps) {
     >
       {output ? (
         <div data-scrollable className="p-2 max-h-48 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
         </div>
       ) : null}
     </BasicTool>
@@ -4275,11 +4274,11 @@ export function ToolError({ error, toolName }: { error: string; toolName?: strin
   // Render validation issues with structured layout
   if (validationIssues && validationIssues.length > 0) {
     return (
-      <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden text-xs">
+      <div className="rounded-lg border border-border/60 bg-muted/30 overflow-hidden text-xs">
         {/* Header */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-red-500/10">
-          <Ban className="size-3 flex-shrink-0 text-red-400" />
-          <span className="font-medium text-red-400">{displayType}</span>
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40">
+          <Ban className="size-3 flex-shrink-0 text-muted-foreground/70" />
+          <span className="font-medium text-muted-foreground">{displayType}</span>
           {toolName && (
             <span className="text-muted-foreground/50 font-mono text-[10px] ml-auto">{toolName}</span>
           )}
@@ -4291,10 +4290,10 @@ export function ToolError({ error, toolName }: { error: string; toolName?: strin
             <div key={i} className="space-y-1.5">
               {/* Path + message */}
               <div className="flex items-start gap-2">
-                <CircleAlert className="size-3 flex-shrink-0 text-red-400/70 mt-0.5" />
+                <CircleAlert className="size-3 flex-shrink-0 text-muted-foreground/60 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   {issue.path.length > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-300 font-mono mr-1.5">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground/70 font-mono mr-1.5">
                       {issue.path.join('.')}
                     </span>
                   )}
@@ -4328,11 +4327,11 @@ export function ToolError({ error, toolName }: { error: string; toolName?: strin
   }
 
   return (
-    <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden text-xs">
+    <div className="rounded-lg border border-border/60 bg-muted/30 overflow-hidden text-xs">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-red-500/10">
-        <Ban className="size-3 flex-shrink-0 text-red-400" />
-        <span className="font-medium text-red-400">{displayType}</span>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40">
+        <Ban className="size-3 flex-shrink-0 text-muted-foreground/70" />
+        <span className="font-medium text-muted-foreground">{displayType}</span>
         {toolName && (
           <span className="text-muted-foreground/50 font-mono text-[10px] ml-auto">{toolName}</span>
         )}
@@ -4350,7 +4349,7 @@ export function ToolError({ error, toolName }: { error: string; toolName?: strin
         <>
           <button
             onClick={() => setShowTrace((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 w-full text-left border-t border-red-500/10 text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 w-full text-left border-t border-border/40 text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
           >
             <ChevronRight className={cn('size-3 transition-transform', showTrace && 'rotate-90')} />
             <span className="text-[10px] font-medium">Stack trace</span>
@@ -4629,7 +4628,7 @@ export function ToolPartRenderer({
 
     return (
       <BasicTool
-        icon={<CircleAlert className="size-3.5 flex-shrink-0 text-red-400" />}
+        icon={<CircleAlert className="size-3.5 flex-shrink-0 text-muted-foreground/70" />}
         trigger={
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <span className="font-medium text-xs text-foreground whitespace-nowrap">{display}</span>
@@ -4638,7 +4637,7 @@ export function ToolPartRenderer({
                 {server}
               </span>
             )}
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 font-medium ml-auto flex-shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground font-medium ml-auto flex-shrink-0">
               Error
             </span>
           </div>

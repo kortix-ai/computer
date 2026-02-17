@@ -13,19 +13,14 @@ import {
   Check,
   Bug,
   FileText,
-  FileDown,
   Image as ImageIcon,
   ArrowUpLeft,
-  GitCompareArrows,
   GitFork,
   Layers,
   ListPlus,
-  ListTodo,
-  MoreHorizontal,
   Scissors,
   Pencil,
   Send,
-  Sparkles,
   Trash2,
   Undo2,
   X,
@@ -71,13 +66,7 @@ import { useMessageQueueStore } from '@/stores/message-queue-store';
 import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { useThrottledValue } from '@/hooks/use-throttled-value';
 import { SessionSiteHeader } from '@/components/session/session-site-header';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+
 import {
   Dialog,
   DialogContent,
@@ -87,11 +76,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CompactDialog } from '@/components/session/compact-dialog';
-import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
-import { DiffDialog } from '@/components/session/diff-dialog';
-import { TodoDialog } from '@/components/session/todo-dialog';
-import { InitProjectDialog } from '@/components/session/init-project-dialog';
+
 
 // Shared UI primitives (framework-agnostic, reusable on mobile)
 import {
@@ -168,182 +153,7 @@ import { playSound } from '@/lib/sounds';
 // Sub-Session / Fork Breadcrumb
 // ============================================================================
 
-function SubSessionBar({
-  sessionId,
-  parentID,
-  variant = 'thread',
-  isCompacting = false,
-}: {
-  sessionId: string;
-  parentID: string;
-  /** 'thread' for task sub-sessions, 'fork' for forked sessions */
-  variant?: 'thread' | 'fork';
-  isCompacting?: boolean;
-}) {
-  const { data: parentSession } = useOpenCodeSession(parentID);
-
-  // Dialog states for actions menu
-  const [diffOpen, setDiffOpen] = useState(false);
-  const [todoOpen, setTodoOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [compactOpen, setCompactOpen] = useState(false);
-  const [initOpen, setInitOpen] = useState(false);
-
-  const handleBackToParent = useCallback(() => {
-    if (parentSession) {
-      openTabAndNavigate({
-        id: parentSession.id,
-        title: parentSession.title || 'Parent session',
-        type: 'session',
-        href: `/sessions/${parentSession.id}`,
-        serverId: useServerStore.getState().activeServerId,
-      });
-    }
-  }, [parentSession]);
-
-  const parentTitle = parentSession?.title || 'Parent session';
-  const isFork = variant === 'fork';
-
-  return (
-    <>
-      <div className="flex-shrink-0">
-        {/* Thin accent stripe */}
-        <div
-          className={cn(
-            'h-[2px] bg-gradient-to-r',
-            isFork
-              ? 'from-muted-foreground/30 via-muted-foreground/20 to-muted-foreground/10'
-              : 'from-indigo-500/80 via-violet-500/80 to-purple-500/60',
-          )}
-        />
-        {/* Bar */}
-        <div className="flex items-center h-10 px-3 gap-2 border-b border-border/50 bg-background">
-          <button
-            onClick={handleBackToParent}
-            className={cn(
-              'flex items-center gap-1.5 h-7 px-2 rounded-md',
-              'text-xs text-muted-foreground hover:text-foreground',
-              'hover:bg-muted/60 active:bg-muted/80',
-              'transition-colors cursor-pointer group',
-            )}
-          >
-            <ArrowUpLeft className="size-3.5 group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            <span className="max-w-[200px] truncate">{parentTitle}</span>
-          </button>
-
-          <div className="flex-1" />
-
-          {/* More actions dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  'flex items-center justify-center h-7 w-7 rounded-md',
-                  'text-muted-foreground hover:text-foreground',
-                  'hover:bg-muted/60 active:bg-muted/80',
-                  'transition-colors cursor-pointer',
-                )}
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => setDiffOpen(true)}>
-                <GitCompareArrows className="mr-2 h-4 w-4" />
-                View changes
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTodoOpen(true)}>
-                <ListTodo className="mr-2 h-4 w-4" />
-                View tasks
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setExportOpen(true)}>
-                <FileDown className="mr-2 h-4 w-4" />
-                Export transcript
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setCompactOpen(true)}
-                disabled={isCompacting}
-              >
-                {isCompacting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Layers className="mr-2 h-4 w-4" />
-                )}
-                {isCompacting ? 'Compacting...' : 'Compact session'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setInitOpen(true)}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Initialize project
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-muted/50">
-                {isFork ? (
-                  <GitFork className="size-3 text-muted-foreground flex-shrink-0" />
-                ) : (
-                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500 flex-shrink-0" />
-                )}
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  {isFork ? 'Fork' : 'Thread'}
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              {isFork ? `Forked from: ${parentTitle}` : `Sub-session of: ${parentTitle}`}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
-      {/* Dialogs */}
-      <DiffDialog sessionId={sessionId} open={diffOpen} onOpenChange={setDiffOpen} />
-      <TodoDialog sessionId={sessionId} open={todoOpen} onOpenChange={setTodoOpen} />
-      <ExportTranscriptDialog sessionId={sessionId} open={exportOpen} onOpenChange={setExportOpen} />
-      <CompactDialog sessionId={sessionId} open={compactOpen} onOpenChange={setCompactOpen} />
-      <InitProjectDialog sessionId={sessionId} open={initOpen} onOpenChange={setInitOpen} />
-    </>
-  );
-}
-
-// Sub-session indicator shown above the chat input
-function SubSessionInputBanner({ parentID, variant = 'thread' }: { parentID: string; variant?: 'thread' | 'fork' }) {
-  const { data: parentSession } = useOpenCodeSession(parentID);
-  const isForkVariant = variant === 'fork';
-
-  return (
-    <div className="flex items-center gap-2 px-4 py-1.5 border-t border-border/40 bg-muted/20">
-      {isForkVariant ? (
-        <GitFork className="size-3 text-muted-foreground/60 flex-shrink-0" />
-      ) : (
-        <span className="h-1.5 w-1.5 rounded-full bg-violet-500/70 flex-shrink-0" />
-      )}
-      <span className="text-[11px] text-muted-foreground truncate">
-        {isForkVariant ? 'Continuing in fork' : 'Replying in thread'}
-      </span>
-      <button
-        onClick={() =>
-          parentSession &&
-          openTabAndNavigate({
-            id: parentSession.id,
-            title: parentSession.title || 'Parent session',
-            type: 'session',
-            href: `/sessions/${parentSession.id}`,
-            serverId: useServerStore.getState().activeServerId,
-          })
-        }
-        className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors ml-auto flex items-center gap-1 cursor-pointer"
-      >
-        <ArrowUpLeft className="size-3" />
-        <span className="truncate max-w-[150px]">{parentSession?.title || 'Back'}</span>
-      </button>
-    </div>
-  );
-}
+// SubSessionBar removed — subsessions now use SessionSiteHeader + chat input indicator
 
 // ============================================================================
 // Fork Context Divider — shown at the top of the message list in forked sessions
@@ -402,7 +212,7 @@ function DebugView({ messages }: { messages: MessageWithParts[] | undefined }) {
         <details key={msg.info.id} className="mb-3 border border-border/40 rounded-lg overflow-hidden">
           <summary className={cn(
             "px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors flex items-center gap-2",
-            (msg.info as any).error ? 'bg-red-500/20' : 'bg-muted/30',
+            (msg.info as any).error ? 'bg-muted/50' : 'bg-muted/30',
           )}>
             <span className={cn(
               'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase',
@@ -411,7 +221,7 @@ function DebugView({ messages }: { messages: MessageWithParts[] | undefined }) {
               {msg.info.role}
             </span>
             {(msg.info as any).error && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/30 text-red-500">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-muted text-muted-foreground">
                 ERROR: {(msg.info as any).error?.name}
               </span>
             )}
@@ -490,7 +300,8 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
       const name = match[1];
       detected.push({ start: mStart, end: match.index + match[0].length, type: agentSet.has(name) ? 'agent' : 'file' });
     }
-    if (detected.length === 0) return [{ text: cleanText, type: undefined as MentionType | undefined }];
+    if (detected.length === 0) return [{ text, type: undefined }];
+
     detected.sort((a, b) => a.start - b.start || b.end - a.end);
     const result: { text: string; type?: MentionType }[] = [];
     let lastIndex = 0;
@@ -2181,9 +1992,11 @@ function SessionTurn({
 
 interface SessionChatProps {
   sessionId: string;
+  /** Optional element rendered at the leading (left) edge of the session header */
+  headerLeadingAction?: React.ReactNode;
 }
 
-export function SessionChat({ sessionId }: SessionChatProps) {
+export function SessionChat({ sessionId, headerLeadingAction }: SessionChatProps) {
   const [debugMode, setDebugMode] = useState(false);
 
   // ---- KortixComputer side panel ----
@@ -2465,7 +2278,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [pollingActive, sessionStatus?.type, sessionId]);
 
   // Clear pendingSendInFlight once the server acknowledges it's working,
-  // or once assistant messages arrive (server processed so fast we missed busy).
+  // or when new messages arrive from the server.
   // This bridges the gap between the optimistic prompt clearing and the
   // server status updating — keeps isBusy true so the turn shows a loader.
   useEffect(() => {
@@ -2916,6 +2729,25 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // The effective parent ID: prefer server parentID, fall back to localStorage
   const effectiveParentId = session?.parentID || forkParentId;
 
+  // Parent session data — used for SubSessionBar and threadContext on chat input
+  const { data: parentSessionData } = useOpenCodeSession(effectiveParentId || '');
+  const threadContext = useMemo(() => {
+    if (!effectiveParentId || !parentSessionData) return undefined;
+    return {
+      variant: isFork ? 'fork' as const : 'thread' as const,
+      parentTitle: parentSessionData.title || 'Parent session',
+      onBackToParent: () => {
+        openTabAndNavigate({
+          id: parentSessionData.id,
+          title: parentSessionData.title || 'Parent session',
+          type: 'session',
+          href: `/sessions/${parentSessionData.id}`,
+          serverId: useServerStore.getState().activeServerId,
+        });
+      },
+    };
+  }, [effectiveParentId, parentSessionData, isFork]);
+
   // ============================================================================
   // Loading / Not-found states
   // ============================================================================
@@ -2947,26 +2779,15 @@ export function SessionChat({ sessionId }: SessionChatProps) {
           Session not found
         </div>
       )}
-      {/* Session header */}
-      {!isSubSession && (
-        <SessionSiteHeader
-          sessionId={sessionId}
-          sessionTitle={session?.title || 'Untitled'}
-          onToggleSidePanel={handleTogglePanel}
-          isSidePanelOpen={isSidePanelOpen}
-          canOpenSidePanel={hasToolCalls}
-        />
-      )}
-
-      {/* Sub-session / fork top bar */}
-      {isSubSession && effectiveParentId && (
-        <SubSessionBar
-          sessionId={sessionId}
-          parentID={effectiveParentId}
-          variant={isFork ? 'fork' : 'thread'}
-          isCompacting={!!session?.time?.compacting}
-        />
-      )}
+      {/* Session header — shown for all sessions including sub-sessions */}
+      <SessionSiteHeader
+        sessionId={sessionId}
+        sessionTitle={session?.title || 'Untitled'}
+        onToggleSidePanel={handleTogglePanel}
+        isSidePanelOpen={isSidePanelOpen}
+        canOpenSidePanel={hasToolCalls}
+        leadingAction={headerLeadingAction}
+      />
 
       {/* Revert banner — shown when session is in reverted state */}
       {isReverted && session?.revert?.messageID && (
@@ -3322,9 +3143,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         </div>
       )}
 
-      {/* Sub-session indicator above input */}
-      {effectiveParentId && <SubSessionInputBanner parentID={effectiveParentId} variant={isFork ? 'fork' : 'thread'} />}
-
       {/* Input */}
       <SessionChatInput
         onSend={handleSend}
@@ -3345,6 +3163,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
         sessionId={sessionId}
         onFileSearch={handleFileSearch}
         providers={providers}
+        threadContext={threadContext}
       />
     </div>
   );
