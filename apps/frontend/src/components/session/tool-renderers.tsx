@@ -877,7 +877,12 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         </div>
         {/* Output */}
         {hasOutput && (
-          <div className="border-t border-border/30">
+          <div className="mx-2 mb-2 rounded-md border border-border/40 bg-background/50 overflow-hidden">
+            {/* Output label */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 border-b border-border/30">
+              <div className="size-1.5 rounded-full bg-muted-foreground/25" />
+              <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40">Output</span>
+            </div>
             {sessionMeta ? (
               <div className="p-2">
                 <SessionMetadataList sessions={sessionMeta} />
