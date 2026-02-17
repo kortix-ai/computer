@@ -472,7 +472,7 @@ function TabItem({
         'transition-all duration-200 ease-out',
         isDashboard
           ? 'w-9 md:w-10 justify-center px-0'
-          : 'gap-1.5 px-3 max-w-[200px] min-w-[110px]',
+          : 'gap-2 pl-3 pr-2 max-w-[200px] min-w-[100px]',
         isActive
           ? 'h-[36px] md:h-[40px] rounded-t-[8px] bg-muted text-foreground'
           : 'h-[32px] md:h-[36px] rounded-t-[6px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]',
@@ -492,10 +492,10 @@ function TabItem({
           <TooltipTrigger asChild>
             <div className="relative flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
               {isBusy && (
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               )}
               {pendingCount > 0 && !isBusy && (
-                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
               )}
             </div>
           </TooltipTrigger>
@@ -508,29 +508,29 @@ function TabItem({
       ) : isDashboard ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 transition-colors', isActive ? 'text-foreground/80' : 'text-muted-foreground')} />
+            <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 transition-colors', isActive ? 'text-foreground' : 'text-muted-foreground/50')} />
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">Home</TooltipContent>
         </Tooltip>
       ) : (
-        <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 transition-colors', isActive ? 'text-foreground/60' : 'text-muted-foreground')} />
+        <Icon className={cn('h-3 w-3 flex-shrink-0 transition-colors', isActive ? 'text-foreground/50' : 'text-muted-foreground/40')} />
       )}
 
       {/* Title — hidden for dashboard tab */}
       {!isDashboard && (
-        <span className="flex-1 truncate">
+        <span className={cn('flex-1 truncate', isActive && 'font-medium')}>
           {tab.title || 'Untitled'}
         </span>
       )}
 
       {/* Dirty indicator */}
       {tab.dirty && (
-        <span className="flex-shrink-0 h-2 w-2 rounded-full bg-amber-500 ring-1 ring-amber-500/20" />
+        <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-amber-500" />
       )}
 
       {/* Pin indicator — hidden for dashboard (it's always pinned but we don't show the icon) */}
       {tab.pinned && !isDashboard && (
-        <Pin className="flex-shrink-0 h-2.5 w-2.5 text-muted-foreground/60 -rotate-[20deg]" />
+        <Pin className="flex-shrink-0 h-2 w-2 text-muted-foreground/40 -rotate-[20deg]" />
       )}
 
       {/* Close button — never shown for dashboard */}
@@ -538,15 +538,15 @@ function TabItem({
         <button
           onClick={handleCloseClick}
           className={cn(
-            'flex-shrink-0 p-0.5 rounded-md transition-all duration-100 cursor-pointer',
-            'hover:bg-foreground/10 active:bg-foreground/15',
+            'flex-shrink-0 p-0.5 rounded transition-all duration-100 cursor-pointer',
+            'hover:bg-foreground/8 active:bg-foreground/12',
             isActive
-              ? 'opacity-60 hover:opacity-100'
-              : 'opacity-0 group-hover:opacity-100',
+              ? 'opacity-50 hover:opacity-100'
+              : 'opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100',
           )}
           aria-label={`Close ${tab.title}`}
         >
-          <X className="h-3 w-3" />
+          <X className="h-2.5 w-2.5" />
         </button>
       )}
 
@@ -625,7 +625,7 @@ export function TabBar() {
 
   // Track which server the sessions data was last fetched for.
   // After a server switch, sessions briefly contains stale data from the OLD server.
-  // We must not prune until sessions has been refetched for the CURRENT server.
+  // We must not prune until sessions data is confirmed fresh for the current server.
   const lastPrunedServerRef = useRef(activeServerId);
   const sessionsReadyForServer = useRef(false);
 
@@ -1183,29 +1183,28 @@ export function TabBar() {
               <button
                 onClick={handleNewTab}
                 className={cn(
-                  'flex items-center justify-center w-8 h-9 cursor-pointer',
-                  'text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors',
+                  'flex items-center justify-center w-7 h-7 rounded-md cursor-pointer',
+                  'text-muted-foreground/50 hover:text-muted-foreground transition-colors',
                 )}
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3 w-3" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">New tab</TooltipContent>
           </Tooltip>
 
-          {/* Tab list button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 ref={tabListBtnRef}
                 onClick={() => setShowTabList((v) => !v)}
                 className={cn(
-                  'flex items-center justify-center w-8 h-9 cursor-pointer',
-                  'text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors',
-                  showTabList && 'bg-muted/50 text-foreground',
+                  'flex items-center justify-center w-7 h-7 rounded-md cursor-pointer',
+                  'text-muted-foreground/50 hover:text-muted-foreground transition-colors',
+                  showTabList && 'text-muted-foreground',
                 )}
               >
-                <ChevronsUpDown className="h-3.5 w-3.5" />
+                <ChevronsUpDown className="h-3 w-3" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Open tab list</TooltipContent>

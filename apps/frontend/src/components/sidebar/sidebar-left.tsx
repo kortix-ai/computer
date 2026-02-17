@@ -14,10 +14,12 @@ import {
   ChevronDown,
   Search,
   Blocks,
+  ArrowDownToLine,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
 import { SessionList } from '@/components/sidebar/session-list';
+import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
 
 import { UserMenu } from '@/components/sidebar/user-menu';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
@@ -338,6 +340,50 @@ function ProjectsFlyout() {
 // ============================================================================
 // User Profile Section
 // ============================================================================
+
+// ============================================================================
+// Sidebar Update Indicator
+// ============================================================================
+
+function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
+  const { updateAvailable, latestVersion, changelog } = useGlobalSandboxUpdate();
+  const router = useRouter();
+
+  if (!updateAvailable) return null;
+
+  if (collapsed) {
+    return (
+      <div className="flex justify-center">
+        <button
+          onClick={() => router.push('/changelog')}
+          className="relative p-2 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
+          title={`Update v${latestVersion} available`}
+        >
+          <ArrowDownToLine className="h-4 w-4 text-primary" />
+          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => router.push('/changelog')}
+      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors cursor-pointer"
+    >
+      <div className="relative">
+        <ArrowDownToLine className="h-4 w-4 text-primary" />
+        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
+      </div>
+      <div className="flex-1 min-w-0 text-left">
+        <span className="font-medium text-foreground">v{latestVersion} available</span>
+        {changelog?.title && (
+          <p className="text-muted-foreground truncate text-[10px]">{changelog.title}</p>
+        )}
+      </div>
+    </button>
+  );
+}
 
 function UserProfileSection({ user }: { user: { name: string; email: string; avatar: string; isAdmin?: boolean } }) {
   const isLocal = isLocalMode();
@@ -736,6 +782,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
       {/* ====== FOOTER ====== */}
       <SidebarFooter className="px-3 pb-3 pt-0 group-data-[collapsible=icon]:px-0">
+        <SidebarUpdateIndicator collapsed={state === 'collapsed'} />
         <UserProfileSection user={user} />
       </SidebarFooter>
 
