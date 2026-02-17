@@ -122,16 +122,23 @@ export function KanvaxPreview({
       return;
     }
     setLocalLoading(true);
-    fetch(localPreviewUrl)
-      .then(res => res.text())
+    const controller = new AbortController();
+    const loadPreview = async (url: string) => {
+      const res = await globalThis.fetch(url, { signal: controller.signal });
+      return res.text();
+    };
+    loadPreview(localPreviewUrl)
       .then(text => {
         setLocalData(text);
         setLocalLoading(false);
       })
       .catch(err => {
-        setLocalError(err);
-        setLocalLoading(false);
+        if (!controller.signal.aborted) {
+          setLocalError(err);
+          setLocalLoading(false);
+        }
       });
+    return () => controller.abort();
   }, [localPreviewUrl]);
 
   const shouldFetchFromSandbox = !localPreviewUrl && !!sandboxId;

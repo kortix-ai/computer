@@ -35,30 +35,35 @@ interface SandboxUrlDetectorProps {
 
 type ReachabilityStatus = 'checking' | 'reachable' | 'unreachable';
 
+async function probePort(
+  url: string,
+  onReachable: () => void,
+  onUnreachable: () => void,
+) {
+  try {
+    await fetch(url, {
+      method: 'HEAD',
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(4000),
+    });
+    onReachable();
+  } catch {
+    onUnreachable();
+  }
+}
+
 function usePortReachability(proxyUrl: string): ReachabilityStatus {
   const [status, setStatus] = useState<ReachabilityStatus>('checking');
 
   useEffect(() => {
     let cancelled = false;
 
-    async function probe() {
-      try {
-        // no-cors gives an opaque response (status 0) but succeeds if the
-        // server is listening. If the port is down, fetch throws a TypeError.
-        await fetch(proxyUrl, {
-          method: 'HEAD',
-          mode: 'no-cors',
-          cache: 'no-store',
-          signal: AbortSignal.timeout(4000),
-        });
-        if (!cancelled) setStatus('reachable');
-      } catch {
-        if (!cancelled) setStatus('unreachable');
-      }
-    }
+    const onReachable = () => { if (!cancelled) setStatus('reachable'); };
+    const onUnreachable = () => { if (!cancelled) setStatus('unreachable'); };
 
-    probe();
-    const interval = setInterval(probe, 10_000);
+    probePort(proxyUrl, onReachable, onUnreachable);
+    const interval = setInterval(() => probePort(proxyUrl, onReachable, onUnreachable), 10_000);
     return () => {
       cancelled = true;
       clearInterval(interval);

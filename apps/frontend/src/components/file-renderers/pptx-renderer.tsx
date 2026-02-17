@@ -237,7 +237,7 @@ export function PptxRenderer({
           pptxBlob = blob ?? null;
         }
         if ((!pptxBlob || pptxBlob.size < 4) && binaryUrl) {
-          const resp = await fetch(binaryUrl);
+          const resp = await globalThis.fetch(binaryUrl);
           pptxBlob = await resp.blob();
         }
         if (!pptxBlob) throw new Error('No blob data');
