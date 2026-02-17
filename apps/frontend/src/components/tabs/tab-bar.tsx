@@ -1120,8 +1120,7 @@ export function TabBar() {
         className="flex-shrink-0 flex items-end bg-sidebar h-[42px] md:h-[46px] relative overflow-hidden"
         role="tablist"
       >
-        {/* Chrome-style floor line — active tab (z-20) renders above this */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-border/40 z-10" />
+        {/* The content area's border-t provides the floor line; no extra line needed here */}
 
         {/* Chrome-style curved connectors — rendered at tab-bar level (outside
             the scroll container) so they aren't clipped by overflow-x-auto.
