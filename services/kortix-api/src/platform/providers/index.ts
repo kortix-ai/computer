@@ -28,6 +28,12 @@ export interface ProvisionResult {
 
 export type SandboxStatus = 'running' | 'stopped' | 'removed' | 'unknown';
 
+/** Resolved endpoint for making direct HTTP calls to a sandbox. */
+export interface ResolvedEndpoint {
+  url: string;
+  headers: Record<string, string>;
+}
+
 export interface SandboxProvider {
   readonly name: ProviderName;
   create(opts: CreateSandboxOpts): Promise<ProvisionResult>;
@@ -35,6 +41,19 @@ export interface SandboxProvider {
   stop(externalId: string): Promise<void>;
   remove(externalId: string): Promise<void>;
   getStatus(externalId: string): Promise<SandboxStatus>;
+
+  /**
+   * Resolve the direct HTTP endpoint for a sandbox.
+   * Returns a URL + auth headers that can be used to call the sandbox's
+   * Kortix Master / OpenCode API without going through the preview proxy.
+   */
+  resolveEndpoint(externalId: string): Promise<ResolvedEndpoint>;
+
+  /**
+   * Ensure the sandbox is running (wake it if sleeping).
+   * Idempotent — if already running, returns immediately.
+   */
+  ensureRunning(externalId: string): Promise<void>;
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
