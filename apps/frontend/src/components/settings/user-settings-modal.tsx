@@ -146,9 +146,11 @@ export function UserSettingsModal({
         { id: 'api-keys', label: 'API Keys', icon: Key },
     ];
     
-    useEffect(() => {
+    const prevDefaultTabRef = useRef(defaultTab);
+    if (prevDefaultTabRef.current !== defaultTab) {
+        prevDefaultTabRef.current = defaultTab;
         setActiveTab(defaultTab);
-    }, [defaultTab]);
+    }
 
     const handleTabClick = (tabId: TabId) => {
         if (tabId === 'plan') {

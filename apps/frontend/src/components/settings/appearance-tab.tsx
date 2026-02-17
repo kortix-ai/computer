@@ -94,9 +94,9 @@ export function AppearanceTab() {
 
       {/* Base mode selector */}
       <div className="px-1 pb-4">
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">
+        <span className="text-xs font-medium text-muted-foreground mb-2 block">
           Color Mode
-        </label>
+        </span>
         <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
           {BASE_MODES.map((mode) => {
             const Icon = mode.icon;

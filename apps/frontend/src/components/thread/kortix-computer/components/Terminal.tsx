@@ -217,7 +217,10 @@ export const Terminal = memo(function Terminal({ sandboxId, className }: Termina
         "bg-zinc-100 text-zinc-800 dark:bg-[#1a1b26] dark:text-[#a9b1d6]",
         className
       )}
+      role="button"
+      tabIndex={0}
       onClick={focusInput}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusInput(e); } }}
     >
       <div className="flex items-center h-7 px-3 bg-zinc-200/80 dark:bg-[#24283b] border-b border-zinc-300 dark:border-[#414868] gap-2 flex-shrink-0">
         <span className="text-zinc-500 dark:text-[#565f89] text-xs">{getPromptDisplay(cwd)} — bash</span>
@@ -263,7 +266,6 @@ export const Terminal = memo(function Terminal({ sandboxId, className }: Termina
               onChange={(e) => setCurrentInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isExecuting}
-              autoFocus
               spellCheck={false}
               autoComplete="off"
               autoCapitalize="off"

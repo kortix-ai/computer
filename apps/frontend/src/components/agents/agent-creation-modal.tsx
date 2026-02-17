@@ -229,7 +229,6 @@ export function AgentCreationModal({ open, onOpenChange, onSuccess }: AgentCreat
                 onChange={(e) => setChatDescription(e.target.value)}
                 placeholder="e.g., A worker that monitors competitor prices and sends me daily reports..."
                 className="min-h-[120px] sm:min-h-[160px] resize-none text-sm sm:text-base"
-                autoFocus
               />
             </div>
 

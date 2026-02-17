@@ -123,6 +123,10 @@ export interface UnifiedAgentCardProps {
   currentUserId?: string;
 }
 
+// Stable defaults to avoid re-renders
+const EMPTY_ACTIONS: AgentCardActions = {};
+const EMPTY_STATE: AgentCardState = {};
+
 // Avatar component
 const CardAvatar: React.FC<{ 
   data: BaseAgentData;
@@ -325,8 +329,8 @@ const CapabilitiesList: React.FC<{ capabilities?: string[]; maxCapabilities?: nu
 export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   variant,
   data,
-  actions = {},
-  state = {},
+  actions = EMPTY_ACTIONS,
+  state = EMPTY_STATE,
   className,
   size = 'md',
   delay = 0,
@@ -405,7 +409,10 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
         'hover:border-primary/20',
         className
       )}
+      role="button"
+      tabIndex={0}
       onClick={() => onClick?.(data)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(data); } }}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       <div className="h-full relative flex flex-col overflow-hidden w-full p-4 gap-2">
@@ -538,7 +545,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     const renderActions = () => {
       if (variant === 'marketplace') {
         return (
-          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-2" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={(e) => e.stopPropagation()}>
             <Button 
               onClick={(e) => {
                 e.stopPropagation();
@@ -625,7 +632,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     };
     
     return (
-      <div className={cardClassName} onClick={() => onClick?.(data)}>
+      <div className={cardClassName} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={() => onClick?.(data)}>
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="relative p-6 flex flex-col flex-1">
           <div className="flex items-start justify-between mb-4">

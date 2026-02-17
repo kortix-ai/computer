@@ -290,7 +290,10 @@ function FilePathList({
           <div
             key={i}
             className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-muted transition-colors group"
+            role="button"
+            tabIndex={0}
             onClick={() => onFileClick(fp)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFileClick(fp); } }}
             title={dp}
           >
             <FileText className="h-3.5 w-3.5 text-amber-500/70 dark:text-amber-400/70 flex-shrink-0 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors" />
@@ -342,7 +345,10 @@ function GrepResultList({
             {/* File header row */}
             <div
               className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors group"
+              role="button"
+              tabIndex={0}
               onClick={() => setExpandedIndex(isExpanded ? null : i)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedIndex(isExpanded ? null : i); } }}
             >
               {isExpanded ? (
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -353,10 +359,13 @@ function GrepResultList({
               <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
                 <span
                   className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                  role="button"
+                  tabIndex={0}
                   onClick={(e) => {
                     e.stopPropagation();
                     onFileClick(group.filePath);
                   }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFileClick(group.filePath); } }}
                   title={dp}
                 >
                   {name}

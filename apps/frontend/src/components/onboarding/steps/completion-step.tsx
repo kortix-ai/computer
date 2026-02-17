@@ -24,10 +24,10 @@ export const CompletionStep = () => {
           <motion.div
             key={i}
             className="absolute"
-            initial={{ opacity: 0, scale: 0 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{
               opacity: [0, 1, 0],
-              scale: [0, 1, 0],
+              scale: [0.95, 1, 0.95],
               rotate: [0, 180, 360]
             }}
             transition={{
@@ -59,7 +59,7 @@ export const CompletionStep = () => {
       >
         {/* Grandiose success icon with crown */}
         <motion.div
-          initial={{ scale: 0, opacity: 0, rotate: -180 }}
+          initial={{ scale: 0.95, opacity: 0, rotate: -180 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
           transition={{
             type: "spring",

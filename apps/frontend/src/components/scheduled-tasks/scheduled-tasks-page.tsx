@@ -121,7 +121,7 @@ const TaskListItem = ({
         isSelected ? "bg-muted" : "bg-card"
       )}
     >
-      <div onClick={onClick} className="flex items-center justify-between p-5">
+      <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={onClick} className="flex items-center justify-between p-5">
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-card border border-border/50 shrink-0">
             <Timer className="h-5 w-5 text-foreground" />
@@ -323,7 +323,10 @@ export function ScheduledTasksPage() {
         {selectedTrigger && (
           <div
             className="block 2xl:hidden fixed inset-0 bg-black/70 z-30"
+            role="button"
+            tabIndex={0}
             onClick={handleClosePanel}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClosePanel(e); } }}
           />
         )}
 

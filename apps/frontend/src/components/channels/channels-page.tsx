@@ -87,7 +87,7 @@ const ChannelListItem = ({
 
   return (
     <SpotlightCard className="transition-colors cursor-pointer bg-card">
-      <div onClick={onClick} className="flex items-center justify-between p-3">
+      <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={onClick} className="flex items-center justify-between p-3">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-card border border-border/50 shrink-0">
             <Icon className="h-4.5 w-4.5 text-foreground" />

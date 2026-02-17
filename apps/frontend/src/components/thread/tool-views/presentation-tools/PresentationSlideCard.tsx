@@ -138,7 +138,10 @@ export function PresentationSlideCard({
       {/* Slide Preview */}
       <div 
         className="relative aspect-video bg-muted/30 cursor-pointer"
+        role="button"
+        tabIndex={0}
         onClick={() => onFullScreenClick?.(slide.number)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFullScreenClick?.(slide.number); } }}
       >
         <div className="w-full h-full flex items-center justify-center bg-transparent">
           <div 
@@ -165,7 +168,6 @@ export function PresentationSlideCard({
                 position: 'absolute',
                 top: 0,
                 left: 0,
-                willChange: 'transform',
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden'
               }}

@@ -553,10 +553,13 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           {state === 'collapsed' && (
             <div
               className="group/collapsed absolute inset-0 flex items-center justify-center cursor-pointer"
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 setOpen(true);
                 window.dispatchEvent(new CustomEvent('sidebar-left-toggled', { detail: { expanded: true } }));
               }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } }}
             >
               {/* Symbol — hides on hover */}
               <Link href="/dashboard" onClick={(e) => {

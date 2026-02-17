@@ -33,10 +33,12 @@ export function FileSearch() {
     enabled: debouncedQuery.length > 0,
   });
 
-  // Reset selection when results change
-  useEffect(() => {
+  // Reset selection when results change — computed during render
+  const prevResultsRef = useRef(results);
+  if (prevResultsRef.current !== results) {
+    prevResultsRef.current = results;
     setSelectedIndex(0);
-  }, [results]);
+  }
 
   const handleSelect = useCallback(
     (path: string) => {
@@ -95,8 +97,8 @@ export function FileSearch() {
   );
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={closeSearch}>
-      <div className="mx-auto max-w-lg mt-4 px-4" onClick={(e) => e.stopPropagation()}>
+    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={closeSearch}>
+      <div className="mx-auto max-w-lg mt-4 px-4" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={(e) => e.stopPropagation()}>
         <div className="rounded-lg border border-border bg-card shadow-2xl overflow-hidden">
           {/* Search input */}
           <div className="flex items-center gap-2 px-3 border-b">

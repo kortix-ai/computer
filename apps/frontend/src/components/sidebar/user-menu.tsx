@@ -199,7 +199,7 @@ export function UserMenu({ user }: UserMenuProps) {
           {!isLocal && (
             <div className="absolute bottom-full left-0 right-0 mb-2 px-0 group-data-[collapsible=icon]:hidden z-50 flex flex-col gap-2">
               <SpotlightCard className="bg-zinc-200/60 dark:bg-zinc-800/60 backdrop-blur-md cursor-pointer">
-                <div onClick={openReferralDialog} className="flex items-center gap-3 px-3 py-2.5">
+                <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={openReferralDialog} className="flex items-center gap-3 px-3 py-2.5">
                   <Heart className="h-4 w-4 text-zinc-700 dark:text-zinc-300 flex-shrink-0" />
                   <div className="flex-1 text-left">
                     <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('referralShareTitle')}</div>

@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -294,13 +296,12 @@ function AssistantBlock({
     <div className="flex flex-col gap-2">
       {/* Agent header — Kortix logomark (matches Suna AgentHeader for name="Kortix") */}
       <div className="flex items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/kortix-logomark-white.svg"
           alt="Kortix"
           className="dark:invert-0 invert flex-shrink-0"
           style={{ height: '12px', width: 'auto' }}
-        />
+        width={12} height={12} unoptimized />
       </div>
 
       {/* Text content */}

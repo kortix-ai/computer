@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { FileAttachment, FileAttachmentGrid } from './index';
+import { FileAttachment, FileAttachmentGrid } from '.';
 import { Project } from '@/lib/api/threads';
 
 type LayoutStyle = 'inline' | 'grid';
@@ -160,7 +160,10 @@ export function AttachmentGroup({
                                 {onRemove && (
                                     <div
                                         className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-black dark:bg-white border-3 border-sidebar text-white dark:text-black flex items-center justify-center z-10 cursor-pointer"
+                                        role="button"
+                                        tabIndex={0}
                                         onClick={() => onRemove(index)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRemove(index); } }}
                                     >
                                         <TooltipProvider>
                                             <Tooltip>
@@ -238,12 +241,15 @@ export function AttachmentGroup({
                                     {onRemove && (
                                         <div
                                             className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-black dark:bg-white border-3 border-sidebar text-white dark:text-black flex items-center justify-center z-10 cursor-pointer"
+                                            role="button"
+                                            tabIndex={0}
                                             onClick={() => {
                                                 onRemove(index);
                                                 if (uniqueFiles.length <= 1) {
                                                     setIsModalOpen(false);
                                                 }
                                             }}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRemove(index); } }}
                                         >
                                             <TooltipProvider>
                                                 <Tooltip>

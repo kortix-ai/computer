@@ -96,7 +96,7 @@ export function VersionInlineEditor({
 
   if (isEditing) {
     return (
-      <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+      <div className="space-y-3" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2">
           <Input
             value={editedName}
@@ -104,7 +104,6 @@ export function VersionInlineEditor({
             onKeyDown={handleKeyDown}
             placeholder="Version name"
             className="flex-1"
-            autoFocus
           />
           <div className="flex items-center gap-1">
             <Button

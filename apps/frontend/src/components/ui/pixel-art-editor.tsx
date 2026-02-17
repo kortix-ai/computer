@@ -203,6 +203,7 @@ export const PixelArtEditor: React.FC<PixelArtEditorProps> = ({
             {grid.map((row, rowIndex) =>
               row.map((pixel, colIndex) => (
                 <div
+                  role="gridcell"
                   key={`${rowIndex}-${colIndex}`}
                   className="border border-gray-200 dark:border-gray-700 cursor-pointer hover:opacity-80"
                   style={{

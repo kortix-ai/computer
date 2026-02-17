@@ -1,14 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { trackSignUp, trackLogin, AuthMethod } from '@/lib/analytics/gtm';
 
-/**
- * Tracks auth events (sign_up, login) from URL parameters
- * after OAuth/magic link redirects
- */
-export function AuthEventTracker() {
+function AuthEventTrackerInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -47,3 +43,14 @@ export function AuthEventTracker() {
   return null;
 }
 
+/**
+ * Tracks auth events (sign_up, login) from URL parameters
+ * after OAuth/magic link redirects
+ */
+export function AuthEventTracker() {
+  return (
+    <Suspense>
+      <AuthEventTrackerInner />
+    </Suspense>
+  );
+}

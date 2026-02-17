@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useRef, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -52,12 +54,12 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
         transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
         aria-hidden="true"
       >
-        <img
+        <Image
           src="/kortix-brandmark-bg.svg"
           alt=""
           className="w-[85%] max-w-[800px] h-auto object-contain select-none opacity-20"
           draggable={false}
-        />
+        width={24} height={24} unoptimized />
       </motion.div>
 
       <div className="absolute inset-0 z-[1] opacity-80">
@@ -104,12 +106,12 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 1.6, delay: 1.4, ease: [0.16, 1, 0.3, 1] }}
             >
-              <img
+              <Image
                 src="/logomark-white.svg"
                 alt="Kortix"
                 className="h-9 sm:h-11 w-auto"
                 draggable={false}
-              />
+              width={24} height={24} unoptimized />
             </motion.div>
 
             <motion.div

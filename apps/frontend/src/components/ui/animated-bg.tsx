@@ -44,7 +44,6 @@ const LeftArc = ({
             className={className}
             style={{
                 overflow: 'visible',
-                willChange: 'transform',
                 transform: 'translate3d(0, 0, 0)',
                 ...style
             }}
@@ -120,7 +119,6 @@ const RightArc = ({
             className={className}
             style={{
                 overflow: 'visible',
-                willChange: 'transform',
                 transform: 'translate3d(0, 0, 0)',
                 ...style
             }}
@@ -176,7 +174,6 @@ const Arc = ({ left, cfg }: { left?: boolean; cfg: ArcCfg }) => {
         left: cfg.pos.left,
         right: cfg.pos.right,
         top: cfg.pos.top,
-        willChange: 'transform',
         transform: 'translate3d(0, 0, 0)',
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',

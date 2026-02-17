@@ -129,7 +129,7 @@ const NotificationItem = (notification: Notification) => {
   };
 
   return (
-     <div onClick={handleClick} className='p-2 flex items-center justify-center'>
+     <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={handleClick} className='p-2 flex items-center justify-center'>
          <div
          className={`
              relative px-4 py-3 rounded-xl w-full transition-all cursor-pointer group

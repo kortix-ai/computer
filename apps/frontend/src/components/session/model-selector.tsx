@@ -248,7 +248,6 @@ export function ManageModelsDialog({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9"
-            autoFocus
           />
         </div>
 
@@ -266,10 +265,18 @@ export function ManageModelsDialog({
                     <div
                       key={`${model.providerID}:${model.modelID}`}
                        className="flex items-center justify-between gap-3 px-2 py-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                      onClick={() => modelStore.setVisibility(key, !visible)}
+                       role="button"
+                       tabIndex={0}
+                       onClick={() => modelStore.setVisibility(key, !visible)}
+                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); modelStore.setVisibility(key, !visible); } }}
                     >
                       <span className="text-sm truncate">{model.modelName}</span>
-                      <div onClick={(e) => e.stopPropagation()}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                      >
                         <Switch
                           checked={visible}
                           onCheckedChange={(checked) => modelStore.setVisibility(key, checked)}

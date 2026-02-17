@@ -215,34 +215,42 @@ export const AppWindow = memo(function AppWindow({
       {!isMaximized && (
         <>
           <div 
+            role="separator"
             className="absolute top-0 left-0 w-2 h-full cursor-ew-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 'w')}
           />
           <div 
+            role="separator"
             className="absolute top-0 right-0 w-2 h-full cursor-ew-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 'e')}
           />
           <div 
+            role="separator"
             className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 's')}
           />
           <div 
+            role="separator"
             className="absolute top-0 left-0 w-full h-2 cursor-ns-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 'n')}
           />
           <div 
+            role="separator"
             className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 'nw')}
           />
           <div 
+            role="separator"
             className="absolute top-0 right-0 w-4 h-4 cursor-nesw-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 'ne')}
           />
           <div 
+            role="separator"
             className="absolute bottom-0 left-0 w-4 h-4 cursor-nesw-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 'sw')}
           />
           <div 
+            role="separator"
             className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-[100] pointer-events-auto" 
             onMouseDown={(e) => handleResize(e, 'se')}
           />

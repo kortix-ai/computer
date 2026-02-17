@@ -308,7 +308,7 @@ export default function DashboardLayoutContent({
       try {
         const backendUrl =
           process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-        const res = await fetch(`${backendUrl}/setup/onboarding-status`);
+        const res = await globalThis.fetch(`${backendUrl}/setup/onboarding-status`);
         if (res.ok) {
           const data = await res.json();
           if (!data.complete) {

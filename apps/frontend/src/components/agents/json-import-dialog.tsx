@@ -199,10 +199,13 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
   ), [setupSteps, profileMappings, customMcpConfigs]);
 
   const handleStepComplete = useCallback(() => {
-    if (currentStep < setupSteps.length - 1) {
-      setTimeout(() => setCurrentStep(currentStep + 1), 500);
-    }
-  }, [currentStep, setupSteps.length]);
+    setCurrentStep(prev => {
+      if (prev < setupSteps.length - 1) {
+        setTimeout(() => setCurrentStep(p => p + 1), 500);
+      }
+      return prev;
+    });
+  }, [setupSteps.length]);
 
   const renderPasteStep = () => (
     <div className="space-y-6 min-w-0">
@@ -285,7 +288,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
 
         <div className="flex gap-3 pt-6 border-t">
           {currentStep > 0 ? (
-            <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)} className="flex-1">
+            <Button variant="outline" onClick={() => setCurrentStep(prev => prev - 1)} className="flex-1">
               Back
             </Button>
           ) : (
@@ -314,7 +317,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
             </Button>
           ) : (
             <Button 
-              onClick={() => setCurrentStep(currentStep + 1)}
+              onClick={() => setCurrentStep(prev => prev + 1)}
               disabled={!canProceedToNextStep}
               className="flex-1"
             >

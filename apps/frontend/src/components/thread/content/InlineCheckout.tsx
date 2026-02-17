@@ -253,7 +253,7 @@ function PlanPicker({
     return availablePlans[0]?.name || 'Pro';
   };
 
-  const [selectedPlan, setSelectedPlan] = useState<Plan>(getDefaultPlan());
+  const [selectedPlan, setSelectedPlan] = useState<Plan>(() => getDefaultPlan());
 
   // Update selection if current plan is no longer available
   React.useEffect(() => {

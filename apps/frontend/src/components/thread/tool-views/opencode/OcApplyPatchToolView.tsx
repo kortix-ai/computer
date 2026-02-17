@@ -134,7 +134,10 @@ export function OcApplyPatchToolView({
                     {/* File header */}
                     <div
                       className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-muted transition-colors"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setExpandedFile(isExpanded ? null : i)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedFile(isExpanded ? null : i); } }}
                     >
                       {hasDiff ? (
                         isExpanded ? (
@@ -153,10 +156,13 @@ export function OcApplyPatchToolView({
                       <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
                         <span
                           className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-primary transition-colors"
+                          role="button"
+                          tabIndex={0}
                           onClick={(e) => {
                             e.stopPropagation();
                             openFile(file.relativePath);
                           }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFile(file.relativePath); } }}
                         >
                           {name}
                         </span>

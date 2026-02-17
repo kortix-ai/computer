@@ -83,7 +83,10 @@ export const TagInput: React.FC<TagInputProps> = ({
           "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
           disabled && "opacity-50 cursor-not-allowed bg-muted"
         )}
+        role="button"
+        tabIndex={0}
         onClick={handleContainerClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleContainerClick(e); } }}
       >
         {tags.map((tag, index) => (
           <Badge

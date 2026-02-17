@@ -262,6 +262,8 @@ export function BasicTool({
                       'text-muted-foreground text-xs truncate font-mono',
                       onSubtitleClick && 'cursor-pointer hover:text-foreground underline-offset-2 hover:underline',
                     )}
+                    role="button"
+                    tabIndex={0}
                     onClick={
                       onSubtitleClick
                         ? (e) => {
@@ -270,6 +272,7 @@ export function BasicTool({
                           }
                         : undefined
                     }
+                    onKeyDown={onSubtitleClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSubtitleClick(); } } : undefined}
                   >
                     {trigger.subtitle}
                   </span>
@@ -1335,7 +1338,10 @@ function InlineFileList({ paths, onFileClick, toDisplayPath }: { paths: string[]
           <div
             key={i}
             className="flex items-center gap-2 px-3 py-1 cursor-pointer hover:bg-muted/50 transition-colors group"
+            role="button"
+            tabIndex={0}
             onClick={() => onFileClick(fp)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFileClick(fp); } }}
             title={dp}
           >
             <FileText className="size-3 text-muted-foreground/50 flex-shrink-0 group-hover:text-foreground/60 transition-colors" />
@@ -1369,7 +1375,10 @@ function InlineGrepResults({ groups, onFileClick, toDisplayPath }: { groups: Gre
           <div key={i}>
             <div
               className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors group"
+              role="button"
+              tabIndex={0}
               onClick={() => setExpandedIndex(isExpanded ? null : i)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedIndex(isExpanded ? null : i); } }}
             >
               <ChevronRight className={cn(
                 'size-3 text-muted-foreground flex-shrink-0 transition-transform',
@@ -1379,7 +1388,10 @@ function InlineGrepResults({ groups, onFileClick, toDisplayPath }: { groups: Gre
               <span className="text-[11px] min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
                 <span
                   className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-blue-500 transition-colors"
+                  role="button"
+                  tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); onFileClick(group.filePath); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                   title={group.filePath}
                 >
                   {name}
@@ -2766,10 +2778,7 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
     return [];
   }, [metadata.todos, input.todos]);
 
-  const completed = useMemo(
-    () => todos.filter((t: Record<string, unknown>) => t.status === 'completed').length,
-    [todos],
-  );
+  const completed = todos.filter((t: Record<string, unknown>) => t.status === 'completed').length;
 
   const subtitle = todos.length > 0 ? `${completed}/${todos.length}` : '';
 

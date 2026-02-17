@@ -86,7 +86,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
       }
 
       // Advance to next tab
-      setTab(tab + 1);
+      setTab(prev => prev + 1);
       setEditing(false);
     },
     [answers, customInputs, tab, isSingle, request.id, onReply],
@@ -351,7 +351,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
           {/* Next button for multi-select (not on confirm) */}
           {!isSingle && !isConfirm && isMulti && (
             <button
-              onClick={() => { setTab(tab + 1); setEditing(false); }}
+              onClick={() => { setTab(prev => prev + 1); setEditing(false); }}
               disabled={currentAnswers.length === 0}
               className={cn(
                 'px-3 py-1.5 text-[11px] font-medium rounded-lg transition-all',

@@ -87,9 +87,12 @@ export const QuickLaunch = memo(function QuickLaunch({
     }
   }, [isOpen]);
 
-  useEffect(() => {
+  // Reset selection when query changes — computed during render
+  const prevQueryRef = useRef(query);
+  if (prevQueryRef.current !== query) {
+    prevQueryRef.current = query;
     setSelectedIndex(0);
-  }, [query]);
+  }
 
   const handleSelect = useCallback((index: number) => {
     const item = allResults[index];
@@ -155,7 +158,10 @@ export const QuickLaunch = memo(function QuickLaunch({
         <>
           <div
             className="fixed inset-0 z-[100]"
+            role="button"
+            tabIndex={0}
             onClick={onClose}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(e); } }}
           />
           <motion.div
             initial={{ opacity: 1, scale: 0.95, y: -20 }}

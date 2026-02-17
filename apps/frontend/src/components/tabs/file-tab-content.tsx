@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useState, useEffect, lazy, Suspense } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   Download,
   FileWarning,
@@ -208,12 +208,14 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
     useTabStore.getState().setTabDirty(tabId, hasUnsavedChanges);
   }, [tabId, hasUnsavedChanges]);
 
-  // Reset editing mode when file changes
-  useEffect(() => {
+  // Reset editing mode when file changes — computed during render
+  const prevFilePathRef = useRef(filePath);
+  if (prevFilePathRef.current !== filePath) {
+    prevFilePathRef.current = filePath;
     setIsEditing(false);
     setHighlightedHtml('');
     setEditedContent(null);
-  }, [filePath]);
+  }
 
   // Syntax highlight with Shiki
   const shikiTheme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
@@ -416,7 +418,6 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
             )}
             {isEditing ? (
               <textarea
-                autoFocus
                 value={displayContent}
                 onChange={(e) => setEditedContent(e.target.value)}
                 onKeyDown={(e) => {

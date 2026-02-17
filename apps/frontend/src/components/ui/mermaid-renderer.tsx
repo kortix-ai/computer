@@ -605,7 +605,10 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
           minHeight: '200px',
           width: '100%'
         }}
+        role="button"
+        tabIndex={0}
         onClick={enableFullscreen ? handleFullscreenOpen : undefined}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
       >
         <div
           ref={containerRef}
@@ -687,7 +690,10 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
             <div
               ref={canvasRef}
               className="flex-1 min-h-0 relative overflow-hidden bg-muted/10 cursor-move touch-none select-none"
+              role="button"
+              tabIndex={0}
               onClick={(e) => e.stopPropagation()} // Prevent dialog from closing on canvas clicks
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
               onMouseDown={(e) => {
                 e.stopPropagation(); // Prevent dialog from closing
                 handleMouseDown(e);

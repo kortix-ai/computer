@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,10 +27,11 @@ export const ExpandableMarkdownEditor: React.FC<ExpandableMarkdownEditorProps> =
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
-
-  useEffect(() => {
+  const prevValueRef = useRef(value);
+  if (prevValueRef.current !== value) {
+    prevValueRef.current = value;
     setEditValue(value);
-  }, [value]);
+  }
 
   const handleSave = () => {
     onSave(editValue);
@@ -76,7 +77,10 @@ export const ExpandableMarkdownEditor: React.FC<ExpandableMarkdownEditorProps> =
               ? "cursor-not-allowed opacity-60"
               : "hover:opacity-80 cursor-pointer"
           )}
+          role="button"
+          tabIndex={0}
           onClick={openDialog}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDialog(e); } }}
         >
           <div className="p-4 h-full overflow-hidden">
             {value ? (

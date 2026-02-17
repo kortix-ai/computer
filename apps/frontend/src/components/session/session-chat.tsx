@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import {
   ChevronDown,
   ChevronRight,
@@ -508,7 +509,10 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
           <span
             key={i}
             className="text-blue-500 font-medium cursor-pointer hover:underline"
+            role="button"
+            tabIndex={0}
             onClick={(e) => { e.stopPropagation(); onFileClick(seg.text.replace(/^@/, '')); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
           >
             {seg.text}
           </span>
@@ -516,6 +520,8 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
           <span
             key={i}
             className="text-emerald-500 font-medium cursor-pointer hover:underline"
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               const title = seg.text.replace(/^@/, '');
@@ -530,6 +536,7 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
                 });
               }
             }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
           >
             {seg.text}
           </span>
@@ -924,7 +931,6 @@ function EditPartDialog({
             value={text}
             onChange={(e) => setText(e.target.value)}
             className="min-h-[120px] text-sm"
-            autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
@@ -1317,7 +1323,10 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
           'flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden',
           canExpand && 'cursor-pointer hover:bg-card/80 transition-colors',
         )}
+        role="button"
+        tabIndex={0}
         onClick={() => canExpand && setExpanded(!expanded)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); canExpand && setExpanded(!expanded); } }}
       >
         {/* Attachment thumbnails (images/PDFs) */}
         {attachments.length > 0 && (
@@ -1377,7 +1386,10 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
                     <span
                       key={i}
                       className="text-blue-500 font-medium cursor-pointer hover:underline"
+                      role="button"
+                      tabIndex={0}
                       onClick={(e) => { e.stopPropagation(); openFileInComputer(seg.text.replace(/^@/, '')); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                     >
                       {seg.text}
                     </span>
@@ -1385,6 +1397,8 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
                     <span
                       key={i}
                       className="text-emerald-500 font-medium cursor-pointer hover:underline"
+                      role="button"
+                      tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
                         const title = seg.text.replace(/^@/, '');
@@ -1399,6 +1413,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
                           });
                         }
                       }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                     >
                       {seg.text}
                     </span>
@@ -1793,13 +1808,12 @@ function SessionTurn({
       {/* Kortix logo header */}
       {(working || hasSteps) && (
          <div className="flex items-center gap-2 mt-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/kortix-logomark-white.svg"
             alt="Kortix"
             className={cn('dark:invert-0 invert flex-shrink-0', working && 'animate-pulse')}
             style={{ height: '14px', width: 'auto' }}
-          />
+          width={14} height={14} unoptimized />
         </div>
       )}
 
@@ -2017,13 +2031,12 @@ function SessionTurn({
           {/* Kortix logo — shown when there are no steps (otherwise logo is already above) */}
           {!hasSteps && (
             <div className="flex items-center gap-2 mb-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src="/kortix-logomark-white.svg"
                 alt="Kortix"
                 className="dark:invert-0 invert flex-shrink-0"
                 style={{ height: '14px', width: 'auto' }}
-              />
+              width={14} height={14} unoptimized />
             </div>
           )}
           <div className="text-sm">
@@ -3060,13 +3073,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
                         className="dark:invert-0 invert flex-shrink-0 animate-pulse"
                         style={{ height: '14px', width: 'auto' }}
-                      />
+                      width={14} height={14} unoptimized />
                       {isRetrying && (
                         <span className="text-xs text-amber-500 animate-pulse">
                           Retrying connection...
@@ -3156,13 +3168,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                       </div>
                     )}
                     <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
                         className="dark:invert-0 invert flex-shrink-0 animate-pulse"
                         style={{ height: '14px', width: 'auto' }}
-                      />
+                      width={14} height={14} unoptimized />
                       {isRetrying && (
                         <span className="text-xs text-amber-500 animate-pulse">
                           Retrying connection...
@@ -3175,13 +3186,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 {/* Busy indicator when no turns yet but session is busy */}
                 {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
                   <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src="/kortix-logomark-white.svg"
                       alt="Kortix"
                       className="dark:invert-0 invert flex-shrink-0 animate-pulse"
                       style={{ height: '14px', width: 'auto' }}
-                    />
+                    width={14} height={14} unoptimized />
                   </div>
                 )}
 

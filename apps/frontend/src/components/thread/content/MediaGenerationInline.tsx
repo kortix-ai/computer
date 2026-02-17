@@ -212,7 +212,10 @@ function InlineVideo({ filePath, sandboxId }: { filePath: string; sandboxId?: st
           {/* Play/Pause overlay */}
           <div
             className="absolute inset-0 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-black/20"
+            role="button"
+            tabIndex={0}
             onClick={togglePlay}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePlay(e); } }}
           >
             <div className="h-12 w-12 rounded-full bg-white/90 dark:bg-black/90 flex items-center justify-center shadow-lg">
               {isPlaying ? (

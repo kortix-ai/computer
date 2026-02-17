@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { trackRouteChange } from '@/lib/analytics/gtm';
 
@@ -13,7 +13,7 @@ import { trackRouteChange } from '@/lib/analytics/gtm';
  * This solves the SPA tracking problem where page views aren't
  * automatically tracked on client-side navigation.
  */
-export function RouteChangeTracker() {
+function RouteChangeTrackerInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isInitialMount = useRef(true);
@@ -39,3 +39,10 @@ export function RouteChangeTracker() {
   return null;
 }
 
+export function RouteChangeTracker() {
+  return (
+    <Suspense>
+      <RouteChangeTrackerInner />
+    </Suspense>
+  );
+}

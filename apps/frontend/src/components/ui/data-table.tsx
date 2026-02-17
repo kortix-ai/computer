@@ -35,6 +35,9 @@ export interface DataTableProps<T> {
   headerActions?: React.ReactNode;
 }
 
+// Stable default to avoid re-renders
+const EMPTY_SELECTED: never[] = [];
+
 export function DataTable<T>({
   columns,
   data,
@@ -42,7 +45,7 @@ export function DataTable<T>({
   emptyMessage = 'No data available',
   onRowClick,
   selectable = false,
-  selectedItems = [],
+  selectedItems = EMPTY_SELECTED,
   onSelectionChange,
   getItemId,
   headerActions,

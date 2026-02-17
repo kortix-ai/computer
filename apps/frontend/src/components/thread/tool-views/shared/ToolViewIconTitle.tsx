@@ -38,7 +38,10 @@ export function ToolViewIconTitle({
         {onTitleClick ? (
           <div
             className="text-base font-medium text-foreground truncate cursor-pointer hover:text-primary transition-colors"
+            role="button"
+            tabIndex={0}
             onClick={onTitleClick}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTitleClick(e); } }}
             title={subtitle || undefined}
           >
             {title}

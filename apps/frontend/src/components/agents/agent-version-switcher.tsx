@@ -158,7 +158,10 @@ export function AgentVersionSwitcher({
                         <div className="flex items-center gap-2">
                           <div 
                             className="flex-1 cursor-pointer"
+                            role="button"
+                            tabIndex={0}
                             onClick={() => handleVersionSelect(version)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleVersionSelect(version); } }}
                           >
                             <VersionInlineEditor
                               agentId={agentId}
@@ -181,7 +184,10 @@ export function AgentVersionSwitcher({
                         </div>
                         <div 
                           className="flex items-center gap-2 mt-1 cursor-pointer"
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleVersionSelect(version)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleVersionSelect(version); } }}
                         >
                           <Clock className="h-3 w-3 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">

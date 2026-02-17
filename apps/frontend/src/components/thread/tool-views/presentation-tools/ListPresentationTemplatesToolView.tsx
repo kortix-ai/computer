@@ -181,7 +181,10 @@ export function ListPresentationTemplatesToolView({
                   return (
                     <div
                       key={template.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleTemplateClick(template.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTemplateClick(template.id); } }}
                       className="group rounded-lg cursor-pointer transition-all duration-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-lg hover:scale-[1.01]"
                     >
                       <div className="relative rounded-t-lg overflow-hidden bg-muted">

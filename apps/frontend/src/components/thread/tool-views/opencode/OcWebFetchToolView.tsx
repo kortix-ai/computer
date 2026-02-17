@@ -402,7 +402,10 @@ function ContentDisplay({
       {/* Clickable header row */}
       <div
         className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(e); } }}
       >
         {expanded ? (
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />

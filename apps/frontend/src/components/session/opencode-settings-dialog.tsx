@@ -139,9 +139,9 @@ function GeneralSection({
     <div className="space-y-6 overflow-y-auto pr-1">
       {/* Custom Instructions */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Custom Instructions
-        </label>
+        </span>
         <p className="text-xs text-muted-foreground/60">
           Additional instruction file paths, one per line (e.g. docs/rules.md)
         </p>
@@ -161,9 +161,9 @@ function GeneralSection({
 
       {/* Default Model */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Default Model
-        </label>
+        </span>
         <Select
           value={model || '__auto__'}
           onValueChange={(v) => onDraft('model', v === '__auto__' ? undefined : v)}
@@ -412,9 +412,9 @@ function PermissionsSection({
     <div className="space-y-6 overflow-y-auto pr-1">
       {/* Global permission mode */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Global Permission Mode
-        </label>
+        </span>
         <p className="text-xs text-muted-foreground/60">
           Set a blanket permission level, or configure per-tool below.
         </p>
@@ -458,9 +458,9 @@ function PermissionsSection({
       {/* Per-tool permission overrides */}
       {!isGlobalMode && (
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Per-Tool Permissions
-          </label>
+          </span>
           <div className="rounded-xl border border-border/50 bg-card divide-y divide-border/30">
             {PERMISSION_TYPES.map(({ key, label, description }) => (
               <div
@@ -500,9 +500,9 @@ function PermissionsSection({
       {/* Tool enable/disable overrides */}
       {builtinToolIds.length > 0 && (
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Tool Overrides
-          </label>
+          </span>
           <p className="text-xs text-muted-foreground/60">
             Enable or disable individual tools.
           </p>
@@ -762,12 +762,11 @@ function McpServersSection() {
               and paste the code below.
             </p>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Authorization Code</label>
+              <span className="text-xs text-muted-foreground mb-1 block">Authorization Code</span>
               <Input
                 placeholder="Paste code here..."
                 value={authCode}
                 onChange={(e) => setAuthCode(e.target.value)}
-                autoFocus
               />
             </div>
             {authError && (
@@ -829,18 +828,17 @@ function McpServersSection() {
         <form onSubmit={handleAddServer} className="space-y-4">
           {/* Name */}
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Server Name</label>
+            <span className="text-xs text-muted-foreground mb-1 block">Server Name</span>
             <Input
               placeholder="my-server"
               value={addForm.name}
               onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
-              autoFocus
             />
           </div>
 
           {/* Transport Type */}
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground mb-1 block">Transport Type</label>
+            <span className="text-xs text-muted-foreground mb-1 block">Transport Type</span>
             <div className="flex gap-1.5">
               <button
                 type="button"
@@ -872,7 +870,7 @@ function McpServersSection() {
           {/* Transport-specific fields */}
           {addForm.transportType === 'stdio' ? (
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Command</label>
+              <span className="text-xs text-muted-foreground mb-1 block">Command</span>
               <Input
                 placeholder="npx -y @modelcontextprotocol/server-github"
                 value={addForm.command}
@@ -884,7 +882,7 @@ function McpServersSection() {
             </div>
           ) : (
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">URL</label>
+              <span className="text-xs text-muted-foreground mb-1 block">URL</span>
               <Input
                 placeholder="https://mcp.example.com/sse"
                 value={addForm.url}
@@ -896,7 +894,7 @@ function McpServersSection() {
           {/* Environment Variables */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground">Environment Variables</label>
+              <span className="text-xs text-muted-foreground">Environment Variables</span>
               <button
                 type="button"
                 onClick={addEnvPair}

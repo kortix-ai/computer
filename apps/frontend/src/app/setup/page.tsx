@@ -1,19 +1,11 @@
-'use client';
+import type { Metadata } from 'next';
+import SetupPageClient from './page-client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export const metadata: Metadata = {
+  title: 'Setup',
+  description: 'Set up your Kortix workspace.',
+};
 
-/**
- * /setup — redirects to /dashboard.
- * Setup is now an overlay inside the dashboard layout (SetupOverlay).
- * This page exists only so that the installer's auto-open URL still works.
- */
 export default function SetupPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/dashboard');
-  }, [router]);
-
-  return null;
+  return <SetupPageClient />;
 }

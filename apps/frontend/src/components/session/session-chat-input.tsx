@@ -720,6 +720,12 @@ function MentionPopover({
   );
 }
 
+// Stable defaults to avoid re-renders
+const EMPTY_AGENTS: SessionChatInputProps['agents'] = [];
+const EMPTY_COMMANDS: SessionChatInputProps['commands'] = [];
+const EMPTY_MODELS: SessionChatInputProps['models'] = [];
+const EMPTY_VARIANTS: SessionChatInputProps['variants'] = [];
+
 // ============================================================================
 // Prompt history persistence
 // ============================================================================
@@ -759,7 +765,6 @@ export interface SessionChatInputProps {
   /** If true, disables the input (e.g. during session creation redirect) */
   disabled?: boolean;
   /** Auto-focus the textarea on mount (default: true on desktop) */
-  autoFocus?: boolean;
   placeholder?: string;
 
   /** Callback to search files via SDK for @ mentions */
@@ -772,21 +777,20 @@ export function SessionChatInput({
   onSend,
   isBusy = false,
   onStop,
-  agents = [],
+  agents = EMPTY_AGENTS,
   selectedAgent = null,
   onAgentChange,
-  commands = [],
+  commands = EMPTY_COMMANDS,
   onCommand,
-  models = [],
+  models = EMPTY_MODELS,
   selectedModel = null,
   onModelChange,
-  variants = [],
+  variants = EMPTY_VARIANTS,
   selectedVariant = null,
   onVariantChange,
   messages,
   sessionId,
   disabled = false,
-  autoFocus,
   placeholder = 'Ask anything...',
 
   onFileSearch,
@@ -919,8 +923,8 @@ export function SessionChatInput({
     }
   }, []);
 
-  // Default autoFocus: true on desktop, false on mobile
-  const shouldAutoFocus = autoFocus ?? (typeof window !== 'undefined' && window.innerWidth >= 640);
+  // Default: true on desktop, false on mobile
+  const shouldAutoFocus = typeof window !== 'undefined' && window.innerWidth >= 640;
 
   // Focus the textarea whenever it becomes visible (handles mount, tab switch,
   // and new-session creation where the component may mount inside a hidden div
@@ -1490,7 +1494,7 @@ export function SessionChatInput({
                   'relative w-full bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-[24px] text-[16px] sm:text-[15px] outline-none placeholder:text-muted-foreground disabled:opacity-50',
                   highlightSegments && 'caret-foreground text-transparent',
                 )}
-                autoFocus={shouldAutoFocus}
+               
               />
             </div>
           </div>
