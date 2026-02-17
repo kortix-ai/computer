@@ -513,16 +513,13 @@ export function ProjectPage({ projectId }: { projectId: string }) {
   }, [sessions, projectId]);
 
   // File count
-  const fileCount = useMemo(() => {
-    if (!files) return 0;
-    return files.filter((f) => f.type === 'file').length;
-  }, [files]);
+  const fileCount = files ? files.filter((f) => f.type === 'file').length : 0;
 
   // Instructions from config
   const instructions = useMemo(() => config?.instructions ?? [], [config]);
 
   // Visible agent count (non-hidden) for tab badge
-  const visibleAgentCount = useMemo(() => (agents ?? []).filter((a) => !a.hidden).length, [agents]);
+  const visibleAgentCount = (agents ?? []).filter((a) => !a.hidden).length;
 
   // Chat input handler — create session scoped to this project's worktree
   const handleSend = useCallback(

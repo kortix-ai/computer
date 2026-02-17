@@ -2766,10 +2766,7 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
     return [];
   }, [metadata.todos, input.todos]);
 
-  const completed = useMemo(
-    () => todos.filter((t: Record<string, unknown>) => t.status === 'completed').length,
-    [todos],
-  );
+  const completed = todos.filter((t: Record<string, unknown>) => t.status === 'completed').length;
 
   const subtitle = todos.length > 0 ? `${completed}/${todos.length}` : '';
 

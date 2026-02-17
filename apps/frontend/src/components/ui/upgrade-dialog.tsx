@@ -17,6 +17,9 @@ import { KortixLoader } from '@/components/ui/kortix-loader';
 export type DialogTheme = 'warning' | 'destructive' | 'primary' | 'info';
 export type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
+// Stable default to avoid re-renders
+const EMPTY_ACTIONS: DialogAction[] = [];
+
 interface DialogAction {
   label: string;
   onClick: () => void;
@@ -82,7 +85,7 @@ export const UpgradeDialog: React.FC<UpgradeDialogProps> = ({
   theme = 'warning',
   children,
   size = 'md',
-  actions = [],
+  actions = EMPTY_ACTIONS,
   className,
   headerClassName,
   contentClassName,

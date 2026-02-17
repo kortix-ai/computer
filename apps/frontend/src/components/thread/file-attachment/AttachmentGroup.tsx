@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { FileAttachment, FileAttachmentGrid } from './index';
+import { FileAttachment, FileAttachmentGrid } from '.';
 import { Project } from '@/lib/api/threads';
 
 type LayoutStyle = 'inline' | 'grid';

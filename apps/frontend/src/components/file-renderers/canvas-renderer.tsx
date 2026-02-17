@@ -346,6 +346,9 @@ function calculateSnapResult(
   return { snapX, snapY, guides };
 }
 
+// Stable default to avoid re-renders
+const EMPTY_FRAMES: FrameCanvasElement[] = [];
+
 // Image element with drag and resize
 function CanvasImageElement({
   element,
@@ -358,7 +361,7 @@ function CanvasImageElement({
   authToken,
   isProcessing = false,
   clipPath,
-  frames = [],
+  frames = EMPTY_FRAMES,
   onSnapChange,
 }: {
   element: ImageCanvasElement;

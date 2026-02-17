@@ -17,6 +17,7 @@ export function WordmarkFooter() {
                                     src="/kortix-symbol.svg"
                                     alt="Kortix"
                                     fill
+                                    sizes="280px"
                                     className="object-contain invert dark:invert-0 opacity-15"
                                     priority
                                     style={{ mixBlendMode: 'normal' }}
@@ -46,6 +47,7 @@ export function WordmarkFooter() {
                                 src="/wordmark.svg"
                                 alt="Kortix"
                                 fill
+                                sizes="(max-width: 768px) 0px, 100vw"
                                 className="object-contain dark:invert hidden md:block"
                                 priority
                                 style={{ mixBlendMode: 'normal' }}
@@ -79,6 +81,7 @@ export function WordmarkFooter() {
                                 src="/kortix-symbol.svg"
                                 alt="Kortix"
                                 fill
+                                sizes="280px"
                                 className="object-contain"
                                 priority
                             />
@@ -87,6 +90,7 @@ export function WordmarkFooter() {
                             src="/wordmark.svg"
                             alt="Kortix"
                             fill
+                            sizes="(max-width: 768px) 0px, 100vw"
                             className="object-contain hidden md:block"
                             priority
                         />

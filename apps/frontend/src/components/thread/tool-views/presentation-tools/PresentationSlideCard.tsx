@@ -165,7 +165,6 @@ export function PresentationSlideCard({
                 position: 'absolute',
                 top: 0,
                 left: 0,
-                willChange: 'transform',
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden'
               }}

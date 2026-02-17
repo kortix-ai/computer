@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
@@ -82,9 +82,7 @@ export const ToolsManager: React.FC<ToolsManagerProps> = (props) => {
     }
   }, [data, initialEnabledTools]);
 
-  const enabledCount = useMemo(() => {
-    return Object.values(localTools).filter(Boolean).length;
-  }, [localTools]);
+  const enabledCount = Object.values(localTools).filter(Boolean).length;
 
   const totalCount = data?.tools?.length || 0;
   

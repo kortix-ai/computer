@@ -288,7 +288,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
 
         <div className="flex gap-3 pt-6 border-t">
           {currentStep > 0 ? (
-            <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)} className="flex-1">
+            <Button variant="outline" onClick={() => setCurrentStep(prev => prev - 1)} className="flex-1">
               Back
             </Button>
           ) : (
@@ -317,7 +317,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
             </Button>
           ) : (
             <Button 
-              onClick={() => setCurrentStep(currentStep + 1)}
+              onClick={() => setCurrentStep(prev => prev + 1)}
               disabled={!canProceedToNextStep}
               className="flex-1"
             >

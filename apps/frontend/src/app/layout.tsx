@@ -11,6 +11,7 @@ import { roobertMono } from './fonts/roobert-mono';
 import { Suspense, lazy } from 'react';
 import { I18nProvider } from '@/components/i18n-provider';
 import { featureFlags } from '@/lib/feature-flags';
+import Script from 'next/script';
 
 // Lazy load non-critical analytics and global components
 const Analytics = lazy(() => import('@vercel/analytics/react').then(mod => ({ default: mod.Analytics })));
@@ -111,7 +112,9 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://eu.i.posthog.com" />
         
         {/* Container Load - Initialize dataLayer with page context BEFORE GTM loads */}
-        <script
+        <Script
+          id="gtm-datalayer-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -182,8 +185,10 @@ export default function RootLayout({
 
 
 
-        <script
+        <Script
+          id="ld-json-organization"
           type="application/ld+json"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
@@ -208,8 +213,10 @@ export default function RootLayout({
           }}
         />
 
-        <script
+        <Script
+          id="ld-json-software-application"
           type="application/ld+json"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',

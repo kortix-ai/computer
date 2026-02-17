@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 export default function NotificationManagementPage() {
   const [workflowId, setWorkflowId] = useState("");
   const [payload, setPayload] = useState(
-    JSON.stringify(
+    () => JSON.stringify(
       {
         message: "Your custom message here",
         action_url: "https://example.com"

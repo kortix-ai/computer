@@ -123,6 +123,10 @@ export interface UnifiedAgentCardProps {
   currentUserId?: string;
 }
 
+// Stable defaults to avoid re-renders
+const EMPTY_ACTIONS: AgentCardActions = {};
+const EMPTY_STATE: AgentCardState = {};
+
 // Avatar component
 const CardAvatar: React.FC<{ 
   data: BaseAgentData;
@@ -325,8 +329,8 @@ const CapabilitiesList: React.FC<{ capabilities?: string[]; maxCapabilities?: nu
 export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   variant,
   data,
-  actions = {},
-  state = {},
+  actions = EMPTY_ACTIONS,
+  state = EMPTY_STATE,
   className,
   size = 'md',
   delay = 0,

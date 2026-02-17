@@ -23,6 +23,9 @@ import { PresentationSlidePreview } from '@/components/thread/tool-views/present
 import { usePresentationViewerStore } from '@/stores/presentation-viewer-store';
 import { IframePreview } from '../iframe-preview';
 
+// Stable default values to avoid re-renders
+const EMPTY_PREVIEW_URLS: Record<string, string> = {};
+
 // Helper function to check if a filepath is a presentation attachment
 // Matches paths like: presentations/name/slide_01.html, /workspace/presentations/name/slide_01.html, etc.
 function isPresentationAttachment(filepath: string): boolean {
@@ -400,7 +403,7 @@ export function FileAttachmentGrid({
     project,
     standalone = false,
     alignRight = false,
-    localPreviewUrls = {},
+    localPreviewUrls = EMPTY_PREVIEW_URLS,
 }: FileAttachmentGridProps) {
     // Call hooks at the top level before any early returns
     const [currentIndex, setCurrentIndex] = useState(0);

@@ -218,14 +218,8 @@ export function DiagnosticsBadge() {
     return all;
   }, [byFile]);
 
-  const errorCount = useMemo(
-    () => allDiagnostics.filter((d) => d.severity === 1).length,
-    [allDiagnostics],
-  );
-  const warningCount = useMemo(
-    () => allDiagnostics.filter((d) => d.severity === 2).length,
-    [allDiagnostics],
-  );
+  const errorCount = allDiagnostics.filter((d) => d.severity === 1).length;
+  const warningCount = allDiagnostics.filter((d) => d.severity === 2).length;
 
   const groups = useMemo(() => groupByFile(allDiagnostics), [allDiagnostics]);
 

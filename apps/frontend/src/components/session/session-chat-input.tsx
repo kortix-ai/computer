@@ -720,6 +720,12 @@ function MentionPopover({
   );
 }
 
+// Stable defaults to avoid re-renders
+const EMPTY_AGENTS: SessionChatInputProps['agents'] = [];
+const EMPTY_COMMANDS: SessionChatInputProps['commands'] = [];
+const EMPTY_MODELS: SessionChatInputProps['models'] = [];
+const EMPTY_VARIANTS: SessionChatInputProps['variants'] = [];
+
 // ============================================================================
 // Prompt history persistence
 // ============================================================================
@@ -772,15 +778,15 @@ export function SessionChatInput({
   onSend,
   isBusy = false,
   onStop,
-  agents = [],
+  agents = EMPTY_AGENTS,
   selectedAgent = null,
   onAgentChange,
-  commands = [],
+  commands = EMPTY_COMMANDS,
   onCommand,
-  models = [],
+  models = EMPTY_MODELS,
   selectedModel = null,
   onModelChange,
-  variants = [],
+  variants = EMPTY_VARIANTS,
   selectedVariant = null,
   onVariantChange,
   messages,
