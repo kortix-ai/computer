@@ -314,6 +314,10 @@ export async function handleSlackWebhook(
   if (parsed.type === 'set_model_fuzzy' && parsed.modelQuery) {
     (async () => {
       try {
+        if (!channelConfig.sandboxId) {
+          confirmCommandInThread(channelConfig, event, ':x: No instance linked. Use `/kortix link` to connect one.');
+          return;
+        }
         const target = await resolveSandboxTarget(channelConfig.sandboxId);
         if (!target) {
           confirmCommandInThread(channelConfig, event, ':x: Sandbox not found.');

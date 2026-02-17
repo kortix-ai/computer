@@ -8,6 +8,7 @@ import { verifySlackRequest, findConfigByTeamId } from './utils';
 import { SlackApi } from './api';
 import { SandboxConnector } from '../../core/sandbox-connector';
 import type { NormalizedMessage, SandboxTarget } from '../../types';
+import { config as appConfig } from '../../../config';
 
 export async function handleSlackCommand(
   c: Context,
@@ -58,6 +59,7 @@ export async function handleSlackCommand(
         '`/kortix config prompt <text>` — Set a channel-specific system prompt',
         '`/kortix config prompt clear` — Clear channel prompt',
         '`/kortix config show` — Show current config for this channel',
+        '`/kortix link` — Link or change the connected instance',
         '`/kortix export` — Export last 24h of channel messages as markdown',
         '`/kortix help` — Show this help',
       ].join('\n'),
@@ -112,6 +114,14 @@ export async function handleSlackCommand(
     return c.json({ response_type: 'ephemeral', text: ':gear: Processing...' }, 200);
   }
 
+  if (subcommand.type === 'link') {
+    handleLinkCommand(channelConfig, ctx).catch((err) => {
+      console.error('[SLACK/COMMANDS] Link command failed:', err);
+      postToResponseUrl(responseUrl, `:x: Error: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
+    });
+    return c.json({ response_type: 'ephemeral', text: ':link: Fetching instances...' }, 200);
+  }
+
   if (subcommand.type === 'export') {
     handleExportCommand(channelConfig, ctx).catch((err) => {
       console.error('[SLACK/COMMANDS] Export command failed:', err);
@@ -139,7 +149,7 @@ export async function handleSlackCommand(
 }
 
 interface Subcommand {
-  type: 'help' | 'digest' | 'prompt' | 'config' | 'export' | 'models' | 'agents' | 'status' | 'share' | 'diff';
+  type: 'help' | 'digest' | 'prompt' | 'config' | 'export' | 'models' | 'agents' | 'status' | 'share' | 'diff' | 'link';
   prompt: string;
   digestChannel?: string;
   configAction?: 'set' | 'clear' | 'show';
@@ -171,6 +181,10 @@ function parseSubcommand(text: string): Subcommand {
 
   if (lower === 'diff') {
     return { type: 'diff', prompt: '' };
+  }
+
+  if (lower === 'link') {
+    return { type: 'link', prompt: '' };
   }
 
   const digestMatch = text.match(/^digest\s+(?:<#(\w+)\|[^>]*>|<?#?(\S+?)>?)\s*$/i);
@@ -235,6 +249,7 @@ async function resolveSandboxTarget(sandboxId: string): Promise<SandboxTarget | 
 }
 
 async function getConnector(channelConfig: ChannelConfig): Promise<SandboxConnector | null> {
+  if (!channelConfig.sandboxId) return null;
   const target = await resolveSandboxTarget(channelConfig.sandboxId);
   if (!target) return null;
   return new SandboxConnector(target);
@@ -418,6 +433,35 @@ async function handleDiffCommand(
     });
     await postToResponseUrl(ctx.responseUrl, ':white_check_mark: Diff uploaded as file.', true);
   }
+}
+
+async function handleLinkCommand(
+  channelConfig: ChannelConfig,
+  ctx: CommandContext,
+): Promise<void> {
+  const instances = await db
+    .select({ sandboxId: sandboxes.sandboxId, name: sandboxes.name, status: sandboxes.status })
+    .from(sandboxes)
+    .where(eq(sandboxes.accountId, channelConfig.accountId));
+
+  if (instances.length === 0) {
+    await postToResponseUrl(ctx.responseUrl, ':x: No instances found for your account.', true);
+    return;
+  }
+
+  const currentSandboxId = channelConfig.sandboxId;
+  const frontendUrl = appConfig.FRONTEND_URL;
+
+  const lines: string[] = ['*Available Instances*\n'];
+  for (const inst of instances) {
+    const isCurrent = currentSandboxId && inst.sandboxId === currentSandboxId;
+    const marker = isCurrent ? ' :white_check_mark: _(current)_' : '';
+    lines.push(`\`${inst.name}\` — ${inst.status}${marker}`);
+  }
+
+  lines.push(`\n<${frontendUrl}/channels|Link an instance in the dashboard>`);
+
+  await postToResponseUrl(ctx.responseUrl, lines.join('\n'), true);
 }
 
 async function processCommandAsync(
