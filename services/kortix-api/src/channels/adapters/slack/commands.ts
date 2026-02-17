@@ -771,6 +771,15 @@ async function buildDigestPrompt(
 
   const api = new SlackApi(botToken);
 
+  // If channelId is a name (not starting with C/G), resolve it to an ID
+  if (!/^[CG]\w+$/.test(channelId)) {
+    const resolved = await resolveChannelId(api, channelId);
+    if (!resolved) {
+      return `Unable to find channel "${channelId}". Make sure the channel exists and the bot has access.`;
+    }
+    channelId = resolved;
+  }
+
   // Auto-join the target channel so we can read its history
   await api.conversationsJoin(channelId).catch(() => {});
 
@@ -1059,6 +1068,24 @@ async function handleChannelCommand(
     }
     await postToResponseUrl(ctx.responseUrl, ':white_check_mark: Channel archived.', true);
   }
+}
+
+async function resolveChannelId(api: SlackApi, name: string): Promise<string | null> {
+  const query = name.replace(/^#/, '').toLowerCase();
+  let cursor: string | undefined;
+
+  do {
+    const result = await api.conversationsList(cursor);
+    if (!result.ok || !result.channels) return null;
+
+    for (const ch of result.channels) {
+      if (ch.name?.toLowerCase() === query) return ch.id;
+    }
+
+    cursor = result.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+
+  return null;
 }
 
 async function resolveUserId(api: SlackApi, target: string): Promise<string | null> {
