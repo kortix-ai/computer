@@ -81,7 +81,7 @@ interface UserMenuProps {
   };
 }
 
-type SettingsTab = 'general' | 'appearance' | 'billing' | 'usage' | 'providers';
+type SettingsTab = 'general' | 'appearance' | 'billing' | 'usage';
 
 interface MenuItemConfig {
   icon: React.ComponentType<{ className?: string }>;
@@ -132,7 +132,7 @@ export function UserMenu({ user }: UserMenuProps) {
   // Data-driven menu items — cloud-only items filtered out in local mode
   const generalItems: MenuItemConfig[] = isLocal
     ? [
-        { icon: Plug, label: 'Providers', onClick: () => openSettings('providers') },
+        { icon: KeyRound, label: 'Secrets Manager', href: '/settings/credentials' },
         { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
         { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
         { icon: Sparkles, label: 'Skills', href: '/skills' },
@@ -143,7 +143,6 @@ export function UserMenu({ user }: UserMenuProps) {
         { icon: LifeBuoy, label: 'Support', href: '/support' },
         { icon: CreditCard, label: 'Billing', onClick: () => openSettings('billing') },
         { icon: TrendingDown, label: 'Usage', onClick: () => openSettings('usage') },
-        { icon: Plug, label: 'Providers', onClick: () => openSettings('providers') },
         { icon: KeyRound, label: 'Secrets Manager', href: '/settings/credentials' },
         { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
         { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
