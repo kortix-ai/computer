@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Check, Loader2, Sparkles, ArrowLeft, CreditCard, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -569,25 +569,25 @@ export function InlineCheckout({ options }: { options?: InlineCheckoutOptions })
   };
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-md mt-4 p-4 rounded-2xl border border-border bg-card shadow-lg"
     >
       <AnimatePresence mode="wait">
         {error && step === 'select' && (
-          <motion.div
+          <m.div
             key="error"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="mb-4 p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg"
           >
             {error}
-          </motion.div>
+          </m.div>
         )}
 
         {step === 'select' ? (
-          <motion.div
+          <m.div
             key="select"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -598,9 +598,9 @@ export function InlineCheckout({ options }: { options?: InlineCheckoutOptions })
               defaultPlan={preSelectedPlan}
               defaultPeriod={preSelectedPeriod}
             />
-          </motion.div>
+          </m.div>
         ) : clientSecret && selectedPlan && subscriptionId ? (
-          <motion.div
+          <m.div
             key="payment"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -617,17 +617,17 @@ export function InlineCheckout({ options }: { options?: InlineCheckoutOptions })
                 onCancel={handleCancel}
               />
             </StripeProvider>
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key="loading"
             className="flex items-center justify-center py-12"
           >
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   );
 }
 

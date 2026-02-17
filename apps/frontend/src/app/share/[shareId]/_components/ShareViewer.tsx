@@ -23,7 +23,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { toast } from '@/lib/toast';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 
 // ============================================================================
 // Types
@@ -382,7 +382,7 @@ function MessageActions({ text, className }: { text: string; className?: string 
       {/* Thumbs up */}
       <AnimatePresence mode="popLayout">
         {!disliked && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.5, width: 0 }}
             animate={{ opacity: 1, scale: 1, width: 'auto' }}
             exit={{ opacity: 0, scale: 0.5, width: 0 }}
@@ -399,14 +399,14 @@ function MessageActions({ text, className }: { text: string; className?: string 
                 fill={liked ? 'currentColor' : 'none'}
               />
             </Button>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* Thumbs down */}
       <AnimatePresence mode="popLayout">
         {!liked && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.5, width: 0 }}
             animate={{ opacity: 1, scale: 1, width: 'auto' }}
             exit={{ opacity: 0, scale: 0.5, width: 0 }}
@@ -423,7 +423,7 @@ function MessageActions({ text, className }: { text: string; className?: string 
                 fill={disliked ? 'currentColor' : 'none'}
               />
             </Button>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAccountState, accountStateSelectors } from '@/hooks/billing';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { usePricingModalStore } from '@/stores/pricing-modal-store';
 import { usePathname } from 'next/navigation';
 import { useWelcomeBannerStore } from '@/stores/welcome-banner-store';
@@ -59,7 +59,7 @@ export function DashboardPromoBanner() {
 
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: -32 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -32 }}
@@ -107,7 +107,7 @@ export function DashboardPromoBanner() {
             </div>
           </div>
         </div>
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   );
 }

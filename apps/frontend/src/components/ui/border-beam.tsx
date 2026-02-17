@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, MotionStyle, Transition } from "framer-motion"
+import { m, MotionStyle, Transition } from 'framer-motion'
 
 import { cn } from "@/lib/utils"
 
@@ -79,7 +79,7 @@ export const BorderBeam = ({
                 } as React.CSSProperties
             }
         >
-            <motion.div
+            <m.div
                 className={cn(
                     "absolute will-change-transform",
                     "bg-gradient-to-l from-[var(--color-from)] via-[var(--color-to)] to-transparent",

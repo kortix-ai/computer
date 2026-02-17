@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -106,7 +106,7 @@ export function AttachmentGroup({
 
     if (!files || files.length === 0) {
         return (
-            <motion.div
+            <m.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -137,7 +137,7 @@ export function AttachmentGroup({
     return (
         <>
             <AnimatePresence>
-                <motion.div
+                <m.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
@@ -204,7 +204,7 @@ export function AttachmentGroup({
                             </div>
                         </button>
                     )}
-                </motion.div>
+                </m.div>
             </AnimatePresence>
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

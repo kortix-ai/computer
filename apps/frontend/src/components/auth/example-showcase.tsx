@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import Image from 'next/image';
 import { Computer, CornerDownLeft, Paperclip, Mic, Zap, FolderOpen, Globe, Presentation, BarChart3, FileText, Search, Image as ImageIcon, ChevronRight, File, Database } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 
 type ViewType = 'terminal' | 'files' | 'browser';
@@ -375,7 +375,7 @@ export function ExampleShowcase() {
             <div className="bg-background px-4 pt-3 pb-2">
               <div className="flex gap-1.5 flex-wrap">
                 {exampleShowcases.map((example, idx) => (
-                  <motion.button
+                  <m.button
                     key={example.id}
                     onClick={() => setActiveExample(idx)}
                     animate={{
@@ -393,7 +393,7 @@ export function ExampleShowcase() {
                       }`}
                   >
                     {example.title}
-                  </motion.button>
+                  </m.button>
                 ))}
               </div>
             </div>
@@ -452,7 +452,7 @@ export function ExampleShowcase() {
                 <div className="flex items-center gap-0.5 border rounded-full bg-card p-1 relative">
                   <div className="p-1 relative z-10 pointer-events-none">
                     {selectedView === 'terminal' && (
-                      <motion.div
+                      <m.div
                         layoutId="active-view"
                         className="absolute inset-0 bg-primary rounded-xl"
                         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
@@ -465,7 +465,7 @@ export function ExampleShowcase() {
                   </div>
                   <div className="p-1 relative z-10 pointer-events-none">
                     {selectedView === 'files' && (
-                      <motion.div
+                      <m.div
                         layoutId="active-view"
                         className="absolute inset-0 bg-primary rounded-xl"
                         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
@@ -478,7 +478,7 @@ export function ExampleShowcase() {
                   </div>
                   <div className="p-1 relative z-10 pointer-events-none">
                     {selectedView === 'browser' && (
-                      <motion.div
+                      <m.div
                         layoutId="active-view"
                         className="absolute inset-0 bg-primary rounded-xl"
                         transition={{ type: 'spring', stiffness: 380, damping: 30 }}

@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { SpreadsheetComponent } from '@syncfusion/ej2-react-spreadsheet';
 import { registerLicense } from '@syncfusion/ej2-base';
 import { 
@@ -480,7 +480,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
   );
 
   const renderHome = () => (
-    <motion.div
+    <m.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -538,7 +538,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
             
             {(searchQuery ? filteredFiles : spreadsheetFiles).length > 0 ? (
               (searchQuery ? filteredFiles : spreadsheetFiles).map((file, index) => (
-                <motion.button
+                <m.button
                   key={file.path || file.name}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -560,7 +560,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
                   <div className="w-32 text-xs text-zinc-400 truncate">
                      /workspace/spreadsheets
                   </div>
-                </motion.button>
+                </m.button>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
@@ -581,7 +581,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
           </div>
         </div>
       </div>
-    </motion.div>
+    </m.div>
   );
 
   return (

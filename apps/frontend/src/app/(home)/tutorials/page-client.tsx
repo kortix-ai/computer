@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { SimpleFooter } from '@/components/home/simple-footer';
 import { 
   BookOpen, 
@@ -133,7 +133,7 @@ function TutorialCard({ tutorial, index }: { tutorial: Tutorial; index: number }
   const Icon = tutorial.icon;
 
   return (
-    <motion.section
+    <m.section
       id={tutorial.id}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -215,7 +215,7 @@ function TutorialCard({ tutorial, index }: { tutorial: Tutorial; index: number }
           </div>
         )}
       </div>
-    </motion.section>
+    </m.section>
   );
 }
 
@@ -253,7 +253,7 @@ export default function TutorialsPageClient() {
       {/* Hero Section */}
       <div className="border-b border-border">
         <div className="max-w-7xl mx-auto px-6 md:px-10 pt-28 md:pt-32 pb-12">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
@@ -274,7 +274,7 @@ export default function TutorialsPageClient() {
               Step-by-step interactive tutorials to help you get the most out of Kortix. 
               From getting started to advanced workflows, master every feature.
             </p>
-          </motion.div>
+          </m.div>
         </div>
       </div>
 
@@ -288,7 +288,7 @@ export default function TutorialsPageClient() {
             ))}
 
             {/* More Coming Soon Section */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
@@ -304,7 +304,7 @@ export default function TutorialsPageClient() {
                 We&apos;re always adding new tutorials to help you get the most out of Kortix. 
                 Check back regularly for fresh content and tips.
               </p>
-            </motion.div>
+            </m.div>
           </div>
 
           {/* Table of Contents - Desktop only */}

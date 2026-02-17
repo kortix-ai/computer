@@ -3,7 +3,7 @@
 import Image from 'next/image';
 
 import React, { useRef, useCallback, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 
@@ -47,7 +47,7 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
   return (
     <div className="fixed inset-0 z-50 bg-black overflow-hidden">
       {/* Shared background layers */}
-      <motion.div
+      <m.div
         className="absolute inset-0 flex items-center justify-center pointer-events-none"
         initial={{ opacity: 0, scale: 0.92 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -60,7 +60,7 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
           className="w-[85%] max-w-[800px] h-auto object-contain select-none opacity-20"
           draggable={false}
         width={24} height={24} unoptimized />
-      </motion.div>
+      </m.div>
 
       <div className="absolute inset-0 z-[1] opacity-80">
         <LightRays
@@ -85,23 +85,23 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
       {/* Step content */}
       <AnimatePresence mode="wait">
         {step === 'welcome' && (
-          <motion.div
+          <m.div
             key="welcome"
             className="absolute inset-0 z-10 flex flex-col items-center justify-center select-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.4 } }}
           >
-            <motion.p
+            <m.p
               className="text-[11px] sm:text-xs tracking-[0.4em] uppercase text-white/30 font-light mb-5"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1.4, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
             >
               Welcome to your
-            </motion.p>
+            </m.p>
 
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 1.6, delay: 1.4, ease: [0.16, 1, 0.3, 1] }}
@@ -112,9 +112,9 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
                 className="h-9 sm:h-11 w-auto"
                 draggable={false}
               width={24} height={24} unoptimized />
-            </motion.div>
+            </m.div>
 
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 1.2, delay: 2.6 }}
@@ -125,12 +125,12 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
               >
                 Get started
               </button>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
 
         {step === 'credentials' && (
-          <motion.div
+          <m.div
             key="credentials"
             className="absolute inset-0 z-10 flex items-center justify-center"
             initial={{ opacity: 0, y: 30 }}
@@ -169,7 +169,7 @@ export function SetupOverlay({ onComplete }: SetupOverlayProps) {
                 </Button>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

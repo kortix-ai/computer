@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { SimpleFooter } from '@/components/home/simple-footer';
 import { PricingSection } from '@/components/billing/pricing';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,7 +41,7 @@ export default function PricingPageClient() {
     <main className="min-h-screen bg-background">
       <article className="max-w-4xl mx-auto px-6 md:px-10 pt-24 md:pt-28 pb-16">
         {/* Pricing Section */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
@@ -54,7 +54,7 @@ export default function PricingPageClient() {
               customTitle="Choose your plan"
             />
           </Suspense>
-        </motion.div>
+        </m.div>
 
         {/* Credits Explained Modal */}
         <CreditsExplainedModal

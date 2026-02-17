@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useSyncExternalStore } from 'react';
 import { Smartphone, Bell, Shield, Zap } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { AppDownloadQR, APP_DOWNLOAD_URL } from '@/components/common/app-download-qr';
 import { SimpleFooter } from '@/components/home/simple-footer';
 
@@ -65,7 +65,7 @@ if (!mounted) {
 
       <div className="relative z-10 flex-1 max-w-4xl mx-auto px-6 md:px-10 py-16">
           {/* Header */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -85,10 +85,10 @@ if (!mounted) {
               Your AI Worker, in your pocket.<br />
               Download the app and take Kortix with you everywhere.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* QR Code Card */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -136,10 +136,10 @@ if (!mounted) {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Features Section */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -151,7 +151,7 @@ if (!mounted) {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-12">
               {FEATURES.map((feature, index) => (
-                <motion.div
+                <m.div
                   key={feature.label}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -170,10 +170,10 @@ if (!mounted) {
                     {feature.label === 'Secure & private' && 'Your data is encrypted end-to-end and stored securely. Privacy-first, always.'}
                     {feature.label === 'Lightning fast' && 'Native performance optimized for mobile. Faster than the web app.'}
                   </p>
-                </motion.div>
+                </m.div>
               ))}
             </div>
-          </motion.div>
+          </m.div>
 
       </div>
 

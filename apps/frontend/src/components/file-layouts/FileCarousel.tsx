@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -145,7 +145,7 @@ export function FileCarousel({
             {/* File Display with Animation */}
             <div className="relative isolate">
                 <AnimatePresence mode="wait">
-                    <motion.div
+                    <m.div
                         key={currentIndex}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -157,7 +157,7 @@ export function FileCarousel({
                                 {children(currentFile, currentIndex)}
                             </div>
                         )}
-                    </motion.div>
+                    </m.div>
                 </AnimatePresence>
             </div>
         </div>

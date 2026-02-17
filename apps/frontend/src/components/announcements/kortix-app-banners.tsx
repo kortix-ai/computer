@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { X, Smartphone, Monitor, Bell } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { isElectron } from '@/lib/utils/is-electron';
 import { featureFlags } from '@/lib/feature-flags';
 import { AppDownloadQR, APP_DOWNLOAD_URL } from '@/components/common/app-download-qr';
@@ -177,7 +177,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
   const showBothBanners = mobileVisible && desktopVisible;
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -190,7 +190,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
         <AnimatePresence mode="wait">
           {/* Collapsed state - pill with icons */}
           {!isExpanded && showBothBanners ? (
-            <motion.div
+            <m.div
               key="collapsed"
               initial={{ opacity: 0, scale: 0.95, y: 5 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -219,9 +219,9 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
                   <KortixSymbol size={20} className="text-background dark:text-black" />
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           ) : (isExpanded || !showBothBanners) ? (
-            <motion.div
+            <m.div
               key="expanded"
               initial={{ opacity: 1 }}
               animate={{ opacity: 1 }}
@@ -231,7 +231,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
             >
               {/* Mobile Banner */}
               {mobileVisible && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 40 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
@@ -303,12 +303,12 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </m.div>
               )}
 
               {/* Desktop Banner */}
               {desktopVisible && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 40 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: mobileVisible ? 0.1 : 0 }}
@@ -382,12 +382,12 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
                       )}
                     </div>
                   </div>
-                </motion.div>
+                </m.div>
               )}
 
               {/* Notification Prompt */}
               {showNotifPrompt && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 40 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: (mobileVisible || desktopVisible) ? 0.2 : 0 }}
@@ -429,13 +429,13 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
                       </button>
                     </div>
                   </div>
-                </motion.div>
+                </m.div>
               )}
-            </motion.div>
+            </m.div>
           ) : null}
         </AnimatePresence>
       </div>
-    </motion.div>
+    </m.div>
   );
 }
 

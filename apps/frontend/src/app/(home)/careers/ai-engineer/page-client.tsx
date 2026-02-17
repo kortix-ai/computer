@@ -1,7 +1,7 @@
 'use client';
 
 import { SimpleFooter } from '@/components/home/simple-footer';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ArrowLeft, ArrowRight, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -47,7 +47,7 @@ export default function AIEngineerPageClient() {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="max-w-3xl mx-auto px-6 md:px-10 pt-8 pb-16 md:pb-20">
-          <motion.div
+          <m.div
             className="space-y-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -70,14 +70,14 @@ export default function AIEngineerPageClient() {
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
               Help us build AI agents that can complete real tasks. You'll work on improving reliability, adding new capabilities, and shipping features.
             </p>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
       {/* About the Role */}
       <section className="border-t border-border">
         <div className="max-w-3xl mx-auto px-6 md:px-10 py-16 md:py-20">
-          <motion.div
+          <m.div
             className="space-y-6"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -98,14 +98,14 @@ export default function AIEngineerPageClient() {
                 Small team, big impact. You'll have significant ownership over your work and direct impact on the product.
               </p>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
       {/* What You'll Do */}
       <section className="border-t border-border">
         <div className="max-w-3xl mx-auto px-6 md:px-10 py-16 md:py-20">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -116,7 +116,7 @@ export default function AIEngineerPageClient() {
             </h2>
             <ul className="space-y-4">
               {responsibilities.map((item, index) => (
-                <motion.li
+                <m.li
                   key={String(item)}
                   className="flex items-start gap-3"
                   initial={{ opacity: 0, x: -10 }}
@@ -126,17 +126,17 @@ export default function AIEngineerPageClient() {
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-foreground mt-2.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{item}</span>
-                </motion.li>
+                </m.li>
               ))}
             </ul>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
       {/* What We're Looking For */}
       <section className="border-t border-border">
         <div className="max-w-3xl mx-auto px-6 md:px-10 py-16 md:py-20">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -147,7 +147,7 @@ export default function AIEngineerPageClient() {
             </h2>
             <ul className="space-y-4">
               {qualifications.map((item, index) => (
-                <motion.li
+                <m.li
                   key={String(item)}
                   className="flex items-start gap-3"
                   initial={{ opacity: 0, x: -10 }}
@@ -157,17 +157,17 @@ export default function AIEngineerPageClient() {
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-foreground mt-2.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{item}</span>
-                </motion.li>
+                </m.li>
               ))}
             </ul>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
       {/* Bonus Points */}
       <section className="border-t border-border">
         <div className="max-w-3xl mx-auto px-6 md:px-10 py-16 md:py-20">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -178,7 +178,7 @@ export default function AIEngineerPageClient() {
             </h2>
             <ul className="space-y-4">
               {bonuses.map((item, index) => (
-                <motion.li
+                <m.li
                   key={String(item)}
                   className="flex items-start gap-3"
                   initial={{ opacity: 0, x: -10 }}
@@ -188,17 +188,17 @@ export default function AIEngineerPageClient() {
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-foreground mt-2.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{item}</span>
-                </motion.li>
+                </m.li>
               ))}
             </ul>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
       {/* Apply CTA */}
       <section className="border-t border-border">
         <div className="max-w-3xl mx-auto px-6 md:px-10 py-16 md:py-20">
-          <motion.div
+          <m.div
             className="p-8 md:p-10 rounded-2xl bg-muted/50 border border-border"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -221,7 +221,7 @@ export default function AIEngineerPageClient() {
                 </a>
               </Button>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 

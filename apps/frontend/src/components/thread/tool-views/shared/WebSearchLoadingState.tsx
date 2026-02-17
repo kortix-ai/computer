@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { 
   Search, 
   FileText, 
@@ -254,37 +254,37 @@ export function WebSearchLoadingState({
     <div className="flex flex-col items-center justify-center h-full py-8 px-6 overflow-auto">
       <div className="w-full max-w-md flex flex-col items-center">
         {/* Animated Search Icon */}
-        <motion.div
+        <m.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           className="relative mb-6"
         >
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border border-border shadow-inner">
-            <motion.div
+            <m.div
               animate={{ rotate: [0, 10, -10, 0] }}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             >
               <Search className="w-7 h-7 text-muted-foreground" />
-            </motion.div>
+            </m.div>
           </div>
           {/* Pulse ring */}
-          <motion.div
+          <m.div
             className="absolute inset-0 rounded-full border-2 border-muted-foreground/30"
             animate={{ scale: [1, 1.3, 1.3], opacity: [0.6, 0, 0] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
           />
-        </motion.div>
+        </m.div>
 
         {/* Title */}
-        <motion.h3
+        <m.h3
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="text-lg font-semibold text-foreground mb-6"
         >
           {title}
-        </motion.h3>
+        </m.h3>
 
         {/* Query List - Bottom to top with staggered animation */}
         <div className="w-full">
@@ -297,7 +297,7 @@ export function WebSearchLoadingState({
               const IconComponent = style.icon;
 
               return (
-                <motion.div
+                <m.div
                   key={`${query}-${index}`}
                   initial={{ opacity: 0, y: 20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -316,7 +316,7 @@ export function WebSearchLoadingState({
                 >
                   {/* Query icon with contextual styling */}
                   <div className="flex-shrink-0">
-                    <motion.div 
+                    <m.div 
                       className={cn(
                         'w-8 h-8 rounded-lg flex items-center justify-center border',
                         style.bgClass,
@@ -327,7 +327,7 @@ export function WebSearchLoadingState({
                       transition={{ delay: delay + 0.1, duration: 0.3, ease: 'easeOut' }}
                     >
                       <IconComponent className={cn('w-4 h-4', style.iconClass)} />
-                    </motion.div>
+                    </m.div>
                   </div>
 
                   {/* Query text */}
@@ -337,7 +337,7 @@ export function WebSearchLoadingState({
 
                   {/* Kortix loading animation */}
                   <KortixLoader customSize={16} />
-                </motion.div>
+                </m.div>
               );
             })}
           </div>

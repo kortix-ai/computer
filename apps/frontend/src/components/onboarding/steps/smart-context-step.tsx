@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -61,7 +61,7 @@ export const SmartContextStep = () => {
   return (
     <StepWrapper>
       <div className="text-center space-y-8">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -74,11 +74,11 @@ export const SmartContextStep = () => {
               ? 'Help us understand your business better'
               : 'Help us understand what you do'}
           </p>
-        </motion.div>
+        </m.div>
 
         <div className="w-full max-w-2xl mx-auto space-y-6">
           {/* Main description textarea */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -111,7 +111,7 @@ export const SmartContextStep = () => {
             </div>
 
             {localContext.extractedContext && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
@@ -137,13 +137,13 @@ export const SmartContextStep = () => {
                     <span>{localContext.extractedContext.services?.join(', ')}</span>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             )}
-          </motion.div>
+          </m.div>
 
           {/* Progress indicator */}
           {localContext.websiteUrl && localContext.websiteUrl.trim().length > 10 && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
@@ -157,7 +157,7 @@ export const SmartContextStep = () => {
                   Perfect! Ready to find your AI assistants
                 </span>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </div>
       </div>

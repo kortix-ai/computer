@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, ReactNode, useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Folder, Globe, TerminalSquare, Info, Table } from 'lucide-react';
 import { getUserFriendlyToolName, getToolIcon } from '@/components/thread/utils';
 import { cn } from '@/lib/utils';
@@ -75,7 +75,7 @@ const DockCard = memo(function DockCard({
 
   return (
     <div className="relative flex flex-col items-center group">
-      <motion.button
+      <m.button
         type="button"
         onClick={() => onClick?.()}
         style={{ width: ICON_SIZE, height: ICON_SIZE }}
@@ -104,7 +104,7 @@ const DockCard = memo(function DockCard({
             )}
           />
         )}
-      </motion.button>
+      </m.button>
       
       {isFailed && (
         <div className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center border-2 border-white z-10">
@@ -149,7 +149,7 @@ const SystemDockCard = memo(function SystemDockCard({
 }: SystemDockCardProps) {
   return (
     <div className="relative flex flex-col items-center group">
-      <motion.button
+      <m.button
         type="button"
         onClick={onClick}
         style={{ width: ICON_SIZE, height: ICON_SIZE }}
@@ -162,7 +162,7 @@ const SystemDockCard = memo(function SystemDockCard({
         whileTap={{ scale: 0.95 }}
       >
         <Icon className={cn("w-3/5 h-3/5 pointer-events-none drop-shadow-md", iconColor)} />
-      </motion.button>
+      </m.button>
 
       <div 
         className={cn(
@@ -266,7 +266,7 @@ export const AppDock = memo(function AppDock({
   const showJumpButton = !isLiveMode;
 
   return (
-    <motion.footer
+    <m.footer
       initial={{ y: 80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 80, opacity: 0 }}
@@ -274,7 +274,7 @@ export const AppDock = memo(function AppDock({
       className="absolute bottom-0 left-0 right-0 flex-shrink-0 w-full z-50"
     >
       <div className="relative flex items-center justify-center py-3 px-4 max-w-full">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: canNavigateLeft ? 1 : 0.4, scale: 1 }}
           whileTap={canNavigateLeft ? { scale: 0.92 } : undefined}
@@ -295,7 +295,7 @@ export const AppDock = memo(function AppDock({
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
           </div>
-        </motion.div>
+        </m.div>
         <Dock>
           {isMaximized && (
             <>
@@ -361,7 +361,7 @@ export const AppDock = memo(function AppDock({
           })} */}
         </Dock>
         <div className="absolute right-4 flex items-center gap-2">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: canNavigateRight ? 1 : 0.4, scale: 1 }}
             whileTap={canNavigateRight ? { scale: 0.92 } : undefined}
@@ -381,9 +381,9 @@ export const AppDock = memo(function AppDock({
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-          </motion.div>
+          </m.div>
           {showJumpButton && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               whileTap={{ scale: 0.95 }}
@@ -403,11 +403,11 @@ export const AppDock = memo(function AppDock({
                   <span>{agentStatus === 'running' ? 'Jump to Live' : 'Jump to Latest'}</span>
                 </button>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </div>
       </div>
-    </motion.footer>
+    </m.footer>
   );
 });
 

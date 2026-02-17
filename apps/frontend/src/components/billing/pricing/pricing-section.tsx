@@ -4,7 +4,7 @@ import type { PricingTier } from '@/lib/pricing-config';
 import { siteConfig } from '@/lib/site-config';
 import { storeCheckoutData, trackSelectItem, trackViewItem, trackAddToCart, PlanItemData } from '@/lib/analytics/gtm';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import React, { useState, useEffect, useCallback } from 'react';
 import NextImage from 'next/image';
 import {
@@ -84,7 +84,7 @@ const FeatureCheckIcon = () => <CheckIcon className="size-3.5 sm:size-4 text-pri
 
 function PriceDisplay({ price, isCompact }: PriceDisplayProps) {
   return (
-    <motion.span
+    <m.span
       key={price}
       className={isCompact ? 'text-xl font-medium' : 'text-[48px] font-medium leading-none'}
       initial={{
@@ -96,7 +96,7 @@ function PriceDisplay({ price, isCompact }: PriceDisplayProps) {
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
     >
       {price}
-    </motion.span>
+    </m.span>
   );
 }
 

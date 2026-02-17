@@ -4,7 +4,7 @@ import { ThemeToggle } from '@/components/home/theme-toggle';
 import { siteConfig } from '@/lib/site-config';
 import { cn } from '@/lib/utils';
 import { X, Menu } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useAuth } from '@/components/AuthProvider';
@@ -257,7 +257,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
       {/* Mobile Drawer - Full Screen */}
       <AnimatePresence>
         {isDrawerOpen && (
-          <motion.div
+          <m.div
             className="fixed inset-0 bg-background z-50 flex flex-col pt-4"
             initial="hidden"
             animate="visible"
@@ -279,13 +279,13 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
             </div>
 
             {/* Navigation Links - Big Typography, Left Aligned */}
-            <motion.nav
+            <m.nav
               className="flex-1 px-6 pt-8"
               variants={drawerMenuContainerVariants}
             >
               <ul className="flex flex-col gap-1">
                 {filteredNavLinks.map((item) => (
-                  <motion.li
+                  <m.li
                     key={item.id}
                     variants={drawerMenuVariants}
                   >
@@ -300,10 +300,10 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                     >
                       {item.name}
                     </a>
-                  </motion.li>
+                  </m.li>
                 ))}
                 {/* Mobile App Link */}
-                <motion.li variants={drawerMenuVariants}>
+                <m.li variants={drawerMenuVariants}>
                   <Link
                     href="/app"
                     onClick={() => setIsDrawerOpen(false)}
@@ -315,13 +315,13 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                   >
                     Mobile
                   </Link>
-                </motion.li>
+                </m.li>
               </ul>
-            </motion.nav>
+            </m.nav>
 
             {/* Footer Actions */}
             <div className="px-6 pb-8 mt-auto">
-              <motion.div 
+              <m.div 
                 className="flex flex-col gap-4"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -353,9 +353,9 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                 <div className="flex items-center justify-between">
                   <ThemeToggle />
                 </div>
-              </motion.div>
+              </m.div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </header>

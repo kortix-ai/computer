@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { StepWrapper } from '../shared/step-wrapper';
 import { UnifiedAgentCard, type BaseAgentData } from '@/components/ui/unified-agent-card';
@@ -99,7 +99,7 @@ export const WorkforceSelectionStep = () => {
     <StepWrapper>
       <div className="space-y-8">
         {/* Header */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -108,10 +108,10 @@ export const WorkforceSelectionStep = () => {
           <h2 className="text-3xl font-medium">
             Choose Your AI Workers
           </h2>
-        </motion.div>
+        </m.div>
 
         {/* AI Workers */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
@@ -146,11 +146,11 @@ export const WorkforceSelectionStep = () => {
               />
             );
           })}
-        </motion.div>
+        </m.div>
 
         {/* Simple selection summary */}
         {selectedAgents.length > 0 && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
@@ -159,7 +159,7 @@ export const WorkforceSelectionStep = () => {
             <Badge variant="outline" className="px-4 py-2">
               {selectedAgents.length} worker{selectedAgents.length !== 1 ? 's' : ''} selected
             </Badge>
-          </motion.div>
+          </m.div>
         )}
       </div>
     </StepWrapper>

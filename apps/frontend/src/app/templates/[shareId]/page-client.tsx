@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { motion, useScroll } from 'framer-motion';
+import { m, useScroll } from 'framer-motion';
 import { backendApi } from '@/lib/api-client';
 import {
   Download,

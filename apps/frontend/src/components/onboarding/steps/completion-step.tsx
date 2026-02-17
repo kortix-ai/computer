@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { CheckCircle2, ArrowRight, Sparkles, Zap, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,7 @@ export const CompletionStep = () => {
       {/* Background sparkles animation */}
       <div className="absolute inset-0 pointer-events-none">
         {[...Array(12)].map((_, i) => (
-          <motion.div
+          <m.div
             key={`_-${i}`}
             className="absolute"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -42,11 +42,11 @@ export const CompletionStep = () => {
             }}
           >
             <Sparkles className="h-4 w-4 text-primary/30" />
-          </motion.div>
+          </m.div>
         ))}
       </div>
 
-      <motion.div
+      <m.div
         initial={{ opacity: 0, scale: 0.8, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{
@@ -58,7 +58,7 @@ export const CompletionStep = () => {
         className="text-center max-w-3xl mx-auto space-y-8 relative z-10"
       >
         {/* Grandiose success icon with crown */}
-        <motion.div
+        <m.div
           initial={{ scale: 0.95, opacity: 0, rotate: -180 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
           transition={{
@@ -70,17 +70,17 @@ export const CompletionStep = () => {
           className="relative mx-auto mb-6"
         >
           <div className="w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center mx-auto relative">
-            <motion.div
+            <m.div
               animate={{ rotate: 360 }}
               transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
               className="absolute inset-0 rounded-full border-2 border-dashed border-primary/20"
             />
             <Crown className="h-12 w-12 text-primary" />
           </div>
-        </motion.div>
+        </m.div>
 
         {/* Grandiose main message */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
@@ -93,7 +93,7 @@ export const CompletionStep = () => {
             is Ready to Dominate!
           </h1>
 
-          <motion.p
+          <m.p
             className="text-lg text-muted-foreground max-w-xl mx-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -101,10 +101,10 @@ export const CompletionStep = () => {
           >
             AI Workforce
             are now configured, trained, and ready to revolutionize your workflow
-          </motion.p>
-        </motion.div>
+          </m.p>
+        </m.div>
 
-      </motion.div>
+      </m.div>
     </div>
   );
 };

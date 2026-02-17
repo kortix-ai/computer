@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FieldRenderer } from './field-renderer';
@@ -42,7 +42,7 @@ export const AgentConfiguration = ({
     <div className="space-y-6">
       {/* Header */}
       {showHeader && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-4"
@@ -58,13 +58,13 @@ export const AgentConfiguration = ({
               </p>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       )}
 
 
       {/* Configuration Fields */}
       {configFields.length > 0 && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -85,12 +85,12 @@ export const AgentConfiguration = ({
               ))}
             </CardContent>
           </Card>
-        </motion.div>
+        </m.div>
       )}
 
       {/* Integration Fields */}
       {integrationFields.length > 0 && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -111,11 +111,11 @@ export const AgentConfiguration = ({
               ))}
             </CardContent>
           </Card>
-        </motion.div>
+        </m.div>
       )}
 
       {/* Agent capabilities reminder */}
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
@@ -132,7 +132,7 @@ export const AgentConfiguration = ({
             </Badge>
           ))}
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 };

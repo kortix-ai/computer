@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -68,7 +68,7 @@ export const MultiAgentConfigurationStep = () => {
     <StepWrapper>
       <div className="space-y-6">
         {/* Compact header */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
@@ -77,10 +77,10 @@ export const MultiAgentConfigurationStep = () => {
           <p className="text-sm text-muted-foreground">
             {currentAgentIndex + 1} of {selectedAgents.length}
           </p>
-        </motion.div>
+        </m.div>
 
         {/* Agent configuration */}
-        <motion.div
+        <m.div
           key={currentAgent.id}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -92,11 +92,11 @@ export const MultiAgentConfigurationStep = () => {
             showHeader={false}
             onConfigurationChange={handleConfigurationChange}
           />
-        </motion.div>
+        </m.div>
 
         {/* Compact navigation */}
         {selectedAgents.length > 1 && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -135,7 +135,7 @@ export const MultiAgentConfigurationStep = () => {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-          </motion.div>
+          </m.div>
         )}
       </div>
     </StepWrapper>

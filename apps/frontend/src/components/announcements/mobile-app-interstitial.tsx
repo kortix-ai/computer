@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 
 const STORAGE_KEY = 'kortix-mobile-banner-dismissed';
 const DISMISS_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -86,7 +86,7 @@ export function MobileAppInterstitial() {
 
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         initial={{ y: 120, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 120, opacity: 0 }}
@@ -156,7 +156,7 @@ export function MobileAppInterstitial() {
             </div>
           </button>
         </div>
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   );
 }

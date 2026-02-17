@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useMotionValue, useTransform } from 'framer-motion';
+import { m, useMotionValue, useTransform } from 'framer-motion';
 import type { TargetAndTransition } from 'framer-motion';
 import { useEffect, useState, useId, useMemo } from 'react';
 
@@ -209,7 +209,7 @@ const Arc = ({ left, cfg }: { left?: boolean; cfg: ArcCfg }) => {
     }, [blurAmount]);
 
     return (
-        <motion.div
+        <m.div
             className="absolute"
             style={stylePos}
             initial={{ x: 0, y: 0, scale: cfg.scale[0] }}
@@ -238,7 +238,7 @@ const Arc = ({ left, cfg }: { left?: boolean; cfg: ArcCfg }) => {
             ) : (
                 <RightArc size={cfg.size} tone={cfg.tone} opacity={cfg.opacity} blurAmount={currentBlur} />
             )}
-        </motion.div>
+        </m.div>
     );
 };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { SimpleFooter } from '@/components/home/simple-footer';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ArrowRight, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -48,7 +48,7 @@ export default function CareersPageClient() {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="max-w-4xl mx-auto px-6 md:px-10 pt-32 md:pt-40 pb-20 md:pb-28">
-          <motion.div
+          <m.div
             className="space-y-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -65,14 +65,14 @@ export default function CareersPageClient() {
             <p className="text-foreground text-[1.375rem] md:text-[1.5rem] leading-[1.6] tracking-[-0.025em] font-medium max-w-2xl opacity-50">
               We're building the ultimate AI worker. Join us.
             </p>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
       {/* Values Section */}
       <section className="border-t border-border">
         <div className="max-w-4xl mx-auto px-6 md:px-10 py-20 md:py-28">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -81,11 +81,11 @@ export default function CareersPageClient() {
             <h2 className="text-2xl md:text-3xl font-medium tracking-tight mb-12">
               How we work
             </h2>
-          </motion.div>
+          </m.div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
             {values.map((value, index) => (
-              <motion.div
+              <m.div
                 key={value.title}
                 className="space-y-3"
                 initial={{ opacity: 0, y: 20 }}
@@ -95,7 +95,7 @@ export default function CareersPageClient() {
               >
                 <h3 className="text-lg font-semibold">{value.title}</h3>
                 <p className="text-muted-foreground leading-relaxed">{value.description}</p>
-              </motion.div>
+              </m.div>
             ))}
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function CareersPageClient() {
       {/* Open Positions */}
       <section className="border-t border-border">
         <div className="max-w-4xl mx-auto px-6 md:px-10 py-20 md:py-28">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -116,11 +116,11 @@ export default function CareersPageClient() {
             <p className="text-muted-foreground mb-12">
               If you're good at what you do, we'd like to talk.
             </p>
-          </motion.div>
+          </m.div>
 
           <div className="space-y-4">
             {openings.map((job, index) => (
-              <motion.div
+              <m.div
                 key={job.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -152,7 +152,7 @@ export default function CareersPageClient() {
                     </div>
                   </div>
                 </Link>
-              </motion.div>
+              </m.div>
             ))}
           </div>
         </div>
@@ -161,7 +161,7 @@ export default function CareersPageClient() {
       {/* CTA Section */}
       <section className="border-t border-border">
         <div className="max-w-4xl mx-auto px-6 md:px-10 py-20 md:py-28">
-          <motion.div
+          <m.div
             className="text-center space-y-6"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -182,7 +182,7 @@ export default function CareersPageClient() {
                 </a>
               </Button>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 

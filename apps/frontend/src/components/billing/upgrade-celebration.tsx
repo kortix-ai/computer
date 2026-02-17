@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { TierBadge } from './tier-badge';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
@@ -69,7 +69,7 @@ export function UpgradeCelebration({ isOpen, onClose, planName, isLoading = fals
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-50 flex items-center justify-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -77,7 +77,7 @@ export function UpgradeCelebration({ isOpen, onClose, planName, isLoading = fals
           transition={{ duration: 0.3 }}
         >
           {/* Subtle backdrop for readability */}
-          <motion.div 
+          <m.div 
             className="absolute inset-0 bg-background/60 backdrop-blur-[2px] cursor-pointer"
             onClick={onClose}
             initial={{ opacity: 0 }}
@@ -86,7 +86,7 @@ export function UpgradeCelebration({ isOpen, onClose, planName, isLoading = fals
           />
           
           {/* Content */}
-          <motion.div
+          <m.div
             className="relative flex flex-col items-center gap-4 pointer-events-none select-none"
             initial={{ scale: 0.8, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -99,26 +99,26 @@ export function UpgradeCelebration({ isOpen, onClose, planName, isLoading = fals
             }}
           >
             {/* Kortix Logo */}
-            <motion.div
+            <m.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.05, duration: 0.3 }}
             >
               <KortixLogo size={36} variant="logomark" />
-            </motion.div>
+            </m.div>
 
             {/* Welcome text */}
-            <motion.p
+            <m.p
               className="text-lg text-muted-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.4 }}
             >
               Welcome to
-            </motion.p>
+            </m.p>
 
             {/* Tier Badge */}
-            <motion.div
+            <m.div
               className="min-h-[40px] flex items-center justify-center"
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -140,9 +140,9 @@ export function UpgradeCelebration({ isOpen, onClose, planName, isLoading = fals
                   className="scale-150"
                 />
               )}
-            </motion.div>
-          </motion.div>
-        </motion.div>
+            </m.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

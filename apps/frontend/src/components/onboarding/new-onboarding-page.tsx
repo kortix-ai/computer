@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, CheckCircle2, Sparkles, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { 
   onboardingSteps, 
@@ -81,7 +81,7 @@ export function NewOnboardingPage({ className, onComplete, onClose }: NewOnboard
     )}>
       <div className="h-full w-full flex flex-col">
         {/* Progress indicator - top center */}
-        <motion.div
+        <m.div
           className="flex items-center justify-center px-6 py-6"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -91,13 +91,13 @@ export function NewOnboardingPage({ className, onComplete, onClose }: NewOnboard
             steps={onboardingSteps.map(step => ({ id: step.id, title: step.title }))}
             currentStep={currentStepIndex}
           />
-        </motion.div>
+        </m.div>
 
         {/* Main content - DEAD CENTER */}
         <div className="flex-1 flex items-center justify-center overflow-auto px-6">
           <div className="w-full max-w-6xl">
             <AnimatePresence mode="wait">
-              <motion.div
+              <m.div
                 key={currentStepData.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -105,13 +105,13 @@ export function NewOnboardingPage({ className, onComplete, onClose }: NewOnboard
                 transition={{ duration: 0.3 }}
               >
                 {currentStepData.content}
-              </motion.div>
+              </m.div>
             </AnimatePresence>
           </div>
         </div>
 
         {/* Footer - bottom center */}
-        <motion.div
+        <m.div
           className="flex items-center justify-center px-6 py-6"
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -151,7 +151,7 @@ export function NewOnboardingPage({ className, onComplete, onClose }: NewOnboard
               )}
             </Button>
           </div>
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

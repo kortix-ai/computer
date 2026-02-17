@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Building2, User, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StepWrapper } from '../shared/step-wrapper';
@@ -68,7 +68,7 @@ export const UserTypeStep = () => {
         <AnimatePresence mode="wait">
           {/* Step 1: User Type Selection */}
           {step === 'type' && (
-            <motion.div
+            <m.div
               key="type-selection"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -106,12 +106,12 @@ export const UserTypeStep = () => {
                   </div>
                 </Button>
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {/* Step 2: Company Size */}
           {step === 'size' && (
-            <motion.div
+            <m.div
               key="size-selection"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -137,12 +137,12 @@ export const UserTypeStep = () => {
                   </Button>
                 ))}
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {/* Step 3: Role Selection */}
           {step === 'role' && (
-            <motion.div
+            <m.div
               key="role-selection"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -168,7 +168,7 @@ export const UserTypeStep = () => {
                   </Button>
                 ))}
               </div>
-            </motion.div>
+            </m.div>
           )}
 
         </AnimatePresence>

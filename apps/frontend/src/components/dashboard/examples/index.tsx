@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3,
@@ -151,7 +151,7 @@ export const Examples = ({
       <div className="group relative">
         <div className="flex gap-2 justify-center py-2 flex-wrap">
           {displayedPrompts.map((prompt, index) => (
-            <motion.div
+            <m.div
               key={`${prompt.title}-${index}`}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -173,7 +173,7 @@ export const Examples = ({
                   <span className="whitespace-nowrap">{prompt.title}</span>
                 </div>
               </Button>
-            </motion.div>
+            </m.div>
           ))}
         </div>
         <Button
@@ -182,12 +182,12 @@ export const Examples = ({
           onClick={handleRefresh}
           className="absolute -top-4 right-1 h-5 w-5 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
         >
-          <motion.div
+          <m.div
             animate={{ rotate: isRefreshing ? 360 : 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
           >
             <RefreshCw size={10} className="text-muted-foreground" />
-          </motion.div>
+          </m.div>
         </Button>
       </div>
     </div>

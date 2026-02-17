@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { X, BookOpen, Play, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -42,7 +42,7 @@ export function TutorialsBanner() {
 
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -67,30 +67,30 @@ export function TutorialsBanner() {
               
               {/* Chapter badges floating */}
               <div className="relative flex items-center gap-2">
-                <motion.div 
+                <m.div 
                   initial={{ y: 0 }}
                   animate={{ y: [-2, 2, -2] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                   className="w-10 h-10 bg-background dark:bg-[#1a1a1a] rounded-lg flex items-center justify-center shadow-md border border-border/50"
                 >
                   <span className="text-sm font-bold text-primary">1</span>
-                </motion.div>
-                <motion.div 
+                </m.div>
+                <m.div 
                   initial={{ y: 0 }}
                   animate={{ y: [2, -2, 2] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
                   className="w-10 h-10 bg-background dark:bg-[#1a1a1a] rounded-lg flex items-center justify-center shadow-md border border-border/50"
                 >
                   <span className="text-sm font-bold text-primary">2</span>
-                </motion.div>
-                <motion.div 
+                </m.div>
+                <m.div 
                   initial={{ y: 0 }}
                   animate={{ y: [-2, 2, -2] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                   className="w-10 h-10 bg-background dark:bg-[#1a1a1a] rounded-lg flex items-center justify-center shadow-md border border-border/50"
                 >
                   <span className="text-sm font-bold text-primary">3</span>
-                </motion.div>
+                </m.div>
                 <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
                   <span className="text-xs font-medium text-primary">+4</span>
                 </div>
@@ -127,7 +127,7 @@ export function TutorialsBanner() {
             </div>
           </div>
         </Link>
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   );
 }

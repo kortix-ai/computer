@@ -10,6 +10,7 @@ import { roobert } from './fonts/roobert';
 import { roobertMono } from './fonts/roobert-mono';
 import { Suspense, lazy } from 'react';
 import { I18nProvider } from '@/components/i18n-provider';
+import { LazyMotionProvider } from '@/components/layout/lazy-motion-provider';
 import { featureFlags } from '@/lib/feature-flags';
 import Script from 'next/script';
 
@@ -251,7 +252,9 @@ export default function RootLayout({
           <AuthProvider>
             <I18nProvider>
               <ReactQueryProvider>
-                {children}
+                <LazyMotionProvider>
+                  {children}
+                </LazyMotionProvider>
                 <Toaster />
                 <Suspense fallback={null}>
                   <PlanSelectionModal />

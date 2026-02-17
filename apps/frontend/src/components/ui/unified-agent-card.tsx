@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Check, Plus, Download, CheckCircle, Globe, GlobeLock, GitBranch, Trash2, MoreVertical, User, ArrowRight } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { DynamicIcon } from 'lucide-react/dynamic';
@@ -137,13 +137,13 @@ const CardAvatar: React.FC<{
   
   if (variant === 'showcase') {
     return (
-      <motion.div 
+      <m.div 
         className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300"
         whileHover={{ rotate: [0, -10, 10, 0] }}
         transition={{ duration: 0.5 }}
       >
         {data.icon}
-      </motion.div>
+      </m.div>
     );
   }
   
@@ -369,7 +369,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   
   // Render different variants
   const renderShowcaseCard = () => (
-    <motion.div className="flex flex-col items-start justify-end relative group cursor-pointer hover:bg-accent/30 transition-colors duration-300">
+    <m.div className="flex flex-col items-start justify-end relative group cursor-pointer hover:bg-accent/30 transition-colors duration-300">
       <div className="relative flex size-full items-center justify-center h-full overflow-hidden">
         <div className="pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-t from-background to-transparent z-20"></div>
         
@@ -388,7 +388,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
             </p>
           </div>
 
-          <motion.button
+          <m.button
             className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-all duration-300"
             initial={{ y: 10 }}
             whileHover={{ y: 0 }}
@@ -396,10 +396,10 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
           >
             Try {data.name} 
             <ArrowRight className="w-4 h-4" />
-          </motion.button>
+          </m.button>
         </div>
       </div>
-    </motion.div>
+    </m.div>
   );
   
   const renderDashboardCard = () => (
@@ -432,7 +432,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   );
   
   const renderOnboardingCard = () => (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay }}
@@ -492,7 +492,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
           )}
         </CardContent>
       </Card>
-    </motion.div>
+    </m.div>
   );
   
   const renderStandardCard = () => {

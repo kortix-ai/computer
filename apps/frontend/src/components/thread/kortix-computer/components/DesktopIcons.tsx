@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useCallback, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { getFileIcon, FolderIcon } from './Icons';
 import { FileContextMenu } from './FileContextMenu';
@@ -122,7 +122,7 @@ export const DesktopIcons = memo(function DesktopIcons({
         className="flex flex-col flex-wrap-reverse gap-0.5 h-full content-start items-start justify-start"
       >
         {isCreatingNewFolder && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             onClick={(e) => e.stopPropagation()}
@@ -144,7 +144,7 @@ export const DesktopIcons = memo(function DesktopIcons({
               className="text-[11px] font-medium text-white text-center w-full leading-tight bg-black/40 rounded px-1 py-0.5 outline-none border border-white/30 focus:border-white/60"
               style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
             />
-          </motion.div>
+          </m.div>
         )}
         {files.map((file) => (
           <FileContextMenu
@@ -163,7 +163,7 @@ export const DesktopIcons = memo(function DesktopIcons({
             onOpenChange={(open) => setActiveContextPath(open ? file.path : null)}
           >
             <ContextMenuTrigger asChild>
-              <motion.button
+              <m.button
                 initial={{ opacity: 0, scale: 1, y: 0 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ delay: 0.05, type: 'spring', stiffness: 500, damping: 30 }}
@@ -187,7 +187,7 @@ export const DesktopIcons = memo(function DesktopIcons({
                 <span className="text-[11px] font-medium text-white text-center w-full leading-tight break-words drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                   {file.name}
                 </span>
-              </motion.button>
+              </m.button>
             </ContextMenuTrigger>
           </FileContextMenu>
         ))}

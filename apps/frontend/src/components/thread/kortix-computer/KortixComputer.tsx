@@ -9,7 +9,7 @@ import { ApiMessageType } from '@/components/thread/types';
 import { useIsMobile } from '@/hooks/utils';
 import { cn } from '@/lib/utils';
 import { ToolView } from '../tool-views/wrapper';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useDocumentModalStore } from '@/stores/use-document-modal-store';
@@ -723,7 +723,7 @@ export const KortixComputer = memo(function KortixComputer({
     return (
       <AnimatePresence mode="wait">
         {isOpen && (
-          <motion.div
+          <m.div
             key="sidepanel"
             layoutId={FLOATING_LAYOUT_ID}
             initial={disableInitialAnimation ? { opacity: 1 } : { opacity: 0 }}
@@ -738,7 +738,7 @@ export const KortixComputer = memo(function KortixComputer({
           >
             {renderContent()}
             {navElement}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     );

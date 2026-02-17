@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useCallback } from 'react';
-import { motion, useDragControls, PanInfo } from 'framer-motion';
+import { m, useDragControls, PanInfo } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Minus, Square, X } from 'lucide-react';
 
@@ -125,7 +125,7 @@ export const AppWindow = memo(function AppWindow({
   }, [size, position]);
 
   return (
-    <motion.div
+    <m.div
       ref={windowRef}
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ 
@@ -256,7 +256,7 @@ export const AppWindow = memo(function AppWindow({
           />
         </>
       )}
-    </motion.div>
+    </m.div>
   );
 });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Users, Plus, X, Mail, Send, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,7 +62,7 @@ export const TeamInvitationStep = () => {
     <StepWrapper>
       <div className="text-center space-y-8 max-w-2xl mx-auto">
         {/* Header */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -73,11 +73,11 @@ export const TeamInvitationStep = () => {
             Collaboration makes everything better. Invite your teammates to join your AI workforce
             and work together more efficiently.
           </p>
-        </motion.div>
+        </m.div>
 
         {/* Success state */}
         {invitesSent && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-6"
@@ -89,12 +89,12 @@ export const TeamInvitationStep = () => {
             <p className="text-sm text-green-700 dark:text-green-400">
               Your teammates will receive an invitation email to join your AI workforce.
             </p>
-          </motion.div>
+          </m.div>
         )}
 
         {/* Skip state */}
         {isSkipping && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6"
@@ -106,12 +106,12 @@ export const TeamInvitationStep = () => {
             <p className="text-sm text-blue-700 dark:text-blue-400">
               You can always invite teammates later from your dashboard.
             </p>
-          </motion.div>
+          </m.div>
         )}
 
         {/* Invitation form */}
         {!invitesSent && !isSkipping && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -155,7 +155,7 @@ export const TeamInvitationStep = () => {
               <Label className="text-sm font-medium">Team member email addresses</Label>
 
               {inviteEmails.map((email, index) => (
-                <motion.div
+                <m.div
                   key={String(email)}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -179,7 +179,7 @@ export const TeamInvitationStep = () => {
                       <X className="h-4 w-4" />
                     </Button>
                   )}
-                </motion.div>
+                </m.div>
               ))}
 
               <Button
@@ -229,7 +229,7 @@ export const TeamInvitationStep = () => {
                 )}
               </div>
             )}
-          </motion.div>
+          </m.div>
         )}
       </div>
     </StepWrapper>

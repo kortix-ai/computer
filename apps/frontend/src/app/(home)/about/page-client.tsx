@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { SimpleFooter } from '@/components/home/simple-footer';
-import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
+import { m, useScroll, useMotionValueEvent } from 'framer-motion';
 import { useRef, useState, useEffect } from 'react';
 
 type ParagraphItem = 
@@ -241,7 +241,7 @@ export default function AboutPageClient() {
       <article className="max-w-4xl mx-auto px-6 md:px-10 pt-24 md:pt-28 pb-32">
         
         {/* Hero Image */}
-        <motion.figure 
+        <m.figure 
           className="mb-16 md:mb-20"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -257,7 +257,7 @@ export default function AboutPageClient() {
               priority
             />
           </div>
-        </motion.figure>
+        </m.figure>
 
         <div 
           ref={containerRef}

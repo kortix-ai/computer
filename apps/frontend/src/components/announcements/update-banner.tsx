@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { ArrowDownToLine, X, Loader2, Sparkles, ChevronRight } from 'lucide-react';
 import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
 
@@ -54,7 +54,7 @@ export function UpdateBanner() {
 
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: -36 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -36 }}
@@ -107,7 +107,7 @@ export function UpdateBanner() {
             <X className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   );
 }
