@@ -237,6 +237,18 @@ export function useOpenCodeSessionTodo(sessionId: string) {
 }
 
 export function useOpenCodeMessages(sessionId: string) {
+  // While the session is busy, SSE events keep the React Query cache fresh via
+  // setQueryData. Background refetches during this time can race with SSE
+  // updates and temporarily replace the cache with stale server data, causing
+  // tool calls to flicker (appear → disappear → reappear). To prevent this,
+  // set staleTime to Infinity while busy so React Query never triggers a
+  // background refetch. Once the session goes idle, revert to a short
+  // staleTime so the cache refreshes with the final server state.
+  const sessionStatus = useOpenCodeSessionStatusStore(
+    (s) => s.statuses[sessionId],
+  );
+  const isBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
+
   return useQuery<MessageWithParts[]>({
     queryKey: opencodeKeys.messages(sessionId),
     queryFn: async () => {
@@ -245,8 +257,9 @@ export function useOpenCodeMessages(sessionId: string) {
       return unwrap(result) as MessageWithParts[];
     },
     enabled: !!sessionId,
-    staleTime: 5 * 1000,
+    staleTime: isBusy ? Infinity : 5 * 1000,
     gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: !isBusy,
   });
 }
 
