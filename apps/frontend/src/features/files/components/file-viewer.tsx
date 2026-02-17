@@ -337,8 +337,10 @@ export function FileViewer() {
       const file = new File([blob], fileName, { type: 'text/plain' });
       const parentPath = selectedFilePath.substring(0, selectedFilePath.lastIndexOf('/'));
       await uploadFile(file, parentPath || undefined);
-      setEditedContent(null);
+      // Refetch FIRST so the cache has the new content, then clear local edits.
+      // Clearing editedContent before refetch would flash the stale cached value.
       await refetch();
+      setEditedContent(null);
       toast.success('File saved');
     } catch (err) {
       toast.error(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);

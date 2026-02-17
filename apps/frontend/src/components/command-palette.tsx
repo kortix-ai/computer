@@ -28,6 +28,7 @@ import {
   MessagesSquare,
   Layers,
   GitCompareArrows,
+  History,
   ListTodo,
   TextSearch,
   Hash,
@@ -72,6 +73,7 @@ import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { THEMES, getThemeById } from '@/lib/themes';
 import { CompactDialog } from '@/components/session/compact-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
+import { SnapshotDialog } from '@/components/session/snapshot-dialog';
 import { TodoDialog } from '@/components/session/todo-dialog';
 import { InitProjectDialog } from '@/components/session/init-project-dialog';
 
@@ -237,6 +239,7 @@ export function CommandPalette() {
   const [isCreating, setIsCreating] = useState(false);
   const [compactOpen, setCompactOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [todoOpen, setTodoOpen] = useState(false);
   const [initOpen, setInitOpen] = useState(false);
   const router = useRouter();
@@ -655,6 +658,12 @@ export function CommandPalette() {
     setDiffOpen(true);
   }, [currentSessionId, close]);
 
+  const handleViewSnapshots = useCallback(() => {
+    if (!currentSessionId) return;
+    close();
+    setSnapshotOpen(true);
+  }, [currentSessionId, close]);
+
   const handleViewTasks = useCallback(() => {
     if (!currentSessionId) return;
     close();
@@ -1004,6 +1013,12 @@ export function CommandPalette() {
                   </CommandItem>
                 )}
                 {currentSessionId && (
+                  <CommandItem onSelect={handleViewSnapshots}>
+                    <History className="mr-2 h-4 w-4" />
+                    <span>View Snapshots</span>
+                  </CommandItem>
+                )}
+                {currentSessionId && (
                   <CommandItem onSelect={handleViewTasks}>
                     <ListTodo className="mr-2 h-4 w-4" />
                     <span>View Tasks</span>
@@ -1190,6 +1205,11 @@ export function CommandPalette() {
             sessionId={currentSessionId}
             open={diffOpen}
             onOpenChange={setDiffOpen}
+          />
+          <SnapshotDialog
+            sessionId={currentSessionId}
+            open={snapshotOpen}
+            onOpenChange={setSnapshotOpen}
           />
           <TodoDialog
             sessionId={currentSessionId}

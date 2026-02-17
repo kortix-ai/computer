@@ -68,3 +68,11 @@ export function useUpdateOpenCodeConfig() {
     },
   });
 }
+
+/**
+ * @deprecated No longer needed — server persists config correctly.
+ * Kept as no-op for existing call sites.
+ */
+export function clearConfigOverrides(): void {
+  // no-op — localStorage overrides removed
+}

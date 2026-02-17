@@ -134,6 +134,7 @@ function GeneralSection({
   const model = (draft.model as string) ?? config.model ?? '';
   const instructions = (draft.instructions as string[]) ?? config.instructions ?? [];
   const instructionsText = instructions.join('\n');
+  const snapshot = (draft.snapshot as boolean | undefined) ?? config.snapshot ?? false;
 
   return (
     <div className="space-y-6 overflow-y-auto pr-1">
@@ -180,6 +181,24 @@ function GeneralSection({
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Snapshots */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Snapshots
+            </label>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">
+              Create a git snapshot at each agentic step for reviewing changes
+            </p>
+          </div>
+          <Switch
+            checked={snapshot}
+            onCheckedChange={(v) => onDraft('snapshot', v)}
+          />
+        </div>
       </div>
     </div>
   );

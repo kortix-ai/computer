@@ -103,6 +103,8 @@ import {
   type ToolPart,
   type FilePart,
   type AgentPart,
+  type SnapshotPart,
+  type PatchPart,
   type PermissionRequest,
   type QuestionRequest,
   type RetryInfo,
@@ -114,6 +116,8 @@ import {
   isFilePart,
   isAgentPart,
   isCompactionPart,
+  isSnapshotPart,
+  isPatchPart,
   isAttachment,
   splitUserParts,
   groupMessagesIntoTurns,
@@ -151,6 +155,7 @@ import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
 import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
 import { TurnErrorDisplay } from '@/components/session/session-error-banner';
+import { OcSnapshotPartView, OcPatchPartView } from '@/components/session/snapshot-part-views';
 import { ConnectProviderDialog } from '@/components/session/model-selector';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
@@ -1946,6 +1951,24 @@ function SessionTurn({
                     onQuestionReply={onQuestionReply}
                     onQuestionReject={onQuestionReject}
                   />
+                </div>
+              );
+            }
+
+            // Snapshot parts — collapsible metadata
+            if (isSnapshotPart(part)) {
+              return (
+                <div key={part.id}>
+                  <OcSnapshotPartView part={part} />
+                </div>
+              );
+            }
+
+            // Patch parts — collapsible with file list
+            if (isPatchPart(part)) {
+              return (
+                <div key={part.id}>
+                  <OcPatchPartView part={part} sessionId={sessionId} />
                 </div>
               );
             }

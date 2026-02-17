@@ -17,6 +17,8 @@ import type {
   AgentPart,
   CompactionPart,
   StepFinishPart,
+  SnapshotPart,
+  PatchPart,
   AssistantMessage,
   PermissionRequest,
   QuestionRequest,
@@ -57,6 +59,14 @@ export function isAgentPart(part: Part): part is AgentPart {
 
 export function isCompactionPart(part: Part): part is CompactionPart {
   return part.type === 'compaction';
+}
+
+export function isSnapshotPart(part: Part): part is SnapshotPart {
+  return part.type === 'snapshot';
+}
+
+export function isPatchPart(part: Part): part is PatchPart {
+  return part.type === 'patch';
 }
 
 /** Get the text content from any part that has a `text` field. */
@@ -189,7 +199,10 @@ export function findLastTextPart(parts: PartWithMessage[]): TextPart | undefined
 
 /** Check if a turn has tool steps. */
 export function turnHasSteps(parts: PartWithMessage[]): boolean {
-  return parts.some(({ part }) => part.type === 'tool' || part.type === 'compaction');
+  return parts.some(({ part }) =>
+    part.type === 'tool' || part.type === 'compaction' ||
+    part.type === 'snapshot' || part.type === 'patch',
+  );
 }
 
 // ============================================================================
