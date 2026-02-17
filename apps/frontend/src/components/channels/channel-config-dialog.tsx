@@ -20,10 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Send,
-  Hash,
-  MessageCircle,
-  Phone,
   Users,
   Mic,
   Mail,
@@ -33,6 +29,10 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useCreateChannel, type ChannelType, type SessionStrategy } from '@/hooks/channels';
+import { SlackIcon } from '@/components/ui/icons/slack';
+import { TelegramIcon } from '@/components/ui/icons/telegram';
+import { DiscordIcon } from '@/components/ui/icons/discord';
+import { WhatsAppIcon } from '@/components/ui/icons/whatsapp';
 import { useSandbox } from '@/hooks/platform/use-sandbox';
 import { useServerStore } from '@/stores/server-store';
 import { ensureSandbox } from '@/lib/platform-client';
@@ -45,10 +45,10 @@ interface ChannelConfigDialogProps {
 }
 
 const CHANNEL_OPTIONS: { type: ChannelType; label: string; icon: React.ComponentType<{ className?: string }>; available: boolean }[] = [
-  { type: 'telegram', label: 'Telegram', icon: Send, available: true },
-  { type: 'slack', label: 'Slack', icon: Hash, available: true },
-  { type: 'discord', label: 'Discord', icon: MessageCircle, available: false },
-  { type: 'whatsapp', label: 'WhatsApp', icon: Phone, available: false },
+  { type: 'telegram', label: 'Telegram', icon: TelegramIcon, available: true },
+  { type: 'slack', label: 'Slack', icon: SlackIcon, available: true },
+  { type: 'discord', label: 'Discord', icon: DiscordIcon, available: false },
+  { type: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon, available: false },
   { type: 'teams', label: 'Teams', icon: Users, available: false },
   { type: 'voice', label: 'Voice', icon: Mic, available: false },
   { type: 'email', label: 'Email', icon: Mail, available: false },
@@ -102,13 +102,16 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
   const handleSelectType = async (type: ChannelType) => {
     if (type === 'slack') {
       const sandboxId = await resolveSandboxId();
-      if (!sandboxId) {
-        toast.error('Could not find your sandbox — is the backend running?');
-        return;
-      }
       // Redirect to backend install endpoint for OAuth flow
       const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/v1\/?$/, '');
-      const installUrl = `${backendUrl}/webhooks/slack/install?sandboxId=${encodeURIComponent(sandboxId)}`;
+      const params = new URLSearchParams();
+      if (sandboxId) {
+        params.set('sandboxId', sandboxId);
+      } else {
+        toast.error('Please create an instance first, then connect Slack.');
+        return;
+      }
+      const installUrl = `${backendUrl}/webhooks/slack/install?${params.toString()}`;
       handleClose();
       window.location.href = installUrl;
       return;

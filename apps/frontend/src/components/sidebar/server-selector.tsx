@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
-import { ensureSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, type SandboxProviderName } from '@/lib/platform-client';
+import { ensureSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
 import { useProviders } from '@/hooks/platform/use-sandbox';
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { SANDBOX_SERVER_ID } from '@/hooks/platform/use-sandbox';
@@ -167,6 +167,7 @@ type SandboxUpdateInfo = {
   updateAvailable: boolean;
   currentVersion: string | null;
   latestVersion: string | null;
+  changelog: ChangelogEntry | null;
   update: () => void;
   isUpdating: boolean;
   isLoading: boolean;
@@ -292,6 +293,21 @@ function DialogInstanceRow({
               <Loader2 className="h-3 w-3 animate-spin" />
               Updating...
             </span>
+          )}
+
+          {/* Changelog preview — what's new */}
+          {sandboxUpdate && sandboxUpdate.updateAvailable && !sandboxUpdate.isUpdating && sandboxUpdate.changelog && (
+            <div className="basis-full mt-0.5 text-[10px] text-muted-foreground/70 space-y-0.5 max-w-[280px]">
+              <p className="font-medium">{sandboxUpdate.changelog.title}</p>
+              <ul className="list-disc list-inside">
+                {sandboxUpdate.changelog.changes.slice(0, 3).map((c, i) => (
+                  <li key={i} className="truncate">{c.text}</li>
+                ))}
+                {sandboxUpdate.changelog.changes.length > 3 && (
+                  <li className="text-muted-foreground/50">+{sandboxUpdate.changelog.changes.length - 3} more</li>
+                )}
+              </ul>
+            </div>
           )}
 
           {/* Spacer */}

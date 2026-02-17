@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Browser Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f0f1a;
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh; font-family: system-ui, -apple-system, sans-serif;
+      color: #c0c0d0; padding: 12px;
+    }
+    header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px; width: 100%; max-width: 1300px;
+    }
+    header h1 { font-size: 15px; font-weight: 600; color: #e0e0f0; white-space: nowrap; }
+    #session-tabs {
+      display: flex; gap: 4px; overflow-x: auto; flex: 1;
+    }
+    .tab {
+      font-size: 12px; padding: 4px 12px; border-radius: 6px;
+      background: #1a1a2e; border: 1px solid #333; color: #888;
+      cursor: pointer; white-space: nowrap; transition: all 0.15s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .tab:hover { border-color: #555; color: #bbb; }
+    .tab.active { background: #1e3a5f; border-color: #4a8fe7; color: #e0e8f0; }
+    .tab.stale { opacity: 0.5; }
+    .tab .dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    }
+    .tab .dot.live { background: #4caf50; }
+    .tab .dot.dead { background: #666; }
+    .tab .dot.stale { background: #ff9800; }
+    .tab .label { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    .tab .badge {
+      font-size: 9px; padding: 1px 5px; border-radius: 3px;
+      background: #2a4a6e; color: #8ab4e8; font-weight: 600;
+    }
+    .tab .close-btn {
+      font-size: 14px; color: #666; cursor: pointer; margin-left: 2px;
+      line-height: 1;
+    }
+    .tab .close-btn:hover { color: #f44336; }
+    #status {
+      font-size: 12px; padding: 3px 10px; border-radius: 12px;
+      background: #1a1a2e; border: 1px solid #333; white-space: nowrap;
+    }
+    #status.connected { color: #4caf50; border-color: #2e5a30; }
+    #status.disconnected { color: #f44336; border-color: #5a2e2e; }
+    #status.connecting { color: #ff9800; border-color: #5a4a2e; }
+    #frame-info { font-size: 11px; color: #555; white-space: nowrap; }
+    #viewport-wrap {
+      position: relative; background: #000; border-radius: 6px;
+      border: 1px solid #222; overflow: hidden;
+      max-width: 95vw; max-height: calc(100vh - 70px);
+    }
+    canvas {
+      display: block; width: 100%; height: 100%;
+      cursor: default;
+    }
+    #empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px; padding: 60px 40px;
+      color: #555; text-align: center;
+    }
+    #empty-state code {
+      background: #1a1a2e; padding: 6px 14px; border-radius: 6px;
+      font-size: 13px; color: #aaa; border: 1px solid #333;
+    }
+    #empty-state .hint { font-size: 12px; max-width: 400px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Agent Browser</h1>
+    <div id="session-tabs"></div>
+    <div id="status" class="connecting">connecting...</div>
+    <div id="frame-info"></div>
+  </header>
+
+  <div id="viewport-wrap">
+    <div id="empty-state">
+      <div style="font-size: 28px; opacity: 0.3;">&#x1f310;</div>
+      <div class="hint">
+        No browser session active.<br>
+        Start one from the sandbox terminal:
+      </div>
+      <code>agent-browser --session kortix open https://example.com</code>
+    </div>
+    <canvas id="viewport" width="1280" height="720" style="display:none" tabindex="0"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('viewport');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const frameInfo = document.getElementById('frame-info');
+    const emptyState = document.getElementById('empty-state');
+    const tabsEl = document.getElementById('session-tabs');
+
+    const PRIMARY_SESSION = 'kortix';
+    let ws = null;
+    let frameCount = 0;
+    let lastFrameTime = 0;
+    let activePort = 9223;
+    let activeSession = PRIMARY_SESSION;
+    let sessions = [];
+    let previousSessionNames = new Set();
+
+    // ── Proxy detection ──────────────────────────────────────────
+    // When loaded through the preview proxy, the URL looks like:
+    //   https://new-api.kortix.com/v1/preview/{sandboxId}/9224/?token=JWT
+    // We detect this pattern and route HTTP + WS through the proxy.
+    const PREVIEW_PATH_RE = /^(.*\/preview\/[^/]+)\/\d+/;
+    const proxyMatch = window.location.pathname.match(PREVIEW_PATH_RE);
+    const proxyBase = proxyMatch ? proxyMatch[1] : null; // e.g. "/v1/preview/{sandboxId}"
+    const isProxied = !!proxyBase;
+    // Carry the auth token for proxied requests
+    const proxyToken = isProxied ? new URLSearchParams(window.location.search).get('token') : null;
+
+    // Track which sessions have received frames recently (for stale detection)
+    let sessionLastFrame = {}; // name -> timestamp
+    const STALE_THRESHOLD_MS = 10000; // 10s without frames = stale
+
+    // ── URL parameter: ?session=name ─────────────────────────────
+    function getUrlSession() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('session');
+    }
+
+    function setUrlSession(name) {
+      const url = new URL(window.location);
+      url.searchParams.set('session', name);
+      window.history.replaceState({}, '', url);
+    }
+
+    // On load, check URL for target session
+    const urlSession = getUrlSession();
+    if (urlSession) {
+      activeSession = urlSession;
+    }
+
+    // ── Session discovery ─────────────────────────────────────────
+    async function pollSessions() {
+      try {
+        // When proxied, /sessions must go through the proxy path for port 9224
+        const sessionsUrl = isProxied
+          ? `${proxyBase}/9224/sessions${proxyToken ? '?token=' + encodeURIComponent(proxyToken) : ''}`
+          : '/sessions';
+        const res = await fetch(sessionsUrl);
+        const newSessions = await res.json();
+        const newNames = new Set(newSessions.map(s => s.name));
+
+        // Detect newly appeared sessions — auto-switch if no URL param lock
+        if (!urlSession) {
+          for (const s of newSessions) {
+            if (!previousSessionNames.has(s.name) && previousSessionNames.size > 0) {
+              // A new session just appeared — switch to it
+              activeSession = s.name;
+              activePort = s.port;
+              setUrlSession(s.name);
+              reconnect();
+            }
+          }
+        }
+
+        // If the URL-requested session just appeared, connect to it
+        if (urlSession && newNames.has(urlSession) && !previousSessionNames.has(urlSession)) {
+          const target = newSessions.find(s => s.name === urlSession);
+          if (target) {
+            activeSession = target.name;
+            activePort = target.port;
+            reconnect();
+          }
+        }
+
+        previousSessionNames = newNames;
+        sessions = newSessions;
+
+        // If active session is in the list, ensure port is correct
+        const active = sessions.find(s => s.name === activeSession);
+        if (active && active.port !== activePort) {
+          activePort = active.port;
+          reconnect();
+        }
+      } catch(e) {
+        sessions = [];
+      }
+      renderTabs();
+    }
+
+    function renderTabs() {
+      const list = sessions.length > 0 ? sessions : [{ name: PRIMARY_SESSION, port: 9223 }];
+      const now = Date.now();
+
+      // Sort: primary first, then alphabetically
+      const sorted = [...list].sort((a, b) => {
+        if (a.name === PRIMARY_SESSION) return -1;
+        if (b.name === PRIMARY_SESSION) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      tabsEl.innerHTML = sorted.map(s => {
+        const isActive = s.name === activeSession;
+        const isConnected = connected && s.port === activePort && isActive;
+        const isPrimary = s.name === PRIMARY_SESSION;
+        const lastFrame = sessionLastFrame[s.name] || 0;
+        const isStale = lastFrame > 0 && (now - lastFrame) > STALE_THRESHOLD_MS;
+        const dotClass = isConnected ? 'live' : (isStale ? 'stale' : 'dead');
+        const tabClass = 'tab' + (isActive ? ' active' : '') + (isStale && !isActive ? ' stale' : '');
+
+        let label = s.name;
+        let badge = '';
+        if (isPrimary) {
+          badge = '<span class="badge">primary</span>';
+        }
+
+        return `<div class="${tabClass}" data-port="${s.port}" data-name="${s.name}">` +
+          `<span class="dot ${dotClass}"></span>` +
+          `<span class="label">${label}</span>` +
+          badge +
+          `</div>`;
+      }).join('');
+
+      tabsEl.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const port = parseInt(tab.dataset.port, 10);
+          const name = tab.dataset.name;
+          if (port !== activePort || name !== activeSession) {
+            activePort = port;
+            activeSession = name;
+            frameCount = 0;
+            lastFrameTime = 0;
+            setUrlSession(name);
+            canvas.style.display = 'none';
+            emptyState.style.display = '';
+            emptyState.querySelector('.hint').innerHTML =
+              `Connecting to session <b>${name}</b>...`;
+            reconnect();
+            renderTabs();
+          }
+        });
+      });
+    }
+
+    // ── Connection (WS direct or SSE proxied) ─────────────────────
+    let connected = false;
+    let eventSource = null;
+
+    function reconnect() {
+      if (ws) { ws.onclose = null; ws.close(); ws = null; }
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      connected = false;
+      connect();
+    }
+
+    function handleMessage(raw) {
+      try {
+        const msg = JSON.parse(raw);
+        if (msg.type === 'frame' && msg.data) {
+          frameCount++;
+          const now = performance.now();
+          const fps = lastFrameTime ? Math.round(1000 / (now - lastFrameTime)) : 0;
+          lastFrameTime = now;
+          sessionLastFrame[activeSession] = Date.now();
+
+          const img = new Image();
+          img.onload = () => {
+            if (canvas.width !== img.width || canvas.height !== img.height) {
+              canvas.width = img.width;
+              canvas.height = img.height;
+            }
+            ctx.drawImage(img, 0, 0);
+            if (canvas.style.display === 'none') {
+              canvas.style.display = 'block';
+              emptyState.style.display = 'none';
+            }
+            frameInfo.textContent = `${img.width}x${img.height} | ${fps}fps | #${frameCount}`;
+          };
+          img.src = 'data:image/jpeg;base64,' + msg.data;
+        }
+      } catch (e) {}
+    }
+
+    function connect() {
+      statusEl.textContent = `connecting (${activeSession})...`;
+      statusEl.className = 'connecting';
+
+      if (isProxied) {
+        // ── SSE mode: receive frames via server-sent events ──────
+        const tokenParam = proxyToken ? '&token=' + encodeURIComponent(proxyToken) : '';
+        const streamUrl = `${proxyBase}/9224/stream?port=${activePort}${tokenParam}`;
+        eventSource = new EventSource(streamUrl);
+        eventSource.onopen = () => {
+          connected = true;
+          statusEl.textContent = activeSession;
+          statusEl.className = 'connected';
+          renderTabs();
+        };
+        eventSource.onmessage = (event) => {
+          handleMessage(event.data);
+        };
+        eventSource.addEventListener('close', () => {
+          connected = false;
+          statusEl.textContent = 'disconnected';
+          statusEl.className = 'disconnected';
+          renderTabs();
+          eventSource.close();
+          eventSource = null;
+          setTimeout(connect, 2000);
+        });
+        eventSource.onerror = () => {
+          connected = false;
+          statusEl.textContent = 'disconnected';
+          statusEl.className = 'disconnected';
+          renderTabs();
+          eventSource.close();
+          eventSource = null;
+          setTimeout(connect, 3000);
+        };
+      } else {
+        // ── WS mode: direct WebSocket to the stream port ─────────
+        const wsHost = window.location.hostname || 'localhost';
+        const wsUrl = `ws://${wsHost}:${activePort}`;
+
+        try { ws = new WebSocket(wsUrl); } catch(e) {
+          statusEl.textContent = 'failed'; statusEl.className = 'disconnected';
+          setTimeout(connect, 3000); return;
+        }
+
+        ws.onopen = () => {
+          connected = true;
+          statusEl.textContent = activeSession;
+          statusEl.className = 'connected';
+          renderTabs();
+        };
+        ws.onmessage = (event) => handleMessage(event.data);
+        ws.onclose = () => {
+          connected = false;
+          statusEl.textContent = 'disconnected';
+          statusEl.className = 'disconnected';
+          renderTabs();
+          setTimeout(connect, 2000);
+        };
+        ws.onerror = () => {};
+      }
+    }
+
+    // ── Input forwarding ──────────────────────────────────────────
+    // Sends input to the browser session.
+    // Direct mode: ws.send()   Proxied mode: POST /input via preview proxy
+
+    function sendInput(payload) {
+      const json = JSON.stringify(payload);
+      if (isProxied) {
+        const tokenParam = proxyToken ? '&token=' + encodeURIComponent(proxyToken) : '';
+        const inputUrl = `${proxyBase}/9224/input?port=${activePort}${tokenParam}`;
+        fetch(inputUrl, { method: 'POST', body: json, keepalive: true }).catch(() => {});
+      } else {
+        if (ws && ws.readyState === 1) ws.send(json);
+      }
+    }
+
+    function getScale() {
+      const rect = canvas.getBoundingClientRect();
+      return { sx: canvas.width / rect.width, sy: canvas.height / rect.height, rect };
+    }
+
+    function sendMouse(eventType, e, clickCount) {
+      if (!connected) return;
+      const { sx, sy, rect } = getScale();
+      sendInput({
+        type: 'input_mouse', eventType,
+        x: Math.round((e.clientX - rect.left) * sx),
+        y: Math.round((e.clientY - rect.top) * sy),
+        button: ['left', 'middle', 'right'][e.button] || 'left',
+        clickCount: clickCount || 1,
+      });
+    }
+
+    canvas.addEventListener('mousedown', e => { e.preventDefault(); sendMouse('mousePressed', e); });
+    canvas.addEventListener('mouseup', e => sendMouse('mouseReleased', e));
+    canvas.addEventListener('mousemove', e => sendMouse('mouseMoved', e));
+    canvas.addEventListener('dblclick', e => { e.preventDefault(); sendMouse('mousePressed', e, 2); });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    canvas.addEventListener('touchstart', e => {
+      if (!connected) return;
+      e.preventDefault();
+      const { sx, sy, rect } = getScale();
+      const points = Array.from(e.touches).map(t => ({
+        x: Math.round((t.clientX - rect.left) * sx),
+        y: Math.round((t.clientY - rect.top) * sy),
+      }));
+      sendInput({ type: 'input_touch', eventType: 'touchStart', touchPoints: points });
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', e => {
+      if (!connected) return;
+      sendInput({ type: 'input_touch', eventType: 'touchEnd', touchPoints: [] });
+    });
+
+    function sendKey(eventType, e) {
+      if (!connected) return;
+      sendInput({
+        type: 'input_keyboard', eventType,
+        key: e.key, code: e.code,
+        modifiers: (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0),
+      });
+    }
+
+    canvas.addEventListener('keydown', e => sendKey('keyDown', e));
+    canvas.addEventListener('keyup', e => sendKey('keyUp', e));
+
+    canvas.addEventListener('wheel', e => {
+      if (!connected) return;
+      e.preventDefault();
+      const { sx, sy, rect } = getScale();
+      sendInput({
+        type: 'input_mouse', eventType: 'mouseWheel',
+        x: Math.round((e.clientX - rect.left) * sx),
+        y: Math.round((e.clientY - rect.top) * sy),
+        deltaX: Math.round(e.deltaX), deltaY: Math.round(e.deltaY),
+      });
+    }, { passive: false });
+
+    // ── Init ──────────────────────────────────────────────────────
+    pollSessions();
+    setInterval(pollSessions, 3000);
+    connect();
+  </script>
+</body>
+</html>

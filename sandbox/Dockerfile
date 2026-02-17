@@ -43,30 +43,32 @@ RUN for i in 1 2 3; do curl -fsSL https://bun.sh/install | bash && break || slee
     && test -x /opt/bun/bin/bun \
     && ln -sf /opt/bun/bin/bun /usr/local/bin/bun
 
-# pip packages:
-#   - greenlet, pyee, typing-extensions: native musl builds (playwright deps)
-#   - pypdf2, python-pptx: pure Python, install normally
-#   - playwright: no musl wheels exist — force-install manylinux wheel via --target,
-#     then copy to site-packages (the Python API is pure Python + greenlet)
-#   - pillow: already in base image
-RUN pip3 install --break-system-packages --timeout=120 --retries=3 \
-        greenlet pyee typing-extensions \
-        pypdf2==3.0.1 python-pptx==1.0.2 \
+# pip packages — versions read from sandbox/package.json (single source of truth)
+# COPY is done later for agent-browser; we need it now for pip versions too.
+COPY sandbox/package.json /tmp/sandbox-pkg-versions.json
+RUN PIP_ARGS=$(node -e " \
+      const p=require('/tmp/sandbox-pkg-versions.json'); \
+      const deps=p.kortix?.pythonDependencies||{}; \
+      const args=[]; \
+      for(const[pkg,ver] of Object.entries(deps)){ \
+        if(pkg==='playwright') continue; \
+        args.push(ver==='latest'?pkg:pkg+'=='+ver); \
+      } \
+      console.log(args.join(' '));" 2>/dev/null) \
+    && pip3 install --break-system-packages --timeout=120 --retries=3 $PIP_ARGS \
+    && PW_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.kortix?.pythonDependencies?.playwright||'1.58.0')" 2>/dev/null) \
     && SITE=$(python3 -c "import site; print(site.getsitepackages()[0])") \
     && ARCH=$(uname -m) \
     && if [ "$ARCH" = "x86_64" ]; then PW_PLAT=manylinux1_x86_64; \
        else PW_PLAT=manylinux_2_17_aarch64; fi \
     && pip3 install --platform "$PW_PLAT" --only-binary :all: \
-        --no-deps --target /tmp/pw playwright==1.58.0 \
+        --no-deps --target /tmp/pw "playwright==$PW_VERSION" \
     && cp -r /tmp/pw/playwright* "$SITE/" \
     && rm -rf /tmp/pw \
     && python3 -c "from playwright.sync_api import sync_playwright; print('playwright OK')"
 
 # Install uv (Python package runner) — used by presentation-gen tool scripts
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
-
-# ── LSS (Local Semantic Search + file-watcher sync) ─────────────────────────
-RUN pip3 install --break-system-packages local-semantic-search
 
 # Remove build-only deps to save space (keep runtime libs)
 RUN apk del gcc g++ musl-dev linux-headers python3-dev libffi-dev \
@@ -76,7 +78,10 @@ RUN apk del gcc g++ musl-dev linux-headers python3-dev libffi-dev \
 # Skip `playwright install` — we use the system chromium at /usr/bin/chromium-browser
 
 # ── Agent Browser (headless browser automation for AI agents) ────────────────
-RUN npm install -g agent-browser
+# Initial install for Docker image; postinstall.sh handles version updates.
+# /tmp/sandbox-pkg-versions.json already COPY'd above for pip versions.
+RUN AB_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['agent-browser']||'latest')" 2>/dev/null || echo "latest") \
+    && npm install -g "agent-browser@$AB_VERSION"
 COPY sandbox/patch-agent-browser.js /tmp/patch-agent-browser.js
 RUN node /tmp/patch-agent-browser.js && rm /tmp/patch-agent-browser.js
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium-browser
@@ -88,24 +93,27 @@ ENV AGENT_BROWSER_ARGS="--no-sandbox,--disable-setuid-sandbox,--disable-gpu,--di
 ENV AGENT_BROWSER_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 # ── Agent Browser Viewer (watch the browser session from your Mac) ───────────
-COPY sandbox/assets/browser-viewer/ /opt/agent-browser-viewer/
+COPY sandbox/browser-viewer/ /opt/agent-browser-viewer/
 
 # ── OpenCode CLI ────────────────────────────────────────────────────────────
+# Initial install for Docker image; postinstall.sh handles version updates.
 # npm installs the glibc binary by default; force-install the musl variant
 # and symlink it over the glibc one so the wrapper script finds it.
-RUN npm install -g @kortix/opencode-ai@0.2.0 \
+RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['@kortix/opencode-ai']||'latest')" 2>/dev/null || echo "latest") \
+    && npm install -g "@kortix/opencode-ai@$CLI_VERSION" \
     && ARCH=$(uname -m) \
     && if [ "$ARCH" = "x86_64" ]; then \
-         npm install -g @kortix/opencode-ai-linux-x64-musl@0.2.0 --force \
+         npm install -g "@kortix/opencode-ai-linux-x64-musl@$CLI_VERSION" --force \
          && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-x64-musl/bin/opencode \
          && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-x64/bin/opencode \
          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
        else \
-         npm install -g @kortix/opencode-ai-linux-arm64-musl@0.2.0 --force \
+         npm install -g "@kortix/opencode-ai-linux-arm64-musl@$CLI_VERSION" --force \
          && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-arm64-musl/bin/opencode \
          && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-arm64/bin/opencode \
          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
        fi \
+    && rm /tmp/sandbox-pkg-versions.json \
     && opencode --version
 
 # ── OpenCode (agents, tools, skills) ────────────────────────────────────────
@@ -149,9 +157,10 @@ COPY sandbox/kortix-master/package.json /opt/kortix-master/package.json
 RUN cd /opt/kortix-master && bun install
 COPY sandbox/kortix-master/ /opt/kortix-master/
 
-# ── Version (for live update system) ─────────────────────────────────────────
+# ── Version & Changelog (for live update system) ────────────────────────────
 # Read version from sandbox/package.json (single source of truth) and write .version
 COPY sandbox/package.json /tmp/sandbox-pkg.json
+COPY sandbox/CHANGELOG.json /opt/kortix/CHANGELOG.json
 RUN mkdir -p /opt/kortix \
     && PKG_VERSION=$(node -e "console.log(require('/tmp/sandbox-pkg.json').version)") \
     && echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /opt/kortix/.version \

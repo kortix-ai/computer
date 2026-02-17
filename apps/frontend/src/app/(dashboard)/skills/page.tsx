@@ -1,7 +1,5 @@
-'use client';
-
-import { SkillList } from '@/features/skills';
+import { redirect } from 'next/navigation';
 
 export default function SkillsPage() {
-  return <SkillList />;
+  redirect('/workspace');
 }

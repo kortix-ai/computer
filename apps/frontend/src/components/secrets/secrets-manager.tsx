@@ -103,10 +103,10 @@ export function SecretsManager() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="flex flex-col">
+      <div>
         {/* Header: Search + Add */}
-        <div className="sticky top-0 z-10 bg-background px-3 py-2 flex items-center gap-2">
+        <div className="px-3 py-2 flex items-center gap-2 border-b border-border/50">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input

@@ -226,7 +226,7 @@ console.log(`
 ╚═══════════════════════════════════════════════════════════╝
 `);
 
-startScheduler();
+startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
 startChannelService();
 
 // Graceful shutdown

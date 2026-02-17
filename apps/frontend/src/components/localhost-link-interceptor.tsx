@@ -32,6 +32,11 @@ export function LocalhostLinkInterceptor() {
       const href = anchor.href; // resolved absolute URL
       if (!href || !isProxiableLocalhostUrl(href)) return;
 
+      // Never intercept links pointing at the app itself (same origin)
+      try {
+        if (new URL(href).origin === window.location.origin) return;
+      } catch { /* not a valid URL, skip */ }
+
       const match = href.match(LOCALHOST_HREF_RE);
       if (!match) return;
 

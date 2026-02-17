@@ -22,7 +22,14 @@ export { OcTodoToolView } from './OcTodoToolView';
 export { OcGenericToolView } from './OcGenericToolView';
 export { OcQuestionToolView } from './OcQuestionToolView';
 export { OcMemSearchToolView } from './OcMemSearchToolView';
+export { OcMemGetToolView } from './OcMemGetToolView';
+export { OcMemSaveToolView } from './OcMemSaveToolView';
+export { OcMemTimelineToolView } from './OcMemTimelineToolView';
 export { OcSessionContextToolView } from './OcSessionContextToolView';
+export { OcSkillToolView } from './OcSkillToolView';
+export { OcCodesearchToolView } from './OcCodesearchToolView';
+export { OcBatchToolView } from './OcBatchToolView';
+export { OcPlanToolView } from './OcPlanToolView';
 export { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
@@ -43,7 +50,14 @@ import { OcTodoToolView } from './OcTodoToolView';
 import { OcGenericToolView } from './OcGenericToolView';
 import { OcQuestionToolView } from './OcQuestionToolView';
 import { OcMemSearchToolView } from './OcMemSearchToolView';
+import { OcMemGetToolView } from './OcMemGetToolView';
+import { OcMemSaveToolView } from './OcMemSaveToolView';
+import { OcMemTimelineToolView } from './OcMemTimelineToolView';
 import { OcSessionContextToolView } from './OcSessionContextToolView';
+import { OcSkillToolView } from './OcSkillToolView';
+import { OcCodesearchToolView } from './OcCodesearchToolView';
+import { OcBatchToolView } from './OcBatchToolView';
+import { OcPlanToolView } from './OcPlanToolView';
 import { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
 
 /**
@@ -124,6 +138,21 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-session-context': OcSessionContextToolView,
   'oc-session_context': OcSessionContextToolView,
 
+  // Skill loading (SKILL.md knowledge modules)
+  'oc-skill': OcSkillToolView,
+
+  // Code search (external API search)
+  'oc-codesearch': OcCodesearchToolView,
+
+  // Batch execution (parallel tool calls)
+  'oc-batch': OcBatchToolView,
+
+  // Plan tools (agent switching)
+  'oc-plan_exit': OcPlanToolView,
+  'oc-plan-exit': OcPlanToolView,
+  'oc-plan_enter': OcPlanToolView,
+  'oc-plan-enter': OcPlanToolView,
+
   // Memory search (observations)
   'oc-mem-search': OcMemSearchToolView,
   'oc-mem_search': OcMemSearchToolView,
@@ -131,6 +160,18 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-memory_search': OcMemSearchToolView,
   'oc-memory-read': OcMemSearchToolView,
   'oc-memory_read': OcMemSearchToolView,
+
+  // Memory get (full observation details)
+  'oc-mem-get': OcMemGetToolView,
+  'oc-mem_get': OcMemGetToolView,
+
+  // Memory save (create observation)
+  'oc-mem-save': OcMemSaveToolView,
+  'oc-mem_save': OcMemSaveToolView,
+
+  // Memory timeline (chronological context)
+  'oc-mem-timeline': OcMemTimelineToolView,
+  'oc-mem_timeline': OcMemTimelineToolView,
 
   // MCP tools and other unknown tools will fall through to the
   // registry's default (GenericToolView). The OcGenericToolView

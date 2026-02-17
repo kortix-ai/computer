@@ -10,6 +10,20 @@ import updateRouter from './routes/update'
 import deployRouter from './routes/deploy'
 import { config } from './config'
 
+// ─── Changelog ──────────────────────────────────────────────────────────────
+const CHANGELOG_FILE = '/opt/kortix/CHANGELOG.json'
+
+async function getChangelog(version: string) {
+  try {
+    const file = Bun.file(CHANGELOG_FILE)
+    if (await file.exists()) {
+      const entries = await file.json()
+      return entries.find((e: any) => e.version === version) ?? null
+    }
+  } catch {}
+  return null
+}
+
 // ─── Crash protection ────────────────────────────────────────────────────────
 // Prevent unhandled errors from silently killing the process or leaving it
 // in a broken state. Log and continue.
@@ -75,7 +89,8 @@ app.get('/kortix/health', async (c) => {
     }
   } catch {}
   await checkOpenCodeReady()
-  return c.json({ status: 'ok', version, build: '0.4.11', activeWs: activeConnections, opencode: openCodeReady })
+  const changelog = await getChangelog(version)
+  return c.json({ status: 'ok', version, changelog, activeWs: activeConnections, opencode: openCodeReady })
 })
 
 // Port mappings — returns container→host port map so the frontend

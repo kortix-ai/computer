@@ -13,7 +13,7 @@ export default function SecretsPage() {
             Manage environment variables and API keys for your sandbox.
           </p>
         </div>
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg">
           <SecretsManager />
         </div>
       </div>

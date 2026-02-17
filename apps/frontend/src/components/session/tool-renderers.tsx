@@ -42,6 +42,7 @@ import {
   Hash,
   Clock,
   FileIcon,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -716,6 +717,112 @@ function SessionMetadataList({
   );
 }
 
+// --- Session messages rich rendering ---
+
+interface ParsedSessionMessage {
+  index: number;
+  role: string;
+  cost: number;
+  content: string;
+  tools?: string;
+}
+
+function parseSessionMessagesOutput(output: string): ParsedSessionMessage[] | null {
+  const trimmed = output.trim();
+  if (!trimmed.includes('--- Msg ')) return null;
+
+  const msgRegex = /---\s*Msg\s+(\d+)\s+\[(\w+)\]\s+cost=\$?([\d.]+)\s*---/g;
+  const matches = [...trimmed.matchAll(msgRegex)];
+  if (matches.length < 1) return null;
+
+  const messages: ParsedSessionMessage[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const start = m.index! + m[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : trimmed.length;
+    const rawContent = trimmed.slice(start, end).trim();
+
+    const toolsMatch = rawContent.match(/^\s*Tools used:\s*(.+)$/m);
+    const content = rawContent.replace(/^\s*Tools used:\s*.+$/m, '').trim();
+
+    messages.push({
+      index: parseInt(m[1], 10),
+      role: m[2].toLowerCase(),
+      cost: parseFloat(m[3]),
+      content,
+      tools: toolsMatch?.[1],
+    });
+  }
+
+  return messages.length > 0 ? messages : null;
+}
+
+function InlineSessionMessagesList({ messages }: { messages: ParsedSessionMessage[] }) {
+  return (
+    <div className="flex flex-col gap-1 p-1.5">
+      <div className="px-1.5 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        {messages.length} message{messages.length !== 1 ? 's' : ''}
+      </div>
+      {messages.map((msg) => (
+        <div
+          key={msg.index}
+          className={cn(
+            'rounded-md border overflow-hidden',
+            msg.role === 'user' ? 'border-border/60' : 'border-border/40',
+          )}
+        >
+          <div className={cn(
+            'flex items-center gap-2 px-2.5 py-1',
+            msg.role === 'user' ? 'bg-muted/50' : 'bg-card',
+          )}>
+            <span className={cn(
+              'text-[10px] font-semibold uppercase tracking-wide',
+              msg.role === 'user' ? 'text-blue-500' : 'text-emerald-500',
+            )}>
+              {msg.role}
+            </span>
+            <span className="text-[10px] text-muted-foreground/50 ml-auto">#{msg.index}</span>
+            {msg.cost > 0 && (
+              <span className="text-[10px] text-muted-foreground/50">${msg.cost.toFixed(4)}</span>
+            )}
+          </div>
+          <div className="px-2.5 py-1.5">
+            <div className="text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+              {msg.content.slice(0, 800)}
+              {msg.content.length > 800 && (
+                <span className="text-muted-foreground/50"> ... (truncated)</span>
+              )}
+            </div>
+            {msg.tools && (
+              <div className="mt-1 flex items-center gap-1 flex-wrap">
+                {msg.tools.split(',').map((t, i) => {
+                  const trimmedTool = t.trim();
+                  const nameMatch = trimmedTool.match(/^(\w+)\s*\((\w+)\)/);
+                  const name = nameMatch?.[1] || trimmedTool;
+                  const toolStatus = nameMatch?.[2] || '';
+                  return (
+                    <span
+                      key={i}
+                      className={cn(
+                        'text-[9px] px-1 py-0.5 rounded border',
+                        toolStatus === 'completed'
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-muted/50 border-border/50 text-muted-foreground',
+                      )}
+                    >
+                      {name}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const input = partInput(part);
   const metadata = partMetadata(part);
@@ -731,21 +838,27 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
     [strippedOutput],
   );
 
+  // Try to detect session messages output (--- Msg N [ROLE] cost=$X.XXXX ---)
+  const sessionMessages = useMemo(
+    () => (sessionMeta ? null : parseSessionMessagesOutput(strippedOutput)),
+    [strippedOutput, sessionMeta],
+  );
+
   // Try to detect structured log-like output (warnings, tracebacks, etc.)
   const structuredSections = useMemo(() => {
-    if (sessionMeta || !strippedOutput) return null;
+    if (sessionMeta || sessionMessages || !strippedOutput) return null;
     const normalized = normalizeToolOutput(strippedOutput);
     if (!hasStructuredContent(normalized)) return null;
     return parseStructuredOutput(normalized);
-  }, [strippedOutput, sessionMeta]);
+  }, [strippedOutput, sessionMeta, sessionMessages]);
 
   const outputBlock = useMemo(() => {
-    if (!strippedOutput || sessionMeta || structuredSections) return '';
+    if (!strippedOutput || sessionMeta || sessionMessages || structuredSections) return '';
     const { content, lang } = formatBashOutput(strippedOutput);
     return `\`\`\`${lang}\n${content}\n\`\`\``;
-  }, [strippedOutput, sessionMeta, structuredSections]);
+  }, [strippedOutput, sessionMeta, sessionMessages, structuredSections]);
 
-  const hasOutput = !!sessionMeta || !!structuredSections || !!outputBlock;
+  const hasOutput = !!sessionMeta || !!sessionMessages || !!structuredSections || !!outputBlock;
 
   return (
     <BasicTool
@@ -764,10 +877,19 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         </div>
         {/* Output */}
         {hasOutput && (
-          <div className="border-t border-border/30">
+          <div className="mx-2 mb-2 rounded-md border border-border/40 bg-background/50 overflow-hidden">
+            {/* Output label */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 border-b border-border/30">
+              <div className="size-1.5 rounded-full bg-muted-foreground/25" />
+              <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40">Output</span>
+            </div>
             {sessionMeta ? (
               <div className="p-2">
                 <SessionMetadataList sessions={sessionMeta} />
+              </div>
+            ) : sessionMessages ? (
+              <div className="p-2">
+                <InlineSessionMessagesList messages={sessionMessages} />
               </div>
             ) : structuredSections ? (
               <div className="p-2">
@@ -2722,6 +2844,140 @@ function SessionContextTool({ part, defaultOpen, forceOpen, locked }: ToolProps)
 }
 ToolRegistry.register('session_context', SessionContextTool);
 
+// --- Skill ---
+function SkillToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const metadata = partMetadata(part);
+  const output = partOutput(part);
+
+  const skillName = String(metadata.name || input.name || 'Skill');
+  const skillDir = String(metadata.dir || '');
+  const subtitle = skillDir || undefined;
+
+  return (
+    <BasicTool
+      icon={<BookOpen className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Skill', subtitle: skillName }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {output && (
+        <div data-scrollable className={`p-2 max-h-48 overflow-auto ${MD_FLUSH_CLASSES}`}>
+          <UnifiedMarkdown content={output.slice(0, 2000)} isStreaming={false} />
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('skill', SkillToolRenderer);
+
+// --- Code Search ---
+function CodesearchToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+
+  const query = String(input.query || '');
+
+  return (
+    <BasicTool
+      icon={<Globe className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Code Search', subtitle: query || undefined }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {output && (
+        <div data-scrollable className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}>
+          <UnifiedMarkdown content={output.slice(0, 3000)} isStreaming={false} />
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('codesearch', CodesearchToolRenderer);
+
+// --- Batch ---
+function BatchToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const metadata = partMetadata(part);
+  const status = partStatus(part);
+
+  const totalCalls = (metadata.totalCalls as number) || 0;
+  const successful = (metadata.successful as number) || 0;
+  const failed = (metadata.failed as number) || 0;
+  const details = (Array.isArray(metadata.details) ? metadata.details : []) as Array<{ tool: string; success: boolean }>;
+
+  const toolCalls = details.length > 0
+    ? details
+    : (Array.isArray(input.tool_calls) ? input.tool_calls as Array<{ tool: string }> : []).map((c) => ({ tool: c.tool, success: true }));
+
+  const subtitle = totalCalls > 0
+    ? `${successful}/${totalCalls} passed`
+    : `${toolCalls.length} tool${toolCalls.length !== 1 ? 's' : ''}`;
+
+  return (
+    <BasicTool
+      icon={<Layers className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: 'Batch', subtitle }}
+      defaultOpen={defaultOpen ?? (failed > 0)}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {toolCalls.length > 0 && (
+        <div className="px-3 py-2 space-y-1">
+          {toolCalls.map((call: { tool: string; success?: boolean }, i: number) => (
+            <div key={i} className="flex items-center gap-2 text-xs">
+              {status === 'running' || status === 'pending' ? (
+                <Loader2 className="size-2.5 text-muted-foreground animate-spin shrink-0" />
+              ) : call.success !== false ? (
+                <Check className="size-2.5 text-emerald-500 shrink-0" />
+              ) : (
+                <CircleAlert className="size-2.5 text-red-500 shrink-0" />
+              )}
+              <span className="font-mono truncate">{call.tool}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('batch', BatchToolRenderer);
+
+// --- Plan (Enter/Exit) ---
+function PlanToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const status = partStatus(part);
+
+  const toolName = (part as any).tool || '';
+  const isExit = toolName === 'plan_exit';
+  const subtitle = isExit ? 'Plan -> Build' : 'Build -> Plan';
+
+  return (
+    <BasicTool
+      icon={<SquareKanban className="size-3.5 flex-shrink-0" />}
+      trigger={{ title: isExit ? 'Switch to Build' : 'Switch to Plan', subtitle }}
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {status === 'completed' && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          {isExit ? 'Switched to build agent.' : 'Switched to plan agent.'}
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          User declined the switch.
+        </div>
+      )}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('plan_exit', PlanToolRenderer);
+ToolRegistry.register('plan_enter', PlanToolRenderer);
+
 // --- Question ---
 function QuestionSkeletonOptions() {
   return (
@@ -3219,6 +3475,555 @@ ToolRegistry.register('mem-search', MemSearchTool);
 ToolRegistry.register('mem_search', MemSearchTool);
 
 // ============================================================================
+// MemGetTool — renders the rich markdown observation output from
+// the "mem-get" / "mem_get" tool as structured cards
+// ============================================================================
+
+interface MemGetObservation {
+  id: string;
+  title: string;
+  time: string;
+  type: string;
+  typeEmoji: string;
+  tool: string;
+  subtitle: string;
+  narrative: string;
+  facts: string[];
+  concepts: string[];
+  filesRead: string[];
+  filesModified: string[];
+}
+
+/** Parse the rich markdown output produced by formatObservations() in the mem_get tool. */
+function parseMemGetOutput(output: string): MemGetObservation[] {
+  if (!output) return [];
+  // Split by "---" separator between observations
+  const sections = output.split(/\n---\n/).filter(s => s.trim());
+  const observations: MemGetObservation[] = [];
+
+  for (const section of sections) {
+    const lines = section.split('\n');
+    // Parse header: ## #2 — 🔵 Title
+    const headerMatch = lines[0]?.match(/^##\s+#(\d+)\s*[—–-]\s*(.+)/);
+    if (!headerMatch) continue;
+
+    const id = `#${headerMatch[1]}`;
+    const titlePart = headerMatch[2].trim();
+    // Extract emoji from title start (first char or two)
+    const emojiMatch = titlePart.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)\s*/u);
+    const typeEmoji = emojiMatch ? emojiMatch[1] : '';
+    const title = emojiMatch ? titlePart.slice(emojiMatch[0].length) : titlePart;
+
+    // Parse metadata line: **Time:** Feb 16 18:23 | **Type:** discovery | **Tool:** web-search
+    let time = '', type = '', tool = '';
+    const metaLine = lines.find(l => l.includes('**Time:**'));
+    if (metaLine) {
+      const timeM = metaLine.match(/\*\*Time:\*\*\s*([^|]+)/);
+      const typeM = metaLine.match(/\*\*Type:\*\*\s*([^|]+)/);
+      const toolM = metaLine.match(/\*\*Tool:\*\*\s*(.+)/);
+      time = timeM?.[1]?.trim() || '';
+      type = typeM?.[1]?.trim() || '';
+      tool = toolM?.[1]?.trim() || '';
+    }
+
+    // Parse subtitle
+    const subtitleLine = lines.find(l => l.startsWith('**Subtitle:**'));
+    const subtitle = subtitleLine?.replace('**Subtitle:**', '').trim() || '';
+
+    // Parse narrative (text between subtitle/metadata and **Facts:**)
+    let narrative = '';
+    let inNarrative = false;
+    const narrativeLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith('## #') || line.includes('**Time:**') || line.startsWith('**Subtitle:**')) {
+        inNarrative = false;
+        continue;
+      }
+      if (line.startsWith('**Facts:**') || line.startsWith('**Concepts:**') || line.startsWith('**Files read:**') || line.startsWith('**Files modified:**')) {
+        inNarrative = false;
+        continue;
+      }
+      if (inNarrative || (narrativeLines.length === 0 && line.trim() && !line.startsWith('**') && !line.startsWith('-'))) {
+        inNarrative = true;
+        narrativeLines.push(line);
+      }
+    }
+    narrative = narrativeLines.join(' ').trim();
+
+    // Parse facts
+    const facts: string[] = [];
+    let inFacts = false;
+    for (const line of lines) {
+      if (line.startsWith('**Facts:**')) { inFacts = true; continue; }
+      if (inFacts && line.startsWith('- ')) {
+        facts.push(line.slice(2).trim());
+      } else if (inFacts && !line.startsWith('- ') && line.trim()) {
+        inFacts = false;
+      }
+    }
+
+    // Parse concepts
+    const conceptsLine = lines.find(l => l.startsWith('**Concepts:**'));
+    const concepts = conceptsLine
+      ? conceptsLine.replace('**Concepts:**', '').split(',').map(c => c.trim()).filter(Boolean)
+      : [];
+
+    // Parse files
+    const filesReadLine = lines.find(l => l.startsWith('**Files read:**'));
+    const filesRead = filesReadLine
+      ? filesReadLine.replace('**Files read:**', '').split(',').map(f => f.trim()).filter(Boolean)
+      : [];
+
+    const filesModifiedLine = lines.find(l => l.startsWith('**Files modified:**'));
+    const filesModified = filesModifiedLine
+      ? filesModifiedLine.replace('**Files modified:**', '').split(',').map(f => f.trim()).filter(Boolean)
+      : [];
+
+    observations.push({ id, title, time, type, typeEmoji, tool, subtitle, narrative, facts, concepts, filesRead, filesModified });
+  }
+
+  return observations;
+}
+
+/** Map the type string/emoji from mem_get to label + styles. */
+function memGetTypeInfo(typeEmoji: string, type: string): { label: string; bg: string; text: string; dot: string } {
+  const e = typeEmoji.trim();
+  if (e.includes('\u{1F535}') || type === 'discovery')
+    return { label: 'Research',  bg: 'bg-blue-500/10',    text: 'text-blue-400',    dot: 'bg-blue-400' };
+  if (e.includes('\u{1F7E3}') || type === 'feature')
+    return { label: 'Feature',   bg: 'bg-purple-500/10',  text: 'text-purple-400',  dot: 'bg-purple-400' };
+  if (e.includes('\u{1F534}') || type === 'bugfix')
+    return { label: 'Bugfix',    bg: 'bg-red-500/10',     text: 'text-red-400',     dot: 'bg-red-400' };
+  if (e.includes('\u{2696}') || type === 'decision')
+    return { label: 'Decision',  bg: 'bg-amber-500/10',   text: 'text-amber-400',   dot: 'bg-amber-400' };
+  if (e.includes('\u{1F504}') || type === 'refactor')
+    return { label: 'Refactor',  bg: 'bg-orange-500/10',  text: 'text-orange-400',  dot: 'bg-orange-400' };
+  if (e.includes('\u{2705}') || type === 'change')
+    return { label: 'Change',    bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400' };
+  return { label: 'Note', bg: 'bg-muted/40', text: 'text-muted-foreground', dot: 'bg-muted-foreground/50' };
+}
+
+function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const ids = input.ids ? String(input.ids) : '';
+
+  const observations = useMemo(() => parseMemGetOutput(output), [output]);
+  const hasResults = observations.length > 0;
+
+  const triggerBadge = status === 'completed'
+    ? hasResults
+      ? `${observations.length} loaded`
+      : 'empty'
+    : undefined;
+
+  return (
+    <BasicTool
+      icon={<Brain className="size-3.5 flex-shrink-0" />}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Mem Get</span>
+          {ids && <span className="text-muted-foreground text-xs truncate font-mono">{ids}</span>}
+          {triggerBadge && (
+            <span className={cn(
+              'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
+              hasResults ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
+            )}>
+              {triggerBadge}
+            </span>
+          )}
+        </div>
+      }
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {status === 'completed' && hasResults ? (
+        <div data-scrollable className="max-h-[400px] overflow-auto">
+          <div className="px-3 pb-2.5">
+            {/* Section label */}
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5 mt-1">
+              Observations
+            </div>
+
+            {/* Observation list */}
+            <div className="space-y-0.5">
+              {observations.map((obs, i) => {
+                const typeInfo = memGetTypeInfo(obs.typeEmoji, obs.type);
+                const allFiles = [...obs.filesRead, ...obs.filesModified].join(', ');
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2.5 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
+                  >
+                    {/* Type dot */}
+                    <div className={cn('size-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5', typeInfo.bg)}>
+                      <span className={cn('size-2 rounded-full', typeInfo.dot)} />
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-medium text-foreground line-clamp-2">
+                        {obs.title}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-[10px] text-muted-foreground/50 font-mono">
+                          {obs.id}
+                        </span>
+                        <span className="text-muted-foreground/20">&middot;</span>
+                        <span className="text-[10px] text-muted-foreground/50">
+                          {obs.time}
+                        </span>
+                        <span className="text-muted-foreground/20">&middot;</span>
+                        <span className={cn('text-[10px] font-medium', typeInfo.text)}>
+                          {typeInfo.label}
+                        </span>
+                        {obs.tool && obs.tool !== '—' && (
+                          <>
+                            <span className="text-muted-foreground/20">&middot;</span>
+                            <span className="text-[10px] text-muted-foreground/40 font-mono">
+                              {obs.tool}
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Subtitle / narrative snippet */}
+                      {(obs.subtitle || obs.narrative) && (
+                        <div className="text-[10px] text-muted-foreground/60 mt-1 line-clamp-2">
+                          {obs.subtitle || obs.narrative}
+                        </div>
+                      )}
+
+                      {/* Facts preview */}
+                      {obs.facts.length > 0 && (
+                        <div className="mt-1.5 space-y-0.5">
+                          {obs.facts.slice(0, 3).map((fact, fi) => (
+                            <div key={fi} className="text-[10px] text-muted-foreground/50 flex items-start gap-1.5">
+                              <span className="text-muted-foreground/30 mt-px flex-shrink-0">&bull;</span>
+                              <span className="line-clamp-1">{fact}</span>
+                            </div>
+                          ))}
+                          {obs.facts.length > 3 && (
+                            <div className="text-[10px] text-muted-foreground/30 pl-3">
+                              +{obs.facts.length - 3} more
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Concepts */}
+                      {obs.concepts.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {obs.concepts.slice(0, 5).map((c, ci) => (
+                            <span key={ci} className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/60">
+                              {c}
+                            </span>
+                          ))}
+                          {obs.concepts.length > 5 && (
+                            <span className="text-[9px] text-muted-foreground/30">+{obs.concepts.length - 5}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Files */}
+                      {allFiles && (
+                        <div className="text-[10px] text-muted-foreground/40 font-mono truncate mt-1">
+                          {allFiles}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : status === 'completed' && output ? (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+        </div>
+      ) : null}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('mem-get', MemGetTool);
+ToolRegistry.register('mem_get', MemGetTool);
+
+// ============================================================================
+// MemSaveTool — renders the "mem-save" / "mem_save" tool result
+// Success: "Observation #42 saved: "title""
+// ============================================================================
+
+function MemSaveTool({ part }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const title = (input.title as string) || '';
+  const type = (input.type as string) || 'discovery';
+
+  // Parse success output: Observation #137 saved: "title"
+  const parsed = useMemo(() => {
+    if (!output) return null;
+    const m = output.match(/Observation\s+#(\d+)\s+saved:\s+"([^"]+)"/);
+    if (!m) return null;
+    return { id: `#${m[1]}`, title: m[2] };
+  }, [output]);
+
+  const displayTitle = parsed?.title || title || '';
+  const typeInfo = memGetTypeInfo('', type);
+
+  const triggerBadge = status === 'completed'
+    ? parsed
+      ? parsed.id
+      : 'saved'
+    : undefined;
+
+  return (
+    <BasicTool
+      icon={<Brain className="size-3.5 flex-shrink-0" />}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Mem Save</span>
+          {displayTitle && (
+            <span className="text-muted-foreground text-xs truncate font-mono">{displayTitle}</span>
+          )}
+          {triggerBadge && (
+            <span className={cn(
+              'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
+              'bg-emerald-500/10 text-emerald-400',
+            )}>
+              {triggerBadge}
+            </span>
+          )}
+        </div>
+      }
+    >
+      {status === 'completed' && parsed ? (
+        <div className="px-3 py-2.5">
+          <div className="flex items-start gap-2.5">
+            {/* Type dot */}
+            <div className={cn('size-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5', typeInfo.bg)}>
+              <span className={cn('size-2 rounded-full', typeInfo.dot)} />
+            </div>
+
+            {/* Content */}
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-medium text-foreground line-clamp-2">
+                {parsed.title}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] text-muted-foreground/50 font-mono">
+                  {parsed.id}
+                </span>
+                <span className="text-muted-foreground/20">&middot;</span>
+                <span className={cn('text-[10px] font-medium', typeInfo.text)}>
+                  {typeInfo.label}
+                </span>
+                <span className="text-muted-foreground/20">&middot;</span>
+                <span className="text-[10px] text-emerald-400 font-medium inline-flex items-center gap-1">
+                  <Check className="size-3" />
+                  Saved
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : status === 'completed' && output ? (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+        </div>
+      ) : null}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('mem-save', MemSaveTool);
+ToolRegistry.register('mem_save', MemSaveTool);
+
+// ============================================================================
+// MemTimelineTool — renders the "mem-timeline" / "mem_timeline" tool result
+// ============================================================================
+
+interface TimelineEntry {
+  id: string;
+  time: string;
+  typeEmoji: string;
+  title: string;
+  isAnchor: boolean;
+  subtitle: string;
+  narrative: string;
+  files: string;
+}
+
+/** Parse the timeline output produced by formatTimeline(). */
+function parseTimelineOutput(output: string): TimelineEntry[] {
+  if (!output) return [];
+  const entries: TimelineEntry[] = [];
+  const lines = output.split('\n');
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Match: **#42** Feb 16 05:14 🔵 Some title here **[ANCHOR]**
+    const m = line.match(/^\*\*#(\d+)\*\*\s+(.+?)\s+(\S+)\s+(.+?)(?:\s+\*\*\[ANCHOR\]\*\*)?$/);
+    if (!m) { i++; continue; }
+
+    const isAnchor = line.includes('**[ANCHOR]**');
+    const titleText = m[4].replace(/\s*\*\*\[ANCHOR\]\*\*/, '').trim();
+
+    // Gather continuation lines (indented with 2 spaces)
+    let subtitle = '';
+    let narrative = '';
+    let files = '';
+    i++;
+    while (i < lines.length && lines[i].startsWith('  ')) {
+      const content = lines[i].slice(2).trim();
+      if (content.startsWith('Files:')) {
+        files = content.replace('Files:', '').trim();
+      } else if (!subtitle) {
+        subtitle = content;
+      } else {
+        narrative = content;
+      }
+      i++;
+    }
+
+    entries.push({
+      id: `#${m[1]}`,
+      time: m[2],
+      typeEmoji: m[3],
+      title: titleText,
+      isAnchor,
+      subtitle,
+      narrative,
+      files,
+    });
+  }
+
+  return entries;
+}
+
+function MemTimelineTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+  const input = partInput(part);
+  const output = partOutput(part);
+  const status = partStatus(part);
+  const anchor = input.anchor ? `#${input.anchor}` : '';
+
+  const entries = useMemo(() => parseTimelineOutput(output), [output]);
+  const hasResults = entries.length > 0;
+
+  const triggerBadge = status === 'completed'
+    ? hasResults
+      ? `${entries.length} entries`
+      : 'empty'
+    : undefined;
+
+  return (
+    <BasicTool
+      icon={<Clock className="size-3.5 flex-shrink-0" />}
+      trigger={
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Mem Timeline</span>
+          {anchor && <span className="text-muted-foreground text-xs truncate font-mono">{anchor}</span>}
+          {triggerBadge && (
+            <span className={cn(
+              'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
+              hasResults ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
+            )}>
+              {triggerBadge}
+            </span>
+          )}
+        </div>
+      }
+      defaultOpen={defaultOpen}
+      forceOpen={forceOpen}
+      locked={locked}
+    >
+      {status === 'completed' && hasResults ? (
+        <div data-scrollable className="max-h-[400px] overflow-auto">
+          <div className="px-3 pb-2.5">
+            {/* Section label */}
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5 mt-1">
+              Timeline
+            </div>
+
+            {/* Timeline list */}
+            <div className="space-y-0.5 relative">
+              {/* Vertical timeline line */}
+              <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border/30" />
+
+              {entries.map((entry, i) => {
+                const typeInfo = observationTypeInfo(entry.typeEmoji);
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex items-start gap-2.5 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors relative',
+                      entry.isAnchor && 'bg-primary/5 border border-primary/10',
+                    )}
+                  >
+                    {/* Type dot */}
+                    <div className={cn('size-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 z-10', typeInfo.bg)}>
+                      <span className={cn('size-2 rounded-full', typeInfo.dot)} />
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-medium text-foreground line-clamp-2">
+                        {entry.title}
+                        {entry.isAnchor && (
+                          <span className="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary font-semibold">
+                            ANCHOR
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground/50 font-mono">
+                          {entry.id}
+                        </span>
+                        <span className="text-muted-foreground/20">&middot;</span>
+                        <span className="text-[10px] text-muted-foreground/50">
+                          {entry.time}
+                        </span>
+                        <span className="text-muted-foreground/20">&middot;</span>
+                        <span className={cn('text-[10px] font-medium', typeInfo.text)}>
+                          {typeInfo.label}
+                        </span>
+                      </div>
+
+                      {/* Subtitle / narrative */}
+                      {(entry.subtitle || entry.narrative) && (
+                        <div className="text-[10px] text-muted-foreground/60 mt-1 line-clamp-2">
+                          {entry.subtitle || entry.narrative}
+                        </div>
+                      )}
+
+                      {/* Files */}
+                      {entry.files && (
+                        <div className="text-[10px] text-muted-foreground/40 font-mono truncate mt-0.5">
+                          {entry.files}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : status === 'completed' && output ? (
+        <div data-scrollable className="p-2 max-h-72 overflow-auto">
+          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{output}</pre>
+        </div>
+      ) : null}
+    </BasicTool>
+  );
+}
+ToolRegistry.register('mem-timeline', MemTimelineTool);
+ToolRegistry.register('mem_timeline', MemTimelineTool);
+
+// ============================================================================
 // DCP Tools (distill, compress, prune, context_info)
 // ============================================================================
 
@@ -3360,14 +4165,52 @@ ToolRegistry.register('context_info', ContextInfoTool);
 // ============================================================================
 
 /**
+ * A parsed Zod/JSON validation error issue.
+ */
+interface ValidationIssue {
+  code: string;
+  message: string;
+  path: string[];
+  values?: string[];
+}
+
+/**
  * Parse an error string into a summary line and optional traceback/details.
  */
 function parseErrorContent(error: string): {
   summary: string;
   traceback: string | null;
   errorType: string | null;
+  validationIssues: ValidationIssue[] | null;
 } {
   const cleaned = error.replace(/^Error:\s*/, '');
+
+  // Try to detect JSON validation errors (Zod-style arrays of issues)
+  const trimmed = cleaned.trim();
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      // Check if it looks like validation issues (has code + message fields)
+      if (arr.length > 0 && arr.every((item: any) => item && typeof item === 'object' && 'message' in item)) {
+        const issues: ValidationIssue[] = arr.map((item: any) => ({
+          code: item.code || 'error',
+          message: item.message || String(item),
+          path: Array.isArray(item.path) ? item.path.map(String) : [],
+          values: Array.isArray(item.values) ? item.values.map(String) : undefined,
+        }));
+        // Build a readable summary from the first issue
+        const first = issues[0];
+        const pathStr = first.path.length > 0 ? first.path.join('.') : '';
+        const summary = pathStr
+          ? `${pathStr}: ${first.message}`
+          : first.message;
+        return { summary, traceback: null, errorType: 'Validation Error', validationIssues: issues };
+      }
+    } catch {
+      // Not valid JSON — fall through to other detection methods
+    }
+  }
 
   // Try to extract Python-style traceback
   const tracebackIdx = cleaned.indexOf('Traceback (most recent call last):');
@@ -3381,14 +4224,14 @@ function parseErrorContent(error: string): {
     const typeMatch = lastLine.match(/^([\w._]+(?:Error|Exception|Warning)):\s*/);
     const errorType = typeMatch ? typeMatch[1].split('.').pop() || typeMatch[1] : null;
     const summary = before || (errorType ? lastLine : lastLine.slice(0, 120));
-    return { summary, traceback: traceSection, errorType };
+    return { summary, traceback: traceSection, errorType, validationIssues: null };
   }
 
   // Try to extract Node.js-style stack trace
   const stackIdx = cleaned.indexOf('\n    at ');
   if (stackIdx >= 0) {
     const summary = cleaned.slice(0, stackIdx).trim();
-    return { summary, traceback: cleaned.slice(stackIdx), errorType: null };
+    return { summary, traceback: cleaned.slice(stackIdx), errorType: null, validationIssues: null };
   }
 
   // Simple "ErrorType: message" pattern
@@ -3396,11 +4239,11 @@ function parseErrorContent(error: string): {
   if (colonIdx > 0 && colonIdx < 60) {
     const left = cleaned.slice(0, colonIdx);
     if (/^[\w._-]+$/.test(left)) {
-      return { summary: cleaned, traceback: null, errorType: left };
+      return { summary: cleaned, traceback: null, errorType: left, validationIssues: null };
     }
   }
 
-  return { summary: cleaned, traceback: null, errorType: null };
+  return { summary: cleaned, traceback: null, errorType: null, validationIssues: null };
 }
 
 export function ToolError({ error, toolName }: { error: string; toolName?: string }) {
@@ -3413,7 +4256,7 @@ export function ToolError({ error, toolName }: { error: string; toolName?: strin
     return parseStructuredOutput(normalized);
   }, [error]);
 
-  const { summary, traceback, errorType } = useMemo(() => parseErrorContent(
+  const { summary, traceback, errorType, validationIssues } = useMemo(() => parseErrorContent(
     normalizeToolOutput(error),
   ), [error]);
 
@@ -3425,6 +4268,61 @@ export function ToolError({ error, toolName }: { error: string; toolName?: strin
     return (
       <div className="text-xs">
         <StructuredOutput sections={structuredSections} />
+      </div>
+    );
+  }
+
+  // Render validation issues with structured layout
+  if (validationIssues && validationIssues.length > 0) {
+    return (
+      <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden text-xs">
+        {/* Header */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-red-500/10">
+          <Ban className="size-3 flex-shrink-0 text-red-400" />
+          <span className="font-medium text-red-400">{displayType}</span>
+          {toolName && (
+            <span className="text-muted-foreground/50 font-mono text-[10px] ml-auto">{toolName}</span>
+          )}
+        </div>
+
+        {/* Validation issues */}
+        <div className="px-3 py-2.5 space-y-2.5">
+          {validationIssues.map((issue, i) => (
+            <div key={i} className="space-y-1.5">
+              {/* Path + message */}
+              <div className="flex items-start gap-2">
+                <CircleAlert className="size-3 flex-shrink-0 text-red-400/70 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  {issue.path.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-300 font-mono mr-1.5">
+                      {issue.path.join('.')}
+                    </span>
+                  )}
+                  <span className="text-foreground/80 text-[11px]">
+                    {issue.message}
+                  </span>
+                </div>
+              </div>
+
+              {/* Valid values */}
+              {issue.values && issue.values.length > 0 && (
+                <div className="ml-5">
+                  <div className="text-[10px] text-muted-foreground/50 mb-1">Expected one of:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {issue.values.map((val, vi) => (
+                      <span
+                        key={vi}
+                        className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/40 text-muted-foreground/70 font-mono"
+                      >
+                        {val}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

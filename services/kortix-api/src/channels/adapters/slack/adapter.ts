@@ -79,11 +79,16 @@ export class SlackAdapter extends BaseAdapter {
 
     const chunks = splitMessage(fallbackText, this.capabilities.textChunkLimit);
 
+    const meta = channelConfig.metadata as Record<string, unknown> | null;
+    const customIdentity = meta?.customIdentity as { username?: string; iconUrl?: string } | undefined;
+
     const firstResult = await api.postMessage({
       channel,
       text: chunks[0] || fallbackText,
       thread_ts: threadTs,
       blocks,
+      ...(customIdentity?.username && { username: customIdentity.username }),
+      ...(customIdentity?.iconUrl && { icon_url: customIdentity.iconUrl }),
     });
 
     if (!firstResult.ok) {
@@ -215,6 +220,62 @@ export class SlackAdapter extends BaseAdapter {
     });
   }
 
+  async sendUnlinkedMessage(
+    channelConfig: ChannelConfig,
+    message: NormalizedMessage,
+  ): Promise<void> {
+    // For slash commands, respond via response_url
+    const rawPayload = message.raw as Record<string, unknown> | undefined;
+    if (rawPayload?._slackCommand && rawPayload?.responseUrl) {
+      const { postToResponseUrl } = await import('./commands');
+      const frontendUrl = config.FRONTEND_URL;
+      await postToResponseUrl(
+        rawPayload.responseUrl as string,
+        `:warning: This Slack channel isn't linked to an instance yet. <${frontendUrl}/channels|Link one in the dashboard> to start chatting.`,
+        true,
+      );
+      return;
+    }
+
+    const botToken = this.getBotToken(channelConfig);
+    if (!botToken) return;
+
+    const event = rawPayload?.event as Record<string, unknown> | undefined;
+    const channel = event?.channel as string;
+    if (!channel) return;
+
+    const api = new SlackApi(botToken);
+    const threadTs = message.threadId || message.externalId;
+    const frontendUrl = config.FRONTEND_URL;
+
+    await api.postMessage({
+      channel,
+      text: "This channel isn't linked to an instance yet. Link one to start chatting.",
+      thread_ts: threadTs,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: ":warning: *No instance linked*\nThis Slack channel isn't connected to a Kortix instance yet. Link one to start chatting.",
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Link Instance', emoji: true },
+              style: 'primary',
+              action_id: 'link_instance',
+              url: `${frontendUrl}/channels`,
+            },
+          ],
+        },
+      ],
+    });
+  }
+
   override async sendFiles(
     channelConfig: ChannelConfig,
     message: NormalizedMessage,
@@ -278,18 +339,24 @@ export class SlackAdapter extends BaseAdapter {
 
   private async handleInstall(c: Context): Promise<Response> {
     const sandboxId = c.req.query('sandboxId');
+    const accountId = c.req.query('accountId');
 
-    if (!sandboxId) {
-      return c.json({ error: 'Missing sandboxId' }, 400);
-    }
+    let resolvedAccountId: string | undefined;
 
-    const [sandbox] = await db
-      .select({ accountId: sandboxes.accountId })
-      .from(sandboxes)
-      .where(eq(sandboxes.sandboxId, sandboxId));
+    if (sandboxId) {
+      const [sandbox] = await db
+        .select({ accountId: sandboxes.accountId })
+        .from(sandboxes)
+        .where(eq(sandboxes.sandboxId, sandboxId));
 
-    if (!sandbox) {
-      return c.json({ error: 'Sandbox not found' }, 404);
+      if (!sandbox) {
+        return c.json({ error: 'Sandbox not found' }, 404);
+      }
+      resolvedAccountId = sandbox.accountId;
+    } else if (accountId) {
+      resolvedAccountId = accountId;
+    } else {
+      return c.json({ error: 'Missing sandboxId or accountId' }, 400);
     }
 
     const clientId = config.SLACK_CLIENT_ID;
@@ -297,8 +364,11 @@ export class SlackAdapter extends BaseAdapter {
       return c.json({ error: 'Slack OAuth not configured (missing client ID)' }, 500);
     }
 
-    const state = JSON.stringify({ sandboxId, accountId: sandbox.accountId });
-    const scopes = 'chat:write,reactions:read,reactions:write,app_mentions:read,im:history,channels:history,groups:history,mpim:history,commands,files:read,files:write,links:read,links:write,channels:read';
+    const state = JSON.stringify({
+      sandboxId: sandboxId || null,
+      accountId: resolvedAccountId,
+    });
+    const scopes = 'chat:write,chat:write.customize,reactions:read,reactions:write,app_mentions:read,im:history,im:write,channels:history,channels:read,channels:join,channels:manage,groups:history,mpim:history,commands,files:read,files:write,links:read,links:write,users:read,users:read.email,users.profile:read,search:read.public,search:read.files,search:read.users,pins:read,pins:write,usergroups:read,bookmarks:read,bookmarks:write,reminders:write,reminders:read,dnd:read,team:read,emoji:read';
 
     const slackUrl = new URL('https://slack.com/oauth/v2/authorize');
     slackUrl.searchParams.set('client_id', clientId);
@@ -322,12 +392,12 @@ export class SlackAdapter extends BaseAdapter {
       return c.redirect(`${frontendUrl}/channels?slack=error&message=${encodeURIComponent('Missing code or state')}`);
     }
 
-    let sandboxId: string;
+    let sandboxId: string | null;
     let accountId: string;
     try {
-      const parsed = JSON.parse(stateRaw) as { sandboxId?: string; accountId?: string };
-      if (!parsed.sandboxId || !parsed.accountId) throw new Error('incomplete state');
-      sandboxId = parsed.sandboxId;
+      const parsed = JSON.parse(stateRaw) as { sandboxId?: string | null; accountId?: string };
+      if (!parsed.accountId) throw new Error('incomplete state');
+      sandboxId = parsed.sandboxId || null;
       accountId = parsed.accountId;
     } catch {
       return c.redirect(`${frontendUrl}/channels?slack=error&message=${encodeURIComponent('Invalid state parameter')}`);
@@ -403,6 +473,9 @@ export class SlackAdapter extends BaseAdapter {
       return c.redirect(`${frontendUrl}/channels?slack=error&message=${encodeURIComponent('Failed to save channel config')}`);
     }
 
-    return c.redirect(`${frontendUrl}/channels?slack=connected`);
+    const redirectParams = sandboxId
+      ? 'slack=connected'
+      : 'slack=connected&needsLink=true';
+    return c.redirect(`${frontendUrl}/channels?${redirectParams}`);
   }
 }

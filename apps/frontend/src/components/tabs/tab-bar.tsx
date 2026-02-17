@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -468,14 +468,14 @@ function TabItem({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group relative flex items-center h-8 md:h-9 text-xs select-none cursor-pointer',
-        'transition-colors duration-150 ease-out',
+        'group relative flex items-center text-xs select-none cursor-pointer',
+        'transition-all duration-200 ease-out',
         isDashboard
           ? 'w-9 md:w-10 justify-center px-0'
           : 'gap-1.5 px-3 max-w-[200px] min-w-[110px]',
         isActive
-          ? 'text-foreground'
-          : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+          ? 'h-[36px] md:h-[40px] rounded-t-[8px] bg-muted text-foreground'
+          : 'h-[32px] md:h-[36px] rounded-t-[6px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]',
       )}
     >
       {/* Drag-over indicator */}
@@ -550,10 +550,7 @@ function TabItem({
         </button>
       )}
 
-      {/* Active indicator — subtle bottom line */}
-      {isActive && (
-        <div className="absolute bottom-0 inset-x-0 h-[2px] bg-foreground/80" />
-      )}
+
     </div>
   );
 }
@@ -577,6 +574,12 @@ export function TabBar() {
   // Tab list dropdown state
   const [showTabList, setShowTabList] = useState(false);
   const tabListBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Refs for the tab bar container, chrome-style curve elements, and scroll fade
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const curveLeftRef = useRef<HTMLDivElement>(null);
+  const curveRightRef = useRef<HTMLDivElement>(null);
+  const scrollFadeRef = useRef<HTMLDivElement>(null);
 
   // Drag-and-drop state
   const dragTabIdRef = useRef<string | null>(null);
@@ -1047,31 +1050,108 @@ export function TabBar() {
     }
   }, [activeTabId]);
 
+  // ---------------------------------------------------------------------------
+  // Chrome-style curve positioning: measure the active tab's position relative
+  // to the tab bar and update the curve DOM elements directly (no setState)
+  // so they stay perfectly in sync even during fast scrolling.
+  // ---------------------------------------------------------------------------
+  useLayoutEffect(() => {
+    const measure = () => {
+      const lEl = curveLeftRef.current;
+      const rEl = curveRightRef.current;
+      if (!lEl || !rEl) return;
+
+      if (!activeTabId || !scrollRef.current || !tabBarRef.current) {
+        lEl.style.display = 'none';
+        rEl.style.display = 'none';
+        return;
+      }
+      const wrapper = scrollRef.current.querySelector(
+        `[data-tab-id="${activeTabId}"]`
+      ) as HTMLElement | null;
+      const tabEl = wrapper?.firstElementChild as HTMLElement | null;
+      if (!tabEl) {
+        lEl.style.display = 'none';
+        rEl.style.display = 'none';
+        return;
+      }
+      const barRect = tabBarRef.current.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+
+      lEl.style.display = '';
+      lEl.style.left = `${tabRect.left - barRect.left - 8}px`;
+      rEl.style.display = '';
+      rEl.style.left = `${tabRect.right - barRect.left}px`;
+
+      // Hide the scroll fade when fully scrolled to the right (or no overflow)
+      const sc = scrollRef.current;
+      if (scrollFadeRef.current && sc) {
+        const atEnd = sc.scrollWidth - sc.scrollLeft - sc.clientWidth < 2;
+        scrollFadeRef.current.style.opacity = atEnd ? '0' : '1';
+      }
+    };
+
+    measure();
+
+    // Sync on every scroll frame — no re-render needed
+    const el = scrollRef.current;
+    el?.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+
+    return () => {
+      el?.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, [activeTabId, orderedTabs]);
+
   const handleNewTab = useCallback(() => {
     router.push('/dashboard');
   }, [router]);
 
   // Always render the bar so the bg-sidebar strip above the content curve is consistent
   if (orderedTabs.length === 0) {
-    return <div className="flex-shrink-0 bg-sidebar h-9 md:h-10" />;
+    return <div className="flex-shrink-0 bg-sidebar h-[42px] md:h-[46px]" />;
   }
 
   return (
     <>
       <div
-        className="flex-shrink-0 flex items-end bg-sidebar h-9 md:h-10 overflow-hidden"
+        ref={tabBarRef}
+        className="flex-shrink-0 flex items-end bg-sidebar h-[42px] md:h-[46px] relative overflow-hidden"
         role="tablist"
       >
+        {/* Chrome-style floor line — active tab (z-20) renders above this */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-border/40 z-10" />
+
+        {/* Chrome-style curved connectors — rendered at tab-bar level (outside
+            the scroll container) so they aren't clipped by overflow-x-auto.
+            Positioned via refs for instant sync during scroll (no re-render). */}
+        <div
+          ref={curveLeftRef}
+          className="absolute bottom-0 w-2 h-2 pointer-events-none z-[11]"
+          style={{
+            display: 'none',
+            background: 'radial-gradient(circle at 0 0, transparent 7px, var(--muted) 8px)',
+          }}
+        />
+        <div
+          ref={curveRightRef}
+          className="absolute bottom-0 w-2 h-2 pointer-events-none z-[11]"
+          style={{
+            display: 'none',
+            background: 'radial-gradient(circle at 100% 0, transparent 7px, var(--muted) 8px)',
+          }}
+        />
         <div
           ref={scrollRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-end overflow-x-auto md:pl-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+          className="flex-1 flex items-end overflow-x-auto px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
             const busy = tab.type === 'session' && pending === 0 && statuses[tab.id]?.type === 'busy';
             return (
-              <div key={tab.id} data-tab-id={tab.id} className="flex items-end">
+              <div key={tab.id} data-tab-id={tab.id} className={cn("flex items-end relative", tab.id === activeTabId ? "z-20" : "z-0")}>
                 <TabItem
                   tab={tab}
                   index={index}
@@ -1093,8 +1173,10 @@ export function TabBar() {
           })}
         </div>
 
-        {/* Action buttons group */}
-        <div className="flex-shrink-0 flex items-center gap-px pr-1">
+        {/* Action buttons group — solid bg so tabs don't scroll behind */}
+        <div className="flex-shrink-0 flex items-center gap-px pr-1 relative z-20 bg-sidebar pl-2">
+          {/* Fade edge — hidden when scrolled fully right */}
+          <div ref={scrollFadeRef} className="absolute right-full top-0 bottom-0 w-3 bg-gradient-to-r from-transparent to-sidebar pointer-events-none transition-opacity duration-150" />
           {/* New tab button */}
           <Tooltip>
             <TooltipTrigger asChild>

@@ -245,7 +245,15 @@ export async function handleSlackWebhook(
   }
 
   const credentials = channelConfig.credentials as Record<string, unknown>;
+  const botToken = credentials?.botToken as string | undefined;
   const botUserId = credentials?.botUserId as string | undefined;
+
+  if (botToken && event.channel && event.channel_type !== 'im') {
+    const api = new SlackApi(botToken);
+    api.conversationsJoin(event.channel).catch((err) => {
+      console.warn(`[SLACK] Auto-join channel ${event.channel} failed:`, err);
+    });
+  }
 
   const isMention = event.type === 'app_mention';
 
@@ -314,6 +322,10 @@ export async function handleSlackWebhook(
   if (parsed.type === 'set_model_fuzzy' && parsed.modelQuery) {
     (async () => {
       try {
+        if (!channelConfig.sandboxId) {
+          confirmCommandInThread(channelConfig, event, ':x: No instance linked. Use `/kortix link` to connect one.');
+          return;
+        }
         const target = await resolveSandboxTarget(channelConfig.sandboxId);
         if (!target) {
           confirmCommandInThread(channelConfig, event, ':x: Sandbox not found.');

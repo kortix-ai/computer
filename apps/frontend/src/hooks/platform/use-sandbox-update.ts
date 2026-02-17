@@ -64,6 +64,8 @@ export function useSandboxUpdate(currentVersion: string | null) {
     currentVersion,
     /** Latest version available on npm */
     latestVersion,
+    /** Changelog for the latest available version */
+    changelog: latestQuery.data?.changelog ?? null,
     /** Trigger the update — user must explicitly call this */
     update: updateMutation.mutate,
     /** Whether an update is currently running */

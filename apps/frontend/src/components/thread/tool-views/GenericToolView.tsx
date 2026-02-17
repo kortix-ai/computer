@@ -574,8 +574,39 @@ function GenericToolErrorDisplay({
     return parseStructuredOutput(normalized);
   }, [errorText, parsedToolContent]);
 
-  const { summary, traceback, errorType } = React.useMemo(() => {
+  // Parse validation issues from JSON error strings
+  interface ValidationIssue {
+    code: string;
+    message: string;
+    path: string[];
+    values?: string[];
+  }
+
+  const { summary, traceback, errorType, validationIssues } = React.useMemo(() => {
     const cleaned = errorText.replace(/^Error:\s*/, '');
+
+    // Try to detect JSON validation errors (Zod-style arrays of issues)
+    const trimmed = cleaned.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const arr = Array.isArray(parsed) ? parsed : [parsed];
+        if (arr.length > 0 && arr.every((item: any) => item && typeof item === 'object' && 'message' in item)) {
+          const issues: ValidationIssue[] = arr.map((item: any) => ({
+            code: item.code || 'error',
+            message: item.message || String(item),
+            path: Array.isArray(item.path) ? item.path.map(String) : [],
+            values: Array.isArray(item.values) ? item.values.map(String) : undefined,
+          }));
+          const first = issues[0];
+          const pathStr = first.path.length > 0 ? first.path.join('.') : '';
+          const sum = pathStr ? `${pathStr}: ${first.message}` : first.message;
+          return { summary: sum, traceback: null, errorType: 'Validation Error' as string | null, validationIssues: issues as ValidationIssue[] | null };
+        }
+      } catch {
+        // Not valid JSON
+      }
+    }
 
     // Python-style traceback
     const tbIdx = cleaned.indexOf('Traceback (most recent call last):');
@@ -587,16 +618,16 @@ function GenericToolErrorDisplay({
       const typeMatch = lastLine.match(/^([\w._]+(?:Error|Exception|Warning)):\s*/);
       const errType = typeMatch ? typeMatch[1].split('.').pop() || typeMatch[1] : null;
       const sum = before || (errType ? lastLine : lastLine.slice(0, 150));
-      return { summary: sum, traceback: traceSection, errorType: errType };
+      return { summary: sum, traceback: traceSection, errorType: errType, validationIssues: null as ValidationIssue[] | null };
     }
 
     // Node.js-style stack
     const stackIdx = cleaned.indexOf('\n    at ');
     if (stackIdx >= 0) {
-      return { summary: cleaned.slice(0, stackIdx).trim(), traceback: cleaned.slice(stackIdx), errorType: null };
+      return { summary: cleaned.slice(0, stackIdx).trim(), traceback: cleaned.slice(stackIdx), errorType: null, validationIssues: null as ValidationIssue[] | null };
     }
 
-    return { summary: cleaned.length > 300 ? cleaned.slice(0, 300) + '...' : cleaned, traceback: cleaned.length > 300 ? cleaned : null, errorType: null };
+    return { summary: cleaned.length > 300 ? cleaned.slice(0, 300) + '...' : cleaned, traceback: cleaned.length > 300 ? cleaned : null, errorType: null, validationIssues: null as ValidationIssue[] | null };
   }, [errorText]);
 
   const displayType = errorType || 'Error';
@@ -604,6 +635,52 @@ function GenericToolErrorDisplay({
   // If structured output was detected, render it
   if (structuredSections) {
     return <GenericStructuredOutputDisplay sections={structuredSections} />;
+  }
+
+  // Render validation issues with structured layout
+  if (validationIssues && validationIssues.length > 0) {
+    return (
+      <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-red-500/10">
+          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-red-400" />
+          <span className="text-xs font-medium text-red-400">{displayType}</span>
+        </div>
+        <div className="px-3 py-2.5 space-y-2.5">
+          {validationIssues.map((issue, i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-400/70 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  {issue.path.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-300 font-mono mr-1.5">
+                      {issue.path.join('.')}
+                    </span>
+                  )}
+                  <span className="text-xs text-foreground/80">
+                    {issue.message}
+                  </span>
+                </div>
+              </div>
+              {issue.values && issue.values.length > 0 && (
+                <div className="ml-5">
+                  <div className="text-[10px] text-muted-foreground/50 mb-1">Expected one of:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {issue.values.map((val, vi) => (
+                      <span
+                        key={vi}
+                        className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/40 text-muted-foreground/70 font-mono"
+                      >
+                        {val}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   // If the content is structured JSON, show it with SmartJsonViewer

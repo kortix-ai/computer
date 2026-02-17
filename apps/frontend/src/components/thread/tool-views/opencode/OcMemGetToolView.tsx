@@ -1,0 +1,338 @@
+'use client';
+
+import React, { useMemo } from 'react';
+import {
+  Brain,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  FileText,
+  Wrench,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ToolViewProps } from '../types';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
+import { ToolViewFooter } from '../shared/ToolViewFooter';
+
+// ============================================================================
+// Types & Parsing
+// ============================================================================
+
+interface MemGetObservation {
+  id: string;
+  title: string;
+  time: string;
+  type: string;
+  typeEmoji: string;
+  tool: string;
+  subtitle: string;
+  narrative: string;
+  facts: string[];
+  concepts: string[];
+  filesRead: string[];
+  filesModified: string[];
+}
+
+/** Parse the rich markdown output produced by formatObservations() in the mem_get tool. */
+function parseMemGetOutput(output: string): MemGetObservation[] {
+  if (!output) return [];
+  const sections = output.split(/\n---\n/).filter(s => s.trim());
+  const observations: MemGetObservation[] = [];
+
+  for (const section of sections) {
+    const lines = section.split('\n');
+    const headerMatch = lines[0]?.match(/^##\s+#(\d+)\s*[—–-]\s*(.+)/);
+    if (!headerMatch) continue;
+
+    const id = `#${headerMatch[1]}`;
+    const titlePart = headerMatch[2].trim();
+    const emojiMatch = titlePart.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)\s*/u);
+    const typeEmoji = emojiMatch ? emojiMatch[1] : '';
+    const title = emojiMatch ? titlePart.slice(emojiMatch[0].length) : titlePart;
+
+    let time = '', type = '', tool = '';
+    const metaLine = lines.find(l => l.includes('**Time:**'));
+    if (metaLine) {
+      const timeM = metaLine.match(/\*\*Time:\*\*\s*([^|]+)/);
+      const typeM = metaLine.match(/\*\*Type:\*\*\s*([^|]+)/);
+      const toolM = metaLine.match(/\*\*Tool:\*\*\s*(.+)/);
+      time = timeM?.[1]?.trim() || '';
+      type = typeM?.[1]?.trim() || '';
+      tool = toolM?.[1]?.trim() || '';
+    }
+
+    const subtitleLine = lines.find(l => l.startsWith('**Subtitle:**'));
+    const subtitle = subtitleLine?.replace('**Subtitle:**', '').trim() || '';
+
+    let inNarrative = false;
+    const narrativeLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith('## #') || line.includes('**Time:**') || line.startsWith('**Subtitle:**')) {
+        inNarrative = false;
+        continue;
+      }
+      if (line.startsWith('**Facts:**') || line.startsWith('**Concepts:**') || line.startsWith('**Files read:**') || line.startsWith('**Files modified:**')) {
+        inNarrative = false;
+        continue;
+      }
+      if (inNarrative || (narrativeLines.length === 0 && line.trim() && !line.startsWith('**') && !line.startsWith('- '))) {
+        inNarrative = true;
+        narrativeLines.push(line);
+      }
+    }
+    const narrative = narrativeLines.join(' ').trim();
+
+    const facts: string[] = [];
+    let inFacts = false;
+    for (const line of lines) {
+      if (line.startsWith('**Facts:**')) { inFacts = true; continue; }
+      if (inFacts && line.startsWith('- ')) {
+        facts.push(line.slice(2).trim());
+      } else if (inFacts && !line.startsWith('- ') && line.trim()) {
+        inFacts = false;
+      }
+    }
+
+    const conceptsLine = lines.find(l => l.startsWith('**Concepts:**'));
+    const concepts = conceptsLine
+      ? conceptsLine.replace('**Concepts:**', '').split(',').map(c => c.trim()).filter(Boolean)
+      : [];
+
+    const filesReadLine = lines.find(l => l.startsWith('**Files read:**'));
+    const filesRead = filesReadLine
+      ? filesReadLine.replace('**Files read:**', '').split(',').map(f => f.trim()).filter(Boolean)
+      : [];
+
+    const filesModifiedLine = lines.find(l => l.startsWith('**Files modified:**'));
+    const filesModified = filesModifiedLine
+      ? filesModifiedLine.replace('**Files modified:**', '').split(',').map(f => f.trim()).filter(Boolean)
+      : [];
+
+    observations.push({ id, title, time, type, typeEmoji, tool, subtitle, narrative, facts, concepts, filesRead, filesModified });
+  }
+
+  return observations;
+}
+
+function memGetTypeInfo(typeEmoji: string, type: string): { label: string; bg: string; text: string; dot: string } {
+  const e = typeEmoji.trim();
+  if (e.includes('\u{1F535}') || type === 'discovery')
+    return { label: 'Research',  bg: 'bg-blue-500/10',    text: 'text-blue-400',    dot: 'bg-blue-400' };
+  if (e.includes('\u{1F7E3}') || type === 'feature')
+    return { label: 'Feature',   bg: 'bg-purple-500/10',  text: 'text-purple-400',  dot: 'bg-purple-400' };
+  if (e.includes('\u{1F534}') || type === 'bugfix')
+    return { label: 'Bugfix',    bg: 'bg-red-500/10',     text: 'text-red-400',     dot: 'bg-red-400' };
+  if (e.includes('\u{2696}') || type === 'decision')
+    return { label: 'Decision',  bg: 'bg-amber-500/10',   text: 'text-amber-400',   dot: 'bg-amber-400' };
+  if (e.includes('\u{1F504}') || type === 'refactor')
+    return { label: 'Refactor',  bg: 'bg-orange-500/10',  text: 'text-orange-400',  dot: 'bg-orange-400' };
+  if (e.includes('\u{2705}') || type === 'change')
+    return { label: 'Change',    bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400' };
+  return { label: 'Note', bg: 'bg-muted/40', text: 'text-muted-foreground', dot: 'bg-muted-foreground/50' };
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export function OcMemGetToolView({
+  toolCall,
+  toolResult,
+  assistantTimestamp,
+  toolTimestamp,
+  isSuccess = true,
+  isStreaming = false,
+}: ToolViewProps) {
+  const args = toolCall?.arguments || {};
+  const ocState = args._oc_state as any;
+  const ids = (args.ids as string) || (ocState?.input?.ids as string) || '';
+  const rawOutput = toolResult?.output || ocState?.output || '';
+  const output = typeof rawOutput === 'string' ? rawOutput : String(rawOutput);
+
+  const isError = toolResult?.success === false || !!toolResult?.error;
+  const observations = useMemo(() => parseMemGetOutput(output), [output]);
+
+  // --- Loading ---
+  if (isStreaming && !toolResult) {
+    return (
+      <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
+        <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+          <div className="flex flex-row items-center justify-between">
+            <ToolViewIconTitle icon={Brain} title="Mem Get" subtitle={ids} />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 h-full flex-1 overflow-hidden relative">
+          <div className="flex flex-col items-center justify-center h-full py-12 px-6 gap-3">
+            <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Brain className="size-5 text-primary animate-pulse" />
+            </div>
+            <p className="text-sm text-muted-foreground">Loading observations...</p>
+            {ids && (
+              <p className="text-xs text-muted-foreground/50 font-mono">{ids}</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
+      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+        <div className="flex flex-row items-center justify-between">
+          <ToolViewIconTitle icon={Brain} title="Mem Get" subtitle={ids} />
+          {observations.length > 0 && (
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted flex-shrink-0 ml-2">
+              <Brain className="h-3 w-3 mr-1 opacity-70" />
+              {observations.length} {observations.length === 1 ? 'observation' : 'observations'}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-0 h-full flex-1 overflow-hidden">
+        {observations.length > 0 ? (
+          <ScrollArea className="h-full w-full">
+            <div className="p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-2 px-1">
+                Observations
+              </div>
+              <div className="space-y-1.5">
+                {observations.map((obs, i) => {
+                  const typeInfo = memGetTypeInfo(obs.typeEmoji, obs.type);
+                  const allFiles = [...obs.filesRead, ...obs.filesModified];
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 p-3 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
+                    >
+                      {/* Type indicator */}
+                      <div className={cn('size-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5', typeInfo.bg)}>
+                        <span className={cn('size-2 rounded-full', typeInfo.dot)} />
+                      </div>
+
+                      {/* Content */}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-foreground line-clamp-2">
+                          {obs.title}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="text-xs text-muted-foreground/50 font-mono">
+                            {obs.id}
+                          </span>
+                          <span className="text-muted-foreground/20">&middot;</span>
+                          <span className="text-xs text-muted-foreground/50 inline-flex items-center gap-1">
+                            <Clock className="size-3" />
+                            {obs.time}
+                          </span>
+                          <span className="text-muted-foreground/20">&middot;</span>
+                          <span className={cn('text-xs font-medium', typeInfo.text)}>
+                            {typeInfo.label}
+                          </span>
+                          {obs.tool && obs.tool !== '—' && (
+                            <>
+                              <span className="text-muted-foreground/20">&middot;</span>
+                              <span className="text-xs text-muted-foreground/40 font-mono inline-flex items-center gap-1">
+                                <Wrench className="size-3" />
+                                {obs.tool}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Subtitle / narrative */}
+                        {(obs.subtitle || obs.narrative) && (
+                          <div className="text-xs text-muted-foreground/60 mt-1.5 line-clamp-2">
+                            {obs.subtitle || obs.narrative}
+                          </div>
+                        )}
+
+                        {/* Facts */}
+                        {obs.facts.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {obs.facts.slice(0, 4).map((fact, fi) => (
+                              <div key={fi} className="text-xs text-muted-foreground/50 flex items-start gap-2">
+                                <span className="text-muted-foreground/30 mt-px flex-shrink-0">&bull;</span>
+                                <span className="line-clamp-1">{fact}</span>
+                              </div>
+                            ))}
+                            {obs.facts.length > 4 && (
+                              <div className="text-xs text-muted-foreground/30 pl-4">
+                                +{obs.facts.length - 4} more facts
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Concepts */}
+                        {obs.concepts.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {obs.concepts.slice(0, 6).map((c, ci) => (
+                              <span key={ci} className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/60">
+                                {c}
+                              </span>
+                            ))}
+                            {obs.concepts.length > 6 && (
+                              <span className="text-[10px] text-muted-foreground/30">+{obs.concepts.length - 6}</span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Files */}
+                        {allFiles.length > 0 && (
+                          <div className="text-xs text-muted-foreground/40 font-mono truncate mt-1.5 inline-flex items-center gap-1">
+                            <FileText className="size-3 flex-shrink-0" />
+                            {allFiles.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </ScrollArea>
+        ) : output && !isError ? (
+          <ScrollArea className="h-full w-full">
+            <div className="p-3 text-sm text-muted-foreground whitespace-pre-wrap font-mono">
+              {output.slice(0, 3000)}
+            </div>
+          </ScrollArea>
+        ) : isError ? (
+          <div className="flex items-start gap-2.5 px-4 py-6 text-muted-foreground">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <p className="text-sm">{output || 'Failed to load observations'}</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full py-12 px-6">
+            <Brain className="h-8 w-8 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">No observations found</p>
+          </div>
+        )}
+      </CardContent>
+
+      <ToolViewFooter
+        assistantTimestamp={assistantTimestamp}
+        toolTimestamp={toolTimestamp}
+        isStreaming={isStreaming}
+      >
+        {!isStreaming && (
+          isError ? (
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
+              <AlertCircle className="h-3 w-3" />
+              Failed
+            </Badge>
+          ) : observations.length > 0 ? (
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-muted-foreground" />
+              {observations.length} {observations.length === 1 ? 'observation' : 'observations'}
+            </Badge>
+          ) : null
+        )}
+      </ToolViewFooter>
+    </Card>
+  );
+}
