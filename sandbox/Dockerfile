@@ -93,15 +93,15 @@ COPY sandbox/assets/browser-viewer/ /opt/agent-browser-viewer/
 # ── OpenCode CLI ────────────────────────────────────────────────────────────
 # npm installs the glibc binary by default; force-install the musl variant
 # and symlink it over the glibc one so the wrapper script finds it.
-RUN npm install -g @kortix/opencode-ai@0.2.0 \
+RUN npm install -g @kortix/opencode-ai@0.3.0 \
     && ARCH=$(uname -m) \
     && if [ "$ARCH" = "x86_64" ]; then \
-         npm install -g @kortix/opencode-ai-linux-x64-musl@0.2.0 --force \
+         npm install -g @kortix/opencode-ai-linux-x64-musl@0.3.0 --force \
          && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-x64-musl/bin/opencode \
          && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-x64/bin/opencode \
          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
        else \
-         npm install -g @kortix/opencode-ai-linux-arm64-musl@0.2.0 --force \
+         npm install -g @kortix/opencode-ai-linux-arm64-musl@0.3.0 --force \
          && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-arm64-musl/bin/opencode \
          && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-arm64/bin/opencode \
          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \

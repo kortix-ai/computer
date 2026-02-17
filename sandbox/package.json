@@ -27,7 +27,7 @@
     "patch-agent-browser.js"
   ],
   "dependencies": {
-    "@kortix/opencode-ai": "0.2.0"
+    "@kortix/opencode-ai": "0.3.0"
   },
   "peerDependencies": {},
   "publishConfig": {
