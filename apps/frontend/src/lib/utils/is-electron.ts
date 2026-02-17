@@ -28,7 +28,7 @@ export function isElectron(): boolean {
  * - Web: returns the web URL (https://kortix.com/auth/callback)
  * - Electron: returns the custom protocol URL (kortix://auth/callback)
  */
-export function getAuthCallbackUrl(returnUrl?: string, termsAccepted?: boolean): string {
+function getAuthCallbackUrl(returnUrl?: string, termsAccepted?: boolean): string {
   const params = new URLSearchParams();
   if (returnUrl) params.set('returnUrl', returnUrl);
   if (termsAccepted) params.set('terms_accepted', 'true');

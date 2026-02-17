@@ -4,8 +4,8 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { getPlanIcon } from './plan-utils';
 
-export type TierBadgeSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
-export type TierBadgeVariant = 'default' | 'circle';
+type TierBadgeSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
+type TierBadgeVariant = 'default' | 'circle';
 
 interface TierBadgeProps {
   /** Plan name (e.g., 'Basic', 'Plus', 'Pro', 'Ultra') */
@@ -123,5 +123,4 @@ export function TierBadge({
     </div>
   );
 }
-
 

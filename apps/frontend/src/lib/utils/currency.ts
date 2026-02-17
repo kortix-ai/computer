@@ -50,7 +50,7 @@ export function parsePriceAmount(priceStr: string): number {
 /**
  * Convert all price strings in a tier to target currency
  */
-export function convertTierPrices(
+function convertTierPrices(
   tier: { price: string; yearlyPrice?: string },
   currency: Currency
 ): { price: string; yearlyPrice?: string } {

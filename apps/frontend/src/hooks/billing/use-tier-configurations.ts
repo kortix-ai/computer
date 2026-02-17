@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { backendApi } from '@/lib/api-client';
 import { accountStateKeys } from './use-account-state';
 
-export interface TierConfiguration {
+interface TierConfiguration {
   tier_key: string;
   name: string;
   display_name: string;
@@ -12,7 +12,7 @@ export interface TierConfiguration {
   price_ids: string[];  // Backend-only: kept for API response compatibility, frontend should use tier_key
 }
 
-export interface TierConfigurationsResponse {
+interface TierConfigurationsResponse {
   success: boolean;
   tiers: TierConfiguration[];
   timestamp: string;
@@ -29,7 +29,7 @@ async function fetchTierConfigurations(): Promise<TierConfigurationsResponse> {
   return response.data!;
 }
 
-export function useTierConfigurations() {
+function useTierConfigurations() {
   return useQuery({
     queryKey: [...accountStateKeys.all, 'tier-configurations'],
     queryFn: fetchTierConfigurations,
@@ -43,7 +43,7 @@ export function useTierConfigurations() {
 /**
  * Helper function to get a tier configuration by tier key
  */
-export function getTierByKey(
+function getTierByKey(
   tiers: TierConfiguration[] | undefined,
   tierKey: string
 ): TierConfiguration | undefined {

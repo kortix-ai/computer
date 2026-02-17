@@ -198,7 +198,7 @@ export function OcWebFetchToolView({
 
                 return (
                   <a
-                    key={idx}
+                    key={result.url}
                     href={result.url}
                     target="_blank"
                     rel="noopener noreferrer"

@@ -116,7 +116,7 @@ type ToolComponent = ComponentType<ToolProps>;
 
 const registry = new Map<string, ToolComponent>();
 
-export const ToolRegistry = {
+const ToolRegistry = {
   register(name: string, component: ToolComponent) {
     registry.set(name, component);
   },
@@ -201,7 +201,7 @@ interface BasicToolProps {
   onSubtitleClick?: () => void;
 }
 
-export function BasicTool({
+function BasicTool({
   icon,
   trigger,
   children,
@@ -281,7 +281,7 @@ export function BasicTool({
                   trigger.args.length > 0 &&
                   trigger.args.map((arg, i) => (
                     <span
-                      key={i}
+                      key={String(arg)}
                       className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap"
                     >
                       {arg}
@@ -354,7 +354,7 @@ function InlineDiffView({
 
         if (isHunk || line === '') {
           return (
-            <div key={i} className={cls}>
+            <div key={String(line)} className={cls}>
               {line}
             </div>
           );
@@ -366,7 +366,7 @@ function InlineDiffView({
         if (highlightedTokens) {
           const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={i} className={cls}>
+            <div key={`line-${i}`} className={cls}>
               <span className={cn(isAdd && 'text-emerald-500', isDel && 'text-red-500')}>
                 {prefix}
               </span>
@@ -376,7 +376,7 @@ function InlineDiffView({
         }
 
         return (
-          <div key={i} className={cn(cls, isAdd && 'text-emerald-500', isDel && 'text-red-500')}>
+          <div key={`${i}-${typeof line === 'string' ? line : i}`} className={cn(cls, isAdd && 'text-emerald-500', isDel && 'text-red-500')}>
             {line}
           </div>
         );
@@ -395,7 +395,7 @@ function DiagnosticsDisplay({ diagnostics }: { diagnostics: Diagnostic[] }) {
   return (
     <div className="space-y-1 px-2 pb-2">
       {diagnostics.map((d, i) => (
-        <div key={i} className="flex items-start gap-1.5 text-[10px] text-red-500">
+        <div key={`d-${i}`} className="flex items-start gap-1.5 text-[10px] text-red-500">
           <CircleAlert className="size-3 flex-shrink-0 mt-0.5" />
           <span>
             [{d.range.start.line + 1}:{d.range.start.character + 1}] {d.message}
@@ -438,7 +438,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
           case 'warning':
             return (
               <div
-                key={i}
+                key={`section-${i}`}
                 className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-yellow-500/5 border border-yellow-500/15"
               >
                 <AlertTriangle className="size-3 flex-shrink-0 mt-0.5 text-yellow-500" />
@@ -451,7 +451,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
           case 'error':
             return (
               <div
-                key={i}
+                key={`section-${i}`}
                 className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-red-500/5 border border-red-500/15"
               >
                 <Ban className="size-3 flex-shrink-0 mt-0.5 text-red-400" />
@@ -470,7 +470,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 
           case 'traceback':
             return (
-              <div key={i}>
+              <div key={`${i}-${typeof section === 'string' ? section : i}`}>
                 <button
                   onClick={() => setShowTrace((v) => !v)}
                   className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
@@ -515,7 +515,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
           case 'install':
             return (
               <div
-                key={i}
+                key={`item-${i}`}
                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-emerald-500/5 border border-emerald-500/15"
               >
                 <CheckCircle className="size-3 flex-shrink-0 text-emerald-500" />
@@ -528,7 +528,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
           case 'info':
             return (
               <div
-                key={i}
+                key={`item-${i}`}
                 className="flex items-center gap-2 px-2.5 py-1 text-[11px] text-muted-foreground font-mono"
               >
                 <span className="size-1 rounded-full bg-muted-foreground/30 flex-shrink-0" />
@@ -539,7 +539,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
           case 'plain':
             return (
               <pre
-                key={i}
+                key={`item-${i}`}
                 className="px-2.5 py-1 font-mono text-[11px] leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
               >
                 {section.text}
@@ -805,7 +805,7 @@ function InlineSessionMessagesList({ messages }: { messages: ParsedSessionMessag
                   const toolStatus = nameMatch?.[2] || '';
                   return (
                     <span
-                      key={i}
+                      key={`t-${i}`}
                       className={cn(
                         'text-[9px] px-1 py-0.5 rounded border',
                         toolStatus === 'completed'
@@ -1262,7 +1262,7 @@ function ReadTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       {loaded.length > 0 && (
         <div className="mt-1 space-y-0.5 pl-2">
           {loaded.map((filepath, i) => (
-            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div key={String(filepath)} className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="text-emerald-500">+</span>
               <span className="truncate font-mono text-[10px]">{filepath}</span>
             </div>
@@ -1336,7 +1336,7 @@ function InlineFileList({ paths, onFileClick, toDisplayPath }: { paths: string[]
         const dir = getDirectory(dp);
         return (
           <div
-            key={i}
+            key={`fp-${i}`}
             className="flex items-center gap-2 px-3 py-1 cursor-pointer hover:bg-muted/50 transition-colors group"
             role="button"
             tabIndex={0}
@@ -1372,7 +1372,7 @@ function InlineGrepResults({ groups, onFileClick, toDisplayPath }: { groups: Gre
         const isExpanded = expandedIndex === i;
 
         return (
-          <div key={i}>
+          <div key={`group-${i}`}>
             <div
               className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors group"
               role="button"
@@ -1539,7 +1539,7 @@ function WebFetchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
           <span className="text-muted-foreground text-xs truncate font-mono">{url}</span>
           {args.map((arg, i) => (
             <span
-              key={i}
+              key={String(arg)}
               className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap"
             >
               {arg}
@@ -1991,7 +1991,7 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
 
               return (
                 <a
-                  key={idx}
+                  key={result.url}
                   href={result.url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -2127,7 +2127,7 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
               const title = img.title || '';
               return (
                 <a
-                  key={i}
+                  key={`item-${i}`}
                   href={imgUrl}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -2793,7 +2793,7 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       {todos.length > 0 && (
         <div className="px-3 py-2.5 space-y-1.5">
           {todos.map((todo: Record<string, unknown>, i: number) => (
-            <label key={i} className="flex items-start gap-2.5 text-xs cursor-default">
+            <label key={`item-${i}`} className="flex items-start gap-2.5 text-xs cursor-default">
               <span className={cn(
                 'mt-0.5 size-3.5 rounded flex-shrink-0 flex items-center justify-center border',
                 todo.status === 'completed'
@@ -2936,7 +2936,7 @@ function BatchToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) 
       {toolCalls.length > 0 && (
         <div className="px-3 py-2 space-y-1">
           {toolCalls.map((call: { tool: string; success?: boolean }, i: number) => (
-            <div key={i} className="flex items-center gap-2 text-xs">
+            <div key={`item-${i}`} className="flex items-center gap-2 text-xs">
               {status === 'running' || status === 'pending' ? (
                 <Loader2 className="size-2.5 text-muted-foreground animate-spin shrink-0" />
               ) : call.success !== false ? (
@@ -2999,7 +2999,7 @@ function QuestionSkeletonOptions() {
       <div className="space-y-1.5">
         {[0.85, 0.7, 0.6, 0.75].map((w, i) => (
           <div
-            key={i}
+            key={`w-${i}`}
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/20 bg-muted/10"
           >
             <div className="flex-1 flex items-center gap-2">
@@ -3058,7 +3058,7 @@ function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked, hasActiveQ
           {questions.map((q, i) => {
             const answer = answers[i] || [];
             return (
-              <div key={i} className="space-y-0.5">
+              <div key={`q-${i}`} className="space-y-0.5">
                 <p className="text-xs font-medium text-foreground">{q.question}</p>
                 <p className="text-xs text-muted-foreground">
                   {answer.join(', ') || 'No answer'}
@@ -3099,7 +3099,7 @@ function ApplyPatchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       {files.length > 0 && (
         <div className="p-2 space-y-2">
           {files.map((file, i) => (
-            <div key={i} className="space-y-1">
+            <div key={`file-${i}`} className="space-y-1">
               {/* File header */}
               <div className="flex items-center gap-2 text-xs">
                 <span
@@ -3229,7 +3229,7 @@ function MemorySearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
             <div className="px-3 py-2.5 space-y-2">
               {results.map((result, i) => (
                 <div
-                  key={i}
+                  key={`result-${i}`}
                   className="rounded-md bg-muted/10 overflow-hidden"
                 >
                   {/* Result header */}
@@ -3273,7 +3273,7 @@ function MemorySearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
               {suggestions.length > 0 && (
                 <div className="mt-2.5 pl-5 space-y-1">
                   {suggestions.map((s, i) => (
-                    <div key={i} className="flex items-baseline gap-1.5">
+                    <div key={String(s)} className="flex items-baseline gap-1.5">
                       <span className="text-[10px] text-muted-foreground/40 flex-shrink-0">•</span>
                       <span className="text-[10px] text-muted-foreground/70">{s}</span>
                     </div>
@@ -3422,7 +3422,7 @@ function MemSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                 const typeInfo = observationTypeInfo(obs.type);
                 return (
                   <div
-                    key={i}
+                    key={obs.title}
                     className="flex items-start gap-2.5 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
                   >
                     {/* Type dot */}
@@ -3663,7 +3663,7 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                 const allFiles = [...obs.filesRead, ...obs.filesModified].join(', ');
                 return (
                   <div
-                    key={i}
+                    key={obs.title}
                     className="flex items-start gap-2.5 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
                   >
                     {/* Type dot */}
@@ -3966,7 +3966,7 @@ function MemTimelineTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                 const typeInfo = observationTypeInfo(entry.typeEmoji);
                 return (
                   <div
-                    key={i}
+                    key={entry.title}
                     className={cn(
                       'flex items-start gap-2.5 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors relative',
                       entry.isAnchor && 'bg-primary/5 border border-primary/10',
@@ -4255,7 +4255,7 @@ function parseErrorContent(error: string): {
   return { summary: cleaned, traceback: null, errorType: null, validationIssues: null };
 }
 
-export function ToolError({ error, toolName }: { error: string; toolName?: string }) {
+function ToolError({ error, toolName }: { error: string; toolName?: string }) {
   const [showTrace, setShowTrace] = useState(false);
 
   // Normalize and try structured rendering
@@ -4297,7 +4297,7 @@ export function ToolError({ error, toolName }: { error: string; toolName?: strin
         {/* Validation issues */}
         <div className="px-3 py-2.5 space-y-2.5">
           {validationIssues.map((issue, i) => (
-            <div key={i} className="space-y-1.5">
+            <div key={issue.path} className="space-y-1.5">
               {/* Path + message */}
               <div className="flex items-start gap-2">
                 <CircleAlert className="size-3 flex-shrink-0 text-red-400/70 mt-0.5" />
@@ -4397,7 +4397,7 @@ function parseToolName(tool: string): { server: string | null; name: string; dis
   return { server, name, display };
 }
 
-export function GenericTool({ part }: ToolProps) {
+function GenericTool({ part }: ToolProps) {
   const output = partOutput(part);
   const strippedGenericOutput = output ? stripAnsi(output) : '';
   const status = partStatus(part);

@@ -3,28 +3,16 @@
  */
 
 // Directory listing
-export {
-  useFileList,
-  useInvalidateFileList,
-  fileListKeys,
-} from './use-file-list';
+export { useFileList, fileListKeys } from './use-file-list';
 
 // File content reading
-export {
-  useFileContent,
-  useInvalidateFileContent,
-  fileContentKeys,
-} from './use-file-content';
+export { useFileContent } from './use-file-content';
 
 // File/text search
-export {
-  useFileSearch,
-  useTextSearch,
-  fileSearchKeys,
-} from './use-file-search';
+export { useFileSearch, useTextSearch } from './use-file-search';
 
 // Semantic search (LSS)
-export { useLssSearch, lssSearchKeys } from './use-lss-search';
+export { useLssSearch } from './use-lss-search';
 
 // Server health & project info
 export { useServerHealth, useCurrentProject } from './use-server-health';
@@ -34,25 +22,12 @@ export {
   useFileUpload,
   useFileDelete,
   useFileMkdir,
-  useFileRename,
-  useFileCreate,
-  useFileCopy,
+  useFileRename
 } from './use-file-mutations';
 
 // Git status
-export {
-  useGitStatus,
-  buildGitStatusMap,
-  gitStatusKeys,
-} from './use-git-status';
+export { useGitStatus, buildGitStatusMap } from './use-git-status';
 
 // SSE-based real-time invalidation
-export { useFileEventInvalidation } from './use-file-events';
 
 // Git history
-export {
-  useFileHistory,
-  useFileCommitDiff,
-  useFileAtCommit,
-  fileHistoryKeys,
-} from './use-file-history';

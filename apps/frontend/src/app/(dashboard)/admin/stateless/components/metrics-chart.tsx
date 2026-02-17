@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic';
 "use client";
 
 import { useMemo } from "react";
@@ -11,22 +12,20 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  Line,
-  LineChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+const Area = dynamic(() => import('recharts').then(m => m.Area), { ssr: false }) as any;
+const AreaChart = dynamic(() => import('recharts').then(m => m.AreaChart), { ssr: false }) as any;
+const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false }) as any;
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false }) as any;
+const Line = dynamic(() => import('recharts').then(m => m.Line), { ssr: false }) as any;
+const LineChart = dynamic(() => import('recharts').then(m => m.LineChart), { ssr: false }) as any;
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false }) as any;
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false }) as any;
+const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false }) as any;
+const PieChart = dynamic(() => import('recharts').then(m => m.PieChart), { ssr: false }) as any;
+const Pie = dynamic(() => import('recharts').then(m => m.Pie), { ssr: false }) as any;
+const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false }) as any;
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false }) as any;
+const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false }) as any;
 import { Loader2 } from "lucide-react";
 
 interface ChartDataPoint {
@@ -304,7 +303,7 @@ export function DonutChart({
                     nameKey="name"
                   >
                     {data.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} stroke="transparent" />
+                      <Cell key={`entry-${index}`} fill={entry.color} stroke="transparent" />
                     ))}
                   </Pie>
                 </PieChart>
@@ -322,7 +321,7 @@ export function DonutChart({
             </div>
             <div className="flex-1 space-y-2">
               {data.map((entry, index) => (
-                <div key={index} className="flex items-center justify-between text-sm">
+                <div key={entry.name} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full"

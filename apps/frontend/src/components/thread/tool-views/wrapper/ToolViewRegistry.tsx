@@ -53,9 +53,9 @@ class ToolViewRegistry {
   }
 }
 
-export const toolViewRegistry = new ToolViewRegistry();
+const toolViewRegistry = new ToolViewRegistry();
 
-export function useToolView(toolName: string): ToolViewComponent {
+function useToolView(toolName: string): ToolViewComponent {
   return useMemo(() => toolViewRegistry.get(toolName), [toolName]);
 }
 

@@ -31,7 +31,7 @@ export function useRightSidebar() {
  * Try to use the right sidebar context, returning null if not inside the provider.
  * Useful for components that may or may not be inside the right sidebar provider.
  */
-export function useRightSidebarSafe(): RightSidebarContextProps | null {
+function useRightSidebarSafe(): RightSidebarContextProps | null {
   return React.useContext(RightSidebarContext);
 }
 

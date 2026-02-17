@@ -1,5 +1,7 @@
 'use client';
 
+
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,7 +15,10 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { Bar, BarChart, XAxis, CartesianGrid } from 'recharts';
+const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false }) as any;
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false }) as any;
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false }) as any;
+const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false }) as any;
 import { format, parseISO } from 'date-fns';
 
 const chartConfig = {

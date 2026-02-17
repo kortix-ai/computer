@@ -156,7 +156,7 @@ export const TeamInvitationStep = () => {
 
               {inviteEmails.map((email, index) => (
                 <motion.div
-                  key={index}
+                  key={String(email)}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}

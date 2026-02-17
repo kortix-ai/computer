@@ -447,7 +447,7 @@ export default function TemplateSharePageClient() {
                 {template.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {template.tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary">
+                      <Badge key={String(tag)} variant="secondary">
                         {tag}
                       </Badge>
                     ))}
@@ -544,7 +544,7 @@ export default function TemplateSharePageClient() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {integrations.map((integration: any, index: number) => (
                       <div
-                        key={index}
+                        key={`item-${index}`}
                         className="flex items-center gap-3 p-3 rounded-lg border bg-background"
                       >
                         <IntegrationIcon
@@ -584,7 +584,7 @@ export default function TemplateSharePageClient() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {customTools.map((tool: any, index: number) => (
                       <div
-                        key={index}
+                        key={`item-${index}`}
                         className="flex items-center gap-3 p-3 rounded-lg border bg-background"
                       >
                         <IntegrationIcon

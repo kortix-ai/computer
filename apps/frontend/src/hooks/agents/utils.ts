@@ -48,7 +48,7 @@ export type Agent = {
   };
 };
 
-export type PaginationInfo = {
+type PaginationInfo = {
   current_page: number;
   page_size: number;
   total_items: number;
@@ -57,7 +57,7 @@ export type PaginationInfo = {
   has_previous: boolean;
 };
 
-export type AgentsResponse = {
+type AgentsResponse = {
   agents: Agent[];
   pagination: PaginationInfo;
 };
@@ -77,7 +77,7 @@ export type AgentsParams = {
 
 // Removed ThreadAgentResponse - agent info now derived from messages/agent runs
 
-export type AgentCreateRequest = {
+type AgentCreateRequest = {
   name: string;
   description?: string;
   system_prompt?: string;
@@ -98,7 +98,7 @@ export type AgentCreateRequest = {
   icon_background?: string | null;
 };
 
-export type AgentVersionCreateRequest = {
+type AgentVersionCreateRequest = {
   system_prompt: string;
   model?: string;
   configured_mcps?: Array<{
@@ -331,10 +331,7 @@ export const deleteAgent = async (agentId: string): Promise<void> => {
   }
 };
 
-
-
-
-export const getAgentVersions = async (agentId: string): Promise<AgentVersion[]> => {
+const getAgentVersions = async (agentId: string): Promise<AgentVersion[]> => {
   try {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
@@ -362,7 +359,7 @@ export const getAgentVersions = async (agentId: string): Promise<AgentVersion[]>
   }
 };
 
-export const createAgentVersion = async (
+const createAgentVersion = async (
   agentId: string,
   data: AgentVersionCreateRequest
 ): Promise<AgentVersion> => {
@@ -396,7 +393,7 @@ export const createAgentVersion = async (
   }
 };
 
-export const activateAgentVersion = async (
+const activateAgentVersion = async (
   agentId: string,
   versionId: string
 ): Promise<void> => {
@@ -428,7 +425,7 @@ export const activateAgentVersion = async (
   }
 };
 
-export const getAgentVersion = async (
+const getAgentVersion = async (
   agentId: string,
   versionId: string
 ): Promise<AgentVersion> => {
@@ -462,7 +459,7 @@ export const getAgentVersion = async (
   }
 };
 
-export const updateAgentVersionDetails = async (
+const updateAgentVersionDetails = async (
   agentId: string,
   versionId: string,
   data: { version_name?: string; change_description?: string }

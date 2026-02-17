@@ -40,7 +40,7 @@ import { logger } from '@/lib/logger';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
-export interface AgentStreamCallbacks {
+interface AgentStreamCallbacks {
   onMessage: (message: UnifiedMessage) => void;
   onStatusChange?: (status: AgentStatus) => void;
   onError?: (error: string) => void;
@@ -57,14 +57,14 @@ export interface AgentStreamCallbacks {
   onUXError?: (event: ErrorEvent) => void;
 }
 
-export interface UseAgentStreamOptions {
+interface UseAgentStreamOptions {
   handleBillingError?: (errorMessage: string, balance?: string | null) => void;
   showToast?: (message: string, type?: 'error' | 'success' | 'warning') => void;
   clearToolTracking?: () => void;
   queryKeys?: (string | readonly string[])[];
 }
 
-export interface UseAgentStreamResult {
+interface UseAgentStreamResult {
   status: AgentStatus;
   textContent: string;
   reasoningContent: string;
@@ -76,7 +76,7 @@ export interface UseAgentStreamResult {
   stopStreaming: () => Promise<void>;
 }
 
-export function useAgentStream(
+function useAgentStream(
   callbacks: AgentStreamCallbacks,
   threadId: string,
   setMessages: (messages: UnifiedMessage[]) => void,

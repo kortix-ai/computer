@@ -158,7 +158,7 @@ interface AgentNameProps {
   fallback?: string;
 }
 
-export const AgentName: React.FC<AgentNameProps> = ({
+const AgentName: React.FC<AgentNameProps> = ({
   agent: propAgent,
   agentId,
   fallback = "Kortix"
@@ -170,7 +170,7 @@ export const AgentName: React.FC<AgentNameProps> = ({
 };
 
 // Utility function for checking if agent has custom profile
-export function hasCustomProfile(agent: {
+function hasCustomProfile(agent: {
   icon_name?: string | null;
 }): boolean {
   return !!(agent.icon_name);

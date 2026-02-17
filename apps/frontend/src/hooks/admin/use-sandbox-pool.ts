@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendApi } from '@/lib/api-client';
 
-export interface PoolHealth {
+interface PoolHealth {
   status: 'healthy' | 'warning' | 'critical' | 'disabled';
   service_running: boolean;
   pool_enabled: boolean;
@@ -11,7 +11,7 @@ export interface PoolHealth {
   issues: string[];
 }
 
-export interface PoolConfig {
+interface PoolConfig {
   enabled: boolean;
   min_size: number;
   max_size: number;
@@ -20,7 +20,7 @@ export interface PoolConfig {
   max_age: number;
 }
 
-export interface PoolStats {
+interface PoolStats {
   pool_size: number;
   total_created: number;
   total_claimed: number;
@@ -32,26 +32,26 @@ export interface PoolStats {
   config: PoolConfig;
 }
 
-export interface PooledSandbox {
+interface PooledSandbox {
   id: string;
   external_id: string;
   pooled_at: string | null;
   created_at: string | null;
 }
 
-export interface PooledSandboxList {
+interface PooledSandboxList {
   count: number;
   sandboxes: PooledSandbox[];
 }
 
-export interface ReplenishResponse {
+interface ReplenishResponse {
   success: boolean;
   sandboxes_created: number;
   pool_size_before: number;
   pool_size_after: number;
 }
 
-export interface ForceCreateResponse {
+interface ForceCreateResponse {
   success: boolean;
   requested: number;
   created_count: number;
@@ -62,21 +62,21 @@ export interface ForceCreateResponse {
   pool_size_after: number;
 }
 
-export interface CleanupResponse {
+interface CleanupResponse {
   success: boolean;
   cleaned_count: number;
   pool_size_before: number;
   pool_size_after: number;
 }
 
-export interface RestartResponse {
+interface RestartResponse {
   success: boolean;
   was_running: boolean;
   is_running: boolean;
   message: string;
 }
 
-export interface RemoveResponse {
+interface RemoveResponse {
   success: boolean;
   removed_count: number;
   removed_ids: string[];
@@ -195,7 +195,7 @@ export const useSandboxPoolRestart = () => {
   });
 };
 
-export const useSandboxPoolRemove = () => {
+const useSandboxPoolRemove = () => {
   const queryClient = useQueryClient();
 
   return useMutation<RemoveResponse, Error, { sandbox_ids: string[]; delete_sandbox?: boolean }>({

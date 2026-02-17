@@ -330,7 +330,7 @@ export function ExampleShowcase() {
                   const isTyping = isCurrentStep && aiText.length < (step.aiText?.length || 0);
 
                   return (
-                    <div key={idx} className="flex justify-start">
+                    <div key={`step-${idx}`} className="flex justify-start">
                       <div className="max-w-[90%] space-y-1">
                         <div className="flex items-center gap-1 mb-1">
                           <Image
@@ -352,7 +352,7 @@ export function ExampleShowcase() {
                 if (step.type === 'toolcall') {
                   const IconComponent = getIconComponent(step.icon);
                   return (
-                    <div key={idx} className="my-1">
+                    <div key={step.title} className="my-1">
                       <button
                         onClick={() => setCurrentStepIndex(idx)}
                         className="inline-flex items-center gap-1 h-6 px-1.5 py-1 text-xs text-muted-foreground bg-card rounded-lg border border-neutral-200 dark:border-neutral-700/50 whitespace-nowrap cursor-pointer hover:bg-card/80 transition-colors"
@@ -542,7 +542,7 @@ export function ExampleShowcase() {
                   <div className="p-3 h-full grid grid-cols-3 gap-1.5 content-start">
                     {displayedContent.contentFiles.map((file, idx) => (
                       <div
-                        key={idx}
+                        key={file.name}
                         className={`flex flex-col items-center justify-center p-1.5 rounded-lg ${idx === displayedContent.contentFiles!.length - 1
                           ? 'bg-primary/10 border border-primary/20'
                           : ''
@@ -575,7 +575,7 @@ export function ExampleShowcase() {
                     <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1.5">
                       {displayedContent.contentSlides.map((_, idx) => (
                         <div
-                          key={idx}
+                          key={`_-${idx}`}
                           className={`transition-all ${idx === currentSlide
                             ? 'w-4 h-1 rounded-full bg-primary'
                             : 'w-1 h-1 rounded-full bg-muted-foreground/30'
@@ -608,7 +608,7 @@ export function ExampleShowcase() {
                             ['2024-05', 'Sales', '298,000', '101,000'],
                             ['2024-06', 'Sales', '334,000', '105,000'],
                           ].map((row, idx) => (
-                            <tr key={idx} className="border-b last:border-b-0">
+                            <tr key={`row-${idx}`} className="border-b last:border-b-0">
                               <td className="px-2 py-1 text-foreground">{row[0]}</td>
                               <td className="px-2 py-1 text-foreground">{row[1]}</td>
                               <td className="px-2 py-1 text-right text-foreground">{row[2]}</td>
@@ -667,33 +667,33 @@ export function ExampleShowcase() {
                               <span className={className}>
                                 {parts.map((part, i) => {
                                   if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
+                                    return <strong key={String(part)} className="font-bold">{part.slice(2, -2)}</strong>;
                                   }
-                                  return <span key={i}>{part}</span>;
+                                  return <span key={String(part)}>{part}</span>;
                                 })}
                               </span>
                             );
                           };
 
                           if (line.startsWith('# ')) {
-                            return <h1 key={idx} className="text-sm font-bold text-foreground mb-2">{line.slice(2)}</h1>;
+                            return <h1 key={`line-${idx}`} className="text-sm font-bold text-foreground mb-2">{line.slice(2)}</h1>;
                           }
                           if (line.startsWith('## ')) {
-                            return <h2 key={idx} className="text-xs font-bold text-foreground mt-3 mb-1.5">{line.slice(3)}</h2>;
+                            return <h2 key={`line-${idx}`} className="text-xs font-bold text-foreground mt-3 mb-1.5">{line.slice(3)}</h2>;
                           }
                           if (line.startsWith('### ')) {
-                            return <h3 key={idx} className="text-[11px] font-semibold text-foreground mt-2 mb-1">{line.slice(4)}</h3>;
+                            return <h3 key={`line-${idx}`} className="text-[11px] font-semibold text-foreground mt-2 mb-1">{line.slice(4)}</h3>;
                           }
                           if (line.startsWith('- ')) {
-                            return <p key={idx} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">• {renderText(line.slice(2), '')}</p>;
+                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">• {renderText(line.slice(2), '')}</p>;
                           }
                           if (line.match(/^\d+\./)) {
-                            return <p key={idx} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">{renderText(line, '')}</p>;
+                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">{renderText(line, '')}</p>;
                           }
                           if (line.trim() === '') {
-                            return <div key={idx} className="h-2" />;
+                            return <div key={`${idx}-${typeof line === 'string' ? line : idx}`} className="h-2" />;
                           }
-                          return <p key={idx} className="leading-relaxed">{renderText(line, 'text-[10px] text-muted-foreground')}</p>;
+                          return <p key={`${idx}-${typeof line === 'string' ? line : idx}`} className="leading-relaxed">{renderText(line, 'text-[10px] text-muted-foreground')}</p>;
                         })}
                       </div>
                     </div>

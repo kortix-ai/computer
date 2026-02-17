@@ -202,7 +202,7 @@ export default function NotificationManagementPage() {
                     {selectedWorkflow.tags.length > 0 && (
                       <div className="flex gap-1 flex-wrap">
                         {selectedWorkflow.tags.map((tag, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
+                          <Badge key={String(tag)} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>
                         ))}

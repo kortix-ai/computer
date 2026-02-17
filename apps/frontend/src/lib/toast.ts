@@ -40,10 +40,4 @@ export const toast = Object.assign(
 );
 
 // Re-export everything else from sonner
-export { Toaster } from 'sonner';
-export type { ExternalToast, ToasterProps } from 'sonner';
-
-
-
-
 

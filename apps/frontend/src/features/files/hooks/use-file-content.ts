@@ -41,7 +41,7 @@ export function useFileContent(
 /**
  * Utility to imperatively invalidate file content queries.
  */
-export function useInvalidateFileContent() {
+function useInvalidateFileContent() {
   const queryClient = useQueryClient();
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
 

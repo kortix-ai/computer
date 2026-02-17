@@ -9,7 +9,7 @@ import { skillsKeys } from './use-skills';
  *
  * Removes the skill's directory (and its SKILL.md file) from the filesystem.
  */
-export function useDeleteSkill() {
+function useDeleteSkill() {
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, { location: string }>({

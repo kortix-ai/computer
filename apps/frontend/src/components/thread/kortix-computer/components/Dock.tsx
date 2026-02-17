@@ -44,7 +44,7 @@ interface DockCardProps {
 
 const ICON_SIZE = 40;
 
-export function Dock({ children, className }: DockProps) {
+function Dock({ children, className }: DockProps) {
   return (
     <div className="relative isolate">
       <div className="absolute inset-x-0 bottom-0 h-[56px] pointer-events-none" style={{ zIndex: -1 }}>
@@ -60,7 +60,7 @@ export function Dock({ children, className }: DockProps) {
   );
 }
 
-export const DockCard = memo(function DockCard({
+const DockCard = memo(function DockCard({
   toolCall,
   toolName,
   label,
@@ -139,7 +139,7 @@ interface SystemDockCardProps {
   onClick?: () => void;
 }
 
-export const SystemDockCard = memo(function SystemDockCard({
+const SystemDockCard = memo(function SystemDockCard({
   icon: Icon,
   label,
   bgClass,

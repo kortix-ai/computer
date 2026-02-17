@@ -14,7 +14,7 @@ import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { backendApi } from '@/lib/api-client';
 import { toast } from '@/lib/toast';
 
-export type DowngradeReason =
+type DowngradeReason =
   | 'tooExpensive'
   | 'notUsingOften'
   | 'foundAlternative'

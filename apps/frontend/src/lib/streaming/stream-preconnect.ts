@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
-export interface PreconnectedStream {
+interface PreconnectedStream {
   connection: StreamConnection;
   agentRunId: string;
   threadId: string;
@@ -225,7 +225,7 @@ class StreamPreconnectService {
 
 let serviceInstance: StreamPreconnectService | null = null;
 
-export function getStreamPreconnectService() {
+function getStreamPreconnectService() {
   if (typeof window === 'undefined') {
     return {
       preconnect: async () => ({} as PreconnectedStream),
@@ -246,14 +246,14 @@ export function getStreamPreconnectService() {
   return serviceInstance;
 }
 
-export function storePreconnectInfo(agentRunId: string, threadId: string): void {
+function storePreconnectInfo(agentRunId: string, threadId: string): void {
   if (typeof window === 'undefined') return;
   
   sessionStorage.setItem('preconnect_agent_run_id', agentRunId);
   sessionStorage.setItem('preconnect_thread_id', threadId);
 }
 
-export function consumePreconnectInfo(): { agentRunId: string; threadId: string } | null {
+function consumePreconnectInfo(): { agentRunId: string; threadId: string } | null {
   if (typeof window === 'undefined') return null;
   
   const agentRunId = sessionStorage.getItem('preconnect_agent_run_id');

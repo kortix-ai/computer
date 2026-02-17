@@ -152,7 +152,7 @@ export default function ThreadUsage() {
                 </TableHeader>
                 <TableBody>
                   {[...Array(5)].map((_, i) => (
-                    <TableRow key={i}>
+                    <TableRow key={`_-${i}`}>
                       <TableCell>
                         <Skeleton className="h-5 w-48" />
                       </TableCell>

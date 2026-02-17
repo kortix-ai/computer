@@ -100,7 +100,7 @@ export function ConfirmDialog({
 // MessageActions — hover-visible action buttons on each turn
 // ============================================================================
 
-export function MessageActions({
+function MessageActions({
   messageId,
   sessionId,
   isFirstTurn,

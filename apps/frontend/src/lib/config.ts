@@ -1,17 +1,17 @@
 // Environment mode types — only two modes: local (Docker) and cloud (hosted)
-export enum EnvMode {
+enum EnvMode {
   LOCAL = 'local',
   CLOUD = 'cloud',
 }
 
 // Subscription tier structure - tier keys only, no price IDs
-export interface SubscriptionTierData {
+interface SubscriptionTierData {
   tierKey: string;  // Backend tier key like 'free', 'tier_2_20', etc.
   name: string;     // Display name like 'Basic', 'Plus', 'Pro'
 }
 
 // Subscription tiers structure - ONLY tier keys, price IDs come from backend
-export interface SubscriptionTiers {
+interface SubscriptionTiers {
   FREE_TIER: SubscriptionTierData;
   TIER_2_20: SubscriptionTierData;
   TIER_6_50: SubscriptionTierData;
@@ -88,8 +88,7 @@ export const isLocalMode = (): boolean => {
   return config.IS_LOCAL;
 };
 
-export const isCloudMode = (): boolean => {
+const isCloudMode = (): boolean => {
   return config.IS_CLOUD;
 };
-
 

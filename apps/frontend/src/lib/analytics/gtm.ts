@@ -14,7 +14,7 @@ declare const window: GTMWindow;
  * Initialize the dataLayer if it doesn't exist
  * GTM automatically creates window.dataLayer, so we just ensure it exists
  */
-export function initDataLayer() {
+function initDataLayer() {
   if (typeof window !== 'undefined' && !window.dataLayer) {
     window.dataLayer = [];
   }
@@ -25,7 +25,7 @@ export function initDataLayer() {
  * Provides contextual page information (master_group, content_group, page_type, language)
  * NOTE: No 'event' key - this is initialization data only
  */
-export interface ContainerLoadData {
+interface ContainerLoadData {
   master_group: string;
   content_group: string;
   page_type: string;
@@ -36,10 +36,10 @@ export interface ContainerLoadData {
  * Pages documented for routeChange tracking (from Miro/data dictionary)
  * Only these page types should trigger routeChange events
  */
-export const TRACKED_PAGE_TYPES = ['home', 'auth', 'plans', 'order_confirm'] as const;
-export type TrackedPageType = typeof TRACKED_PAGE_TYPES[number];
+const TRACKED_PAGE_TYPES = ['home', 'auth', 'plans', 'order_confirm'] as const;
+type TrackedPageType = typeof TRACKED_PAGE_TYPES[number];
 
-export function getPageContext(pathname: string): ContainerLoadData {
+function getPageContext(pathname: string): ContainerLoadData {
   // Determine language from document or default to 'en'
   const language = typeof document !== 'undefined' 
     ? document.documentElement.lang || 'en' 
@@ -129,11 +129,11 @@ export function getPageContext(pathname: string): ContainerLoadData {
  * Check if a page type should trigger routeChange events
  * Only documented pages (Homepage, Auth, Dashboard, Plans, Order Confirm) should be tracked
  */
-export function shouldTrackRouteChange(pageType: string): boolean {
+function shouldTrackRouteChange(pageType: string): boolean {
   return TRACKED_PAGE_TYPES.includes(pageType as TrackedPageType);
 }
 
-export function pushContainerLoad(pathname: string) {
+function pushContainerLoad(pathname: string) {
   if (typeof window === 'undefined') return;
   
   initDataLayer();
@@ -188,7 +188,7 @@ function markAsTracked() {
   sessionStorage.setItem('gtm_has_tracked', 'true');
 }
 
-export interface RouteChangeData {
+interface RouteChangeData {
   event: 'routeChange';
   page_location: string;
   page_path: string;
@@ -273,7 +273,7 @@ export function trackRouteChange(pathname: string, searchParams?: string) {
  * Clear GTM tracking session data
  * Useful for logout or session reset
  */
-export function clearGTMSession() {
+function clearGTMSession() {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem('gtm_previous_page');
   sessionStorage.removeItem('gtm_has_tracked');
@@ -443,7 +443,7 @@ export function trackSendAuthLink() {
 // ECOMMERCE EVENTS - Purchase Tracking
 // =============================================================================
 
-export interface PurchaseItem {
+interface PurchaseItem {
   item_id: string;          // e.g., "tier_2_20", "tier_6_50", "free"
   item_name: string;        // e.g., "Plus", "Pro", "Basic"
   coupon?: string;
@@ -456,13 +456,13 @@ export interface PurchaseItem {
   quantity: number;
 }
 
-export interface PurchaseCustomer {
+interface PurchaseCustomer {
   name?: string;
   surname?: string;
   email: string;
 }
 
-export interface PurchaseData {
+interface PurchaseData {
   transaction_id: string;
   value: number;
   tax?: number;
@@ -477,7 +477,7 @@ export interface PurchaseData {
  * Push a purchase event to the dataLayer
  * Call this when a user completes a purchase (after checkout success)
  */
-export function trackPurchase(data: PurchaseData) {
+function trackPurchase(data: PurchaseData) {
   if (typeof window === 'undefined') return;
   
   initDataLayer();
@@ -557,7 +557,7 @@ export function storeCheckoutData(data: {
 /**
  * Retrieve stored checkout data after returning from Stripe
  */
-export function getStoredCheckoutData(): {
+function getStoredCheckoutData(): {
   item_id: string;
   item_name: string;
   price: number;
@@ -590,7 +590,7 @@ export function getStoredCheckoutData(): {
 /**
  * Clear stored checkout data after tracking
  */
-export function clearCheckoutData() {
+function clearCheckoutData() {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem('gtm_checkout_data');
 }

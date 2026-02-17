@@ -3,7 +3,7 @@ import { referralsApi, ReferralCodeResponse, ReferralStats, ReferralListResponse
 import { toast } from '@/lib/toast';
 import { useTranslations } from 'next-intl';
 
-export const REFERRALS_QUERY_KEYS = {
+const REFERRALS_QUERY_KEYS = {
   code: ['referrals', 'code'] as const,
   stats: ['referrals', 'stats'] as const,
   list: (limit: number, offset: number) => ['referrals', 'list', limit, offset] as const,
@@ -19,7 +19,7 @@ export function useReferralCode(options?: { enabled?: boolean }) {
   });
 }
 
-export function useRefreshReferralCode() {
+function useRefreshReferralCode() {
   const queryClient = useQueryClient();
   const t = useTranslations('settings.referrals');
   
@@ -47,7 +47,7 @@ export function useReferralStats(options?: { enabled?: boolean }) {
   });
 }
 
-export function useUserReferrals(limit = 50, offset = 0, options?: { enabled?: boolean }) {
+function useUserReferrals(limit = 50, offset = 0, options?: { enabled?: boolean }) {
   const enabled = options?.enabled ?? true;
   return useQuery({
     queryKey: REFERRALS_QUERY_KEYS.list(limit, offset),
@@ -58,7 +58,7 @@ export function useUserReferrals(limit = 50, offset = 0, options?: { enabled?: b
   });
 }
 
-export function useValidateReferralCode() {
+function useValidateReferralCode() {
   return useMutation({
     mutationFn: (code: string) => referralsApi.validateReferralCode(code),
     onError: (error) => {
@@ -68,7 +68,7 @@ export function useValidateReferralCode() {
   });
 }
 
-export function useCopyReferralLink() {
+function useCopyReferralLink() {
   const { data: referralData } = useReferralCode();
 
   const copyToClipboard = async () => {

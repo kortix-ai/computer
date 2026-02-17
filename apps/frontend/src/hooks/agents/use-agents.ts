@@ -18,7 +18,7 @@ const DEFAULT_AGENT_PARAMS: AgentsParams = {
  * - Uses placeholderData from cached queries to avoid unnecessary refetches
  * - Shares cache between similar queries
  */
-export const useAgents = (
+const useAgents = (
   params: AgentsParams = {},
   customOptions?: Omit<
     UseQueryOptions<Awaited<ReturnType<typeof getAgents>>, Error, Awaited<ReturnType<typeof getAgents>>, ReturnType<typeof agentKeys.list>>,
@@ -114,7 +114,7 @@ export const useAgents = (
   });
 };
 
-export const useAgent = (agentId: string, options?: any) => {
+const useAgent = (agentId: string, options?: any) => {
   return useQuery<Agent>({
     queryKey: agentKeys.detail(agentId),
     queryFn: () => getAgent(agentId),
@@ -127,7 +127,7 @@ export const useAgent = (agentId: string, options?: any) => {
   });
 };
 
-export const useCreateAgent = () => {
+const useCreateAgent = () => {
   const queryClient = useQueryClient();
   
   return useMutation<Agent, Error, AgentUpdateRequest>({
@@ -149,7 +149,7 @@ export const useCreateAgent = () => {
   });
 };
 
-export const useCreateNewAgent = () => {
+const useCreateNewAgent = () => {
   const createAgentMutation = useCreateAgent();
 
   return useMutation({
@@ -175,7 +175,7 @@ export const useCreateNewAgent = () => {
   });
 };
 
-export const useUpdateAgent = () => {
+const useUpdateAgent = () => {
   const queryClient = useQueryClient();
   
   return useMutation<Agent, Error, { agentId: string } & AgentUpdateRequest>({
@@ -191,7 +191,7 @@ export const useUpdateAgent = () => {
   });
 };
 
-export const useDeleteAgent = () => {
+const useDeleteAgent = () => {
   const queryClient = useQueryClient();
   
   return useMutation<void, Error, string, { previousAgents: Array<[any, any]> }>({
@@ -245,7 +245,7 @@ interface DeleteMultipleAgentsVariables {
   onProgress?: (completed: number, total: number) => void;
 }
 
-export const useDeleteMultipleAgents = () => {
+const useDeleteMultipleAgents = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -275,7 +275,7 @@ export const useDeleteMultipleAgents = () => {
   });
 };
 
-export const useOptimisticAgentUpdate = () => {
+const useOptimisticAgentUpdate = () => {
   const queryClient = useQueryClient();
   
   return {
@@ -295,7 +295,7 @@ export const useOptimisticAgentUpdate = () => {
   };
 };
 
-export const useAgentDeletionState = () => {
+const useAgentDeletionState = () => {
   const [deletingAgents, setDeletingAgents] = useState<Set<string>>(new Set());
   const deleteAgentMutation = useDeleteAgent();
 
@@ -321,7 +321,6 @@ export const useAgentDeletionState = () => {
     isDeleting: deleteAgentMutation.isPending,
   };
 };
-
 
 /**
  * Hook to get an agent from the cache without fetching.
@@ -358,7 +357,7 @@ export const useAgentFromCache = (agentId: string | undefined): Agent | undefine
  * Hook to get multiple agents from cache by IDs.
  * Returns a map of agentId -> Agent for quick lookup.
  */
-export const useAgentsFromCache = (agentIds: string[]): Map<string, Agent> => {
+const useAgentsFromCache = (agentIds: string[]): Map<string, Agent> => {
   const queryClient = useQueryClient();
   
   return useMemo(() => {

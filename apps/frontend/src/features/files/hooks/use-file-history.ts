@@ -5,7 +5,7 @@ import { useServerStore } from '@/stores/server-store';
 import { getFileHistory, getFileCommitDiff, getFileAtCommit } from '../api/git-history';
 import type { FileHistoryResult, FileCommitDiff } from '../types';
 
-export const fileHistoryKeys = {
+const fileHistoryKeys = {
   all: ['opencode-files', 'history'] as const,
   file: (serverUrl: string, filePath: string) =>
     ['opencode-files', 'history', serverUrl, filePath] as const,
@@ -86,7 +86,7 @@ export function useFileCommitDiff(
 /**
  * Fetch the content of a file at a specific commit.
  */
-export function useFileAtCommit(
+function useFileAtCommit(
   filePath: string | null,
   commitHash: string | null,
   options?: { enabled?: boolean },

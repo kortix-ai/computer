@@ -18,7 +18,7 @@ export function SpreadsheetLoader({ mode = 'max' }: SpreadsheetLoaderProps) {
         <div className="flex-1 relative">
             <div className="absolute inset-0 grid grid-cols-4 grid-rows-6 gap-[1px] bg-border/50 p-[1px]">
                  {[...Array(24)].map((_, i) => (
-                    <div key={i} className="bg-background" />
+                    <div key={`_-${i}`} className="bg-background" />
                  ))}
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
@@ -79,7 +79,7 @@ export function SpreadsheetLoader({ mode = 'max' }: SpreadsheetLoaderProps) {
         <div className="flex-1 overflow-hidden relative">
            <div className="absolute inset-0 overflow-hidden">
              {[...Array(50)].map((_, i) => (
-               <div key={i} className="flex h-[28px] border-b">
+               <div key={`_-${i}`} className="flex h-[28px] border-b">
                  <div className="w-10 flex-none border-r bg-muted/10 flex items-center justify-center">
                    <span className="text-[10px] text-muted-foreground">{i + 1}</span>
                  </div>

@@ -244,7 +244,7 @@ const languageMap: Record<string, () => any> = {
 };
 
 // Get language from file extension
-export function getLanguageFromExtension(fileName: string): string {
+function getLanguageFromExtension(fileName: string): string {
   const extension = fileName.split('.').pop()?.toLowerCase() || '';
   const fileNameLower = fileName.toLowerCase();
   
@@ -705,5 +705,4 @@ export function CodeEditor({
     </div>
   );
 }
-
 

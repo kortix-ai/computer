@@ -72,7 +72,7 @@ export interface UpdateSkillInput {
   body: string;
 }
 
-export interface DeleteSkillInput {
+interface DeleteSkillInput {
   /** Absolute path to the skill directory (parent of SKILL.md) */
   location: string;
 }
@@ -82,11 +82,11 @@ export interface DeleteSkillInput {
 // ---------------------------------------------------------------------------
 
 /** Name must be lowercase alphanumeric with single hyphens, 1-64 chars */
-export const SKILL_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-export const SKILL_NAME_MAX_LENGTH = 64;
-export const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
+const SKILL_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const SKILL_NAME_MAX_LENGTH = 64;
+const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
 
-export function validateSkillName(name: string): string | null {
+function validateSkillName(name: string): string | null {
   if (!name) return 'Name is required';
   if (name.length > SKILL_NAME_MAX_LENGTH)
     return `Name must be ${SKILL_NAME_MAX_LENGTH} characters or fewer`;
@@ -95,7 +95,7 @@ export function validateSkillName(name: string): string | null {
   return null;
 }
 
-export function validateSkillDescription(description: string): string | null {
+function validateSkillDescription(description: string): string | null {
   if (!description.trim()) return 'Description is required';
   if (description.length > SKILL_DESCRIPTION_MAX_LENGTH)
     return `Description must be ${SKILL_DESCRIPTION_MAX_LENGTH} characters or fewer`;
@@ -175,9 +175,9 @@ export function parseSkillFileContent(content: string): {
 // Filter types
 // ---------------------------------------------------------------------------
 
-export type SkillFilterTab = 'all' | SkillSource;
+type SkillFilterTab = 'all' | SkillSource;
 
-export const SKILL_FILTER_TABS: { value: SkillFilterTab; label: string }[] = [
+const SKILL_FILTER_TABS: { value: SkillFilterTab; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'project', label: 'Project' },
   { value: 'global', label: 'Global' },

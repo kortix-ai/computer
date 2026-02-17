@@ -8,7 +8,7 @@ export const agentKeys = {
   detail: (id: string) => [...agentKeysBase, 'detail', id] as const,
 } as const;
 
-export const versionKeys = {
+const versionKeys = {
   all: ['versions'] as const,
   lists: () => [...versionKeys.all, 'list'] as const,
   list: (agentId: string) => [...versionKeys.lists(), agentId] as const,

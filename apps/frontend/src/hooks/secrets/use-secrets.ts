@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 const getBackendUrl = () =>
   process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
 
-export const secretsKeys = {
+const secretsKeys = {
   all: ['secrets'] as const,
 };
 

@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendApi } from '@/lib/api-client';
 
-export interface MaintenanceNotice {
+interface MaintenanceNotice {
   enabled: boolean;
   start_time?: string | null;
   end_time?: string | null;
 }
 
-export interface TechnicalIssue {
+interface TechnicalIssue {
   enabled: boolean;
   message?: string | null;
   status_url?: string | null;
@@ -17,20 +17,20 @@ export interface TechnicalIssue {
   severity?: 'degraded' | 'outage' | 'maintenance' | null;
 }
 
-export interface SystemStatus {
+interface SystemStatus {
   maintenance_notice: MaintenanceNotice;
   technical_issue: TechnicalIssue;
   updated_at?: string | null;
   updated_by?: string | null;
 }
 
-export interface UpdateMaintenanceRequest {
+interface UpdateMaintenanceRequest {
   enabled: boolean;
   start_time?: string | null;
   end_time?: string | null;
 }
 
-export interface UpdateTechnicalIssueRequest {
+interface UpdateTechnicalIssueRequest {
   enabled: boolean;
   message?: string | null;
   status_url?: string | null;
@@ -94,7 +94,7 @@ export const useUpdateTechnicalIssue = () => {
   });
 };
 
-export const useClearSystemStatus = () => {
+const useClearSystemStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({

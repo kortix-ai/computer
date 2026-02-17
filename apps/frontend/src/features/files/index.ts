@@ -6,91 +6,37 @@
  */
 
 // Types
-export type {
-  FileNode,
-  FileContent,
-  FilePatch,
-  FilePatchHunk,
-  FindMatch,
-  LssHit,
-  LssSearchResult,
-  OpenCodeProjectInfo,
-  ServerHealth,
-  GitCommit,
-  FileHistoryResult,
-  FileCommitDiff,
-} from './types';
+export type { FindMatch } from './types';
 
 // API — read
 export {
-  listFiles,
   readFile,
-  findFiles,
-  findText,
-  getCurrentProject,
-  getServerHealth,
-  isServerReachable,
   // binary helpers
-  readFileAsBlob,
-  downloadFile,
+  
   // write
   uploadFile,
-  deleteFile,
-  mkdirFile,
-  renameFile,
-  createFile,
-  copyFile,
-  type UploadResult,
+  mkdirFile
 } from './api/opencode-files';
 
 // API — semantic search (LSS)
-export { searchLss } from './api/lss-search';
 
 // API — git history
-export { getFileHistory, getFileCommitDiff, getFileAtCommit } from './api/git-history';
 
 // Hooks
 export {
   useFileList,
-  useInvalidateFileList,
-  useFileContent,
-  useInvalidateFileContent,
   useFileSearch,
   useTextSearch,
   useLssSearch,
-  useServerHealth,
-  useCurrentProject,
-  useFileEventInvalidation,
   useFileUpload,
   useFileDelete,
   useFileMkdir,
   useFileRename,
-  useFileCreate,
-  useFileCopy,
-  useFileHistory,
-  useFileCommitDiff,
-  useFileAtCommit,
-  fileListKeys,
-  fileContentKeys,
-  fileSearchKeys,
-  fileHistoryKeys,
-  lssSearchKeys,
+  fileListKeys
 } from './hooks';
 
 // Store
-export {
-  useFilesStore,
-  type FilesView,
-  type ClipboardOperation,
-  type ClipboardItem,
-} from './store/files-store';
+export { useFilesStore } from './store/files-store';
 
 // Components
-export {
-  FileBrowser,
-  FileViewer,
-  FileSearch,
-  FileBreadcrumbs,
-  FileTreeItem,
-  FileHistoryPanel,
-} from './components';
+export { FileBrowser, FileViewer, FileHistoryPanel } from './components';

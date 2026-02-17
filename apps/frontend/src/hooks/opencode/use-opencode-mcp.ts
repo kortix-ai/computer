@@ -49,7 +49,7 @@ function unwrap<T>(result: { data?: T; error?: unknown; response?: Response }): 
 // Add MCP Server
 // ============================================================================
 
-export interface AddMcpServerParams {
+interface AddMcpServerParams {
   name: string;
   type: 'local' | 'remote';
   /** For local (stdio) servers: the command + args as an array */
@@ -214,7 +214,7 @@ export function useMcpAuthCallback() {
 // MCP OAuth: Remove
 // ============================================================================
 
-export function useMcpAuthRemove() {
+function useMcpAuthRemove() {
   const queryClient = useQueryClient();
 
   return useMutation({

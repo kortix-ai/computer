@@ -4,7 +4,7 @@ import React from 'react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export interface ToolViewIconTitleProps {
+interface ToolViewIconTitleProps {
   /** The icon to display */
   icon: LucideIcon;
   /** The title text */

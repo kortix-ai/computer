@@ -23,6 +23,6 @@ export const IconRenderer = ({ iconName, className, size = 24 }: IconRendererPro
 };
 
 // Helper function to get integration icon
-export const getIntegrationIcon = (iconName: string, className?: string, size?: number) => {
+const getIntegrationIcon = (iconName: string, className?: string, size?: number) => {
   return <IconRenderer iconName={iconName} className={className} size={size} />;
 };

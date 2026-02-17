@@ -206,7 +206,7 @@ export function OcMemGetToolView({
                   const allFiles = [...obs.filesRead, ...obs.filesModified];
                   return (
                     <div
-                      key={i}
+                      key={obs.title}
                       className="flex items-start gap-3 p-3 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
                     >
                       {/* Type indicator */}

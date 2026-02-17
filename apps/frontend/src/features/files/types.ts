@@ -30,7 +30,7 @@ export interface FilePatch {
   index?: string;
 }
 
-export interface FilePatchHunk {
+interface FilePatchHunk {
   oldStart: number;
   oldLines: number;
   newStart: number;

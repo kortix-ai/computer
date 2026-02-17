@@ -317,7 +317,7 @@ export default function AdminAnalyticsPage() {
                   {(summaryLoading || engagementLoading || taskLoading || funnelLoading) ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-5 gap-4">
-                        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+                        {[...Array(5)].map((_, i) => <Skeleton key={`_-${i}`} className="h-20" />)}
                       </div>
                       <Skeleton className="h-24" />
                     </div>
@@ -440,7 +440,7 @@ export default function AdminAnalyticsPage() {
                 <div className="p-5">
                   {engagementLoading ? (
                     <div className="grid grid-cols-4 gap-4">
-                      {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+                      {[...Array(4)].map((_, i) => <Skeleton key={`_-${i}`} className="h-20" />)}
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-4">
@@ -541,7 +541,7 @@ export default function AdminAnalyticsPage() {
                               {conversionFunnel.web_subscriber_emails?.length > 0 ? (
                                 <ul className="space-y-1">
                                   {conversionFunnel.web_subscriber_emails.map((email, idx) => (
-                                    <li key={idx} className="text-sm">
+                                    <li key={String(email)} className="text-sm">
                                       <UserEmailLink email={email} onUserClick={handleUserEmailClick} />
                                     </li>
                                   ))}
@@ -563,7 +563,7 @@ export default function AdminAnalyticsPage() {
                               {conversionFunnel.app_subscriber_emails?.length > 0 ? (
                                 <ul className="space-y-1">
                                   {conversionFunnel.app_subscriber_emails.map((email, idx) => (
-                                    <li key={idx} className="text-sm">
+                                    <li key={String(email)} className="text-sm">
                                       <UserEmailLink email={email} onUserClick={handleUserEmailClick} />
                                     </li>
                                   ))}
@@ -602,7 +602,7 @@ export default function AdminAnalyticsPage() {
                         <h4 className="font-medium text-sm mb-2">Paying Users</h4>
                         <ul className="space-y-1">
                           {profitability.paying_user_emails.map((email, idx) => (
-                            <li key={idx} className="text-sm">
+                            <li key={String(email)} className="text-sm">
                               <UserEmailLink email={email} onUserClick={handleUserEmailClick} />
                             </li>
                           ))}
@@ -616,7 +616,7 @@ export default function AdminAnalyticsPage() {
                   {profitabilityLoading ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-6 gap-4">
-                        {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+                        {[...Array(6)].map((_, i) => <Skeleton key={`_-${i}`} className="h-20" />)}
                       </div>
                       <Skeleton className="h-32" />
                     </div>
@@ -786,7 +786,7 @@ export default function AdminAnalyticsPage() {
                                   const valuePercent = totalValue > 0 ? ((value / totalValue) * 100).toFixed(0) : '0';
                                   return (
                                     <div
-                                      key={idx}
+                                      key={`tier-${idx}`}
                                       className="grid grid-cols-3 gap-2 text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors"
                                     >
                                       <div className="font-medium truncate flex items-center gap-1">

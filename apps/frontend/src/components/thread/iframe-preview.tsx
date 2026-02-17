@@ -36,7 +36,7 @@ export function IframePreview({
           </div>
         </div>
       ) : (
-        <iframe
+        <iframe title="Embedded content"
           src={url}
           title={title || 'Preview'}
           className={cn("absolute inset-0 w-full h-full border-0", className)}

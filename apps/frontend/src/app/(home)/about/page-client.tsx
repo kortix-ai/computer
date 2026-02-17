@@ -265,7 +265,7 @@ export default function AboutPageClient() {
         >
           {paragraphs.map((paragraph, index) => (
             <TypewriterParagraph 
-              key={index} 
+              key={String(paragraph)} 
               paragraph={paragraph}
               paragraphIndex={index}
               progress={currentProgress}

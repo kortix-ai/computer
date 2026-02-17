@@ -432,7 +432,7 @@ export function PptxRenderer({
               <div className="space-y-3 mb-6">
                 {slide.texts.map((text, idx) => (
                   <p
-                    key={idx}
+                    key={String(text)}
                     className={cn(
                       'text-foreground',
                       idx === 0 ? 'text-xl font-semibold' : 'text-sm',
@@ -450,7 +450,7 @@ export function PptxRenderer({
                 {slide.images.map((img, idx) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    key={idx}
+                    key={img.url}
                     src={img.url}
                     alt={img.alt}
                     className="max-w-full rounded-lg shadow-sm"
@@ -475,7 +475,7 @@ export function PptxRenderer({
           <div className="flex gap-2">
             {slides.map((s, idx) => (
               <button
-                key={idx}
+                key={`s-${idx}`}
                 onClick={() => setCurrentSlide(idx)}
                 className={cn(
                   'shrink-0 w-20 h-14 rounded-md border text-xs flex items-center justify-center transition-colors',

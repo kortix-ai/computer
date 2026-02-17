@@ -23,7 +23,7 @@ import type {
 // Re-export SDK types for consumers
 // ============================================================================
 
-export type { Session, Message, Part, Agent, Command, Project, SessionStatus, PermissionRule, Model, McpStatus, PathInfo };
+export type { Session, Message, Part, Agent, Command, Project, McpStatus };
 
 /**
  * Shape returned by `client.session.messages()`:
@@ -45,12 +45,12 @@ export type ProviderListResponse = SdkProviderListResponse;
  * Prompt part (input to send message).
  * Supports text, file references, and agent/mode mentions.
  */
-export type PromptPart =
+type PromptPart =
   | { type: 'text'; text: string; id?: string }
   | { type: 'file'; mime: string; url: string; filename?: string; source?: { text: { value: string; start: number; end: number }; type: 'file'; path: string } }
   | { type: 'agent'; name: string; source?: { value: string; start: number; end: number } };
 
-export interface SendMessageOptions {
+interface SendMessageOptions {
   model?: { providerID: string; modelID: string };
   agent?: string;
   variant?: string;
@@ -69,7 +69,7 @@ export interface Skill {
 /**
  * Tool list item from `client.tool.list()`.
  */
-export interface ToolListItem {
+interface ToolListItem {
   id: string;
   description: string;
   parameters: unknown;
@@ -344,7 +344,7 @@ export function useOpenCodeAgents() {
   });
 }
 
-export function useOpenCodeAgent(agentName: string) {
+function useOpenCodeAgent(agentName: string) {
   return useQuery<Agent | undefined>({
     queryKey: [...opencodeKeys.agents(), agentName],
     queryFn: async () => {
@@ -358,7 +358,7 @@ export function useOpenCodeAgent(agentName: string) {
   });
 }
 
-export function useUpdateOpenCodeAgent() {
+function useUpdateOpenCodeAgent() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -390,7 +390,7 @@ export function useOpenCodeToolIds() {
   });
 }
 
-export function useOpenCodeTools(providerID: string, modelID: string) {
+function useOpenCodeTools(providerID: string, modelID: string) {
   return useQuery<ToolListItem[]>({
     queryKey: opencodeKeys.tools(providerID, modelID),
     queryFn: async () => {
@@ -438,7 +438,7 @@ export function useOpenCodeProjects() {
   });
 }
 
-export function useOpenCodeCurrentProject() {
+function useOpenCodeCurrentProject() {
   return useQuery<Project>({
     queryKey: opencodeKeys.currentProject(),
     queryFn: async () => {
@@ -455,7 +455,7 @@ export function useOpenCodeCurrentProject() {
 // Path Info Hook
 // ============================================================================
 
-export function useOpenCodePathInfo() {
+function useOpenCodePathInfo() {
   return useQuery<PathInfo>({
     queryKey: opencodeKeys.pathInfo(),
     queryFn: async () => {
@@ -751,7 +751,7 @@ export function useOpenCodeMcpStatus() {
 // Share / Unshare Hooks
 // ============================================================================
 
-export function useShareSession() {
+function useShareSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -767,7 +767,7 @@ export function useShareSession() {
   });
 }
 
-export function useUnshareSession() {
+function useUnshareSession() {
   const queryClient = useQueryClient();
 
   return useMutation({

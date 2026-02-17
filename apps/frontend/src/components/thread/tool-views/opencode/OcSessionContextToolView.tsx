@@ -123,7 +123,7 @@ function TodoContent({ output }: { output: string }) {
         const isCancelled = line.includes('[-]');
         const content = line.replace(/^- \[.\] /, '');
         return (
-          <label key={i} className="flex items-start gap-2.5 py-1">
+          <label key={`line-${i}`} className="flex items-start gap-2.5 py-1">
             <input type="checkbox" checked={isCompleted} readOnly className="mt-0.5 rounded border-border" />
             <span
               className={cn(
@@ -169,7 +169,7 @@ function MessagesContent({ output }: { output: string }) {
     <div className="space-y-3">
       {messages.map((msg, i) => (
         <div
-          key={i}
+          key={`msg-${i}`}
           className={cn(
             'rounded-lg px-3 py-2 text-sm',
             msg.role === 'user'
@@ -209,7 +209,7 @@ function DiffsContent({ output }: { output: string }) {
   return (
     <div className="space-y-2">
       {files.map((file, i) => (
-        <DiffFile key={i} header={file.header} content={file.content} />
+        <DiffFile key={`file-${i}`} header={file.header} content={file.content} />
       ))}
     </div>
   );

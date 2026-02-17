@@ -5,33 +5,6 @@
  * to avoid collision with AgentPress tool names.
  */
 
-export { OcBashToolView } from './OcBashToolView';
-export { OcEditToolView } from './OcEditToolView';
-export { OcWriteToolView } from './OcWriteToolView';
-export { OcReadToolView } from './OcReadToolView';
-export { OcSearchToolView } from './OcSearchToolView';
-export { OcWebFetchToolView } from './OcWebFetchToolView';
-export { OcWebSearchToolView } from './OcWebSearchToolView';
-export { OcPresentationGenToolView } from './OcPresentationGenToolView';
-export { OcImageSearchToolView } from './OcImageSearchToolView';
-export { OcImageGenToolView } from './OcImageGenToolView';
-export { OcShowUserToolView } from './OcShowUserToolView';
-export { OcApplyPatchToolView } from './OcApplyPatchToolView';
-export { OcTaskToolView } from './OcTaskToolView';
-export { OcTodoToolView } from './OcTodoToolView';
-export { OcGenericToolView } from './OcGenericToolView';
-export { OcQuestionToolView } from './OcQuestionToolView';
-export { OcMemSearchToolView } from './OcMemSearchToolView';
-export { OcMemGetToolView } from './OcMemGetToolView';
-export { OcMemSaveToolView } from './OcMemSaveToolView';
-export { OcMemTimelineToolView } from './OcMemTimelineToolView';
-export { OcSessionContextToolView } from './OcSessionContextToolView';
-export { OcSkillToolView } from './OcSkillToolView';
-export { OcCodesearchToolView } from './OcCodesearchToolView';
-export { OcBatchToolView } from './OcBatchToolView';
-export { OcPlanToolView } from './OcPlanToolView';
-export { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
-
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
 import { OcBashToolView } from './OcBashToolView';
 import { OcEditToolView } from './OcEditToolView';

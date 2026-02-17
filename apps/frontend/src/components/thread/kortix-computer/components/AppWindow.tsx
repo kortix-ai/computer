@@ -5,9 +5,9 @@ import { motion, useDragControls, PanInfo } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Minus, Square, X } from 'lucide-react';
 
-export const DESKTOP_HEADER_HEIGHT = 36;
-export const DESKTOP_DOCK_HEIGHT = 68;
-export const DESKTOP_PADDING = 4;
+const DESKTOP_HEADER_HEIGHT = 36;
+const DESKTOP_DOCK_HEIGHT = 68;
+const DESKTOP_PADDING = 4;
 
 interface AppWindowProps {
   id: string;

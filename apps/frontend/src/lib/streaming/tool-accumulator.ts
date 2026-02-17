@@ -7,7 +7,7 @@ import type {
 } from './types';
 import { safeJsonParse } from './utils';
 
-export function createAccumulatorState(): ToolCallAccumulatorState {
+function createAccumulatorState(): ToolCallAccumulatorState {
   return {
     accumulatedToolCalls: new Map(),
     completedToolCallIds: new Set(),
@@ -123,13 +123,13 @@ export function markToolCallCompleted(
   accumulator.toolResults.set(toolCallId, resultMessage);
 }
 
-export function clearAccumulator(accumulator: ToolCallAccumulatorState): void {
+function clearAccumulator(accumulator: ToolCallAccumulatorState): void {
   accumulator.accumulatedToolCalls.clear();
   accumulator.completedToolCallIds.clear();
   accumulator.toolResults.clear();
 }
 
-export function getAccumulatedArgumentsForToolCall(
+function getAccumulatedArgumentsForToolCall(
   toolCallId: string,
   accumulator: ToolCallAccumulatorState
 ): string | null {
@@ -143,14 +143,14 @@ export function getAccumulatedArgumentsForToolCall(
   return mergedArgs;
 }
 
-export function hasToolCall(
+function hasToolCall(
   toolCallId: string,
   accumulator: ToolCallAccumulatorState
 ): boolean {
   return accumulator.accumulatedToolCalls.has(toolCallId);
 }
 
-export function isToolCallCompleted(
+function isToolCallCompleted(
   toolCallId: string,
   accumulator: ToolCallAccumulatorState
 ): boolean {

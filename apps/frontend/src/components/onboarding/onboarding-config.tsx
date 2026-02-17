@@ -66,15 +66,15 @@ export const getStepByIndex = (index: number): OnboardingStep | null => {
   return onboardingSteps[index] || null;
 };
 
-export const getStepById = (id: string): OnboardingStep | null => {
+const getStepById = (id: string): OnboardingStep | null => {
   return onboardingSteps.find(step => step.id === id) || null;
 };
 
-export const getStepIndex = (id: string): number => {
+const getStepIndex = (id: string): number => {
   return onboardingSteps.findIndex(step => step.id === id);
 };
 
-export const isValidStepIndex = (index: number): boolean => {
+const isValidStepIndex = (index: number): boolean => {
   return index >= 0 && index < onboardingSteps.length;
 };
 

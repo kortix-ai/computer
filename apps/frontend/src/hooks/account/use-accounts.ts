@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/client';
 import { GetAccountsResponse } from '@usebasejump/shared';
 import { backendApi } from '@/lib/api-client';
 
-export const useAccounts = (
+const useAccounts = (
   options?: Partial<UseQueryOptions<GetAccountsResponse>> & {
     enabled?: boolean;
   },

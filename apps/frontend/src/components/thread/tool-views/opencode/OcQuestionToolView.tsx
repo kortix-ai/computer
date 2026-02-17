@@ -84,7 +84,7 @@ export function OcQuestionToolView({
               const hasAnswer = answer.length > 0;
 
               return (
-                <div key={i} className="space-y-2">
+                <div key={`q-${i}`} className="space-y-2">
                   {/* Question header */}
                   {q.header && (
                     <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">

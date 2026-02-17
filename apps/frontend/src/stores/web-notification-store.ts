@@ -7,9 +7,9 @@ import { persist } from 'zustand/middleware';
 // Types
 // ============================================================================
 
-export type WebNotificationPermission = 'default' | 'granted' | 'denied';
+type WebNotificationPermission = 'default' | 'granted' | 'denied';
 
-export interface WebNotificationPreferences {
+interface WebNotificationPreferences {
   /** Master toggle for browser notifications */
   enabled: boolean;
   /** Notify when a session task completes (becomes idle after being busy) */

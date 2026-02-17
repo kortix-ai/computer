@@ -434,7 +434,7 @@ export function VideoRenderer({
 }
 
 // Compact video player for inline tool views
-export function InlineVideoPlayer({
+function InlineVideoPlayer({
   url,
   className,
 }: {

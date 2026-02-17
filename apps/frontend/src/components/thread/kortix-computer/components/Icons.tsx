@@ -18,7 +18,7 @@ export const FolderIcon = () => (
   </svg>
 );
 
-export const CodeFileIcon = () => (
+const CodeFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="codeModernBrowser" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -34,7 +34,7 @@ export const CodeFileIcon = () => (
   </svg>
 );
 
-export const ImageFileIcon = () => (
+const ImageFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="imgModernBrowser" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -49,7 +49,7 @@ export const ImageFileIcon = () => (
   </svg>
 );
 
-export const DocumentFileIcon = () => (
+const DocumentFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="docModernBrowser" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -66,7 +66,7 @@ export const DocumentFileIcon = () => (
   </svg>
 );
 
-export const GenericFileIcon = () => (
+const GenericFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="genModernBrowser" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -82,7 +82,7 @@ export const GenericFileIcon = () => (
   </svg>
 );
 
-export const VideoFileIcon = () => (
+const VideoFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="videoModern" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -95,7 +95,7 @@ export const VideoFileIcon = () => (
   </svg>
 );
 
-export const AudioFileIcon = () => (
+const AudioFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="audioModern" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -113,7 +113,7 @@ export const AudioFileIcon = () => (
   </svg>
 );
 
-export const ArchiveFileIcon = () => (
+const ArchiveFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="archiveModern" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -131,7 +131,7 @@ export const ArchiveFileIcon = () => (
   </svg>
 );
 
-export const MarkdownFileIcon = () => (
+const MarkdownFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="mdModern" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -144,7 +144,7 @@ export const MarkdownFileIcon = () => (
   </svg>
 );
 
-export const JsonFileIcon = () => (
+const JsonFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="jsonModern" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -157,7 +157,7 @@ export const JsonFileIcon = () => (
   </svg>
 );
 
-export const PdfFileIcon = () => (
+const PdfFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="pdfModern" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -170,7 +170,7 @@ export const PdfFileIcon = () => (
   </svg>
 );
 
-export const SpreadsheetFileIcon = () => (
+const SpreadsheetFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="sheetModern" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -187,7 +187,7 @@ export const SpreadsheetFileIcon = () => (
   </svg>
 );
 
-export const ConfigFileIcon = () => (
+const ConfigFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="configModern" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -205,7 +205,7 @@ export const ConfigFileIcon = () => (
   </svg>
 );
 
-export const PresentationFileIcon = () => (
+const PresentationFileIcon = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full">
     <defs>
       <linearGradient id="presentModern" x1="0%" y1="0%" x2="100%" y2="100%">

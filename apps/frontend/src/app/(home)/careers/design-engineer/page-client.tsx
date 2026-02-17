@@ -116,7 +116,7 @@ export default function DesignEngineerPageClient() {
             <ul className="space-y-4">
               {responsibilities.map((item, index) => (
                 <motion.li
-                  key={index}
+                  key={String(item)}
                   className="flex items-start gap-3"
                   initial={{ opacity: 0, x: -10 }}
                   whileInView={{ opacity: 1, x: 0 }}
@@ -147,7 +147,7 @@ export default function DesignEngineerPageClient() {
             <ul className="space-y-4">
               {qualifications.map((item, index) => (
                 <motion.li
-                  key={index}
+                  key={String(item)}
                   className="flex items-start gap-3"
                   initial={{ opacity: 0, x: -10 }}
                   whileInView={{ opacity: 1, x: 0 }}
@@ -178,7 +178,7 @@ export default function DesignEngineerPageClient() {
             <ul className="space-y-4">
               {bonuses.map((item, index) => (
                 <motion.li
-                  key={index}
+                  key={String(item)}
                   className="flex items-start gap-3"
                   initial={{ opacity: 0, x: -10 }}
                   whileInView={{ opacity: 1, x: 0 }}

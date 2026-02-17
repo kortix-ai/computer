@@ -75,7 +75,7 @@ export const getIntegrationFields = (agentId: string): ConfigurationField[] => {
 };
 
 // Calculate configuration completeness
-export const getConfigurationCompleteness = (agentId: string, configuration: Record<string, any>) => {
+const getConfigurationCompleteness = (agentId: string, configuration: Record<string, any>) => {
   const fields = [...getConfigurationFields(agentId), ...getIntegrationFields(agentId)];
   const configuredFields = fields.filter(field => {
     const value = configuration[field.key];

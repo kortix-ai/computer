@@ -8,7 +8,7 @@ import { ChevronUpIcon, ChevronDownIcon, CheckIcon } from '@radix-ui/react-icons
 import { cn } from '@/lib/utils'
 import type { DateRange } from 'react-day-picker'
 
-export interface DateRangePickerProps {
+interface DateRangePickerProps {
   onUpdate?: (values: { range: DateRange }) => void
   initialDateFrom?: Date | string
   initialDateTo?: Date | string

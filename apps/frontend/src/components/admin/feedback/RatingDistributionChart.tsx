@@ -1,5 +1,7 @@
 'use client';
 
+
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminFeedbackStats } from '@/hooks/admin/use-admin-feedback';
@@ -9,8 +11,11 @@ import {
   ChartTooltipContent,
   ChartConfig,
 } from '@/components/ui/chart';
-import { Bar, BarChart, XAxis, YAxis, Cell } from 'recharts';
-
+const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false }) as any;
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false }) as any;
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false }) as any;
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false }) as any;
+const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false }) as any;
 const chartConfig = {
   count: {
     label: 'Count',

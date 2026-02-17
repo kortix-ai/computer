@@ -51,7 +51,6 @@ export function getToolTitle(toolName: string): string {
     'browser-screenshot': 'Browser Screenshot',
     'load-image': 'Load Image',
 
-
     'initialize-tools': 'Mode Activated',
     'initialize_tools': 'Mode Activated',
 
@@ -126,7 +125,7 @@ export function getToolTitle(toolName: string): string {
 }
 
 // Helper to extract command from execute-command content
-export function extractCommand(content: string | object | undefined | null): string | null {
+function extractCommand(content: string | object | undefined | null): string | null {
   const contentStr = normalizeContentToString(content);
   if (!contentStr) return null;
   
@@ -167,7 +166,7 @@ export function extractCommand(content: string | object | undefined | null): str
 }
 
 // Helper to extract session name from check-command-output content
-export function extractSessionName(content: string | object | undefined | null): string | null {
+function extractSessionName(content: string | object | undefined | null): string | null {
   const contentStr = normalizeContentToString(content);
   if (!contentStr) return null;
   
@@ -207,7 +206,7 @@ export function extractSessionName(content: string | object | undefined | null):
 }
 
 // Helper to extract command output from tool result content
-export function extractCommandOutput(
+function extractCommandOutput(
   content: string | object | undefined | null,
 ): string | null {
   const contentStr = normalizeContentToString(content);
@@ -259,7 +258,7 @@ export function extractCommandOutput(
 }
 
 // Helper to extract the exit code from tool result
-export function extractExitCode(content: string | object | undefined | null): number | null {
+function extractExitCode(content: string | object | undefined | null): number | null {
   const contentStr = normalizeContentToString(content);
   if (!contentStr) return null;
 
@@ -275,7 +274,7 @@ export function extractExitCode(content: string | object | undefined | null): nu
 }
 
 // Helper to extract file path from commands
-export function extractFilePath(content: string | object | undefined | null): string | null {
+function extractFilePath(content: string | object | undefined | null): string | null {
   const contentStr = normalizeContentToString(content);
   if (!contentStr) return null;
 
@@ -420,7 +419,7 @@ function cleanFilePath(path: string): string {
 }
 
 // Helper to extract str-replace old and new strings
-export function extractStrReplaceContent(content: string | object | undefined | null): {
+function extractStrReplaceContent(content: string | object | undefined | null): {
   oldStr: string | null;
   newStr: string | null;
 } {
@@ -460,7 +459,7 @@ export function extractStrReplaceContent(content: string | object | undefined | 
 }
 
 // Helper to extract file content from create-file or file-rewrite
-export function extractFileContent(
+function extractFileContent(
   content: string | object | undefined | null,
   toolType: 'create-file' | 'full-file-rewrite' | 'edit-file',
 ): string | null {
@@ -545,7 +544,7 @@ function processFileContent(content: string | object): string {
 }
 
 // Helper to determine file type (for syntax highlighting)
-export function getFileType(filePath: string): string {
+function getFileType(filePath: string): string {
   const extension = filePath.split('.').pop()?.toLowerCase() || '';
 
   switch (extension) {
@@ -572,7 +571,7 @@ export function getFileType(filePath: string): string {
 }
 
 // Helper to extract URL from browser navigate operations
-export function extractBrowserUrl(content: string | object | undefined | null): string | null {
+function extractBrowserUrl(content: string | object | undefined | null): string | null {
   const contentStr = normalizeContentToString(content);
   if (!contentStr) return null;
   
@@ -581,7 +580,7 @@ export function extractBrowserUrl(content: string | object | undefined | null): 
 }
 
 // Helper to extract browser operation type
-export function extractBrowserOperation(toolName: string | undefined): string {
+function extractBrowserOperation(toolName: string | undefined): string {
   if (!toolName) return 'Browser Operation';
 
   const operation = toolName.replace('browser_', '').replace(/_/g, ' ');
@@ -589,7 +588,7 @@ export function extractBrowserOperation(toolName: string | undefined): string {
 }
 
 // Helper to extract search query
-export function extractSearchQuery(content: string | object | undefined | null): string | null {
+function extractSearchQuery(content: string | object | undefined | null): string | null {
   const contentStr = normalizeContentToString(content);
   if (!contentStr) return null;
 
@@ -679,7 +678,7 @@ export function extractSearchQuery(content: string | object | undefined | null):
 }
 
 // Helper to extract URLs and titles with regex
-export function extractUrlsAndTitles(
+function extractUrlsAndTitles(
   content: string,
 ): Array<{ title: string; url: string; snippet?: string }> {
   const results: Array<{ title: string; url: string; snippet?: string }> = [];
@@ -813,7 +812,7 @@ export function extractUrlsAndTitles(
 }
 
 // Helper to clean URL for display
-export function cleanUrl(url: string): string {
+function cleanUrl(url: string): string {
   try {
     const urlObj = new URL(url);
     return (
@@ -826,7 +825,7 @@ export function cleanUrl(url: string): string {
 }
 
 // Helper to extract URL for webpage crawling/scraping
-export function extractCrawlUrl(content: string | object | undefined | null): string | null {
+function extractCrawlUrl(content: string | object | undefined | null): string | null {
   const contentStr = normalizeContentToString(content);
   if (!contentStr) return null;
 
@@ -853,7 +852,7 @@ export function extractCrawlUrl(content: string | object | undefined | null): st
 }
 
 // Helper to extract webpage content from crawl/scrape result
-export function extractWebpageContent(
+function extractWebpageContent(
   content: string | object | undefined | null,
 ): { title: string; text: string } | null {
   const contentStr = normalizeContentToString(content);
@@ -983,7 +982,7 @@ export function extractWebpageContent(
 }
 
 // Helper to extract search results from tool response
-export function extractSearchResults(
+function extractSearchResults(
   content: string | object | undefined | null,
 ): Array<{ title: string; url: string; snippet?: string }> {
   const contentStr = normalizeContentToString(content);
@@ -1069,7 +1068,7 @@ export function extractSearchResults(
 }
 
 // Function to determine which tool component to render based on the tool name
-export function getToolComponent(toolName: string): string {
+function getToolComponent(toolName: string): string {
   if (!toolName) return 'GenericToolView';
 
   const normalizedName = toolName.toLowerCase();
@@ -1113,7 +1112,6 @@ export function getToolComponent(toolName: string): string {
     case 'scrape-webpage':
       return 'WebScrapeToolView';
 
-
     // MCP operations
     case 'search-mcp-servers':
       return 'SearchMcpServersToolView';
@@ -1140,7 +1138,6 @@ export function getToolComponent(toolName: string): string {
     case 'create-event-trigger':
       return 'CreateEventTriggerToolView';
 
-
     // Upload operations
     case 'upload-file':
       return 'UploadFileToolView';
@@ -1156,7 +1153,7 @@ export function getToolComponent(toolName: string): string {
 }
 
 // Helper function to normalize content to string
-export function normalizeContentToString(content: string | object | undefined | null): string | null {
+function normalizeContentToString(content: string | object | undefined | null): string | null {
   if (!content) return null;
   
   if (typeof content === 'string') {
@@ -1228,7 +1225,7 @@ export function normalizeContentToString(content: string | object | undefined | 
 }
 
 // Helper function to extract file content for streaming
-export function extractStreamingFileContent(
+function extractStreamingFileContent(
   content: string | object | undefined | null,
   toolType: 'create-file' | 'full-file-rewrite' | 'edit-file',
 ): string | null {
@@ -1288,7 +1285,7 @@ export function extractStreamingFileContent(
   return null;
 }
 
-export const getFileIconAndColor = (filename: string) => {
+const getFileIconAndColor = (filename: string) => {
   const ext = filename.split('.').pop()?.toLowerCase();
   
   // All file types use consistent gray styling

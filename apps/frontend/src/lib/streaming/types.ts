@@ -1,5 +1,4 @@
 import type { UnifiedMessage } from '@/components/thread/types';
-export type { UnifiedMessage };
 
 export type ConnectionState = 
   | 'idle'
@@ -97,7 +96,7 @@ export interface ToolOutputStreamData {
   is_final: boolean;
 }
 
-export interface StreamConnectionConfig {
+interface StreamConnectionConfig {
   apiUrl: string;
   getAuthToken: () => Promise<string | null>;
   onMessage: (data: string) => void;
@@ -107,7 +106,7 @@ export interface StreamConnectionConfig {
   onStateChange?: (state: ConnectionState) => void;
 }
 
-export interface StreamConnectionEvents {
+interface StreamConnectionEvents {
   message: (data: string) => void;
   open: () => void;
   error: (error: Error) => void;
@@ -115,7 +114,7 @@ export interface StreamConnectionEvents {
   stateChange: (state: ConnectionState) => void;
 }
 
-export interface UseAgentStreamConfig {
+interface UseAgentStreamConfig {
   threadId: string;
   agentId?: string;
   onMessage: (message: UnifiedMessage) => void;
@@ -128,7 +127,7 @@ export interface UseAgentStreamConfig {
   onToolOutputStream?: (data: ToolOutputStreamData) => void;
 }
 
-export interface UseAgentStreamResult {
+interface UseAgentStreamResult {
   status: AgentStatus;
   textContent: string;
   reasoningContent: string;
@@ -139,7 +138,6 @@ export interface UseAgentStreamResult {
   startStreaming: (runId: string) => Promise<void>;
   stopStreaming: () => Promise<void>;
 }
-
 
 export interface BillingErrorContext {
   errorMessage: string;
@@ -198,7 +196,7 @@ export interface ErrorEvent {
   timestamp: string;
 }
 
-export type StreamEventType = 
+type StreamEventType = 
   | 'text_chunk'
   | 'reasoning_chunk'
   | 'tool_call_start'
@@ -209,7 +207,7 @@ export type StreamEventType =
   | 'error'
   | 'ping';
 
-export interface StreamEvent {
+interface StreamEvent {
   type: StreamEventType;
   data: unknown;
   sequence?: number;

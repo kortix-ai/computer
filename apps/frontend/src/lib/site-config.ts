@@ -1,7 +1,6 @@
 import { pricingTiers, type PricingTier } from '@/lib/pricing-config';
 
 // Re-export for backward compatibility
-export type { PricingTier } from '@/lib/pricing-config';
 
 export const siteConfig = {
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
@@ -48,4 +47,4 @@ export const siteConfig = {
   ],
 };
 
-export type SiteConfig = typeof siteConfig;
+type SiteConfig = typeof siteConfig;

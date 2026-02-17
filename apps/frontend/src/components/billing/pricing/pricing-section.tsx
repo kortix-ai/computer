@@ -42,7 +42,7 @@ import { convertPriceString, parsePriceAmount, formatPrice } from '@/lib/utils/c
 import { usePromo } from '@/hooks/utils/use-promo';
 
 // Constants
-export const SUBSCRIPTION_PLANS = {
+const SUBSCRIPTION_PLANS = {
   FREE: 'free',
   PRO: 'base',
   ENTERPRISE: 'extra',
@@ -56,8 +56,6 @@ type ButtonVariant =
   | 'outline'
   | 'link'
   | null;
-
-
 
 interface PriceDisplayProps {
   price: string;
@@ -230,7 +228,6 @@ function PricingTier({
         effectiveBillingPeriod === 'yearly' ? 'yearly' :
           'monthly';
 
-
       if (isDowngrade) {
         scheduleDowngradeMutation.mutate({
           target_tier_key: tierKey,
@@ -384,7 +381,6 @@ function PricingTier({
     currentSubscription?.tier?.name === tier.tierKey ||
     currentSubscription?.subscription.tier_display_name === tier.tierKey;
   const isSameBillingPeriod = currentBillingPeriod === billingPeriod;
-
 
   const isRevenueCatSubscription = currentSubscription?.subscription.provider === 'revenuecat';
 
@@ -1236,8 +1232,6 @@ export function PricingSection({
       onSubscriptionUpdate();
     }
   };
-
-
 
   if (isLocalMode()) {
     return (

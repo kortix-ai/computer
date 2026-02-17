@@ -20,7 +20,7 @@ interface NovuInboxContextValue {
 
 const NovuInboxContext = createContext<NovuInboxContextValue | null>(null);
 
-export function useNovuInbox() {
+function useNovuInbox() {
   const context = useContext(NovuInboxContext);
   if (!context) {
     throw new Error('useNovuInbox must be used within NovuInboxProvider');
@@ -63,7 +63,7 @@ export function NovuInboxProvider({ children }: NovuInboxProviderProps) {
  * Helper hook to get stable appearance config
  * This ensures the appearance object reference doesn't change on every render
  */
-export function useNovuAppearance() {
+function useNovuAppearance() {
   return useMemo(() => ({
     variables: {
       colorBackground: 'var(--card)',

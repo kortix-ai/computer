@@ -33,7 +33,7 @@ export interface ChannelConfig {
   sandbox?: { name: string; status: string };
 }
 
-export interface ChannelMessage {
+interface ChannelMessage {
   channelMessageId: string;
   channelConfigId: string;
   direction: 'inbound' | 'outbound';
@@ -47,7 +47,7 @@ export interface ChannelMessage {
   createdAt: string;
 }
 
-export interface CreateChannelData {
+interface CreateChannelData {
   sandbox_id?: string | null;
   channel_type: ChannelType;
   name: string;
@@ -60,7 +60,7 @@ export interface CreateChannelData {
   metadata?: Record<string, unknown>;
 }
 
-export interface UpdateChannelData {
+interface UpdateChannelData {
   sandbox_id?: string | null;
   name?: string;
   enabled?: boolean;
@@ -184,7 +184,7 @@ export const useChannels = (sandboxId?: string) => {
   });
 };
 
-export const useChannel = (channelId: string) => {
+const useChannel = (channelId: string) => {
   return useQuery({
     queryKey: ['channel', channelId],
     queryFn: () => fetchChannel(channelId),

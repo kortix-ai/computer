@@ -25,9 +25,9 @@ import type { SoundEvent } from '@/stores/sound-store';
 // Types
 // ============================================================================
 
-export type WebNotificationType = 'completion' | 'error' | 'question' | 'permission';
+type WebNotificationType = 'completion' | 'error' | 'question' | 'permission';
 
-export interface WebNotificationPayload {
+interface WebNotificationPayload {
   /** Which category this notification belongs to */
   type: WebNotificationType;
   /** Notification title */
@@ -137,7 +137,7 @@ function navigateToSession(sessionId: string, sessionTitle?: string) {
  * to another Chrome tab (`document.hidden`) or switched to another app
  * via Cmd+Tab / Alt+Tab (`!document.hasFocus()`).
  */
-export function isTabHidden(): boolean {
+function isTabHidden(): boolean {
   if (typeof document === 'undefined') return false;
   return document.hidden || !document.hasFocus();
 }

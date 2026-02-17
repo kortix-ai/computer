@@ -104,7 +104,7 @@ const TIMEZONE_TO_LOCALE_MAP: Record<string, Locale> = {
  * Detects locale based on browser timezone
  * Returns null if no match found
  */
-export function detectLocaleFromTimezone(): Locale | null {
+function detectLocaleFromTimezone(): Locale | null {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -177,7 +177,7 @@ export function detectLocaleFromTimezone(): Locale | null {
 /**
  * Detects locale from browser language (Accept-Language header)
  */
-export function detectLocaleFromBrowser(): Locale | null {
+function detectLocaleFromBrowser(): Locale | null {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -234,7 +234,7 @@ export function detectBestLocale(): Locale {
 /**
  * EU member states (27 countries)
  */
-export const EU_COUNTRY_CODES = new Set([
+const EU_COUNTRY_CODES = new Set([
   'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
   'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
   'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'
@@ -243,7 +243,7 @@ export const EU_COUNTRY_CODES = new Set([
 /**
  * Map of EU timezones (for detection)
  */
-export const EU_TIMEZONES = new Set([
+const EU_TIMEZONES = new Set([
   'Europe/Paris', 'Europe/Berlin', 'Europe/Rome', 'Europe/Madrid',
   'Europe/Vienna', 'Europe/Brussels', 'Europe/Amsterdam',
   'Europe/Copenhagen', 'Europe/Stockholm', 'Europe/Helsinki',
@@ -259,7 +259,7 @@ export const EU_TIMEZONES = new Set([
  * Detect if user is in EU based on timezone
  * This is a heuristic for display purposes only
  */
-export function isEUTimezone(): boolean {
+function isEUTimezone(): boolean {
   if (typeof window === 'undefined') {
     return false;
   }

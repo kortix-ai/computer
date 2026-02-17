@@ -3464,7 +3464,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       {generatedPreviews.map((src, idx) => (
                         <div
-                          key={idx}
+                          key={String(src)}
                           role="button"
                           tabIndex={0}
                           onClick={() => addGeneratedImageToCanvas(src)}

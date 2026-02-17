@@ -33,7 +33,7 @@ export function parseToolResult(content: any): ParsedToolResult | null {
 /**
  * Check if message has tool result in metadata
  */
-export function isToolResult(message: any): boolean {
+function isToolResult(message: any): boolean {
   if (!message || !message.metadata) return false;
   try {
     const metadata = typeof message.metadata === 'string' 
@@ -48,7 +48,7 @@ export function isToolResult(message: any): boolean {
 /**
  * Format tool name for display (convert kebab-case to Title Case)
  */
-export function formatToolNameForDisplay(toolName: string): string {
+function formatToolNameForDisplay(toolName: string): string {
   return toolName
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))

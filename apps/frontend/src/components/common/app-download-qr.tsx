@@ -22,7 +22,7 @@ function KortixSymbol({ size = 24, className }: { size?: number; className?: str
  */
 export const APP_DOWNLOAD_URL = 'https://www.kortix.com/app';
 
-export interface AppDownloadQRProps {
+interface AppDownloadQRProps {
   /** Size of the QR code in pixels */
   size?: number;
   /** Additional class names for the container */

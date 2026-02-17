@@ -529,7 +529,7 @@ export function ConnectProviderContent({
               <div className="space-y-1">
                 {authMethods.map((method, i) => (
                   <button
-                    key={i}
+                    key={method.label}
                     type="button"
                     onClick={() => selectMethod(view.providerID, authMethods, i)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer text-sm"

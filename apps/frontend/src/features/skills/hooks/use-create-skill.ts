@@ -11,7 +11,7 @@ import type { CreateSkillInput } from '../types';
  * Creates a SKILL.md file in ~/.config/opencode/skills/<name>/
  * and invalidates the skills query cache on success.
  */
-export function useCreateSkill() {
+function useCreateSkill() {
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, CreateSkillInput>({

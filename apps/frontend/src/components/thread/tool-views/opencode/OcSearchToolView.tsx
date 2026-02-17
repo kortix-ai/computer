@@ -288,7 +288,7 @@ function FilePathList({
 
         return (
           <div
-            key={i}
+            key={`fp-${i}`}
             className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-muted transition-colors group"
             role="button"
             tabIndex={0}
@@ -339,7 +339,7 @@ function GrepResultList({
 
         return (
           <div
-            key={i}
+            key={`group-${i}`}
             className="rounded-lg border border-border overflow-hidden bg-card"
           >
             {/* File header row */}

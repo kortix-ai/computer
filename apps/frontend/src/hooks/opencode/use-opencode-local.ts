@@ -16,19 +16,17 @@ import { useModelStore, type ModelKey } from './use-model-store';
 import type { FlatModel } from '@/components/session/session-chat-input';
 import type { Agent, ProviderListResponse, Config } from '@kortix/opencode-sdk/v2/client';
 
-export type { ModelKey };
-
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface UseOpenCodeLocalOptions {
+interface UseOpenCodeLocalOptions {
   agents?: Agent[];
   providers?: ProviderListResponse;
   config?: Config;
 }
 
-export interface OpenCodeLocalAgent {
+interface OpenCodeLocalAgent {
   /** Currently selected agent (or first available) */
   current: Agent | undefined;
   /** List of visible (non-subagent, non-hidden) agents */
@@ -39,7 +37,7 @@ export interface OpenCodeLocalAgent {
   move: (direction: 1 | -1) => void;
 }
 
-export interface OpenCodeLocalModel {
+interface OpenCodeLocalModel {
   /** Current resolved model (ephemeral override -> agent.model -> fallback) */
   current: FlatModel | undefined;
   /** Current model as ModelKey (for sending to API) */
@@ -65,7 +63,7 @@ export interface OpenCodeLocalModel {
   };
 }
 
-export interface OpenCodeLocal {
+interface OpenCodeLocal {
   agent: OpenCodeLocalAgent;
   model: OpenCodeLocalModel;
 }

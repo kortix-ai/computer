@@ -907,7 +907,7 @@ function McpServersSection() {
             {addForm.envPairs.length > 0 && (
               <div className="space-y-2">
                 {addForm.envPairs.map((pair, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div key={pair.key} className="flex gap-2 items-center">
                     <Input
                       placeholder="KEY"
                       value={pair.key}

@@ -126,7 +126,7 @@ export interface TokenUsage {
   message_id?: string;
 }
 
-export interface DeductResult {
+interface DeductResult {
   success: boolean;
   cost: number;
   new_balance: number;
@@ -183,7 +183,7 @@ export interface CreatePortalSessionRequest {
   return_url: string;
 }
 
-export interface CreatePortalSessionResponse {
+interface CreatePortalSessionResponse {
   portal_url: string;
 }
 
@@ -193,7 +193,7 @@ export interface PurchaseCreditsRequest {
   cancel_url: string;
 }
 
-export interface PurchaseCreditsResponse {
+interface PurchaseCreditsResponse {
   checkout_url: string;
 }
 
@@ -201,13 +201,13 @@ export interface CancelSubscriptionRequest {
   feedback?: string;
 }
 
-export interface CancelSubscriptionResponse {
+interface CancelSubscriptionResponse {
   success: boolean;
   cancel_at: number;
   message: string;
 }
 
-export interface ReactivateSubscriptionResponse {
+interface ReactivateSubscriptionResponse {
   success: boolean;
   message: string;
 }
@@ -217,7 +217,7 @@ export interface ScheduleDowngradeRequest {
   commitment_type?: 'monthly' | 'yearly' | 'yearly_commitment';
 }
 
-export interface ScheduleDowngradeResponse {
+interface ScheduleDowngradeResponse {
   success: boolean;
   message: string;
   scheduled_date: string;
@@ -237,12 +237,12 @@ export interface ScheduleDowngradeResponse {
   change_description: string;
 }
 
-export interface CancelScheduledChangeResponse {
+interface CancelScheduledChangeResponse {
   success: boolean;
   message: string;
 }
 
-export interface Transaction {
+interface Transaction {
   id: string;
   user_id: string;
   type: 'credit' | 'debit';
@@ -253,7 +253,7 @@ export interface Transaction {
   created_at: string;
 }
 
-export interface UsageHistory {
+interface UsageHistory {
   daily_usage: Record<string, {
     credits: number;
     debits: number;
@@ -263,7 +263,7 @@ export interface UsageHistory {
   total_period_credits: number;
 }
 
-export interface TrialStatus {
+interface TrialStatus {
   has_trial: boolean;
   trial_status?: 'none' | 'active' | 'expired' | 'converted' | 'cancelled' | 'used';
   trial_started_at?: string;
@@ -281,27 +281,27 @@ export interface TrialStatus {
   };
 }
 
-export interface TrialStartRequest {
+interface TrialStartRequest {
   success_url: string;
   cancel_url: string;
 }
 
-export interface TrialStartResponse {
+interface TrialStartResponse {
   checkout_url: string;
   session_id: string;
 }
 
-export interface TrialCheckoutRequest {
+interface TrialCheckoutRequest {
   success_url: string;
   cancel_url: string;
 }
 
-export interface TrialCheckoutResponse {
+interface TrialCheckoutResponse {
   checkout_url: string;
   session_id: string;
 }
 
-export interface CheckoutSessionDetails {
+interface CheckoutSessionDetails {
   session_id: string;
   amount_total: number;           // Final amount in cents (after discounts and tax)
   amount_subtotal: number;        // Amount before discounts/tax in cents
@@ -583,44 +583,44 @@ export const billingApi = {
 // CONVENIENCE EXPORTS
 // =============================================================================
 
-export const getAccountState = (skipCache?: boolean) => billingApi.getAccountState(skipCache);
-export const deductUsage = (params: { amount: number; thread_id?: string; description?: string }) =>
+const getAccountState = (skipCache?: boolean) => billingApi.getAccountState(skipCache);
+const deductUsage = (params: { amount: number; thread_id?: string; description?: string }) =>
   billingApi.deductUsage(params);
-export const deductTokenUsage = (usage: TokenUsage) => billingApi.deductTokenUsage(usage);
+const deductTokenUsage = (usage: TokenUsage) => billingApi.deductTokenUsage(usage);
 export const createCheckoutSession = (request: CreateCheckoutSessionRequest) => 
   billingApi.createCheckoutSession(request);
-export const createPortalSession = (request: CreatePortalSessionRequest) => 
+const createPortalSession = (request: CreatePortalSessionRequest) => 
   billingApi.createPortalSession(request);
-export const cancelSubscription = (feedback?: string) => 
+const cancelSubscription = (feedback?: string) => 
   billingApi.cancelSubscription(feedback ? { feedback } : undefined);
-export const reactivateSubscription = () => billingApi.reactivateSubscription();
-export const purchaseCredits = (request: PurchaseCreditsRequest) => 
+const reactivateSubscription = () => billingApi.reactivateSubscription();
+const purchaseCredits = (request: PurchaseCreditsRequest) => 
   billingApi.purchaseCredits(request);
-export const getTransactions = (limit?: number, offset?: number) => 
+const getTransactions = (limit?: number, offset?: number) => 
   billingApi.getTransactions(limit, offset);
-export const getUsageHistory = (days?: number) => billingApi.getUsageHistory(days);
-export const getTrialStatus = () => billingApi.getTrialStatus();
-export const startTrial = (request: TrialStartRequest) => billingApi.startTrial(request);
+const getUsageHistory = (days?: number) => billingApi.getUsageHistory(days);
+const getTrialStatus = () => billingApi.getTrialStatus();
+const startTrial = (request: TrialStartRequest) => billingApi.startTrial(request);
 export const createTrialCheckout = (request: TrialCheckoutRequest) => 
   billingApi.createTrialCheckout(request);
-export const cancelTrial = () => billingApi.cancelTrial();
-export const scheduleDowngrade = (request: ScheduleDowngradeRequest) => 
+const cancelTrial = () => billingApi.cancelTrial();
+const scheduleDowngrade = (request: ScheduleDowngradeRequest) => 
   billingApi.scheduleDowngrade(request);
-export const cancelScheduledChange = () => billingApi.cancelScheduledChange();
-export const syncSubscription = () => billingApi.syncSubscription();
-export const getCheckoutSession = (sessionId: string) => billingApi.getCheckoutSession(sessionId);
+const cancelScheduledChange = () => billingApi.cancelScheduledChange();
+const syncSubscription = () => billingApi.syncSubscription();
+const getCheckoutSession = (sessionId: string) => billingApi.getCheckoutSession(sessionId);
 
 // =============================================================================
 // INLINE CHECKOUT
 // =============================================================================
 
-export interface CreateInlineCheckoutRequest {
+interface CreateInlineCheckoutRequest {
   tier_key: string;
   billing_period: 'monthly' | 'yearly';
   promo_code?: string;
 }
 
-export interface CreateInlineCheckoutResponse {
+interface CreateInlineCheckoutResponse {
   // For new subscriptions
   client_secret?: string;
   subscription_id: string;
@@ -636,7 +636,7 @@ export interface CreateInlineCheckoutResponse {
   message?: string;
 }
 
-export async function createInlineCheckout(
+async function createInlineCheckout(
   request: CreateInlineCheckoutRequest
 ): Promise<CreateInlineCheckoutResponse> {
   const response = await backendApi.post<CreateInlineCheckoutResponse>(
@@ -647,19 +647,19 @@ export async function createInlineCheckout(
   return response.data!;
 }
 
-export interface ConfirmInlineCheckoutRequest {
+interface ConfirmInlineCheckoutRequest {
   subscription_id: string;
   tier_key: string;
   payment_intent_id?: string;
 }
 
-export interface ConfirmInlineCheckoutResponse {
+interface ConfirmInlineCheckoutResponse {
   success: boolean;
   tier: string;
   message: string;
 }
 
-export async function confirmInlineCheckout(
+async function confirmInlineCheckout(
   request: ConfirmInlineCheckoutRequest
 ): Promise<ConfirmInlineCheckoutResponse> {
   const response = await backendApi.post<ConfirmInlineCheckoutResponse>(

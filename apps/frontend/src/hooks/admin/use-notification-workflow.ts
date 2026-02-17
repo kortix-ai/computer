@@ -18,7 +18,7 @@ interface TriggerWorkflowResult {
   result?: any;
 }
 
-export interface Workflow {
+interface Workflow {
   workflow_id: string;
   name: string;
   description?: string;

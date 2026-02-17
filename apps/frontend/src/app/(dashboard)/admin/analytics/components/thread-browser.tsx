@@ -275,7 +275,7 @@ export function ThreadBrowser({
         {isLoading ? (
           <div className="p-4 pt-0 space-y-3">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
+              <Skeleton key={`_-${i}`} className="h-14 w-full" />
             ))}
           </div>
         ) : (

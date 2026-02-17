@@ -70,13 +70,13 @@ function getLanguageFromFilename(filename: string): string {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface HighlightedToken {
+interface HighlightedToken {
   content: string;
   color?: string;
 }
 
 /** A single line of highlighted tokens */
-export type HighlightedLine = HighlightedToken[];
+type HighlightedLine = HighlightedToken[];
 
 // ---------------------------------------------------------------------------
 // Max length guard — skip highlighting for very large diffs
@@ -181,4 +181,3 @@ function escapeHtml(str: string): string {
 // Re-export for convenience
 // ---------------------------------------------------------------------------
 
-export { getLanguageFromFilename };

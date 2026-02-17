@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Helper function to convert any CSS color to rgba
-export const getRGBA = (
+const getRGBA = (
   cssColor: React.CSSProperties['color'],
   fallback: string = 'rgba(180, 180, 180)',
 ): string => {
@@ -33,14 +33,14 @@ export const getRGBA = (
 };
 
 // Helper function to add opacity to an RGB color string
-export const colorWithOpacity = (color: string, opacity: number): string => {
+const colorWithOpacity = (color: string, opacity: number): string => {
   if (!color.startsWith('rgb')) return color;
   return Color.formatRGBA(Color.alpha(Color.parse(color), opacity));
 };
 
 // Tremor Raw focusInput [v0.0.1]
 
-export const focusInput = [
+const focusInput = [
   // base
   'focus:ring-2',
   // ring color
@@ -51,7 +51,7 @@ export const focusInput = [
 
 // Tremor Raw focusRing [v0.0.1]
 
-export const focusRing = [
+const focusRing = [
   // base
   'outline outline-offset-2 outline-0 focus-visible:outline-2',
   // outline color
@@ -60,7 +60,7 @@ export const focusRing = [
 
 // Tremor Raw hasErrorInput [v0.0.1]
 
-export const hasErrorInput = [
+const hasErrorInput = [
   // base
   'ring-2',
   // border color
@@ -70,6 +70,3 @@ export const hasErrorInput = [
 ];
 
 // Import truncateString directly from shared utils to avoid pulling in React hooks
-export { truncateString } from '@kortix/shared/utils';
-
-

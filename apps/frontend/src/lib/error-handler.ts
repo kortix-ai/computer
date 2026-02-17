@@ -157,7 +157,6 @@ const formatErrorMessage = (message: string, context?: ErrorContext): string => 
   return `${prefix}: ${message}`;
 };
 
-
 export const handleApiError = (error: any, context?: ErrorContext): void => {
   console.error('API Error:', error, context);
 
@@ -219,21 +218,21 @@ export const handleNetworkError = (error: any, context?: ErrorContext): void => 
   }
 };
 
-export const handleApiSuccess = (message: string, description?: string): void => {
+const handleApiSuccess = (message: string, description?: string): void => {
   toast.success(message, {
     description,
     duration: 3000,
   });
 };
 
-export const handleApiWarning = (message: string, description?: string): void => {
+const handleApiWarning = (message: string, description?: string): void => {
   toast.warning(message, {
     description,
     duration: 4000,
   });
 };
 
-export const handleApiInfo = (message: string, description?: string): void => {
+const handleApiInfo = (message: string, description?: string): void => {
   toast.info(message, {
     description,
     duration: 3000,
@@ -244,7 +243,7 @@ export const handleApiInfo = (message: string, description?: string): void => {
  * Check if an error is a billing/limit error that should open the pricing modal.
  * This is an alias for isTierRestrictionError from shared package for backwards compatibility.
  */
-export const isBillingError = isTierRestrictionError;
+const isBillingError = isTierRestrictionError;
 
 /**
  * Handle billing errors by opening the pricing modal with appropriate message.

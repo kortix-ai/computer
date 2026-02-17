@@ -86,7 +86,7 @@ export default function CareersPageClient() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
             {values.map((value, index) => (
               <motion.div
-                key={index}
+                key={value.title}
                 className="space-y-3"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -121,7 +121,7 @@ export default function CareersPageClient() {
           <div className="space-y-4">
             {openings.map((job, index) => (
               <motion.div
-                key={index}
+                key={job.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}

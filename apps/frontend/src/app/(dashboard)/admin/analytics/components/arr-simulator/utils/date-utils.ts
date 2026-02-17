@@ -33,7 +33,7 @@ export function getCurrentPeriod(): { currentWeekNumber: number; currentMonthInd
 }
 
 // Get week number from a date string (based on Dec 15, 2025 start)
-export function getWeekNumber(dateStr: string): number {
+function getWeekNumber(dateStr: string): number {
   const startDate = new Date(2025, 11, 15); // Dec 15, 2025
   const date = new Date(dateStr);
   const daysSinceStart = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));

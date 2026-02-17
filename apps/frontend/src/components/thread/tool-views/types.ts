@@ -42,6 +42,6 @@ export interface ToolViewProps {
   streamingText?: string; // Live streaming content from assistant message
 }
 
-export interface BrowserToolViewProps extends ToolViewProps {
+interface BrowserToolViewProps extends ToolViewProps {
   name?: string;
 }

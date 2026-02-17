@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export interface AnnouncementData {
+interface AnnouncementData {
   component: string;
   props?: Record<string, unknown>;
 }

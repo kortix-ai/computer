@@ -101,7 +101,7 @@ export interface SandboxInfo {
   updated_at: string;
 }
 
-export interface ProvidersInfo {
+interface ProvidersInfo {
   providers: SandboxProviderName[];
   default: SandboxProviderName;
 }
@@ -182,7 +182,7 @@ export function getSandboxUrl(sandbox: SandboxInfo): string {
  *   `http://localhost:{hostPort}`. Returns null if no mapping exists.
  * - Falls back to null if the port can't be resolved.
  */
-export function getSandboxPortUrl(
+function getSandboxPortUrl(
   sandbox: SandboxInfo,
   containerPort: string,
 ): string | null {
@@ -259,7 +259,7 @@ export async function ensureSandbox(opts?: {
  * Backwards-compatible alias for ensureSandbox.
  * @deprecated Use ensureSandbox() directly.
  */
-export const initAccount = ensureSandbox;
+const initAccount = ensureSandbox;
 
 /**
  * Get the user's sandbox.
@@ -299,7 +299,7 @@ export async function listSandboxes(): Promise<SandboxInfo[]> {
 /**
  * Restart the active sandbox (stop + start).
  */
-export async function restartSandbox(): Promise<void> {
+async function restartSandbox(): Promise<void> {
   const result = await platformFetch<void>('/platform/sandbox/restart', {
     method: 'POST',
   });
@@ -312,7 +312,7 @@ export async function restartSandbox(): Promise<void> {
 /**
  * Stop the active sandbox.
  */
-export async function stopSandbox(): Promise<void> {
+async function stopSandbox(): Promise<void> {
   const result = await platformFetch<void>('/platform/sandbox/stop', {
     method: 'POST',
   });
@@ -357,13 +357,13 @@ export interface ChangelogEntry {
   artifacts?: ChangelogArtifact[];
 }
 
-export interface SandboxVersionInfo {
+interface SandboxVersionInfo {
   version: string;
   package: string;
   changelog: ChangelogEntry | null;
 }
 
-export interface SandboxUpdateResult {
+interface SandboxUpdateResult {
   success?: boolean;
   upToDate?: boolean;
   previousVersion?: string;

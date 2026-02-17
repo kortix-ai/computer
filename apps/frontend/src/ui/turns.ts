@@ -60,7 +60,7 @@ export function isCompactionPart(part: Part): part is CompactionPart {
 }
 
 /** Get the text content from any part that has a `text` field. */
-export function getPartText(part: Part): string | undefined {
+function getPartText(part: Part): string | undefined {
   if (isTextPart(part)) return part.text;
   if (isReasoningPart(part)) return part.text;
   return undefined;
@@ -272,7 +272,7 @@ export function shouldHideResponsePart(
 // ============================================================================
 
 /** Tool part references to hide from the step list when permission/question is pending. */
-export interface HiddenToolRef {
+interface HiddenToolRef {
   messageID: string;
   callID: string;
 }
@@ -343,7 +343,7 @@ export function getAnsweredQuestionParts(
  * Extract human-readable error message from a raw error value.
  * Matches SolidJS `unwrap()` function — session-turn.tsx:34-81
  */
-export function unwrapError(raw: unknown): string {
+function unwrapError(raw: unknown): string {
   if (!raw) return 'An error occurred';
 
   if (typeof raw === 'string') {
@@ -690,7 +690,7 @@ export function getDirectory(path: string | undefined): string | undefined {
 }
 
 /** Strip the project root directory from paths for display. */
-export function relativizePath(path: string, projectDir?: string): string {
+function relativizePath(path: string, projectDir?: string): string {
   if (!projectDir) return path;
   if (path.startsWith(projectDir)) {
     const rel = path.slice(projectDir.length);
@@ -893,5 +893,4 @@ export function allDescendantIds(
   }
   return result;
 }
-
 

@@ -41,8 +41,6 @@ import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 
-export type { ProviderListResponse };
-
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const minutes = Math.floor(diff / 60000);
@@ -475,7 +473,7 @@ function AttachmentPreview({
         const Icon = getFileTypeIcon(type);
 
         return (
-          <div key={i} className="relative group">
+          <div key={`af-${i}`} className="relative group">
             {af.isImage ? (
               <div className="h-[54px] w-[54px] rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -587,7 +585,7 @@ function SlashCommandPopover({
 // @ Mention Types & Popover
 // ============================================================================
 
-export interface MentionItem {
+interface MentionItem {
   kind: 'file' | 'agent' | 'session';
   label: string;
   value: string;
@@ -744,7 +742,7 @@ function loadPromptHistory(key: string): string[] {
 // SessionChatInput - The unified chat input
 // ============================================================================
 
-export interface SessionChatInputProps {
+interface SessionChatInputProps {
   onSend: (text: string, files?: AttachedFile[], mentions?: TrackedMention[]) => void | Promise<void>;
   isBusy?: boolean;
   onStop?: () => void;
@@ -1465,7 +1463,7 @@ export function SessionChatInput({
                 >
                   {highlightSegments.map((seg, i) => (
                     <span
-                      key={i}
+                      key={`seg-${i}`}
                       className={cn(
                         seg.kind === 'file' && 'text-blue-500 font-medium',
                         seg.kind === 'agent' && 'text-purple-500 font-medium',

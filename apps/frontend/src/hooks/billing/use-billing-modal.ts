@@ -12,7 +12,7 @@ interface UseBillingModalReturn {
  * Unified hook for handling billing modals consistently across the app.
  * Determines if credits are exhausted based on the error type and message.
  */
-export function useBillingModal(): UseBillingModalReturn {
+function useBillingModal(): UseBillingModalReturn {
   const [showModal, setShowModal] = useState(false);
   const [creditsExhausted, setCreditsExhausted] = useState(false);
 

@@ -38,7 +38,6 @@ import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-session
 import { ConnectProviderContent } from '@/components/providers/connect-provider-content';
 
 // Re-export for consumers
-export { ConnectProviderContent } from '@/components/providers/connect-provider-content';
 
 // =============================================================================
 // Constants
@@ -94,7 +93,7 @@ function formatContext(tokens: number): string {
 // Provider / Model icons
 // =============================================================================
 
-export function ProviderIcon({ providerID, size }: { providerID: string; size: number }) {
+function ProviderIcon({ providerID, size }: { providerID: string; size: number }) {
   if (providerID === 'kortix') {
     return <KortixLogo size={size} variant="symbol" />;
   }
@@ -112,7 +111,7 @@ function InlineModelIcon({ providerID, modelID, size }: { providerID: string; mo
 // Tag (matches reference Tag component)
 // =============================================================================
 
-export function Tag({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'free' | 'latest' | 'recommended' | 'custom' }) {
+function Tag({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'free' | 'latest' | 'recommended' | 'custom' }) {
   return (
     <span
       className={cn(
@@ -339,7 +338,7 @@ export function ConnectProviderDialog({
 // - Click selects and closes
 // =============================================================================
 
-export interface ModelSelectorProps {
+interface ModelSelectorProps {
   models: FlatModel[];
   selectedModel: { providerID: string; modelID: string } | null;
   onSelect: (model: { providerID: string; modelID: string } | null) => void;

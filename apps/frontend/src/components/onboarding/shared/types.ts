@@ -17,7 +17,7 @@ export interface UserContext {
   selectedAgents?: string[];
 }
 
-export interface OnboardingStep {
+interface OnboardingStep {
   id: string;
   title: string;
   description: string;

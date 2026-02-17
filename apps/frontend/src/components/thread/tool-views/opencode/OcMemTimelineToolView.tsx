@@ -169,7 +169,7 @@ export function OcMemTimelineToolView({
                   const typeInfo = observationTypeInfo(entry.typeEmoji);
                   return (
                     <div
-                      key={i}
+                      key={entry.title}
                       className={cn(
                         'flex items-start gap-3 p-3 -mx-1 rounded-lg hover:bg-muted/40 transition-colors relative',
                         entry.isAnchor && 'bg-primary/5 border border-primary/10',

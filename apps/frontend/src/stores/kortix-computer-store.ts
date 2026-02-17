@@ -202,14 +202,14 @@ export const useKortixComputerStore = create<KortixComputerState>()(
 // === SELECTOR HOOKS ===
 
 // Sandbox context
-export const useKortixComputerSandboxId = () =>
+const useKortixComputerSandboxId = () =>
   useKortixComputerStore((state) => state.currentSandboxId);
 
-export const useSetSandboxContext = () =>
+const useSetSandboxContext = () =>
   useKortixComputerStore((state) => state.setSandboxContext);
 
 // Main view state
-export const useKortixComputerActiveView = () => 
+const useKortixComputerActiveView = () => 
   useKortixComputerStore((state) => state.activeView);
 
 // Individual selectors for pending tool navigation (stable primitives)
@@ -220,14 +220,14 @@ export const useKortixComputerClearPendingToolNav = () =>
   useKortixComputerStore((state) => state.clearPendingToolNav);
 
 // Side panel state selectors
-export const useIsSidePanelOpen = () =>
+const useIsSidePanelOpen = () =>
   useKortixComputerStore((state) => state.isSidePanelOpen);
 
-export const useSetIsSidePanelOpen = () =>
+const useSetIsSidePanelOpen = () =>
   useKortixComputerStore((state) => state.setIsSidePanelOpen);
 
-export const useIsExpanded = () =>
+const useIsExpanded = () =>
   useKortixComputerStore((state) => state.isExpanded);
 
-export const useToggleExpanded = () =>
+const useToggleExpanded = () =>
   useKortixComputerStore((state) => state.toggleExpanded);

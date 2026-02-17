@@ -164,7 +164,7 @@ export default function SandboxPoolAdminPage() {
                     <p className="font-medium text-amber-400">Issues Detected</p>
                     <ul className="mt-1 space-y-0.5">
                       {health.issues.map((issue, i) => (
-                        <li key={i} className="text-sm text-muted-foreground">• {issue}</li>
+                        <li key={String(issue)} className="text-sm text-muted-foreground">• {issue}</li>
                       ))}
                     </ul>
                   </div>

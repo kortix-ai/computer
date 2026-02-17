@@ -45,7 +45,7 @@ export interface Execution {
   trigger_name?: string;
 }
 
-export interface CreateTriggerData {
+interface CreateTriggerData {
   sandbox_id: string;
   name: string;
   description?: string;
@@ -60,7 +60,7 @@ export interface CreateTriggerData {
   metadata?: Record<string, unknown>;
 }
 
-export interface UpdateTriggerData {
+interface UpdateTriggerData {
   name?: string;
   description?: string | null;
   cron_expr?: string;
@@ -192,7 +192,7 @@ export const useTriggers = (sandboxId?: string) => {
   });
 };
 
-export const useTrigger = (triggerId: string) => {
+const useTrigger = (triggerId: string) => {
   return useQuery({
     queryKey: ['trigger', triggerId],
     queryFn: () => fetchTrigger(triggerId),

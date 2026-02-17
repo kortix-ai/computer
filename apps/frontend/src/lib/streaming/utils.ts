@@ -35,7 +35,7 @@ export function isBillingError(message: string): boolean {
   return BILLING_ERROR_KEYWORDS.some(keyword => messageLower.includes(keyword));
 }
 
-export function extractBillingErrorContext(errorMessage: string): BillingErrorContext {
+function extractBillingErrorContext(errorMessage: string): BillingErrorContext {
   const messageLower = errorMessage.toLowerCase();
   const isCreditsExhausted = 
     messageLower.includes('insufficient credits') ||
@@ -53,7 +53,7 @@ export function extractBillingErrorContext(errorMessage: string): BillingErrorCo
   };
 }
 
-export function mapBackendStatus(backendStatus: string): AgentStatus {
+function mapBackendStatus(backendStatus: string): AgentStatus {
   switch (backendStatus) {
     case 'completed':
       return 'completed';
@@ -70,7 +70,7 @@ export function mapBackendStatus(backendStatus: string): AgentStatus {
   }
 }
 
-export function isTerminalStatus(status: string): boolean {
+function isTerminalStatus(status: string): boolean {
   return ['completed', 'stopped', 'failed', 'error', 'agent_not_running'].includes(status);
 }
 
@@ -85,7 +85,7 @@ export function calculateExponentialBackoff(
   return delay + jitter;
 }
 
-export function createAbortController(): { controller: AbortController; signal: AbortSignal } {
+function createAbortController(): { controller: AbortController; signal: AbortSignal } {
   const controller = new AbortController();
   return { controller, signal: controller.signal };
 }
@@ -99,7 +99,7 @@ export function formatStreamUrl(apiUrl: string, runId: string, token: string | n
   return queryString ? `${baseUrl}?${queryString}` : baseUrl;
 }
 
-export function debounce<T extends (...args: unknown[]) => unknown>(
+function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -116,7 +116,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
   };
 }
 
-export function throttle<T extends (...args: unknown[]) => unknown>(
+function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -140,7 +140,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
   };
 }
 
-export function rafThrottle<T extends (...args: unknown[]) => unknown>(
+function rafThrottle<T extends (...args: unknown[]) => unknown>(
   fn: T
 ): (...args: Parameters<T>) => void {
   let rafId: number | null = null;
@@ -160,6 +160,6 @@ export function rafThrottle<T extends (...args: unknown[]) => unknown>(
   };
 }
 
-export function generateMessageId(): string {
+function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }

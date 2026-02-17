@@ -19,7 +19,7 @@ export interface LspDiagnostic {
   source?: string;
 }
 
-export interface DiagnosticsState {
+interface DiagnosticsState {
   /** All diagnostics keyed by file path */
   byFile: Record<string, LspDiagnostic[]>;
 
@@ -53,7 +53,7 @@ export interface DiagnosticsState {
  * Raw diagnostic shape from LSP / tool metadata.
  * Supports both the range-based format (from tool metadata) and flat format.
  */
-export interface RawDiagnostic {
+interface RawDiagnostic {
   range?: {
     start: { line: number; character: number };
     end?: { line: number; character: number };

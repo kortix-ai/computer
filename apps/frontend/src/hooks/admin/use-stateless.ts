@@ -26,7 +26,7 @@ export interface StatelessHealth {
   };
 }
 
-export interface StatelessDashboard {
+interface StatelessDashboard {
   active_runs: number;
   active_runs_metric?: number;
   owned_runs: number;
@@ -80,7 +80,7 @@ export interface DLQEntry {
   failed_at: number;
 }
 
-export interface RecoveryResponse {
+interface RecoveryResponse {
   run_id: string;
   success: boolean;
   action: string;
@@ -115,7 +115,7 @@ export interface Backpressure {
   recommended_flush_interval: number;
 }
 
-export interface SweepResult {
+interface SweepResult {
   orphaned: number;
   recovered: number;
   stuck: number;
@@ -123,7 +123,7 @@ export interface SweepResult {
   errors: string[];
 }
 
-export interface FlushResult {
+interface FlushResult {
   runs: number;
   total: number;
   details: Record<string, number>;
@@ -194,7 +194,7 @@ export const useStatelessDLQ = (count: number = 50, runId?: string) => {
   });
 };
 
-export const useStatelessWALStats = () => {
+const useStatelessWALStats = () => {
   return useQuery<{ total_pending: number; runs_with_pending: number; local_buffer_runs: number }>({
     queryKey: QUERY_KEYS.wal,
     queryFn: async () => {
@@ -261,7 +261,7 @@ export const useStatelessRateLimiters = () => {
   });
 };
 
-export interface RunInfo {
+interface RunInfo {
   run_id: string;
   thread_id: string | null;
   owner: string | null;
@@ -289,7 +289,7 @@ export const useStatelessRunLookup = (runId: string | null) => {
   });
 };
 
-export interface MetricsSnapshot {
+interface MetricsSnapshot {
   timestamp: number;
   active_runs: number;
   pending_writes: number;
@@ -302,7 +302,7 @@ export interface MetricsSnapshot {
   dlq_entries: number;
 }
 
-export interface MetricsHistory {
+interface MetricsHistory {
   current: MetricsSnapshot;
   history: MetricsSnapshot[];
   minutes: number;

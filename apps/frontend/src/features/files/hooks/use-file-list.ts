@@ -42,7 +42,7 @@ export function useFileList(
 /**
  * Utility to imperatively invalidate all file list queries for the active server.
  */
-export function useInvalidateFileList() {
+function useInvalidateFileList() {
   const queryClient = useQueryClient();
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
 

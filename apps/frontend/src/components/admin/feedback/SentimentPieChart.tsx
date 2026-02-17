@@ -1,5 +1,7 @@
 'use client';
 
+
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminSentimentSummary } from '@/hooks/admin/use-admin-feedback';
@@ -9,8 +11,9 @@ import {
   ChartTooltipContent,
   ChartConfig,
 } from '@/components/ui/chart';
-import { Pie, PieChart, Cell } from 'recharts';
-
+const Pie = dynamic(() => import('recharts').then(m => m.Pie), { ssr: false }) as any;
+const PieChart = dynamic(() => import('recharts').then(m => m.PieChart), { ssr: false }) as any;
+const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false }) as any;
 const chartConfig = {
   positive: {
     label: 'Positive',
@@ -81,7 +84,7 @@ export function SentimentPieChart() {
             </ChartContainer>
             <div className="flex flex-wrap justify-center gap-4 mt-2">
               {chartData.map((entry, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div key={entry.name} className="flex items-center gap-2">
                   <div 
                     className="w-3 h-3 rounded-full" 
                     style={{ backgroundColor: entry.fill }}

@@ -40,14 +40,14 @@ interface FeedbackListParams {
   sort_order?: 'asc' | 'desc';
 }
 
-export interface FeedbackStats {
+interface FeedbackStats {
   total_feedback: number;
   average_rating: number;
   total_with_text: number;
   rating_distribution: Record<string, number>;
 }
 
-export interface SentimentSummary {
+interface SentimentSummary {
   total: number;
   positive: number;
   neutral: number;
@@ -58,7 +58,7 @@ export interface SentimentSummary {
   negative_percentage: number;
 }
 
-export interface TimeSeriesPoint {
+interface TimeSeriesPoint {
   period: string;
   count: number;
   avg_rating: number;
@@ -67,12 +67,12 @@ export interface TimeSeriesPoint {
   with_text_count: number;
 }
 
-export interface RatingTrends {
+interface RatingTrends {
   periods: string[];
   data: Record<string, Record<string, number>>;
 }
 
-export interface CriticalFeedback {
+interface CriticalFeedback {
   feedback_id: string;
   rating: number;
   feedback_text: string;
@@ -178,7 +178,7 @@ export function useAdminFeedbackTimeSeries(days: number = 30, granularity: strin
   });
 }
 
-export function useAdminRatingTrends(days: number = 30) {
+function useAdminRatingTrends(days: number = 30) {
   return useQuery({
     queryKey: ['admin', 'feedback', 'rating-trends', days],
     queryFn: async (): Promise<RatingTrends> => {
@@ -206,7 +206,7 @@ export function useAdminCriticalFeedback(limit: number = 20) {
   });
 }
 
-export function useAdminFeedbackExport(params: {
+function useAdminFeedbackExport(params: {
   rating_filter?: number;
   has_text?: boolean;
   start_date?: string;
@@ -245,7 +245,7 @@ export function useAdminFeedbackAnalysis() {
   });
 }
 
-export function useRefreshFeedbackData() {
+function useRefreshFeedbackData() {
   const queryClient = useQueryClient();
   
   return {

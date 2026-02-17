@@ -123,7 +123,7 @@ function ArrayEditor({
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {values.map((v, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono bg-muted border border-border">
+            <span key={String(v)} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono bg-muted border border-border">
               {v}
               <button onClick={() => onChange(values.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-foreground">
                 <X className="h-3 w-3" />

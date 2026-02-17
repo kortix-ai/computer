@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 
-export type AlertBannerVariant = 'warning' | 'error' | 'info';
+type AlertBannerVariant = 'warning' | 'error' | 'info';
 
 interface AlertBannerProps {
   title: string;

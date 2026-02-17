@@ -12,41 +12,18 @@
 // ---------------------------------------------------------------------------
 
 export type {
-  Session,
-  Message,
-  UserMessage,
-  AssistantMessage,
   Part,
   TextPart,
-  ReasoningPart,
   ToolPart,
   FilePart,
   AgentPart,
-  SubtaskPart,
-  StepStartPart,
-  StepFinishPart,
-  SnapshotPart,
-  PatchPart,
-  RetryPart,
-  CompactionPart,
   ToolState,
-  ToolStatePending,
-  ToolStateRunning,
-  ToolStateCompleted,
-  ToolStateError,
   PermissionRequest,
   QuestionRequest,
   QuestionInfo,
-  QuestionOption,
   QuestionAnswer,
-  SessionStatus,
-  Agent,
   Command,
-  Project,
-  Model,
-  Provider,
-  Todo,
-  FileDiff,
+  FileDiff
 } from '@kortix/opencode-sdk/v2/client';
 
 // ---------------------------------------------------------------------------

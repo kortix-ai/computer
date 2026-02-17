@@ -5,7 +5,7 @@ import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatTimestamp } from '../utils';
 
-export interface ToolViewFooterProps {
+interface ToolViewFooterProps {
   /** Children to render on the left side of the footer */
   children?: React.ReactNode;
   /** Assistant message timestamp */

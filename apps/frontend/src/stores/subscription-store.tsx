@@ -50,7 +50,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
 );
 
 // Hook to sync React Query with Zustand store
-export function useSubscriptionStoreSync() {
+function useSubscriptionStoreSync() {
   const { user } = useAuth();
   const isAuthenticated = !!user;
   
@@ -96,7 +96,7 @@ export function SubscriptionStoreSync({ children }: { children: React.ReactNode 
 }
 
 // Backward compatibility hooks - map to new unified structure
-export function useSubscriptionContext() {
+function useSubscriptionContext() {
   const store = useSubscriptionStore();
   
   return {
@@ -139,7 +139,7 @@ export function useSubscriptionContext() {
   };
 }
 
-export function useSharedSubscription() {
+function useSharedSubscription() {
   const store = useSubscriptionStore();
   const ctx = useSubscriptionContext();
   
@@ -151,7 +151,7 @@ export function useSharedSubscription() {
   };
 }
 
-export function useSubscriptionData() {
+function useSubscriptionData() {
   const store = useSubscriptionStore();
   const { user } = useAuth();
   

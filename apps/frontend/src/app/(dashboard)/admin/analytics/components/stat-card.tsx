@@ -80,7 +80,7 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ title, value, description, icon, trend, className }: StatCardProps) {
+function StatCard({ title, value, description, icon, trend, className }: StatCardProps) {
   return (
     <div className={cn(
       'relative overflow-hidden rounded-xl border bg-card p-5',

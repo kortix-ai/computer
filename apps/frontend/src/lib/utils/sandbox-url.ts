@@ -81,7 +81,7 @@ export function detectLocalhostUrls(text: string): DetectedLocalhostUrl[] {
 /**
  * Check if a string contains any localhost URLs worth rewriting.
  */
-export function hasLocalhostUrls(text: string): boolean {
+function hasLocalhostUrls(text: string): boolean {
   LOCALHOST_URL_REGEX.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = LOCALHOST_URL_REGEX.exec(text)) !== null) {

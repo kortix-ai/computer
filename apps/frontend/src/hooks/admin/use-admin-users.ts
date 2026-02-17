@@ -143,7 +143,7 @@ export function useAdminUserStats() {
   });
 }
 
-export interface UserThreadSummary {
+interface UserThreadSummary {
   thread_id: string;
   project_id?: string | null;
   project_name?: string | null;

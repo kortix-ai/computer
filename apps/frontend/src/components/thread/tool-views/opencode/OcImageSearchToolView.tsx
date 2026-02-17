@@ -195,7 +195,7 @@ export function OcImageSearchToolView({
                   const isActive = idx === safeQueryIndex;
                   return (
                     <button
-                      key={idx}
+                      key={`bi-${idx}`}
                       type="button"
                       onClick={() => setCurrentQueryIndex(idx)}
                       className={`
@@ -297,7 +297,7 @@ export function OcImageSearchToolView({
                     : null;
 
                   return (
-                    <TooltipProvider key={idx}>
+                    <TooltipProvider key={img.title}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <a

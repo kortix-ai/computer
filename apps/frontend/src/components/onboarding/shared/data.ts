@@ -65,7 +65,7 @@ export const allAgents: AIAgent[] = [
 ];
 
 // Agent categories
-export const agentCategories = [
+const agentCategories = [
   { id: 'all', name: 'All', description: 'View all available AI workers' },
   { id: 'Productivity', name: 'Productivity', description: 'Email, scheduling, and daily automation' },
   { id: 'Sales', name: 'Sales', description: 'Lead generation and sales automation' },

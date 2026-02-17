@@ -16,7 +16,7 @@ export interface UserEmailLinkProps {
   className?: string;
 }
 
-export interface StatCardProps {
+interface StatCardProps {
   title: string;
   value: string | number;
   description?: string;
@@ -28,7 +28,7 @@ export interface StatCardProps {
   className?: string;
 }
 
-export interface MetricCardProps {
+interface MetricCardProps {
   label: string;
   value: string | number;
   subtext?: string;
@@ -111,7 +111,7 @@ export interface MonthlyActual {
   overrides?: FieldOverrides;
 }
 
-export interface WeeklyChartData {
+interface WeeklyChartData {
   week: string;
   goalViews: number;
   actualViews: number | null;
@@ -127,7 +127,7 @@ export interface WeeklyChartData {
   actualARR: number | null;
 }
 
-export interface MonthlyChartData {
+interface MonthlyChartData {
   month: string;
   monthIndex: number;
   actualNewPaid: number | null;

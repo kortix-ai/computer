@@ -3,13 +3,13 @@
 import { create } from 'zustand';
 
 /** Lightweight file reference for queued messages (mirrors AttachedFile from session-chat-input) */
-export interface QueuedFile {
+interface QueuedFile {
   file: File;
   localUrl: string;
   isImage: boolean;
 }
 
-export interface QueuedMessage {
+interface QueuedMessage {
   id: string;
   sessionId: string;
   text: string;

@@ -55,7 +55,7 @@ export function isMermaidCode(language: string, code: string): boolean {
 /**
  * Validates Mermaid syntax (basic validation)
  */
-export function validateMermaidSyntax(code: string): { valid: boolean; error?: string } {
+function validateMermaidSyntax(code: string): { valid: boolean; error?: string } {
   if (!code?.trim()) {
     return { valid: false, error: 'Empty diagram' };
   }
@@ -102,7 +102,7 @@ export function validateMermaidSyntax(code: string): { valid: boolean; error?: s
 /**
  * Extracts and processes Mermaid diagrams from markdown content
  */
-export function extractMermaidDiagrams(content: string): Array<{
+function extractMermaidDiagrams(content: string): Array<{
   original: string;
   code: string;
   language: string;

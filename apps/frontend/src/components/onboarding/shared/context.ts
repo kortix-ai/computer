@@ -11,7 +11,7 @@ export const updateUserContext = (updates: Partial<UserContext>) => {
   userContext = { ...userContext, ...updates };
 };
 
-export const resetUserContext = () => {
+const resetUserContext = () => {
   userContext = {
     name: '',
     primaryGoals: [],

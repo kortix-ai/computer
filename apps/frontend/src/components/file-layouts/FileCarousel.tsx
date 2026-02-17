@@ -104,7 +104,7 @@ export function FileCarousel({
                     <div className="flex items-center gap-1.5">
                         {files.map((_, idx) => (
                             <button
-                                key={idx}
+                                key={`_-${idx}`}
                                 onClick={() => onIndexChange(idx)}
                                 className={cn(
                                     "h-2 rounded-full transition-all duration-200",

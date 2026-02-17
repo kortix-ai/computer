@@ -9,7 +9,7 @@ import { locales, defaultLocale, type Locale } from '@/i18n/config';
  * Detects locale from Accept-Language header
  * This is the primary method for server-side geo-detection
  */
-export function detectLocaleFromHeaders(acceptLanguage: string | null): Locale | null {
+function detectLocaleFromHeaders(acceptLanguage: string | null): Locale | null {
   if (!acceptLanguage) {
     console.log('🌍 No Accept-Language header found');
     return null;

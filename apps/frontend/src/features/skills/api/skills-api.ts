@@ -141,7 +141,7 @@ function toRelativePath(absoluteLocation: string): string {
 /**
  * Create a new skill in the project's .opencode/skills/ directory.
  */
-export async function createSkill(input: CreateSkillInput): Promise<void> {
+async function createSkill(input: CreateSkillInput): Promise<void> {
   const skillDir = `${SKILLS_DIR}/${input.name}`;
 
   // Ensure the skill directory exists
@@ -189,7 +189,7 @@ export async function updateSkill(
  *
  * The location points to the SKILL.md file — we delete the parent directory.
  */
-export async function deleteSkill(location: string): Promise<void> {
+async function deleteSkill(location: string): Promise<void> {
   const relativePath = toRelativePath(location);
   // Remove the /SKILL.md suffix to get the directory
   const skillDir = relativePath.replace(/\/SKILL\.md$/, '');

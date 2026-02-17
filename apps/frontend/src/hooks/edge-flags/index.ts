@@ -4,13 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
-export interface IMaintenanceNotice {
+interface IMaintenanceNotice {
   enabled: boolean;
   startTime?: string;
   endTime?: string;
 }
 
-export interface ITechnicalIssue {
+interface ITechnicalIssue {
   enabled: boolean;
   message?: string;
   statusUrl?: string;
@@ -20,7 +20,7 @@ export interface ITechnicalIssue {
   severity?: 'degraded' | 'outage' | 'maintenance';
 }
 
-export interface SystemStatusResponse {
+interface SystemStatusResponse {
   maintenanceNotice: IMaintenanceNotice;
   technicalIssue: ITechnicalIssue;
   updatedAt?: string;
@@ -48,7 +48,7 @@ async function fetchSystemStatus(): Promise<SystemStatusResponse> {
   }
 }
 
-export const systemStatusKeys = {
+const systemStatusKeys = {
   all: ['system-status'] as const,
 } as const;
 

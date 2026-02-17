@@ -25,7 +25,7 @@ const getEndOfCurrentMonthUTC = (): number => {
 // No active promos — array kept for future use.
 const PROMOS: PromoConfig[] = [];
 
-export interface PromoState {
+interface PromoState {
   isActive: boolean;
   hasStarted: boolean;
   msRemaining: number;

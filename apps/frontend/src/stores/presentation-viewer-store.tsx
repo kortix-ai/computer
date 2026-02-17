@@ -13,7 +13,7 @@ interface PresentationViewerState {
   closePresentation: () => void;
 }
 
-export const usePresentationViewerStore = create<PresentationViewerState>()(
+const usePresentationViewerStore = create<PresentationViewerState>()(
   devtools(
     (set) => ({
       isOpen: false,
@@ -46,7 +46,7 @@ export const usePresentationViewerStore = create<PresentationViewerState>()(
 );
 
 // Backward compatibility hook
-export function usePresentationViewerContext() {
+function usePresentationViewerContext() {
   const store = usePresentationViewerStore();
   
   return {
@@ -56,7 +56,7 @@ export function usePresentationViewerContext() {
 }
 
 // Hook for backward compatibility with usePresentationViewer
-export function usePresentationViewer() {
+function usePresentationViewer() {
   const store = usePresentationViewerStore();
   
   return {

@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type ModelProvider =
+type ModelProvider =
   | 'openai'
   | 'anthropic'
   | 'google'
@@ -16,7 +16,7 @@ export type ModelProvider =
 /**
  * Check if a model ID corresponds to a Kortix mode (Basic, Advanced, or Test)
  */
-export function isKortixMode(modelId: string): boolean {
+function isKortixMode(modelId: string): boolean {
   // New Kortix registry IDs
   if (modelId === 'kortix/basic' || modelId === 'kortix/power' || modelId === 'kortix/test' ||
       modelId === 'kortix-basic' || modelId === 'kortix-power' || modelId === 'kortix-test') {
@@ -36,7 +36,7 @@ export function isKortixMode(modelId: string): boolean {
 /**
  * Get the provider from a model ID
  */
-export function getModelProvider(modelId: string): ModelProvider {
+function getModelProvider(modelId: string): ModelProvider {
   // Check for Kortix modes first
   if (isKortixMode(modelId)) {
     return 'kortix';
@@ -156,7 +156,7 @@ export function ModelProviderIcon({
 /**
  * Get the provider display name
  */
-export function getModelProviderName(modelId: string): string {
+function getModelProviderName(modelId: string): string {
   const provider = getModelProvider(modelId);
 
   const nameMap: Record<ModelProvider, string> = {

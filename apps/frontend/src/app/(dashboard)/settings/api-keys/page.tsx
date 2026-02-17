@@ -373,7 +373,7 @@ export default function APIKeysPage() {
         {isLoading ? (
           <div className="grid gap-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
+              <Card key={`item-${i}`} className="animate-pulse">
                 <CardHeader>
                   <div className="h-4 bg-muted rounded w-1/3"></div>
                   <div className="h-3 bg-muted rounded w-1/2"></div>

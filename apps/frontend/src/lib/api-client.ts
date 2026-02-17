@@ -197,7 +197,7 @@ async function makeRequest<T = any>(
   }
 }
 
-export const supabaseClient = {
+const supabaseClient = {
   async execute<T = any>(
     queryFn: () => Promise<{ data: T | null; error: any }>,
     errorContext?: ErrorContext

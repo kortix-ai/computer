@@ -81,7 +81,7 @@ const UnifiedDiffView: React.FC<{ lineDiff: LineDiff[]; fileName?: string }> = (
   <div className="font-mono text-[13px] leading-relaxed">
     {lineDiff.map((line, i) => (
       <div
-        key={i}
+        key={`line-${i}`}
         className={cn(
           "flex border-l-2 transition-colors",
           line.type === 'removed' && "bg-red-50/80 dark:bg-red-950/40 border-l-red-400 dark:border-l-red-500",
@@ -127,7 +127,7 @@ const SplitDiffView: React.FC<{ lineDiff: LineDiff[] }> = ({ lineDiff }) => (
       </div>
       {lineDiff.map((line, i) => (
         <div
-          key={i}
+          key={`line-${i}`}
           className={cn(
             "flex border-l-2 transition-colors",
             line.type === 'removed' && "bg-red-50/80 dark:bg-red-950/40 border-l-red-400",
@@ -159,7 +159,7 @@ const SplitDiffView: React.FC<{ lineDiff: LineDiff[] }> = ({ lineDiff }) => (
       </div>
       {lineDiff.map((line, i) => (
         <div
-          key={i}
+          key={`line-${i}`}
           className={cn(
             "flex border-l-2 transition-colors",
             line.type === 'added' && "bg-zinc-50/80 dark:bg-zinc-900/40 border-l-zinc-400",

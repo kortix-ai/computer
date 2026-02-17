@@ -158,7 +158,7 @@ export function useAccountState(options?: UseAccountStateOptions) {
  * Account state with periodic refresh during streaming.
  * Use this in components that display credits during agent runs.
  */
-export function useAccountStateWithStreaming(isStreaming: boolean = false) {
+function useAccountStateWithStreaming(isStreaming: boolean = false) {
   return useQuery<AccountState>({
     queryKey: accountStateKeys.state(),
     queryFn: () => billingApi.getAccountState(),
@@ -176,7 +176,7 @@ export function useAccountStateWithStreaming(isStreaming: boolean = false) {
 // MUTATION HOOKS - All invalidate account state after success
 // =============================================================================
 
-export function useCreateCheckoutSession() {
+function useCreateCheckoutSession() {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -249,7 +249,7 @@ export function useReactivateSubscription() {
   });
 }
 
-export function usePurchaseCredits() {
+function usePurchaseCredits() {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -263,7 +263,7 @@ export function usePurchaseCredits() {
   });
 }
 
-export function useDeductTokenUsage() {
+function useDeductTokenUsage() {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -313,7 +313,7 @@ export function useCancelScheduledChange() {
   });
 }
 
-export function useSyncSubscription() {
+function useSyncSubscription() {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -332,7 +332,7 @@ export function useSyncSubscription() {
 // USAGE HISTORY & TRANSACTIONS - Separate queries for analytics
 // =============================================================================
 
-export function useUsageHistory(days = 30) {
+function useUsageHistory(days = 30) {
   return useQuery({
     queryKey: accountStateKeys.usageHistory(days),
     queryFn: () => billingApi.getUsageHistory(days),
@@ -340,7 +340,7 @@ export function useUsageHistory(days = 30) {
   });
 }
 
-export function useTransactions(limit = 50, offset = 0) {
+function useTransactions(limit = 50, offset = 0) {
   return useQuery({
     queryKey: accountStateKeys.transactions(limit, offset),
     queryFn: () => billingApi.getTransactions(limit, offset),
@@ -376,7 +376,7 @@ export function useStartTrial() {
   });
 }
 
-export function useCancelTrial() {
+function useCancelTrial() {
   const queryClient = useQueryClient();
   
   return useMutation({

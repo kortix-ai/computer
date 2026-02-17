@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
-export interface StressTestConfig {
+interface StressTestConfig {
   num_requests: number;
   prompts?: string[];
   measure_ttft?: boolean;
@@ -33,14 +33,14 @@ export interface StressTestResult {
   };
 }
 
-export interface TimingBreakdownStats {
+interface TimingBreakdownStats {
   min: number;
   avg: number;
   max: number;
   count: number;
 }
 
-export interface StressTestSummary {
+interface StressTestSummary {
   total_requests: number;
   successful: number;
   failed: number;
@@ -76,7 +76,7 @@ export interface StressTestSummary {
   };
 }
 
-export interface StressTestState {
+interface StressTestState {
   isRunning: boolean;
   results: StressTestResult[];
   summary: StressTestSummary | null;

@@ -18,11 +18,11 @@ export function FeedbackStatsCards() {
         <div className="flex items-center gap-0.5">
           {[...Array(5)].map((_, i) => {
             if (i < fullStars) {
-              return <Star key={i} className="h-5 w-5 fill-yellow-500 text-yellow-500" />;
+              return <Star key={`_-${i}`} className="h-5 w-5 fill-yellow-500 text-yellow-500" />;
             } else if (i === fullStars && hasHalfStar) {
-              return <Star key={i} className="h-5 w-5 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
+              return <Star key={`_-${i}`} className="h-5 w-5 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
             } else {
-              return <Star key={i} className="h-5 w-5 text-muted-foreground/30" />;
+              return <Star key={`_-${i}`} className="h-5 w-5 text-muted-foreground/30" />;
             }
           })}
         </div>

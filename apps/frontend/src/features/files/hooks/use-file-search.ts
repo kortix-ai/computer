@@ -5,7 +5,7 @@ import { useServerStore } from '@/stores/server-store';
 import { findFiles, findText } from '../api/opencode-files';
 import type { FindMatch } from '../types';
 
-export const fileSearchKeys = {
+const fileSearchKeys = {
   files: (serverUrl: string, query: string) =>
     ['opencode-files', 'search', 'files', serverUrl, query] as const,
   text: (serverUrl: string, pattern: string) =>

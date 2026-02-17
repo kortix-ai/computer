@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { logger } from '@/lib/logger';
 
-export type SandboxConnectionStatus =
+type SandboxConnectionStatus =
   | 'connecting'
   | 'connected'
   | 'unreachable';

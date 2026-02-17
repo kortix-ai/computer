@@ -4,26 +4,20 @@
  */
 
 // Re-export shared utilities
-export { 
-  safeJsonParse,
-  getUserFriendlyToolName,
-  getCompletedToolName,
-  extractAppSlugFromToolCall,
-  HIDE_STREAMING_XML_TAGS,
-} from '@kortix/shared';
+export { getUserFriendlyToolName } from '@kortix/shared';
 
 // Re-export getToolIcon from frontend icon resolver
 export { getToolIcon } from '@/lib/icons/tool-icons';
 
 // Frontend-specific flags
-export const SHOULD_RENDER_TOOL_RESULTS = false;
+const SHOULD_RENDER_TOOL_RESULTS = false;
 export const HIDE_BROWSER_TAB = true;
 
 /**
  * Extract a primary parameter from tool call arguments for display
  * Frontend-specific implementation
  */
-export const extractPrimaryParam = (
+const extractPrimaryParam = (
   toolName: string,
   content: string | undefined,
 ): string | null => {
@@ -159,7 +153,7 @@ export const extractPrimaryParam = (
  *
  * This function handles all cases and returns the actual user text.
  */
-export const extractUserMessageText = (content: unknown): string => {
+const extractUserMessageText = (content: unknown): string => {
   if (!content) return '';
 
   // If it's already a string

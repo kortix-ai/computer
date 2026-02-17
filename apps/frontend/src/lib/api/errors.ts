@@ -12,22 +12,14 @@ export {
   ModelAccessDeniedError,
   CustomWorkerLimitError,
   ThreadLimitError,
-  NoAccessTokenAvailableError,
   RequestTooLargeError,
   // Parsing utilities
   parseTierRestrictionError,
   isTierRestrictionError,
   // Error state types and utilities
-  extractTierLimitErrorState,
-  getTierLimitErrorTitle,
-  getTierLimitErrorAction,
+  
   // UI formatting utilities
-  formatTierLimitErrorForUI,
-  formatTierErrorForUI,
+  
+  formatTierErrorForUI
 } from '@kortix/shared/errors';
 
-export type {
-  TierErrorType,
-  TierLimitErrorState,
-  TierLimitErrorUI,
-} from '@kortix/shared/errors';

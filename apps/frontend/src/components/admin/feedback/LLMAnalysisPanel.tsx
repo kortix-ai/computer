@@ -53,7 +53,7 @@ export function LLMAnalysisPanel() {
       <div className="flex gap-0.5">
         {[1, 2, 3].map((i) => (
           <div 
-            key={i} 
+            key={`item-${i}`} 
             className={`w-1.5 h-1.5 rounded-full ${i <= count ? 'bg-secondary' : 'bg-muted'}`} 
           />
         ))}
@@ -154,7 +154,7 @@ export function LLMAnalysisPanel() {
                   <div className="flex flex-wrap gap-2">
                     {analysis.key_themes.map((theme, i) => (
                       <span 
-                        key={i} 
+                        key={String(theme)} 
                         className="px-3 py-1.5 rounded-full text-sm font-medium bg-secondary/10 text-secondary"
                       >
                         {theme}
@@ -175,7 +175,7 @@ export function LLMAnalysisPanel() {
                     </div>
                     <ul className="space-y-2">
                       {analysis.positive_highlights.map((highlight, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm">
+                        <li key={String(highlight)} className="flex items-start gap-2 text-sm">
                           <span className="text-secondary mt-0.5 shrink-0">✓</span>
                           <span className="text-muted-foreground">{highlight}</span>
                         </li>
@@ -193,7 +193,7 @@ export function LLMAnalysisPanel() {
                     </div>
                     <div className="space-y-2">
                       {analysis.improvement_areas.slice(0, 4).map((area, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm">
+                        <div key={`area-${i}`} className="flex items-center gap-2 text-sm">
                           <div className={`w-2 h-2 rounded-full shrink-0 ${
                             area.severity === 'high' ? 'bg-destructive' : 'bg-secondary'
                           }`} />
@@ -215,7 +215,7 @@ export function LLMAnalysisPanel() {
                   <div className="space-y-3">
                     {analysis.improvement_areas.map((area, i) => (
                       <div 
-                        key={i} 
+                        key={`area-${i}`} 
                         className={`rounded-lg border-l-4 p-4 ${getSeverityStyles(area.severity)}`}
                       >
                         <div className="flex items-start justify-between gap-4 mb-2">
@@ -261,7 +261,7 @@ export function LLMAnalysisPanel() {
                   <div className="space-y-3">
                     {analysis.actionable_recommendations.map((rec, i) => (
                       <div 
-                        key={i} 
+                        key={`rec-${i}`} 
                         className="group rounded-xl border bg-card p-4 hover:border-secondary/50 transition-colors"
                       >
                         <div className="flex items-start gap-4">

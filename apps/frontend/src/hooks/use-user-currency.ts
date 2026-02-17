@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { detectCurrencyFromTimezone } from '@/lib/utils/geo-detection';
 import { getCurrencySymbol, type Currency } from '@/lib/utils/currency';
 
-export interface UserCurrencyInfo {
+interface UserCurrencyInfo {
   currency: Currency;
   symbol: string;
   isEU: boolean;

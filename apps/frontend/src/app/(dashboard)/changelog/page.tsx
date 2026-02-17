@@ -90,7 +90,7 @@ function ChangelogEntryCard({ entry, isCurrent, isLatest }: { entry: ChangelogEn
       <p className="text-xs text-muted-foreground mb-3">{entry.description}</p>
       <div className="space-y-0.5">
         {entry.changes.map((change, i) => (
-          <ChangeItem key={i} change={change} />
+          <ChangeItem key={String(change)} change={change} />
         ))}
       </div>
       {entry.artifacts && entry.artifacts.length > 0 && (

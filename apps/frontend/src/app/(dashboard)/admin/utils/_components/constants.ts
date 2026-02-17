@@ -7,5 +7,5 @@ export const AVAILABLE_SERVICES = [
   { id: 'authentication', label: 'Authentication', icon: Shield },
 ] as const;
 
-export type ServiceId = typeof AVAILABLE_SERVICES[number]['id'];
-export type ServiceLabel = typeof AVAILABLE_SERVICES[number]['label'];
+type ServiceId = typeof AVAILABLE_SERVICES[number]['id'];
+type ServiceLabel = typeof AVAILABLE_SERVICES[number]['label'];

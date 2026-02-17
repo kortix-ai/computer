@@ -6,7 +6,7 @@ import { handleApiError } from '@/lib/error-handler';
 import { useMemo } from 'react';
 import { ThreadsResponse } from '@/lib/api/threads';
 
-export const useProjectQuery = (projectId: string | undefined, options?: any) => {
+const useProjectQuery = (projectId: string | undefined, options?: any) => {
   const queryClient = useQueryClient();
   
   // Try to get project from cached threads ONLY (don't fetch threads list!)
@@ -118,7 +118,7 @@ export const useProjects = (options?: any) => {
   };
 };
 
-export const usePublicProjectsQuery = (options?: any) => {
+const usePublicProjectsQuery = (options?: any) => {
   const queryClient = useQueryClient();
   
   // Derive public projects from cached threads data ONLY (no API call!)
@@ -166,7 +166,7 @@ export const usePublicProjectsQuery = (options?: any) => {
 };
 
 // Project Mutations
-export const useUpdateProjectMutation = () => {
+const useUpdateProjectMutation = () => {
   const queryClient = useQueryClient();
   
   return useMutation<Project, Error, { projectId: string; data: Partial<Project> }>({
@@ -188,9 +188,9 @@ export const useUpdateProjectMutation = () => {
 };
 
 // Alias for backward compatibility
-export const useUpdateProject = useUpdateProjectMutation;
+const useUpdateProject = useUpdateProjectMutation;
 
-export const useDeleteProject = () => {
+const useDeleteProject = () => {
   const queryClient = useQueryClient();
   
   return useMutation<void, Error, { projectId: string }>({

@@ -473,7 +473,7 @@ export default function CommandDetailPage() {
                 <div className="p-3 space-y-1.5">
                   {command.hints.map((hint, i) => (
                     <div
-                      key={i}
+                      key={String(hint)}
                       className="rounded-lg bg-muted/30 px-3 py-2"
                     >
                       <p className="text-xs font-mono text-foreground/80">{hint}</p>

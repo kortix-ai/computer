@@ -27,7 +27,7 @@ interface DeleteOperationStore {
   ) => Promise<void>;
 }
 
-export const useDeleteOperationStore = create<DeleteOperationStore>()(
+const useDeleteOperationStore = create<DeleteOperationStore>()(
   devtools(
     (set, get) => ({
       isDeleting: false,

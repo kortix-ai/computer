@@ -3,7 +3,7 @@
  * These use userAgent detection for actual phone/tablet detection
  */
 
-export type MobileDevicePlatform = 'ios' | 'android' | null;
+type MobileDevicePlatform = 'ios' | 'android' | null;
 
 /**
  * Detect if the current device is an actual mobile device (iPhone, iPad, Android)
@@ -31,7 +31,7 @@ export function isMobileDevice(): boolean {
  * Detect the specific mobile platform (iOS or Android)
  * Returns null if not a mobile device
  */
-export function getMobileDevicePlatform(): MobileDevicePlatform {
+function getMobileDevicePlatform(): MobileDevicePlatform {
   if (typeof window === 'undefined') return null;
   
   const userAgent = window.navigator.userAgent.toLowerCase();
@@ -52,7 +52,7 @@ export function getMobileDevicePlatform(): MobileDevicePlatform {
 /**
  * Check if the device is specifically an iPhone (not iPad)
  */
-export function isIPhone(): boolean {
+function isIPhone(): boolean {
   if (typeof window === 'undefined') return false;
   return /iphone/.test(window.navigator.userAgent.toLowerCase());
 }
@@ -60,7 +60,7 @@ export function isIPhone(): boolean {
 /**
  * Check if the device is an iPad
  */
-export function isIPad(): boolean {
+function isIPad(): boolean {
   if (typeof window === 'undefined') return false;
   const userAgent = window.navigator.userAgent.toLowerCase();
   // Also check for Mac with touch for iPad OS 13+
@@ -72,7 +72,7 @@ export function isIPad(): boolean {
  * Check if the device is specifically an Android phone (not tablet)
  * This is a heuristic based on screen size
  */
-export function isAndroidPhone(): boolean {
+function isAndroidPhone(): boolean {
   if (typeof window === 'undefined') return false;
   const userAgent = window.navigator.userAgent.toLowerCase();
   // Android phones typically have "mobile" in userAgent, tablets don't
@@ -82,7 +82,7 @@ export function isAndroidPhone(): boolean {
 /**
  * Check if the device is an Android tablet
  */
-export function isAndroidTablet(): boolean {
+function isAndroidTablet(): boolean {
   if (typeof window === 'undefined') return false;
   const userAgent = window.navigator.userAgent.toLowerCase();
   // Android tablets typically don't have "mobile" in userAgent
@@ -92,7 +92,7 @@ export function isAndroidTablet(): boolean {
 /**
  * Store links for mobile app downloads
  */
-export const MOBILE_APP_STORE_LINKS = {
+const MOBILE_APP_STORE_LINKS = {
   ios: 'https://apps.apple.com/ie/app/kortix/id6754448524',
   android: 'https://play.google.com/store/apps/details?id=com.kortix.app',
 } as const;
@@ -100,5 +100,5 @@ export const MOBILE_APP_STORE_LINKS = {
 /**
  * Deep link scheme for opening the Kortix app
  */
-export const KORTIX_DEEP_LINK = 'kortix://';
+const KORTIX_DEEP_LINK = 'kortix://';
 

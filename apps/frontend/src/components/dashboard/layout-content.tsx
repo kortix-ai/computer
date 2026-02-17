@@ -130,7 +130,7 @@ function DashboardSkeleton() {
           <div className="h-8 w-32 bg-muted/40 rounded animate-pulse" />
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-10 bg-muted/30 rounded animate-pulse" />
+              <div key={`item-${i}`} className="h-10 bg-muted/30 rounded animate-pulse" />
             ))}
           </div>
         </div>

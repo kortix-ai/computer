@@ -6,7 +6,7 @@ import type { Config } from '@kortix/opencode-sdk/v2/client';
 
 export type { Config };
 
-export const configKeys = {
+const configKeys = {
   all: ['opencode', 'config'] as const,
 };
 

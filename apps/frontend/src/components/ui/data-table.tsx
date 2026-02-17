@@ -22,7 +22,7 @@ export interface DataTableColumn<T> {
   width?: string;
 }
 
-export interface DataTableProps<T> {
+interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
   className?: string;

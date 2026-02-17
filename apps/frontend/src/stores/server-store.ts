@@ -221,7 +221,7 @@ export function getActiveOpenCodeUrl(): string {
  * Get the full active ServerEntry (including mappedPorts, provider, etc.).
  * Returns null if the active server can't be found (shouldn't happen).
  */
-export function getActiveServer(): ServerEntry | null {
+function getActiveServer(): ServerEntry | null {
   const state = useServerStore.getState();
   return state.servers.find((s) => s.id === state.activeServerId) ?? null;
 }
@@ -230,7 +230,7 @@ export function getActiveServer(): ServerEntry | null {
  * Get the host port for a given container port on the active server.
  * Returns null if no mapping exists (e.g. Daytona, default server, or unknown port).
  */
-export function getActiveServerMappedPort(containerPort: string): string | null {
+function getActiveServerMappedPort(containerPort: string): string | null {
   const server = getActiveServer();
   return server?.mappedPorts?.[containerPort] ?? null;
 }

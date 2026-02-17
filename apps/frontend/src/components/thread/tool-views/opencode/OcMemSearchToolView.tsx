@@ -147,7 +147,7 @@ export function OcMemSearchToolView({
                   const typeInfo = observationTypeInfo(obs.type);
                   return (
                     <div
-                      key={i}
+                      key={obs.title}
                       className="flex items-start gap-3 p-3 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
                     >
                       {/* Type indicator */}

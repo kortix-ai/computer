@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 
-export type FilesView = 'browser' | 'viewer' | 'history';
+type FilesView = 'browser' | 'viewer' | 'history';
 
 /** Clipboard operation type for copy/cut */
-export type ClipboardOperation = 'copy' | 'cut';
+type ClipboardOperation = 'copy' | 'cut';
 
 /** Clipboard item representing a file or directory */
-export interface ClipboardItem {
+interface ClipboardItem {
   /** Relative path of the item */
   path: string;
   /** Name of the item */

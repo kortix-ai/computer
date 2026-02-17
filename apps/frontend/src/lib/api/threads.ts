@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/client';
 import { handleApiError } from '../error-handler';
 import { backendApi } from '../api-client';
 
-export type ThreadStatus = 'pending' | 'initializing' | 'ready' | 'error';
+type ThreadStatus = 'pending' | 'initializing' | 'ready' | 'error';
 
 // Thread search types
 export interface ThreadSearchResult {
@@ -118,7 +118,7 @@ export const getProject = async (projectId: string): Promise<Project> => {
 };
 
 // Get threads for a specific project
-export const getProjectThreads = async (projectId: string, page: number = 1, limit: number = 100): Promise<ThreadsResponse> => {
+const getProjectThreads = async (projectId: string, page: number = 1, limit: number = 100): Promise<ThreadsResponse> => {
   try {
     const params = new URLSearchParams({
       page: page.toString(),
@@ -194,7 +194,7 @@ export const getProjectThreads = async (projectId: string, page: number = 1, lim
 };
 
 // Create a thread in an existing project
-export const createThreadInProject = async (projectId: string): Promise<{ thread_id: string; project_id: string }> => {
+const createThreadInProject = async (projectId: string): Promise<{ thread_id: string; project_id: string }> => {
   const supabase = createClient();
 
   // If user is not logged in, redirect to login
@@ -291,7 +291,7 @@ export const updateProject = async (
   } as Project;
 };
 
-export const getThreads = async (projectId?: string): Promise<Thread[]> => {
+const getThreads = async (projectId?: string): Promise<Thread[]> => {
   try {
     const response = await backendApi.get<{ threads: any[] }>('/threads', {
       showErrors: false,
@@ -333,7 +333,7 @@ export const getThreads = async (projectId?: string): Promise<Thread[]> => {
   }
 };
 
-export const getThreadsPaginated = async (projectId?: string, page: number = 1, limit: number = 20): Promise<ThreadsResponse> => {
+const getThreadsPaginated = async (projectId?: string, page: number = 1, limit: number = 20): Promise<ThreadsResponse> => {
   try {
     const params = new URLSearchParams({
       page: page.toString(),
@@ -413,7 +413,7 @@ export const getThreadsPaginated = async (projectId?: string, page: number = 1, 
   }
 };
 
-export const getThread = async (threadId: string): Promise<Thread> => {
+const getThread = async (threadId: string): Promise<Thread> => {
   try {
     const response = await backendApi.get<Thread>(`/threads/${threadId}`, {
       showErrors: false,
@@ -438,7 +438,7 @@ export const getThread = async (threadId: string): Promise<Thread> => {
 };
 
 // Create a new thread (creates both project and thread - legacy endpoint for backwards compatibility)
-export const createThread = async (projectId?: string): Promise<Thread> => {
+const createThread = async (projectId?: string): Promise<Thread> => {
   const supabase = createClient();
 
   // If user is not logged in, redirect to login
@@ -480,14 +480,14 @@ export const createThread = async (projectId?: string): Promise<Thread> => {
   return data;
 };
 
-export class NoAccessTokenAvailableError extends Error {
+class NoAccessTokenAvailableError extends Error {
   constructor() {
     super('No access token available');
     this.name = 'NoAccessTokenAvailableError';
   }
 }
 
-export const addUserMessage = async (
+const addUserMessage = async (
   threadId: string,
   content: string,
 ): Promise<void> => {
@@ -539,7 +539,7 @@ const shouldUseOptimizedMessages = (): boolean => {
   return !urlParams.has('debug_messages');
 };
 
-export const getMessages = async (threadId: string): Promise<Message[]> => {
+const getMessages = async (threadId: string): Promise<Message[]> => {
   try {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();

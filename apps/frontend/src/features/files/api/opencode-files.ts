@@ -282,7 +282,7 @@ export async function getServerHealth(): Promise<ServerHealth> {
  * Check if the OpenCode server is reachable.
  * Returns true/false without throwing.
  */
-export async function isServerReachable(): Promise<boolean> {
+async function isServerReachable(): Promise<boolean> {
   try {
     const health = await getServerHealth();
     return health.healthy === true;

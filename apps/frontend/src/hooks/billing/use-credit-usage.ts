@@ -28,7 +28,7 @@ interface UsageResponse {
   };
 }
 
-export function useCreditUsage(
+function useCreditUsage(
   limit: number = 50,
   offset: number = 0,
   days: number = 30

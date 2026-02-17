@@ -43,7 +43,7 @@ const terminalTheme: ITheme = {
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
-export interface PtyTerminalHandle {
+interface PtyTerminalHandle {
   focus: () => void;
   kill: () => void;
 }

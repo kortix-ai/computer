@@ -26,7 +26,7 @@ export type SoundEvent = 'completion' | 'error' | 'notification' | 'send';
  */
 export type SoundPack = 'off' | 'opencode' | 'kortix';
 
-export interface SoundPreferences {
+interface SoundPreferences {
   /** Active sound pack — 'off' disables all sounds */
   pack: SoundPack;
   /** Master volume 0-1 */

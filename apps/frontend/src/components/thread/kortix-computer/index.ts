@@ -1,3 +1,1 @@
-export { KortixComputer, type ToolCallInput } from './KortixComputer';
-export { KortixComputerHeader } from './KortixComputerHeader';
-
+export { KortixComputer } from './KortixComputer';

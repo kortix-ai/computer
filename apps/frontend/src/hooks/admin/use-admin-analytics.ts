@@ -8,7 +8,7 @@ export type AnalyticsSource = 'vercel' | 'ga';
 // TYPES
 // ============================================================================
 
-export interface AnalyticsSummary {
+interface AnalyticsSummary {
   total_users: number;
   total_threads: number;
   active_users_week: number;
@@ -44,7 +44,7 @@ export interface RetentionData {
   is_recurring: boolean;
 }
 
-export interface MessageDistribution {
+interface MessageDistribution {
   distribution: {
     '0_messages': number;
     '1_message': number;
@@ -54,26 +54,26 @@ export interface MessageDistribution {
   total_threads: number;
 }
 
-export interface CategoryDistribution {
+interface CategoryDistribution {
   distribution: Record<string, number>;
   total_projects: number;
   date: string;
 }
 
-export interface TierDistribution {
+interface TierDistribution {
   distribution: Record<string, number>;
   total_threads: number;
   date: string;
 }
 
-export interface VisitorStats {
+interface VisitorStats {
   total_visitors: number;
   unique_visitors: number;
   pageviews: number;
   date: string;
 }
 
-export interface ConversionFunnel {
+interface ConversionFunnel {
   visitors: number;
   signups: number;
   subscriptions: number;
@@ -86,7 +86,7 @@ export interface ConversionFunnel {
   date: string;
 }
 
-export interface TranslationResponse {
+interface TranslationResponse {
   original: string;
   translated: string;
   target_language: string;
@@ -124,7 +124,7 @@ export interface ThreadBrowseParams {
   sort_order?: 'asc' | 'desc';
 }
 
-export interface RetentionParams {
+interface RetentionParams {
   page?: number;
   page_size?: number;
   weeks_back?: number;
@@ -247,7 +247,7 @@ export function useTierDistribution(dateFrom?: string, dateTo?: string, enabled:
   });
 }
 
-export function useVisitorStats(date?: string, source: AnalyticsSource = 'vercel') {
+function useVisitorStats(date?: string, source: AnalyticsSource = 'vercel') {
   return useQuery({
     queryKey: ['admin', 'analytics', 'visitors', date, source],
     queryFn: async (): Promise<VisitorStats> => {
@@ -324,7 +324,6 @@ export function useTranslate() {
   });
 }
 
-
 // ============================================================================
 // ARR WEEKLY ACTUALS
 // ============================================================================
@@ -357,7 +356,7 @@ export interface WeeklyActualData {
   overrides?: FieldOverrides;  // Tracks which fields are locked/manually overridden
 }
 
-export interface WeeklyActualsResponse {
+interface WeeklyActualsResponse {
   // Key is "{week_number}_{platform}" e.g. "1_web", "1_app"
   actuals: Record<string, WeeklyActualData>;
 }
@@ -394,7 +393,7 @@ export function useUpdateARRWeeklyActual() {
   });
 }
 
-export interface DeleteWeeklyActualParams {
+interface DeleteWeeklyActualParams {
   weekNumber: number;
   platform: Platform;
 }
@@ -417,7 +416,7 @@ export function useDeleteARRWeeklyActual() {
 }
 
 // Toggle override for a specific field in a week
-export interface ToggleOverrideParams {
+interface ToggleOverrideParams {
   weekNumber: number;
   platform: Platform;
   field: keyof FieldOverrides;
@@ -448,7 +447,7 @@ export function useToggleFieldOverride() {
 // ARR SIMULATOR CONFIG
 // ============================================================================
 
-export interface SimulatorConfigData {
+interface SimulatorConfigData {
   starting_subs: number;
   starting_mrr: number;
   weekly_visitors: number;
@@ -495,7 +494,7 @@ export function useUpdateARRSimulatorConfig() {
 // ARR SIGNUPS BY DATE (fetched from database, grouped by frontend)
 // ============================================================================
 
-export interface SignupsByDateResponse {
+interface SignupsByDateResponse {
   date_from: string;
   date_to: string;
   signups_by_date: Record<string, number>;  // YYYY-MM-DD -> count
@@ -523,7 +522,7 @@ export function useSignupsByDate(dateFrom: string, dateTo: string) {
 // ARR VIEWS BY DATE (fetched from Google Analytics, grouped by frontend)
 // ============================================================================
 
-export interface ViewsByDateResponse {
+interface ViewsByDateResponse {
   date_from: string;
   date_to: string;
   views_by_date: Record<string, number>;  // YYYY-MM-DD -> count
@@ -552,7 +551,7 @@ export function useViewsByDate(dateFrom: string, dateTo: string, source: Analyti
 // ARR NEW PAID SUBSCRIPTIONS BY DATE (fetched from Stripe, excludes free tier)
 // ============================================================================
 
-export interface NewPaidByDateResponse {
+interface NewPaidByDateResponse {
   date_from: string;
   date_to: string;
   new_paid_by_date: Record<string, number>;  // YYYY-MM-DD -> count
@@ -581,7 +580,7 @@ export function useNewPaidByDate(dateFrom: string, dateTo: string) {
 // ARR CHURN BY DATE (fetched from Stripe Events, grouped by frontend)
 // ============================================================================
 
-export interface ChurnByDateResponse {
+interface ChurnByDateResponse {
   date_from: string;
   date_to: string;
   churn_by_date: Record<string, number>;  // YYYY-MM-DD -> count
@@ -607,7 +606,6 @@ export function useChurnByDate(dateFrom: string, dateTo: string) {
   });
 }
 
-
 // ============================================================================
 // ARR MONTHLY ACTUALS (Direct monthly editing with override support)
 // ============================================================================
@@ -626,7 +624,7 @@ export interface MonthlyActualData {
   overrides?: FieldOverrides;  // Tracks which fields are locked/manually overridden
 }
 
-export interface MonthlyActualsResponse {
+interface MonthlyActualsResponse {
   // Key is "{month_index}_{platform}" e.g. "0_web", "0_app"
   actuals: Record<string, MonthlyActualData>;
 }
@@ -663,12 +661,12 @@ export function useUpdateARRMonthlyActual() {
   });
 }
 
-export interface DeleteMonthlyActualParams {
+interface DeleteMonthlyActualParams {
   monthIndex: number;
   platform: Platform;
 }
 
-export function useDeleteARRMonthlyActual() {
+function useDeleteARRMonthlyActual() {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -686,7 +684,7 @@ export function useDeleteARRMonthlyActual() {
 }
 
 // Toggle override for a specific field in a month
-export interface ToggleMonthlyOverrideParams {
+interface ToggleMonthlyOverrideParams {
   monthIndex: number;
   platform: Platform;
   field: keyof FieldOverrides;
@@ -713,12 +711,11 @@ export function useToggleMonthlyFieldOverride() {
   });
 }
 
-
 // ============================================================================
 // EXECUTIVE OVERVIEW HOOKS
 // ============================================================================
 
-export interface RevenueSummary {
+interface RevenueSummary {
   mrr: number;
   arr: number;
   total_paid_subscribers: number;
@@ -729,7 +726,7 @@ export interface RevenueSummary {
   churned_this_month: number;
 }
 
-export interface EngagementSummary {
+interface EngagementSummary {
   dau: number;
   wau: number;
   mau: number;
@@ -742,7 +739,7 @@ export interface EngagementSummary {
   retention_d30: number | null;
 }
 
-export interface TaskPerformance {
+interface TaskPerformance {
   total_runs: number;
   completed_runs: number;
   failed_runs: number;
@@ -756,21 +753,21 @@ export interface TaskPerformance {
   runs_by_status: Record<string, number>;
 }
 
-export interface ToolUsage {
+interface ToolUsage {
   tool_name: string;
   usage_count: number;
   unique_threads: number;
   percentage_of_threads: number;
 }
 
-export interface ToolAdoptionSummary {
+interface ToolAdoptionSummary {
   total_tool_calls: number;
   total_threads_with_tools: number;
   top_tools: ToolUsage[];
   tool_adoption_rate: number;
 }
 
-export function useRevenueSummary() {
+function useRevenueSummary() {
   return useQuery({
     queryKey: ['admin', 'analytics', 'revenue-summary'],
     queryFn: async (): Promise<RevenueSummary> => {
@@ -829,7 +826,7 @@ export function useTaskPerformance(dateFrom?: string, dateTo?: string) {
   });
 }
 
-export function useToolAdoption(date?: string) {
+function useToolAdoption(date?: string) {
   return useQuery({
     queryKey: ['admin', 'analytics', 'tool-adoption', date],
     queryFn: async (): Promise<ToolAdoptionSummary> => {
@@ -847,12 +844,11 @@ export function useToolAdoption(date?: string) {
   });
 }
 
-
 // ============================================================================
 // PROFITABILITY
 // ============================================================================
 
-export interface TierProfitability {
+interface TierProfitability {
   tier: string;
   display_name: string;
   provider: 'stripe' | 'revenuecat';
@@ -869,7 +865,7 @@ export interface TierProfitability {
   avg_profit_per_user: number;
 }
 
-export interface ProfitabilitySummary {
+interface ProfitabilitySummary {
   // Overall metrics
   total_revenue: number;
   total_cost: number;

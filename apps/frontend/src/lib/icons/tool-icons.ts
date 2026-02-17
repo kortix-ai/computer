@@ -81,5 +81,4 @@ export function getToolIcon(toolName: string): ElementType {
 }
 
 // Re-export the icon key function for type checking
-export { getToolIconKey, type ToolIconKey };
 

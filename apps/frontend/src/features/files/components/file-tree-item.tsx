@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/context-menu';
 
 /** Git status for display purposes */
-export type GitStatusType = 'added' | 'deleted' | 'modified';
+type GitStatusType = 'added' | 'deleted' | 'modified';
 
 interface FileTreeItemProps {
   node: FileNode;

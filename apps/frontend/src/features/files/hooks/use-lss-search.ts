@@ -5,7 +5,7 @@ import { useServerStore } from '@/stores/server-store';
 import { searchLss } from '../api/lss-search';
 import type { LssHit } from '../types';
 
-export const lssSearchKeys = {
+const lssSearchKeys = {
   search: (serverUrl: string, query: string) =>
     ['lss-search', serverUrl, query] as const,
 };

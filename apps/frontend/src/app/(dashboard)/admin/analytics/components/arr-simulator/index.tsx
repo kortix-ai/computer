@@ -1,5 +1,7 @@
 'use client';
 
+
+import dynamic from 'next/dynamic';
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,19 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/lib/toast';
 import { Lock, Unlock, TrendingUp, Trash2, X } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ReferenceLine,
-} from 'recharts';
+const LineChart = dynamic(() => import('recharts').then(m => m.LineChart), { ssr: false }) as any;
+const Line = dynamic(() => import('recharts').then(m => m.Line), { ssr: false }) as any;
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false }) as any;
+const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false }) as any;
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false }) as any;
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false }) as any;
+const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false }) as any;
+const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false }) as any;
+const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false }) as any;
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false }) as any;
+const ReferenceLine = dynamic(() => import('recharts').then(m => m.ReferenceLine), { ssr: false }) as any;
 import {
   useARRSimulatorConfig,
   useUpdateARRSimulatorConfig,

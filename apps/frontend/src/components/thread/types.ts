@@ -2,32 +2,12 @@ import type { Project } from '@/lib/api/threads';
 import { Message as BaseApiMessageType } from '@/lib/api/threads';
 
 // Re-export shared types - single source of truth
-export type {
-  UnifiedMessage,
-  ParsedContent,
-  ParsedMetadata,
-  AgentStatus,
-} from '@kortix/shared';
+export type { UnifiedMessage } from '@kortix/shared';
 
 // Re-export streaming types from shared
-export type {
-  StreamStatus,
-  StreamMessage,
-  ChunkMessage,
-  StatusMessage,
-  ToolCallStreamMessage,
-  ToolOutputMessage,
-  ErrorStreamMessage,
-  PingMessage,
-  LlmResponseStartMessage,
-  StreamingToolCall,
-  StreamingMetadata,
-} from '@kortix/shared';
-
-export { StreamMessageType, validateStreamMessage } from '@kortix/shared';
 
 // Define a type for the params to make React.use() work properly
-export type ThreadParams = {
+type ThreadParams = {
   threadId: string;
   projectId: string;
 };
@@ -45,4 +25,4 @@ export interface ApiMessageType extends Omit<BaseApiMessageType, 'type'> {
 }
 
 // Re-export existing types
-export type { Project };
+

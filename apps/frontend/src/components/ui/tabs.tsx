@@ -109,4 +109,9 @@ function TabsContent({
   );
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsListCompact, TabsTriggerCompact, TabsContent };
+export {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+};

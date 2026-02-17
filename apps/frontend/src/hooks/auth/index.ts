@@ -5,10 +5,8 @@ export {
   useEnrollPhoneNumber,
   useCreateChallenge,
   useVerifyChallenge,
-  useChallengeAndVerify,
   useListFactors,
   useUnenrollFactor,
-  useUnenrollPhoneFactor,
-  useGetAAL,
+  useGetAAL
 } from './phone-verification';
 

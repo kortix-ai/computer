@@ -2,7 +2,7 @@ import React, { Fragment } from 'react';
 import { LucideIcon, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export interface BreadcrumbSegment {
+interface BreadcrumbSegment {
   name: string;
   path: string;
   isLast: boolean;
@@ -37,7 +37,7 @@ interface KortixComputerHeaderProps {
  * 
  * ALL styling is controlled here - consumers only pass data props.
  */
-export function KortixComputerHeader({
+function KortixComputerHeader({
   icon: Icon,
   onIconClick,
   iconTitle,

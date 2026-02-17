@@ -137,7 +137,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
 
         if (isHunk || isHeader || line === '') {
           return (
-            <div key={i} className={cls}>
+            <div key={`line-${i}`} className={cls}>
               {line || ' '}
             </div>
           );
@@ -149,7 +149,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         if (highlightedTokens) {
           const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={i} className={cls}>
+            <div key={`line-${i}`} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -165,7 +165,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
 
         return (
           <div
-            key={i}
+            key={`item-${i}`}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',

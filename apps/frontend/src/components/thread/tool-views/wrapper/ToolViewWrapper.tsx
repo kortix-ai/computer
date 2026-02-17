@@ -6,7 +6,7 @@ import { CheckCircle, AlertCircle } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { cn } from '@/lib/utils';
 
-export interface ToolViewWrapperProps extends ToolViewProps {
+interface ToolViewWrapperProps extends ToolViewProps {
   children: React.ReactNode;
   headerContent?: React.ReactNode;
   footerContent?: React.ReactNode;
@@ -22,7 +22,7 @@ export interface ToolViewWrapperProps extends ToolViewProps {
   };
 }
 
-export function ToolViewWrapper({
+function ToolViewWrapper({
   toolCall,
   isSuccess = true,
   isStreaming = false,

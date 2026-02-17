@@ -34,7 +34,7 @@ export const useVerifyChallenge = () => {
   });
 };
 
-export const useChallengeAndVerify = () => {
+const useChallengeAndVerify = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -72,9 +72,7 @@ export const useUnenrollFactor = () => {
   });
 };
 
-
-
-export const useUnenrollPhoneFactor = () => {
+const useUnenrollPhoneFactor = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -86,8 +84,6 @@ export const useUnenrollPhoneFactor = () => {
     },
   });
 };
-
-
 
 export const useGetAAL = () => {
   const { user } = useAuth();

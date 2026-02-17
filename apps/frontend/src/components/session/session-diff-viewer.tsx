@@ -56,7 +56,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         // For hunk headers or empty lines, render plain
         if (isHunk || line === '') {
           return (
-            <div key={i} className={cls}>
+            <div key={`line-${i}`} className={cls}>
               {line || ' '}
             </div>
           );
@@ -68,7 +68,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         if (highlightedTokens) {
           const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={i} className={cls}>
+            <div key={`line-${i}`} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -85,7 +85,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         // Fallback: no highlighting available
         return (
           <div
-            key={i}
+            key={`item-${i}`}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -218,7 +218,7 @@ function SideBySideDiff({ patch, filename }: { patch: string; filename: string }
             const isLeftHunk = row.left.content.startsWith('@@');
 
             return (
-              <tr key={i}>
+              <tr key={`row-${i}`}>
                 {/* Left side (old) */}
                 <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
                   {row.left.num ?? ''}

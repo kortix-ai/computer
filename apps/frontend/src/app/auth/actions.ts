@@ -4,8 +4,7 @@ import { createTrialCheckout } from '@/lib/api/billing';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
-
-export async function signIn(prevState: any, formData: FormData) {
+async function signIn(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const returnUrl = formData.get('returnUrl') as string | undefined;
   const origin = formData.get('origin') as string;
@@ -113,7 +112,7 @@ export async function signUp(prevState: any, formData: FormData) {
   };
 }
 
-export async function forgotPassword(prevState: any, formData: FormData) {
+async function forgotPassword(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const origin = formData.get('origin') as string;
 
@@ -165,7 +164,7 @@ export async function resetPassword(prevState: any, formData: FormData) {
   };
 }
 
-export async function resendMagicLink(prevState: any, formData: FormData) {
+async function resendMagicLink(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const returnUrl = formData.get('returnUrl') as string | undefined;
   const origin = formData.get('origin') as string;

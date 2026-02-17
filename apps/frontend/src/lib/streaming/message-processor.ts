@@ -25,7 +25,7 @@ import {
   markToolCallCompleted,
 } from './tool-accumulator';
 
-export interface ProcessedMessage {
+interface ProcessedMessage {
   type: 'text_chunk' |
         'reasoning_chunk' |
         'text_with_reasoning' |
@@ -63,7 +63,7 @@ export interface ProcessedMessage {
   compressed?: boolean;
 }
 
-export function parseStreamMessage(rawData: string): StreamMessage | null {
+function parseStreamMessage(rawData: string): StreamMessage | null {
   const processedData = preprocessStreamData(rawData);
   if (!processedData || processedData.trim() === '') {
     return null;
@@ -76,7 +76,7 @@ export function parseStreamMessage(rawData: string): StreamMessage | null {
   }
 }
 
-export function processStreamData(
+function processStreamData(
   rawData: string,
   accumulator: ToolCallAccumulatorState
 ): ProcessedMessage {
@@ -358,7 +358,7 @@ function extractReasoningContent(
   return null;
 }
 
-export function createMessageWithToolCalls(
+function createMessageWithToolCalls(
   originalMessage: StreamMessage,
   reconstructedToolCalls: ReconstructedToolCall[]
 ): UnifiedMessage {
@@ -382,7 +382,7 @@ export function createMessageWithToolCalls(
   };
 }
 
-export function streamMessageToUnifiedMessage(message: StreamMessage): UnifiedMessage {
+function streamMessageToUnifiedMessage(message: StreamMessage): UnifiedMessage {
   return {
     message_id: message.message_id || '',
     thread_id: message.thread_id || '',

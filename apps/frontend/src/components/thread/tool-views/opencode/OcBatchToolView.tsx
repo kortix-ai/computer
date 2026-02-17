@@ -89,7 +89,7 @@ export function OcBatchToolView({
             {toolCalls.length > 0 ? (
               toolCalls.map((call, i) => (
                 <div
-                  key={i}
+                  key={`call-${i}`}
                   className={cn(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg border',
                     call.success

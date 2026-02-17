@@ -67,7 +67,7 @@ export function getVariance(actual: number | undefined, goal: number): VarianceR
 }
 
 // Format date for display
-export function formatDisplayDate(dateString: string): string {
+function formatDisplayDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -76,7 +76,7 @@ export function formatDisplayDate(dateString: string): string {
 }
 
 // Format date with time for display
-export function formatDisplayDateTime(dateString: string): string {
+function formatDisplayDateTime(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',

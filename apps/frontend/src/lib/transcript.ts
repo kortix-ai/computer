@@ -20,13 +20,13 @@ export interface TranscriptOptions {
   assistantMetadata: boolean;
 }
 
-export interface SessionInfo {
+interface SessionInfo {
   id: string;
   title: string;
   time: { created: number; updated: number };
 }
 
-export interface MessageWithParts {
+interface MessageWithParts {
   info: Message;
   parts: Part[];
 }

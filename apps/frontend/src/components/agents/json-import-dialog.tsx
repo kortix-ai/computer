@@ -272,7 +272,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
             <div className="flex items-center gap-2">
               {setupSteps.map((_, index) => (
                 <div
-                  key={index}
+                  key={`_-${index}`}
                   className={cn(
                     "h-1 flex-1 rounded-full transition-colors",
                     index <= currentStep ? 'bg-primary' : 'bg-muted'

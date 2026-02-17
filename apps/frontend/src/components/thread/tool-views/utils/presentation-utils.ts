@@ -17,7 +17,7 @@ export enum DownloadFormat {
  * @param templateId - The template ID
  * @returns The full PDF URL with parameters
  */
-export const getPdfUrl = (templateId: string): string => {
+const getPdfUrl = (templateId: string): string => {
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
   return `${API_URL}/presentation-templates/${templateId}/pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
 };
@@ -28,7 +28,7 @@ export const getPdfUrl = (templateId: string): string => {
  * @param hasImage - Whether the template has an image
  * @returns The full image URL
  */
-export const getImageUrl = (templateId: string, hasImage: boolean): string => {
+const getImageUrl = (templateId: string, hasImage: boolean): string => {
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
   return `${API_URL}/presentation-templates/${templateId}/image.png`;
 };
@@ -38,7 +38,7 @@ export const getImageUrl = (templateId: string, hasImage: boolean): string => {
  * @param filePath - The file path to validate and extract information from
  * @returns Object containing validation result and extracted data
  */
-export function parsePresentationSlidePath(filePath: string | null): {
+function parsePresentationSlidePath(filePath: string | null): {
   isValid: boolean;
   presentationName: string | null;
   slideNumber: number | null;
@@ -71,7 +71,7 @@ export function parsePresentationSlidePath(filePath: string | null): {
  * @param slideNumber - Slide number
  * @returns JSON stringified tool content that matches expected structure for PresentationViewer
  */
-export function createPresentationViewerToolContent(
+function createPresentationViewerToolContent(
   presentationName: string,
   filePath: string,
   slideNumber: number
@@ -232,7 +232,7 @@ export async function downloadPresentation(
   }
 }
 
-export const handleGoogleAuth = async (presentationPath: string, sandboxUrl: string) => {
+const handleGoogleAuth = async (presentationPath: string, sandboxUrl: string) => {
   try {
     // Store intent to upload to Google Slides after OAuth
     sessionStorage.setItem('google_slides_upload_intent', JSON.stringify({
@@ -259,7 +259,6 @@ export const handleGoogleAuth = async (presentationPath: string, sandboxUrl: str
     toast.error('Failed to initiate Google authentication');
   }
 };
-
 
 export const handleGoogleSlidesUpload = async (sandboxUrl: string, presentationPath: string) => {
   if (!sandboxUrl || !presentationPath) {

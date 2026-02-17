@@ -46,7 +46,7 @@ import { useDiagnosticsStore } from '@/stores/diagnostics-store';
 // Panel type
 // ============================================================================
 
-export type SidebarPanel = 'sessions' | 'files';
+type SidebarPanel = 'sessions' | 'files';
 
 // ============================================================================
 // Sidebar panel switcher tabs
@@ -57,7 +57,7 @@ interface SidebarPanelTabsProps {
   onChange: (panel: SidebarPanel) => void;
 }
 
-export function SidebarPanelTabs({ active, onChange }: SidebarPanelTabsProps) {
+function SidebarPanelTabs({ active, onChange }: SidebarPanelTabsProps) {
   return (
     <div className="flex items-center gap-0.5 px-2 pt-3 pb-1">
       <button

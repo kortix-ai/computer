@@ -1,6 +1,5 @@
 export {
   useChannels,
-  useChannel,
   useCreateChannel,
   useUpdateChannel,
   useDeleteChannel,
@@ -9,9 +8,6 @@ export {
   useUnlinkChannel,
   useChannelMessages,
   type ChannelConfig,
-  type ChannelMessage,
   type ChannelType,
-  type SessionStrategy,
-  type CreateChannelData,
-  type UpdateChannelData,
+  type SessionStrategy
 } from './use-channels';

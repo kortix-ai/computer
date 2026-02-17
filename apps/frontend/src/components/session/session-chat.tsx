@@ -507,7 +507,7 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
       {segments.map((seg, i) =>
         seg.type === 'file' && onFileClick ? (
           <span
-            key={i}
+            key={`seg-${i}`}
             className="text-blue-500 font-medium cursor-pointer hover:underline"
             role="button"
             tabIndex={0}
@@ -518,7 +518,7 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
           </span>
         ) : seg.type === 'session' ? (
           <span
-            key={i}
+            key={`seg-${i}`}
             className="text-emerald-500 font-medium cursor-pointer hover:underline"
             role="button"
             tabIndex={0}
@@ -542,7 +542,7 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
           </span>
         ) : (
           <span
-            key={i}
+            key={`${i}-${typeof seg === 'string' ? seg : i}`}
             className={cn(
               seg.type === 'file' && 'text-blue-500 font-medium',
               seg.type === 'agent' && 'text-purple-500 font-medium',
@@ -834,7 +834,7 @@ function DCPNotificationCard({ notification }: { notification: DCPNotification }
           {hasItems && (
             <div className="space-y-0.5">
               {notification.items.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
+                <div key={`item-${i}`} className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
                   <span className="text-muted-foreground/40">&rarr;</span>
                   <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground/70">
                     {item.tool}
@@ -1283,7 +1283,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
     return (
       <div className="flex flex-col gap-1.5 w-full">
         {dcpNotifications.map((n, i) => (
-          <DCPNotificationCard key={i} notification={n} />
+          <DCPNotificationCard key={String(n)} notification={n} />
         ))}
       </div>
     );
@@ -1308,7 +1308,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
         {dcpNotifications.length > 0 && (
           <div className="flex flex-col gap-1.5 w-full mt-1">
             {dcpNotifications.map((n, i) => (
-              <DCPNotificationCard key={i} notification={n} />
+              <DCPNotificationCard key={String(n)} notification={n} />
             ))}
           </div>
         )}
@@ -1362,7 +1362,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
         {uploadedFiles.length > 0 && (
           <div className="flex gap-2 p-3 pb-0 flex-wrap">
             {uploadedFiles.map((f, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+              <div key={`f-${i}`} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
                 <FileText className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
               </div>
@@ -1384,7 +1384,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
                 segments.map((seg, i) =>
                   seg.type === 'file' ? (
                     <span
-                      key={i}
+                      key={`seg-${i}`}
                       className="text-blue-500 font-medium cursor-pointer hover:underline"
                       role="button"
                       tabIndex={0}
@@ -1395,7 +1395,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
                     </span>
                   ) : seg.type === 'session' ? (
                     <span
-                      key={i}
+                      key={`seg-${i}`}
                       className="text-emerald-500 font-medium cursor-pointer hover:underline"
                       role="button"
                       tabIndex={0}
@@ -1419,7 +1419,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
                     </span>
                   ) : (
                     <span
-                      key={i}
+                      key={`${i}-${typeof seg === 'string' ? seg : i}`}
                       className={cn(
                         seg.type === 'agent' && 'text-purple-500 font-medium',
                       )}
@@ -1456,7 +1456,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
       {dcpNotifications.length > 0 && (
         <div className="flex flex-col gap-1.5 w-full mt-1">
           {dcpNotifications.map((n, i) => (
-            <DCPNotificationCard key={i} notification={n} />
+            <DCPNotificationCard key={String(n)} notification={n} />
           ))}
         </div>
       )}
@@ -3055,7 +3055,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                               {files.length > 0 && (
                                 <div className="flex gap-2 p-3 pb-0 flex-wrap">
                                   {files.map((f, i) => (
-                                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
+                                    <div key={`f-${i}`} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
                                       <FileText className="size-4 text-muted-foreground shrink-0" />
                                       <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
                                     </div>

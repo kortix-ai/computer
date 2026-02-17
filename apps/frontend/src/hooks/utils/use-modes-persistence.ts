@@ -32,7 +32,7 @@ interface ModesActions {
   setSelectedVideoStyle: (style: string | null) => void;
 }
 
-export function useModePersistence(): ModesState & ModesActions {
+function useModePersistence(): ModesState & ModesActions {
   // Initialize mode from localStorage
   const [selectedMode, setSelectedModeState] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {

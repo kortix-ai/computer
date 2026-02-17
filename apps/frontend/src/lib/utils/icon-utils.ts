@@ -26,7 +26,7 @@ function toKebabCase(str: string): string {
  * Validates if an icon name exists in lucide-react
  * Accepts both kebab-case and PascalCase formats
  */
-export function isValidIconName(iconName: string | null | undefined): boolean {
+function isValidIconName(iconName: string | null | undefined): boolean {
   if (!iconName || typeof iconName !== 'string') {
     return false;
   }

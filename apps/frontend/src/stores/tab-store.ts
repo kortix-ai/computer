@@ -15,7 +15,7 @@ export const DASHBOARD_TAB_ID = 'page:/dashboard';
 
 /** Maximum number of recently closed tabs to remember for CMD+Shift+T */
 const MAX_RECENTLY_CLOSED = 20;
-export const DASHBOARD_TAB: Omit<Tab, 'openedAt'> & { openedAt: number } = {
+const DASHBOARD_TAB: Omit<Tab, 'openedAt'> & { openedAt: number } = {
   id: DASHBOARD_TAB_ID,
   title: '',
   type: 'dashboard',

@@ -3,7 +3,7 @@ import { backendApi } from '@/lib/api-client';
 import { accountStateKeys } from './use-account-state';
 import { dollarsToCredits } from '@kortix/shared';
 
-export interface CreditTransaction {
+interface CreditTransaction {
   id: string;
   created_at: string;
   amount: number;
@@ -15,7 +15,7 @@ export interface CreditTransaction {
   metadata?: Record<string, any>;
 }
 
-export interface TransactionsResponse {
+interface TransactionsResponse {
   transactions: CreditTransaction[];
   pagination: {
     total: number;
@@ -25,7 +25,7 @@ export interface TransactionsResponse {
   };
 }
 
-export interface TransactionsSummary {
+interface TransactionsSummary {
   period_days: number;
   since_date: string;
   current_balance: {

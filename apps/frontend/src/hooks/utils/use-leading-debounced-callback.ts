@@ -12,7 +12,7 @@ type AnyFn = (...args: any[]) => any;
  * Useful for "create resource" actions that must be single-flight even if users
  * tap/click multiple times quickly.
  */
-export function useLeadingDebouncedCallback<TFn extends AnyFn>(fn: TFn, waitMs: number) {
+function useLeadingDebouncedCallback<TFn extends AnyFn>(fn: TFn, waitMs: number) {
   const fnRef = useRef(fn);
   const lastCallAtRef = useRef<number>(0);
   const inFlightRef = useRef(false);

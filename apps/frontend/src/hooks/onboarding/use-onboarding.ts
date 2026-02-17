@@ -13,7 +13,7 @@ export interface OnboardingStep {
   onAction?: () => void | Promise<void>;
 }
 
-export interface UserTypeData {
+interface UserTypeData {
   userType?: 'individual' | 'company';
   role?: string;
   selectedAt?: number;
@@ -147,7 +147,7 @@ export const useOnboarding = () => {
 };
 
 // Hook for checking if onboarding should trigger after subscription
-export const usePostSubscriptionOnboarding = () => {
+const usePostSubscriptionOnboarding = () => {
   const onboarding = useOnboarding();
   
   const shouldTriggerOnboarding = (subscriptionData: any) => {

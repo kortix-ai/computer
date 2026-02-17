@@ -374,7 +374,7 @@ function LoginContent() {
                   <div className="flex justify-center gap-2 sm:gap-3">
                     {[0, 1, 2, 3, 4, 5].map((index) => (
                       <div
-                        key={index}
+                        key={`item-${index}`}
                         className={`
                           relative w-11 h-14 sm:w-12 sm:h-16
                           rounded-xl border-2 transition-all duration-200

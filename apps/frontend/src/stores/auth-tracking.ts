@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type AuthMethod = 'google' | 'github' | 'email';
+type AuthMethod = 'google' | 'github' | 'email';
 
 interface AuthTrackingState {
   lastAuthMethod: AuthMethod | null;
@@ -10,7 +10,7 @@ interface AuthTrackingState {
   clearLastAuthMethod: () => void;
 }
 
-export const useAuthTracking = create<AuthTrackingState>()(
+const useAuthTracking = create<AuthTrackingState>()(
   persist(
     (set, get) => ({
       lastAuthMethod: null,

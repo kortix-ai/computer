@@ -29,7 +29,7 @@ import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { AgentAvatar } from '@/components/thread/content/agent-avatar';
 
 // Unified agent card variants
-export type AgentCardVariant = 
+type AgentCardVariant = 
   | 'onboarding'      // Selection card for onboarding
   | 'marketplace'     // Marketplace template card
   | 'template'        // User template card
@@ -89,7 +89,7 @@ export interface BaseAgentData {
 }
 
 // Action handlers
-export interface AgentCardActions {
+interface AgentCardActions {
   onPrimaryAction?: (data: BaseAgentData, e?: React.MouseEvent) => void;
   onSecondaryAction?: (data: BaseAgentData, e?: React.MouseEvent) => void;
   onDeleteAction?: (data: BaseAgentData, e?: React.MouseEvent) => void;
@@ -98,7 +98,7 @@ export interface AgentCardActions {
 }
 
 // Card state
-export interface AgentCardState {
+interface AgentCardState {
   isSelected?: boolean;
   isRecommended?: boolean;
   isActioning?: boolean;
@@ -106,7 +106,7 @@ export interface AgentCardState {
 }
 
 // Main props interface
-export interface UnifiedAgentCardProps {
+interface UnifiedAgentCardProps {
   variant: AgentCardVariant;
   data: BaseAgentData;
   actions?: AgentCardActions;
@@ -711,5 +711,4 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
 };
 
 // Export legacy component names for backward compatibility
-export const AgentCard = UnifiedAgentCard;
-export default UnifiedAgentCard;
+const AgentCard = UnifiedAgentCard;
