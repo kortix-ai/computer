@@ -333,13 +333,12 @@ export function ExampleShowcase() {
                     <div key={idx} className="flex justify-start">
                       <div className="max-w-[90%] space-y-1">
                         <div className="flex items-center gap-1 mb-1">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <Image
                             src="/kortix-logomark-white.svg"
                             alt="Kortix"
                             className="dark:invert-0 invert flex-shrink-0"
                             style={{ height: '8px', width: 'auto' }}
-                          />
+                          width={8} height={8} unoptimized />
                         </div>
                         <p className="text-[9px] leading-relaxed text-foreground">
                           {displayText}

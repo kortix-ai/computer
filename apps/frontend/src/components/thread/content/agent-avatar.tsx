@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React from 'react';
 import { useAgentFromCache } from '@/hooks/agents/use-agents';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
@@ -89,13 +91,12 @@ export const AgentAvatar: React.FC<AgentAvatarProps> = ({
         )}
         style={{ width: size, height: size, ...borderRadiusStyle }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/kortix-symbol.svg"
           alt="Kortix"
           className="flex-shrink-0 invert dark:invert-0"
           style={{ width: `${size * 0.5}px`, height: `${size * 0.5}px` }}
-        />
+        width={24} height={24} unoptimized />
       </div>
     );
   }

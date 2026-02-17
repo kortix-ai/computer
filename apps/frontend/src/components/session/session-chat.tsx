@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import {
   ChevronDown,
   ChevronRight,
@@ -1807,13 +1808,12 @@ function SessionTurn({
       {/* Kortix logo header */}
       {(working || hasSteps) && (
          <div className="flex items-center gap-2 mt-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/kortix-logomark-white.svg"
             alt="Kortix"
             className={cn('dark:invert-0 invert flex-shrink-0', working && 'animate-pulse')}
             style={{ height: '14px', width: 'auto' }}
-          />
+          width={14} height={14} unoptimized />
         </div>
       )}
 
@@ -2031,13 +2031,12 @@ function SessionTurn({
           {/* Kortix logo — shown when there are no steps (otherwise logo is already above) */}
           {!hasSteps && (
             <div className="flex items-center gap-2 mb-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src="/kortix-logomark-white.svg"
                 alt="Kortix"
                 className="dark:invert-0 invert flex-shrink-0"
                 style={{ height: '14px', width: 'auto' }}
-              />
+              width={14} height={14} unoptimized />
             </div>
           )}
           <div className="text-sm">
@@ -3074,13 +3073,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
                         className="dark:invert-0 invert flex-shrink-0 animate-pulse"
                         style={{ height: '14px', width: 'auto' }}
-                      />
+                      width={14} height={14} unoptimized />
                       {isRetrying && (
                         <span className="text-xs text-amber-500 animate-pulse">
                           Retrying connection...
@@ -3170,13 +3168,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                       </div>
                     )}
                     <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
                         className="dark:invert-0 invert flex-shrink-0 animate-pulse"
                         style={{ height: '14px', width: 'auto' }}
-                      />
+                      width={14} height={14} unoptimized />
                       {isRetrying && (
                         <span className="text-xs text-amber-500 animate-pulse">
                           Retrying connection...
@@ -3189,13 +3186,12 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                 {/* Busy indicator when no turns yet but session is busy */}
                 {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
                   <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src="/kortix-logomark-white.svg"
                       alt="Kortix"
                       className="dark:invert-0 invert flex-shrink-0 animate-pulse"
                       style={{ height: '14px', width: 'auto' }}
-                    />
+                    width={14} height={14} unoptimized />
                   </div>
                 )}
 
