@@ -75,7 +75,7 @@ app.get('/kortix/health', async (c) => {
     }
   } catch {}
   await checkOpenCodeReady()
-  return c.json({ status: 'ok', version, build: '0.4.11', activeWs: activeConnections, opencode: openCodeReady })
+  return c.json({ status: 'ok', version, activeWs: activeConnections, opencode: openCodeReady })
 })
 
 // Port mappings — returns container→host port map so the frontend
