@@ -266,7 +266,7 @@ export function FileAttachment({
                 minWidth: 0,
                 ...customStyle
             }}
-            role={hasError && !isSandboxDeleted ? "button" : undefined}
+            role="group"
             tabIndex={hasError && !isSandboxDeleted ? 0 : undefined}
             onClick={hasError && !isSandboxDeleted ? handleClick : undefined}
             onKeyDown={hasError && !isSandboxDeleted ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick?.(); } } : undefined}
