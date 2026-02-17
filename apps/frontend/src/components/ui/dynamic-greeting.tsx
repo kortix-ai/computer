@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useSyncExternalStore } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +23,7 @@ interface DynamicGreetingProps {
 export function DynamicGreeting({ className }: DynamicGreetingProps) {
   const t = useTranslations('dashboard');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   // Compute greeting - recalculates when t changes (i.e., when language changes)
   const greeting = useMemo(() => {
@@ -109,7 +105,7 @@ export function DynamicGreeting({ className }: DynamicGreetingProps) {
   let globalLetterIndex = 0;
 
   return (
-    <p className={cn('tracking-tight', className)}>
+    <p suppressHydrationWarning className={cn('tracking-tight', className)}>
       {/* Accessibility: announce the full greeting as a sentence, not letter-by-letter */}
       <span className="sr-only">{greeting}</span>
       <span aria-hidden="true">

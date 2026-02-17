@@ -69,16 +69,19 @@ const SpreadsheetEditor = memo(function SpreadsheetEditor({
   filePath,
   fileName,
   isActive,
-  onUnsavedChange,
+  tabId,
+  onTabUnsavedChange,
   onActionsReady,
 }: {
   sandboxId?: string;
   filePath: string;
   fileName: string;
   isActive: boolean;
-  onUnsavedChange: (hasChanges: boolean) => void;
+  tabId: string;
+  onTabUnsavedChange: (tabId: string, hasChanges: boolean) => void;
   onActionsReady?: (handle: SpreadsheetEditorHandle | null) => void;
 }) {
+  const onUnsavedChange = useCallback((hasChanges: boolean) => onTabUnsavedChange(tabId, hasChanges), [tabId, onTabUnsavedChange]);
   const ssRef = useRef<SpreadsheetComponent>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -617,7 +620,8 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
                 filePath={tab.filePath}
                 fileName={tab.fileName}
                 isActive={activeTabId === tab.id && !showHome}
-                onUnsavedChange={(hasChanges) => handleTabUnsavedChange(tab.id, hasChanges)}
+                tabId={tab.id}
+                onTabUnsavedChange={handleTabUnsavedChange}
                 onActionsReady={activeTabId === tab.id ? setActiveEditorHandle : undefined}
               />
             </div>

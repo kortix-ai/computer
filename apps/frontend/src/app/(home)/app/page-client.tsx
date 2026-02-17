@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import { Smartphone, Bell, Shield, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AppDownloadQR, APP_DOWNLOAD_URL } from '@/components/common/app-download-qr';
@@ -55,18 +55,13 @@ const FEATURES = [
 ];
 
 export default function AppDownloadPageClient() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+if (!mounted) {
     return null;
   }
 
   return (
-    <main className="w-full min-h-screen bg-background relative flex flex-col">
+    <main suppressHydrationWarning className="w-full min-h-screen bg-background relative flex flex-col">
 
       <div className="relative z-10 flex-1 max-w-4xl mx-auto px-6 md:px-10 py-16">
           {/* Header */}

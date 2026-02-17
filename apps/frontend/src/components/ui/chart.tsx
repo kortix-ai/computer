@@ -1,7 +1,21 @@
 "use client"
 
 import * as React from "react"
-import * as RechartsPrimitive from "recharts"
+import dynamic from "next/dynamic"
+
+// Dynamic imports for recharts code splitting (~200kb library)
+const RechartsResponsiveContainer = dynamic(
+  () => import("recharts").then(mod => mod.ResponsiveContainer as any),
+  { ssr: false }
+)
+const ChartTooltipBase = dynamic(
+  () => import("recharts").then(mod => mod.Tooltip as any),
+  { ssr: false }
+)
+const ChartLegendBase = dynamic(
+  () => import("recharts").then(mod => mod.Legend as any),
+  { ssr: false }
+)
 
 import { cn } from "@/lib/utils"
 
@@ -42,9 +56,7 @@ function ChartContainer({
   ...props
 }: React.ComponentProps<"div"> & {
   config: ChartConfig
-  children: React.ComponentProps<
-    typeof RechartsPrimitive.ResponsiveContainer
-  >["children"]
+  children: React.ReactElement
 }) {
   const uniqueId = React.useId()
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
@@ -61,9 +73,9 @@ function ChartContainer({
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
+        <RechartsResponsiveContainer>
           {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        </RechartsResponsiveContainer>
       </div>
     </ChartContext.Provider>
   )
@@ -102,7 +114,7 @@ ${colorConfig
   )
 }
 
-const ChartTooltip = RechartsPrimitive.Tooltip
+const ChartTooltip = ChartTooltipBase
 
 interface ChartTooltipContentProps extends React.ComponentProps<"div"> {
   active?: boolean
@@ -265,7 +277,7 @@ function ChartTooltipContent({
   )
 }
 
-const ChartLegend = RechartsPrimitive.Legend
+const ChartLegend = ChartLegendBase
 
 interface ChartLegendContentProps extends React.ComponentProps<"div"> {
   payload?: Array<{

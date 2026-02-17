@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useMediaQuery } from '@/hooks/utils';
-import { useState, useEffect, Suspense, lazy, useRef } from 'react';
+import { useState, useEffect, Suspense, lazy, useRef, useSyncExternalStore } from 'react';
 import { signUp, verifyOtp } from './actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Mail, MailCheck, Clock, ExternalLink } from 'lucide-react';
@@ -45,7 +45,7 @@ function LoginContent() {
   const [showReferralInput, setShowReferralInput] = useState(false);
   const [showReferralDialog, setShowReferralDialog] = useState(false);
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [acceptedTerms, setAcceptedTerms] = useState(false); // GDPR requires explicit opt-in
 
   const { wasLastMethod: wasEmailLastMethod, markAsUsed: markEmailAsUsed } = useAuthMethodTracking('email');
@@ -77,12 +77,7 @@ function LoginContent() {
   const [autoSendingCode, setAutoSendingCode] = useState(false);
   const [autoSendError, setAutoSendError] = useState(false);
   const autoSendAttempted = useRef(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
+useEffect(() => {
     if (isSuccessMessage) {
       setRegistrationSuccess(true);
     }
@@ -623,7 +618,7 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background relative">
+    <div suppressHydrationWarning className="min-h-[100dvh] bg-background relative">
       <div className="absolute top-4 sm:top-6 left-4 sm:left-6 z-10">
         <Link href="/" className="flex items-center space-x-2">
           <KortixLogo size={24} className="sm:w-7 sm:h-7" />

@@ -61,9 +61,10 @@ interface FolderWindowProps {
   window: OpenWindow;
   sandboxId: string;
   isActive: boolean;
-  onFocus: () => void;
-  onClose: () => void;
-  onMinimize: () => void;
+  windowId: string;
+  focusWindow: (id: string) => void;
+  closeWindow: (id: string) => void;
+  minimizeWindow: (id: string) => void;
 }
 
 /**
@@ -100,10 +101,14 @@ const FolderWindow = memo(function FolderWindow({
   window,
   sandboxId,
   isActive,
-  onFocus,
-  onClose,
-  onMinimize,
+  windowId,
+  focusWindow,
+  closeWindow,
+  minimizeWindow,
 }: FolderWindowProps) {
+  const onFocus = useCallback(() => focusWindow(windowId), [focusWindow, windowId]);
+  const onClose = useCallback(() => closeWindow(windowId), [closeWindow, windowId]);
+  const onMinimize = useCallback(() => minimizeWindow(windowId), [minimizeWindow, windowId]);
   const folderName = (window.filePath || '/workspace').split('/').pop() || 'Files';
 
   return (
@@ -884,9 +889,10 @@ export const SandboxDesktop = memo(function SandboxDesktop({
                     window={window}
                     sandboxId={sandboxId}
                     isActive={activeWindowId === window.id}
-                    onFocus={() => focusWindow(window.id)}
-                    onClose={() => closeWindow(window.id)}
-                    onMinimize={() => minimizeWindow(window.id)}
+                    windowId={window.id}
+                    focusWindow={focusWindow}
+                    closeWindow={closeWindow}
+                    minimizeWindow={minimizeWindow}
                   />
                 );
               }

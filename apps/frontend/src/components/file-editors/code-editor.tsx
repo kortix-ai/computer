@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import CodeMirror from '@uiw/react-codemirror';
+import { useEffect, useState, useCallback, useRef, useMemo, useSyncExternalStore } from 'react';
+import dynamic from 'next/dynamic';
+
+const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { xcodeLight } from '@uiw/codemirror-theme-xcode';
 import { langs } from '@uiw/codemirror-extensions-langs';
-import { EditorView, keymap } from '@codemirror/view';
-import { indentWithTab } from '@codemirror/commands';
+// Lazy-loaded codemirror extensions via dynamic require (heavy library, code-split with CodeMirror)
+/* eslint-disable @typescript-eslint/no-require-imports */
+const getCmView = () => require('@codemirror/view') as { EditorView: any; keymap: any };
+const getCmCommands = () => require('@codemirror/commands') as { indentWithTab: any };
+/* eslint-enable @typescript-eslint/no-require-imports */
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Badge } from '@/components/ui/badge';
@@ -387,7 +392,7 @@ export function CodeEditor({
   showLineNumbers = true,
 }: CodeEditorProps) {
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [localContent, setLocalContent] = useState(content);
   // Use originalContent if provided, otherwise fall back to content (for backwards compatibility)
@@ -423,11 +428,7 @@ export function CodeEditor({
   }, [originalContent]);
 
   // Set mounted state
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Calculate editor height based on container - never exceed container bounds
+// Calculate editor height based on container - never exceed container bounds
   // For read-only mode, use auto height to let content expand naturally (better for preview contexts)
   useEffect(() => {
     // In read-only mode, let CodeMirror auto-expand based on content
@@ -589,17 +590,24 @@ export function CodeEditor({
       }
     }
     
-    // Always add these core extensions
-    exts.push(
-      EditorView.lineWrapping,
-      keymap.of([indentWithTab])
-    );
+    // Always add these core extensions (lazy-loaded)
+    try {
+      const { EditorView, keymap } = getCmView();
+      const { indentWithTab } = getCmCommands();
+      exts.push(
+        EditorView.lineWrapping,
+        keymap.of([indentWithTab])
+      );
+    } catch {
+      // Extensions will be added once codemirror is loaded
+    }
     
     return exts;
   }, [langExtension]);
 
   return (
     <div 
+      suppressHydrationWarning
       className={cn(
         'flex flex-col max-w-full',
         readOnly 

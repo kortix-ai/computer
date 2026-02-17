@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useApiHealth } from '@/hooks/usage/use-health';
@@ -10,7 +10,7 @@ import { AnimatedBg } from '@/components/ui/animated-bg';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 
 export function MaintenancePage() {
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [lastChecked, setLastChecked] = useState<Date | null>(() => new Date());
 
   const { data: healthData, isLoading: isCheckingHealth, refetch } = useApiHealth();
 
@@ -27,12 +27,8 @@ export function MaintenancePage() {
     }
   };
 
-  useEffect(() => {
-    setLastChecked(new Date());
-  }, []);
-
   return (
-    <div className="w-full relative overflow-hidden min-h-screen">
+    <div suppressHydrationWarning className="w-full relative overflow-hidden min-h-screen">
       <div className="relative flex flex-col items-center w-full px-4 sm:px-6 min-h-screen justify-center">
         {/* Animated background - exactly like hero section */}
         <AnimatedBg variant="hero" />

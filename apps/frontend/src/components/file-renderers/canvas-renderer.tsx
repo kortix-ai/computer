@@ -2436,7 +2436,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
   const [stagePosition, setStagePosition] = useState({ x: 50, y: 50 });
   const [toolMode, setToolMode] = useState<'select' | 'pan'>('select');
   const [isPanning, setIsPanning] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [selectionRect, setSelectionRect] = useState<{ startX: number; startY: number; x: number; y: number; w: number; h: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -2517,10 +2517,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, fileName]);
-
-  useEffect(() => { setIsMounted(true); }, []);
-
-  useEffect(() => {
+useEffect(() => {
     if (!containerRef.current) return;
     const updateSize = () => {
       if (containerRef.current) {
@@ -3347,7 +3344,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
   const selectedElement = selectedIds.length === 1 ? elements.find(el => el.id === selectedIds[0]) : null;
 
   return (
-    <div className={cn("flex flex-col h-full w-full bg-background", className)} style={canvasData?.background ? { backgroundColor: canvasData.background } : undefined}>
+    <div suppressHydrationWarning className={cn("flex flex-col h-full w-full bg-background", className)} style={canvasData?.background ? { backgroundColor: canvasData.background } : undefined}>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
 
       {/* Header */}

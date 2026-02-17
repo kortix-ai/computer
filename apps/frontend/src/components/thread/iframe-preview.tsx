@@ -38,7 +38,7 @@ export function IframePreview({
       ) : (
         <iframe
           src={url}
-          title={title || 'Preview'}
+          title="Preview"
           className={cn("absolute inset-0 w-full h-full border-0", className)}
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
           style={{ background: 'white' }}

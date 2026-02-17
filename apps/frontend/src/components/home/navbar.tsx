@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { X, Menu } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter, usePathname } from 'next/navigation';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
@@ -89,7 +89,12 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('hero');
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useSyncExternalStore(
+    () => () => {},
+    () => isMobileDevice(),
+    () => false
+  );
+
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -97,12 +102,6 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
   const lastScrollY = useRef(0);
 
   const filteredNavLinks = siteConfig.nav.links;
-
-  // Detect if user is on an actual mobile device (iOS/Android)
-  // Mobile users clicking "Try Free" will be redirected to /app which then redirects to app stores
-  useEffect(() => {
-    setIsMobile(isMobileDevice());
-  }, []);
 
   // Get the appropriate CTA link based on device type
   const ctaLink = isMobile ? '/app' : '/auth';
@@ -145,7 +144,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
   const handleOverlayClick = () => setIsDrawerOpen(false);
 
   return (
-    <header className={cn(
+    <header suppressHydrationWarning className={cn(
       "flex justify-center px-6 md:px-0 pt-4",
       isAbsolute ? "" : "sticky top-0 z-50"
     )}>

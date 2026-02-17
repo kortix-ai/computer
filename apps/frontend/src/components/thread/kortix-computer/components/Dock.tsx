@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, ReactNode, useState, useEffect } from 'react';
+import { memo, ReactNode, useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Folder, Globe, TerminalSquare, Info, Table } from 'lucide-react';
 import { getUserFriendlyToolName, getToolIcon } from '@/components/thread/utils';
@@ -236,6 +236,12 @@ export const AppDock = memo(function AppDock({
     }
   }, [currentIndex, scrollOffset, maxVisibleIcons]);
   
+  const handleFilesClick = useCallback(() => onViewChange?.('files'), [onViewChange]);
+  const handleBrowserClick = useCallback(() => onViewChange?.('browser'), [onViewChange]);
+  const handleTerminalClick = useCallback(() => onViewChange?.('terminal'), [onViewChange]);
+  const handleInfoClick = useCallback(() => onViewChange?.('info'), [onViewChange]);
+  const handleSpreadsheetClick = useCallback(() => onViewChange?.('spreadsheet'), [onViewChange]);
+
   if (toolCalls.length === 0) return null;
 
   const isToolRunning = (index: number) => {
@@ -300,7 +306,7 @@ export const AppDock = memo(function AppDock({
                   bgClass="bg-gradient-to-br from-[#60a5fa] to-[#2563eb]"
                   iconColor="text-white"
                   isActive={isFilesWindowOpen}
-                  onClick={() => onViewChange?.('files')}
+                  onClick={handleFilesClick}
                 />
               )}
               <SystemDockCard
@@ -309,7 +315,7 @@ export const AppDock = memo(function AppDock({
                 bgClass="bg-gradient-to-br from-[#38bdf8] to-[#0284c7]"
                 iconColor="text-white"
                 isActive={isBrowserWindowOpen}
-                onClick={() => onViewChange?.('browser')}
+                onClick={handleBrowserClick}
               />
               <SystemDockCard
                 icon={TerminalSquare}
@@ -317,7 +323,7 @@ export const AppDock = memo(function AppDock({
                 bgClass="bg-gradient-to-br from-[#3f3f46] to-[#18181b]"
                 iconColor="text-[#4ade80]"
                 isActive={isTerminalWindowOpen}
-                onClick={() => onViewChange?.('terminal')}
+                onClick={handleTerminalClick}
               />
               <SystemDockCard
                 icon={Info}
@@ -325,7 +331,7 @@ export const AppDock = memo(function AppDock({
                 bgClass="bg-gradient-to-br from-[#64748B] to-[#475569]"
                 iconColor="text-white"
                 isActive={isInfoWindowOpen}
-                onClick={() => onViewChange?.('info')}
+                onClick={handleInfoClick}
               />
               <SystemDockCard
                 icon={Table}
@@ -333,7 +339,7 @@ export const AppDock = memo(function AppDock({
                 bgClass="bg-gradient-to-br from-[#10b981] to-[#059669]"
                 iconColor="text-white"
                 isActive={isSpreadsheetWindowOpen}
-                onClick={() => onViewChange?.('spreadsheet')}
+                onClick={handleSpreadsheetClick}
               />
             </>
           )}
