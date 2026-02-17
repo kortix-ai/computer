@@ -56,7 +56,7 @@ interface SoundState {
 }
 
 const DEFAULT_PREFERENCES: SoundPreferences = {
-  pack: 'opencode',
+  pack: 'kortix',
   volume: 0.5,
   events: {},
 };

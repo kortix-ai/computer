@@ -164,6 +164,12 @@ export function sendWebNotification(
 
   const { preferences } = useWebNotificationStore.getState();
 
+  // Sound plays independently of browser notification preferences — the sound
+  // store has its own pack/event/volume settings to control it.
+  if (force || preferences.playSound !== false) {
+    playSound(TYPE_TO_SOUND[payload.type]);
+  }
+
   if (!force) {
     // 2. Permission check
     if (Notification.permission !== 'granted') return null;
@@ -216,13 +222,6 @@ export function sendWebNotification(
     } catch (err) {
       logger.error('Failed to send native notification', { error: String(err) });
     }
-  }
-
-  // 8. Sound — uses the sound pack system (falls back to synth tones if mp3s
-  //    are missing). The old `playSound` web-notification preference acts as an
-  //    additional gate on top of the sound store's own pack/event settings.
-  if (force || preferences.playSound) {
-    playSound(TYPE_TO_SOUND[payload.type]);
   }
 
   return notification;
