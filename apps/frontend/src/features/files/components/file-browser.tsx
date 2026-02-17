@@ -64,9 +64,7 @@ function ParentDropTarget({
   const counterRef = useRef(0);
 
   const parentPath = useMemo(() => {
-    const parts = currentPath.split('/').filter(Boolean);
-    parts.pop();
-    return parts.length > 0 ? parts.join('/') : '.';
+    return currentPath.replace(/\/[^/]+\/?$/, '') || '/';
   }, [currentPath]);
 
   return (
@@ -283,10 +281,9 @@ export function FileBrowser() {
 
   // Navigate up one level
   const handleNavigateUp = useCallback(() => {
-    if (currentPath === '.' || currentPath === '') return;
-    const parts = currentPath.split('/').filter(Boolean);
-    parts.pop();
-    navigateToPath(parts.length > 0 ? parts.join('/') : '.');
+    if (currentPath === '/' || currentPath === '.' || currentPath === '') return;
+    const parent = currentPath.replace(/\/[^/]+\/?$/, '') || '/';
+    navigateToPath(parent);
   }, [currentPath, navigateToPath]);
 
   // Open file history
@@ -379,7 +376,7 @@ export function FileBrowser() {
     const folderPath =
       currentPath === '.' || currentPath === ''
         ? newFolderName.trim()
-        : `${currentPath}/${newFolderName.trim()}`;
+        : `${currentPath.replace(/\/$/, '')}/${newFolderName.trim()}`;
 
     try {
       await mkdirMutation.mutateAsync({ dirPath: folderPath });
@@ -402,7 +399,7 @@ export function FileBrowser() {
     const filePath =
       currentPath === '.' || currentPath === ''
         ? newFileName.trim()
-        : `${currentPath}/${newFileName.trim()}`;
+        : `${currentPath.replace(/\/$/, '')}/${newFileName.trim()}`;
 
     try {
       await createMutation.mutateAsync({ filePath });
@@ -454,7 +451,7 @@ export function FileBrowser() {
   const handlePaste = useCallback(async () => {
     if (!clipboard) return;
 
-    const destDir = currentPath === '.' || currentPath === '' ? '' : currentPath;
+    const destDir = currentPath === '.' || currentPath === '' ? '' : currentPath.replace(/\/$/, '');
 
     // Generate a unique name if there's a conflict
     let destName = clipboard.name;
@@ -683,7 +680,7 @@ export function FileBrowser() {
             <ContextMenuTrigger asChild>
               <div className="p-1.5 min-h-full">
                 {/* Go up — also a drop target for moving items to parent */}
-                {currentPath !== '.' && currentPath !== '' && (
+                {currentPath !== '/' && currentPath !== '.' && currentPath !== '' && (
                   <ParentDropTarget
                     currentPath={currentPath}
                     onClick={handleNavigateUp}

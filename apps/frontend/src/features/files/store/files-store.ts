@@ -93,7 +93,7 @@ type FilesStore = FilesStoreState & FilesStoreActions;
 
 const initialState: FilesStoreState = {
   view: 'browser',
-  currentPath: '.',
+  currentPath: '/',
   selectedFilePath: null,
   filePathList: [],
   currentFileIndex: 0,
@@ -111,7 +111,7 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
 
   navigateToPath: (path: string) => {
     set({
-      currentPath: path || '.',
+      currentPath: path || '/',
       view: 'browser',
       selectedFilePath: null,
     });
