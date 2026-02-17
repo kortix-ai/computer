@@ -77,10 +77,19 @@ async function fetchWithRetry(
 /** Default model for cron prompts — matches the "kortix" provider in opencode.jsonc */
 const DEFAULT_CRON_MODEL = { providerID: 'kortix', modelID: 'kortix/basic' };
 
-function buildPromptBody(prompt: string, agentName?: string): Record<string, unknown> {
+interface ModelOverride {
+  providerID?: string;
+  modelID?: string;
+}
+
+function buildPromptBody(prompt: string, agentName?: string, model?: ModelOverride): Record<string, unknown> {
+  const resolvedModel = (model?.providerID && model?.modelID)
+    ? { providerID: model.providerID, modelID: model.modelID }
+    : DEFAULT_CRON_MODEL;
+
   const body: Record<string, unknown> = {
     parts: [{ type: 'text', text: prompt }],
-    model: DEFAULT_CRON_MODEL,
+    model: resolvedModel,
   };
   if (agentName) {
     body.agent = agentName;
@@ -104,6 +113,7 @@ export class OpenCodeClient {
     prompt: string,
     agentName?: string,
     timeoutMs: number = 300000,
+    model?: ModelOverride,
   ): Promise<ExecuteResult> {
     const { url, headers } = await this.endpointPromise;
     const controller = new AbortController();
@@ -129,7 +139,7 @@ export class OpenCodeClient {
       const session = (await sessionRes.json()) as CreateSessionResponse;
 
       // 2. Send prompt — uses OpenCode's { parts: [...] } format
-      const promptBody = buildPromptBody(prompt, agentName);
+      const promptBody = buildPromptBody(prompt, agentName, model);
       const promptRes = await fetchWithRetry(`${url}/session/${session.id}/prompt_async`, {
         method: 'POST',
         headers,
@@ -159,13 +169,14 @@ export class OpenCodeClient {
     prompt: string,
     agentName?: string,
     timeoutMs: number = 300000,
+    model?: ModelOverride,
   ): Promise<ExecuteResult> {
     const { url, headers } = await this.endpointPromise;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const promptBody = buildPromptBody(prompt, agentName);
+      const promptBody = buildPromptBody(prompt, agentName, model);
       const res = await fetchWithRetry(`${url}/session/${sessionId}/prompt_async`, {
         method: 'POST',
         headers,
@@ -206,19 +217,25 @@ export async function executeTrigger(
   prompt: string,
   options: {
     agentName?: string;
+    modelProviderId?: string;
+    modelId?: string;
     sessionMode: 'new' | 'reuse';
     sessionId?: string | null;
     timeoutMs: number;
     triggerId: string;
   },
 ): Promise<ExecuteResult> {
+  const model: ModelOverride | undefined = (options.modelProviderId && options.modelId)
+    ? { providerID: options.modelProviderId, modelID: options.modelId }
+    : undefined;
+
   const client = new OpenCodeClient(sandbox);
 
   try {
     if (options.sessionMode === 'reuse' && options.sessionId) {
-      return await client.promptExisting(options.sessionId, prompt, options.agentName, options.timeoutMs);
+      return await client.promptExisting(options.sessionId, prompt, options.agentName, options.timeoutMs, model);
     } else {
-      return await client.createAndPrompt(prompt, options.agentName, options.timeoutMs);
+      return await client.createAndPrompt(prompt, options.agentName, options.timeoutMs, model);
     }
   } catch (err) {
     throw new ExecutionError(

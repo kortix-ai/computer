@@ -350,6 +350,18 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                 <span className="font-medium">{formatDateTime(trigger.lastRunAt)}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Model</span>
+                <span className="font-medium">
+                  {trigger.modelId || 'Default (Sonnet)'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Agent</span>
+                <span className="font-medium">
+                  {trigger.agentName || 'Default'}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Retries</span>
                 <span className="font-medium">{trigger.maxRetries}</span>
               </div>

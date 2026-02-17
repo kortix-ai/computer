@@ -21,6 +21,8 @@ const createTriggerSchema = z.object({
   }),
   timezone: z.string().default('UTC'),
   agent_name: z.string().optional(),
+  model_provider_id: z.string().max(255).optional(),
+  model_id: z.string().max(255).optional(),
   prompt: z.string().min(1),
   session_mode: z.enum(['new', 'reuse']).default('new'),
   session_id: z.string().optional(),
@@ -42,6 +44,8 @@ const updateTriggerSchema = z.object({
     .optional(),
   timezone: z.string().optional(),
   agent_name: z.string().nullable().optional(),
+  model_provider_id: z.string().max(255).nullable().optional(),
+  model_id: z.string().max(255).nullable().optional(),
   prompt: z.string().min(1).optional(),
   session_mode: z.enum(['new', 'reuse']).optional(),
   session_id: z.string().nullable().optional(),
@@ -84,6 +88,8 @@ app.post('/', async (c) => {
       cronExpr: parsed.data.cron_expr,
       timezone: parsed.data.timezone,
       agentName: parsed.data.agent_name ?? null,
+      modelProviderId: parsed.data.model_provider_id ?? null,
+      modelId: parsed.data.model_id ?? null,
       prompt: parsed.data.prompt,
       sessionMode: parsed.data.session_mode,
       sessionId: parsed.data.session_id ?? null,
@@ -158,6 +164,8 @@ app.patch('/:id', async (c) => {
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
   if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
   if (parsed.data.agent_name !== undefined) updateData.agentName = parsed.data.agent_name;
+  if (parsed.data.model_provider_id !== undefined) updateData.modelProviderId = parsed.data.model_provider_id;
+  if (parsed.data.model_id !== undefined) updateData.modelId = parsed.data.model_id;
   if (parsed.data.prompt !== undefined) updateData.prompt = parsed.data.prompt;
   if (parsed.data.session_mode !== undefined) updateData.sessionMode = parsed.data.session_mode;
   if (parsed.data.session_id !== undefined) updateData.sessionId = parsed.data.session_id;
@@ -297,6 +305,8 @@ app.post('/:id/run', async (c) => {
   // Execute async — respond immediately
   executeTrigger(sandbox, trigger.prompt, {
     agentName: trigger.agentName ?? undefined,
+    modelProviderId: trigger.modelProviderId ?? undefined,
+    modelId: trigger.modelId ?? undefined,
     sessionMode: trigger.sessionMode as 'new' | 'reuse',
     sessionId: trigger.sessionId,
     timeoutMs: trigger.timeoutMs,

@@ -16,6 +16,8 @@ export interface Trigger {
   cronExpr: string;
   timezone: string;
   agentName: string | null;
+  modelProviderId: string | null;
+  modelId: string | null;
   prompt: string;
   sessionMode: SessionMode;
   sessionId: string | null;
@@ -52,6 +54,8 @@ export interface CreateTriggerData {
   cron_expr: string;
   timezone?: string;
   agent_name?: string;
+  model_provider_id?: string;
+  model_id?: string;
   prompt: string;
   session_mode?: SessionMode;
   session_id?: string;
@@ -66,6 +70,8 @@ export interface UpdateTriggerData {
   cron_expr?: string;
   timezone?: string;
   agent_name?: string | null;
+  model_provider_id?: string | null;
+  model_id?: string | null;
   prompt?: string;
   session_mode?: SessionMode;
   session_id?: string | null;
@@ -262,5 +268,62 @@ export const useTriggerExecutions = (triggerId: string, limit = 50) => {
     enabled: !!triggerId,
     staleTime: 15 * 1000,
     refetchInterval: 30 * 1000,
+  });
+};
+
+// ─── Sandbox Models & Agents ────────────────────────────────────────────────
+
+export interface SandboxModel {
+  id: string;
+  name: string;
+}
+
+export interface SandboxProvider {
+  id: string;
+  name: string;
+  models: SandboxModel[];
+}
+
+export interface SandboxAgent {
+  name: string;
+  description?: string;
+  mode?: string;
+}
+
+const fetchSandboxModels = async (sandboxId: string): Promise<SandboxProvider[]> => {
+  const response = await backendApi.get<{ success: boolean; data: SandboxProvider[] }>(
+    `/cron/sandboxes/${sandboxId}/models`,
+  );
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to fetch models');
+  }
+  return response.data!.data;
+};
+
+const fetchSandboxAgents = async (sandboxId: string): Promise<SandboxAgent[]> => {
+  const response = await backendApi.get<{ success: boolean; data: SandboxAgent[] }>(
+    `/cron/sandboxes/${sandboxId}/agents`,
+  );
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to fetch agents');
+  }
+  return response.data!.data;
+};
+
+export const useSandboxModels = (sandboxId?: string | null) => {
+  return useQuery({
+    queryKey: ['sandbox-models', sandboxId],
+    queryFn: () => fetchSandboxModels(sandboxId!),
+    enabled: !!sandboxId,
+    staleTime: 5 * 60 * 1000, // 5 min cache — models don't change often
+  });
+};
+
+export const useSandboxAgents = (sandboxId?: string | null) => {
+  return useQuery({
+    queryKey: ['sandbox-agents', sandboxId],
+    queryFn: () => fetchSandboxAgents(sandboxId!),
+    enabled: !!sandboxId,
+    staleTime: 5 * 60 * 1000,
   });
 };

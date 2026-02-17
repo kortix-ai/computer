@@ -138,6 +138,8 @@ export const triggers = kortixSchema.table(
     cronExpr: varchar('cron_expr', { length: 100 }).notNull(),
     timezone: varchar('timezone', { length: 50 }).default('UTC').notNull(),
     agentName: varchar('agent_name', { length: 255 }),
+    modelProviderId: varchar('model_provider_id', { length: 255 }),
+    modelId: varchar('model_id', { length: 255 }),
     prompt: text('prompt').notNull(),
     sessionMode: sessionModeEnum('session_mode').default('new').notNull(),
     sessionId: text('session_id'),

@@ -78,6 +78,8 @@ export async function processTrigger(trigger: Trigger): Promise<void> {
   try {
     const result = await executeTrigger(sandbox, trigger.prompt, {
       agentName: trigger.agentName ?? undefined,
+      modelProviderId: trigger.modelProviderId ?? undefined,
+      modelId: trigger.modelId ?? undefined,
       sessionMode: trigger.sessionMode as 'new' | 'reuse',
       sessionId: trigger.sessionId,
       timeoutMs: trigger.timeoutMs,
@@ -188,6 +190,8 @@ async function scheduleRetries(
   try {
     const result = await executeTrigger(sandbox, trigger.prompt, {
       agentName: trigger.agentName ?? undefined,
+      modelProviderId: trigger.modelProviderId ?? undefined,
+      modelId: trigger.modelId ?? undefined,
       sessionMode: trigger.sessionMode as 'new' | 'reuse',
       sessionId: trigger.sessionId,
       timeoutMs: trigger.timeoutMs,
