@@ -465,7 +465,9 @@ function TabItem({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       onMouseDown={handleMouseDown}
+      tabIndex={0}
       onClick={handleClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(e); } }}
       onContextMenu={handleContextMenu}
       className={cn(
         'group relative flex items-center text-xs select-none cursor-pointer',

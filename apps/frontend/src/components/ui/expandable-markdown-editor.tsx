@@ -77,7 +77,10 @@ export const ExpandableMarkdownEditor: React.FC<ExpandableMarkdownEditorProps> =
               ? "cursor-not-allowed opacity-60"
               : "hover:opacity-80 cursor-pointer"
           )}
+          role="button"
+          tabIndex={0}
           onClick={openDialog}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDialog(e); } }}
         >
           <div className="p-4 h-full overflow-hidden">
             {value ? (

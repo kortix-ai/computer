@@ -630,6 +630,7 @@ function CanvasImageElement({
 
   return (
     <div
+      role="group"
       onMouseDown={(e) => handleMouseDown(e, 'move')}
       style={{
         position: 'absolute',
@@ -666,15 +667,15 @@ function CanvasImageElement({
       {isSelected && !element.locked && (
         <>
           {/* Corner handles - blue */}
-          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
-          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
-          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
-          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
+          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
+          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
+          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
+          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
           {/* Edge handles - blue */}
-          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
-          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
+          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
+          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
         </>
       )}
     </div>
@@ -855,6 +856,7 @@ function CanvasFrameElement({
       >
         {/* Frame label - top left outside frame - THIS is the click target for selection/move */}
         <div
+          role="group"
           className="absolute left-0 flex items-center gap-1 px-1.5 py-0.5 rounded-t-sm"
           style={{
             top: '-22px',
@@ -891,14 +893,14 @@ function CanvasFrameElement({
       {/* Resize handles - blue when selected, pointer-events:auto so they're clickable */}
       {isSelected && !element.locked && (
         <>
-          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
-          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
-          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
-          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
-          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
-          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
+          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
+          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
+          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 rounded-sm cursor-nesw-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
+          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 rounded-sm cursor-nwse-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
+          <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
+          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 rounded-sm cursor-ew-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-sm cursor-ns-resize z-10" style={{ pointerEvents: 'auto', backgroundColor: '#fff', border: '2px solid #3b82f6' }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
         </>
       )}
     </div>
@@ -1048,6 +1050,7 @@ function CropOverlay({
 
       {/* Crop rectangle */}
       <div
+        role="group"
         className="absolute border-2 border-blue-500 cursor-move z-40"
         style={{
           left: cropX,
@@ -1058,15 +1061,15 @@ function CropOverlay({
         onMouseDown={(e) => handleMouseDown(e, 'move')}
       >
         {/* Corner handles */}
-        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
-        <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
-        <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
-        <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
+        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'nw')} />
+        <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'ne')} />
+        <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nesw-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'sw')} />
+        <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-nwse-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'se')} />
         {/* Edge handles */}
-        <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
-        <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
-        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
-        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
+        <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'w')} />
+        <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ew-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'e')} />
+        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 'n')} />
+        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-ns-resize z-10" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onMouseDown={(e) => handleMouseDown(e, 'resize', 's')} />
 
         {/* Grid lines for rule of thirds */}
         <div className="absolute top-1/3 left-0 right-0 border-t border-blue-400/30" />
@@ -1534,7 +1537,6 @@ function FloatingToolbar({
                     ? "Type the new text you want here..."
                     : "Enter replacement text..."}
                 className="min-h-[100px]"
-                autoFocus
               />
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={cancelTextEditMode}>
@@ -1896,7 +1898,6 @@ function FrameFloatingToolbar({
                     }
                   }}
                   className="w-40 h-7 px-2 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  autoFocus
                 />
                 <Button
                   size="sm"
@@ -2380,7 +2381,6 @@ function MultiSelectToolbar({
                 onChange={(e) => setMergePrompt(e.target.value)}
                 placeholder='e.g. "Blend seamlessly", "Create a collage", "Overlay second on first"'
                 className="min-h-[80px]"
-                autoFocus
               />
             </div>
 
@@ -3465,7 +3465,10 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
                       {generatedPreviews.map((src, idx) => (
                         <div
                           key={idx}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => addGeneratedImageToCanvas(src)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addGeneratedImageToCanvas(src); } }}
                           style={{ borderColor: 'var(--border)' }}
                           className="relative aspect-square rounded-lg overflow-hidden border outline-none transition-colors group cursor-pointer"
                         >
@@ -3488,6 +3491,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
 
       {/* Canvas */}
       <div
+        role="application"
         ref={containerRef}
         className="flex-1 relative overflow-hidden bg-background"
         style={{

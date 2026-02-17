@@ -80,7 +80,10 @@ export function ReferralCodeSection({ referralCode, isLoading }: ReferralCodeSec
             />
             <div
               className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+              role="button"
+              tabIndex={0}
               onClick={() => copyToClipboard(referralCode?.referral_url || '')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copyToClipboard(referralCode?.referral_url || ''); } }}
             >
               {copiedLink ? (
                 <Check className="h-4 w-4" />

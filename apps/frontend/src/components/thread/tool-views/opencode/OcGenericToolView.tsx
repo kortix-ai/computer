@@ -463,7 +463,10 @@ function CodeSection({ label, content, lang }: { label: string; content: string;
     <div className="rounded-lg border border-border overflow-hidden bg-card">
       <div
         className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } }}
       >
         {expanded ? (
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />

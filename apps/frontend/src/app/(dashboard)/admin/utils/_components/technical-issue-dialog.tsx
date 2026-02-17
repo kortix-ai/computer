@@ -151,7 +151,10 @@ export function TechnicalIssueDialog({
                     return (
                       <div
                         key={service.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => toggleService(service.label)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleService(service.label); } }}
                         className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm ${
                           isSelected 
                             ? 'border-primary bg-primary/5' 

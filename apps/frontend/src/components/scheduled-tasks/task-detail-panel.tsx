@@ -444,7 +444,10 @@ function ExecutionItem({ execution }: { execution: Execution }) {
   return (
     <div
       className="rounded-lg border p-3 text-sm cursor-pointer hover:bg-muted/30 transition-colors"
+      role="button"
+      tabIndex={0}
       onClick={() => setExpanded(!expanded)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } }}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

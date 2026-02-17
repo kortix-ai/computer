@@ -201,7 +201,10 @@ function TutorialCard({ tutorial, index }: { tutorial: Tutorial; index: number }
             {!isActive && (
               <div 
                 className="absolute inset-0 cursor-pointer flex items-center justify-center bg-transparent hover:bg-black/5 transition-colors"
+                role="button"
+                tabIndex={0}
                 onClick={() => setIsActive(true)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsActive(true); } }}
               >
                 <div className="bg-background/90 backdrop-blur-sm px-4 py-2 rounded-full border border-border shadow-sm flex items-center gap-2">
                   <Play className="w-4 h-4 text-primary" />

@@ -592,7 +592,6 @@ export function FileViewer() {
               )}
               {isEditing ? (
                 <textarea
-                  autoFocus
                   value={displayContent}
                   onChange={(e) => setEditedContent(e.target.value)}
                   onKeyDown={(e) => {

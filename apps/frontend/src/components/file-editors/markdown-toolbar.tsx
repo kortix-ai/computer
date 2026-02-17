@@ -857,7 +857,10 @@ export function MarkdownToolbar({
                 "hover:border-primary hover:bg-muted/50",
                 imagePreview && "border-primary bg-muted/50"
               )}
+              role="button"
+              tabIndex={0}
               onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
             >
               <input
                 ref={fileInputRef}

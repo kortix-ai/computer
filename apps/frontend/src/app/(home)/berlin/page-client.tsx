@@ -122,7 +122,7 @@ export default function BerlinPageClient() {
                     onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
                     commands={commands || []}
                     onCommand={handleCommand}
-                    autoFocus={false}
+                   
                   />
                 </div>
               </div>

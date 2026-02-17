@@ -367,7 +367,10 @@ export const CustomMCPDialog: React.FC<CustomMCPDialogProps> = ({
                               ? "border-primary bg-primary/5" 
                               : "border-border"
                           )}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleToolToggle(tool.name)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToolToggle(tool.name); } }}
                         >
                           <Checkbox
                             id={tool.name}

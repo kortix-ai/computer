@@ -400,7 +400,6 @@ export function ConnectProviderContent({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-9"
-              autoFocus
             />
           </div>
 
@@ -489,7 +488,7 @@ export function ConnectProviderContent({
           <div className="space-y-3">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Provider ID</label>
-              <Input placeholder="my-provider" value={customForm.providerID} onChange={(e) => setCustomForm((f) => ({ ...f, providerID: e.target.value }))} autoFocus />
+              <Input placeholder="my-provider" value={customForm.providerID} onChange={(e) => setCustomForm((f) => ({ ...f, providerID: e.target.value }))} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Display Name</label>
@@ -560,7 +559,7 @@ export function ConnectProviderContent({
                 <label className="text-xs text-muted-foreground mb-1 block">
                   {selectedProviderData?.name || view.providerID} API Key
                 </label>
-                <Input placeholder="Enter API key..." type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoFocus />
+                <Input placeholder="Enter API key..." type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
               </div>
               {error && <p className="text-sm text-destructive flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}</p>}
               <Button type="submit" disabled={saving} className="w-auto">
@@ -585,7 +584,7 @@ export function ConnectProviderContent({
               </p>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Authorization code</label>
-                <Input placeholder="Enter code..." type="text" value={oauthCode} onChange={(e) => setOauthCode(e.target.value)} autoFocus />
+                <Input placeholder="Enter code..." type="text" value={oauthCode} onChange={(e) => setOauthCode(e.target.value)} />
               </div>
               {error && <p className="text-sm text-destructive flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}</p>}
               <Button type="submit" disabled={saving} className="w-auto">

@@ -767,7 +767,6 @@ function McpServersSection() {
                 placeholder="Paste code here..."
                 value={authCode}
                 onChange={(e) => setAuthCode(e.target.value)}
-                autoFocus
               />
             </div>
             {authError && (
@@ -834,7 +833,6 @@ function McpServersSection() {
               placeholder="my-server"
               value={addForm.name}
               onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
-              autoFocus
             />
           </div>
 

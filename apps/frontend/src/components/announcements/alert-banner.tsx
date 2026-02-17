@@ -115,7 +115,10 @@ export function AlertBanner({
 
           <div 
             className={`p-4 bg-muted/50 dark:bg-[#161618] ${statusUrl ? 'cursor-pointer hover:bg-muted dark:hover:bg-[#1a1a1c]' : ''} transition-colors`}
+            role="button"
+            tabIndex={0}
             onClick={statusUrl ? handleStatusClick : undefined}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
           >
             <div className="flex items-start gap-3">
               <div className={`w-12 h-12 ${styles.iconBg} rounded-xl border ${styles.iconBorder} flex items-center justify-center flex-shrink-0`}>

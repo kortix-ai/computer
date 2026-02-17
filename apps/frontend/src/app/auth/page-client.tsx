@@ -406,7 +406,6 @@ function LoginContent() {
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="sr-only"
-                    autoFocus
                     id="otp-input"
                   />
                 </label>

@@ -56,7 +56,6 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
-          autoFocus
           className={cn(
             'border-none shadow-none px-0 focus-visible:ring-0 bg-transparent resize-none',
             className?.includes('flex-1') ? 'flex-1' : '',
@@ -83,7 +82,10 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
         className?.includes('flex-1') ? 'flex flex-col h-full' : '',
         className
       )}
+      role="button"
+      tabIndex={0}
       onClick={() => setIsEditing(true)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsEditing(true); } }}
     >
       <div 
         className={cn(

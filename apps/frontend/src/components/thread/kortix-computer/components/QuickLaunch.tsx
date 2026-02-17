@@ -158,7 +158,10 @@ export const QuickLaunch = memo(function QuickLaunch({
         <>
           <div
             className="fixed inset-0 z-[100]"
+            role="button"
+            tabIndex={0}
             onClick={onClose}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(e); } }}
           />
           <motion.div
             initial={{ opacity: 1, scale: 0.95, y: -20 }}

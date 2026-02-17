@@ -234,6 +234,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
 
       {/* Image container - Clean background */}
       <div
+        role="application"
         ref={containerRef}
         className="w-full h-full overflow-hidden relative bg-background"
         onMouseDown={handleMouseDown}

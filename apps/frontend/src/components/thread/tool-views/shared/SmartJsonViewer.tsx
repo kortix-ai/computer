@@ -106,10 +106,13 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
           "flex items-start gap-1 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded px-1 -ml-1 py-0.5 transition-colors group",
           !isExpanded && "items-center"
         )}
+        role="button"
+        tabIndex={0}
         onClick={(e) => {
           e.stopPropagation();
           if (!isEmpty) setIsExpanded(!isExpanded);
         }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!isEmpty) setIsExpanded(!isExpanded); } }}
       >
         <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-50 group-hover:opacity-100">
           {!isEmpty && (

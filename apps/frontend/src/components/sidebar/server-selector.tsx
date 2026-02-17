@@ -340,7 +340,7 @@ function DialogInstanceRow({
           )}
 
           {confirmDelete && (
-            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1.5" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 disabled={isDeleting}

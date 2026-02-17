@@ -60,7 +60,6 @@ export const EditableText: React.FC<EditableTextProps> = ({
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleSave}
-            autoFocus
             className={cn(
               'text-sm border-none shadow-none px-0 focus-visible:ring-0 bg-transparent',
               multiline ? 'resize-none' : '',
@@ -85,7 +84,10 @@ export const EditableText: React.FC<EditableTextProps> = ({
           'group bg-transparent cursor-pointer relative rounded px-2 py-1 -mx-2 -my-1 transition-colors',
           className
         )}
+        role="button"
+        tabIndex={0}
         onClick={() => setIsEditing(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsEditing(true); } }}
       >
         <div className={cn(
           value ? '' : 'text-muted-foreground italic',

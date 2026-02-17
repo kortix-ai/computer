@@ -138,7 +138,10 @@ export function ReferralEmailInvitation({ className }: ReferralEmailProps) {
             'focus-within:outline-none focus-within:ring-2 focus-within:ring-primary/50',
             'flex flex-wrap gap-1.5 items-center cursor-text'
           )}
+          role="button"
+          tabIndex={0}
           onClick={() => inputRef.current?.focus()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.focus(); } }}
         >
           {emails.map(({ email, status }) => (
             <Badge

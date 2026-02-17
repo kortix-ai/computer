@@ -217,7 +217,10 @@ export function KanvaxPreview({
       className={cn("h-full w-full overflow-hidden relative cursor-pointer", className)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); } }}
     >
       {/* Canvas background */}
       <div

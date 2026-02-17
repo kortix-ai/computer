@@ -90,6 +90,7 @@ function ColorPickerField({
           >
             <div className="space-y-3">
               <div 
+                role="group"
                 className="react-colorful-container"
                 onMouseDown={() => setIsInteracting(true)}
                 onMouseUp={() => setIsInteracting(false)}

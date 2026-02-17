@@ -183,7 +183,10 @@ function SingleFileRow({
     <div className="rounded-lg border border-border overflow-hidden bg-card">
       <div
         className={`flex items-center gap-2.5 px-3 py-2.5 ${hasContent ? 'cursor-pointer hover:bg-muted' : ''} transition-colors`}
+        role="button"
+        tabIndex={0}
         onClick={hasContent ? onToggle : undefined}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
       >
         {hasContent ? (
           expanded ? (
@@ -197,7 +200,10 @@ function SingleFileRow({
         <span className="text-xs min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
           <span
             className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+            role="button"
+            tabIndex={0}
             onClick={(e) => { e.stopPropagation(); onOpenFile(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
             title={displayPath}
           >
             {filename}
@@ -243,7 +249,10 @@ function MultiFileList({
           <div
             key={i}
             className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-muted transition-colors group"
+            role="button"
+            tabIndex={0}
             onClick={() => onFileClick(fp)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFileClick(fp); } }}
             title={dp}
           >
             <FileText className="h-3.5 w-3.5 text-sky-500/70 dark:text-sky-400/70 flex-shrink-0 group-hover:text-sky-500 dark:group-hover:text-sky-400 transition-colors" />

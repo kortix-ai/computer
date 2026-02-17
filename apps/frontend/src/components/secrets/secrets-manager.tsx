@@ -134,7 +134,6 @@ export function SecretsManager() {
               onChange={(e) => setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
               placeholder="KEY_NAME"
               className="h-7 text-xs font-mono w-[220px] shadow-none"
-              autoFocus
             />
             <Input
               value={newValue}
@@ -192,7 +191,6 @@ export function SecretsManager() {
                       onChange={(e) => setEditValue(e.target.value)}
                       placeholder="Enter value..."
                       className="h-7 text-xs font-mono shadow-none"
-                      autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSave(row.key, editValue);
                         if (e.key === 'Escape') { setEditingKey(null); setEditValue(''); }

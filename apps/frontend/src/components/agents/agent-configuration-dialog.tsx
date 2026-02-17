@@ -702,7 +702,10 @@ export function AgentConfigurationDialog({
                         <div className="relative h-full flex flex-col items-center justify-center px-8">
                           <div 
                             className="max-w-md w-full rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-background to-background p-8 cursor-pointer hover:border-primary/50 transition-all group shadow-lg"
+                            role="button"
+                            tabIndex={0}
                             onClick={() => openPricingModal()}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPricingModal(); } }}
                           >
                             <div className="flex flex-col items-center text-center gap-4">
                               <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/15 border border-primary/20 group-hover:bg-primary/20 transition-colors">

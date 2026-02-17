@@ -900,7 +900,6 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') confirmRename();
             }}
-            autoFocus
             placeholder="Session title..."
           />
           <DialogFooter>

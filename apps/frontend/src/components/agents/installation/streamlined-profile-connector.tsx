@@ -152,7 +152,6 @@ export const ProfileConnector: React.FC<ProfileConnectorProps> = ({
             value={newProfileName}
             onChange={handleProfileNameChange}
             onKeyDown={handleKeyDown}
-            autoFocus
             className="h-11"
           />
           <p className="text-xs text-muted-foreground">

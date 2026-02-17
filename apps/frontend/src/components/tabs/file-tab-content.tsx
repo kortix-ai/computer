@@ -418,7 +418,6 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
             )}
             {isEditing ? (
               <textarea
-                autoFocus
                 value={displayContent}
                 onChange={(e) => setEditedContent(e.target.value)}
                 onKeyDown={(e) => {
