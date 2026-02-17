@@ -338,9 +338,23 @@ export async function removeSandbox(): Promise<void> {
 
 // ─── Sandbox Update API ─────────────────────────────────────────────────────
 
+export interface ChangelogChange {
+  type: 'feature' | 'fix' | 'improvement' | 'breaking' | 'upstream' | 'security' | 'deprecation';
+  text: string;
+}
+
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  title: string;
+  description: string;
+  changes: ChangelogChange[];
+}
+
 export interface SandboxVersionInfo {
   version: string;
   package: string;
+  changelog: ChangelogEntry | null;
 }
 
 export interface SandboxUpdateResult {
@@ -348,6 +362,7 @@ export interface SandboxUpdateResult {
   upToDate?: boolean;
   previousVersion?: string;
   currentVersion: string;
+  changelog?: ChangelogEntry | null;
   output?: string;
   error?: string;
 }

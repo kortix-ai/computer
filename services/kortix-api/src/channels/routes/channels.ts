@@ -22,7 +22,7 @@ const CHANNEL_TYPES = [
 const SESSION_STRATEGIES = ['single', 'per-thread', 'per-user', 'per-message'] as const;
 
 const createChannelSchema = z.object({
-  sandbox_id: z.string().uuid(),
+  sandbox_id: z.string().uuid().nullable().optional(),
   channel_type: z.enum(CHANNEL_TYPES),
   name: z.string().min(1).max(255),
   enabled: z.boolean().default(true),
@@ -35,6 +35,7 @@ const createChannelSchema = z.object({
 });
 
 const updateChannelSchema = z.object({
+  sandbox_id: z.string().uuid().nullable().optional(),
   name: z.string().min(1).max(255).optional(),
   enabled: z.boolean().optional(),
   credentials: z.record(z.unknown()).optional(),
@@ -67,18 +68,20 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       throw new ValidationError(parsed.error.issues.map((i) => i.message).join(', '));
     }
 
-    const [sandbox] = await db
-      .select()
-      .from(sandboxes)
-      .where(
-        and(
-          eq(sandboxes.sandboxId, parsed.data.sandbox_id),
-          eq(sandboxes.accountId, accountId),
-        ),
-      );
+    if (parsed.data.sandbox_id) {
+      const [sandbox] = await db
+        .select()
+        .from(sandboxes)
+        .where(
+          and(
+            eq(sandboxes.sandboxId, parsed.data.sandbox_id),
+            eq(sandboxes.accountId, accountId),
+          ),
+        );
 
-    if (!sandbox) {
-      throw new NotFoundError('Sandbox', parsed.data.sandbox_id);
+      if (!sandbox) {
+        throw new NotFoundError('Sandbox', parsed.data.sandbox_id);
+      }
     }
 
     const adapter = engine.getAdapter(parsed.data.channel_type);
@@ -94,7 +97,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
     const [config] = await db
       .insert(channelConfigs)
       .values({
-        sandboxId: parsed.data.sandbox_id,
+        sandboxId: parsed.data.sandbox_id ?? null,
         accountId: accountId,
         channelType: parsed.data.channel_type,
         name: parsed.data.name,
@@ -168,10 +171,14 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       throw new NotFoundError('Channel config', configId);
     }
 
-    const [sandbox] = await db
-      .select({ name: sandboxes.name, status: sandboxes.status })
-      .from(sandboxes)
-      .where(eq(sandboxes.sandboxId, config.sandboxId));
+    let sandbox: { name: string; status: string } | null = null;
+    if (config.sandboxId) {
+      const [sb] = await db
+        .select({ name: sandboxes.name, status: sandboxes.status })
+        .from(sandboxes)
+        .where(eq(sandboxes.sandboxId, config.sandboxId));
+      sandbox = sb ?? null;
+    }
 
     return c.json({ success: true, data: { ...config, sandbox } });
   });
@@ -202,6 +209,23 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (parsed.data.sandbox_id !== undefined) {
+      if (parsed.data.sandbox_id) {
+        const [sandbox] = await db
+          .select()
+          .from(sandboxes)
+          .where(
+            and(
+              eq(sandboxes.sandboxId, parsed.data.sandbox_id),
+              eq(sandboxes.accountId, accountId),
+            ),
+          );
+        if (!sandbox) {
+          throw new NotFoundError('Sandbox', parsed.data.sandbox_id);
+        }
+      }
+      updateData.sandboxId = parsed.data.sandbox_id;
+    }
     if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
     if (parsed.data.enabled !== undefined) updateData.enabled = parsed.data.enabled;
     if (parsed.data.credentials !== undefined) {
@@ -223,6 +247,69 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
         ),
       )
       .returning();
+
+    return c.json({ success: true, data: updated });
+  });
+
+  app.post('/:id/link', async (c) => {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    const configId = c.req.param('id');
+    const body = await c.req.json();
+
+    const sandboxId = z.string().uuid().parse(body.sandbox_id);
+
+    const [sandbox] = await db
+      .select()
+      .from(sandboxes)
+      .where(
+        and(
+          eq(sandboxes.sandboxId, sandboxId),
+          eq(sandboxes.accountId, accountId),
+        ),
+      );
+
+    if (!sandbox) {
+      throw new NotFoundError('Sandbox', sandboxId);
+    }
+
+    const [updated] = await db
+      .update(channelConfigs)
+      .set({ sandboxId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(channelConfigs.channelConfigId, configId),
+          eq(channelConfigs.accountId, accountId),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundError('Channel config', configId);
+    }
+
+    return c.json({ success: true, data: updated });
+  });
+
+  app.post('/:id/unlink', async (c) => {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    const configId = c.req.param('id');
+
+    const [updated] = await db
+      .update(channelConfigs)
+      .set({ sandboxId: null, updatedAt: new Date() })
+      .where(
+        and(
+          eq(channelConfigs.channelConfigId, configId),
+          eq(channelConfigs.accountId, accountId),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundError('Channel config', configId);
+    }
 
     return c.json({ success: true, data: updated });
   });

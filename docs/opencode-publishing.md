@@ -1,5 +1,7 @@
 # OpenCode Publishing Guide
 
+> **For unified releases (CLI + SDK + Sandbox + GitHub Release), use the [release script](./releasing.md).** The manual steps below are for individual component publishing only.
+
 How the Kortix fork of OpenCode is built, published, and deployed into the sandbox.
 
 ## Architecture
@@ -95,19 +97,36 @@ bun run build
 KORTIX_SDK_VERSION=<VERSION> bun ./script/publish-kortix.ts latest
 ```
 
-### Step 4: Update Dockerfile
+### Step 4: Update sandbox/package.json
 
-Edit `computer/sandbox/Dockerfile`:
+The Dockerfile reads versions from `sandbox/package.json` — no hardcoded versions to edit.
 
-```dockerfile
-RUN npm install -g @kortix/opencode-ai@<VERSION>
+```bash
+# Edit sandbox/package.json:
+#   "dependencies": { "@kortix/opencode-ai": "<VERSION>" }
+# Also bump SDK in sandbox/opencode/package.json if needed:
+#   "@kortix/opencode-sdk": "^<VERSION>"
 ```
 
-### Step 5: Rebuild and test sandbox
+See [sandbox-update-system.md](./sandbox-update-system.md) for the full update architecture.
+
+### Step 5: Publish sandbox update (optional)
+
+If you want running sandboxes to pick up the new CLI/SDK without a Docker rebuild:
 
 ```bash
 cd computer/sandbox
-python3 test_sandbox_e2e.py
+# Bump "version" in package.json
+npm publish
+```
+
+### Step 6: Rebuild Docker image (if needed)
+
+Only needed for new sandbox deployments. Running sandboxes update via npm.
+
+```bash
+cd computer
+./sandbox/push.sh
 ```
 
 ## How to Publish (CI)
@@ -129,6 +148,7 @@ Required secrets: `NPM_TOKEN` (npm auth token with publish access to `@kortix` o
 |---------|------|---------|
 | 0.1.0-dev | Initial | First Kortix fork publish |
 | 0.2.0 | 2026-02-11 | Added `Project.scan()` for automatic git repo discovery |
+| 0.3.0 (CLI) / 0.4.0 (SDK) | 2026-02-17 | Upstream sync to v1.2.6, reverted background mode, added project settings UI, Database/Drizzle migration |
 
 ## Key Files
 
@@ -139,7 +159,9 @@ Required secrets: `NPM_TOKEN` (npm auth token with publish access to `@kortix` o
 | `services/opencode/packages/sdk/js/script/publish-kortix.ts` | SDK npm publish script |
 | `services/opencode/.github/workflows/publish-kortix.yml` | CI publish workflow |
 | `services/opencode/packages/opencode/src/project/project.ts` | Project model (includes scan()) |
-| `sandbox/Dockerfile` | Consumes `@kortix/opencode-ai` |
+| `sandbox/package.json` | Single source of truth for all sandbox versions |
+| `sandbox/Dockerfile` | Reads versions from package.json (no hardcoded versions) |
+| `sandbox/postinstall.sh` | Live update deployment script |
 
 ## Relationship to Upstream
 

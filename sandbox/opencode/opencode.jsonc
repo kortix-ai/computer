@@ -4,6 +4,14 @@
   "plugin": ["opencode-pty", "./plugin/worktree.ts"], // "@tarquinen/opencode-dcp@latest", "./plugin/memory.ts"
   "autoupdate": true,
   "default_agent": "kortix-main",
+  "agent": {
+    // Disable all built-in agents -- Kortix provides its own
+    "build": { "disable": true },
+    "plan": { "disable": true },
+    "explore": { "disable": true },
+    "general": { "disable": true }
+    // compaction, title, summary are hidden infra agents -- leave them
+  },
   // "model": "anthropic/claude-sonnet-4-20250514",
   "provider": {
     "kortix": {

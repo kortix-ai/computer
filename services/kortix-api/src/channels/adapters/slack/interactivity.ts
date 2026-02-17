@@ -81,6 +81,11 @@ async function handleBlockActions(payload: InteractivityPayload): Promise<void> 
   const actions = payload.actions || [];
 
   for (const action of actions) {
+    // link_instance button uses a URL action — no server-side handling needed
+    if (action.action_id === 'link_instance') {
+      continue;
+    }
+
     if (action.action_id === 'permission_approve' || action.action_id === 'permission_reject') {
       const approved = action.action_id === 'permission_approve';
       const permissionId = action.value || '';

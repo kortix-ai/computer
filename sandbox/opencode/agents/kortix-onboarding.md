@@ -1,6 +1,7 @@
 ---
 description: "Kortix Onboarding — First-run assistant that welcomes new users, learns about them, explains Kortix capabilities, and completes the onboarding process."
-mode: primary
+mode: subagent
+hidden: true
 permission:
   bash: allow
   read: allow
@@ -10,6 +11,7 @@ permission:
   grep: allow
   todowrite: allow
   todoread: allow
+
 ---
 
 # Kortix Onboarding Agent
