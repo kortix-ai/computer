@@ -1283,18 +1283,19 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
     );
   }
 
-  // Command messages: render as a centered pill instead of the raw template text
+  // Command messages: render as a right-aligned card instead of the raw template text
   if (effectiveCommandInfo) {
     return (
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-border/60 bg-muted/40">
-          <Terminal className="size-3.5 text-muted-foreground shrink-0" />
-          <span className="font-mono text-sm text-foreground">/{effectiveCommandInfo.name}</span>
+      <div className="flex flex-col items-end gap-1">
+        <div className="inline-flex flex-col gap-1.5 px-4 py-2.5 rounded-2xl border border-border/60 bg-muted/40">
+          <div className="flex items-center gap-2">
+            <Terminal className="size-3.5 text-muted-foreground shrink-0" />
+            <span className="font-mono text-sm text-foreground">/{effectiveCommandInfo.name}</span>
+          </div>
           {effectiveCommandInfo.args && (
-            <>
-              <span className="text-border">|</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[300px]">{effectiveCommandInfo.args}</span>
-            </>
+            <div className="text-xs text-muted-foreground pl-5.5 break-words max-w-[400px]" style={{ paddingLeft: '1.375rem' }}>
+              {effectiveCommandInfo.args}
+            </div>
           )}
         </div>
         {/* DCP notifications from ignored parts */}
@@ -3132,15 +3133,16 @@ export function SessionChat({ sessionId }: SessionChatProps) {
                   <>
                     {pendingCommand ? (
                       /* Command execution card — distinct from regular user messages */
-                      <div className="flex justify-center">
-                        <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-border/60 bg-muted/40">
-                          <Terminal className="size-3.5 text-muted-foreground shrink-0" />
-                          <span className="font-mono text-sm text-foreground">/{pendingCommand.name}</span>
+                      <div className="flex justify-end">
+                        <div className="inline-flex flex-col gap-1.5 px-4 py-2.5 rounded-2xl border border-border/60 bg-muted/40">
+                          <div className="flex items-center gap-2">
+                            <Terminal className="size-3.5 text-muted-foreground shrink-0" />
+                            <span className="font-mono text-sm text-foreground">/{pendingCommand.name}</span>
+                          </div>
                           {pendingCommand.description && (
-                            <>
-                              <span className="text-border">|</span>
-                              <span className="text-xs text-muted-foreground">{pendingCommand.description}</span>
-                            </>
+                            <div className="text-xs text-muted-foreground break-words max-w-[400px]" style={{ paddingLeft: '1.375rem' }}>
+                              {pendingCommand.description}
+                            </div>
                           )}
                         </div>
                       </div>
