@@ -189,7 +189,25 @@ export function useOpenCodeEventStream() {
           }
         } catch (err) {
           if (abortController.signal.aborted) break;
-          logger.error('SSE event stream error', { error: String(err), retryCount });
+          const errStr = String(err);
+          const isAuthError = errStr.includes('401') || errStr.includes('403')
+            || errStr.includes('Unauthorized') || errStr.includes('Token refresh failed');
+          logger.error('SSE event stream error', { error: errStr, retryCount, isAuthError });
+
+          // On auth errors, proactively refresh the session before retrying.
+          // This handles the case where the sandbox connection dropped and the
+          // JWT expired — without this, every retry would fail with the same
+          // stale token until the user manually refreshes the page.
+          if (isAuthError) {
+            try {
+              const { createClient } = await import('@/lib/supabase/client');
+              const supabase = createClient();
+              await supabase.auth.refreshSession();
+              logger.info('SSE: refreshed auth session after auth error');
+            } catch (refreshErr) {
+              logger.error('SSE: failed to refresh auth session', { error: String(refreshErr) });
+            }
+          }
         } finally {
           flush();
         }

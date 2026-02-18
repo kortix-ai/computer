@@ -17,32 +17,57 @@ let cachedClient: OpencodeClient | null = null;
 let cachedUrl: string | null = null;
 
 /**
+ * Build a Headers object with the given token injected as Authorization.
+ */
+function buildHeaders(input: RequestInfo | URL, init?: RequestInit, token?: string | null): Headers {
+  const headers = new Headers(input instanceof Request ? input.headers : undefined);
+  if (init?.headers) {
+    new Headers(init.headers).forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return headers;
+}
+
+/**
  * Create a fetch wrapper that injects the Supabase JWT into every request.
  * Remote instances (cloud sandboxes) require this for the preview proxy auth.
  * Local instances will simply ignore the extra header.
+ *
+ * On a 401 response, forces a token refresh and retries the request once.
+ * This handles the case where the connection was lost and the token expired
+ * while the sandbox was still processing.
  */
 function createAuthFetch(): typeof fetch {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const token = await getSupabaseAccessToken();
-    if (token) {
-      // Start from the Request's own headers (preserves Content-Type etc.),
-      // then layer on any headers from init, then add Authorization.
-      const headers = new Headers(input instanceof Request ? input.headers : undefined);
-      if (init?.headers) {
-        new Headers(init.headers).forEach((value, key) => {
-          headers.set(key, value);
-        });
-      }
-      if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-      init = { ...init, headers };
-    }
+    const headers = buildHeaders(input, init, token);
+    const mergedInit = { ...init, headers };
+
     // Disable Bun timeout on Request objects
     if (input instanceof Request) {
       (input as any).timeout = false;
     }
-    return fetch(input, init);
+
+    const response = await fetch(input, mergedInit);
+
+    // On 401, the token may have expired during a connection drop.
+    // Force a session refresh and retry the request once.
+    if (response.status === 401 && token) {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.refreshSession();
+      const newToken = session?.access_token;
+      if (newToken && newToken !== token) {
+        const retryHeaders = buildHeaders(input, init, newToken);
+        return fetch(input, { ...init, headers: retryHeaders });
+      }
+    }
+
+    return response;
   };
 }
 
