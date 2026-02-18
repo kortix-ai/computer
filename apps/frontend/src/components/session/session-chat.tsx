@@ -1902,21 +1902,8 @@ interface SessionChatProps {
 }
 
 export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: SessionChatProps) {
-  // ---- Context modal (triple-click to open) ----
+  // ---- Context modal ----
   const [contextModalOpen, setContextModalOpen] = useState(false);
-  const tripleClickRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
-
-  const handleContextTripleClick = useCallback(() => {
-    const state = tripleClickRef.current;
-    state.count++;
-    if (state.timer) clearTimeout(state.timer);
-    if (state.count >= 3) {
-      state.count = 0;
-      setContextModalOpen(true);
-      return;
-    }
-    state.timer = setTimeout(() => { state.count = 0; }, 500);
-  }, []);
 
   // ---- KortixComputer side panel ----
   const { isSidePanelOpen, setIsSidePanelOpen, openFileInComputer } = useKortixComputerStore();
@@ -2724,14 +2711,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         providers={providers}
       />
 
-      {/* Triple-click target — invisible overlay on the header area */}
-      {!hideHeader && (
-        <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 z-10 h-10 w-48 cursor-default select-none"
-          onClick={handleContextTripleClick}
-        />
-      )}
-
       {(hasMessages || showOptimistic) ? (
         <div className="relative flex-1 min-h-0">
           <div
@@ -3078,6 +3057,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         onFileSearch={handleFileSearch}
         providers={providers}
         threadContext={threadContext}
+        onContextClick={() => setContextModalOpen(true)}
       />
     </div>
   );

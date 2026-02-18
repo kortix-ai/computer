@@ -380,7 +380,7 @@ function VariantSelector({
 
 const AUTO_COMPACT_THRESHOLD = 0.9;
 
-function TokenProgress({ messages, sessionId, models, selectedModel }: { messages: MessageWithParts[] | undefined; sessionId?: string; models?: FlatModel[]; selectedModel?: { providerID: string; modelID: string } | null }) {
+function TokenProgress({ messages, sessionId, models, selectedModel, onContextClick }: { messages: MessageWithParts[] | undefined; sessionId?: string; models?: FlatModel[]; selectedModel?: { providerID: string; modelID: string } | null; onContextClick?: () => void }) {
   const summarize = useSummarizeOpenCodeSession();
   const autoCompactTriggered = useRef(false);
   const [isCompacting, setIsCompacting] = useState(false);
@@ -467,7 +467,10 @@ function TokenProgress({ messages, sessionId, models, selectedModel }: { message
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="relative size-6 flex items-center justify-center cursor-default">
+        <div
+          className={cn('relative size-6 flex items-center justify-center', onContextClick ? 'cursor-pointer' : 'cursor-default')}
+          onClick={onContextClick}
+        >
           <svg className="size-5 -rotate-90" viewBox="0 0 18 18">
             <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted" />
             <circle
@@ -944,6 +947,9 @@ export interface SessionChatInputProps {
     parentTitle: string;
     onBackToParent: () => void;
   };
+
+  /** Callback when the context usage indicator is clicked */
+  onContextClick?: () => void;
 }
 
 export function SessionChatInput({
@@ -970,6 +976,7 @@ export function SessionChatInput({
   onFileSearch,
   providers,
   threadContext,
+  onContextClick,
 }: SessionChatInputProps) {
   const placeholderVariants = useMemo(
     () => [
@@ -1749,7 +1756,7 @@ export function SessionChatInput({
 
             {/* RIGHT: TokenProgress + Voice + Submit/Stop */}
             <div className="flex items-center gap-0 shrink-0">
-              <TokenProgress messages={messages} sessionId={sessionId} models={models} selectedModel={selectedModel} />
+              <TokenProgress messages={messages} sessionId={sessionId} models={models} selectedModel={selectedModel} onContextClick={onContextClick} />
 
               <VoiceRecorder
                 onTranscription={handleTranscription}
