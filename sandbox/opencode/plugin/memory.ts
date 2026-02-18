@@ -55,19 +55,9 @@ import { getObservationById } from "./memory/db"
 // =============================================================================
 
 export const MemoryPlugin: Plugin = async ({ directory, client }) => {
-	// ── Logging helper ─────────────────────────────────────────────────
-	// Logs to BOTH: OpenCode internal API (client.app.log) AND stdout (console.log)
-	// so logs appear in `docker logs` as well as OpenCode's log system.
-	const log = (level: "debug" | "info" | "warn" | "error", message: string) => {
-		const prefix = `[mem:${level}]`
-		console.log(`${prefix} ${message}`)
-		try {
-			client.app.log({
-				body: { service: "mem", level, message },
-			})
-		} catch {
-			// Ignore if client.app.log fails (e.g., during init)
-		}
+	// ── Logging helper (disabled) ─────────────────────────────────────
+	const log = (_level: "debug" | "info" | "warn" | "error", _message: string) => {
+		// Memory logging is currently disabled.
 	}
 
 	// Initialize SQLite database
@@ -75,7 +65,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	try {
 		db = initMemDb()
 	} catch (err) {
-		log("error", `[mem] FAILED to initialize database: ${err}`)
+		// log("error", `[mem] FAILED to initialize database: ${err}`)
 		return {}
 	}
 
@@ -83,10 +73,10 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	try {
 		ensureMemDir()
 	} catch (err) {
-		log("warn", `[mem] LSS mem directory creation failed: ${err}`)
+		// log("warn", `[mem] LSS mem directory creation failed: ${err}`)
 	}
 
-	log("info", "[mem] Init: ready")
+	// log("info", "[mem] Init: ready")
 
 	// ── Session State ──────────────────────────────────────────────────
 	// In-memory state for the current session (persists across tool calls
@@ -185,13 +175,13 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				// Non-critical: LSS indexing is best-effort
 			}
 
-			log("info", `[mem] Summary: "${(summaryFields.completed || "").slice(0, 80)}"`)
+			// log("info", `[mem] Summary: "${(summaryFields.completed || "").slice(0, 80)}"`)
 
 			if (markComplete) {
 				completeSession(db, sessionId)
 			}
 		} catch (err) {
-			log("warn", `[mem] Summary generation error: ${err}`)
+			// log("warn", `[mem] Summary generation error: ${err}`)
 		}
 	}
 
@@ -206,7 +196,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 			// Skip summarization for trivial sessions (fewer than 3 prompts)
 			if (promptCount <= 2) return
 			generateSummaryForSession(sessionId, false).catch((err) => {
-				log("warn", `[mem] Summary interval failed: ${err}`)
+				// log("warn", `[mem] Summary interval failed: ${err}`)
 			})
 		}, SUMMARY_INTERVAL_MS)
 	}
@@ -509,7 +499,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					for (const f of observation.filesRead) sessionFilesRead.add(f)
 					for (const f of observation.filesModified) sessionFilesModified.add(f)
 
-					log("info", `[mem] PostToolUse: #${obsId} [${observation.type}] "${observation.title}"`)
+					// log("info", `[mem] PostToolUse: #${obsId} [${observation.type}] "${observation.title}"`)
 
 					// Fire-and-forget: AI enrichment (non-blocking)
 					// After enrichment succeeds, re-write the companion file with AI-enhanced data
@@ -521,11 +511,11 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 							// Non-critical
 						}
 					}).catch((err) => {
-						log("warn", `[mem:ai] Compression failed for #${obsId}: ${err}`)
+						// log("warn", `[mem:ai] Compression failed for #${obsId}: ${err}`)
 					})
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ tool.execute.after FAILED for ${input.tool}: ${err}`)
+				// log("warn", `[mem] ⚠ tool.execute.after FAILED for ${input.tool}: ${err}`)
 			}
 		},
 
@@ -543,10 +533,10 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				// Increment prompt count
 				if (currentSessionId) {
 					promptCount = incrementPromptCount(db, currentSessionId)
-					log("info", `[mem] UserPrompt: #${promptCount}`)
+					// log("info", `[mem] UserPrompt: #${promptCount}`)
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ chat.message error: ${err}`)
+				// log("warn", `[mem] ⚠ chat.message error: ${err}`)
 			}
 		},
 
@@ -578,7 +568,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					cachedContextBlock = generateContextBlock(db, currentProjectId ?? undefined)
 					contextInjectedForSession = false
 
-					log("info", `[mem] SessionStart: ${sessionID.slice(0, 12)}...`)
+					// log("info", `[mem] SessionStart: ${sessionID.slice(0, 12)}...`)
 					// Start hourly summary interval for this session
 					startSummaryInterval(sessionID)
 				}
@@ -599,11 +589,11 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						sessionFilesModified.clear()
 						cachedContextBlock = ""
 						contextInjectedForSession = false
-						log("info", `[mem] SessionEnd: ${sessionID?.slice(0, 12)}...`)
+						// log("info", `[mem] SessionEnd: ${sessionID?.slice(0, 12)}...`)
 					}
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ Event handler error (${event.type}): ${err}`)
+				// log("warn", `[mem] ⚠ Event handler error (${event.type}): ${err}`)
 			}
 		},
 
@@ -619,12 +609,12 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				if (cachedContextBlock) {
 					output.system.push(cachedContextBlock)
 					if (!contextInjectedForSession) {
-						log("info", `[mem] ContextInjection: ~${cachedContextBlock.length} chars`)
+						// log("info", `[mem] ContextInjection: ~${cachedContextBlock.length} chars`)
 						contextInjectedForSession = true
 					}
 				}
 			} catch (err) {
-				log("warn", `[mem] Context injection error: ${err}`)
+				// log("warn", `[mem] Context injection error: ${err}`)
 			}
 		},
 
@@ -638,7 +628,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					output.context.push(context)
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ Compaction injection error: ${err}`)
+				// log("warn", `[mem] ⚠ Compaction injection error: ${err}`)
 			}
 		},
 	}
