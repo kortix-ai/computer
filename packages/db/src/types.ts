@@ -1,4 +1,4 @@
-import { sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys } from './schema/kortix';
+import { sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations } from './schema/kortix';
 import { apiKeys, creditAccounts, accountUser } from './schema/public';
 
 // Select types (what you get back from queries)
@@ -26,6 +26,10 @@ export type NewChannelSession = typeof channelSessions.$inferInsert;
 export type NewChannelMessage = typeof channelMessages.$inferInsert;
 export type NewChannelIdentity = typeof channelIdentityMap.$inferInsert;
 export type NewKortixApiKey = typeof kortixApiKeys.$inferInsert;
+export type Integration = typeof integrations.$inferSelect;
+export type NewIntegration = typeof integrations.$inferInsert;
+export type SandboxIntegration = typeof sandboxIntegrations.$inferSelect;
+export type NewSandboxIntegration = typeof sandboxIntegrations.$inferInsert;
 
 // Aliases
 export type SandboxSelect = Sandbox;

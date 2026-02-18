@@ -14,9 +14,21 @@ import { config } from '../config';
  * - Other tokens    = treat as account_id directly (backward compat / fallback)
  */
 export async function apiKeyAuth(c: Context, next: Next) {
-  // Local mode: skip auth, inject mock account — matching supabaseAuth behavior
   if (config.isLocal()) {
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (token?.startsWith('sbt_') && config.DATABASE_URL) {
+      const result = await validateSandboxToken(token);
+      if (result.isValid) {
+        c.set('accountId', result.accountId);
+        c.set('sandboxId', result.sandboxId);
+        await next();
+        return;
+      }
+    }
+
     c.set('accountId', '00000000-0000-0000-0000-000000000000');
+    c.set('sandboxId', 'local');
     await next();
     return;
   }

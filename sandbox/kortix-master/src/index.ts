@@ -8,6 +8,7 @@ import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
 import updateRouter from './routes/update'
 import deployRouter from './routes/deploy'
+import integrationsRouter from './routes/integrations'
 import { config } from './config'
 
 // ─── Changelog ──────────────────────────────────────────────────────────────
@@ -110,6 +111,9 @@ app.route('/lss', lssRouter)
 
 // Deployment management
 app.route('/kortix/deploy', deployRouter)
+
+// Integration proxy — /api/integrations/* forwards to kortix-api
+app.route('/api/integrations', integrationsRouter)
 
 // Dynamic port proxy — /proxy/:port/* forwards to localhost:{port} inside the sandbox
 app.route('/proxy', proxyRouter)
