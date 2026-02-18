@@ -50,7 +50,6 @@ import {
   useUnrevertSession,
   useUpdatePart,
   useDeletePart,
-  useSessionBusyPolling,
   replyToPermission,
   replyToQuestion,
   rejectQuestion,
@@ -1947,8 +1946,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   const [pendingSendInFlight, setPendingSendInFlight] = useState(false);
   // Grace period: don't stop polling immediately on idle after a recent send
   const lastSendTimeRef = useRef<number>(0);
-  useSessionBusyPolling(sessionId, pollingActive);
-
   // ---- Optimistic prompt (from dashboard/project page) ----
   // Uses session-specific sessionStorage keys so pushState navigation works
   // (no dependency on ?new=true URL param which requires router.push).
