@@ -906,7 +906,7 @@ function EditPartDialog({
 
   // Reset text when dialog opens with new content
   useEffect(() => {
-    if (open) setText(initialText);
+    if (Boolean(open)) setText(initialText);
   }, [open, initialText]);
 
   const handleSave = () => {

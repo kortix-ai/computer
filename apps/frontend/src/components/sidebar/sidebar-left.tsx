@@ -484,7 +484,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   }, [createSession, router, isMobile, setOpenMobile]);
 
   useEffect(() => {
-    if (isMobile) setOpenMobile(false);
+    if (Boolean(isMobile)) setOpenMobile(false);
   }, [pathname, searchParams, isMobile, setOpenMobile]);
 
   // Listen for right sidebar expansion → collapse left

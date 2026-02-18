@@ -410,7 +410,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
 
   // Reset on close
   useEffect(() => {
-    if (open) {
+    if (Boolean(open)) {
       setTimeout(() => searchRef.current?.focus(), 50);
     } else {
       setSearch('');

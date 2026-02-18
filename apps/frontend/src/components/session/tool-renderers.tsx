@@ -215,7 +215,7 @@ function BasicTool({
   const [open, setOpen] = useState(() => defaultOpen);
 
   useEffect(() => {
-    if (forceOpen) setOpen(true);
+    if (Boolean(forceOpen)) setOpen(true);
   }, [forceOpen]);
 
   const handleOpenChange = useCallback(

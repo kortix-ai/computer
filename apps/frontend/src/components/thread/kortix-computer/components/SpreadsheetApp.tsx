@@ -253,7 +253,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
   );
 
   useEffect(() => {
-    if (initialFilePath) {
+    if (Boolean(initialFilePath)) {
       openFileInTab(initialFilePath);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -155,19 +155,19 @@ export function SpreadsheetViewer({
   });
 
   useEffect(() => {
-    if (onSyncStateChange) {
+    if (Boolean(onSyncStateChange)) {
       onSyncStateChange(syncState);
     }
   }, [syncState, onSyncStateChange]);
 
   useEffect(() => {
-    if (onLoadingChange) {
+    if (Boolean(onLoadingChange)) {
       onLoadingChange(isLoading);
     }
   }, [isLoading, onLoadingChange]);
 
   useEffect(() => {
-    if (onActionsReady) {
+    if (Boolean(onActionsReady)) {
       onActionsReady(actions);
     }
   }, [actions, onActionsReady]);
@@ -197,13 +197,13 @@ export function SpreadsheetViewer({
   }, [resolvedFilePath, fileName, isDownloadRestricted, openUpgradeModal]);
 
   useEffect(() => {
-    if (onDownloadReady) {
+    if (Boolean(onDownloadReady)) {
       onDownloadReady(handleDownload);
     }
   }, [handleDownload, onDownloadReady]);
 
   useEffect(() => {
-    if (onDownloadingChange) {
+    if (Boolean(onDownloadingChange)) {
       onDownloadingChange(isDownloading);
     }
   }, [isDownloading, onDownloadingChange]);

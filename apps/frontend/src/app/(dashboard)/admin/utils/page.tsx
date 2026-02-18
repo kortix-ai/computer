@@ -37,7 +37,7 @@ export default function AdminUtilsPage() {
   const [technicalIssueStatusUrl, setTechnicalIssueStatusUrl] = useState('/status');
 
   useEffect(() => {
-    if (status) {
+    if (Boolean(status)) {
       setMaintenanceEnabled(status.maintenance_notice.enabled);
       setMaintenanceStartDate(status.maintenance_notice.start_time ? new Date(status.maintenance_notice.start_time) : undefined);
       setMaintenanceEndDate(status.maintenance_notice.end_time ? new Date(status.maintenance_notice.end_time) : undefined);

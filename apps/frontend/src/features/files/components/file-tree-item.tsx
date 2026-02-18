@@ -147,7 +147,7 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, on
 
   // Auto-focus and select when entering rename mode
   useEffect(() => {
-    if (isRenaming) {
+    if (Boolean(isRenaming)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const el = renameInputRef.current;

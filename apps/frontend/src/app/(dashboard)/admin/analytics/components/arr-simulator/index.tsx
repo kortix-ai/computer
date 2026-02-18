@@ -79,7 +79,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
 
   // Initialize state from database when config loads
   useEffect(() => {
-    if (configData) {
+    if (Boolean(configData)) {
       setStartingSubs(configData.starting_subs);
       setStartingMRR(configData.starting_mrr);
       setWeeklyVisitors(configData.weekly_visitors);
@@ -409,7 +409,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
   
   // Clear pending overrides when actual data updates (API call completed)
   useEffect(() => {
-    if (arrActualsData) {
+    if (Boolean(arrActualsData)) {
       setPendingOverrides({});
     }
   }, [arrActualsData]);
@@ -609,7 +609,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
   
   // Clear pending monthly overrides when data updates
   useEffect(() => {
-    if (arrMonthlyActualsData) {
+    if (Boolean(arrMonthlyActualsData)) {
       setPendingMonthlyOverrides({});
     }
   }, [arrMonthlyActualsData]);

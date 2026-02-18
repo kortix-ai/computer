@@ -80,7 +80,7 @@ export const QuickLaunch = memo(function QuickLaunch({
   const totalResults = allResults.length;
 
   useEffect(() => {
-    if (isOpen) {
+    if (Boolean(isOpen)) {
       setQuery('');
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 50);

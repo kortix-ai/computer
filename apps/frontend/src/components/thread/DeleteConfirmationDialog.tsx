@@ -34,7 +34,7 @@ export function DeleteConfirmationDialog({
 }: DeleteConfirmationDialogProps) {
   // Reset pointer events when dialog opens
   useEffect(() => {
-    if (isOpen) {
+    if (Boolean(isOpen)) {
       document.body.style.pointerEvents = 'auto';
     }
   }, [isOpen]);

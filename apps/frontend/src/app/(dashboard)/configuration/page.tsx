@@ -1085,7 +1085,7 @@ function AdvancedTab({
   const [showRaw, setShowRaw] = useState(false);
 
   useEffect(() => {
-    if (showRaw) {
+    if (Boolean(showRaw)) {
       const raw: Record<string, unknown> = {};
       if (formatter !== undefined) raw.formatter = formatter;
       if (lsp !== undefined) raw.lsp = lsp;

@@ -287,7 +287,7 @@ export function FullScreenPresentationViewer({
 
   // Always show controls
   useEffect(() => {
-    if (isOpen) {
+    if (Boolean(isOpen)) {
       setShowControls(true);
     }
   }, [isOpen]);
@@ -334,7 +334,7 @@ export function FullScreenPresentationViewer({
       const [scale, setScale] = useState(1);
 
       useEffect(() => {
-        if (containerRef) {
+        if (Boolean(containerRef)) {
           const updateScale = () => {
             const containerWidth = containerRef.offsetWidth;
             const containerHeight = containerRef.offsetHeight;

@@ -81,13 +81,13 @@ function LoginContent() {
   const [autoSendError, setAutoSendError] = useState(false);
   const autoSendAttempted = useRef(false);
 useEffect(() => {
-    if (isSuccessMessage) {
+    if (Boolean(isSuccessMessage)) {
       setRegistrationSuccess(true);
     }
   }, [isSuccessMessage]);
 
   useEffect(() => {
-    if (isExpired) {
+    if (Boolean(isExpired)) {
       setLinkExpired(true);
       if (expiredEmail) {
         setExpiredEmailState(expiredEmail);

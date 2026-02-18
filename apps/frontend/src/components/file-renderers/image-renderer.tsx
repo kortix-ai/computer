@@ -43,7 +43,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
 
   // Reset position when zoom changes
   useEffect(() => {
-    if (isFitToScreen) {
+    if (Boolean(isFitToScreen)) {
       setPosition({ x: 0, y: 0 });
     }
   }, [zoom, isFitToScreen]);

@@ -71,7 +71,7 @@ export const SessionLayout = memo(function SessionLayout({
   const isActiveTab = activeTabId === sessionId;
 
   useEffect(() => {
-    if (isActiveTab) {
+    if (Boolean(isActiveTab)) {
       setActiveSession(sessionId);
     }
   }, [isActiveTab, sessionId, setActiveSession]);
@@ -110,7 +110,7 @@ export const SessionLayout = memo(function SessionLayout({
   // between sessions (e.g. fork → parent), since the ResizablePanelGroup may
   // retain stale sizes from the previous session's layout.
   useEffect(() => {
-    if (shouldShowPanel) {
+    if (Boolean(shouldShowPanel)) {
       if (isExpanded) {
         sidePanelRef.current?.resize(100);
         mainPanelRef.current?.resize(0);

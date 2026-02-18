@@ -283,7 +283,7 @@ export default function DashboardLayoutContent({
   const isAdmin = adminRoleData?.isAdmin ?? false;
   
   useEffect(() => {
-    if (user) {
+    if (Boolean(user)) {
       backendApi.post('/prewarm', undefined, { showErrors: false });
     }
   }, [user])

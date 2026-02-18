@@ -208,7 +208,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
 
   // Auto-focus and select all text when folder input appears
   useEffect(() => {
-    if (isCreatingFolder) {
+    if (Boolean(isCreatingFolder)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const el = folderInputRef.current;
@@ -223,7 +223,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
 
   // Auto-focus for file create input
   useEffect(() => {
-    if (isCreatingFile) {
+    if (Boolean(isCreatingFile)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const el = fileCreateInputRef.current;

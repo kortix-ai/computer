@@ -18,7 +18,7 @@ export function UpgradeCelebration({ isOpen, onClose, planName, isLoading = fals
   const endTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    if (isOpen) {
+    if (Boolean(isOpen)) {
       // Start confetti
       const colors = ["#a786ff", "#fd8bbc", "#eca184", "#f8deb1"];
       endTimeRef.current = Date.now() + 3000;

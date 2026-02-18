@@ -164,7 +164,7 @@ export function FileBrowser() {
 
   // Auto-focus and select all text when folder input appears
   useEffect(() => {
-    if (isCreatingFolder) {
+    if (Boolean(isCreatingFolder)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const el = folderInputRef.current;
@@ -179,7 +179,7 @@ export function FileBrowser() {
 
   // Auto-focus and select file name (before extension) when file input appears
   useEffect(() => {
-    if (isCreatingFile) {
+    if (Boolean(isCreatingFile)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const el = fileCreateInputRef.current;

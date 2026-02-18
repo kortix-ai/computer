@@ -439,7 +439,7 @@ export function MarkdownEditor({
 
   // Update editable state
   useEffect(() => {
-    if (editor) {
+    if (Boolean(editor)) {
       editor.setEditable(!readOnly);
     }
   }, [readOnly, editor]);
@@ -461,7 +461,7 @@ export function MarkdownEditor({
 
   // Expose editor controls to parent
   useEffect(() => {
-    if (onEditorReady) {
+    if (Boolean(onEditorReady)) {
       if (editorInstance) {
         onEditorReady({
           getHtml: () => editorInstance.getHTML(),

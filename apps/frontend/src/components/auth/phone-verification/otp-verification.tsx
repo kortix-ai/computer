@@ -52,7 +52,7 @@ export function OtpVerification({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    if (challengeId) {
+    if (Boolean(challengeId)) {
       // Focus first input when challenge is available
       inputRefs.current[0]?.focus();
 
