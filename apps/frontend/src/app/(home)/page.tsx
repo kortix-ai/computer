@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { BackgroundAALChecker } from '@/components/auth/background-aal-checker';
 import { HeroSection } from '@/components/home/hero-section';
+import { WordmarkFooter } from '@/components/home/wordmark-footer';
+import { SimpleFooter } from '@/components/home/simple-footer';
 
 export default function Home() {
   const router = useRouter();
@@ -27,8 +29,10 @@ export default function Home() {
 
   return (
     <BackgroundAALChecker>
-      <div className="h-dvh">
+      <div className="min-h-dvh">
         <HeroSection />
+        <WordmarkFooter />
+        <SimpleFooter />
       </div>
     </BackgroundAALChecker>
   );

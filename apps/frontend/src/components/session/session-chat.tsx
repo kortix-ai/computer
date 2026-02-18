@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
 import {
   ChevronDown,
   ChevronRight,
@@ -11,7 +10,6 @@ import {
   Loader2,
   Copy,
   Check,
-  Bug,
   FileText,
   Image as ImageIcon,
   ArrowUpLeft,
@@ -141,6 +139,7 @@ import { ImagePreview } from '@/components/session/image-preview';
 import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
 import { TurnErrorDisplay } from '@/components/session/session-error-banner';
 import { OcSnapshotPartView, OcPatchPartView } from '@/components/session/snapshot-part-views';
+import { SessionContextModal } from '@/components/session/session-context-modal';
 import { ConnectProviderDialog } from '@/components/session/model-selector';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
@@ -195,180 +194,6 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
         </TooltipContent>
       </Tooltip>
       <div className="flex-1 h-px bg-border/50" />
-    </div>
-  );
-}
-
-// ============================================================================
-// Debug JSON View
-// ============================================================================
-
-function DebugView({ messages }: { messages: MessageWithParts[] | undefined }) {
-  const [copiedAll, setCopiedAll] = useState(false);
-
-  if (!messages) return <p className="text-xs text-muted-foreground p-4">No messages loaded.</p>;
-
-  const totalParts = messages.reduce((sum, m) => sum + m.parts.length, 0);
-  const totalTokens = messages.reduce((sum, m) => {
-    const t = (m.info as any).tokens;
-    return sum + (t?.input || 0) + (t?.output || 0) + (t?.reasoning || 0);
-  }, 0);
-  const totalCost = messages.reduce((sum, m) => sum + ((m.info as any).cost || 0), 0);
-  const emptyAssistantMsgs = messages.filter(
-    (m) => m.info.role === 'assistant' && m.parts.length === 0,
-  ).length;
-
-  const formatTime = (ts: number) => {
-    if (!ts) return '—';
-    const d = new Date(ts);
-    return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      + '.' + String(d.getMilliseconds()).padStart(3, '0');
-  };
-
-  const handleCopyAll = () => {
-    navigator.clipboard.writeText(JSON.stringify(messages, null, 2));
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
-  };
-
-  return (
-    <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-relaxed bg-black/5 dark:bg-white/5">
-      {/* Debug summary header */}
-      <div className="mb-4 p-3 rounded-lg border border-border/60 bg-muted/30 flex flex-wrap items-center gap-3">
-        <span className="text-muted-foreground font-semibold">{messages.length} msgs</span>
-        <span className="text-muted-foreground">{totalParts} parts</span>
-        <span className="text-muted-foreground">{totalTokens.toLocaleString()} tokens</span>
-        {totalCost > 0 && <span className="text-muted-foreground">${totalCost.toFixed(4)}</span>}
-        {emptyAssistantMsgs > 0 && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-500">
-            {emptyAssistantMsgs} empty assistant msg{emptyAssistantMsgs > 1 ? 's' : ''}
-          </span>
-        )}
-        <button
-          onClick={handleCopyAll}
-          className="ml-auto px-2 py-1 rounded text-[10px] font-medium border border-border/50 hover:bg-muted/60 transition-colors cursor-pointer"
-        >
-          {copiedAll ? 'Copied!' : 'Copy All JSON'}
-        </button>
-      </div>
-
-      {messages.map((msg) => {
-        const info = msg.info as any;
-        const hasError = !!info.error;
-        const isEmptyAssistant = msg.info.role === 'assistant' && msg.parts.length === 0;
-        const tokens = info.tokens;
-        const totalMsgTokens = tokens ? (tokens.input || 0) + (tokens.output || 0) + (tokens.reasoning || 0) : 0;
-
-        return (
-          <details
-            key={msg.info.id}
-            open={hasError || isEmptyAssistant}
-            className={cn(
-              'mb-3 border rounded-lg overflow-hidden',
-              hasError ? 'border-red-500/50' :
-              isEmptyAssistant ? 'border-yellow-500/50' :
-              'border-border/40',
-            )}
-          >
-            <summary className={cn(
-              "px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors flex items-center gap-2",
-              hasError ? 'bg-red-500/10' :
-              isEmptyAssistant ? 'bg-yellow-500/10' :
-              'bg-muted/30',
-            )}>
-              <span className={cn(
-                'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0',
-                msg.info.role === 'user' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500',
-              )}>
-                {msg.info.role}
-              </span>
-              {hasError && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-500 shrink-0">
-                  ERROR: {info.error?.name || 'unknown'}
-                </span>
-              )}
-              {isEmptyAssistant && !hasError && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 shrink-0">
-                  0 PARTS
-                </span>
-              )}
-              {info.modelID && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground shrink-0 max-w-[200px] truncate">
-                  {info.providerID}/{info.modelID}
-                </span>
-              )}
-              <span className="text-muted-foreground/60 text-[10px] shrink-0">{formatTime(msg.info.time.created)}</span>
-              <span className="text-muted-foreground truncate">{msg.info.id}</span>
-              <span className="ml-auto flex items-center gap-2 shrink-0">
-                {totalMsgTokens > 0 && (
-                  <span className="text-muted-foreground/60">{totalMsgTokens.toLocaleString()}t</span>
-                )}
-                <span className={cn(
-                  'text-muted-foreground/60',
-                  isEmptyAssistant && 'text-yellow-600 dark:text-yellow-400 font-bold',
-                )}>
-                  {msg.parts.length} part{msg.parts.length !== 1 ? 's' : ''}
-                </span>
-              </span>
-            </summary>
-            <div className="px-3 py-2 space-y-2">
-              {/* Error details — shown prominently */}
-              {hasError && (
-                <div className="p-2 rounded bg-red-500/10 border border-red-500/30">
-                  <p className="text-red-500 font-bold text-[10px] uppercase mb-1">Error Details</p>
-                  <pre className="text-red-400 whitespace-pre-wrap break-all">
-                    {JSON.stringify(info.error, null, 2)}
-                  </pre>
-                </div>
-              )}
-              {/* Empty assistant warning */}
-              {isEmptyAssistant && !hasError && (
-                <div className="p-2 rounded bg-yellow-500/10 border border-yellow-500/30">
-                  <p className="text-yellow-600 dark:text-yellow-400 font-bold text-[10px] uppercase">
-                    Assistant message has no parts — LLM completion may have failed silently
-                  </p>
-                  {totalMsgTokens === 0 && (
-                    <p className="text-yellow-600/80 dark:text-yellow-400/80 text-[10px] mt-1">
-                      0 tokens used — the model call likely never completed
-                    </p>
-                  )}
-                </div>
-              )}
-              {/* Message info */}
-              <details className="group" open={hasError || isEmptyAssistant}>
-                <summary className="text-muted-foreground cursor-pointer hover:text-foreground">info</summary>
-                <pre className="mt-1 p-2 rounded bg-muted/40 overflow-x-auto whitespace-pre-wrap break-all">
-                  {JSON.stringify(msg.info, null, 2)}
-                </pre>
-              </details>
-              {/* Parts */}
-              {msg.parts.map((part) => (
-                <details key={part.id} className="group">
-                  <summary className="cursor-pointer hover:text-foreground flex items-center gap-2">
-                    <span className={cn(
-                      'px-1 py-0.5 rounded text-[9px] font-bold uppercase',
-                      part.type === 'text' ? 'bg-violet-500/20 text-violet-500' :
-                      part.type === 'tool' ? 'bg-orange-500/20 text-orange-500' :
-                      part.type === 'reasoning' ? 'bg-pink-500/20 text-pink-500' :
-                      'bg-gray-500/20 text-gray-500',
-                    )}>
-                      {part.type}
-                    </span>
-                    <span className="text-muted-foreground truncate">
-                      {part.type === 'tool' ? (part as ToolPart).tool : ''}
-                      {part.type === 'text' ? ((part as TextPart).text?.slice(0, 80) + '...') : ''}
-                    </span>
-                    <span className="ml-auto text-muted-foreground/50">{part.id}</span>
-                  </summary>
-                  <pre className="mt-1 p-2 rounded bg-muted/40 overflow-x-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(part, null, 2)}
-                  </pre>
-                </details>
-              ))}
-            </div>
-          </details>
-        );
-      })}
     </div>
   );
 }
@@ -1481,16 +1306,10 @@ function SessionTurn({
   );
 
   // Retry info (only on last turn)
-  const retryInfo = useMemo(
-    () => (isLast ? getRetryInfo(sessionStatus) : undefined),
-    [sessionStatus, isLast],
-  );
+  const retryInfo = useMemo(() => (isLast ? getRetryInfo(sessionStatus) : undefined), [sessionStatus, isLast]);
 
   // Cost info (only when not working)
-  const costInfo = useMemo(
-    () => (!working ? getTurnCost(allParts) : undefined),
-    [allParts, working],
-  );
+  const costInfo = useMemo(() => (!working ? getTurnCost(allParts) : undefined), [allParts, working]);
 
   // Turn error — derived directly from message data (same approach as SolidJS reference)
   const turnError = useMemo(() => getTurnError(turn), [turn]);
@@ -1499,26 +1318,14 @@ function SessionTurn({
   const shellModePart = useMemo(() => getShellModePart(turn), [turn]);
 
   // Permission/question matching for this session
-  const nextPermission = useMemo(
-    () => permissions.filter((p) => p.sessionID === sessionId)[0],
-    [permissions, sessionId],
-  );
-  const nextQuestion = useMemo(
-    () => questions.filter((q) => q.sessionID === sessionId)[0],
-    [questions, sessionId],
-  );
+  const nextPermission = useMemo(() => permissions.filter((p) => p.sessionID === sessionId)[0], [permissions, sessionId]);
+  const nextQuestion = useMemo(() => questions.filter((q) => q.sessionID === sessionId)[0], [questions, sessionId]);
 
   // Hidden tool parts (when permission/question is active)
-  const hidden = useMemo(
-    () => getHiddenToolParts(nextPermission, nextQuestion),
-    [nextPermission, nextQuestion],
-  );
+  const hidden = useMemo(() => getHiddenToolParts(nextPermission, nextQuestion), [nextPermission, nextQuestion]);
 
   // Answered question parts (shown outside collapsed steps)
-  const answeredQuestionParts = useMemo(
-    () => getAnsweredQuestionParts(turn, stepsExpanded, !!nextQuestion),
-    [turn, stepsExpanded, nextQuestion],
-  );
+  const answeredQuestionParts = useMemo(() => getAnsweredQuestionParts(turn, stepsExpanded, !!nextQuestion), [turn, stepsExpanded, nextQuestion]);
 
   // Task/subsession parts (always visible outside collapsed steps)
   const taskToolParts = useMemo(() => {
@@ -1717,7 +1524,7 @@ function SessionTurn({
           <img
             src="/kortix-logomark-white.svg"
             alt="Kortix"
-            className={cn('dark:invert-0 invert flex-shrink-0', working && 'animate-pulse')}
+            className={cn('dark:invert-0 invert flex-shrink-0')}
             style={{ height: '14px', width: 'auto' }}
           />
         </div>
@@ -1891,17 +1698,7 @@ function SessionTurn({
             return null;
           })}
 
-          {/* Stable TodoWrite — single instance with stable key to prevent remount flickering */}
-          {lastTodoWritePart && (
-            <ToolPartRenderer
-              key="todowrite-stable"
-              part={lastTodoWritePart}
-              sessionId={sessionId}
-              onPermissionReply={onPermissionReply}
-              onQuestionReply={onQuestionReply}
-              onQuestionReject={onQuestionReject}
-            />
-          )}
+          {/* TodoWrite is now rendered in the chat input area — skip here */}
 
           {/* Error at bottom of steps */}
           {turnError && (
@@ -2105,8 +1902,21 @@ interface SessionChatProps {
 }
 
 export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: SessionChatProps) {
-  const [debugMode, setDebugMode] = useState(false);
-  const debugInitRef = useRef(false);
+  // ---- Context modal (triple-click to open) ----
+  const [contextModalOpen, setContextModalOpen] = useState(false);
+  const tripleClickRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
+
+  const handleContextTripleClick = useCallback(() => {
+    const state = tripleClickRef.current;
+    state.count++;
+    if (state.timer) clearTimeout(state.timer);
+    if (state.count >= 3) {
+      state.count = 0;
+      setContextModalOpen(true);
+      return;
+    }
+    state.timer = setTimeout(() => { state.count = 0; }, 500);
+  }, []);
 
   // ---- KortixComputer side panel ----
   const { isSidePanelOpen, setIsSidePanelOpen, openFileInComputer } = useKortixComputerStore();
@@ -2131,18 +1941,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
   const local = useOpenCodeLocal({ agents, providers, config });
 
-  // ---- URL params ----
-  const searchParams = useSearchParams();
-  const isDebugEnabled = searchParams.has('debug');
   const pendingPromptHandled = useRef(false);
-
-  // Auto-enable debug mode when ?debug is in URL (once on mount)
-  useEffect(() => {
-    if (isDebugEnabled && !debugInitRef.current) {
-      debugInitRef.current = true;
-      setDebugMode(true);
-    }
-  }, [isDebugEnabled]);
 
   // ---- Polling fallback & optimistic send ----
   const [pollingActive, setPollingActive] = useState(false);
@@ -2458,8 +2257,9 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   }, [isServerBusy, sessionId]);
 
   // Message-based idle detection: if the last assistant message has
-  // time.completed set, the server has finished generating. If our session
-  // status still says busy, the SSE idle event was missed — force idle.
+  // time.completed set, the server marked the message as completed but we never got the
+  // idle event — force the session to idle after a short grace period
+  // to avoid racing with a status event that's still in flight.
   useEffect(() => {
     if (!isServerBusy || !messages || messages.length === 0) return;
     // Find the last assistant message
@@ -2468,9 +2268,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       if (msg.info.role === 'assistant') {
         const assistantInfo = msg.info as any;
         if (assistantInfo.time?.completed) {
-          // The server marked the message as completed but we never got the
-          // idle event — force the session to idle after a short grace period
-          // to avoid racing with a status event that's still in flight.
           const timer = setTimeout(() => {
             const currentStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
             if (currentStatus?.type === 'busy' || currentStatus?.type === 'retry') {
@@ -2629,7 +2426,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     if (lastUserId && (sessionStatus?.type !== 'idle' || isBusy)) {
       setExpanded((prev) => ({ ...prev, [lastUserId]: true }));
     }
-  }, [sessionStatus, messages, isBusy]);
+  }, [messages, sessionStatus, isBusy]);
 
   // Reset on session change
   useEffect(() => {
@@ -2918,26 +2715,24 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         />
       )}
 
-      {/* Debug mode toggle — floating, only visible when ?debug is in URL */}
-      {isDebugEnabled && hasMessages && (
-        <button
-          onClick={() => setDebugMode(!debugMode)}
-          className={cn(
-            'absolute bottom-20 right-4 z-50 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium border transition-colors cursor-pointer backdrop-blur-sm',
-            debugMode
-              ? 'bg-orange-500/15 text-orange-500 border-orange-500/30 hover:bg-orange-500/25'
-              : 'bg-background/80 text-muted-foreground/60 border-border/50 hover:text-muted-foreground hover:bg-muted/60',
-          )}
-        >
-          <Bug className="size-3" />
-          {debugMode ? 'Debug ON' : 'Debug'}
-        </button>
+      {/* Context modal — triple-click the session title area to open */}
+      <SessionContextModal
+        open={contextModalOpen}
+        onOpenChange={setContextModalOpen}
+        messages={messages}
+        session={session}
+        providers={providers}
+      />
+
+      {/* Triple-click target — invisible overlay on the header area */}
+      {!hideHeader && (
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 z-10 h-10 w-48 cursor-default select-none"
+          onClick={handleContextTripleClick}
+        />
       )}
 
-      {/* Debug view */}
-      {isDebugEnabled && debugMode && hasMessages ? (
-        <DebugView messages={messages} />
-      ) : (hasMessages || showOptimistic) ? (
+      {(hasMessages || showOptimistic) ? (
         <div className="relative flex-1 min-h-0">
           <div
             ref={scrollRef}
@@ -2988,11 +2783,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                       <img
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
-                        className="dark:invert-0 invert flex-shrink-0 animate-pulse"
+                        className="dark:invert-0 invert flex-shrink-0"
                         style={{ height: '14px', width: 'auto' }}
                       />
                       {isRetrying && (
-                        <span className="text-xs text-amber-500 animate-pulse">
+                        <span className="text-xs text-amber-500">
                           Retrying connection...
                         </span>
                       )}
@@ -3084,11 +2879,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                       <img
                         src="/kortix-logomark-white.svg"
                         alt="Kortix"
-                        className="dark:invert-0 invert flex-shrink-0 animate-pulse"
+                        className="dark:invert-0 invert flex-shrink-0"
                         style={{ height: '14px', width: 'auto' }}
                       />
                       {isRetrying && (
-                        <span className="text-xs text-amber-500 animate-pulse">
+                        <span className="text-xs text-amber-500">
                           Retrying connection...
                         </span>
                       )}
@@ -3103,7 +2898,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                     <img
                       src="/kortix-logomark-white.svg"
                       alt="Kortix"
-                      className="dark:invert-0 invert flex-shrink-0 animate-pulse"
+                      className="dark:invert-0 invert flex-shrink-0"
                       style={{ height: '14px', width: 'auto' }}
                     />
                   </div>

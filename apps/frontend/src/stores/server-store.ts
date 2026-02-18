@@ -52,10 +52,7 @@ interface ServerStore {
 }
 
 const DEFAULT_OPENCODE_URL =
-  process.env.NEXT_PUBLIC_OPENCODE_URL ||
-  (process.env.NEXT_PUBLIC_ENV_MODE === 'local'
-    ? 'http://localhost:14000'
-    : 'http://localhost:4096');
+  process.env.NEXT_PUBLIC_OPENCODE_URL || 'http://localhost:14000';
 
 function generateId(): string {
   return `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
