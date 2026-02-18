@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
@@ -271,16 +272,40 @@ export function useOpenCodeMessages(sessionId: string) {
 // Prompt / Abort Hooks
 // ============================================================================
 
+/**
+ * Generate a monotonic ascending ID compatible with the server's Identifier.ascending().
+ * Server format: prefix + "_" + 12-char hex timestamp + 14-char random base62 = prefix_<26 chars>
+ * Server validates: z.string().startsWith("msg") for messages, "prt" for parts.
+ */
+let lastIdTimestamp = 0;
+let idCounter = 0;
+export function ascendingId(prefix: 'msg' | 'prt' = 'msg'): string {
+  const now = Date.now();
+  if (now !== lastIdTimestamp) {
+    lastIdTimestamp = now;
+    idCounter = 0;
+  }
+  idCounter++;
+  const encoded = BigInt(now) * BigInt(0x1000) + BigInt(idCounter);
+  const hex = encoded.toString(16).padStart(12, '0').slice(0, 12);
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  let rand = '';
+  for (let i = 0; i < 14; i++) rand += chars[Math.floor(Math.random() * 62)];
+  return `${prefix}_${hex}${rand}`;
+}
+
 export function useSendOpenCodeMessage() {
   return useMutation({
     mutationFn: async ({
       sessionId,
       parts,
       options,
+      messageID,
     }: {
       sessionId: string;
       parts: PromptPart[];
       options?: SendMessageOptions;
+      messageID?: string;
     }) => {
       const mappedParts = parts.map((p) => {
         if (p.type === 'file') return { type: 'file' as const, mime: p.mime, url: p.url, filename: p.filename, source: p.source };
@@ -290,6 +315,7 @@ export function useSendOpenCodeMessage() {
       const payload = {
         sessionID: sessionId,
         parts: mappedParts,
+        ...(messageID && { messageID }),
         ...(options?.model && { model: options.model }),
         ...(options?.agent && { agent: options.agent }),
         ...(options?.variant && { variant: options.variant }),
@@ -973,4 +999,78 @@ export async function rejectQuestion(requestId: string): Promise<void> {
 // Session Busy Polling (fallback when SSE is unavailable)
 // ============================================================================
 
+/**
+ * Polls session status + refreshes messages while the session is expected to
+ * be busy. Acts as a safety net when SSE events aren't arriving.
+ *
+ * Activate by calling `start()` after a successful promptAsync.
+ * Automatically stops when the session transitions to idle or after 5 minutes.
+ */
+export function useSessionPolling(sessionId: string) {
+  const queryClient = useQueryClient();
+  const refs = useRef({
+    sessionId,
+    queryClient,
+    interval: null as ReturnType<typeof setInterval> | null,
+    timeout: null as ReturnType<typeof setTimeout> | null,
+    sawBusy: false,
+    startedAt: 0,
+  });
+  refs.current.sessionId = sessionId;
+  refs.current.queryClient = queryClient;
 
+  const fns = useRef<{ stop: () => void; poll: () => Promise<void>; start: () => void }>(null!);
+  if (!fns.current) {
+    const stop = () => {
+      if (refs.current.interval) { clearInterval(refs.current.interval); refs.current.interval = null; }
+      if (refs.current.timeout) { clearTimeout(refs.current.timeout); refs.current.timeout = null; }
+      refs.current.sawBusy = false;
+    };
+
+    const poll = async () => {
+      const sid = refs.current.sessionId;
+      if (!sid) return;
+      const client = getClient();
+
+      // Refresh status
+      const statusResult = await client.session.status().catch(() => null);
+      if (statusResult?.data) {
+        const statuses = statusResult.data as Record<string, any>;
+        const status = statuses[sid];
+        if (status) {
+          useOpenCodeSessionStatusStore.getState().setStatus(sid, status);
+
+          if (status.type === 'busy' || status.type === 'retry') {
+            refs.current.sawBusy = true;
+          }
+
+          // Only stop when: we've seen busy AND now idle, AND at least 5s have passed
+          // This prevents stopping before the server has even started processing
+          const elapsed = Date.now() - refs.current.startedAt;
+          if (status.type === 'idle' && refs.current.sawBusy && elapsed > 5000) {
+            stop();
+          }
+        }
+      }
+
+      // Force refetch messages — bypasses staleTime: Infinity
+      refs.current.queryClient.refetchQueries({ queryKey: opencodeKeys.messages(sid) });
+    };
+
+    const start = () => {
+      stop();
+      refs.current.startedAt = Date.now();
+      refs.current.sawBusy = false;
+      poll();
+      refs.current.interval = setInterval(poll, 2000);
+      refs.current.timeout = setTimeout(stop, 5 * 60 * 1000);
+    };
+
+    fns.current = { stop, poll, start };
+  }
+
+  // Cleanup on unmount
+  useEffect(() => () => fns.current.stop(), []);
+
+  return fns.current;
+}

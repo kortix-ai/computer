@@ -54,8 +54,7 @@ export { useBillingModal } from './use-billing-modal';
 // Download restriction for free tier
 export { useDownloadRestriction } from './use-download-restriction';
 
-// Credit & Thread Usage analytics
-export { useCreditUsage } from './use-credit-usage';
+// Thread Usage analytics
 export { useThreadUsage } from './use-thread-usage';
 
 // =============================================================================

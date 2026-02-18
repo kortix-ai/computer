@@ -44,9 +44,6 @@ const nextConfig = (): NextConfig => ({
     ignoreBuildErrors: true,
   },
 
-  // Transpile shared package
-  transpilePackages: ['@kortix/shared'],
-
   // Set environment variables
   env: {
     NEXT_PUBLIC_BACKEND_URL: getBackendUrl(),
