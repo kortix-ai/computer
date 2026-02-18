@@ -6,9 +6,7 @@ import { useSyncStore } from '@/stores/opencode-sync-store';
 import { useDiagnosticsStore } from '@/stores/diagnostics-store';
 import { useServerStore } from '@/stores/server-store';
 import { getClient, resetClient } from '@/lib/opencode-sdk';
-import { clearConfigOverrides } from '@/hooks/opencode/use-opencode-config';
 import { logger } from '@/lib/logger';
-import { toast } from '@/lib/toast';
 import {
   notifySessionError,
   notifyQuestion,
@@ -17,11 +15,7 @@ import {
 } from '@/lib/web-notifications';
 import { opencodeKeys } from './use-opencode-sessions';
 import { ptyKeys } from './use-opencode-pty';
-import { fileListKeys } from '@/features/files/hooks/use-file-list';
-import { fileContentKeys } from '@/features/files/hooks/use-file-content';
-import { gitStatusKeys } from '@/features/files/hooks/use-git-status';
-import type { Event as OpenCodeEvent, Message, Part } from '@kortix/opencode-sdk/v2/client';
-import type { MessageWithParts } from './use-opencode-sessions';
+import type { Event as OpenCodeEvent, Part } from '@kortix/opencode-sdk/v2/client';
 
 /**
  * Connects to OpenCode's SSE event stream and routes ALL events through
@@ -42,9 +36,7 @@ export function useOpenCodeEventStream() {
 
     if (isServerSwitch) {
       resetClient();
-      clearConfigOverrides();
-      clearStatuses({});
-      clearPending();
+      useSyncStore.getState().reset();
       useDiagnosticsStore.getState().clearAll();
       queryClient.removeQueries({ queryKey: opcodeKeys.all });
     }
@@ -315,56 +307,6 @@ export function useOpenCodeEventStream() {
           queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix() });
           break;
         }
-
-        // ---- Worktree events — disabled for now ----
-        case 'worktree.ready': {
-          queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees() });
-          queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
-          break;
-        }
-
-        case 'worktree.failed': {
-          queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees() });
-          break;
-        }
-
-        // ---- Project updated ----
-        case 'project.updated': {
-          queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
-          queryClient.invalidateQueries({ queryKey: opencodeKeys.currentProject() });
-          break;
-        }
-
-        // ---- File edited (outside agent, e.g. user edits in editor) ----
-        case 'file.edited': {
-          const fileProps = event.properties as { file?: string };
-          queryClient.invalidateQueries({ queryKey: fileListKeys.all });
-          queryClient.invalidateQueries({ queryKey: gitStatusKeys.all });
-          if (fileProps.file) {
-            queryClient.invalidateQueries({ queryKey: fileContentKeys.all });
-          }
-          break;
-        }
-
-        // ---- Installation events ----
-        case 'installation.updated': {
-          const installProps = event.properties as { version?: string };
-          const versionStr = installProps.version ? ` (v${installProps.version})` : '';
-          toast.info(`Installation updated${versionStr}. Restart to apply changes.`, {
-            duration: 10_000,
-          });
-          break;
-        }
-
-        case 'installation.update-available': {
-          const updateProps = event.properties as { version?: string };
-          const versionLabel = updateProps.version ? `v${updateProps.version}` : 'A new version';
-          toast.info(`${versionLabel} is available. Update when you're ready.`, {
-            duration: 15_000,
-          });
-          break;
-        }
-
         default:
           break;
       }

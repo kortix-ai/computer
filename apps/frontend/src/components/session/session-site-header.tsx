@@ -32,8 +32,6 @@ import { DiffDialog } from '@/components/session/diff-dialog';
 import { InitProjectDialog } from '@/components/session/init-project-dialog';
 import { OpenCodeSettingsDialog } from '@/components/session/opencode-settings-dialog';
 import { DiagnosticsBadge } from '@/components/session/diagnostics-panel';
-// Worktree indicator — disabled for now
-// import { useOpenCodeSession, useOpenCodeCurrentProject } from '@/hooks/opencode/use-opencode-sessions';
 
 interface SessionSiteHeaderProps {
   sessionId: string;
@@ -61,9 +59,6 @@ export function SessionSiteHeader({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const isMobile = useIsMobile() || isMobileView;
   const { setOpen: setSidebarOpen, setOpenMobile } = useSidebar();
-
-  // Worktree detection — disabled for now
-  const worktreeInfo = null;
 
   const handleOpenMenu = () => {
     setSidebarOpen(true);
@@ -94,8 +89,6 @@ export function SessionSiteHeader({
             <TooltipProvider delayDuration={300}>
               {/* LSP Diagnostics badge */}
               <DiagnosticsBadge />
-
-              {/* Worktree indicator — disabled for now */}
 
               {/* More actions dropdown */}
               <DropdownMenu>

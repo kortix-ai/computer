@@ -79,8 +79,6 @@ import {
   type ToolPart,
   type FilePart,
   type AgentPart,
-  type SnapshotPart,
-  type PatchPart,
   type PermissionRequest,
   type QuestionRequest,
   type RetryInfo,
@@ -92,8 +90,6 @@ import {
   isFilePart,
   isAgentPart,
   isCompactionPart,
-  isSnapshotPart,
-  isPatchPart,
   isAttachment,
   splitUserParts,
   groupMessagesIntoTurns,
@@ -131,14 +127,15 @@ import { QuestionPrompt } from '@/components/session/question-prompt';
 import { ImagePreview } from '@/components/session/image-preview';
 import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
 import { TurnErrorDisplay } from '@/components/session/session-error-banner';
-import { OcSnapshotPartView, OcPatchPartView } from '@/components/session/snapshot-part-views';
 import { SessionContextModal } from '@/components/session/session-context-modal';
 import { ConnectProviderDialog } from '@/components/session/model-selector';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 
-// billingApi / invalidateAccountState / useQueryClient removed — billing is handled server-side by the router
+import { useQueryClient } from '@tanstack/react-query';
+import { billingApi } from '@/lib/api/billing';
+import { invalidateAccountState } from '@/hooks/billing/use-account-state';
 import { playSound } from '@/lib/sounds';
 
 // ============================================================================
@@ -1299,10 +1296,16 @@ function SessionTurn({
   );
 
   // Retry info (only on last turn)
-  const retryInfo = useMemo(() => (isLast ? getRetryInfo(sessionStatus) : undefined), [sessionStatus, isLast]);
+  const retryInfo = useMemo(
+    () => (isLast ? getRetryInfo(sessionStatus) : undefined),
+    [sessionStatus, isLast],
+  );
 
   // Cost info (only when not working)
-  const costInfo = useMemo(() => (!working ? getTurnCost(allParts) : undefined), [allParts, working]);
+  const costInfo = useMemo(
+    () => (!working ? getTurnCost(allParts) : undefined),
+    [allParts, working],
+  );
 
   // Turn error — derived directly from message data (same approach as SolidJS reference)
   const turnError = useMemo(() => getTurnError(turn), [turn]);
@@ -1311,14 +1314,26 @@ function SessionTurn({
   const shellModePart = useMemo(() => getShellModePart(turn), [turn]);
 
   // Permission/question matching for this session
-  const nextPermission = useMemo(() => permissions.filter((p) => p.sessionID === sessionId)[0], [permissions, sessionId]);
-  const nextQuestion = useMemo(() => questions.filter((q) => q.sessionID === sessionId)[0], [questions, sessionId]);
+  const nextPermission = useMemo(
+    () => permissions.filter((p) => p.sessionID === sessionId)[0],
+    [permissions, sessionId],
+  );
+  const nextQuestion = useMemo(
+    () => questions.filter((q) => q.sessionID === sessionId)[0],
+    [questions, sessionId],
+  );
 
   // Hidden tool parts (when permission/question is active)
-  const hidden = useMemo(() => getHiddenToolParts(nextPermission, nextQuestion), [nextPermission, nextQuestion]);
+  const hidden = useMemo(
+    () => getHiddenToolParts(nextPermission, nextQuestion),
+    [nextPermission, nextQuestion],
+  );
 
   // Answered question parts (shown outside collapsed steps)
-  const answeredQuestionParts = useMemo(() => getAnsweredQuestionParts(turn, stepsExpanded, !!nextQuestion), [turn, stepsExpanded, nextQuestion]);
+  const answeredQuestionParts = useMemo(
+    () => getAnsweredQuestionParts(turn, stepsExpanded, !!nextQuestion),
+    [turn, stepsExpanded, nextQuestion],
+  );
 
   // Task/subsession parts (always visible outside collapsed steps)
   const taskToolParts = useMemo(() => {
@@ -1670,24 +1685,6 @@ function SessionTurn({
               );
             }
 
-            // Snapshot parts — collapsible metadata
-            if (isSnapshotPart(part)) {
-              return (
-                <div key={part.id}>
-                  <OcSnapshotPartView part={part} />
-                </div>
-              );
-            }
-
-            // Patch parts — collapsible with file list
-            if (isPatchPart(part)) {
-              return (
-                <div key={part.id}>
-                  <OcPatchPartView part={part} sessionId={sessionId} />
-                </div>
-              );
-            }
-
             return null;
           })}
 
@@ -1883,6 +1880,12 @@ function SessionTurn({
 }
 
 // ============================================================================
+// Billing: track billed turn IDs to prevent double-deduction
+// ============================================================================
+
+const billedTurnIds = new Set<string>();
+
+// ============================================================================
 // Main SessionChat Component
 // ============================================================================
 
@@ -1917,6 +1920,9 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   const forkSession = useForkSession();
   const revertSession = useRevertSession();
   const unrevertSession = useUnrevertSession();
+
+  // ---- Billing: query client for invalidation ----
+  const queryClient = useQueryClient();
 
   // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
   const local = useOpenCodeLocal({ agents, providers, config });
@@ -2019,150 +2025,32 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       // ignore
     }
 
-  // Clear pendingSendInFlight once the server acknowledges it's working,
-  // or when new messages arrive from the server.
-  // This bridges the gap between the optimistic prompt clearing and the
-  // server status updating — keeps isBusy true so the turn shows a loader.
-  useEffect(() => {
-    if (!pendingSendInFlight) return;
-    if (isServerBusy) {
-      setPendingSendInFlight(false);
-      return;
-    }
-    // If messages include assistant content, the server already processed it
-    const hasAssistant = messages?.some((m) => m.info.role === 'assistant');
-    if (hasAssistant) {
-      setPendingSendInFlight(false);
-    }
-  }, [pendingSendInFlight, isServerBusy, messages]);
+    // Optimistic user message for dashboard handoff — use sync store
+    const msgID = ascendingId();
+    const prtID = ascendingId('prt');
+    useSyncStore.getState().optimisticAdd(sessionId, {
+      id: msgID,
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: Date.now() },
+    } as any, [{
+      id: prtID,
+      type: 'text',
+      sessionID: sessionId,
+      messageID: msgID,
+      text: pending,
+    } as any]);
 
-  // Safety timeout: clear pendingSendInFlight after 30s even if the server
-  // never acknowledged. Prevents the UI from being stuck forever in "busy"
-  // when the send succeeded (HTTP 204) but the server never started processing.
-  useEffect(() => {
-    if (!pendingSendInFlight) return;
-    const timer = setTimeout(() => {
-      setPendingSendInFlight(false);
-    }, 30_000);
-    return () => clearTimeout(timer);
-  }, [pendingSendInFlight]);
-
-  // Stale session watchdog: when the session has been busy for a while, do a
-  // direct status check. If the server reports idle (or doesn't include the
-  // session at all — meaning it's idle), force the status to idle — recovering
-  // from a silently dropped SSE stream or missed event.
-  // First check after 5s, then every 15s.
-  useEffect(() => {
-    if (!isServerBusy) return;
-
-    const check = async () => {
-      try {
-        const client = getClient();
-        const result = await client.session.status();
-        if (result.data) {
-          const statuses = result.data as Record<string, any>;
-          const serverStatus = statuses[sessionId];
-          if (serverStatus) {
-            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, serverStatus);
-          } else {
-            // Server didn't include this session — it's idle
-            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, { type: 'idle' });
-          }
-        }
-      } catch {
-        // ignore — next interval will retry
-      }
-    };
-
-    // First check after 5s, then every 15s
-    const initialTimer = setTimeout(() => {
-      check();
-    }, 5_000);
-    const interval = setInterval(check, 15_000);
-    return () => { clearTimeout(initialTimer); clearInterval(interval); };
-  }, [isServerBusy, sessionId]);
-
-  // Message-based idle detection: if the last assistant message has
-  // time.completed set, the server marked the message as completed but we never got the
-  // idle event — force the session to idle after a short grace period
-  // to avoid racing with a status event that's still in flight.
-  useEffect(() => {
-    if (!isServerBusy || !messages || messages.length === 0) return;
-    // Find the last assistant message
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.info.role === 'assistant') {
-        const assistantInfo = msg.info as any;
-        if (assistantInfo.time?.completed) {
-          const timer = setTimeout(() => {
-            const currentStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-            if (currentStatus?.type === 'busy' || currentStatus?.type === 'retry') {
-              useOpenCodeSessionStatusStore.getState().setStatus(sessionId, { type: 'idle' });
-            }
-          }, 2_000);
-          return () => clearTimeout(timer);
-        }
-        break; // only check the last assistant message
-      }
-    }
-  }, [isServerBusy, messages, sessionId]);
-
-  // Clear pending user message when server acknowledges (status becomes busy)
-  // or when new messages arrive from the server.
-  // When a command was pending, associate the newest user message with the
-  // command info so UserMessageRow can render a nice pill instead of raw template text.
-  const prevMsgLenRef = useRef(messages?.length || 0);
-  useEffect(() => {
-    if (!pendingUserMessage) return;
-    // Server reported busy → it received our prompt, real messages incoming
-    if (isServerBusy) {
-      setPendingUserMessage(null);
-      setPendingCommand(null);
-      return;
-    }
-    // New messages arrived from server → clear optimistic display
-    const len = messages?.length || 0;
-    if (len > prevMsgLenRef.current) {
-      setPendingUserMessage(null);
-      setPendingCommand(null);
-    }
-  }, [isServerBusy, messages?.length, pendingUserMessage]);
-
-  // Associate stashed command info with the newest user message when messages arrive.
-  // Runs separately so it captures the mapping even if busy fires before messages update.
-  useEffect(() => {
-    const stash = pendingCommandStashRef.current;
-    if (!stash || !messages) return;
-    const len = messages.length;
-    if (len <= prevMsgLenRef.current) return;
-    // Find the last user message — the one just created by the command
-    for (let i = len - 1; i >= 0; i--) {
-      if (messages[i].info.role === 'user') {
-        commandMessagesRef.current.set(messages[i].info.id, stash);
-        pendingCommandStashRef.current = null;
-        break;
-      }
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    prevMsgLenRef.current = messages?.length || 0;
-  }, [messages?.length]);
-
-  // ---- Auto-scroll (replaces inline scroll logic) ----
-  const { scrollRef, contentRef, showScrollButton, scrollToBottom } = useAutoScroll({
-    working: isBusy,
-  });
-
-  // Scroll to bottom when switching session tabs or on initial message load.
-  // Uses scrollToBottom() from the hook so the programmatic-scroll guard works
-  // correctly and doesn't interfere with user-intent detection.
-  const initialScrollDoneRef = useRef<string | null>(null);
-  useEffect(() => {
-    // Reset on session change so we scroll on first render of new session
-    if (initialScrollDoneRef.current !== sessionId) {
-      initialScrollDoneRef.current = null;
-    }
+    sendMessage.mutateAsync({
+      sessionId,
+      parts: [{ type: 'text', text: pending }],
+      options: Object.keys(options).length > 0 ? options as any : undefined,
+      messageID: msgID,
+    }).catch(() => {
+      // Send failed — remove optimistic message
+      useSyncStore.getState().optimisticRemove(sessionId, msgID);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   // ---- Pending permissions & questions come from useSessionSync above ----
@@ -2225,7 +2113,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     if (lastUserId && isBusy) {
       setExpanded((prev) => ({ ...prev, [lastUserId]: true }));
     }
-  }, [messages, sessionStatus, isBusy]);
+  }, [sessionStatus, messages, isBusy]);
 
   // Reset on session change
   useEffect(() => {
@@ -2238,12 +2126,63 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   }, []);
 
   // ============================================================================
-  // Billing: DISABLED — billing is handled server-side by the router
-  // (POST /v1/router/chat/completions deducts credits per LLM call).
-  // This frontend useEffect was causing double-billing once opencode.jsonc
-  // got cost config and step-finish.cost became non-zero.
+  // Billing: deduct credits after agent run completes
   // ============================================================================
 
+  useEffect(() => {
+    if (!messages || messages.length === 0 || isBusy) return;
+
+    const currentTurns = groupMessagesIntoTurns(messages);
+    for (const turn of currentTurns) {
+      const turnId = turn.userMessage.info.id;
+      if (billedTurnIds.has(turnId)) continue;
+
+      const parts = collectTurnParts(turn);
+      const costInfo = getTurnCost(parts);
+      console.log('[Billing] Turn', turnId, 'costInfo:', costInfo);
+      if (!costInfo || costInfo.cost <= 0) continue;
+
+      billedTurnIds.add(turnId);
+
+      console.log('[Billing] Deducting', costInfo.cost, 'for turn', turnId);
+      billingApi.deductUsage({
+        amount: costInfo.cost,
+        thread_id: sessionId,
+        description: `Agent run: ${formatCost(costInfo.cost)} (${formatTokens(costInfo.tokens.input + costInfo.tokens.output)} tokens)`,
+      }).then((result) => {
+        console.log('[Billing] Deduction successful:', result);
+        invalidateAccountState(queryClient);
+      }).catch((err) => {
+        console.warn('[Billing] Failed to deduct usage:', err);
+      });
+    }
+  }, [messages, isBusy, sessionId, queryClient]);
+
+  // ---- Auto-scroll (always active, matching SolidJS) ----
+  const { scrollRef, contentRef, showScrollButton, scrollToBottom } = useAutoScroll({
+    working: true,
+  });
+
+  // Scroll to bottom on initial message load / session change
+  const initialScrollDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (initialScrollDoneRef.current !== sessionId) {
+      initialScrollDoneRef.current = null;
+    }
+  }, [sessionId]);
+
+  const messageCount = messages?.length ?? 0;
+  useEffect(() => {
+    if (initialScrollDoneRef.current === sessionId) return;
+    if (messageCount === 0) return;
+    initialScrollDoneRef.current = sessionId;
+
+    scrollToBottom();
+    const t1 = setTimeout(scrollToBottom, 150);
+    const t2 = setTimeout(scrollToBottom, 500);
+
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [messageCount, sessionId, scrollToBottom]);
 
   // ============================================================================
   // Fork / Revert / Unrevert handlers
