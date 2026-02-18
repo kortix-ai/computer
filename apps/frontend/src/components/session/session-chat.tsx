@@ -162,6 +162,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '@/lib/api/billing';
 import { invalidateAccountState } from '@/hooks/billing/use-account-state';
 import { playSound } from '@/lib/sounds';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Sub-Session / Fork Breadcrumb
@@ -1511,7 +1512,7 @@ interface SessionTurnProps {
   commands?: Command[];
 }
 
-const SessionTurn = React.memo(function SessionTurn({
+const SessionTurn = identity(function SessionTurn({
   turn,
   allMessages,
   sessionId,

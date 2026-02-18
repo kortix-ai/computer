@@ -54,7 +54,7 @@ function PaymentForm({
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = React.useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Use actual amount from Stripe if available (includes discounts), otherwise calculate from plan
   const basePrice = billingPeriod === 'yearly'
@@ -229,7 +229,7 @@ function PlanPicker({
   defaultPlan?: Plan;
   defaultPeriod?: BillingPeriod;
 }) {
-  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>(defaultPeriod || 'yearly');
+  const [billingPeriod, setBillingPeriod] = React.useState<BillingPeriod>(defaultPeriod || 'yearly');
   const [isLoading, setIsLoading] = React.useState(false);
   const promo = usePromo();
   const accountState = useSubscriptionStore((state) => state.accountState);
@@ -253,7 +253,7 @@ function PlanPicker({
     return availablePlans[0]?.name || 'Pro';
   };
 
-  const [selectedPlan, setSelectedPlan] = useState<Plan>(() => getDefaultPlan());
+  const [selectedPlan, setSelectedPlan] = React.useState<Plan>(() => getDefaultPlan());
 
   // Update selection if current plan is no longer available
   React.useEffect(() => {
@@ -457,14 +457,14 @@ export function InlineCheckout({ options }: { options?: InlineCheckoutOptions })
   const { user } = useAuth();
   const promo = usePromo();
   const accountState = useSubscriptionStore((state) => state.accountState);
-  const [step, setStep] = useState<'select' | 'payment' | 'loading'>('select');
-  const [selectedPlan, setSelectedPlan] = useState<PlanConfig | null>(null);
-  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('yearly');
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
-  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
-  const [actualAmount, setActualAmount] = useState<number | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = React.useState<'select' | 'payment' | 'loading'>('select');
+  const [selectedPlan, setSelectedPlan] = React.useState<PlanConfig | null>(null);
+  const [billingPeriod, setBillingPeriod] = React.useState<BillingPeriod>('yearly');
+  const [clientSecret, setClientSecret] = React.useState<string | null>(null);
+  const [subscriptionId, setSubscriptionId] = React.useState<string | null>(null);
+  const [appliedPromoCode, setAppliedPromoCode] = React.useState<string | null>(null);
+  const [actualAmount, setActualAmount] = React.useState<number | undefined>(undefined);
+  const [error, setError] = React.useState<string | null>(null);
   // Prevent multiple subscription creations (double-click, StrictMode, etc.)
   const creatingRef = useRef(false);
 

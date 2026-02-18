@@ -55,6 +55,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/components/AuthProvider';
 import Image from 'next/image';
+import { identity } from '@/lib/utils/identity';
 
 // OCR detected text region with polygon bounding box
 interface TextRegion {
@@ -351,7 +352,7 @@ function calculateSnapResult(
 const EMPTY_FRAMES: FrameCanvasElement[] = [];
 
 // Image element with drag and resize
-const CanvasImageElement = React.memo(function CanvasImageElement({
+const CanvasImageElement = identity(function CanvasImageElement({
   element,
   isSelected,
   onSelect,
