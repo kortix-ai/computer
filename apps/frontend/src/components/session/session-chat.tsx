@@ -204,65 +204,171 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
 // ============================================================================
 
 function DebugView({ messages }: { messages: MessageWithParts[] | undefined }) {
+  const [copiedAll, setCopiedAll] = useState(false);
+
   if (!messages) return <p className="text-xs text-muted-foreground p-4">No messages loaded.</p>;
+
+  const totalParts = messages.reduce((sum, m) => sum + m.parts.length, 0);
+  const totalTokens = messages.reduce((sum, m) => {
+    const t = (m.info as any).tokens;
+    return sum + (t?.input || 0) + (t?.output || 0) + (t?.reasoning || 0);
+  }, 0);
+  const totalCost = messages.reduce((sum, m) => sum + ((m.info as any).cost || 0), 0);
+  const emptyAssistantMsgs = messages.filter(
+    (m) => m.info.role === 'assistant' && m.parts.length === 0,
+  ).length;
+
+  const formatTime = (ts: number) => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  };
+
+  const handleCopyAll = () => {
+    navigator.clipboard.writeText(JSON.stringify(messages, null, 2));
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
+  };
 
   return (
     <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-relaxed bg-black/5 dark:bg-white/5">
-      {messages.map((msg) => (
-        <details key={msg.info.id} className="mb-3 border border-border/40 rounded-lg overflow-hidden">
-          <summary className={cn(
-            "px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors flex items-center gap-2",
-            (msg.info as any).error ? 'bg-muted/50' : 'bg-muted/30',
-          )}>
-            <span className={cn(
-              'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase',
-              msg.info.role === 'user' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500',
-            )}>
-              {msg.info.role}
-            </span>
-            {(msg.info as any).error && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-muted text-muted-foreground">
-                ERROR: {(msg.info as any).error?.name}
-              </span>
+      {/* Debug summary header */}
+      <div className="mb-4 p-3 rounded-lg border border-border/60 bg-muted/30 flex flex-wrap items-center gap-3">
+        <span className="text-muted-foreground font-semibold">{messages.length} msgs</span>
+        <span className="text-muted-foreground">{totalParts} parts</span>
+        <span className="text-muted-foreground">{totalTokens.toLocaleString()} tokens</span>
+        {totalCost > 0 && <span className="text-muted-foreground">${totalCost.toFixed(4)}</span>}
+        {emptyAssistantMsgs > 0 && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-500">
+            {emptyAssistantMsgs} empty assistant msg{emptyAssistantMsgs > 1 ? 's' : ''}
+          </span>
+        )}
+        <button
+          onClick={handleCopyAll}
+          className="ml-auto px-2 py-1 rounded text-[10px] font-medium border border-border/50 hover:bg-muted/60 transition-colors cursor-pointer"
+        >
+          {copiedAll ? 'Copied!' : 'Copy All JSON'}
+        </button>
+      </div>
+
+      {messages.map((msg) => {
+        const info = msg.info as any;
+        const hasError = !!info.error;
+        const isEmptyAssistant = msg.info.role === 'assistant' && msg.parts.length === 0;
+        const tokens = info.tokens;
+        const totalMsgTokens = tokens ? (tokens.input || 0) + (tokens.output || 0) + (tokens.reasoning || 0) : 0;
+
+        return (
+          <details
+            key={msg.info.id}
+            open={hasError || isEmptyAssistant}
+            className={cn(
+              'mb-3 border rounded-lg overflow-hidden',
+              hasError ? 'border-red-500/50' :
+              isEmptyAssistant ? 'border-yellow-500/50' :
+              'border-border/40',
             )}
-            <span className="text-muted-foreground truncate">{msg.info.id}</span>
-            <span className="ml-auto text-muted-foreground/60">{msg.parts.length} parts</span>
-          </summary>
-          <div className="px-3 py-2 space-y-2">
-            {/* Message info */}
-            <details className="group">
-              <summary className="text-muted-foreground cursor-pointer hover:text-foreground">info</summary>
-              <pre className="mt-1 p-2 rounded bg-muted/40 overflow-x-auto whitespace-pre-wrap break-all">
-                {JSON.stringify(msg.info, null, 2)}
-              </pre>
-            </details>
-            {/* Parts */}
-            {msg.parts.map((part) => (
-              <details key={part.id} className="group">
-                <summary className="cursor-pointer hover:text-foreground flex items-center gap-2">
-                  <span className={cn(
-                    'px-1 py-0.5 rounded text-[9px] font-bold uppercase',
-                    part.type === 'text' ? 'bg-violet-500/20 text-violet-500' :
-                    part.type === 'tool' ? 'bg-orange-500/20 text-orange-500' :
-                    part.type === 'reasoning' ? 'bg-pink-500/20 text-pink-500' :
-                    'bg-gray-500/20 text-gray-500',
-                  )}>
-                    {part.type}
-                  </span>
-                  <span className="text-muted-foreground truncate">
-                    {part.type === 'tool' ? (part as ToolPart).tool : ''}
-                    {part.type === 'text' ? ((part as TextPart).text?.slice(0, 60) + '...') : ''}
-                  </span>
-                  <span className="ml-auto text-muted-foreground/50">{part.id}</span>
-                </summary>
+          >
+            <summary className={cn(
+              "px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors flex items-center gap-2",
+              hasError ? 'bg-red-500/10' :
+              isEmptyAssistant ? 'bg-yellow-500/10' :
+              'bg-muted/30',
+            )}>
+              <span className={cn(
+                'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0',
+                msg.info.role === 'user' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500',
+              )}>
+                {msg.info.role}
+              </span>
+              {hasError && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-500 shrink-0">
+                  ERROR: {info.error?.name || 'unknown'}
+                </span>
+              )}
+              {isEmptyAssistant && !hasError && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 shrink-0">
+                  0 PARTS
+                </span>
+              )}
+              {info.modelID && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground shrink-0 max-w-[200px] truncate">
+                  {info.providerID}/{info.modelID}
+                </span>
+              )}
+              <span className="text-muted-foreground/60 text-[10px] shrink-0">{formatTime(msg.info.time.created)}</span>
+              <span className="text-muted-foreground truncate">{msg.info.id}</span>
+              <span className="ml-auto flex items-center gap-2 shrink-0">
+                {totalMsgTokens > 0 && (
+                  <span className="text-muted-foreground/60">{totalMsgTokens.toLocaleString()}t</span>
+                )}
+                <span className={cn(
+                  'text-muted-foreground/60',
+                  isEmptyAssistant && 'text-yellow-600 dark:text-yellow-400 font-bold',
+                )}>
+                  {msg.parts.length} part{msg.parts.length !== 1 ? 's' : ''}
+                </span>
+              </span>
+            </summary>
+            <div className="px-3 py-2 space-y-2">
+              {/* Error details — shown prominently */}
+              {hasError && (
+                <div className="p-2 rounded bg-red-500/10 border border-red-500/30">
+                  <p className="text-red-500 font-bold text-[10px] uppercase mb-1">Error Details</p>
+                  <pre className="text-red-400 whitespace-pre-wrap break-all">
+                    {JSON.stringify(info.error, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {/* Empty assistant warning */}
+              {isEmptyAssistant && !hasError && (
+                <div className="p-2 rounded bg-yellow-500/10 border border-yellow-500/30">
+                  <p className="text-yellow-600 dark:text-yellow-400 font-bold text-[10px] uppercase">
+                    Assistant message has no parts — LLM completion may have failed silently
+                  </p>
+                  {totalMsgTokens === 0 && (
+                    <p className="text-yellow-600/80 dark:text-yellow-400/80 text-[10px] mt-1">
+                      0 tokens used — the model call likely never completed
+                    </p>
+                  )}
+                </div>
+              )}
+              {/* Message info */}
+              <details className="group" open={hasError || isEmptyAssistant}>
+                <summary className="text-muted-foreground cursor-pointer hover:text-foreground">info</summary>
                 <pre className="mt-1 p-2 rounded bg-muted/40 overflow-x-auto whitespace-pre-wrap break-all">
-                  {JSON.stringify(part, null, 2)}
+                  {JSON.stringify(msg.info, null, 2)}
                 </pre>
               </details>
-            ))}
-          </div>
-        </details>
-      ))}
+              {/* Parts */}
+              {msg.parts.map((part) => (
+                <details key={part.id} className="group">
+                  <summary className="cursor-pointer hover:text-foreground flex items-center gap-2">
+                    <span className={cn(
+                      'px-1 py-0.5 rounded text-[9px] font-bold uppercase',
+                      part.type === 'text' ? 'bg-violet-500/20 text-violet-500' :
+                      part.type === 'tool' ? 'bg-orange-500/20 text-orange-500' :
+                      part.type === 'reasoning' ? 'bg-pink-500/20 text-pink-500' :
+                      'bg-gray-500/20 text-gray-500',
+                    )}>
+                      {part.type}
+                    </span>
+                    <span className="text-muted-foreground truncate">
+                      {part.type === 'tool' ? (part as ToolPart).tool : ''}
+                      {part.type === 'text' ? ((part as TextPart).text?.slice(0, 80) + '...') : ''}
+                    </span>
+                    <span className="ml-auto text-muted-foreground/50">{part.id}</span>
+                  </summary>
+                  <pre className="mt-1 p-2 rounded bg-muted/40 overflow-x-auto whitespace-pre-wrap break-all">
+                    {JSON.stringify(part, null, 2)}
+                  </pre>
+                </details>
+              ))}
+            </div>
+          </details>
+        );
+      })}
     </div>
   );
 }
@@ -1994,10 +2100,13 @@ interface SessionChatProps {
   sessionId: string;
   /** Optional element rendered at the leading (left) edge of the session header */
   headerLeadingAction?: React.ReactNode;
+  /** Hide the session site header entirely */
+  hideHeader?: boolean;
 }
 
-export function SessionChat({ sessionId, headerLeadingAction }: SessionChatProps) {
+export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: SessionChatProps) {
   const [debugMode, setDebugMode] = useState(false);
+  const debugInitRef = useRef(false);
 
   // ---- KortixComputer side panel ----
   const { isSidePanelOpen, setIsSidePanelOpen, openFileInComputer } = useKortixComputerStore();
@@ -2026,6 +2135,14 @@ export function SessionChat({ sessionId, headerLeadingAction }: SessionChatProps
   const searchParams = useSearchParams();
   const isDebugEnabled = searchParams.has('debug');
   const pendingPromptHandled = useRef(false);
+
+  // Auto-enable debug mode when ?debug is in URL (once on mount)
+  useEffect(() => {
+    if (isDebugEnabled && !debugInitRef.current) {
+      debugInitRef.current = true;
+      setDebugMode(true);
+    }
+  }, [isDebugEnabled]);
 
   // ---- Polling fallback & optimistic send ----
   const [pollingActive, setPollingActive] = useState(false);
@@ -2780,14 +2897,16 @@ export function SessionChat({ sessionId, headerLeadingAction }: SessionChatProps
         </div>
       )}
       {/* Session header — shown for all sessions including sub-sessions */}
-      <SessionSiteHeader
-        sessionId={sessionId}
-        sessionTitle={session?.title || 'Untitled'}
-        onToggleSidePanel={handleTogglePanel}
-        isSidePanelOpen={isSidePanelOpen}
-        canOpenSidePanel={hasToolCalls}
-        leadingAction={headerLeadingAction}
-      />
+      {!hideHeader && (
+        <SessionSiteHeader
+          sessionId={sessionId}
+          sessionTitle={session?.title || 'Untitled'}
+          onToggleSidePanel={handleTogglePanel}
+          isSidePanelOpen={isSidePanelOpen}
+          canOpenSidePanel={hasToolCalls}
+          leadingAction={headerLeadingAction}
+        />
+      )}
 
       {/* Revert banner — shown when session is in reverted state */}
       {isReverted && session?.revert?.messageID && (
@@ -2804,7 +2923,7 @@ export function SessionChat({ sessionId, headerLeadingAction }: SessionChatProps
         <button
           onClick={() => setDebugMode(!debugMode)}
           className={cn(
-            'absolute bottom-20 right-4 z-50 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium shadow-lg border transition-colors cursor-pointer backdrop-blur-sm',
+            'absolute bottom-20 right-4 z-50 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium border transition-colors cursor-pointer backdrop-blur-sm',
             debugMode
               ? 'bg-orange-500/15 text-orange-500 border-orange-500/30 hover:bg-orange-500/25'
               : 'bg-background/80 text-muted-foreground/60 border-border/50 hover:text-muted-foreground hover:bg-muted/60',
@@ -3007,7 +3126,7 @@ export function SessionChat({ sessionId, headerLeadingAction }: SessionChatProps
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full shadow-md h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
+              className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
               onClick={scrollToBottom}
             >
               <ArrowDown className="size-3 mr-1" />
@@ -3022,7 +3141,7 @@ export function SessionChat({ sessionId, headerLeadingAction }: SessionChatProps
       {/* Queued messages popup — expandable/collapsible above input */}
       {queuedMessages.length > 0 && (
         <div className="mx-auto w-full max-w-3xl px-2 sm:px-4">
-          <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-sm shadow-sm overflow-hidden mb-1">
+          <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-sm overflow-hidden mb-1">
             {/* Header — always visible, acts as toggle */}
             <button
               type="button"

@@ -238,7 +238,7 @@ function AgentSelector({
       </Tooltip>
 
       {open && (
-        <div className="absolute bottom-full left-0 mb-1.5 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[240px] max-w-[320px] animate-in fade-in-0 slide-in-from-bottom-2 duration-150">
+        <div className="absolute bottom-full left-0 mb-1.5 z-50 bg-popover border border-border rounded-xl overflow-hidden min-w-[240px] max-w-[320px] animate-in fade-in-0 slide-in-from-bottom-2 duration-150">
           <div ref={listRef} className="max-h-[320px] overflow-y-auto p-1">
             {/* Primary agents */}
             {primaryAgents.length > 0 && (
@@ -667,7 +667,7 @@ function SlashCommandPopover({
 
   return (
     <div
-      className="fixed z-[9999] bg-popover border border-border rounded-xl shadow-lg overflow-hidden"
+      className="fixed z-[9999] bg-popover border border-border rounded-xl overflow-hidden"
       style={{ bottom: window.innerHeight - r.top + 4, left: r.left, width: r.width }}
     >
       <div ref={scrollRef} className="max-h-64 overflow-y-auto py-1">
@@ -747,7 +747,7 @@ function MentionPopover({
 
   return (
     <div
-      className="fixed z-[9999] bg-popover border border-border rounded-xl shadow-lg overflow-hidden"
+      className="fixed z-[9999] bg-popover border border-border rounded-xl overflow-hidden"
       style={{ bottom: window.innerHeight - r.top + 4, left: r.left, width: r.width }}
     >
       <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
@@ -1501,7 +1501,7 @@ export function SessionChatInput({
 
   return (
     <div className="mx-auto w-full max-w-4xl relative shrink-0 px-2 sm:px-4 pb-6">
-      <div ref={cardRef} className="w-full bg-card border border-border rounded-[24px] shadow-sm shadow-black/[0.03] dark:shadow-white/[0.02] overflow-visible relative z-10">
+      <div ref={cardRef} className="w-full bg-card border border-border rounded-[24px] overflow-visible relative z-10">
         <div className="relative flex flex-col w-full gap-2 overflow-visible">
           {/* Slash command popover (portalled to body to escape overflow-hidden ancestors) */}
           {slashFilter !== null && filteredCommands.length > 0 && (

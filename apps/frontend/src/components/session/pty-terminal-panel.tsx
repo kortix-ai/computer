@@ -291,7 +291,7 @@ function PtyTab({
       className={cn(
         'group flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer max-w-[160px]',
         isActive
-          ? 'bg-white dark:bg-zinc-800 text-foreground shadow-sm'
+          ? 'bg-white dark:bg-zinc-800 text-foreground'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
       )}
     >

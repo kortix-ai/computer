@@ -192,9 +192,9 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
               className={cn(
                 'px-3 py-1.5 text-[11px] font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap',
                 tab === i
-                  ? 'bg-primary/15 text-primary shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                (answers[i]?.length ?? 0) > 0 && tab !== i && 'text-primary/70',
+                   ? 'bg-primary/15 text-primary'
+                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                 (answers[i]?.length ?? 0) > 0 && tab !== i && 'text-primary/70',
               )}
             >
               {q.header || `Q${i + 1}`}
@@ -205,7 +205,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
             className={cn(
               'px-3 py-1.5 text-[11px] font-medium rounded-lg transition-all cursor-pointer',
               isConfirm
-                ? 'bg-primary/15 text-primary shadow-sm'
+                ? 'bg-primary/15 text-primary'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
             )}
           >
@@ -260,7 +260,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
                     className={cn(
                       'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs text-left transition-all cursor-pointer group',
                       isPicked
-                        ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                        ? 'bg-primary/10 text-primary border border-primary/25'
                         : 'bg-muted/20 text-foreground hover:bg-muted/50 border border-border/40 hover:border-border/60',
                     )}
                   >
@@ -288,7 +288,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
                   className={cn(
                     'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs text-left transition-all cursor-pointer group',
                     customInputs[tab]
-                      ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                      ? 'bg-primary/10 text-primary border border-primary/25'
                       : 'bg-muted/20 text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border/40 hover:border-border/60',
                   )}
                 >
@@ -368,7 +368,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
           {!isSingle && isConfirm && (
             <button
               onClick={submit}
-              className="px-4 py-1.5 text-[11px] font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm"
+              className="px-4 py-1.5 text-[11px] font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer"
             >
               Submit
             </button>
