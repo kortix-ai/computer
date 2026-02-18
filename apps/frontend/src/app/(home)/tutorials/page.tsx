@@ -105,7 +105,7 @@ function TableOfContents({
           key={tutorial.id}
           href={`#${tutorial.id}`}
           className={cn(
-            "flex items-start gap-3 py-2 px-3 text-sm rounded-lg transition-colors",
+            "flex items-start gap-3 py-2 px-3 text-sm rounded-xl transition-colors",
             activeId === tutorial.id
               ? "bg-primary/10 text-primary font-medium"
               : "text-muted-foreground hover:text-foreground hover:bg-accent/50"

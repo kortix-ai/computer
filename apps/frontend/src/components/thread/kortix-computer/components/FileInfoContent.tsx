@@ -169,7 +169,7 @@ export const FileInfoContent = memo(function FileInfoContent({
                 <button
                   onClick={handleCopyPath}
                   className={cn(
-                    "shrink-0 p-1.5 rounded-md transition-colors",
+                    "shrink-0 p-1.5 rounded-xl transition-colors",
                     copiedPath ? "bg-zinc-500/20 text-zinc-500" : "hover:bg-muted text-muted-foreground"
                   )}
                 >

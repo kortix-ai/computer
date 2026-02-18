@@ -323,7 +323,7 @@ function PlanPicker({
           <button
             onClick={() => setBillingPeriod('monthly')}
             className={cn(
-              "px-3 py-1.5 rounded-md transition-all",
+              "px-3 py-1.5 rounded-xl transition-all",
               billingPeriod === 'monthly'
                 ? "bg-background shadow-sm font-medium"
                 : "text-muted-foreground hover:text-foreground"
@@ -334,7 +334,7 @@ function PlanPicker({
           <button
             onClick={() => setBillingPeriod('yearly')}
             className={cn(
-              "px-3 py-1.5 rounded-md transition-all flex items-center gap-1",
+              "px-3 py-1.5 rounded-xl transition-all flex items-center gap-1",
               billingPeriod === 'yearly'
                 ? "bg-background shadow-sm font-medium"
                 : "text-muted-foreground hover:text-foreground"
@@ -398,7 +398,7 @@ function PlanPicker({
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
               placeholder="Enter promo code"
-              className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+              className="flex-1 px-3 py-2 text-sm border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
             />
             <button
               onClick={() => setShowPromoInput(false)}

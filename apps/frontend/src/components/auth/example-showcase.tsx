@@ -354,7 +354,7 @@ export function ExampleShowcase() {
                     <div key={idx} className="my-1">
                       <button
                         onClick={() => setCurrentStepIndex(idx)}
-                        className="inline-flex items-center gap-1 h-6 px-1.5 py-1 text-xs text-muted-foreground bg-card rounded-lg border border-neutral-200 dark:border-neutral-700/50 whitespace-nowrap cursor-pointer hover:bg-card/80 transition-colors"
+                        className="inline-flex items-center gap-1 h-6 px-1.5 py-1 text-xs text-muted-foreground bg-card rounded-xl border border-neutral-200 dark:border-neutral-700/50 whitespace-nowrap cursor-pointer hover:bg-card/80 transition-colors"
                       >
                         <IconComponent className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
                         <span className="font-mono text-[9px] text-foreground">{step.title}</span>
@@ -386,7 +386,7 @@ export function ExampleShowcase() {
                       duration: 0.3,
                       ease: [0.4, 0, 0.2, 1]
                     }}
-                    className={`py-1 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${activeExample === idx
+                    className={`py-1 rounded-xl text-[10px] font-medium transition-colors cursor-pointer ${activeExample === idx
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-card border text-foreground hover:bg-card/80'
                       }`}
@@ -542,7 +542,7 @@ export function ExampleShowcase() {
                     {displayedContent.contentFiles.map((file, idx) => (
                       <div
                         key={idx}
-                        className={`flex flex-col items-center justify-center p-1.5 rounded-lg ${idx === displayedContent.contentFiles!.length - 1
+                        className={`flex flex-col items-center justify-center p-1.5 rounded-xl ${idx === displayedContent.contentFiles!.length - 1
                           ? 'bg-primary/10 border border-primary/20'
                           : ''
                           }`}

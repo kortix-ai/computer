@@ -286,7 +286,7 @@ export const CustomMCPDialog: React.FC<CustomMCPDialogProps> = ({
                     placeholder="e.g., Gmail MCP Server, Slack Integration, File System Tools"
                     value={manualServerName}
                     onChange={(e) => setManualServerName(e.target.value)}
-                    className="w-full px-4 py-3 border border-input bg-background rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                    className="w-full px-4 py-3 border border-input bg-background rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   />
                   <p className="text-sm text-muted-foreground">
                     Give this MCP server a memorable name
@@ -303,7 +303,7 @@ export const CustomMCPDialog: React.FC<CustomMCPDialogProps> = ({
                       placeholder={exampleConfigs.http}
                       value={configText}
                       onChange={(e) => setConfigText(e.target.value)}
-                      className="w-full px-4 py-3 border border-input bg-muted rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent font-mono"
+                      className="w-full px-4 py-3 border border-input bg-muted rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent font-mono"
                     />
                   <p className="text-sm text-muted-foreground">
                     Enter the complete URL to your MCP server endpoint
@@ -362,7 +362,7 @@ export const CustomMCPDialog: React.FC<CustomMCPDialogProps> = ({
                         <div 
                           key={tool.name} 
                           className={cn(
-                            "flex items-start space-x-3 p-4 rounded-lg border transition-all cursor-pointer hover:bg-muted/50",
+                            "flex items-start space-x-3 p-4 rounded-xl border transition-all cursor-pointer hover:bg-muted/50",
                             selectedTools.has(tool.name) 
                               ? "border-primary bg-primary/5" 
                               : "border-border"

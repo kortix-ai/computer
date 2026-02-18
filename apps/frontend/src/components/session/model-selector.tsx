@@ -482,7 +482,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full h-7 pl-7 pr-6 rounded-md text-xs bg-muted border border-border focus:outline-none focus:border-border placeholder:text-muted-foreground transition-colors"
+                  className="w-full h-7 pl-7 pr-6 rounded-xl text-xs bg-muted border border-border focus:outline-none focus:border-border placeholder:text-muted-foreground transition-colors"
                 />
                 {search && (
                   <button
@@ -502,7 +502,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                       setOpen(false);
                       setConnectProviderOpen(true);
                     }}
-                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
+                    className="size-6 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
@@ -517,7 +517,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                       setOpen(false);
                       setManageModelsOpen(true);
                     }}
-                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
+                    className="size-6 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
                   >
                     <SlidersHorizontal className="h-3.5 w-3.5" />
                   </button>
@@ -551,7 +551,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                             <button
                               type="button"
                               className={cn(
-                                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[13px] transition-colors cursor-pointer',
+                                'w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-left text-[13px] transition-colors cursor-pointer',
                                 isHighlighted && !isSelected && 'bg-accent',
                                 isSelected && 'bg-accent',
                                 !isSelected && !isHighlighted && 'hover:bg-accent',

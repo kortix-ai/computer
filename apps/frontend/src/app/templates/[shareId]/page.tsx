@@ -462,7 +462,7 @@ export default function TemplateSharePage() {
                 <nav className="space-y-1">
                   <button
                     onClick={() => scrollToSection('system-prompt')}
-                    className="w-full px-3 py-2 text-sm rounded-lg transition-colors text-left flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    className="w-full px-3 py-2 text-sm rounded-xl transition-colors text-left flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   >
                     <FileText className="w-4 h-4" />
                     System Prompt
@@ -470,7 +470,7 @@ export default function TemplateSharePage() {
                   {hasIntegrations && (
                     <button
                       onClick={() => scrollToSection('integrations')}
-                      className="w-full px-3 py-2 text-sm rounded-lg transition-colors text-left flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      className="w-full px-3 py-2 text-sm rounded-xl transition-colors text-left flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     >
                       <Plug className="w-4 h-4" />
                       Integrations

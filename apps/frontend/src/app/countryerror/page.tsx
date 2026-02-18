@@ -54,7 +54,7 @@ export default function CountryError() {
               asChild
               size="lg"
               variant="outline"
-              className="w-full h-12 rounded-lg font-medium"
+              className="w-full h-12 rounded-xl font-medium"
             >
               <Link
                 href="mailto:support@kortix.ai"

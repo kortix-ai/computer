@@ -34,7 +34,7 @@ export function SimpleFooter() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="GitHub"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -55,7 +55,7 @@ export function SimpleFooter() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Discord"
-                className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                className="p-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +73,7 @@ export function SimpleFooter() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="X (Twitter)"
-                className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                className="p-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -91,7 +91,7 @@ export function SimpleFooter() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="LinkedIn"
-                className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                className="p-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

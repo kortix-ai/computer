@@ -129,7 +129,7 @@ export default function CareersPage() {
               >
                 <Link
                   href={job.href}
-                  className="group block p-6 rounded-2xl border border-border bg-card hover:bg-accent/50 hover:border-foreground/20 transition-all duration-300"
+                  className="group block p-6 rounded-xl border border-border bg-card hover:bg-accent/50 hover:border-foreground/20 transition-all duration-300"
                 >
                   <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     <div className="space-y-2">

@@ -133,7 +133,7 @@ function CompactInstanceRow({
       role="button"
       tabIndex={0}
       className={cn(
-        'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all group/row cursor-pointer',
+        'w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-left transition-all group/row cursor-pointer',
         isActive ? 'bg-primary/[0.06] dark:bg-primary/[0.08]' : 'hover:bg-muted/50',
       )}
       onClick={onSelect}
@@ -319,7 +319,7 @@ function DialogInstanceRow({
               {onEdit && (
                 <button
                   type="button"
-                  className="p-1.5 rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl hover:bg-muted/80 transition-colors cursor-pointer"
                   onClick={(e) => { e.stopPropagation(); onEdit(); }}
                   aria-label="Edit"
                 >
@@ -329,7 +329,7 @@ function DialogInstanceRow({
               {onDelete && (
                 <button
                   type="button"
-                  className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl hover:bg-destructive/10 transition-colors cursor-pointer"
                   onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
                   aria-label="Delete"
                 >
@@ -344,7 +344,7 @@ function DialogInstanceRow({
               <button
                 type="button"
                 disabled={isDeleting}
-                className="h-6 px-2.5 text-[11px] font-medium text-destructive-foreground bg-destructive rounded-md transition-colors cursor-pointer hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-6 px-2.5 text-[11px] font-medium text-destructive-foreground bg-destructive rounded-xl transition-colors cursor-pointer hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => { onDelete?.(); setConfirmDelete(false); }}
               >
                 {isDeleting ? (
@@ -356,7 +356,7 @@ function DialogInstanceRow({
               {!isDeleting && (
                 <button
                   type="button"
-                  className="p-1 rounded-md hover:bg-muted cursor-pointer"
+                  className="p-1 rounded-xl hover:bg-muted cursor-pointer"
                   onClick={() => setConfirmDelete(false)}
                 >
                   <X className="h-3.5 w-3.5 text-muted-foreground" />
@@ -592,13 +592,13 @@ export function InstanceManagerDialog({
                   placeholder="Search instances..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-8 text-xs pl-8 pr-3 rounded-lg bg-muted/40 border border-border/40 outline-none placeholder:text-muted-foreground/40 focus:border-primary/30 focus:bg-muted/60 transition-all"
+                  className="w-full h-8 text-xs pl-8 pr-3 rounded-xl bg-muted/40 border border-border/40 outline-none placeholder:text-muted-foreground/40 focus:border-primary/30 focus:bg-muted/60 transition-all"
                 />
               </div>
               <button
                 type="button"
                 onClick={startAdd}
-                className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors cursor-pointer flex-shrink-0"
+                className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-primary-foreground bg-primary rounded-xl hover:bg-primary/90 transition-colors cursor-pointer flex-shrink-0"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add
@@ -640,7 +640,7 @@ export function InstanceManagerDialog({
                     type="button"
                     onClick={() => handleCreateSandbox('local_docker')}
                     disabled={isCreatingSandbox}
-                    className="flex items-center justify-center gap-2 w-full h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-2 w-full h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCreatingSandbox ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -663,7 +663,7 @@ export function InstanceManagerDialog({
                       type="button"
                       onClick={() => handleCreateSandbox('daytona')}
                       disabled={isCreatingSandbox}
-                      className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isCreatingSandbox ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -678,7 +678,7 @@ export function InstanceManagerDialog({
                       type="button"
                       onClick={() => handleCreateSandbox('local_docker')}
                       disabled={isCreatingSandbox}
-                      className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isCreatingSandbox ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -716,7 +716,7 @@ export function InstanceManagerDialog({
                   placeholder="http://localhost:4096"
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
-                  className="w-full h-9 px-3 text-sm font-mono rounded-lg bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="w-full h-9 px-3 text-sm font-mono rounded-xl bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                   required
                 />
                 <p className="text-[10px] text-muted-foreground/50">
@@ -733,7 +733,7 @@ export function InstanceManagerDialog({
                   placeholder="My dev instance"
                   value={formLabel}
                   onChange={(e) => setFormLabel(e.target.value)}
-                  className="w-full h-9 px-3 text-sm rounded-lg bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="w-full h-9 px-3 text-sm rounded-xl bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
             </div>
@@ -742,7 +742,7 @@ export function InstanceManagerDialog({
             <div className="flex items-center justify-between pt-1">
               <button
                 type="button"
-                className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer"
+                className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted/60 transition-colors cursor-pointer"
                 onClick={() => setMode('list')}
               >
                 Back
@@ -750,7 +750,7 @@ export function InstanceManagerDialog({
               <button
                 type="submit"
                 disabled={!formUrl.trim()}
-                className="h-8 px-4 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="h-8 px-4 text-sm font-medium text-primary-foreground bg-primary rounded-xl hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 {mode === 'add' ? 'Add & Connect' : 'Save Changes'}
               </button>
@@ -811,7 +811,7 @@ export function ServerSelector() {
         {/* Quick add */}
         <button
           type="button"
-          className="flex items-center gap-1.5 mx-1 px-2 py-1.5 rounded-lg text-[11px] text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/40 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 mx-1 px-2 py-1.5 rounded-xl text-[11px] text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/40 transition-colors cursor-pointer"
           onClick={() => setDialogOpen(true)}
         >
           <Plus className="h-3 w-3" />

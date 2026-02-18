@@ -175,7 +175,7 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
                 serverId: useServerStore.getState().activeServerId,
               })
             }
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
           >
             <GitFork className="size-3 text-muted-foreground/60" />
             <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
@@ -770,7 +770,7 @@ function PartActions({
                 onClick={() => setEditOpen(true)}
                 disabled={isBusy}
                 className={cn(
-                  'p-1.5 rounded-md transition-colors cursor-pointer',
+                  'p-1.5 rounded-xl transition-colors cursor-pointer',
                   'text-muted-foreground/50 hover:text-foreground hover:bg-muted/60',
                   'disabled:opacity-30 disabled:cursor-not-allowed',
                 )}
@@ -791,7 +791,7 @@ function PartActions({
               onClick={() => setDeleteDialogOpen(true)}
               disabled={isBusy}
               className={cn(
-                'p-1.5 rounded-md transition-colors cursor-pointer',
+                'p-1.5 rounded-xl transition-colors cursor-pointer',
                 'text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10',
                 'disabled:opacity-30 disabled:cursor-not-allowed',
               )}
@@ -1506,7 +1506,7 @@ function SessionTurn({
               <TooltipTrigger asChild>
                 <button
                   onClick={handleCopyUser}
-                  className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                 >
                   {userCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                 </button>
@@ -1784,19 +1784,19 @@ function SessionTurn({
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => onPermissionReply(nextPermission.id, 'reject')}
-              className="px-2 py-1 text-[11px] rounded-md text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+              className="px-2 py-1 text-[11px] rounded-xl text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             >
               Deny
             </button>
             <button
               onClick={() => onPermissionReply(nextPermission.id, 'always')}
-              className="px-2 py-1 text-[11px] rounded-md text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
+              className="px-2 py-1 text-[11px] rounded-xl text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
             >
               Allow always
             </button>
             <button
               onClick={() => onPermissionReply(nextPermission.id, 'once')}
-              className="px-2 py-1 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+              className="px-2 py-1 text-[11px] rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
             >
               Allow once
             </button>
@@ -1821,7 +1821,7 @@ function SessionTurn({
               <TooltipTrigger asChild>
                 <button
                   onClick={handleCopy}
-                  className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                 >
                   {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                 </button>
@@ -1833,7 +1833,7 @@ function SessionTurn({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => onFork(lastAssistantMessageId)}
-                    className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-xl text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                   >
                     <GitFork className="size-3.5" />
                   </button>
@@ -1846,7 +1846,7 @@ function SessionTurn({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setRevertDialogOpen(true)}
-                    className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-xl text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                   >
                     <Undo2 className="size-3.5" />
                   </button>
@@ -2996,7 +2996,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                       tabIndex={0}
                       onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
-                      className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      className="inline-flex items-center justify-center size-5 rounded-xl text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
                     >
                       <Trash2 className="size-3" />
                     </span>
@@ -3035,7 +3035,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                               <button
                                 type="button"
                                 onClick={() => handleQueueSendNow(qm.id)}
-                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                                className="inline-flex items-center justify-center size-6 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                               >
                                 <Send className="size-3" />
                               </button>
@@ -3048,7 +3048,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                                 <button
                                   type="button"
                                   onClick={() => queueMoveUp(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                                  className="inline-flex items-center justify-center size-6 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                                 >
                                   <ArrowUp className="size-3" />
                                 </button>
@@ -3062,7 +3062,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                                 <button
                                   type="button"
                                   onClick={() => queueMoveDown(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                                  className="inline-flex items-center justify-center size-6 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                                 >
                                   <ArrowDown className="size-3" />
                                 </button>
@@ -3075,7 +3075,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                               <button
                                 type="button"
                                 onClick={() => queueRemove(qm.id)}
-                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                                className="inline-flex items-center justify-center size-6 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                               >
                                 <X className="size-3" />
                               </button>

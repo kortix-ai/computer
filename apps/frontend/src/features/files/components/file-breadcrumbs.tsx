@@ -24,7 +24,7 @@ export function FileBreadcrumbs() {
       <button
         onClick={() => navigateToPath('/')}
         className={cn(
-          'flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-pointer shrink-0',
+          'flex items-center gap-1.5 px-2 py-1 rounded-xl transition-colors cursor-pointer shrink-0',
           'hover:bg-muted',
           segments.length === 0
             ? 'text-foreground font-medium'
@@ -45,7 +45,7 @@ export function FileBreadcrumbs() {
             <button
               onClick={() => navigateToPath(pathToHere)}
               className={cn(
-                'px-1.5 py-1 rounded-md transition-colors cursor-pointer truncate max-w-[150px]',
+                'px-1.5 py-1 rounded-xl transition-colors cursor-pointer truncate max-w-[150px]',
                 'hover:bg-muted',
                 isLast
                   ? 'text-foreground font-medium'

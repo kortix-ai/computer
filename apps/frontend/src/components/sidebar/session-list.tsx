@@ -114,7 +114,7 @@ function SessionItem({
     >
       <div
         className={cn(
-          'flex items-center gap-2 py-1.5 rounded-lg text-[13px] cursor-pointer',
+          'flex items-center gap-2 py-1.5 rounded-xl text-[13px] cursor-pointer',
           'transition-colors duration-150',
           isActive
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -210,7 +210,7 @@ function SessionItem({
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
-                   'p-0.5 rounded-md hover:bg-sidebar-accent transition-colors duration-150 text-muted-foreground hover:text-sidebar-foreground cursor-pointer',
+                   'p-0.5 rounded-xl hover:bg-sidebar-accent transition-colors duration-150 text-muted-foreground hover:text-sidebar-foreground cursor-pointer',
                   isHovering ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
                 onClick={(e) => {
@@ -698,7 +698,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
         <div className="px-2 pb-1">
           <button
             onClick={() => setShowArchived((v) => !v)}
-            className="flex items-center gap-1.5 w-full px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 w-full px-3 py-1.5 rounded-xl text-xs text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
           >
             <Archive className="size-3" />
             <span>Archived</span>
@@ -714,7 +714,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
               {archivedSessions.map((session) => (
                 <div
                   key={session.id}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors duration-150 group cursor-pointer"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors duration-150 group cursor-pointer"
                 >
                   <span className="flex-1 truncate text-xs">
                     {session.title || 'Untitled'}
@@ -723,7 +723,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => handleUnarchiveSession(session.id)}
-                        className="p-0.5 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors cursor-pointer"
+                        className="p-0.5 rounded-xl hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors cursor-pointer"
                       >
                         <ArchiveRestore className="size-3.5" />
                       </button>
@@ -736,7 +736,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => handleDeleteSession(session.id, session.title || 'Untitled')}
-                        className="p-0.5 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors cursor-pointer"
+                        className="p-0.5 rounded-xl hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors cursor-pointer"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -769,7 +769,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
             <p className="text-xs text-muted-foreground mt-1">Could not reach server</p>
             <button
               onClick={() => refetch()}
-              className="mt-3 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg bg-muted hover:bg-sidebar-accent transition-colors cursor-pointer"
+              className="mt-3 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-xl bg-muted hover:bg-sidebar-accent transition-colors cursor-pointer"
             >
               Retry
             </button>

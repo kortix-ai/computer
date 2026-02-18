@@ -267,7 +267,7 @@ function SandboxPreviewCard({
           {/* Status icon */}
           <div className="relative flex-shrink-0">
             <div className={cn(
-              'w-8 h-8 rounded-lg border flex items-center justify-center transition-colors',
+              'w-8 h-8 rounded-xl border flex items-center justify-center transition-colors',
               isReachable
                 ? 'bg-emerald-500/8 border-emerald-500/15 group-hover/card:bg-emerald-500/12'
                 : isChecking

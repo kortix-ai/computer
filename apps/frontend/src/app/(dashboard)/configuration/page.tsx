@@ -114,7 +114,7 @@ function ArrayEditor({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
           placeholder={placeholder}
-          className="flex-1 h-8 px-2 rounded-lg text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="flex-1 h-8 px-2 rounded-xl text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <Button variant="ghost" size="sm" onClick={add} className="h-8 px-2">
           <Plus className="h-3.5 w-3.5" />
@@ -183,7 +183,7 @@ function GeneralTab({
               <select
                 value={model}
                 onChange={(e) => onDraft('model', e.target.value || undefined)}
-                className="w-full max-w-sm h-8 px-2 rounded-lg text-sm bg-muted border border-border font-mono cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full max-w-sm h-8 px-2 rounded-xl text-sm bg-muted border border-border font-mono cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="">Auto-detect</option>
                 {allModels.map((m) => (
@@ -199,7 +199,7 @@ function GeneralTab({
               <select
                 value={smallModel}
                 onChange={(e) => onDraft('small_model', e.target.value || undefined)}
-                className="w-full max-w-sm h-8 px-2 rounded-lg text-sm bg-muted border border-border font-mono cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full max-w-sm h-8 px-2 rounded-xl text-sm bg-muted border border-border font-mono cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="">Auto-detect</option>
                 {allModels.map((m) => (
@@ -224,7 +224,7 @@ function GeneralTab({
                   const current = (draft.agent ?? config.agent ?? {}) as Record<string, unknown>;
                   onDraft('agent', { ...current, general: { ...(current.general as any), model: e.target.value || undefined } });
                 }}
-                className="w-full max-w-sm h-8 px-2 rounded-lg text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full max-w-sm h-8 px-2 rounded-xl text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="">Default</option>
                 {agentNames.map((n) => (
@@ -247,14 +247,14 @@ function GeneralTab({
               value={username}
               onChange={(e) => onDraft('username', e.target.value || undefined)}
               placeholder="System username"
-              className="w-full max-w-sm h-8 px-2 rounded-lg text-sm bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full max-w-sm h-8 px-2 rounded-xl text-sm bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </Row>
           <Row label="Sharing">
             <select
               value={share}
               onChange={(e) => onDraft('share', e.target.value)}
-              className="h-8 px-2 rounded-lg text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="h-8 px-2 rounded-xl text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="manual">Manual</option>
               <option value="auto">Auto</option>
@@ -268,7 +268,7 @@ function GeneralTab({
                 const v = e.target.value;
                 onDraft('autoupdate', v === 'true' ? true : v === 'notify' ? 'notify' : false);
               }}
-              className="h-8 px-2 rounded-lg text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="h-8 px-2 rounded-xl text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="true">Enabled</option>
               <option value="notify">Notify only</option>
@@ -561,7 +561,7 @@ function ProvidersTab({
                       <button
                         onClick={() => handleDisconnect(p.id)}
                         disabled={isDisc}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                        className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                         title="Disconnect provider"
                       >
                         {isDisc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unplug className="h-3.5 w-3.5" />}
@@ -771,12 +771,12 @@ function McpTab({
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Server name"
-                className="flex-1 h-8 px-2 rounded-lg text-sm bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="flex-1 h-8 px-2 rounded-xl text-sm bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as 'local' | 'remote')}
-                className="h-8 px-2 rounded-lg text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="h-8 px-2 rounded-xl text-sm bg-muted border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="local">Local</option>
                 <option value="remote">Remote</option>
@@ -788,7 +788,7 @@ function McpTab({
                 value={newCommand}
                 onChange={(e) => setNewCommand(e.target.value)}
                 placeholder="Command (e.g. npx -y @modelcontextprotocol/server-filesystem)"
-                className="w-full h-8 px-2 rounded-lg text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full h-8 px-2 rounded-xl text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             ) : (
               <input
@@ -796,7 +796,7 @@ function McpTab({
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
                 placeholder="URL (e.g. https://mcp.example.com/sse)"
-                className="w-full h-8 px-2 rounded-lg text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full h-8 px-2 rounded-xl text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             )}
             <div className="flex justify-end gap-2">
@@ -907,7 +907,7 @@ function PermissionsTab({
                     key={a}
                     onClick={() => setAction(key, a)}
                     className={cn(
-                      'px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+                      'px-3 py-1 rounded-xl text-xs font-medium transition-colors cursor-pointer',
                       getAction(key) === a
                         ? a === 'allow' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                           : a === 'deny' ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20'
@@ -934,7 +934,7 @@ function PermissionsTab({
                   key={a}
                   onClick={() => onDraft('permission', { ...permission, bash: a })}
                   className={cn(
-                    'px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+                    'px-3 py-1 rounded-xl text-xs font-medium transition-colors cursor-pointer',
                     bashIsSimple && bashAction === a
                       ? a === 'allow' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                         : a === 'deny' ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20'
@@ -1125,7 +1125,7 @@ function AdvancedTab({
               placeholder="Default"
               min={0}
               max={10}
-              className="w-20 h-8 px-2 rounded-lg text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-20 h-8 px-2 rounded-xl text-sm bg-muted border border-border font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </Row>
         </div>

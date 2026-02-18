@@ -639,11 +639,11 @@ function LoginContent() {
               </h1>
             </div>
             <div className="space-y-3 mb-4">
-              <Suspense fallback={<div className="h-10 sm:h-11 bg-muted/20 rounded-full animate-pulse" />}>
+              <Suspense fallback={<div className="h-10 sm:h-11 bg-muted/20 rounded-xl animate-pulse" />}>
                 <GoogleSignIn returnUrl={returnUrl || undefined} referralCode={referralCode} />
               </Suspense>
               {/* GitHub auth commented out
-              <Suspense fallback={<div className="h-10 sm:h-11 bg-muted/20 rounded-full animate-pulse" />}>
+              <Suspense fallback={<div className="h-10 sm:h-11 bg-muted/20 rounded-xl animate-pulse" />}>
                 <GitHubSignIn returnUrl={returnUrl || undefined} referralCode={referralCode} />
               </Suspense>
               */}

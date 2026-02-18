@@ -11,7 +11,7 @@ interface PageHeaderProps {
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ icon: Icon, children }) => {
   return (
-    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl flex items-center justify-center border bg-background/80 backdrop-blur-sm">
+    <div className="relative overflow-hidden rounded-xl sm:rounded-xl flex items-center justify-center border bg-background/80 backdrop-blur-sm">
       <AnimatedBg variant="header" blurMultiplier={1.3} sizeMultiplier={1.1} />
       <div className="relative px-4 sm:px-8 py-8 sm:py-16 text-center z-20">
         <div className="mx-auto max-w-3xl space-y-3 sm:space-y-6">

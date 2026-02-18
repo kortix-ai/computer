@@ -107,7 +107,7 @@ export function MobileAppInterstitial() {
           {/* Card */}
           <button
             onClick={openStore}
-            className="w-full bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl text-left active:scale-[0.98] transition-transform"
+            className="w-full bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl shadow-xl text-left active:scale-[0.98] transition-transform"
           >
             <div className="p-5 flex items-center gap-4">
               {/* App Icon */}

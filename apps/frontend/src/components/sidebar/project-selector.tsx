@@ -89,7 +89,7 @@ export function ProjectSelector({
               key={project.id}
               onClick={() => handleProjectClick(project.id, getProjectDisplayName(project))}
               className={cn(
-                'flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-sm cursor-pointer',
+                'flex items-center gap-3 w-full px-3 py-1.5 rounded-xl text-sm cursor-pointer',
                 'transition-colors duration-150',
                 activeProjectId === project.id
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'

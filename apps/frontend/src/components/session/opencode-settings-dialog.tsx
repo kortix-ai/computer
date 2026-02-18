@@ -477,7 +477,7 @@ function PermissionsSection({
                       key={a}
                       onClick={() => setAction(key, a)}
                       className={cn(
-                        'px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer',
+                        'px-2.5 py-1 rounded-xl text-[11px] font-medium transition-colors cursor-pointer',
                         getAction(key) === a
                           ? a === 'allow'
                             ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
@@ -900,7 +900,7 @@ function McpServersSection() {
               <button
                 type="button"
                 onClick={addEnvPair}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
                 <Plus className="h-3 w-3" />
                 Add

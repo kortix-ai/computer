@@ -158,7 +158,7 @@ const TaskListItem = ({
             onClick={onDelete}
             disabled={isDeleting}
             className={cn(
-              "p-2 rounded-lg transition-all",
+              "p-2 rounded-xl transition-all",
               "opacity-0 group-hover:opacity-100 focus:opacity-100",
               "text-muted-foreground hover:text-red-500 hover:bg-red-500/10",
               isDeleting && "opacity-100 text-red-500"

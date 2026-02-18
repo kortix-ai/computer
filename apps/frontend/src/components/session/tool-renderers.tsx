@@ -470,7 +470,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
               <div key={i}>
                 <button
                   onClick={() => setShowTrace((v) => !v)}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-xl text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
                 >
                   <ChevronRight
                     className={cn(
@@ -681,7 +681,7 @@ function SessionMetadataList({
             })
           }
           className={cn(
-            'flex items-start gap-2.5 px-2.5 py-2 rounded-md text-left w-full',
+            'flex items-start gap-2.5 px-2.5 py-2 rounded-xl text-left w-full',
             'hover:bg-muted/60 transition-colors group cursor-pointer',
           )}
         >
@@ -4565,21 +4565,21 @@ function PermissionPromptInline({ permission, onReply }: PermissionPromptInlineP
         <button
           disabled={replying}
           onClick={() => handleReply('reject')}
-          className="px-2 py-1 text-[11px] rounded-md text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+          className="px-2 py-1 text-[11px] rounded-xl text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
         >
           Deny
         </button>
         <button
           disabled={replying}
           onClick={() => handleReply('always')}
-          className="px-2 py-1 text-[11px] rounded-md text-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50"
+          className="px-2 py-1 text-[11px] rounded-xl text-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50"
         >
           Allow always
         </button>
         <button
           disabled={replying}
           onClick={() => handleReply('once')}
-          className="px-2 py-1 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className="px-2 py-1 text-[11px] rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           Allow once
         </button>

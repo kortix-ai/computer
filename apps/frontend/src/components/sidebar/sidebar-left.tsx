@@ -83,7 +83,7 @@ function FloatingMobileMenuButton() {
       <Button
         onClick={() => { setOpen(true); setOpenMobile(true); }}
         size="icon"
-        className="h-9 w-9 rounded-full bg-background/80 backdrop-blur-sm text-foreground border border-border shadow-md hover:bg-background transition-all duration-200 active:scale-95 touch-manipulation"
+        className="h-9 w-9 rounded-xl bg-background/80 backdrop-blur-sm text-foreground border border-border shadow-md hover:bg-background transition-all duration-200 active:scale-95 touch-manipulation"
         aria-label="Open menu"
       >
         <Menu className="h-4 w-4" />
@@ -356,7 +356,7 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
       <div className="flex justify-center">
         <button
           onClick={() => router.push('/changelog')}
-          className="relative p-2 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
+          className="relative p-2 rounded-xl hover:bg-primary/10 transition-colors cursor-pointer"
           title={`Update v${latestVersion} available`}
         >
           <ArrowDownToLine className="h-4 w-4 text-primary" />
@@ -606,7 +606,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
           <button
             className={cn(
-              'flex items-center justify-center h-7 w-7 rounded-lg transition-colors duration-150 cursor-pointer',
+              'flex items-center justify-center h-7 w-7 rounded-xl transition-colors duration-150 cursor-pointer',
         'text-sidebar-foreground hover:bg-sidebar-accent',
               state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}

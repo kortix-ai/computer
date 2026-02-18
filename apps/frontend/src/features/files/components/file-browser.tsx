@@ -98,7 +98,7 @@ function ParentDropTarget({
         onDropMove(sourcePath, parentPath === '.' ? '' : parentPath);
       }}
       className={cn(
-        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer',
+        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-xl transition-colors cursor-pointer',
         'hover:bg-muted/80 text-muted-foreground',
         isDragOver && 'bg-primary/15 ring-1 ring-primary/40',
       )}

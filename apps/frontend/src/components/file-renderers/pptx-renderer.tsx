@@ -478,7 +478,7 @@ export function PptxRenderer({
                 key={idx}
                 onClick={() => setCurrentSlide(idx)}
                 className={cn(
-                  'shrink-0 w-20 h-14 rounded-md border text-xs flex items-center justify-center transition-colors',
+                  'shrink-0 w-20 h-14 rounded-xl border text-xs flex items-center justify-center transition-colors',
                   idx === currentSlide
                     ? 'border-primary bg-primary/10 text-primary font-medium'
                     : 'border-border bg-card text-muted-foreground hover:bg-muted/50',

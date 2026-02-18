@@ -237,7 +237,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
             type="button"
             onClick={() => update({ frequency: freq })}
             className={cn(
-              "flex-1 px-1 py-1.5 rounded-lg text-xs font-medium transition-all text-center",
+              "flex-1 px-1 py-1.5 rounded-xl text-xs font-medium transition-all text-center",
               state.frequency === freq
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -306,7 +306,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                 type="button"
                 onClick={() => toggleWeekday(day)}
                 className={cn(
-                  "flex-1 h-8 rounded-lg text-xs font-medium transition-all",
+                  "flex-1 h-8 rounded-xl text-xs font-medium transition-all",
                   state.weekdays.includes(day)
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "bg-background text-muted-foreground border border-border hover:border-foreground/30 hover:text-foreground"

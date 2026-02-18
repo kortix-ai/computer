@@ -207,7 +207,7 @@ export function UserSettingsModal({
                                             onClick={() => handleTabClick(tab.id)}
                                             disabled={tab.disabled}
                                             className={cn(
-                                                "flex items-center gap-2 px-3 py-2 text-sm rounded-lg whitespace-nowrap flex-shrink-0 transition-colors",
+                                                "flex items-center gap-2 px-3 py-2 text-sm rounded-xl whitespace-nowrap flex-shrink-0 transition-colors",
                                                 isActive
                                                     ? "bg-muted text-foreground font-medium"
                                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -264,7 +264,7 @@ export function UserSettingsModal({
                                             onClick={() => handleTabClick(tab.id)}
                                             disabled={tab.disabled}
                                             className={cn(
-                                                "w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg transition-colors",
+                                                "w-full flex items-center gap-3 px-4 py-3 text-sm rounded-xl transition-colors",
                                                 isActive
                                                     ? "bg-muted text-foreground"
                                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -939,7 +939,7 @@ function SoundsTab() {
                             key={pack.id}
                             htmlFor={`pack-${pack.id}`}
                             className={cn(
-                                'flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
+                                'flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors',
                                 preferences.pack === pack.id
                                     ? 'border-foreground/20 bg-muted/50'
                                     : 'border-border hover:bg-muted/30',

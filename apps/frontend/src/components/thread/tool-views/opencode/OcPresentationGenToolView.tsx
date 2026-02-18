@@ -141,7 +141,7 @@ export function OcPresentationGenToolView({
               href={parsed.viewer_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 ml-2"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 ml-2"
             >
               <ExternalLink className="w-3 h-3" />
               Open

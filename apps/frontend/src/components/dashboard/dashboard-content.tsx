@@ -129,7 +129,7 @@ export function DashboardContent() {
               setSidebarOpenState(true);
               setOpenMobile(true);
             }}
-            className="flex items-center justify-center h-9 w-9 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 active:bg-accent transition-colors touch-manipulation"
+            className="flex items-center justify-center h-9 w-9 -ml-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 active:bg-accent transition-colors touch-manipulation"
             aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />

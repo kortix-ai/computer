@@ -259,7 +259,7 @@ function AgentSelector({
                   }}
                   onMouseEnter={() => setFocusedIndex(globalIdx)}
                   className={cn(
-                    'w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group',
+                    'w-full flex items-start gap-2.5 px-2.5 py-2 rounded-xl text-[13px] transition-colors cursor-pointer group',
                     isFocused ? 'bg-muted' : 'hover:bg-muted',
                     isSelected && !isFocused && 'bg-muted/50',
                   )}
@@ -296,7 +296,7 @@ function AgentSelector({
                       }}
                       onMouseEnter={() => setFocusedIndex(globalIdx)}
                       className={cn(
-                        'w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group',
+                        'w-full flex items-start gap-2.5 px-2.5 py-2 rounded-xl text-[13px] transition-colors cursor-pointer group',
                         isFocused ? 'bg-muted' : 'hover:bg-muted',
                         isSelected && !isFocused && 'bg-muted/50',
                       )}
@@ -680,7 +680,7 @@ function SlashCommandPopover({
               onSelect(cmd);
             }}
             className={cn(
-              'w-full flex flex-col gap-0.5 px-3 py-2 text-left transition-colors cursor-pointer rounded-lg mx-0',
+              'w-full flex flex-col gap-0.5 px-3 py-2 text-left transition-colors cursor-pointer rounded-xl mx-0',
               i === selectedIndex ? 'bg-muted' : 'hover:bg-muted',
             )}
           >

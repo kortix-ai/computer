@@ -79,7 +79,7 @@ export const TagInput: React.FC<TagInputProps> = ({
     <div className={cn("relative", className)}>
       <div
         className={cn(
-          "flex flex-wrap gap-1.5 p-3 min-h-[2.5rem] border rounded-2xl bg-background cursor-text",
+          "flex flex-wrap gap-1.5 p-3 min-h-[2.5rem] border rounded-xl bg-background cursor-text",
           "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
           disabled && "opacity-50 cursor-not-allowed bg-muted"
         )}

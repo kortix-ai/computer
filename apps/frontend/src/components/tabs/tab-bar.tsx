@@ -166,7 +166,7 @@ function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) 
   const item = (label: string, action: string, icon: React.ReactNode, shortcut?: string, destructive?: boolean) => (
     <button
       className={cn(
-        'flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded-md transition-colors text-left cursor-pointer',
+        'flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded-xl transition-colors text-left cursor-pointer',
         destructive
           ? 'text-destructive hover:bg-destructive/10'
           : 'text-foreground hover:bg-accent'
@@ -270,7 +270,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
       <button
         key={tab.id}
         className={cn(
-          'flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded-md transition-colors text-left cursor-pointer',
+          'flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded-xl transition-colors text-left cursor-pointer',
           isActive
             ? 'bg-accent text-accent-foreground font-medium'
             : 'text-foreground hover:bg-accent/50'
@@ -315,7 +315,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Filter tabs..."
-            className="w-full px-2.5 py-1.5 text-xs rounded-md bg-muted/50 border border-border/50 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+            className="w-full px-2.5 py-1.5 text-xs rounded-xl bg-muted/50 border border-border/50 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
           />
         </div>
       )}
@@ -1182,7 +1182,7 @@ export function TabBar() {
               <button
                 onClick={handleNewTab}
                 className={cn(
-                  'flex items-center justify-center w-7 h-7 rounded-md cursor-pointer',
+                  'flex items-center justify-center w-7 h-7 rounded-xl cursor-pointer',
                   'text-muted-foreground/50 hover:text-muted-foreground transition-colors',
                 )}
               >
@@ -1198,7 +1198,7 @@ export function TabBar() {
                 ref={tabListBtnRef}
                 onClick={() => setShowTabList((v) => !v)}
                 className={cn(
-                  'flex items-center justify-center w-7 h-7 rounded-md cursor-pointer',
+                  'flex items-center justify-center w-7 h-7 rounded-xl cursor-pointer',
                   'text-muted-foreground/50 hover:text-muted-foreground transition-colors',
                   showTabList && 'text-muted-foreground',
                 )}

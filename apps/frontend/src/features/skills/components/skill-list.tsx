@@ -136,7 +136,7 @@ export function SkillList() {
                     placeholder="Search skills by name, description, or path..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 h-9 text-sm rounded-lg"
+                    className="pl-9 h-9 text-sm rounded-xl"
                   />
                   {search && (
                     <button
@@ -155,7 +155,7 @@ export function SkillList() {
                       key={tab.value}
                       onClick={() => setActiveFilter(tab.value)}
                       className={cn(
-                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer',
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer',
                         activeFilter === tab.value
                           ? 'bg-foreground text-background'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',

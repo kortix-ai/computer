@@ -476,7 +476,7 @@ export function AgentConfigurationDialog({
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button className="flex items-center gap-2 hover:bg-muted/50 rounded-2xl px-2 py-1 transition-colors group">
+                            <button className="flex items-center gap-2 hover:bg-muted/50 rounded-xl px-2 py-1 transition-colors group">
                               <DialogTitle className="text-xl font-semibold truncate">
                                 {isLoading ? 'Loading...' : formData.name || 'Worker'}
                               </DialogTitle>

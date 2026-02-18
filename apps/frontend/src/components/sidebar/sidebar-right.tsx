@@ -187,7 +187,7 @@ export function SidebarRight() {
               {state === 'collapsed' && (
                 <div className="absolute inset-0 flex items-center justify-center">
                     <button
-                    className="flex items-center justify-center h-7 w-7 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    className="flex items-center justify-center h-7 w-7 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                     onClick={() => setOpen(true)}
                     aria-label="Expand sidebar"
                   >
@@ -205,7 +205,7 @@ export function SidebarRight() {
                   Explorer
                 </span>
                 <button
-                  className="flex items-center justify-center h-7 w-7 rounded-lg transition-colors duration-150 cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent"
+                  className="flex items-center justify-center h-7 w-7 rounded-xl transition-colors duration-150 cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent"
                   onClick={() => setOpen(false)}
                   aria-label="Collapse sidebar"
                 >

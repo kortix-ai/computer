@@ -76,7 +76,7 @@ export function SessionSiteHeader({
             {isMobile && (
               <button
                 onClick={handleOpenMenu}
-                className="flex items-center justify-center h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors touch-manipulation"
+                className="flex items-center justify-center h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors touch-manipulation"
                 aria-label="Open menu"
               >
                 <Menu className="h-4 w-4" />

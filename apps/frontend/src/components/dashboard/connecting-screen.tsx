@@ -171,7 +171,7 @@ function ReconnectBanner({
         <button
           type="button"
           onClick={onSwitchInstance}
-          className="flex items-center gap-1 h-6 px-2.5 text-[11px] font-medium text-foreground bg-muted/60 hover:bg-muted rounded-full transition-colors cursor-pointer"
+          className="flex items-center gap-1 h-6 px-2.5 text-[11px] font-medium text-foreground bg-muted/60 hover:bg-muted rounded-xl transition-colors cursor-pointer"
         >
           <ArrowLeftRight className="h-2.5 w-2.5" />
           Switch

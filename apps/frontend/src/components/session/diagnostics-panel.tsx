@@ -118,7 +118,7 @@ function DiagnosticRow({
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-start gap-2 px-2.5 py-1.5 text-left hover:bg-muted/50 transition-colors cursor-pointer rounded-md group"
+      className="w-full flex items-start gap-2 px-2.5 py-1.5 text-left hover:bg-muted/50 transition-colors cursor-pointer rounded-xl group"
     >
       <SeverityIcon severity={diagnostic.severity} className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">

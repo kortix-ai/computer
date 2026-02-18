@@ -226,14 +226,14 @@ export const SessionLayout = memo(function SessionLayout({
                   <div className="flex-shrink-0 h-10 flex items-center justify-end px-3 gap-0.5">
                     <button
                       onClick={toggleExpanded}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                       title={isExpanded ? 'Collapse' : 'Expand'}
                     >
                       {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={handleSidePanelClose}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>

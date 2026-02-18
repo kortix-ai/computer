@@ -97,7 +97,7 @@ export function HeroSection() {
               <div className="mt-8 sm:mt-10 w-full max-w-lg animate-in fade-in-0 slide-in-from-bottom-4 duration-500 delay-150 fill-mode-both">
                 <button
                   onClick={handleCopy}
-                  className="group w-full flex items-center gap-3 rounded-2xl border border-border bg-background/80 backdrop-blur-sm px-4 py-3 text-left transition-colors hover:bg-accent/50 cursor-pointer"
+                  className="group w-full flex items-center gap-3 rounded-xl border border-border bg-background/80 backdrop-blur-sm px-4 py-3 text-left transition-colors hover:bg-accent/50 cursor-pointer"
                 >
                   <span className="text-muted-foreground/50 text-sm select-none">$</span>
                   <code className="flex-1 text-sm font-mono text-foreground truncate">

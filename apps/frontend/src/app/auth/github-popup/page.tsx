@@ -196,7 +196,7 @@ export default function GitHubOAuthPopup() {
         {status === 'error' && (
           <button
             onClick={() => window.close()}
-            className="mt-4 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            className="mt-4 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
           >
             Close
           </button>

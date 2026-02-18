@@ -274,7 +274,7 @@ export default function WorkspacePage() {
                   placeholder="Search by name, description, or model..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-9 text-sm rounded-lg"
+                  className="pl-9 h-9 text-sm rounded-xl"
                 />
                 {search && (
                   <button
@@ -304,7 +304,7 @@ export default function WorkspacePage() {
                     setScopeFilter('all'); // reset scope when changing kind
                   }}
                   className={cn(
-                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer',
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer',
                     kindFilter === tab.value
                       ? 'bg-foreground text-background'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
@@ -333,7 +333,7 @@ export default function WorkspacePage() {
                     key={tab.value}
                     onClick={() => setScopeFilter(tab.value)}
                     className={cn(
-                      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer',
+                      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-colors cursor-pointer',
                       scopeFilter === tab.value
                         ? 'bg-muted text-foreground'
                         : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30',
@@ -381,7 +381,7 @@ export default function WorkspacePage() {
                       onClick={() => handleItemClick(item)}
                       disabled={!isClickable}
                       className={cn(
-                        'group flex items-center gap-3.5 w-full px-4 py-3 rounded-lg border border-border/50 text-left transition-all duration-150',
+                        'group flex items-center gap-3.5 w-full px-4 py-3 rounded-xl border border-border/50 text-left transition-all duration-150',
                         isClickable
                           ? 'hover:border-border hover:bg-muted/30 cursor-pointer'
                           : 'opacity-80 cursor-default',

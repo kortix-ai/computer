@@ -167,7 +167,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                   key={item.id}
                   href={item.href}
                   className={cn(
-                    "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                    "px-3 py-1.5 text-sm font-medium rounded-xl transition-colors",
                     pathname === item.href
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -182,7 +182,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                 <Link
                   href="/app"
                   className={cn(
-                    "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                    "px-3 py-1.5 text-sm font-medium rounded-xl transition-colors",
                     pathname === '/app'
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -230,7 +230,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
               {/* Mobile Menu Button */}
               <button
                 onClick={toggleDrawer}
-                className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors"
+                className="md:hidden p-2 rounded-xl hover:bg-accent transition-colors"
                 aria-label="Open menu"
               >
                 <Menu className="size-5" />
@@ -257,7 +257,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
               </Link>
               <button
                 onClick={toggleDrawer}
-                className="border border-border rounded-lg p-2 cursor-pointer hover:bg-accent transition-colors"
+                className="border border-border rounded-xl p-2 cursor-pointer hover:bg-accent transition-colors"
                 aria-label="Close menu"
               >
                 <X className="size-5" />

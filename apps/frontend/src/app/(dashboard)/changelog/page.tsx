@@ -133,7 +133,7 @@ export default function ChangelogPage() {
               {!isUpdating ? (
                 <button
                   onClick={() => update()}
-                  className="flex items-center gap-2 h-9 px-4 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors cursor-pointer"
+                  className="flex items-center gap-2 h-9 px-4 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-colors cursor-pointer"
                 >
                   <ArrowDownToLine className="h-4 w-4" />
                   Update to v{latestVersion}

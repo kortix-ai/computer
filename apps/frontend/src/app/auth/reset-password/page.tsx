@@ -75,7 +75,7 @@ function ResetPasswordContent() {
                   <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
                     <Link
                       href="/auth"
-                      className="flex h-12 items-center justify-center w-full text-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
+                      className="flex h-12 items-center justify-center w-full text-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
                     >
                       Go to sign in
                     </Link>
@@ -100,7 +100,7 @@ function ResetPasswordContent() {
             <div className="relative z-10 pt-24 pb-8 max-w-md mx-auto h-full w-full flex flex-col gap-2 items-center justify-center">
               <Link
                 href="/auth"
-                className="group border border-border/50 bg-background hover:bg-accent/20 rounded-full text-sm h-8 px-3 flex items-center gap-2 transition-all duration-200 shadow-sm mb-6"
+                className="group border border-border/50 bg-background hover:bg-accent/20 rounded-xl text-sm h-8 px-3 flex items-center gap-2 transition-all duration-200 shadow-sm mb-6"
               >
                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium text-muted-foreground text-xs tracking-wide">
@@ -135,7 +135,7 @@ function ResetPasswordContent() {
                       name="password"
                       type="password"
                       placeholder="New password"
-                      className="h-12 rounded-full bg-background border-border"
+                      className="h-12 rounded-xl bg-background border-border"
                       required
                     />
                   </div>
@@ -146,7 +146,7 @@ function ResetPasswordContent() {
                       name="confirmPassword"
                       type="password"
                       placeholder="Confirm new password"
-                      className="h-12 rounded-full bg-background border-border"
+                      className="h-12 rounded-xl bg-background border-border"
                       required
                     />
                   </div>
@@ -154,7 +154,7 @@ function ResetPasswordContent() {
                   <div className="space-y-4 pt-4">
                     <SubmitButton
                       formAction={handleResetPassword}
-                      className="w-full h-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
+                      className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
                       pendingText="Updating password..."
                     >
                       Reset Password
@@ -167,7 +167,7 @@ function ResetPasswordContent() {
                 <div className="mt-6 flex justify-center">
                   <Link
                     href="/auth"
-                    className="flex h-12 px-6 items-center justify-center text-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
+                    className="flex h-12 px-6 items-center justify-center text-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
                   >
                     Return to sign in
                   </Link>

@@ -401,7 +401,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   const renderDashboardCard = () => (
     <div
       className={cn(
-        'group h-38 relative bg-muted/80 dark:bg-muted/20 rounded-3xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col w-full border-border/50',
+        'group h-38 relative bg-muted/80 dark:bg-muted/20 rounded-xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col w-full border-border/50',
         'hover:border-primary/20',
         className
       )}
@@ -490,7 +490,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   
   const renderStandardCard = () => {
     const cardClassName = cn(
-      'group relative bg-card rounded-2xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col border-border/50 hover:border-primary/20',
+      'group relative bg-card rounded-xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col border-border/50 hover:border-primary/20',
       className
     );
     

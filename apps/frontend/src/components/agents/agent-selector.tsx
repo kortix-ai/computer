@@ -184,7 +184,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                 placeholder="Search agents..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-muted/40 border-0 rounded-lg focus:outline-none focus:ring-1 focus:ring-ring focus:bg-muted/60 placeholder:text-muted-foreground/60"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-muted/40 border-0 rounded-xl focus:outline-none focus:ring-1 focus:ring-ring focus:bg-muted/60 placeholder:text-muted-foreground/60"
               />
             </div>
           </div>
@@ -213,7 +213,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                 {orderedAgents.map((agent: any) => (
                   <DropdownMenuItem
                     key={agent.agent_id}
-                    className="flex items-center gap-3 px-3 py-2.5 mx-1 rounded-lg cursor-pointer"
+                    className="flex items-center gap-3 px-3 py-2.5 mx-1 rounded-xl cursor-pointer"
                     onClick={() => handleAgentSelect(agent.agent_id)}
                   >
                     <AgentAvatar
@@ -269,7 +269,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
               <DropdownMenuSeparator />
               <div className="p-1">
                 <DropdownMenuItem
-                  className="flex items-center gap-3 px-3 py-2.5 mx-0 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-3 px-3 py-2.5 mx-0 rounded-xl cursor-pointer text-muted-foreground hover:text-foreground"
                   onClick={handleCreateAgent}
                 >
                   <Plus className="h-4 w-4" />

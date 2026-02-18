@@ -220,7 +220,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
           <button
             onClick={() => setTab('settings')}
             className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+              "px-3 py-1.5 text-sm font-medium rounded-xl transition-colors",
               tab === 'settings'
                 ? "bg-muted text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -231,7 +231,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
           <button
             onClick={() => setTab('messages')}
             className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+              "px-3 py-1.5 text-sm font-medium rounded-xl transition-colors",
               tab === 'messages'
                 ? "bg-muted text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"

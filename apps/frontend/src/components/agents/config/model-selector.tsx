@@ -340,7 +340,7 @@ export function AgentModelSelector({
             <div className='w-full'>
               <DropdownMenuItem
                 className={cn(
-                  "text-sm px-2 py-2 mx-2 my-0.5 flex items-center gap-0 rounded-lg transition-all duration-200",
+                  "text-sm px-2 py-2 mx-2 my-0.5 flex items-center gap-0 rounded-xl transition-all duration-200",
                   accessible ? "cursor-pointer" : "cursor-not-allowed",
                   isHighlighted && accessible && "bg-accent",
                   selectedModel === model.id && accessible && "bg-muted border border-border",
@@ -422,7 +422,7 @@ export function AgentModelSelector({
                 {variant === 'menu-item' ? (
                   <div
                     className={cn(
-                      "flex items-center justify-between cursor-pointer rounded-lg px-3 py-2 mx-0 my-0.5 text-sm hover:bg-accent",
+                      "flex items-center justify-between cursor-pointer rounded-xl px-3 py-2 mx-0 my-0.5 text-sm hover:bg-accent",
                       disabled && "opacity-50 cursor-not-allowed",
                       className
                     )}
@@ -510,7 +510,7 @@ export function AgentModelSelector({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleSearchInputKeyDown}
-                    className="w-full h-8 px-8 py-1 rounded-lg text-sm focus:outline-none bg-muted"
+                    className="w-full h-8 px-8 py-1 rounded-xl text-sm focus:outline-none bg-muted"
                   />
                 </div>
               </div>
@@ -568,7 +568,7 @@ export function AgentModelSelector({
                                     <div className='w-full'>
                                       <DropdownMenuItem
                                         className={cn(
-                                          "text-sm px-2 py-2 mx-2 my-0.5 flex items-center gap-0 cursor-pointer rounded-lg transition-all duration-200",
+                                          "text-sm px-2 py-2 mx-2 my-0.5 flex items-center gap-0 cursor-pointer rounded-xl transition-all duration-200",
                                           selectedModel === model.id && "bg-muted border border-border",
                                           !canAccess && "opacity-70"
                                         )}

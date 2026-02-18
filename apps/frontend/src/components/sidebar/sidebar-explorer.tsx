@@ -63,7 +63,7 @@ export function SidebarPanelTabs({ active, onChange }: SidebarPanelTabsProps) {
       <button
         onClick={() => onChange('sessions')}
         className={cn(
-          'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer',
+          'flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium transition-colors cursor-pointer',
           active === 'sessions'
             ? 'bg-muted text-foreground'
             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -75,7 +75,7 @@ export function SidebarPanelTabs({ active, onChange }: SidebarPanelTabsProps) {
       <button
         onClick={() => onChange('files')}
         className={cn(
-          'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer',
+          'flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium transition-colors cursor-pointer',
           active === 'files'
             ? 'bg-muted text-foreground'
             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -139,7 +139,7 @@ function SidebarParentDropTarget({
         onDropMove(sourcePath, parentPath === '.' ? '' : parentPath);
       }}
       className={cn(
-        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-md transition-colors cursor-pointer',
+        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left rounded-xl transition-colors cursor-pointer',
         'hover:bg-muted/80 text-muted-foreground',
         isDragOver && 'bg-primary/15 ring-1 ring-primary/40',
       )}

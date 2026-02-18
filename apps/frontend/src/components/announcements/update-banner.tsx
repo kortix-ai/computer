@@ -86,7 +86,7 @@ export function UpdateBanner() {
           {!isUpdating ? (
             <button
               onClick={() => update()}
-              className="flex items-center gap-1.5 h-6 px-3 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-full transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 h-6 px-3 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-colors cursor-pointer"
             >
               <ArrowDownToLine className="h-3 w-3" />
               Update

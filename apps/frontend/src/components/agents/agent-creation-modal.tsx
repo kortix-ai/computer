@@ -157,7 +157,7 @@ export function AgentCreationModal({ open, onOpenChange, onSuccess }: AgentCreat
                     onClick={() => handleOptionClick(option.id)}
                     disabled={createNewAgentMutation.isPending}
                     className={cn(
-                      "w-full p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all text-left",
+                      "w-full p-3.5 sm:p-4 rounded-xl border transition-all text-left",
                       "flex items-center gap-3 sm:gap-4",
                       isSelected
                         ? "border-primary bg-primary/5"
@@ -210,7 +210,7 @@ export function AgentCreationModal({ open, onOpenChange, onSuccess }: AgentCreat
           <div className="p-5 sm:p-8 overflow-y-auto max-h-[85vh] sm:max-h-none">
             {/* Logo & Header */}
             <div className="flex flex-col items-center text-center mb-5 sm:mb-6">
-              <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-muted/50">
+              <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 rounded-xl bg-muted/50">
                 <KortixLogo size={28} variant="symbol" className="sm:hidden" />
                 <KortixLogo size={36} variant="symbol" className="hidden sm:block" />
               </div>

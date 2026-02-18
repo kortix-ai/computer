@@ -144,7 +144,7 @@ export function MessageActions({
               onClick={() => setRevertDialogOpen(true)}
               disabled={disabled}
               className={cn(
-                'p-1.5 rounded-md transition-colors cursor-pointer',
+                'p-1.5 rounded-xl transition-colors cursor-pointer',
                 'text-muted-foreground/60 hover:text-foreground hover:bg-muted/60',
                 'disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground/60',
               )}
@@ -220,7 +220,7 @@ export function RevertBanner({
             onClick={() => setConfirmOpen(true)}
             disabled={loading}
             className={cn(
-              'flex items-center gap-1.5 h-7 px-3 rounded-md',
+              'flex items-center gap-1.5 h-7 px-3 rounded-xl',
               'text-xs font-medium',
               'bg-amber-500/10 text-amber-600 dark:text-amber-400',
               'hover:bg-amber-500/20 active:bg-amber-500/25',

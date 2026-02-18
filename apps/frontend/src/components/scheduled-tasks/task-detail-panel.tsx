@@ -443,7 +443,7 @@ function ExecutionItem({ execution }: { execution: Execution }) {
 
   return (
     <div
-      className="rounded-lg border p-3 text-sm cursor-pointer hover:bg-muted/30 transition-colors"
+      className="rounded-xl border p-3 text-sm cursor-pointer hover:bg-muted/30 transition-colors"
       onClick={() => setExpanded(!expanded)}
     >
       <div className="flex items-center justify-between">

@@ -274,7 +274,7 @@ function SessionMetadataList({ sessions }: { sessions: ParsedSessionMeta[] }) {
             })
           }
           className={cn(
-            'flex items-start gap-2.5 px-3 py-2 rounded-md text-left w-full',
+            'flex items-start gap-2.5 px-3 py-2 rounded-xl text-left w-full',
             'hover:bg-muted/60 transition-colors group cursor-pointer',
           )}
         >
