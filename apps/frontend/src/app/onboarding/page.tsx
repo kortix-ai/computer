@@ -153,8 +153,42 @@ export default function OnboardingPage() {
   const isDark = !mounted || resolvedTheme !== 'light';
   const raysColor = isDark ? '#ffffff' : '#000000';
 
+  // ── Query param controls ───────────────────────────────────────
+  // ?skip_onboarding → mark complete & go to dashboard
+  // ?redo            → clear ONBOARDING_COMPLETE so the flow reruns
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const instanceUrl = getInstanceUrl();
+
+    if (params.has('skip_onboarding')) {
+      fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 'true' }),
+      })
+        .catch(() => {})
+        .finally(() => router.replace('/dashboard'));
+      return;
+    }
+
+    if (params.has('redo')) {
+      // Reset onboarding flag so the full flow runs again
+      fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 'false' }),
+      }).catch(() => {});
+      // Strip ?redo from URL so it doesn't loop on refresh
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete('redo');
+      window.history.replaceState({}, '', clean.pathname + clean.search);
+    }
+  }, [router]);
+
   // ── Redirect if already onboarded ─────────────────────────────
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('skip_onboarding') || params.has('redo')) return; // handled above
     const check = async () => {
       try {
         const instanceUrl = getInstanceUrl();
