@@ -22,6 +22,14 @@ export {
  * Both set `userId` in context so downstream route handlers work identically.
  */
 async function cronAuth(c: Context, next: Next) {
+  // Local mode: skip auth, inject mock user — same as supabaseAuth
+  if (config.isLocal()) {
+    c.set('userId', '00000000-0000-0000-0000-000000000000');
+    c.set('userEmail', 'local@localhost');
+    await next();
+    return;
+  }
+
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     throw new HTTPException(401, { message: 'Missing or invalid Authorization header' });

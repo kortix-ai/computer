@@ -14,11 +14,12 @@ The installer creates `~/.kortix`, pulls Docker images, and starts everything. C
 
 ## After install
 
-| Service   | URL                    |
-|-----------|------------------------|
-| Dashboard | http://localhost:3000   |
-| API       | http://localhost:8008   |
-| Sandbox   | http://localhost:14000  |
+| Service    | URL                    |
+|------------|------------------------|
+| Dashboard  | http://localhost:3000   |
+| API        | http://localhost:8008   |
+| Sandbox    | http://localhost:14000  |
+| PostgreSQL | localhost:54322        |
 
 ## CLI
 

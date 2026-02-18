@@ -1,10 +1,11 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  Kortix Local — All-in-One Docker Compose                                 ║
 # ║                                                                            ║
-# ║  Starts all 3 services needed for local development:                       ║
-# ║    1. frontend   — Next.js dashboard         (http://localhost:3000)        ║
-# ║    2. kortix-api — Backend API (Bun/Hono)     (http://localhost:8008)       ║
-# ║    3. sandbox    — AI agent environment       (http://localhost:14000)      ║
+# ║  Starts all 4 services needed for local development:                       ║
+# ║    1. postgres   — PostgreSQL + pg_cron + pg_net  (localhost:54322)         ║
+# ║    2. frontend   — Next.js dashboard              (http://localhost:3000)   ║
+# ║    3. kortix-api — Backend API (Bun/Hono)         (http://localhost:8008)   ║
+# ║    4. sandbox    — AI agent environment            (http://localhost:14000) ║
 # ║                                                                            ║
 # ║  Usage:                                                                    ║
 # ║    docker compose -f docker-compose.local.yml up                           ║
@@ -16,9 +17,40 @@
 # ║    1. cp .env.example .env   (fill in at least one LLM API key)            ║
 # ║    2. cp sandbox/.env.example sandbox/.env  (fill in API keys)             ║
 # ║    3. ./scripts/setup-env.sh  (generates per-service .env files)           ║
+# ║                                                                            ║
+# ║  Database:                                                                 ║
+# ║    PostgreSQL runs on localhost:54322 with pg_cron and pg_net extensions.   ║
+# ║    Data is persisted in the 'postgres-data' Docker volume.                 ║
+# ║    To reset: docker compose -f docker-compose.local.yml down -v            ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 services:
+  # ─── PostgreSQL (Local Database) ────────────────────────────────────────────
+  postgres:
+    build:
+      context: services/postgres
+      dockerfile: Dockerfile
+    ports:
+      - "54322:5432"    # Host port 54322 matches .env.example convention
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./services/postgres/init:/docker-entrypoint-initdb.d:ro
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_cron,pg_net
+      -c cron.database_name=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   # ─── Frontend (Next.js Dashboard) ──────────────────────────────────────────
   frontend:
     build:
@@ -53,6 +85,9 @@ services:
       dockerfile: services/Dockerfile
       args:
         SERVICE: kortix-api
+    # Run as root so the API can access the Docker socket
+    # (socket is owned by root:root, bun user can't read it otherwise)
+    user: "0:0"
     ports:
       - "8008:8008"
     environment:
@@ -61,14 +96,26 @@ services:
       - SANDBOX_PROVIDER=local_docker
       # Docker socket lets the API detect/manage the sandbox container
       - DOCKER_HOST=unix:///var/run/docker.sock
+      # OrbStack on macOS: set DOCKER_SOCKET to ~/.orbstack/run/docker.sock
       # The API tells sandboxes to call back via the Docker network
       - KORTIX_URL=http://kortix-api:8008/v1/router
+      # ─── Database (connects to the postgres service) ───────────────────
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      # ─── pg_cron scheduler ─────────────────────────────────────────────
+      - CRON_API_URL=http://kortix-api:8008
+      - CRON_TICK_SECRET=local-dev-cron-secret
+      - SCHEDULER_ENABLED=true
     env_file:
       - path: services/kortix-api/.env
         required: false
     volumes:
       # Mount Docker socket so the API can detect the sandbox container
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Default: /var/run/docker.sock (Docker Desktop)
+      # OrbStack: set DOCKER_SOCKET=~/.orbstack/run/docker.sock
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   # ─── Sandbox (AI Agent Environment) ────────────────────────────────────────
@@ -121,5 +168,6 @@ services:
       start_period: 30s
 
 volumes:
+  postgres-data:
   sandbox-workspace:
   sandbox-secrets:

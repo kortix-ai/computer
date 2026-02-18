@@ -147,6 +147,23 @@ export async function startScheduler(): Promise<void> {
   if (config.CRON_API_URL && config.CRON_TICK_SECRET) {
     console.log(`[scheduler] pg_cron mode — jobs managed per-trigger via cron.schedule()`);
     console.log(`[scheduler] API URL: ${config.CRON_API_URL}`);
+
+    // Configure the global scheduler tick in PostgreSQL.
+    // This sets the API URL and secret that kortix.scheduler_tick() uses
+    // to fire the global tick every minute via pg_cron + pg_net.
+    try {
+      await db.execute(
+        sql.raw(
+          `SELECT kortix.configure_scheduler('${escSql(config.CRON_API_URL)}', '${escSql(config.CRON_TICK_SECRET)}')`
+        ),
+      );
+      console.log(`[scheduler] Configured pg_cron scheduler in database`);
+    } catch (err: any) {
+      // Not fatal — configure_scheduler() may not exist if the
+      // pg_cron migration (0001_pg_cron_scheduler.sql) hasn't been applied.
+      const msg = err?.message ?? err?.cause?.message ?? '';
+      console.warn(`[scheduler] Could not configure pg_cron in database: ${msg}`);
+    }
   } else {
     console.log('[scheduler] CRON_API_URL or CRON_TICK_SECRET not set — pg_cron scheduling disabled');
     console.log('[scheduler] Triggers can still be executed manually via POST /v1/cron/trigger/:id/execute');

@@ -20,6 +20,11 @@ COPY --chown=nextjs:nodejs apps/frontend/.next/standalone ./
 COPY --chown=nextjs:nodejs apps/frontend/.next/static ./apps/frontend/.next/static
 COPY --chown=nextjs:nodejs apps/frontend/public ./apps/frontend/public
 
+# Remove any .env files from the standalone output — runtime env vars
+# (set in docker-compose) must take precedence. Next.js .env files override
+# process.env for server components, which breaks local/VPS deploys.
+RUN rm -f /app/apps/frontend/.env /app/apps/frontend/.env.local /app/apps/frontend/.env.production /app/.env
+
 # Copy entrypoint script (needs to run as root for VPS URL rewriting)
 COPY apps/frontend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

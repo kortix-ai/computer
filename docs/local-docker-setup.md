@@ -6,13 +6,14 @@ Everything about building, publishing, and testing the one-click Docker installe
 
 ## Architecture
 
-Three Docker images, all published to Docker Hub under `kortixmarko/`:
+Four Docker images, all published to Docker Hub under `kortix/`:
 
 | Image | Source | Description |
 |---|---|---|
-| `kortixmarko/kortix-frontend:latest` | `apps/frontend/` | Next.js dashboard (standalone mode) |
-| `kortixmarko/kortix-api:latest` | `services/` | Bun/Hono backend API |
-| `kortixmarko/sandbox:latest` | `sandbox/` | AI agent sandbox (s6-overlay, OpenCode, kortix-master) |
+| `kortix/kortix-frontend:latest` | `apps/frontend/` | Next.js dashboard (standalone mode) |
+| `kortix/kortix-api:latest` | `services/` | Bun/Hono backend API |
+| `kortix/postgres:latest` | `services/postgres/` | PostgreSQL 16 + pg_cron + pg_net (scheduler) |
+| `kortix/computer:latest` | `sandbox/` | AI agent sandbox (s6-overlay, OpenCode, kortix-master) |
 
 The installer script (`scripts/get-kortix.sh`) writes `~/.kortix/docker-compose.yml` + `.env` + CLI helper, pulls the images, and starts everything.
 
@@ -22,29 +23,32 @@ The installer script (`scripts/get-kortix.sh`) writes `~/.kortix/docker-compose.
 
 ### Build order & parallelism
 
-The three images have different build characteristics:
+The four images have different build characteristics:
 
 | Image | Build time | Bottleneck | Depends on host build? |
 |---|---|---|---|
 | Frontend | ~30s host build + ~10s Docker | Next.js standalone build (host) | YES — must `pnpm run build` first |
 | API | ~20-30s | `pnpm install` inside Docker | No |
+| Postgres | ~2-3min | Compiling pg_net from source | No |
 | Sandbox | ~2-5min | Large image, many layers (~4GB) | No |
 
-**Key insight:** API and Sandbox Docker builds do NOT depend on the frontend host build. Start all three simultaneously for maximum parallelism:
+**Key insight:** API, Postgres, and Sandbox Docker builds do NOT depend on the frontend host build. Start all four simultaneously for maximum parallelism:
 
 ```
 Timeline (optimised):
 ───────────────────────────────────────────────────────────
  T=0   Frontend host build (pnpm run build)
        API Docker build ──────────┐
-       Sandbox Docker build ──────┼── run in parallel
- T=30s Frontend host build done   │
-       Frontend Docker build ─────┘
+       Postgres Docker build ─────┼── run in parallel
+       Sandbox Docker build ──────┘
+ T=30s Frontend host build done
+       Frontend Docker build ─────
  T=40s Frontend Docker image ready
  T=30s API Docker image ready
+ T=2m  Postgres Docker image ready
  T=3m  Sandbox Docker image ready
 ───────────────────────────────────────────────────────────
- Push all 3 in parallel immediately after each finishes
+ Push all 4 in parallel immediately after each finishes
 ```
 
 ### Frontend (2-step: host build + Docker package)
@@ -93,14 +97,23 @@ docker build --build-arg SERVICE=kortix-api -f services/Dockerfile -t kortixmark
 
 Straightforward Bun image. No special considerations. Can be built **in parallel** with the frontend host build and sandbox build.
 
+### PostgreSQL (pg_cron + pg_net)
+
+```bash
+cd /path/to/computer/services/postgres
+docker build -t kortix/postgres:latest .
+```
+
+Custom PG16 image (~460MB). Stage 1 compiles `pg_net` from source; stage 2 installs `pg_cron` via apt and copies the compiled pg_net. Both extensions are loaded via `shared_preload_libraries`. Can be built **in parallel** with all other images.
+
 ### Sandbox
 
 ```bash
 cd /path/to/computer
-docker build -f sandbox/Dockerfile -t kortixmarko/sandbox:latest .
+docker build -f sandbox/Dockerfile -t kortix/computer:latest .
 ```
 
-Large image (~4GB) with s6-overlay, OpenCode, browser tools, etc. Takes a few minutes. Can be built **in parallel** with the frontend host build and API build.
+Large image (~4GB) with s6-overlay, OpenCode, browser tools, etc. Takes a few minutes. Can be built **in parallel** with the frontend host build, API build, and Postgres build.
 
 ---
 
@@ -124,16 +137,20 @@ cd /path/to/computer
 
 # Sandbox (multi-platform, builds Rust + Node for each arch natively)
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -f sandbox/Dockerfile -t kortixmarko/sandbox:latest --push .
+  -f sandbox/Dockerfile -t kortix/computer:latest --push .
 
 # API
 docker buildx build --platform linux/amd64,linux/arm64 \
   --build-arg SERVICE=kortix-api \
-  -f services/Dockerfile -t kortixmarko/kortix-api:latest --push .
+  -f services/Dockerfile -t kortix/kortix-api:latest --push .
+
+# PostgreSQL (pg_cron + pg_net)
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -f services/postgres/Dockerfile -t kortix/postgres:latest --push services/postgres/
 
 # Frontend (after host build)
 docker buildx build --platform linux/amd64,linux/arm64 --no-cache \
-  -f apps/frontend/Dockerfile -t kortixmarko/kortix-frontend:latest --push .
+  -f apps/frontend/Dockerfile -t kortix/kortix-frontend:latest --push .
 ```
 
 > **Note:** `--push` is required because multi-platform images can't be loaded into the local Docker daemon (they contain multiple architectures). The images go directly to Docker Hub. To test locally, build for your platform only with `docker build` (no buildx).
@@ -141,7 +158,7 @@ docker buildx build --platform linux/amd64,linux/arm64 --no-cache \
 ### Local-only build (single platform, for dev/testing)
 
 ```bash
-docker build -f sandbox/Dockerfile -t kortixmarko/sandbox:latest .
+docker build -f sandbox/Dockerfile -t kortix/computer:latest .
 ```
 
 This builds for your host platform only. Fast, but the image won't work on other architectures.
@@ -153,14 +170,15 @@ This builds for your host platform only. Fast, but the image won't work on other
 When using `docker buildx build --push`, images are pushed automatically during build. For single-platform builds:
 
 ```bash
-docker push kortixmarko/kortix-frontend:latest
-docker push kortixmarko/kortix-api:latest
-docker push kortixmarko/sandbox:latest
+docker push kortix/kortix-frontend:latest
+docker push kortix/kortix-api:latest
+docker push kortix/postgres:latest
+docker push kortix/computer:latest
 ```
 
-All three can be pushed in parallel. Sandbox is the largest (~4GB, takes longest). Push each image as soon as its build finishes — don't wait for all three.
+All four can be pushed in parallel. Sandbox is the largest (~4GB, takes longest). Push each image as soon as its build finishes — don't wait for all four.
 
-Requires `docker login` with the `kortixmarko` Docker Hub credentials.
+Requires `docker login` with the `kortix` Docker Hub credentials.
 
 ---
 
@@ -179,9 +197,10 @@ When using an AI coding agent (OpenCode, Claude Code, etc.) to build and push, u
 ### Optimal PTY flow
 
 ```
-Phase 1 — Build (3 parallel PTY sessions):
+Phase 1 — Build (4 parallel PTY sessions):
   pty_spawn: Frontend host build    (pnpm run build)       notifyOnExit=true
   pty_spawn: API Docker build       (docker build ...)     notifyOnExit=true
+  pty_spawn: Postgres Docker build  (docker build ...)     notifyOnExit=true
   pty_spawn: Sandbox Docker build   (docker build ...)     notifyOnExit=true
 
   → Agent continues working on other tasks
@@ -192,9 +211,10 @@ Phase 2 — Frontend Docker build (triggered by Phase 1 notification):
   pty_spawn: Frontend Docker build  (docker build --no-cache ...) notifyOnExit=true
 
 Phase 3 — Push (each triggered by its build completing):
-  [API build exits 0]     → pty_spawn: docker push kortixmarko/kortix-api:latest
-  [Sandbox build exits 0] → pty_spawn: docker push kortixmarko/sandbox:latest
-  [Frontend Docker exits 0] → pty_spawn: docker push kortixmarko/kortix-frontend:latest
+  [API build exits 0]       → pty_spawn: docker push kortix/kortix-api:latest
+  [Postgres build exits 0]  → pty_spawn: docker push kortix/postgres:latest
+  [Sandbox build exits 0]   → pty_spawn: docker push kortix/computer:latest
+  [Frontend Docker exits 0] → pty_spawn: docker push kortix/kortix-frontend:latest
 
   All pushes run in parallel with notifyOnExit=true.
 
@@ -412,11 +432,12 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 
 The installer writes `~/.kortix/docker-compose.yml` with:
 
-- **3 services:** `sandbox`, `kortix-api`, `frontend`
-- **2 named volumes:** `sandbox-workspace`, `sandbox-secrets` (persist across upgrades)
+- **4 services:** `postgres`, `sandbox`, `kortix-api`, `frontend`
+- **3 named volumes:** `postgres-data`, `sandbox-workspace`, `sandbox-secrets` (persist across upgrades)
 - **1 network:** `kortix_default` (bridge, all services connected)
-- **Health checks:** sandbox has a health check; frontend and API depend on sandbox being healthy
-- **Port mappings:** `3000` (frontend), `8008` (API), `14000` (sandbox master, proxied to OpenCode)
+- **Health checks:** postgres and sandbox have health checks; API depends on postgres being healthy; frontend depends on API being started
+- **Port mappings:** `54322` (postgres), `3000` (frontend), `8008` (API), `14000` (sandbox master, proxied to OpenCode)
+- **Database:** PostgreSQL with `pg_cron` and `pg_net` extensions for scheduled trigger execution. `kortix-api` connects via `DATABASE_URL` and configures `pg_cron` on startup.
 
 ### CLI commands (via `~/.kortix/kortix`)
 
@@ -436,8 +457,13 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 
 ### Install System
 - `scripts/get-kortix.sh` — One-click installer + embedded CLI
-- `scripts/tests/test-install.sh` — Installer structure tests (21 tests)
-- `scripts/tests/test-cli.sh` — Embedded CLI tests (16 tests)
+- `scripts/tests/test-install.sh` — Installer structure tests
+- `scripts/tests/test-cli.sh` — Embedded CLI tests
+
+### PostgreSQL (Local Database)
+- `services/postgres/Dockerfile` — Custom PG16 image with pg_cron 1.6 + pg_net 0.20.2
+- `services/postgres/init/00-init-kortix.sql` — Init SQL: creates `kortix` schema, all tables, indexes, pg_cron/pg_net extensions, `scheduler_tick()` function, global tick cron job
+- `sandbox/push.sh` — Builds + pushes `kortix/postgres` image to Docker Hub
 
 ### Frontend — Setup & Onboarding
 - `apps/frontend/src/components/dashboard/setup-overlay.tsx` — Setup overlay (welcome + providers)

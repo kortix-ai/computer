@@ -4,13 +4,28 @@ How the Kortix database layer works. Drizzle ORM is the source of truth for all 
 
 ## Architecture
 
+### Cloud Mode (`ENV_MODE=cloud`)
+
 ```
-PostgreSQL (Supabase)
+PostgreSQL (Supabase-hosted)
 ├── public          ← Legacy tables (73 tables). DO NOT TOUCH. Managed by Supabase migrations.
 ├── basejump        ← Multi-tenancy (accounts, account_user). DO NOT TOUCH.
 ├── auth            ← Supabase Auth (users, sessions). DO NOT TOUCH.
 └── kortix          ← NEW tables. Managed by Drizzle ORM via @kortix/db.
 ```
+
+### Local Mode (`ENV_MODE=local`)
+
+```
+PostgreSQL 16 (Docker — kortix/postgres image)
+├── cron            ← pg_cron extension (scheduled jobs)
+├── net             ← pg_net extension (async HTTP from SQL)
+└── kortix          ← All app tables + scheduler_config + scheduler_tick()
+```
+
+In local mode, the bundled PostgreSQL container includes `pg_cron` and `pg_net` extensions. These power the cron trigger system: `pg_cron` fires a global tick every minute, which calls `kortix.scheduler_tick()`, which uses `pg_net.http_post()` to call the API's `/v1/cron/tick` endpoint. Individual triggers also get their own `pg_cron` jobs via `cron.schedule()`.
+
+The init SQL (`services/postgres/init/00-init-kortix.sql`) creates all tables, indexes, extensions, and scheduler functions on first container start.
 
 **Rule: all new tables go in the `kortix` schema. Never modify `public`, `basejump`, or `auth`.**
 
@@ -230,12 +245,66 @@ Use `generate` + `migrate` when you need reviewable migration SQL for production
 4. Run `bunx drizzle-kit push` from `packages/db/` to apply to live DB
 5. Import in your service: `import { myTable } from '@kortix/db'`
 
+## Local PostgreSQL (Docker)
+
+When running locally (`ENV_MODE=local`), a bundled PostgreSQL 16 container provides the database.
+
+### Image: `kortix/postgres`
+
+- **Source:** `services/postgres/Dockerfile`
+- **Base:** `postgres:16` (Debian Bookworm)
+- **Extensions:** `pg_cron` 1.6 (apt), `pg_net` 0.20.2 (compiled from source)
+- **Port:** `54322` on host → `5432` in container
+- **Volume:** `postgres-data` (persisted across restarts)
+- **Init SQL:** `services/postgres/init/00-init-kortix.sql` (runs on first start only)
+
+### Scheduler Tables & Functions
+
+| Object | Type | Purpose |
+|---|---|---|
+| `kortix.scheduler_config` | table | Stores `api_url` and `tick_secret` for pg_cron callbacks |
+| `kortix.scheduler_tick()` | function | Reads config, fires `pg_net.http_post` to `/v1/cron/tick` |
+| `kortix.configure_scheduler(url, secret)` | function | Sets config values, called by API on startup |
+| `kortix-scheduler-tick` | cron job | `* * * * *` — calls `scheduler_tick()` every minute |
+
+### How the Scheduler Works
+
+1. **API starts** → calls `SELECT kortix.configure_scheduler(api_url, tick_secret)` to write callback config
+2. **Every minute** → `pg_cron` fires `kortix-scheduler-tick` job → calls `kortix.scheduler_tick()`
+3. **`scheduler_tick()`** → reads config → fires `pg_net.http_post` to `http://kortix-api:8008/v1/cron/tick`
+4. **API `/v1/cron/tick`** → finds all active triggers with `nextRunAt <= now()` → processes them
+5. **Per-trigger jobs** → when a trigger is created, `cron.schedule()` adds a dedicated job that calls `/v1/cron/tick/trigger/:id/execute` directly
+
+### Resetting the Database
+
+```bash
+# Full reset (destroys all data, re-runs init SQL on next start)
+docker compose -f docker-compose.local.yml down -v
+docker compose -f docker-compose.local.yml up -d
+
+# Connect to psql
+docker exec -it computer-postgres-1 psql -U postgres
+```
+
 ## Environment Variables
 
 The `DATABASE_URL` env var must be set for both Drizzle Kit commands and service runtime.
 
+**Cloud:**
 ```
 DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres
+```
+
+**Local (set automatically in docker-compose.local.yml):**
+```
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+```
+
+Additional env vars for local scheduler:
+```
+CRON_API_URL=http://kortix-api:8008     # Internal Docker network URL
+CRON_TICK_SECRET=<random>                # Shared secret for pg_cron → API auth
+SCHEDULER_ENABLED=true                   # Enable the scheduler service
 ```
 
 For Drizzle Kit commands, `packages/db/.env` is loaded automatically.
@@ -269,3 +338,7 @@ bunx drizzle-kit pull --config drizzle.config.pull.ts
 | `packages/db/drizzle.config.ts` | Drizzle Kit config (targets `kortix` schema) |
 | `packages/db/drizzle.config.pull.ts` | Drizzle Kit config for legacy introspection |
 | `services/kortix-api/src/db/index.ts` | Example: service consuming `@kortix/db` |
+| `services/postgres/Dockerfile` | Custom PG16 image with pg_cron + pg_net |
+| `services/postgres/init/00-init-kortix.sql` | Init SQL: schema, tables, indexes, scheduler functions |
+| `services/kortix-api/src/cron/services/scheduler.ts` | pg_cron job management + configure_scheduler() call |
+| `services/kortix-api/src/cron/routes/tick.ts` | Global tick + per-trigger execution endpoints |

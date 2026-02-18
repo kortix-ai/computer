@@ -13,7 +13,8 @@
 #   1. Reads version from sandbox/package.json (single source of truth)
 #   2. Builds all 3 images multi-platform (amd64 + arm64)
 #   3. Pushes to Docker Hub with both :latest and :{version} tags
-#   4. Creates Daytona snapshot from the Docker Hub image (no local upload)
+#   4. Builds + pushes PostgreSQL image with pg_cron + pg_net
+#   5. Creates Daytona snapshot from the Docker Hub image (no local upload)
 #
 # Prerequisites:
 #   - Docker running with buildx (multi-platform)
@@ -57,6 +58,7 @@ for arg in "$@"; do
       echo "Images pushed to Docker Hub (kortix/):"
       echo "  kortix/computer:{version} + :latest"
       echo "  kortix/kortix-api:{version} + :latest"
+      echo "  kortix/postgres:{version} + :latest"
       echo "  kortix/kortix-frontend:{version} + :latest"
       exit 0
       ;;
@@ -127,6 +129,18 @@ if ! $SANDBOX_ONLY; then
     --push "$REPO_ROOT"
   ok "kortix-api → Docker Hub (${VERSION} + latest)"
   PUSHED+=("${DOCKER_ORG}/kortix-api:${VERSION}")
+fi
+
+# ── PostgreSQL (pg_cron + pg_net) ────────────────────────────────────────────
+if ! $SANDBOX_ONLY; then
+  info "Building + pushing PostgreSQL..."
+  docker buildx build --platform "${PLATFORMS}" \
+    -f services/postgres/Dockerfile \
+    -t "${DOCKER_ORG}/postgres:${VERSION}" \
+    -t "${DOCKER_ORG}/postgres:latest" \
+    --push "$REPO_ROOT/services/postgres"
+  ok "postgres → Docker Hub (${VERSION} + latest)"
+  PUSHED+=("${DOCKER_ORG}/postgres:${VERSION}")
 fi
 
 # ── Frontend ────────────────────────────────────────────────────────────────
