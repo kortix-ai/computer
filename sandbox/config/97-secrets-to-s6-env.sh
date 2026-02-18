@@ -49,3 +49,9 @@ if [ -f "$SECRETS_FILE" ]; then
 else
   echo "[Kortix] No secrets file yet — skipping secret sync"
 fi
+
+# Fix ownership of s6 env files AFTER sync (sync runs as root, writes root-owned files).
+# kortix-master (abc) needs write access to update these at runtime via /env API.
+if [ -d "$S6_ENV_DIR" ]; then
+  chown -R abc:users "$S6_ENV_DIR"
+fi
