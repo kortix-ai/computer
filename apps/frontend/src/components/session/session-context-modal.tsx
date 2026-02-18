@@ -43,11 +43,13 @@ interface Metrics {
 }
 
 function tokenTotal(msg: AssistantMessage) {
-  return msg.tokens.input + msg.tokens.output + msg.tokens.reasoning + msg.tokens.cache.read + msg.tokens.cache.write;
+  if (!msg.tokens) return 0;
+  const t = msg.tokens;
+  return (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0) + ((t.cache?.read ?? 0) + (t.cache?.write ?? 0));
 }
 
 function getSessionContextMetrics(messages: Message[], providers: ProviderListResponse | undefined): Metrics {
-  const totalCost = messages.reduce((sum, msg) => sum + (msg.role === 'assistant' ? msg.cost : 0), 0);
+  const totalCost = messages.reduce((sum, msg) => sum + (msg.role === 'assistant' ? (msg.cost ?? 0) : 0), 0);
 
   // Find last assistant with tokens
   let last: AssistantMessage | undefined;
@@ -72,11 +74,11 @@ function getSessionContextMetrics(messages: Message[], providers: ProviderListRe
       providerLabel: (provider as any)?.name ?? last.providerID,
       modelLabel: model?.name ?? last.modelID,
       limit,
-      input: last.tokens.input,
-      output: last.tokens.output,
-      reasoning: last.tokens.reasoning,
-      cacheRead: last.tokens.cache.read,
-      cacheWrite: last.tokens.cache.write,
+      input: last.tokens?.input ?? 0,
+      output: last.tokens?.output ?? 0,
+      reasoning: last.tokens?.reasoning ?? 0,
+      cacheRead: last.tokens?.cache?.read ?? 0,
+      cacheWrite: last.tokens?.cache?.write ?? 0,
       total,
       usage: limit ? Math.round((total / limit) * 100) : null,
     },
