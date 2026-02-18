@@ -4,7 +4,6 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   ArrowDown,
   ArrowUp,
   Loader2,
@@ -12,7 +11,6 @@ import {
   Check,
   FileText,
   Image as ImageIcon,
-  ArrowUpLeft,
   GitFork,
   Layers,
   ListPlus,
@@ -22,8 +20,6 @@ import {
   Trash2,
   Undo2,
   X,
-  MessageSquare,
-  ExternalLink,
   Terminal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,14 +46,12 @@ import {
   useUnrevertSession,
   useUpdatePart,
   useDeletePart,
-  useSessionBusyPolling,
   replyToPermission,
   replyToQuestion,
   rejectQuestion,
   findOpenCodeFiles,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
-import { getClient } from '@/lib/opencode-sdk';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
@@ -1068,7 +1062,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
         {attachments.length > 0 && (
           <div className="flex gap-2 p-3 pb-0 flex-wrap">
             {attachments.map((file) => (
-              <div key={file.id} className="rounded-lg overflow-hidden border border-border/50">
+              <div key={file.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
                 {file.mime?.startsWith('image/') && file.url ? (
                   <ImagePreview src={file.url} alt={file.filename ?? 'Attachment'}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1928,113 +1922,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
   const local = useOpenCodeLocal({ agents, providers, config });
 
-  const pendingPromptHandled = useRef(false);
-
-  // ---- Polling fallback & optimistic send ----
-  const [pollingActive, setPollingActive] = useState(false);
-  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
-  const [pendingCommand, setPendingCommand] = useState<{ name: string; description?: string } | null>(null);
-  // Map of user message IDs → command info, so UserMessageRow can render
-  // a compact command pill instead of the raw expanded template text.
-  const commandMessagesRef = useRef<Map<string, { name: string; args?: string }>>(new Map());
-  // Stash the pending command info so we can associate it with the user message
-  // even if the busy signal arrives before the message list updates.
-  const pendingCommandStashRef = useRef<{ name: string; args?: string } | null>(null);
-  // Track whether we're retrying a failed send (keeps loader visible)
-  const [isRetrying, setIsRetrying] = useState(false);
-  // Track whether a pending prompt send is in flight (dashboard→session flow).
-  // Keeps isBusy true until the server acknowledges with a busy status.
-  const [pendingSendInFlight, setPendingSendInFlight] = useState(false);
-  // Grace period: don't stop polling immediately on idle after a recent send
-  const lastSendTimeRef = useRef<number>(0);
-  useSessionBusyPolling(sessionId, pollingActive);
-
-  // ---- Optimistic prompt (from dashboard/project page) ----
-  // Uses session-specific sessionStorage keys so pushState navigation works
-  // (no dependency on ?new=true URL param which requires router.push).
-  const [optimisticPrompt, setOptimisticPrompt] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
-    }
-    return null;
-  });
-
-  // Hydrate options from sessionStorage and send the pending prompt for new sessions.
-  // The dashboard/project page stores the prompt in sessionStorage and navigates here.
-  // We send the message from here (not the dashboard) so that SSE listeners and polling
-  // are already active when the response starts streaming back.
-  // Retries up to 3 times on failure (e.g. "Unable to connect" errors).
-  useEffect(() => {
-    if (pendingPromptHandled.current) return;
-    const pendingPrompt = sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
-    if (pendingPrompt) {
-      pendingPromptHandled.current = true;
-      setPollingActive(true);
-      setPendingSendInFlight(true);
-      sessionStorage.removeItem(`opencode_pending_prompt:${sessionId}`);
-      sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
-
-      // Restore agent/model/variant selections from the dashboard
-      const options: Record<string, unknown> = {};
-      try {
-        const raw = sessionStorage.getItem(`opencode_pending_options:${sessionId}`);
-        if (raw) {
-          const pendingOptions = JSON.parse(raw);
-          sessionStorage.removeItem(`opencode_pending_options:${sessionId}`);
-          if (pendingOptions?.agent) { options.agent = pendingOptions.agent; local.agent.set(pendingOptions.agent as string); }
-          if (pendingOptions?.model) { options.model = pendingOptions.model; local.model.set(pendingOptions.model as { providerID: string; modelID: string }); }
-          if (pendingOptions?.variant) { options.variant = pendingOptions.variant; local.model.variant.set(pendingOptions.variant as string); }
-        }
-      } catch {
-        // ignore
-      }
-
-      // Send the message with retry. The useSendOpenCodeMessage hook already
-      // retries 3 times internally for transient errors. We add one additional
-      // outer retry (2 attempts total at this level) to cover cases where the
-      // SDK client itself fails to initialize or the server takes longer to start.
-      const sendOpts = Object.keys(options).length > 0 ? options as any : undefined;
-      const maxOuterRetries = 2;
-      let outerAttempt = 0;
-      lastSendTimeRef.current = Date.now();
-      const trySend = () => {
-        outerAttempt++;
-        sendMessage.mutateAsync({
-          sessionId,
-          parts: [{ type: 'text', text: pendingPrompt }],
-          options: sendOpts,
-        }).then(() => {
-          // Send succeeded — update send time for grace period and clear retrying.
-          // Keep pendingSendInFlight true until server status goes busy (cleared below).
-          lastSendTimeRef.current = Date.now();
-          setIsRetrying(false);
-        }).catch(() => {
-          if (outerAttempt < maxOuterRetries) {
-            // Show retrying indicator and keep loader visible
-            setIsRetrying(true);
-            // Wait 3s before outer retry (inner retries already used 1s + 2s)
-            setTimeout(trySend, 3000);
-          } else {
-            // All retries failed — clear optimistic display so user can retry manually
-            setIsRetrying(false);
-            setPendingSendInFlight(false);
-            setOptimisticPrompt(null);
-            setPollingActive(false);
-          }
-        });
-      };
-      trySend();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
-
-  // Clear optimistic prompt once real messages arrive
-  useEffect(() => {
-    if (optimisticPrompt && messages && messages.length > 0) {
-      setOptimisticPrompt(null);
-    }
-  }, [optimisticPrompt, messages]);
-
   const agentNames = useMemo(
     () => local.agent.list.map((a) => a.name),
     [local.agent.list],
@@ -2060,21 +1947,17 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     lastUserMsgIdRef.current = lastUserMessage.info.id;
     const msg = lastUserMessage.info as any;
     if (msg.agent) local.agent.set(msg.agent);
-    if (msg.model) local.model.set(msg.model); // no { recent: true } — matches SolidJS
+    if (msg.model) local.model.set(msg.model);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastUserMessage?.info.id]);
 
-  // ---- Session status ----
+  // ---- Session status (purely server-driven, matching SolidJS) ----
   const sessionStatus = useOpenCodeSessionStatusStore(
     (s) => s.statuses[sessionId],
   );
-  const isServerBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
-  const isBusy = isServerBusy || !!pendingUserMessage || pendingSendInFlight;
+  const isBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
 
   // ---- Message Queue ----
-  // Select the full array (stable ref) and derive the filtered list via useMemo
-  // to avoid the "getSnapshot should be cached" infinite-loop error that occurs
-  // when .filter() creates a new array reference on every selector call.
   const allQueuedMessages = useMessageQueueStore((s) => s.messages);
   const queuedMessages = useMemo(
     () => allQueuedMessages.filter((m) => m.sessionId === sessionId),
@@ -2085,61 +1968,21 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   const queueMoveUp = useMessageQueueStore((s) => s.moveUp);
   const queueMoveDown = useMessageQueueStore((s) => s.moveDown);
   const queueClearSession = useMessageQueueStore((s) => s.clearSession);
-  const [queueExpanded, setQueueExpanded] = useState(true);
 
-  // Track previous *server* busy state to detect idle transitions.
-  // We use `isServerBusy` (the actual server status) instead of the derived
-  // `isBusy` because `isBusy` includes optimistic client state
-  // (`pendingUserMessage`) which can flicker false before the server has
-  // reported busy via SSE — causing the drain to fire twice.
-  const prevServerBusyRef = useRef(isServerBusy);
-  // Guard against double-drain: tracks whether a drain is already scheduled
-  const drainScheduledRef = useRef(false);
-
-  // Auto-drain: when server transitions from busy → idle, send the next queued message
+  // Auto-drain: when server transitions to idle and there are queued messages,
+  // send the next one. Single effect — no double-drain guards needed.
+  const prevBusyRef = useRef(isBusy);
   useEffect(() => {
-    const wasBusy = prevServerBusyRef.current;
-    prevServerBusyRef.current = isServerBusy;
+    const wasBusy = prevBusyRef.current;
+    prevBusyRef.current = isBusy;
 
-    if (wasBusy && !isServerBusy) {
-      // Server confirmed idle — check for queued messages
-      const sessionQueue = useMessageQueueStore.getState().messages.filter(
-        (m) => m.sessionId === sessionId,
-      );
-      if (sessionQueue.length > 0) {
-        // Small delay to let the UI settle before auto-sending
-        drainScheduledRef.current = true;
-        const timer = setTimeout(() => {
-          drainScheduledRef.current = false;
-          const next = queueDequeue(sessionId);
-          if (next) {
-            handleSend(next.text, next.files);
-          }
-        }, 500);
-        return () => { clearTimeout(timer); drainScheduledRef.current = false; };
-      }
+    if (wasBusy && !isBusy && queuedMessages.length > 0) {
+      const timer = setTimeout(() => {
+        const next = queueDequeue(sessionId);
+        if (next) handleSend(next.text, next.files);
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [isServerBusy, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fallback drain: when isBusy becomes false and there are queued messages,
-  // drain the queue. This covers cases where the SSE missed the busy event
-  // entirely (e.g. status went undefined → idle, so isServerBusy was never
-  // true and the primary drain above never fires).
-  useEffect(() => {
-    if (isBusy || drainScheduledRef.current) return;
-    const sessionQueue = useMessageQueueStore.getState().messages.filter(
-      (m) => m.sessionId === sessionId,
-    );
-    if (sessionQueue.length === 0) return;
-     drainScheduledRef.current = true;
-    const timer = setTimeout(() => {
-      drainScheduledRef.current = false;
-      const next = queueDequeue(sessionId);
-      if (next) {
-        handleSend(next.text, next.files);
-      }
-    }, 500);
-    return () => { clearTimeout(timer); drainScheduledRef.current = false; };
   }, [isBusy, queuedMessages.length, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Send now" handler: abort current session + send the queued message
@@ -2148,38 +1991,40 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       const msg = useMessageQueueStore.getState().messages.find((m) => m.id === messageId);
       if (!msg) return;
       queueRemove(messageId);
-      // Abort the current session first
       abortSession.mutate(sessionId);
-      // Send after a brief delay to let abort take effect
       setTimeout(() => {
         handleSend(msg.text, msg.files);
       }, 150);
     },
-    [sessionId, abortSession, queueRemove], // handleSend added via eslint-disable below
-  ); // eslint-disable-line react-hooks/exhaustive-deps
+    [sessionId, abortSession, queueRemove], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
-  // Stop polling when session goes idle (via SSE or polling fallback).
-  // Grace period: if we sent a message recently (within 5s), don't stop polling
-  // on the first idle status — the server may not have started processing yet.
+  // ---- Dashboard handoff: send pending prompt on mount (fire-and-forget) ----
+  const handoffDone = useRef(false);
   useEffect(() => {
-    if (pollingActive && sessionStatus?.type === 'idle') {
-      const timeSinceSend = Date.now() - lastSendTimeRef.current;
-      if (timeSinceSend < 5000) {
-        // Still within grace period — check again shortly
-        const remaining = 5000 - timeSinceSend;
-        const timer = setTimeout(() => {
-          // Re-check: if still idle after grace period, stop polling
-          const currentStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-          if (currentStatus?.type === 'idle') {
-            setPollingActive(false);
-          }
-        }, remaining);
-        return () => clearTimeout(timer);
-      }
-      setPollingActive(false);
-    }
-  }, [pollingActive, sessionStatus?.type, sessionId]);
+    if (handoffDone.current) return;
+    const pending = sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
+    if (!pending) return;
+    handoffDone.current = true;
+    sessionStorage.removeItem(`opencode_pending_prompt:${sessionId}`);
+    sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
 
+    // Restore agent/model/variant from dashboard
+    const options: Record<string, unknown> = {};
+    try {
+      const raw = sessionStorage.getItem(`opencode_pending_options:${sessionId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        sessionStorage.removeItem(`opencode_pending_options:${sessionId}`);
+        if (parsed?.agent) { options.agent = parsed.agent; local.agent.set(parsed.agent as string); }
+        if (parsed?.model) { options.model = parsed.model; local.model.set(parsed.model as { providerID: string; modelID: string }); }
+        if (parsed?.variant) { options.variant = parsed.variant; local.model.variant.set(parsed.variant as string); }
+      }
+    } catch {
+      // ignore
+    }
+
+<<<<<<< HEAD
   // Clear pendingSendInFlight once the server acknowledges it's working,
   // or when new messages arrive from the server.
   // This bridges the gap between the optimistic prompt clearing and the
@@ -2326,22 +2171,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     }
   }, [sessionId]);
 
-  const messageCount = messages?.length ?? 0;
-  useEffect(() => {
-    if (initialScrollDoneRef.current === sessionId) return;
-    if (messageCount === 0) return;
-    initialScrollDoneRef.current = sessionId;
-
-    // Staggered attempts: the scroll container mounts after this render,
-    // then message components (markdown, code blocks) render asynchronously.
-    // All go through scrollToBottom() which marks them as programmatic.
-    scrollToBottom();
-    const t1 = setTimeout(scrollToBottom, 150);
-    const t2 = setTimeout(scrollToBottom, 500);
-
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [messageCount, sessionId, scrollToBottom]);
-
   // ---- Pending permissions & questions ----
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);
   const allQuestions = useOpenCodePendingStore((s) => s.questions);
@@ -2354,44 +2183,45 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     [allQuestions, sessionId],
   );
 
-  // ---- Permission/question reply handlers ----
+  // ---- Permission/question reply handlers (with double-click guard) ----
   const removePermission = useOpenCodePendingStore((s) => s.removePermission);
   const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
+  const [responding, setResponding] = useState(false);
 
   const handlePermissionReply = useCallback(
     async (requestId: string, reply: 'once' | 'always' | 'reject') => {
-      try {
-        await replyToPermission(requestId, reply);
-        removePermission(requestId);
-      } catch {
-        // ignore
-      }
+      if (responding) return;
+      setResponding(true);
+      replyToPermission(requestId, reply)
+        .then(() => removePermission(requestId))
+        .catch(() => {})
+        .finally(() => setResponding(false));
     },
-    [removePermission],
+    [responding, removePermission],
   );
 
   const handleQuestionReply = useCallback(
     async (requestId: string, answers: string[][]) => {
-      try {
-        await replyToQuestion(requestId, answers);
-        removeQuestion(requestId);
-      } catch {
-        // ignore
-      }
+      if (responding) return;
+      setResponding(true);
+      replyToQuestion(requestId, answers)
+        .then(() => removeQuestion(requestId))
+        .catch(() => {})
+        .finally(() => setResponding(false));
     },
-    [removeQuestion],
+    [responding, removeQuestion],
   );
 
   const handleQuestionReject = useCallback(
     async (requestId: string) => {
-      try {
-        await rejectQuestion(requestId);
-        removeQuestion(requestId);
-      } catch {
-        // ignore
-      }
+      if (responding) return;
+      setResponding(true);
+      rejectQuestion(requestId)
+        .then(() => removeQuestion(requestId))
+        .catch(() => {})
+        .finally(() => setResponding(false));
     },
-    [removeQuestion],
+    [responding, removeQuestion],
   );
 
   // ---- Group messages into turns ----
@@ -2406,11 +2236,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  // Auto-expand last turn when session is busy (use isBusy to avoid race with SSE sessionStatus)
+  // Auto-expand last turn when server reports busy (purely server-driven)
   useEffect(() => {
     if (!messages || messages.length === 0) return;
     const lastUserId = [...messages].reverse().find((m) => m.info.role === 'user')?.info.id;
-    if (lastUserId && (sessionStatus?.type !== 'idle' || isBusy)) {
+    if (lastUserId && isBusy) {
       setExpanded((prev) => ({ ...prev, [lastUserId]: true }));
     }
   }, [messages, sessionStatus, isBusy]);
@@ -2418,12 +2248,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // Reset on session change
   useEffect(() => {
     setExpanded({});
-    setPollingActive(false);
-    setPendingUserMessage(null);
-    setPendingCommand(null);
-    setPendingSendInFlight(false);
-    setIsRetrying(false);
-    lastSendTimeRef.current = 0;
+    handoffDone.current = false;
   }, [sessionId]);
 
   const toggleExpanded = useCallback((id: string) => {
@@ -2437,6 +2262,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // got cost config and step-finish.cost became non-zero.
   // ============================================================================
 
+
   // ============================================================================
   // Fork / Revert / Unrevert handlers
   // ============================================================================
@@ -2445,19 +2271,12 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
 
   const handleFork = useCallback(
     async (messageId: string) => {
-      // The server's fork copies all messages BEFORE the given messageID
-      // (exclusive: msg.id >= messageID → break). Since the user clicks
-      // "Fork from here" on an assistant response and expects that response
-      // to be included, we pass the ID of the first message AFTER the
-      // assistant message as the cut-off. If the assistant message is the
-      // last one in the session, we omit messageID entirely to copy everything.
       let forkAtMessageId: string | undefined;
       if (messages) {
         const idx = messages.findIndex((m) => m.info.id === messageId);
         if (idx >= 0 && idx < messages.length - 1) {
           forkAtMessageId = messages[idx + 1].info.id;
         }
-        // else: last message — omit messageID to copy all
       }
 
       const forkedSession = await forkSession.mutateAsync({
@@ -2465,7 +2284,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         messageId: forkAtMessageId,
       });
 
-      // Open the forked session in a new tab and navigate
       const title = forkedSession.title || 'Forked session';
       openTabAndNavigate({
         id: forkedSession.id,
@@ -2475,8 +2293,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         parentSessionId: sessionId,
         serverId: useServerStore.getState().activeServerId,
       });
-      // Store fork origin in localStorage (survives refresh) so the forked
-      // session can show the "Forked from" indicator.
       localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
     },
     [sessionId, forkSession, messages],
@@ -2496,30 +2312,21 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     await unrevertSession.mutateAsync(sessionId);
   }, [sessionId, unrevertSession]);
 
-
-
-
   // ============================================================================
   // Send / Stop / Command handlers
   // ============================================================================
 
   const handleSend = useCallback(
     async (text: string, files?: AttachedFile[], mentions?: TrackedMention[]) => {
-      // Play send sound
       playSound('send');
-
-      // Optimistic: show message immediately and start polling fallback
-      setPendingUserMessage(text);
-      setPollingActive(true);
-      lastSendTimeRef.current = Date.now();
+      scrollToBottom();
 
       const options: Record<string, unknown> = {};
       if (local.agent.current) options.agent = local.agent.current.name;
       if (local.model.currentKey) options.model = local.model.currentKey;
       if (local.model.variant.current) options.variant = local.model.variant.current;
 
-      // Build parts: text first, then upload attached files to /workspace/uploads/
-      // and send as XML text references (agent reads from disk on demand, not loaded into context)
+      // Build parts: text first, then upload attached files
       const parts: Array<
         | { type: 'text'; text: string }
         | { type: 'file'; mime: string; url: string; filename?: string }
@@ -2563,22 +2370,17 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         });
       }
 
-      try {
-        await sendMessage.mutateAsync({
-          sessionId,
-          parts,
-          options: Object.keys(options).length > 0 ? options as any : undefined,
-        });
-        // Send succeeded — update send time for grace period
-        lastSendTimeRef.current = Date.now();
-      } catch {
-        // If send fails (after all internal retries), clear optimistic state
-        setPendingUserMessage(null);
-        setPollingActive(false);
-      }
+      // Fire-and-forget: SSE will deliver the messages
+      sendMessage.mutateAsync({
+        sessionId,
+        parts,
+        options: Object.keys(options).length > 0 ? options as any : undefined,
+      }).catch(() => {
+        // Send failed after retries — user can re-submit manually
+      });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
+    [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current, scrollToBottom],
   );
 
   const handleStop = useCallback(() => {
@@ -2588,23 +2390,10 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   const handleCommand = useCallback(
     (cmd: Command, args?: string) => {
       playSound('send');
-      const label = args ? `/${cmd.name} ${args}` : `/${cmd.name}`;
-      setPendingCommand({ name: cmd.name, description: args || cmd.description });
-      pendingCommandStashRef.current = { name: cmd.name, args: args || cmd.description };
-      setPendingUserMessage(label);
-      setPollingActive(true);
-      lastSendTimeRef.current = Date.now();
+      scrollToBottom();
       executeCommand.mutate(
         { sessionId, command: cmd.name, args },
-        {
-          onError: () => {
-            setPendingCommand(null);
-            setPendingUserMessage(null);
-            setPollingActive(false);
-          },
-        },
       );
-      requestAnimationFrame(() => scrollToBottom());
     },
     [sessionId, executeCommand, scrollToBottom],
   );
@@ -2618,19 +2407,14 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   }, []);
 
   // Detect if this session was forked and resolve its parent.
-  // Must be above early returns to preserve hook order.
-  // localStorage is the source of truth (set by handleFork). The server may
-  // or may not populate parentID on the forked session.
   const forkParentId = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem(`fork_origin_${sessionId}`);
   }, [sessionId]);
   const isSubSession = !!session?.parentID || !!forkParentId;
   const isFork = !!forkParentId;
-  // The effective parent ID: prefer server parentID, fall back to localStorage
   const effectiveParentId = session?.parentID || forkParentId;
 
-  // Parent session data — used for SubSessionBar and threadContext on chat input
   const { data: parentSessionData } = useOpenCodeSession(effectiveParentId || '');
   const threadContext = useMemo(() => {
     if (!effectiveParentId || !parentSessionData) return undefined;
@@ -2652,23 +2436,16 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // ============================================================================
   // Loading / Not-found states
   // ============================================================================
-  //
-  // IMPORTANT: Do NOT use early returns here. Returning a different component
-  // tree unmounts the textarea, losing user input, focus, and all local state.
-  // Instead, render the full layout with a loading overlay on top. The main
-  // component tree (including SessionChatInput) stays mounted.
 
-  const isSessionReady = !!(session || optimisticPrompt);
-  const isDataLoading = (sessionLoading || messagesLoading) && !optimisticPrompt;
-  const isNotFound = !session && !sessionLoading && !optimisticPrompt;
+  const isDataLoading = sessionLoading || messagesLoading;
+  const isNotFound = !session && !sessionLoading;
 
   const hasMessages = messages && messages.length > 0;
-  const showOptimistic = !!optimisticPrompt && !hasMessages;
 
   return (
     <div className="relative flex flex-col h-full bg-background">
-      {/* Loading overlay — covers content but does NOT unmount children */}
-      {isDataLoading && (
+      {/* Loading overlay */}
+      {isDataLoading && !hasMessages && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
           <KortixLoader size="small" />
         </div>
@@ -2680,7 +2457,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
           Session not found
         </div>
       )}
-      {/* Session header — shown for all sessions including sub-sessions */}
+      {/* Session header */}
       {!hideHeader && (
         <SessionSiteHeader
           sessionId={sessionId}
@@ -2692,7 +2469,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         />
       )}
 
-      {/* Revert banner — shown when session is in reverted state */}
+      {/* Revert banner */}
       {isReverted && session?.revert?.messageID && (
         <RevertBanner
           sessionId={sessionId}
@@ -2702,7 +2479,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         />
       )}
 
-      {/* Context modal — triple-click the session title area to open */}
+      {/* Context modal */}
       <SessionContextModal
         open={contextModalOpen}
         onOpenChange={setContextModalOpen}
@@ -2711,7 +2488,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         providers={providers}
       />
 
-      {(hasMessages || showOptimistic) ? (
+      {hasMessages ? (
         <div className="relative flex-1 min-h-0">
           <div
             ref={scrollRef}
@@ -2723,61 +2500,13 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
               className="mx-auto max-w-3xl min-w-0 w-full px-3 sm:px-6"
             >
               <div className="flex flex-col gap-12 min-w-0">
-                {/* Fork context divider — shown at the top of forked sessions */}
+                {/* Fork context divider */}
                 {isFork && effectiveParentId && (
                   <ForkContextDivider parentID={effectiveParentId} />
                 )}
 
-                {/* Optimistic user message */}
-                {showOptimistic && (
-                  <>
-                    <div className="flex justify-end">
-                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
-                        {(() => {
-                          const { cleanText, files } = parseFileReferences(optimisticPrompt || '');
-                          return (
-                            <>
-                              {files.length > 0 && (
-                                <div className="flex gap-2 p-3 pb-0 flex-wrap">
-                                  {files.map((f, i) => (
-                                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
-                                      <FileText className="size-4 text-muted-foreground shrink-0" />
-                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {cleanText && (
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
-                                  <HighlightMentions text={cleanText} agentNames={agentNames} onFileClick={openFileInComputer} />
-                                </p>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/kortix-logomark-white.svg"
-                        alt="Kortix"
-                        className="dark:invert-0 invert flex-shrink-0"
-                        style={{ height: '14px', width: 'auto' }}
-                      />
-                      {isRetrying && (
-                        <span className="text-xs text-amber-500">
-                          Retrying connection...
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-
                 {/* Turn-based message rendering */}
                 {turns.map((turn, turnIndex) => {
-                  // Check if this turn is a compaction summary
-                  // The server sets `summary: true` on assistant messages that are compaction summaries
                   const hasCompaction = turn.assistantMessages.some(
                     (msg) => (msg.info as any).summary === true
                   ) || turn.assistantMessages.some(
@@ -2786,7 +2515,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
 
                   return (
                     <div key={turn.userMessage.info.id}>
-                      {/* Compaction divider — shown before the first turn after compaction */}
                       {hasCompaction && (
                         <div className="flex items-center gap-3 py-4 my-3">
                           <div className="flex-1 h-px bg-border" />
@@ -2819,71 +2547,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                         onFork={handleFork}
                         onRevert={handleRevert}
                         providers={providers}
-                        commandMessages={commandMessagesRef.current}
                         commands={commands}
                       />
                     </div>
                   );
                 })}
-
-                {/* Optimistic user message / command for in-session sends */}
-                {pendingUserMessage && !showOptimistic && (
-                  <>
-                    {pendingCommand ? (
-                      /* Command execution card — distinct from regular user messages */
-                      <div className="flex justify-end">
-                        <div className="inline-flex flex-col gap-1.5 px-4 py-2.5 rounded-2xl border border-border/60 bg-muted/40">
-                          <div className="flex items-center gap-2">
-                            <Terminal className="size-3.5 text-muted-foreground shrink-0" />
-                            <span className="font-mono text-sm text-foreground">/{pendingCommand.name}</span>
-                          </div>
-                          {pendingCommand.description && (
-                            <div className="text-xs text-muted-foreground break-words max-w-[400px]" style={{ paddingLeft: '1.375rem' }}>
-                              {pendingCommand.description}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex justify-end">
-                        <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
-                            <HighlightMentions text={pendingUserMessage} agentNames={agentNames} onFileClick={openFileInComputer} />
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/kortix-logomark-white.svg"
-                        alt="Kortix"
-                        className="dark:invert-0 invert flex-shrink-0"
-                        style={{ height: '14px', width: 'auto' }}
-                      />
-                      {isRetrying && (
-                        <span className="text-xs text-amber-500">
-                          Retrying connection...
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {/* Busy indicator when no turns yet but session is busy */}
-                {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
-                  <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/kortix-logomark-white.svg"
-                      alt="Kortix"
-                      className="dark:invert-0 invert flex-shrink-0"
-                      style={{ height: '14px', width: 'auto' }}
-                    />
-                  </div>
-                )}
-
-
               </div>
             </div>
           </div>
@@ -2912,16 +2580,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         <SessionWelcome />
       )}
 
-      {/* Queued messages popup — expandable/collapsible above input */}
+      {/* Queued messages popup */}
       {queuedMessages.length > 0 && (
         <div className="mx-auto w-full max-w-3xl px-2 sm:px-4">
           <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-sm overflow-hidden mb-1">
-            {/* Header — always visible, acts as toggle */}
-            <button
-              type="button"
-              onClick={() => setQueueExpanded((v) => !v)}
-              className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
-            >
+            <div className="flex items-center justify-between w-full px-3 py-2">
               <div className="flex items-center gap-2">
                 <ListPlus className="size-3.5 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground">
@@ -2937,8 +2600,8 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                     <span
                       role="button"
                       tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
+                      onClick={() => queueClearSession(sessionId)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') queueClearSession(sessionId); }}
                       className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
                     >
                       <Trash2 className="size-3" />
@@ -2946,92 +2609,82 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                   </TooltipTrigger>
                   <TooltipContent side="top"><p className="text-xs">Clear all</p></TooltipContent>
                 </Tooltip>
-                <ChevronUp className={cn('size-3.5 text-muted-foreground/50 transition-transform', !queueExpanded && 'rotate-180')} />
               </div>
-            </button>
+            </div>
 
-            {/* Expandable body */}
-            {queueExpanded && (
-              <div className="border-t border-border/40">
-                {/* Max 5 items visible by height (~240px), scroll if more */}
-                <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: '240px' }}>
-                  <div className="flex flex-col gap-0.5 p-1.5">
-                    {queuedMessages.map((qm, idx) => (
-                      <div
-                        key={qm.id}
-                        className="group/queued flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors"
-                      >
-                        {/* Index indicator */}
-                        <span className="text-[10px] tabular-nums text-muted-foreground/40 mt-1 shrink-0 w-4 text-center">
-                          {idx + 1}
-                        </span>
-
-                        {/* Message text */}
-                        <p className="flex-1 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words line-clamp-2 min-w-0">
-                          {qm.text}
-                        </p>
-
-                        {/* Action buttons — visible on hover */}
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover/queued:opacity-100 transition-opacity shrink-0">
+            <div className="border-t border-border/40">
+              <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: '240px' }}>
+                <div className="flex flex-col gap-0.5 p-1.5">
+                  {queuedMessages.map((qm, idx) => (
+                    <div
+                      key={qm.id}
+                      className="group/queued flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors"
+                    >
+                      <span className="text-[10px] tabular-nums text-muted-foreground/40 mt-1 shrink-0 w-4 text-center">
+                        {idx + 1}
+                      </span>
+                      <p className="flex-1 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words line-clamp-2 min-w-0">
+                        {qm.text}
+                      </p>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover/queued:opacity-100 transition-opacity shrink-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleQueueSendNow(qm.id)}
+                              className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                            >
+                              <Send className="size-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
+                        </Tooltip>
+                        {idx > 0 && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
-                                onClick={() => handleQueueSendNow(qm.id)}
+                                onClick={() => queueMoveUp(qm.id)}
                                 className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                               >
-                                <Send className="size-3" />
+                                <ArrowUp className="size-3" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
+                            <TooltipContent side="top"><p className="text-xs">Move up</p></TooltipContent>
                           </Tooltip>
-                          {idx > 0 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => queueMoveUp(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                >
-                                  <ArrowUp className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Move up</p></TooltipContent>
-                            </Tooltip>
-                          )}
-                          {idx < queuedMessages.length - 1 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => queueMoveDown(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                >
-                                  <ArrowDown className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Move down</p></TooltipContent>
-                            </Tooltip>
-                          )}
+                        )}
+                        {idx < queuedMessages.length - 1 && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
-                                onClick={() => queueRemove(qm.id)}
-                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                                onClick={() => queueMoveDown(qm.id)}
+                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
                               >
-                                <X className="size-3" />
+                                <ArrowDown className="size-3" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent side="top"><p className="text-xs">Remove</p></TooltipContent>
+                            <TooltipContent side="top"><p className="text-xs">Move down</p></TooltipContent>
                           </Tooltip>
-                        </div>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => queueRemove(qm.id)}
+                              className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top"><p className="text-xs">Remove</p></TooltipContent>
+                        </Tooltip>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -3057,7 +2710,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         onFileSearch={handleFileSearch}
         providers={providers}
         threadContext={threadContext}
-        onContextClick={() => setContextModalOpen(true)}
       />
     </div>
   );

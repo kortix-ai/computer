@@ -385,18 +385,17 @@ function TokenProgress({ messages, sessionId, models, selectedModel, onContextCl
   const autoCompactTriggered = useRef(false);
   const [isCompacting, setIsCompacting] = useState(false);
 
-  // Use the LAST assistant message's input tokens as the context window fill level.
-  // Each API call's input tokens represent the full prompt size (all prior context),
-  // so the last one reflects the current context window usage — not a cumulative sum.
+  // Use the LAST assistant message's total token count as context window fill.
+  // Total = input + output + reasoning + cache.read + cache.write
   const contextTokens = useMemo(() => {
     if (!messages) return 0;
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.info.role === 'assistant') {
-        const tokens = (msg.info as any).tokens;
-        if (tokens && (tokens.input || 0) > 0) {
-          return tokens.input as number;
-        }
+        const t = (msg.info as any).tokens;
+        if (!t) continue;
+        const total = (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0) + (t.cache?.read ?? 0) + (t.cache?.write ?? 0);
+        if (total > 0) return total;
       }
     }
     return 0;
@@ -450,7 +449,8 @@ function TokenProgress({ messages, sessionId, models, selectedModel, onContextCl
     }
   }, [ratio, sessionId, isCompacting, summarize]);
 
-  if (contextTokens === 0) return null;
+  // Hide entirely only if no session and no tokens
+  if (contextTokens === 0 && !onContextClick) return null;
 
   const circumference = 2 * Math.PI * 7;
   const offset = circumference * (1 - ratio);
@@ -467,9 +467,10 @@ function TokenProgress({ messages, sessionId, models, selectedModel, onContextCl
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div
+        <button
+          type="button"
           className={cn('relative size-6 flex items-center justify-center', onContextClick ? 'cursor-pointer' : 'cursor-default')}
-          onClick={onContextClick}
+          onClick={(e) => { e.preventDefault(); onContextClick?.(); }}
         >
           <svg className="size-5 -rotate-90" viewBox="0 0 18 18">
             <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted" />
@@ -483,7 +484,7 @@ function TokenProgress({ messages, sessionId, models, selectedModel, onContextCl
           {isCompacting && (
             <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500 animate-pulse" />
           )}
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent side="top">
         <div className="text-xs font-mono space-y-1">
