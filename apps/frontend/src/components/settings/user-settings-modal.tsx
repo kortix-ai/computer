@@ -44,7 +44,7 @@ import { isLocalMode } from '@/lib/config';
 import { backendApi } from '@/lib/api-client';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Switch } from '@/components/ui/switch';
-import { ProviderSettings } from '@/components/providers/provider-settings';
+
 import { useIsMobile } from '@/hooks/utils';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { useQueryClient } from '@tanstack/react-query';
@@ -103,7 +103,7 @@ import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
 import { previewSound } from '@/lib/sounds';
-type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'usage' | 'providers' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
+type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'usage' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
 
 interface Tab {
     id: TabId;
@@ -135,14 +135,13 @@ export function UserSettingsModal({
         { id: 'appearance', label: 'Appearance', icon: Palette },
         { id: 'sounds', label: 'Sounds', icon: Volume2 },
         { id: 'notifications', label: 'Notifications', icon: Bell },
-        ...(isLocal ? [{ id: 'providers' as TabId, label: 'Providers', icon: Plug }] : []),
         { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
         { id: 'plan', label: 'Plan', icon: Zap },
         { id: 'billing', label: 'Billing', icon: CreditCard },
         { id: 'transactions', label: 'Transactions', icon: Receipt },
         { id: 'usage', label: 'Usage', icon: TrendingDown },
         ...(!isLocal ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
-        { id: 'integrations', label: 'Integrations', icon: Plug },
+        { id: 'integrations', label: 'Secrets Manager', icon: Plug },
         { id: 'api-keys', label: 'API Keys', icon: Key },
     ];
     
@@ -234,7 +233,6 @@ export function UserSettingsModal({
                                 {activeTab === 'transactions' && <TransactionsTab />}
                                 {activeTab === 'usage' && <UsageTab />}
                                 {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                                {activeTab === 'providers' && <ProvidersTab />}
                             </div>
                         </div>
                     </div>
@@ -291,7 +289,6 @@ export function UserSettingsModal({
                             {activeTab === 'transactions' && <TransactionsTab />}
                             {activeTab === 'usage' && <UsageTab />}
                             {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                            {activeTab === 'providers' && <ProvidersTab />}
                         </div>
                     </div>
                 )}
@@ -909,8 +906,8 @@ function SoundsTab() {
 
     const packs: { id: SoundPack; label: string; description: string }[] = [
         { id: 'off', label: 'Off', description: 'All sounds disabled' },
-        { id: 'opencode', label: 'OpenCode', description: 'Default sound pack' },
-        { id: 'kortix', label: 'Kortix', description: 'Kortix branded sounds' },
+        { id: 'opencode', label: 'Default', description: 'Default sound pack' },
+        { id: 'kortix', label: 'Seshion Pack', description: 'Whistlin' },
     ];
 
     const events: { id: SoundEvent; label: string; description: string }[] = [
@@ -1702,12 +1699,6 @@ function TransactionsTab() {
     );
 }
 
-function ProvidersTab() {
-    return (
-        <div className="p-4 sm:p-6 min-w-0 max-w-full overflow-x-hidden">
-            <ProviderSettings />
-        </div>
-    );
-}
+
 
 
