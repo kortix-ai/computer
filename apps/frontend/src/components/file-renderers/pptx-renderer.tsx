@@ -13,6 +13,7 @@ import {
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import JSZip from 'jszip';
 import { readFileAsBlob } from '@/features/files/api/opencode-files';
+import Image from 'next/image';
 
 // ---------------------------------------------------------------------------
 // Optional: keep the public-URL path for document rendering
@@ -449,12 +450,12 @@ export function PptxRenderer({
               <div className="space-y-4">
                 {slide.images.map((img, idx) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     key={img.url}
                     src={img.url}
                     alt={img.alt}
                     className="max-w-full rounded-lg shadow-sm"
-                  />
+                  width={500} height={300} unoptimized />
                 ))}
               </div>
             )}

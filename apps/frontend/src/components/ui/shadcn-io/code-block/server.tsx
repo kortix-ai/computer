@@ -11,6 +11,7 @@ import {
   type CodeOptionsMultipleThemes,
   codeToHtml,
 } from 'shiki';
+import { RawHTML } from '@/components/ui/raw-html';
 
 export type CodeBlockContentProps = HTMLAttributes<HTMLDivElement> & {
   themes?: CodeOptionsMultipleThemes['themes'];
@@ -54,10 +55,6 @@ export const CodeBlockContent = async ({
     : children;
 
   return (
-    <div
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: "Kinda how Shiki works"
-      dangerouslySetInnerHTML={{ __html: html }}
-      {...props}
-    />
+    <RawHTML html={html} {...props} />
   );
 };

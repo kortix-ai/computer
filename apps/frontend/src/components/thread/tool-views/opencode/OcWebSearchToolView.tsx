@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { WebSearchLoadingState } from '../shared/WebSearchLoadingState';
+import Image from 'next/image';
 
 // ============================================================================
 // Types & Parsing
@@ -304,7 +305,7 @@ export function OcWebSearchToolView({
                                   <div className="size-6 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                                     {favicon ? (
                                       // eslint-disable-next-line @next/next/no-img-element
-                                      <img
+                                      <Image
                                         src={favicon}
                                         alt=""
                                         className="size-4 rounded"

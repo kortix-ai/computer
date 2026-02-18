@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // Tutorial data structure - easy to add more tutorials
 interface Tutorial {
@@ -190,8 +191,7 @@ function TutorialCard({ tutorial, index }: { tutorial: Tutorial; index: number }
             className="relative rounded-xl overflow-hidden border border-border bg-accent/20"
             onMouseLeave={() => setIsActive(false)}
           >
-            <div 
-              dangerouslySetInnerHTML={{ __html: tutorial.embedCode }}
+            <RawHTML html={tutorial.embedCode}
               className={cn(
                 "transition-opacity",
                 !isActive && "pointer-events-none"

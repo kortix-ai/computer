@@ -103,6 +103,7 @@ import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
 import { previewSound } from '@/lib/sounds';
+import Image from 'next/image';
 type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'usage' | 'providers' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
 
 interface Tab {
@@ -1395,12 +1396,12 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
                             {planIcon && (
                                 <div className="rounded-full py-0.5 flex items-center justify-center">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img 
+                                    <Image 
                                         src={planIcon} 
                                         alt={planName} 
                                         className="h-6 w-auto" 
                                         style={{ height: '24px', width: 'auto' }}
-                                    />
+                                    width={500} height={300} unoptimized />
                                 </div>
                             )}
                             {accountState?.subscription.current_period_end && !hasScheduledChange && (

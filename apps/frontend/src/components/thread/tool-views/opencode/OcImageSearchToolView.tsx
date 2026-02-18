@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import Image from 'next/image';
 
 interface ImageResult {
   url?: string;
@@ -307,7 +308,7 @@ export function OcImageSearchToolView({
                             className="group relative overflow-hidden rounded-lg border border-border bg-muted hover:border-violet-300 dark:hover:border-violet-700 transition-colors shadow-sm hover:shadow-md"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <Image
                               src={imageUrl}
                               alt={img.title || `Image ${idx + 1}`}
                               className="object-cover w-full h-32 group-hover:opacity-90 transition-opacity"

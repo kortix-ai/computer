@@ -406,7 +406,7 @@ export default function TemplateSharePageClient() {
                     />
                   </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     ref={imageRef}
                     src={""}
                     alt={template.name}

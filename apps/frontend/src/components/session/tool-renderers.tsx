@@ -91,6 +91,8 @@ import {
   getChildSessionToolParts,
   getPermissionForTool,
 } from '@/ui';
+import Image from 'next/image';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // ============================================================================
 // Shared CSS overrides — strip CodeBlock's nested border/bg/padding inside
@@ -370,7 +372,7 @@ function InlineDiffView({
               <span className={cn(isAdd && 'text-emerald-500', isDel && 'text-red-500')}>
                 {prefix}
               </span>
-              <span dangerouslySetInnerHTML={{ __html: html }} />
+              <RawHTML as="span" html={html} />
             </div>
           );
         }
@@ -1833,7 +1835,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                               <div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                                 {favicon ? (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img
+                                  <Image
                                     src={favicon}
                                     alt=""
                                     className="size-4 rounded"
@@ -2001,7 +2003,7 @@ function ScrapeWebpageTool({ part, defaultOpen, forceOpen, locked }: ToolProps) 
                   <div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                     {favicon ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         src={favicon}
                         alt=""
                         className="size-4 rounded"
@@ -2135,7 +2137,7 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
                   title={title}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={imgUrl}
                     alt={title}
                     className="object-cover w-full h-full group-hover:opacity-80 transition-opacity"
@@ -2198,7 +2200,7 @@ function ImageGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       {imagePath ? (
         <div className="p-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={imagePath}
             alt={prompt}
             className="rounded border border-border/30 max-h-64 object-contain"

@@ -95,6 +95,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { RawHTML } from '@/components/ui/raw-html';
 
 export type BundledLanguage = string;
 
@@ -611,8 +612,7 @@ export const CodeBlockContent = ({
   }
 
   return (
-    <div
-      dangerouslySetInnerHTML={{ __html: highlightedCode }}
+    <RawHTML html={highlightedCode}
       {...props}
     />
   );

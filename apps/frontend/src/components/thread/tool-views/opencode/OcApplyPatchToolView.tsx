@@ -23,6 +23,7 @@ import { LoadingState } from '../shared/LoadingState';
 import { useOcFileOpen } from './useOcFileOpen';
 import { createTwoFilesPatch } from 'diff';
 import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
+import { RawHTML } from '@/components/ui/raw-html';
 
 interface PatchFile {
   relativePath: string;
@@ -284,7 +285,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
                 >
                   {prefix}
                 </span>
-                <span dangerouslySetInnerHTML={{ __html: html }} />
+                <RawHTML as="span" html={html} />
               </div>
             );
           }

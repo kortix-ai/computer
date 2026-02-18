@@ -21,6 +21,7 @@ import { LoadingState } from '../shared/LoadingState';
 import { useOcFileOpen } from './useOcFileOpen';
 import { createTwoFilesPatch } from 'diff';
 import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
+import { RawHTML } from '@/components/ui/raw-html';
 
 function getFilename(path: string | undefined): string {
   if (!path) return '';
@@ -89,7 +90,7 @@ function DiffLinesView({ patch, filename }: { patch: string; filename: string })
               >
                 {prefix}
               </span>
-              <span dangerouslySetInnerHTML={{ __html: html }} />
+              <RawHTML as="span" html={html} />
             </div>
           );
         }
@@ -240,7 +241,7 @@ function SideBySideDiffView({ patch, filename }: { patch: string; filename: stri
                   {isLeftHunk ? (
                     <span className="text-blue-500/60 text-[10px]">{row.left.content}</span>
                   ) : leftTokens && row.left.content ? (
-                    <span dangerouslySetInnerHTML={{ __html: renderHighlightedLine(leftTokens, row.left.content) }} />
+                    <RawHTML as="span" html={renderHighlightedLine(leftTokens, row.left.content)} />
                   ) : (
                     <span className={cn(row.left.type === 'deleted' && 'text-red-600 dark:text-red-400')}>
                       {row.left.content || ' '}
@@ -260,7 +261,7 @@ function SideBySideDiffView({ patch, filename }: { patch: string; filename: stri
                   )}
                 >
                   {rightTokens && row.right.content ? (
-                    <span dangerouslySetInnerHTML={{ __html: renderHighlightedLine(rightTokens, row.right.content) }} />
+                    <RawHTML as="span" html={renderHighlightedLine(rightTokens, row.right.content)} />
                   ) : (
                     <span className={cn(row.right.type === 'added' && 'text-emerald-600 dark:text-emerald-400')}>
                       {row.right.content || ' '}

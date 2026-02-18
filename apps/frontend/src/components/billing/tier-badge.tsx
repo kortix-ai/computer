@@ -3,6 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { getPlanIcon } from './plan-utils';
+import Image from 'next/image';
 
 type TierBadgeSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
 type TierBadgeVariant = 'default' | 'circle';
@@ -98,12 +99,12 @@ export function TierBadge({
       >
         {/* Use regular img for SVG icons to avoid Next.js Image aspect ratio warnings */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={planIcon}
           alt={planName}
           className="object-contain"
           style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
-        />
+        width={500} height={300} unoptimized />
       </div>
     );
   }
@@ -114,12 +115,12 @@ export function TierBadge({
   return (
     <div className="flex items-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={planIcon}
         alt={planName}
         className={cn("object-contain", className)}
         style={{ height: `${config.height}px`, width: 'auto' }}
-      />
+      width={500} height={300} unoptimized />
     </div>
   );
 }

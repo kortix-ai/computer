@@ -13,6 +13,8 @@ import { autoLinkUrls } from '@kortix/shared';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
 import { useServerStore } from '@/stores/server-store';
 import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
+import Image from 'next/image';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // Helper to check if a URL is internal (same origin)
 function isInternalUrl(href: string | undefined): boolean {
@@ -142,9 +144,8 @@ export function HighlightedCode({ code, language, children }: { code: string; la
 
   if (html) {
     return (
-      <code
+      <RawHTML as="code" html={html}
         className="text-[13px] font-mono leading-relaxed whitespace-pre [&_pre]:contents [&_code]:contents"
-        dangerouslySetInnerHTML={{ __html: html }}
       />
     );
   }
@@ -548,7 +549,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
             return (
               <span className="block my-5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={resolvedSrc}
                   alt={alt || ''}
                   className={cn(
@@ -557,7 +558,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
                     "shadow-sm"
                   )}
                   loading="lazy"
-                />
+                width={500} height={300} unoptimized />
                 {alt && (
                   <span className="block mt-2 text-center text-sm text-muted-foreground">
                     {alt}

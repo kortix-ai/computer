@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 // Kortix symbol SVG
 function KortixSymbol({ size = 24, className }: { size?: number; className?: string }) {
@@ -48,13 +49,13 @@ export function AppDownloadQR({
   return (
     <div className={cn("relative bg-white rounded-2xl p-4 shadow-lg", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img 
+      <Image 
         src={qrUrl}
         alt="Scan to download Kortix - redirects to App Store or Google Play based on your device"
         width={size}
         height={size}
         className="block"
-      />
+      unoptimized />
       {showLogo && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="bg-white p-2 rounded-xl shadow-md">

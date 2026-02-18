@@ -116,51 +116,7 @@ export default function RootLayout({
         <Script
           id="gtm-datalayer-init"
           strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                window.dataLayer = window.dataLayer || [];
-                var pathname = window.location.pathname;
-                
-                // Get language from localStorage, cookie, or default to 'en'
-                var lang = 'en';
-                try {
-                  // Check localStorage first
-                  var stored = localStorage.getItem('locale');
-                  if (stored) {
-                    lang = stored;
-                  } else {
-                    // Check cookie
-                    var cookies = document.cookie.split(';');
-                    for (var i = 0; i < cookies.length; i++) {
-                      var cookie = cookies[i].trim();
-                      if (cookie.indexOf('locale=') === 0) {
-                        lang = cookie.substring(7);
-                        break;
-                      }
-                    }
-                  }
-                } catch (e) {}
-                
-                var context = { master_group: 'General', content_group: 'Other', page_type: 'other', language: lang };
-                
-                if (pathname === '/' || pathname === '') {
-                  context = { master_group: 'General', content_group: 'Other', page_type: 'home', language: lang };
-                } else if (pathname.indexOf('/auth') === 0) {
-                  context = { master_group: 'General', content_group: 'User', page_type: 'auth', language: lang };
-                } else if (pathname === '/dashboard') {
-                  context = { master_group: 'Platform', content_group: 'Dashboard', page_type: 'home', language: lang };
-                } else if (pathname.indexOf('/projects') === 0 || pathname.indexOf('/thread') === 0) {
-                  context = { master_group: 'Platform', content_group: 'Dashboard', page_type: 'thread', language: lang };
-                } else if (pathname.indexOf('/settings') === 0) {
-                  context = { master_group: 'Platform', content_group: 'User', page_type: 'settings', language: lang };
-                }
-                
-                window.dataLayer.push(context);
-              })();
-            `,
-          }}
-        />
+        >{`(function(){window.dataLayer=window.dataLayer||[];var p=window.location.pathname;var l='en';try{var s=localStorage.getItem('locale');if(s){l=s}else{var c=document.cookie.split(';');for(var i=0;i<c.length;i++){var k=c[i].trim();if(k.indexOf('locale=')===0){l=k.substring(7);break}}}}catch(e){}var x={master_group:'General',content_group:'Other',page_type:'other',language:l};if(p==='/'||p===''){x={master_group:'General',content_group:'Other',page_type:'home',language:l}}else if(p.indexOf('/auth')===0){x={master_group:'General',content_group:'User',page_type:'auth',language:l}}else if(p==='/dashboard'){x={master_group:'Platform',content_group:'Dashboard',page_type:'home',language:l}}else if(p.indexOf('/projects')===0||p.indexOf('/thread')===0){x={master_group:'Platform',content_group:'Dashboard',page_type:'thread',language:l}}else if(p.indexOf('/settings')===0){x={master_group:'Platform',content_group:'User',page_type:'settings',language:l}}window.dataLayer.push(x)})();`}</Script>
         
         {/* Static SEO meta tags - rendered in initial HTML */}
         <title>Kortix: Your Autonomous AI Worker</title>
@@ -190,8 +146,7 @@ export default function RootLayout({
           id="ld-json-organization"
           type="application/ld+json"
           strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+        >{JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'Organization',
               name: siteMetadata.name,
@@ -210,16 +165,13 @@ export default function RootLayout({
                 contactType: 'Customer Support',
                 url: siteMetadata.url,
               },
-            }),
-          }}
-        />
+            })}</Script>
 
         <Script
           id="ld-json-software-application"
           type="application/ld+json"
           strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+        >{JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'SoftwareApplication',
               name: siteMetadata.title,
@@ -237,9 +189,7 @@ export default function RootLayout({
                 ratingValue: '4.8',
                 ratingCount: '1000',
               },
-            }),
-          }}
-        />
+            })}</Script>
       </head>
 
       <body className="antialiased font-sans bg-background">

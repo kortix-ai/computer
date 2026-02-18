@@ -7,6 +7,7 @@ import { KortixLoader } from '@/components/ui/kortix-loader';
 import { cn } from '@/lib/utils';
 import { getFilename, getFileIcon } from '@/lib/utils/file-utils';
 import { useFileContent } from '@/features/files';
+import Image from 'next/image';
 
 export interface ImagePreviewProps {
     filepath: string;
@@ -191,7 +192,7 @@ export function ImagePreview({
             )}
             
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
                 src={imageSrc}
                 alt={filename}
                 className={cn(

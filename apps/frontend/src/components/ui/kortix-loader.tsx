@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
+import { RawHTML } from '@/components/ui/raw-html';
 
 interface KortixLoaderProps {
   /**
@@ -169,7 +170,7 @@ export function KortixLoader({
               : 'none',
         }}
       />
-      <style dangerouslySetInnerHTML={{ __html: `@keyframes kortix-spin { to { transform: rotate(360deg); } }` }} />
+      <RawHTML as="style" html={`@keyframes kortix-spin { to { transform: rotate(360deg); } }`} />
     </div>
   );
 }

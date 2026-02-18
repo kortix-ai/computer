@@ -20,6 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { createTwoFilesPatch } from 'diff';
 import type { FileDiff, ApplyPatchFile } from '@/ui/types';
 import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // ============================================================================
 // Diff line renderer (unified view)
@@ -77,7 +78,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
               >
                 {prefix}
               </span>
-              <span dangerouslySetInnerHTML={{ __html: html }} />
+              <RawHTML as="span" html={html} />
             </div>
           );
         }
@@ -234,7 +235,7 @@ function SideBySideDiff({ patch, filename }: { patch: string; filename: string }
                   {isLeftHunk ? (
                     <span className="text-blue-500/60 text-[10px]">{row.left.content}</span>
                   ) : leftTokens && row.left.content ? (
-                    <span dangerouslySetInnerHTML={{ __html: renderHighlightedLine(leftTokens, row.left.content) }} />
+                    <RawHTML as="span" html={renderHighlightedLine(leftTokens, row.left.content)} />
                   ) : (
                     <span className={cn(row.left.type === 'deleted' && 'text-red-600 dark:text-red-400')}>
                       {row.left.content || ' '}
@@ -254,7 +255,7 @@ function SideBySideDiff({ patch, filename }: { patch: string; filename: string }
                   )}
                 >
                   {rightTokens && row.right.content ? (
-                    <span dangerouslySetInnerHTML={{ __html: renderHighlightedLine(rightTokens, row.right.content) }} />
+                    <RawHTML as="span" html={renderHighlightedLine(rightTokens, row.right.content)} />
                   ) : (
                     <span className={cn(row.right.type === 'added' && 'text-emerald-600 dark:text-emerald-400')}>
                       {row.right.content || ' '}

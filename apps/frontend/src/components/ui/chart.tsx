@@ -18,6 +18,7 @@ const ChartLegendBase = dynamic(
 )
 
 import { cn } from "@/lib/utils"
+import { RawHTML } from '@/components/ui/raw-html';
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
@@ -91,9 +92,7 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   }
 
   return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
+    <RawHTML as="style" html={Object.entries(THEMES)
           .map(
             ([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
@@ -108,8 +107,7 @@ ${colorConfig
 }
 `
           )
-          .join("\n"),
-      }}
+          .join("\n")}
     />
   )
 }

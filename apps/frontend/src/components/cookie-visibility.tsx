@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { RawHTML } from '@/components/ui/raw-html';
 
 export function CookieVisibility() {
   const pathname = usePathname();
@@ -12,6 +13,6 @@ export function CookieVisibility() {
   if (shouldShow) return null;
 
   return (
-    <style dangerouslySetInnerHTML={{ __html: `.cky-btn-revisit-wrapper { display: none !important; }` }} />
+    <RawHTML as="style" html={`.cky-btn-revisit-wrapper { display: none !important; }`} />
   );
 }

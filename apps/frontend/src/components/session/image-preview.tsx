@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import Image from 'next/image';
 
 interface ImagePreviewProps {
   src: string;
@@ -37,11 +38,11 @@ export function ImagePreview({ src, alt = 'Image preview', children }: ImagePrev
             <DialogTitle>{alt}</DialogTitle>
           </VisuallyHidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={src}
             alt={alt}
             className="max-w-full max-h-[85vh] object-contain mx-auto rounded"
-          />
+          width={500} height={300} unoptimized />
         </DialogContent>
       </Dialog>
     </>

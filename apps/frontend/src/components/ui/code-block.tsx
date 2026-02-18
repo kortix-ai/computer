@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { codeToHtml } from 'shiki';
 import { useTheme } from 'next-themes';
 import { MermaidRenderer } from './mermaid-renderer';
+import { RawHTML } from '@/components/ui/raw-html';
 
 export type CodeBlockProps = {
   children?: React.ReactNode;
@@ -86,9 +87,8 @@ function CodeBlockCode({
 
   // Regular code rendering (including failed Mermaid)
   return highlightedHtml ? (
-    <div
+    <RawHTML html={highlightedHtml}
       className={classNames}
-      dangerouslySetInnerHTML={{ __html: highlightedHtml }}
       {...props}
     />
   ) : (

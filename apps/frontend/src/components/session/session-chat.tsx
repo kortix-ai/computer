@@ -1337,11 +1337,11 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
                 {file.mime?.startsWith('image/') && file.url ? (
                   <ImagePreview src={file.url} alt={file.filename ?? 'Attachment'}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={file.url}
                       alt={file.filename ?? 'Attachment'}
                       className="max-h-32 max-w-48 object-cover"
-                    />
+                    width={500} height={300} unoptimized />
                   </ImagePreview>
                 ) : file.mime === 'application/pdf' ? (
                   <div className="flex items-center gap-2 px-3 py-2 bg-muted/30">

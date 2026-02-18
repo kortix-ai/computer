@@ -10,6 +10,7 @@ import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
+import Image from 'next/image';
 
 function getDomain(url: string): string {
   try {
@@ -207,7 +208,7 @@ export function OcWebFetchToolView({
                     <div className="size-6 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                       {favicon ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                           src={favicon}
                           alt=""
                           className="size-4 rounded"

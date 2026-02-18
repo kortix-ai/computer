@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
+import Image from 'next/image';
 
 export function OcShowUserToolView({
   toolCall,
@@ -67,7 +68,7 @@ export function OcShowUserToolView({
             {isImage && path && (
               <div className="flex justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={path}
                   alt={title || 'Output image'}
                   className="max-w-full max-h-[400px] rounded-lg border border-border object-contain"

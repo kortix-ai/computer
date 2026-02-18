@@ -77,6 +77,7 @@ import { KortixLoader } from '@/components/ui/kortix-loader';
 import { cn } from '@/lib/utils';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { exportDocument, type ExportFormat } from '@/lib/utils/document-export';
+import Image from 'next/image';
 
 function ToolbarButton({
   onClick,
@@ -872,11 +873,11 @@ export function MarkdownToolbar({
               {imagePreview ? (
                 <div className="space-y-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={imagePreview}
                     alt="Preview"
                     className="max-h-40 mx-auto rounded-lg object-contain"
-                  />
+                  width={500} height={300} unoptimized />
                   <p className="text-sm text-muted-foreground">Click to change image</p>
                   <p className="text-xs text-green-600 dark:text-green-400">
                     Will be uploaded to workspace
@@ -910,7 +911,7 @@ export function MarkdownToolbar({
             {imageUrl && (
               <div className="border rounded-lg p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={imageUrl}
                   alt="Preview"
                   className="max-h-40 mx-auto rounded object-contain"

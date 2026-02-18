@@ -54,6 +54,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/components/AuthProvider';
+import Image from 'next/image';
 
 // OCR detected text region with polygon bounding box
 interface TextRegion {
@@ -652,7 +653,7 @@ function CanvasImageElement({
         style={{ clipPath: clipPath || undefined }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageSrc} alt={element.name} draggable={false} className="w-full h-full object-fill pointer-events-none" />
+        <Image src={imageSrc} alt={element.name} draggable={false} className="w-full h-full object-fill pointer-events-none" width={500} height={300} unoptimized />
       </div>
 
       {/* Selection ring - OUTSIDE clipped area, always fully visible */}
@@ -2341,11 +2342,11 @@ function MultiSelectToolbar({
                       <div className="w-16 h-16 rounded border border-border overflow-hidden bg-card shrink-0 relative">
                         {el.src?.startsWith('data:') ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={el.src}
                             alt={el.name}
                             className="w-full h-full object-cover"
-                          />
+                          width={500} height={300} unoptimized />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-xs text-muted-foreground p-1">
                             <ImagePlus className="h-4 w-4 mb-0.5 opacity-50" />
@@ -3472,7 +3473,7 @@ useEffect(() => {
                           className="relative aspect-square rounded-lg overflow-hidden border outline-none transition-colors group cursor-pointer"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt={`Generated ${idx + 1}`} className="w-full h-full object-cover" />
+                          <Image src={src} alt={`Generated ${idx + 1}`} className="w-full h-full object-cover" width={500} height={300} unoptimized />
                           <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <Plus className="h-3 w-3" />
                           </div>

@@ -40,6 +40,7 @@ import { useSummarizeOpenCodeSession, findOpenCodeFiles, useOpenCodeSessions } f
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
+import Image from 'next/image';
 
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -477,7 +478,7 @@ function AttachmentPreview({
             {af.isImage ? (
               <div className="h-[54px] w-[54px] rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={af.localUrl} alt={af.file.name} className="h-full w-full object-cover" />
+                <Image src={af.localUrl} alt={af.file.name} className="h-full w-full object-cover" width={500} height={300} unoptimized />
               </div>
             ) : (
               <div className="flex items-center rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-sidebar h-[54px] w-fit min-w-[200px] max-w-[300px]">

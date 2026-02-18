@@ -6,6 +6,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { useFileContent } from '@/features/files';
+import Image from 'next/image';
 
 interface CanvasElement {
   id: string;
@@ -95,12 +96,12 @@ function CanvasImageElement({
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
       src={imageSrc}
       alt=""
       style={style}
       draggable={false}
-    />
+    width={500} height={300} unoptimized />
   );
 }
 

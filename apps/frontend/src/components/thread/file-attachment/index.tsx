@@ -22,6 +22,7 @@ import { Project } from '@/lib/api/threads';
 import { PresentationSlidePreview } from '@/components/thread/tool-views/presentation-tools/PresentationSlidePreview';
 import { usePresentationViewerStore } from '@/stores/presentation-viewer-store';
 import { IframePreview } from '../iframe-preview';
+import Image from 'next/image';
 
 // Stable default values to avoid re-renders
 const EMPTY_PREVIEW_URLS: Record<string, string> = {};
@@ -467,7 +468,7 @@ export function FileAttachmentGrid({
                                     className="block my-5"
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
+                                    <Image
                                         src={url}
                                         alt={imageName}
                                         className={cn(
@@ -476,7 +477,7 @@ export function FileAttachmentGrid({
                                             "shadow-sm"
                                         )}
                                         loading="lazy"
-                                    />
+                                    width={500} height={300} unoptimized />
                                     {imageName && (
                                         <span className="block mt-2 text-center text-sm text-muted-foreground">
                                             {imageName}

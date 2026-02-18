@@ -27,6 +27,7 @@ import { useFileHistory, useFileCommitDiff } from '../hooks/use-file-history';
 import type { GitCommit } from '../types';
 import { createTwoFilesPatch } from 'diff';
 import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -158,7 +159,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
               >
                 {prefix}
               </span>
-              <span dangerouslySetInnerHTML={{ __html: html }} />
+              <RawHTML as="span" html={html} />
             </div>
           );
         }

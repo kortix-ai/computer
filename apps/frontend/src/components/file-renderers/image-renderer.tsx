@@ -11,6 +11,7 @@ import {
   Minimize2,
   Info,
 } from 'lucide-react';
+import Image from 'next/image';
 
 interface ImageRendererProps {
   url: string;
@@ -265,7 +266,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
             {isSvg ? (
               // For SVGs, just use img tag - object tag has issues with blob URLs
               // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 ref={imageRef}
                 src={url}
                 alt="SVG preview"
@@ -277,10 +278,10 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
                 draggable={false}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
-              />
+              width={500} height={300} unoptimized />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 ref={imageRef}
                 src={url}
                 alt="Image preview"
@@ -293,7 +294,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
                 draggable={false}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
-              />
+              width={500} height={300} unoptimized />
             )}
           </div>
         )}

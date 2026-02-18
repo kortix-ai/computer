@@ -16,6 +16,7 @@ import { downloadFile, uploadFile, readFileAsBlob } from '@/features/files/api/o
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useTabStore } from '@/stores/tab-store';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // Lazy-load heavy renderers
 const PdfRenderer = lazy(() =>
@@ -440,13 +441,12 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
                 onDoubleClick={() => setIsEditing(true)}
               >
                 {highlightedHtml ? (
-                  <div
+                  <RawHTML html={highlightedHtml}
                     className={cn(
                       'p-4 font-mono text-sm leading-relaxed min-h-full',
                       '[&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_pre]:!overflow-visible',
                       '[&_code]:!bg-transparent',
                     )}
-                    dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                   />
                 ) : (
                   <pre className="p-4 font-mono text-sm leading-relaxed text-foreground whitespace-pre min-h-full">

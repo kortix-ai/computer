@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Maximize2, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // Global cache for rendered Mermaid diagrams
 const mermaidCache = new Map<string, string>();
@@ -543,8 +544,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
 
     return (
     <>
-      <style dangerouslySetInnerHTML={{
-        __html: `
+      <RawHTML as="style" html={`
           .mermaid-container svg {
             max-width: 100% !important;
             height: auto !important;
@@ -595,8 +595,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
             align-items: flex-start !important;
             justify-content: center !important;
           }
-        `
-      }} />
+        `} />
       <div
         className={cn(
           'mermaid-container my-4 rounded-2xl border overflow-auto bg-background relative group cursor-pointer',
@@ -612,9 +611,8 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
         onClick={enableFullscreen ? handleFullscreenOpen : undefined}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
       >
-        <div
+        <RawHTML html={renderedContent}
           ref={containerRef}
-          dangerouslySetInnerHTML={{ __html: renderedContent }}
         />
         {enableFullscreen && (
           <div className="absolute inset-0 bg-black/0 hover:bg-black/5 transition-colors rounded-2xl flex items-center justify-center opacity-0 hover:opacity-100 pointer-events-none">
@@ -714,14 +712,13 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
               }}
             >
               {fullscreenRenderedContent ? (
-                <div
+                <RawHTML html={fullscreenRenderedContent}
                   className="absolute inset-0 flex items-center justify-center"
                   style={{
                     transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
                     transformOrigin: 'center center',
                     transition: isDragging ? 'none' : 'transform 0.1s ease-out'
                   }}
-                  dangerouslySetInnerHTML={{ __html: fullscreenRenderedContent }}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full w-full">

@@ -20,6 +20,7 @@ import { useFileContent } from '../hooks';
 import { downloadFile, uploadFile, readFileAsBlob } from '../api/opencode-files';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+import { RawHTML } from '@/components/ui/raw-html';
 
 // Lazy-load heavy renderers to keep initial bundle small
 const PdfRenderer = lazy(() =>
@@ -617,13 +618,12 @@ export function FileViewer() {
                   onDoubleClick={() => setIsEditing(true)}
                 >
                   {highlightedHtml ? (
-                    <div
+                    <RawHTML html={highlightedHtml}
                       className={cn(
                         'p-4 font-mono text-sm leading-relaxed min-h-full',
                         '[&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_pre]:!overflow-visible',
                         '[&_code]:!bg-transparent',
                       )}
-                      dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                     />
                   ) : (
                     <pre className="p-4 font-mono text-sm leading-relaxed text-foreground whitespace-pre min-h-full">
