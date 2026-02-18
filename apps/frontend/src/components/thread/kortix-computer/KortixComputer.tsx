@@ -1,6 +1,6 @@
 'use client';
 
-import { Project } from '@/lib/api/threads';
+import { Project } from '@/types/project';
 import { HIDE_BROWSER_TAB } from '@/components/thread/utils';
 import { isHiddenTool } from '@kortix/shared/tools';
 import React, { memo, useMemo, useCallback, useState, useEffect, useRef } from 'react';

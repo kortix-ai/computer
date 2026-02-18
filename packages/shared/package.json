@@ -8,8 +8,7 @@
     ".": "./src/index.ts",
     "./tools": "./src/tools/index.ts",
     "./utils": "./src/utils/index.ts",
-    "./constants": "./src/constants/upload-limits.ts",
-    "./errors": "./src/errors/index.ts"
+    "./constants": "./src/constants/upload-limits.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

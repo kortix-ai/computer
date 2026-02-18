@@ -44,8 +44,6 @@ export async function deductCredits(
   accountId: string,
   amount: number,
   description: string,
-  threadId?: string,
-  messageId?: string,
 ) {
   const supabase = getSupabase();
 
@@ -53,8 +51,6 @@ export async function deductCredits(
     p_account_id: accountId,
     p_amount: amount,
     p_description: description,
-    p_thread_id: threadId ?? null,
-    p_message_id: messageId ?? null,
   });
 
   if (error) {

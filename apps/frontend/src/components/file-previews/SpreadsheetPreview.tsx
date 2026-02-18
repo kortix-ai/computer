@@ -4,7 +4,7 @@
 
 import dynamic from 'next/dynamic';
 import { useFileContent } from '@/features/files';
-import { Project } from '@/lib/api/threads';
+import { Project } from '@/types/project';
 
 const SpreadsheetViewer = dynamic(
     () => import('@/components/thread/tool-views/spreadsheet/SpreadsheetViewer').then((mod) => mod.SpreadsheetViewer),

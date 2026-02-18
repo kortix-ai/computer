@@ -103,10 +103,6 @@ export const config = {
   SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET || '',
   SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET || '',
 
-  // ─── Legacy Backend (fallback) ─────────────────────────────────────────────
-  BACKEND_API_URL: process.env.BACKEND_API_URL || 'http://localhost:8000',
-  BACKEND_API_KEY: process.env.BACKEND_API_KEY || '',
-
   // ─── Helper Methods ────────────────────────────────────────────────────────
 
   isLocal(): boolean {

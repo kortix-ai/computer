@@ -1,23 +1,14 @@
 'use client';
 
 import React from 'react';
-import { useAgentFromCache } from '@/hooks/agents/use-agents';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { DynamicIcon } from 'lucide-react/dynamic';
 import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { normalizeIconName } from '@/lib/utils/icon-utils';
-import type { Agent } from '@/hooks/agents/utils';
 
 interface AgentAvatarProps {
-  // For passing agent data directly (preferred - no fetch)
-  agent?: Agent;
-
-  // For fetching agent by ID (will use cache if available)
-  agentId?: string;
-  fallbackName?: string;
-
-  // For direct props (bypasses agent fetch)
+  // For direct props
   iconName?: string | null;
   iconColor?: string;
   backgroundColor?: string;
@@ -30,15 +21,10 @@ interface AgentAvatarProps {
 }
 
 export const AgentAvatar: React.FC<AgentAvatarProps> = ({
-  // Agent data props
-  agent: propAgent,
-  agentId,
-  fallbackName = "Kortix",
-
   // Direct props
   iconName: propIconName,
-  iconColor: propIconColor,
-  backgroundColor: propBackgroundColor,
+  iconColor: propIconColor = '#6B7280',
+  backgroundColor: propBackgroundColor = '#F3F4F6',
   agentName: propAgentName,
   isDefault: propIsDefault,
 
@@ -46,22 +32,15 @@ export const AgentAvatar: React.FC<AgentAvatarProps> = ({
   size = 16,
   className = ""
 }) => {
-  // Try to get agent from cache if agentId is provided and agent prop is not
-  const cachedAgent = useAgentFromCache(!propAgent && agentId ? agentId : undefined);
-  const agent = propAgent || cachedAgent;
-
-  // Determine values from props or agent data
-  const iconName = propIconName ?? agent?.icon_name;
-  const iconColor = propIconColor ?? agent?.icon_color ?? '#6B7280';
-  const backgroundColor = propBackgroundColor ?? agent?.icon_background ?? '#F3F4F6';
+  const iconName = propIconName;
+  const iconColor = propIconColor;
+  const backgroundColor = propBackgroundColor;
   const isDefaultAgent = propIsDefault ?? false;
 
   // Calculate responsive border radius - proportional to size
-  // Use a ratio that prevents full rounding while maintaining nice corners
-  // For size 40, this gives 16px border radius (rounded-2xl)
   const borderRadius = Math.min(size * 0.4, 16);
   const borderRadiusStyle = {
-    borderRadius: `${borderRadius}px` // 40% of size, max 16px (16px for size 40)
+    borderRadius: `${borderRadius}px`
   };
 
   // Filter out any rounded-* classes from className to prevent overrides
@@ -69,16 +48,6 @@ export const AgentAvatar: React.FC<AgentAvatarProps> = ({
     .split(' ')
     .filter(cls => !cls.match(/^rounded(-[a-z0-9]+)?$/))
     .join(' ');
-
-  // Show skeleton when no data is available
-  if (!agent && !propIconName && !propIsDefault && agentId) {
-    return (
-      <div
-        className={cn("bg-muted animate-pulse", filteredClassName)}
-        style={{ width: size, height: size, ...borderRadiusStyle }}
-      />
-    );
-  }
 
   if (isDefaultAgent) {
     return (
@@ -152,20 +121,15 @@ export const AgentAvatar: React.FC<AgentAvatarProps> = ({
 };
 
 interface AgentNameProps {
-  agent?: Agent;
-  agentId?: string;
   fallback?: string;
+  name?: string;
 }
 
 export const AgentName: React.FC<AgentNameProps> = ({
-  agent: propAgent,
-  agentId,
+  name,
   fallback = "Kortix"
 }) => {
-  const cachedAgent = useAgentFromCache(!propAgent && agentId ? agentId : undefined);
-  const agent = propAgent || cachedAgent;
-
-  return <span>{agent?.name || fallback}</span>;
+  return <span>{name || fallback}</span>;
 };
 
 // Utility function for checking if agent has custom profile
@@ -173,4 +137,4 @@ export function hasCustomProfile(agent: {
   icon_name?: string | null;
 }): boolean {
   return !!(agent.icon_name);
-} 
+}

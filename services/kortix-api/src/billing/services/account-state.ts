@@ -149,8 +149,6 @@ export function buildLocalAccountState(): AccountStateResponse {
     },
     models: getModelsForTier('ultra'),
     limits: {
-      projects: { current: 0, max: 999, can_create: true, tier_name: 'ultra' },
-      threads: { current: 0, max: 999, can_create: true, tier_name: 'ultra' },
       concurrent_runs: { running_count: 0, limit: 999, can_start: true, tier_name: 'ultra' },
       ai_worker_count: { current_count: 0, limit: 999, can_create: true, tier_name: 'ultra' },
       custom_mcp_count: { current_count: 0, limit: 999, can_create: true, tier_name: 'ultra' },
@@ -221,8 +219,6 @@ function buildLimits(tierName: string, _accountId: string) {
   const l = tier.limits;
 
   return {
-    projects: { current: 0, max: l.projects, can_create: true, tier_name: tierName },
-    threads: { current: 0, max: l.threads, can_create: true, tier_name: tierName },
     concurrent_runs: { running_count: 0, limit: l.concurrentRuns, can_start: true, tier_name: tierName },
     ai_worker_count: { current_count: 0, limit: l.customWorkers, can_create: true, tier_name: tierName },
     custom_mcp_count: { current_count: 0, limit: 10, can_create: true, tier_name: tierName },

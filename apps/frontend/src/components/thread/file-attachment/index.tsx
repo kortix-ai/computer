@@ -18,7 +18,7 @@ import { FileGrid } from '@/components/file-layouts/FileGrid';
 import { useFileContent } from '@/features/files';
 import { getFileType, getFilename } from '@/lib/utils/file-utils';
 import { isImageFile, isPdfExtension, isSpreadsheetExtension, isCsvExtension, isPreviewableFile, isKanvaxFile, isDocxExtension } from '@/lib/utils/file-types';
-import { Project } from '@/lib/api/threads';
+import { Project } from '@/types/project';
 import { PresentationSlidePreview } from '@/components/thread/tool-views/presentation-tools/PresentationSlidePreview';
 import { usePresentationViewerStore } from '@/stores/presentation-viewer-store';
 import { IframePreview } from '../iframe-preview';

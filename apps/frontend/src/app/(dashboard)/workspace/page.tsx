@@ -112,7 +112,7 @@ export default function WorkspacePage() {
           description: a.description,
           kind: 'agent',
           scope: 'project',
-          href: `/agents/${encodeURIComponent(a.name)}`,
+          href: `/configuration`,
           meta: a.model?.modelID,
         });
       }

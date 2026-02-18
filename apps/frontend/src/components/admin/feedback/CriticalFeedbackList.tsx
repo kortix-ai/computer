@@ -83,7 +83,7 @@ export function CriticalFeedbackList() {
                             variant="ghost"
                             size="sm"
                             className="h-6 px-2 text-xs"
-                            onClick={() => router.push(`/agents/${feedback.thread_id}`)}
+                            onClick={() => router.push(`/share/${feedback.thread_id}`)}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             View Chat

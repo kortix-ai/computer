@@ -6,7 +6,7 @@ import { HtmlRenderer, JsonRenderer } from '@/components/file-renderers';
 import { UnifiedMarkdown } from '@/components/markdown';
 import { useFileContent } from '@/features/files';
 import { constructHtmlPreviewUrl } from '@/lib/utils/url';
-import { Project } from '@/lib/api/threads';
+import { Project } from '@/types/project';
 import { getExtension } from '@/lib/utils/file-types';
 import { getFileUrl } from '@/lib/utils/file-utils';
 import { cn } from '@/lib/utils';

@@ -10,7 +10,7 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { FileAttachment, FileAttachmentGrid } from './index';
-import { Project } from '@/lib/api/threads';
+import { Project } from '@/types/project';
 
 type LayoutStyle = 'inline' | 'grid';
 

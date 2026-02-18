@@ -57,7 +57,7 @@ mock.module('../billing/services/credits', () => ({
     const outputCost = (completion / 1_000_000) * 15;
     return (inputCost + outputCost) * 1.2;
   },
-  deductCredits: async (accountId: string, cost: number, desc: string, threadId?: string, messageId?: string) => {
+  deductCredits: async (accountId: string, cost: number, desc: string) => {
     if (mockDeductError) throw mockDeductError;
     return mockDeductResult;
   },
@@ -92,8 +92,7 @@ mock.module('../billing/repositories/transactions', () => ({
   insertLedgerEntry: async (data: any) => ({ id: 'ledger_mock', ...data }),
   getTransactions: async () => ({ rows: [], total: 0 }),
   getTransactionsSummary: async () => mockTransactionsSummary,
-  getUsageRecords: async () => ({ records: [], count: 0 }),
-  getUsageByThread: async () => ({ threads: [] }),
+  getUsageRecords: async () => ({ rows: [], total: 0 }),
   insertPurchase: async (data: any) => ({ id: 'purchase_mock', ...data }),
   getPurchaseByPaymentIntent: async () => null,
   updatePurchaseStatus: async () => {},
@@ -336,7 +335,7 @@ describe('Billing: deduct', () => {
     expect(res.status).toBe(402);
   });
 
-  test('includes optional thread_id and message_id', async () => {
+  test('deducts without thread_id or message_id', async () => {
     const app = createBillingTestApp();
     const res = await app.request('/v1/billing/deduct', {
       method: 'POST',
@@ -345,8 +344,6 @@ describe('Billing: deduct', () => {
         prompt_tokens: 1000,
         completion_tokens: 500,
         model: 'claude-sonnet-4-5',
-        thread_id: 'thread_123',
-        message_id: 'msg_456',
       }),
     });
     expect(res.status).toBe(200);

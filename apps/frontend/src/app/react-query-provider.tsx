@@ -5,16 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { handleApiError } from '@/lib/error-handler';
 import { isLocalMode } from '@/lib/config';
-import { 
-  AgentRunLimitError, 
-  BillingError, 
-  ProjectLimitError, 
-  ThreadLimitError,
-  AgentCountLimitError,
-  TriggerLimitError,
-  CustomWorkerLimitError,
-  ModelAccessDeniedError
-} from '@/lib/api/errors';
+import { isBillingError } from '@/lib/api/errors';
 
 export function ReactQueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -42,14 +33,9 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
               return failureCount < 1;
             },
             onError: (error: any) => {
-              if (error instanceof BillingError || 
-                  error instanceof AgentRunLimitError ||
-                  error instanceof ProjectLimitError ||
-                  error instanceof ThreadLimitError ||
-                  error instanceof AgentCountLimitError ||
-                  error instanceof TriggerLimitError ||
-                  error instanceof CustomWorkerLimitError ||
-                  error instanceof ModelAccessDeniedError) {
+              // Billing errors are handled by the error handler (opens pricing modal)
+              // Don't show generic toast for them
+              if (isBillingError(error)) {
                 return;
               }
               handleApiError(error, {
@@ -69,4 +55,3 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
     </QueryClientProvider>
   );
 }
-

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 import { handleApiError, handleNetworkError, ErrorContext, ApiError } from './error-handler';
-import { parseTierRestrictionError, RequestTooLargeError } from './api/errors';
+import { parseBillingError, RequestTooLargeError } from './api/errors';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
@@ -100,7 +100,7 @@ async function makeRequest<T = any>(
       });
 
       if (response.status === 402) {
-        error = parseTierRestrictionError(error);
+        error = parseBillingError(error);
       }
 
       // Handle HTTP 431 - Request Header Fields Too Large
