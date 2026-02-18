@@ -21,14 +21,14 @@ export interface ModelConfig {
  */
 export const MODELS: Record<string, ModelConfig> = {
   'kortix/basic': {
-    openrouterId: 'anthropic/claude-sonnet-4-5',
+    openrouterId: 'anthropic/claude-sonnet-4.5',
     inputPer1M: 3.00,
     outputPer1M: 15.00,
     contextWindow: 200000,
     tier: 'free',
   },
   'kortix/power': {
-    openrouterId: 'anthropic/claude-opus-4-6',
+    openrouterId: 'anthropic/claude-opus-4.6',
     inputPer1M: 5.00,
     outputPer1M: 25.00,
     contextWindow: 200000,
