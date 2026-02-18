@@ -14,6 +14,7 @@ import { useTranslations } from 'next-intl';
 import { trackCtaSignup } from '@/lib/analytics/gtm';
 import { AppDownloadQR } from '@/components/common/app-download-qr';
 import { isMobileDevice } from '@/lib/utils/is-mobile-device';
+import { Button } from '@/components/ui/button';
 
 // Apple logo SVG
 function AppleLogo({ className }: { className?: string }) {
@@ -209,21 +210,21 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
             {/* Right Section - Actions */}
             <div className="flex items-center justify-end gap-2 sm:gap-3 ml-auto">
               {user ? (
-                <Link
-                  href="/dashboard"
-                  className="h-8 px-4 text-sm font-medium rounded-lg bg-foreground text-background hover:bg-foreground/90 transition-colors inline-flex items-center justify-center"
-                >
-                  Dashboard
-                </Link>
+                <Button asChild size="sm">
+                  <Link href="/dashboard">
+                    Dashboard
+                  </Link>
+                </Button>
               ) : (
-                <Link
-                  href={ctaLink}
-                  onClick={() => trackCtaSignup()}
-                  className="h-8 px-4 text-sm font-medium rounded-lg bg-foreground text-background hover:bg-foreground/90 transition-colors inline-flex items-center justify-center"
-                  suppressHydrationWarning
-                >
-                  {t('tryFree')}
-                </Link>
+                <Button asChild size="sm">
+                  <Link
+                    href={ctaLink}
+                    onClick={() => trackCtaSignup()}
+                    suppressHydrationWarning
+                  >
+                    {t('tryFree')}
+                  </Link>
+                </Button>
               )}
               
               {/* Mobile Menu Button */}
@@ -327,25 +328,27 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                 transition={{ delay: 0.3, duration: 0.3 }}
               >
                 {user ? (
-                  <Link
-                    href="/dashboard"
-                    className="w-full h-14 text-lg font-medium rounded-xl bg-foreground text-background hover:bg-foreground/90 transition-colors inline-flex items-center justify-center"
-                    onClick={() => setIsDrawerOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
+                  <Button asChild size="lg" className="w-full h-14 text-lg">
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setIsDrawerOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
+                  </Button>
                 ) : (
-                  <Link
-                    href={ctaLink}
-                    onClick={() => {
-                      trackCtaSignup();
-                      setIsDrawerOpen(false);
-                    }}
-                    className="w-full h-14 text-lg font-medium rounded-xl bg-foreground text-background hover:bg-foreground/90 transition-colors inline-flex items-center justify-center"
-                    suppressHydrationWarning
-                  >
-                    {t('tryFree')}
-                  </Link>
+                  <Button asChild size="lg" className="w-full h-14 text-lg">
+                    <Link
+                      href={ctaLink}
+                      onClick={() => {
+                        trackCtaSignup();
+                        setIsDrawerOpen(false);
+                      }}
+                      suppressHydrationWarning
+                    >
+                      {t('tryFree')}
+                    </Link>
+                  </Button>
                 )}
                 
                 {/* Theme Toggle */}

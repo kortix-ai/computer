@@ -295,15 +295,11 @@ export default function DashboardLayoutContent({
     }
   }, [user, isLoading, router]);
 
-  // Hard gate: show setup overlay if onboarding not complete (local mode only)
+  // Hard gate: show setup overlay if onboarding not complete (both local & cloud)
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showSetupOverlay, setShowSetupOverlay] = useState(false);
+  const [existingOnboardingSessionId, setExistingOnboardingSessionId] = useState<string | null>(null);
   useEffect(() => {
-    if (!isLocalMode()) {
-      setOnboardingChecked(true);
-      return;
-    }
-
     const checkOnboarding = async () => {
       try {
         const backendUrl =
@@ -313,10 +309,15 @@ export default function DashboardLayoutContent({
           const data = await res.json();
           if (!data.complete) {
             setShowSetupOverlay(true);
+            if (data.session_id) setExistingOnboardingSessionId(data.session_id);
           }
+        } else {
+          // Endpoint missing (404) or error — treat as not onboarded
+          setShowSetupOverlay(true);
         }
       } catch {
-        // Backend not reachable — don't block, let them in
+        // Backend not reachable — treat as not onboarded
+        setShowSetupOverlay(true);
       }
       setOnboardingChecked(true);
     };
@@ -383,6 +384,7 @@ export default function DashboardLayoutContent({
       {showSetupOverlay && (
         <Suspense fallback={null}>
           <SetupOverlay
+            existingSessionId={existingOnboardingSessionId}
             onComplete={() => {
               setShowSetupOverlay(false);
               // NOTE: Do NOT set ONBOARDING_COMPLETE here — only the onboarding
