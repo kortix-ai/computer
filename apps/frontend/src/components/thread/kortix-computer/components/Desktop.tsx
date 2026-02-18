@@ -10,7 +10,7 @@ import { ToolView } from '../../tool-views/wrapper';
 import { getUserFriendlyToolName, getToolIcon } from '@/components/thread/utils';
 import { ToolCallInput } from '../KortixComputer';
 import { Project } from '@/lib/api/threads';
-import { ApiMessageType } from '@/components/thread/types';
+
 import { ViewType } from '@/stores/kortix-computer-store';
 import { cn } from '@/lib/utils';
 import { useFileList, readFile, fileListKeys, useFileUpload, useFileMkdir, useFileDelete, useFileRename, useFilesStore, FileBrowser, FileViewer, FileHistoryPanel } from '@/features/files';
@@ -141,7 +141,7 @@ interface SandboxDesktopProps {
   onJumpToLive: () => void;
   onJumpToLatest: () => void;
   project?: Project;
-  messages?: ApiMessageType[];
+  messages?: any[];
   onFileClick?: (filePath: string) => void;
   streamingText?: string;
   onClose: () => void;

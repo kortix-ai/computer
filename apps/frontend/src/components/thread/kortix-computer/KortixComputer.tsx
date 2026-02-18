@@ -5,7 +5,6 @@ import { HIDE_BROWSER_TAB } from '@/components/thread/utils';
 import { isHiddenTool } from '@kortix/shared/tools';
 import React, { memo, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ApiMessageType } from '@/components/thread/types';
 import { useIsMobile } from '@/hooks/utils';
 import { cn } from '@/lib/utils';
 import { ToolView } from '../tool-views/wrapper';
@@ -32,7 +31,6 @@ export interface ToolCallInput {
   assistantTimestamp?: string;
   toolTimestamp?: string;
   isSuccess?: boolean;
-  messages?: ApiMessageType[];
 }
 
 interface KortixComputerProps {
@@ -42,7 +40,7 @@ interface KortixComputerProps {
   currentIndex: number;
   onNavigate: (newIndex: number) => void;
   externalNavigateToIndex?: number;
-  messages?: ApiMessageType[];
+  messages?: any[];
   agentStatus: string;
   project?: Project;
   renderAssistantMessage?: (
