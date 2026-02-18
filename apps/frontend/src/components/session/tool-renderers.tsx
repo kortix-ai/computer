@@ -2785,29 +2785,28 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       locked={locked}
     >
       {todos.length > 0 && (
-        <div className="px-3 py-2.5 space-y-1.5">
+        <div className="px-3 py-1.5 space-y-px max-h-[200px] overflow-y-auto scrollbar-hide">
           {todos.map((todo: Record<string, unknown>, i: number) => (
-            <label key={i} className="flex items-start gap-2.5 text-xs cursor-default">
+            <div key={i} className={cn(
+              'flex items-center gap-2 py-0.5 text-[11px] cursor-default',
+              todo.status === 'completed' && 'opacity-40',
+            )}>
               <span className={cn(
-                'mt-0.5 size-3.5 rounded flex-shrink-0 flex items-center justify-center border',
-                todo.status === 'completed'
-                  ? 'bg-emerald-500/15 border-emerald-500/30'
-                  : todo.status === 'in_progress'
-                    ? 'bg-primary/10 border-primary/30'
-                    : 'border-border/60',
+                'size-3 rounded-sm flex-shrink-0 flex items-center justify-center border border-border/60',
+                todo.status === 'completed' && 'bg-muted',
               )}>
-                {todo.status === 'completed' && <Check className="size-2.5 text-emerald-500" />}
-                {todo.status === 'in_progress' && <Loader2 className="size-2.5 text-primary animate-spin" />}
+                {todo.status === 'completed' && <Check className="size-2 text-muted-foreground" />}
+                {todo.status === 'in_progress' && <Loader2 className="size-2 text-muted-foreground animate-spin" />}
               </span>
               <span
                 className={cn(
-                  'leading-relaxed',
+                  'leading-tight truncate',
                   todo.status === 'completed' && 'line-through text-muted-foreground',
                 )}
               >
                 {String(todo.content || '')}
               </span>
-            </label>
+            </div>
           ))}
         </div>
       )}
@@ -2984,29 +2983,14 @@ ToolRegistry.register('plan_enter', PlanToolRenderer);
 // --- Question ---
 function QuestionSkeletonOptions() {
   return (
-    <div className="p-3 space-y-3 animate-pulse">
-      {/* Question text skeleton */}
-      <div className="space-y-1.5">
-        <div className="h-3.5 w-3/4 bg-muted/40 rounded-md" />
-      </div>
-      {/* Option skeletons */}
-      <div className="space-y-1.5">
-        {[0.85, 0.7, 0.6, 0.75].map((w, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/20 bg-muted/10"
-          >
-            <div className="flex-1 flex items-center gap-2">
-              <div className="h-3 rounded-md bg-muted/40" style={{ width: `${w * 50}%` }} />
-              <div className="h-3 rounded-md bg-muted/20" style={{ width: `${w * 30}%` }} />
-            </div>
-            <div className="size-3.5 rounded bg-muted/20 shrink-0" />
+    <div className="px-3 py-2 space-y-1.5 animate-pulse">
+      <div className="h-3 w-3/4 bg-muted/40 rounded" />
+      <div className="space-y-1">
+        {[0.85, 0.7, 0.6].map((w, i) => (
+          <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/20">
+            <div className="h-2.5 rounded bg-muted/40" style={{ width: `${w * 50}%` }} />
           </div>
         ))}
-      </div>
-      {/* Dismiss skeleton */}
-      <div className="flex justify-end pt-2 border-t border-border/10">
-        <div className="h-5 w-14 rounded-md bg-muted/20" />
       </div>
     </div>
   );
@@ -3029,7 +3013,6 @@ function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked, hasActiveQ
 
   const isAnswered = answers.length > 0;
   const isRunning = status === 'running' || status === 'pending';
-  // Show skeleton only when running AND the QuestionPrompt hasn't taken over yet
   const showSkeleton = isRunning && !hasActiveQuestion;
   const subtitle = questions.length > 0
     ? isAnswered
@@ -3048,15 +3031,15 @@ function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked, hasActiveQ
       locked={locked}
     >
       {isAnswered ? (
-        <div className="p-2 space-y-2">
+        <div className="px-3 py-2 space-y-1">
           {questions.map((q, i) => {
             const answer = answers[i] || [];
             return (
-              <div key={i} className="space-y-0.5">
-                <p className="text-xs font-medium text-foreground">{q.question}</p>
-                <p className="text-xs text-muted-foreground">
+              <div key={i} className="flex items-baseline gap-1.5 text-[11px]">
+                <span className="font-medium text-foreground shrink-0">{q.question}</span>
+                <span className="text-muted-foreground truncate">
                   {answer.join(', ') || 'No answer'}
-                </p>
+                </span>
               </div>
             );
           })}

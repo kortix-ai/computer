@@ -27,8 +27,8 @@ interface TodoDialogProps {
 
 const statusConfig: Record<string, { icon: typeof Circle; color: string; label: string }> = {
   pending: { icon: Circle, color: 'text-muted-foreground/50', label: 'Pending' },
-  in_progress: { icon: Loader2, color: 'text-blue-500', label: 'In Progress' },
-  completed: { icon: CheckCircle2, color: 'text-emerald-500', label: 'Completed' },
+  in_progress: { icon: Loader2, color: 'text-muted-foreground', label: 'In Progress' },
+  completed: { icon: CheckCircle2, color: 'text-muted-foreground', label: 'Completed' },
   cancelled: { icon: Ban, color: 'text-muted-foreground/30', label: 'Cancelled' },
 };
 
@@ -64,7 +64,7 @@ export function TodoDialog({ sessionId, open, onOpenChange }: TodoDialogProps) {
           <div className="px-6 pb-4">
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                className="h-full bg-foreground/50 rounded-full transition-all duration-300"
                 style={{ width: `${(completed / total) * 100}%` }}
               />
             </div>
@@ -107,30 +107,28 @@ export function TodoDialog({ sessionId, open, onOpenChange }: TodoDialogProps) {
                 <div
                   key={todo.id}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-3 rounded-lg transition-colors',
-                    isCompleted && 'opacity-60',
-                    isCancelled && 'opacity-40',
+                    'flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors',
+                    isCompleted && 'opacity-40',
+                    isCancelled && 'opacity-30',
                   )}
                 >
                   <StatusIcon
                     className={cn(
-                      'h-4.5 w-4.5 flex-shrink-0',
+                      'h-3.5 w-3.5 flex-shrink-0',
                       status.color,
                       todo.status === 'in_progress' && 'animate-spin',
                     )}
                   />
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      'text-sm',
-                      isCompleted && 'line-through text-muted-foreground',
-                      isCancelled && 'line-through text-muted-foreground/50',
-                    )}>
-                      {todo.content}
-                    </p>
-                  </div>
-                  {priority && (
+                  <p className={cn(
+                    'flex-1 min-w-0 text-[13px] leading-tight truncate',
+                    isCompleted && 'line-through text-muted-foreground',
+                    isCancelled && 'line-through text-muted-foreground/50',
+                  )}>
+                    {todo.content}
+                  </p>
+                  {priority && todo.priority !== 'medium' && (
                     <span className={cn(
-                      'text-[10px] font-medium px-2 py-0.5 rounded border flex-shrink-0',
+                      'text-[9px] font-medium px-1.5 py-px rounded border flex-shrink-0',
                       priority.color,
                     )}>
                       {priority.label}
