@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
@@ -974,69 +973,4 @@ export async function rejectQuestion(requestId: string): Promise<void> {
 // Session Busy Polling (fallback when SSE is unavailable)
 // ============================================================================
 
-/**
- * Polls session status and refreshes messages when enabled.
- * Acts as a reliable fallback for when the SSE event stream is
- * not connected or drops — ensures promptAsync responses always arrive.
- */
-export function useSessionBusyPolling(sessionId: string, enabled: boolean) {
-  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!enabled || !sessionId) return;
-
-    let cancelled = false;
-
-    const poll = async () => {
-      if (cancelled) return;
-      try {
-        const client = getClient();
-        const statusResult = await client.session.status();
-        if (!cancelled && statusResult.data) {
-          const statuses = statusResult.data as Record<string, any>;
-          const status = statuses[sessionId];
-          if (status) {
-            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, status);
-          }
-        }
-      } catch {
-        // ignore polling errors
-      }
-      // NOTE: Do NOT invalidateQueries for messages here.
-      // Message cache is updated via SSE (message.updated → setQueryData).
-      // Polling invalidation causes a race: the API refetch returns stale
-      // data (without .error) and overwrites the SSE-patched cache.
-    };
-
-    // Immediate first poll, then every 2s
-    poll();
-    const interval = setInterval(poll, 2000);
-
-    // Safety: stop after 5 minutes to prevent infinite polling.
-    // Do one final status check — if server says idle, update the store so
-    // the UI doesn't stay stuck in a "busy" state after polling stops.
-    const timeout = setTimeout(async () => {
-      clearInterval(interval);
-      try {
-        const client = getClient();
-        const statusResult = await client.session.status();
-        if (!cancelled && statusResult.data) {
-          const statuses = statusResult.data as Record<string, any>;
-          const status = statuses[sessionId];
-          if (status) {
-            useOpenCodeSessionStatusStore.getState().setStatus(sessionId, status);
-          }
-        }
-      } catch {
-        // ignore
-      }
-      cancelled = true;
-    }, 5 * 60 * 1000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [enabled, sessionId, queryClient]);
-}
