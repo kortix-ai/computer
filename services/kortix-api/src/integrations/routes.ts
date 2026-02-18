@@ -198,6 +198,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
       throw new HTTPException(403, { message: 'Sandbox not found or not owned by account' });
     }
 
+    
     await linkSandboxIntegration(parsed.data.sandbox_id, integrationId);
     return c.json({ success: true }, 201);
   });
