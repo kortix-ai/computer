@@ -152,8 +152,8 @@ interface SandboxDesktopProps {
   onClose: () => void;
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
-  renderFilesView?: () => ReactNode;
-  renderBrowserView?: () => ReactNode;
+  $renderFilesView?: () => ReactNode;
+  $renderBrowserView?: () => ReactNode;
   isStreaming?: boolean;
   project_id: string;
 }
@@ -176,8 +176,8 @@ export const SandboxDesktop = memo(function SandboxDesktop({
   onClose,
   currentView,
   onViewChange,
-  renderFilesView,
-  renderBrowserView,
+  $renderFilesView,
+  $renderBrowserView,
   project_id,
   isStreaming = false,
 }: SandboxDesktopProps) {
@@ -711,7 +711,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
     toast.info('Download all functionality coming soon');
   }, [sandboxId]);
 
-  const renderDesktop = () => (
+  const $renderDesktop = () => (
     <>
       <div className="absolute inset-0">
         {(desktopFiles.length > 0 || isCreatingNewFolder) && (
@@ -786,7 +786,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
                 );
               }
 
-              if (window.type === 'files' && renderFilesView) {
+              if (window.type === 'files' && $renderFilesView) {
                 return (
                   <AppWindow
                     key={window.id}
@@ -805,12 +805,12 @@ export const SandboxDesktop = memo(function SandboxDesktop({
                     onMinimize={() => minimizeWindow(window.id)}
                     zIndex={window.zIndex}
                   >
-                    {renderFilesView()}
+                    {$renderFilesView()}
                   </AppWindow>
                 );
               }
 
-              if (window.type === 'browser' && renderBrowserView) {
+              if (window.type === 'browser' && $renderBrowserView) {
                 return (
                   <AppWindow
                     key={window.id}
@@ -829,7 +829,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
                     onMinimize={() => minimizeWindow(window.id)}
                     zIndex={window.zIndex}
                   >
-                    {renderBrowserView()}
+                    {$renderBrowserView()}
                   </AppWindow>
                 );
               }
@@ -1065,7 +1065,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
         </div>
 
         <div className="relative flex-1 overflow-hidden">
-          {renderDesktop()}
+          {$renderDesktop()}
         </div>
 
         <QuickLaunch

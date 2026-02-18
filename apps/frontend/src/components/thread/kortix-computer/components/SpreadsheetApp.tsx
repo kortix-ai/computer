@@ -414,7 +414,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
   }, []);
 
 
-  const renderTabBar = () => (
+  const $renderTabBar = () => (
     <div className="flex items-center bg-zinc-100/80 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800">
       <div className="flex items-center flex-1 overflow-x-auto scrollbar-hide">
         <button
@@ -479,7 +479,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
     </div>
   );
 
-  const renderHome = () => (
+  const $renderHome = () => (
     <m.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -600,11 +600,11 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
         }
       `}</style>
       <div className="h-full w-full overflow-hidden flex flex-col">
-        {renderTabBar()}
+        {$renderTabBar()}
         
         <div className="flex-1 overflow-hidden relative">
           <AnimatePresence mode="wait">
-            {showHome && renderHome()}
+            {showHome && $renderHome()}
           </AnimatePresence>
 
           {tabs.map((tab) => (

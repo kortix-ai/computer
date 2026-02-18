@@ -79,7 +79,7 @@ export function MetricsChart({
     return config;
   }, [dataKeys]);
 
-  const renderAreaChart = () => (
+  const $renderAreaChart = () => (
     <AreaChart
       accessibilityLayer
       data={data}
@@ -124,7 +124,7 @@ export function MetricsChart({
     </AreaChart>
   );
 
-  const renderBarChart = () => (
+  const $renderBarChart = () => (
     <BarChart
       accessibilityLayer
       data={data}
@@ -158,7 +158,7 @@ export function MetricsChart({
     </BarChart>
   );
 
-  const renderLineChart = () => (
+  const $renderLineChart = () => (
     <LineChart
       accessibilityLayer
       data={data}
@@ -194,16 +194,16 @@ export function MetricsChart({
     </LineChart>
   );
 
-  const renderChart = () => {
+  const $renderChart = () => {
     switch (type) {
       case "area":
-        return renderAreaChart();
+        return $renderAreaChart();
       case "bar":
-        return renderBarChart();
+        return $renderBarChart();
       case "line":
-        return renderLineChart();
+        return $renderLineChart();
       default:
-        return renderAreaChart();
+        return $renderAreaChart();
     }
   };
 
@@ -224,7 +224,7 @@ export function MetricsChart({
           </div>
         ) : (
           <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
-            {renderChart()}
+            {$renderChart()}
           </ChartContainer>
         )}
       </CardContent>

@@ -45,11 +45,11 @@ interface KortixComputerProps {
   messages?: ApiMessageType[];
   agentStatus: string;
   project?: Project;
-  renderAssistantMessage?: (
+  $renderAssistantMessage?: (
     assistantContent?: string,
     toolContent?: string,
   ) => React.ReactNode;
-  renderToolResult?: (
+  $renderToolResult?: (
     toolContent?: string,
     isSuccess?: boolean,
   ) => React.ReactNode;
@@ -532,7 +532,7 @@ export const KortixComputer = memo(function KortixComputer({
 
   const effectiveSandboxId = sandboxId || project?.sandbox?.id || '';
 
-  const renderToolsView = () => {
+  const $renderToolsView = () => {
     // If no tool calls at all, show empty state
     if (toolCallSnapshots.length === 0) {
       return <EmptyState t={t} />;
@@ -587,7 +587,7 @@ export const KortixComputer = memo(function KortixComputer({
     );
   };
 
-  const renderContent = () => (
+  const $renderContent = () => (
     <div className="flex flex-col h-full max-h-full max-w-full overflow-hidden min-w-0" style={{ contain: 'strict' }}>
       {!isMobile && !hideTopBar && (
         <PanelHeader
@@ -622,7 +622,7 @@ export const KortixComputer = memo(function KortixComputer({
         />
       )}
       <div className="flex-1 overflow-hidden max-w-full max-h-full min-w-0 min-h-0" style={{ contain: 'strict' }}>
-        {renderToolsView()}
+        {$renderToolsView()}
       </div>
     </div>
   );
@@ -706,7 +706,7 @@ export const KortixComputer = memo(function KortixComputer({
             showFilesTab={true}
           />
           <div className="flex-1 overflow-hidden min-w-0 min-h-0" style={{ contain: 'strict' }}>
-            {renderToolsView()}
+            {$renderToolsView()}
           </div>
           {navElement && (
             <div className="flex-shrink-0 pb-[env(safe-area-inset-bottom,0px)]">
@@ -736,7 +736,7 @@ export const KortixComputer = memo(function KortixComputer({
             className="m-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] border rounded-2xl flex flex-col z-30 overflow-hidden bg-card"
             style={{ contain: 'strict' }}
           >
-            {renderContent()}
+            {$renderContent()}
             {navElement}
           </m.div>
         )}
@@ -757,7 +757,7 @@ export const KortixComputer = memo(function KortixComputer({
     >
       {headerSlot}
       <div className="flex-1 overflow-hidden min-w-0 min-h-0" style={{ contain: 'strict' }}>
-        {renderContent()}
+        {$renderContent()}
       </div>
       {navElement}
     </div>

@@ -59,7 +59,7 @@ function TypewriterParagraph({
   // For linked paragraphs, find where the link starts
   const linkStartIndex = isLinkedParagraph ? paragraph.text.length : -1;
   
-  const renderCharacters = (chars: string[], startIdx: number) => 
+  const $renderCharacters = (chars: string[], startIdx: number) => 
     chars.map((char, i) => {
       const charIndex = startIdx + i;
       const charProgress = charIndex / characters.length;
@@ -93,16 +93,16 @@ function TypewriterParagraph({
       <p className="absolute inset-0">
         {isLinkedParagraph ? (
           <>
-            {renderCharacters(paragraph.text.split(''), 0)}
+            {$renderCharacters(paragraph.text.split(''), 0)}
             <Link 
               href={paragraph.linkHref} 
               className="opacity-50 hover:opacity-100 transition-opacity"
             >
-              {renderCharacters(paragraph.linkText.split(''), linkStartIndex)}
+              {$renderCharacters(paragraph.linkText.split(''), linkStartIndex)}
             </Link>
           </>
         ) : (
-          renderCharacters(characters, 0)
+          $renderCharacters(characters, 0)
         )}
       </p>
     </div>

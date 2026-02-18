@@ -368,7 +368,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   };
   
   // Render different variants
-  const renderShowcaseCard = () => (
+  const $renderShowcaseCard = () => (
     <m.div className="flex flex-col items-start justify-end relative group cursor-pointer hover:bg-accent/30 transition-colors duration-300">
       <div className="relative flex size-full items-center justify-center h-full overflow-hidden">
         <div className="pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-t from-background to-transparent z-20"></div>
@@ -402,7 +402,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     </m.div>
   );
   
-  const renderDashboardCard = () => (
+  const $renderDashboardCard = () => (
     <div
       className={cn(
         'group h-38 relative bg-muted/80 dark:bg-muted/20 rounded-3xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col w-full border-border/50',
@@ -431,7 +431,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     </div>
   );
   
-  const renderOnboardingCard = () => (
+  const $renderOnboardingCard = () => (
     <m.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -495,13 +495,13 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     </m.div>
   );
   
-  const renderStandardCard = () => {
+  const $renderStandardCard = () => {
     const cardClassName = cn(
       'group relative bg-card rounded-2xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col border-border/50 hover:border-primary/20',
       className
     );
     
-    const renderBadge = () => {
+    const $renderBadge = () => {
       switch (variant) {
         case 'marketplace':
           return <MarketplaceBadge isKortixTeam={data.is_kortix_team} isOwner={isOwner} />;
@@ -514,7 +514,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
       }
     };
     
-    const renderMetadata = () => {
+    const $renderMetadata = () => {
       if (variant === 'marketplace') {
         return (
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -542,7 +542,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
       return null;
     };
     
-    const renderActions = () => {
+    const $renderActions = () => {
       if (variant === 'marketplace') {
         return (
           <div className="flex gap-2" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }} onClick={(e) => e.stopPropagation()}>
@@ -638,7 +638,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
           <div className="flex items-start justify-between mb-4">
             <CardAvatar data={data} variant={variant} />
             <div className="flex items-center gap-2">
-              {renderBadge()}
+              {$renderBadge()}
             </div>
           </div>
           
@@ -653,9 +653,9 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
             
             <div className="mt-auto">
               <div className="mb-3">
-                {renderMetadata()}
+                {$renderMetadata()}
               </div>
-              {renderActions()}
+              {$renderActions()}
             </div>
           </div>
         </div>
@@ -699,14 +699,14 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   // Render based on variant
   switch (variant) {
     case 'showcase':
-      return renderShowcaseCard();
+      return $renderShowcaseCard();
     case 'dashboard':
     case 'compact':
-      return renderDashboardCard();
+      return $renderDashboardCard();
     case 'onboarding':
-      return renderOnboardingCard();
+      return $renderOnboardingCard();
     default:
-      return renderStandardCard();
+      return $renderStandardCard();
   }
 };
 

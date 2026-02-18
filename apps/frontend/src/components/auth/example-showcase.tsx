@@ -661,7 +661,7 @@ export function ExampleShowcase() {
                       <div className="prose prose-sm max-w-none">
                         {displayedContent.contentMarkdown.split('\n').map((line, idx) => {
                           // Helper to render text with inline bold
-                          const renderText = (text: string, className: string) => {
+                          const $renderText = (text: string, className: string) => {
                             const parts = text.split(/(\*\*.*?\*\*)/g);
                             return (
                               <span className={className}>
@@ -685,15 +685,15 @@ export function ExampleShowcase() {
                             return <h3 key={`line-${idx}`} className="text-[11px] font-semibold text-foreground mt-2 mb-1">{line.slice(4)}</h3>;
                           }
                           if (line.startsWith('- ')) {
-                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">• {renderText(line.slice(2), '')}</p>;
+                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">• {$renderText(line.slice(2), '')}</p>;
                           }
                           if (line.match(/^\d+\./)) {
-                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">{renderText(line, '')}</p>;
+                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">{$renderText(line, '')}</p>;
                           }
                           if (line.trim() === '') {
                             return <div key={`${idx}-${typeof line === 'string' ? line : idx}`} className="h-2" />;
                           }
-                          return <p key={`${idx}-${typeof line === 'string' ? line : idx}`} className="leading-relaxed">{renderText(line, 'text-[10px] text-muted-foreground')}</p>;
+                          return <p key={`${idx}-${typeof line === 'string' ? line : idx}`} className="leading-relaxed">{$renderText(line, 'text-[10px] text-muted-foreground')}</p>;
                         })}
                       </div>
                     </div>

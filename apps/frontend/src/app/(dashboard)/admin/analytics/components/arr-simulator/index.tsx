@@ -1707,7 +1707,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                   };
                   
                   // Editable cell helper for monthly data
-                  const renderEditableMonthlyCell = (
+                  const $renderEditableMonthlyCell = (
                     field: keyof MonthlyActual,
                     autoValue: number,
                     goalValue: number,
@@ -1784,14 +1784,14 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                       </td>
                       {/* Visitors */}
                       <td className="text-right p-2"></td>
-                      {renderEditableMonthlyCell('views', autoViews, month.visitors)}
+                      {$renderEditableMonthlyCell('views', autoViews, month.visitors)}
                       {/* % Growth */}
                       <td className={`text-right p-2 font-medium ${getGrowthColor(viewsGrowth)}`}>
                         {platform === 'web' ? formatGrowth(viewsGrowth) : '—'}
                       </td>
                       {/* Signups */}
                       <td className="text-right p-2"></td>
-                      {renderEditableMonthlyCell('signups', autoSignups, month.signups)}
+                      {$renderEditableMonthlyCell('signups', autoSignups, month.signups)}
                       {/* Signups Growth */}
                       <td className={`text-right p-2 font-medium ${getGrowthColor(signupsGrowth)}`}>
                         {platform === 'web' ? formatGrowth(signupsGrowth) : '—'}
@@ -1802,7 +1802,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                       </td>
                       {/* New Paid */}
                       <td className="text-right p-2"></td>
-                      {renderEditableMonthlyCell('newPaid', autoNewPaid, month.newPaid)}
+                      {$renderEditableMonthlyCell('newPaid', autoNewPaid, month.newPaid)}
                       {/* New Paid Growth */}
                       <td className={`text-right p-2 font-medium ${getGrowthColor(newPaidGrowth)}`}>
                         {platform === 'web' ? formatGrowth(newPaidGrowth) : '—'}
@@ -1812,20 +1812,20 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
                         {paidConvRate !== null ? `${paidConvRate.toFixed(1)}%` : '—'}
                       </td>
                       {/* Churn */}
-                      {renderEditableMonthlyCell('churn', autoChurn, 0)}
+                      {$renderEditableMonthlyCell('churn', autoChurn, 0)}
                       {/* Churn Rate = Churn / Subs at 1st of month */}
                       <td className={`text-right p-2 font-medium ${churnRate !== null && churnRate > 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
                         {churnRate !== null ? `${churnRate.toFixed(1)}%` : '—'}
                       </td>
                       {/* Total Subs */}
                       <td className="text-right p-2"></td>
-                      {renderEditableMonthlyCell('subscribers', effectiveSubs, month.totalSubs)}
+                      {$renderEditableMonthlyCell('subscribers', effectiveSubs, month.totalSubs)}
                       {/* MRR */}
                       <td className="text-right p-2"></td>
-                      {renderEditableMonthlyCell('mrr', effectiveMRR, month.mrr, true)}
+                      {$renderEditableMonthlyCell('mrr', effectiveMRR, month.mrr, true)}
                       {/* ARR */}
                       <td className="text-right p-2"></td>
-                      {renderEditableMonthlyCell('arr', effectiveARR, month.arr, true)}
+                      {$renderEditableMonthlyCell('arr', effectiveARR, month.arr, true)}
                     </tr>
                   );
                   });

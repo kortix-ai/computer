@@ -17,7 +17,7 @@ interface FieldRendererProps {
 }
 
 export const FieldRenderer = ({ field, value, onChange, index }: FieldRendererProps) => {
-  const renderField = () => {
+  const $renderField = () => {
     switch (field.type) {
       case 'text':
         return (
@@ -145,7 +145,7 @@ export const FieldRenderer = ({ field, value, onChange, index }: FieldRendererPr
           <p className="text-xs text-muted-foreground">{field.description}</p>
         )}
       </div>
-      {renderField()}
+      {$renderField()}
     </m.div>
   );
 };

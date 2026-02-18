@@ -14,7 +14,7 @@ export function CriticalFeedbackList() {
   const router = useRouter();
   const { data: criticalFeedback, isLoading } = useAdminCriticalFeedback(10);
 
-  const renderStars = (rating: number) => {
+  const $renderStars = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     
@@ -66,7 +66,7 @@ export function CriticalFeedbackList() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        {renderStars(feedback.rating)}
+                        {$renderStars(feedback.rating)}
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(parseISO(feedback.created_at), { addSuffix: true })}
                         </span>

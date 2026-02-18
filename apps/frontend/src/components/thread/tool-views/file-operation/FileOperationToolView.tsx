@@ -827,7 +827,7 @@ export function FileOperationToolView({
   // Always show FileOperationToolView for file operations, even during streaming
   // Don't fallback to GenericToolView
 
-  const renderFilePreview = () => {
+  const $renderFilePreview = () => {
     // Handle presentation slide files - use same style as PresentationViewer
     if (isPresentationSlide && presentationName && slideNumber) {
       // During streaming, show skeleton with streaming content
@@ -957,7 +957,7 @@ export function FileOperationToolView({
     );
   };
 
-  const renderDeleteOperation = () => (
+  const $renderDeleteOperation = () => (
     <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-white dark:bg-zinc-900">
       <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-6", config.bgColor)}>
         <Icon className={cn("h-10 w-10", config.color)} />
@@ -976,7 +976,7 @@ export function FileOperationToolView({
     </div>
   );
 
-  const renderSourceCode = () => {
+  const $renderSourceCode = () => {
     if (!fileContent) {
       return (
         <div className="flex items-center justify-center h-full p-12 bg-white dark:bg-zinc-900">
@@ -1161,7 +1161,7 @@ export function FileOperationToolView({
                   </div>
                 </div>
               ) : (
-                renderSourceCode()
+                $renderSourceCode()
               )}
             </ScrollArea>
           </TabsContent>
@@ -1169,15 +1169,15 @@ export function FileOperationToolView({
           <TabsContent value="preview" className="w-full max-w-full flex-1 h-full mt-0 p-0 overflow-hidden bg-white dark:bg-zinc-900 flex flex-col min-h-0 min-w-0">
             {isPresentationSlide && presentationName ? (
               <div className="w-full max-w-full h-full relative bg-white dark:bg-zinc-900 flex-1 min-h-0 min-w-0 overflow-hidden">
-                {renderFilePreview()}
+                {$renderFilePreview()}
               </div>
             ) : isHtml && htmlPreviewUrl && !isStreaming ? (
               <div className="w-full max-w-full h-full relative bg-white dark:bg-zinc-900 flex-1 min-h-0 min-w-0 overflow-hidden">
-                {renderFilePreview()}
+                {$renderFilePreview()}
               </div>
             ) : (isCsv || isXlsx) ? (
               <div className="w-full max-w-full h-full relative bg-white dark:bg-zinc-900 flex-1 min-h-0 min-w-0 overflow-hidden">
-                {renderFilePreview()}
+                {$renderFilePreview()}
               </div>
             ) : (
               <ScrollArea ref={previewScrollRef} className="h-full w-full max-w-full flex-1 min-h-0 bg-white dark:bg-zinc-900 min-w-0">
@@ -1194,9 +1194,9 @@ export function FileOperationToolView({
                 ) : !fileContent && isStreaming ? (
                   <StreamingLoader />
                 ) : operation === 'delete' ? (
-                  renderDeleteOperation()
+                  $renderDeleteOperation()
                 ) : (
-                  renderFilePreview()
+                  $renderFilePreview()
                 )}
               </ScrollArea>
             )}
