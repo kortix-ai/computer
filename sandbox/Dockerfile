@@ -210,6 +210,8 @@ COPY sandbox/config/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env
 RUN chmod +x /custom-cont-init.d/98-kortix-env
 COPY sandbox/config/customize.sh /custom-cont-init.d/99-customize
 RUN chmod +x /custom-cont-init.d/99-customize
+COPY sandbox/config/memory-init.sh /custom-cont-init.d/99-memory-init
+RUN chmod +x /custom-cont-init.d/99-memory-init
 
 # ── Daytona entrypoint ───────────────────────────────────────────────────────
 COPY sandbox/startup.sh /opt/startup.sh
