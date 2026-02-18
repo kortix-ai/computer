@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Pagination } from '@/components/agents/pagination';
+import { Pagination } from '@/components/ui/pagination';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, Mail, ExternalLink } from 'lucide-react';
 import { useAdminFeedbackList } from '@/hooks/admin/use-admin-feedback';

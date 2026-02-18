@@ -127,7 +127,7 @@ describe('deductCredits', () => {
       },
     });
 
-    await deductCredits('acc_test_123', 5, 'Test deduction', 'thread_1', 'msg_1');
+    await deductCredits('acc_test_123', 5, 'Test deduction');
 
     expect(rpcCalls.length).toBe(0); // createMockSupabaseRpc doesn't push to rpcCalls
   });
@@ -176,7 +176,7 @@ describe('deductCredits', () => {
     }
   });
 
-  test('passes null when threadId/messageId omitted', async () => {
+  test('passes only accountId, amount, description to RPC', async () => {
     // Use the rpcCalls-tracking mock from beforeEach
     // Override with a mock that ALSO tracks and returns success
     mockRegistry.supabaseRpc = {
@@ -193,8 +193,11 @@ describe('deductCredits', () => {
     };
 
     await deductCredits('acc_test_123', 1, 'Test');
-    expect(rpcCalls[0].params.p_thread_id).toBeNull();
-    expect(rpcCalls[0].params.p_message_id).toBeNull();
+    expect(rpcCalls[0].params.p_account_id).toBe('acc_test_123');
+    expect(rpcCalls[0].params.p_amount).toBe(1);
+    expect(rpcCalls[0].params.p_description).toBe('Test');
+    expect(rpcCalls[0].params.p_thread_id).toBeUndefined();
+    expect(rpcCalls[0].params.p_message_id).toBeUndefined();
   });
 });
 

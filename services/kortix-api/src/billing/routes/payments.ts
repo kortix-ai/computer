@@ -8,7 +8,6 @@ import {
   getTransactions,
   getTransactionsSummary,
   getUsageRecords,
-  getUsageByThread,
   insertPurchase,
 } from '../repositories/transactions';
 import { BillingError } from '../../errors';
@@ -117,37 +116,10 @@ paymentsRouter.get('/credit-usage', async (c) => {
   const records = rows.map((r) => ({
     id: r.id,
     amount_dollars: Number(r.amountDollars),
-    thread_id: r.threadId,
-    message_id: r.messageId,
     description: r.description,
     usage_type: r.usageType,
     created_at: r.createdAt,
   }));
 
   return c.json({ records, count: total });
-});
-
-paymentsRouter.get('/credit-usage-by-thread', async (c) => {
-  const accountId = c.get('userId');
-  const limit = Number(c.req.query('limit') ?? 50);
-  const offset = Number(c.req.query('offset') ?? 0);
-  const startDate = c.req.query('start_date');
-  const endDate = c.req.query('end_date');
-
-  const rows = await getUsageByThread(
-    accountId,
-    limit,
-    offset,
-    startDate || undefined,
-    endDate || undefined,
-  );
-
-  const threads = rows.map((r) => ({
-    thread_id: r.threadId,
-    total_cost: Number(r.totalCost),
-    message_count: Number(r.messageCount),
-    last_used_at: r.lastUsedAt,
-  }));
-
-  return c.json({ threads });
 });

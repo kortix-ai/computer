@@ -1,4 +1,4 @@
-import { Project } from '@/lib/api/threads';
+import { Project } from '@/types/project';
 
 /**
  * Structured tool call data from metadata

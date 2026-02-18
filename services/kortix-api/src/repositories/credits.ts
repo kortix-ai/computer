@@ -97,16 +97,12 @@ export async function deductCredits(
   accountId: string,
   amount: number,
   description: string,
-  threadId?: string,
-  messageId?: string
 ): Promise<CreditDeductResult> {
   try {
     const result = await db.execute(sql`SELECT atomic_use_credits(
       ${accountId}::uuid,
       ${amount}::numeric,
-      ${description}::text,
-      ${threadId ?? null}::text,
-      ${messageId ?? null}::text
+      ${description}::text
     ) as result`);
 
     const row = result[0] as Record<string, unknown> | undefined;

@@ -9,7 +9,7 @@ import { PanelHeader } from './PanelHeader';
 import { ToolView } from '../../tool-views/wrapper';
 import { getUserFriendlyToolName, getToolIcon } from '@/components/thread/utils';
 import { ToolCallInput } from '../KortixComputer';
-import { Project } from '@/lib/api/threads';
+import { Project } from '@/types/project';
 
 import { ViewType } from '@/stores/kortix-computer-store';
 import { cn } from '@/lib/utils';

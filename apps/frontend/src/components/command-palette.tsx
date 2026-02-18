@@ -25,7 +25,6 @@ import {
   TerminalSquare,
   Sparkles,
   Search,
-  MessagesSquare,
   Layers,
   GitCompareArrows,
   TextSearch,
@@ -66,7 +65,6 @@ import {
 //   useRemoveWorktree,
 //   useResetWorktree,
 // } from '@/hooks/opencode/use-opencode-worktree';
-import { useThreadSearch } from '@/hooks/threads/use-thread-search';
 import { useFileSearch, useTextSearch, useLssSearch } from '@/features/files';
 import type { FindMatch } from '@/features/files';
 import { toast } from '@/lib/toast';
@@ -267,13 +265,6 @@ export function CommandPalette() {
   // Fetch available slash commands
   const { data: slashCommands = [] } = useOpenCodeCommands();
 
-  // Thread/conversation content search (backend semantic search, 400ms internal debounce)
-  const {
-    results: threadResults,
-    isSearching: isThreadSearching,
-    isConfigured: isThreadSearchConfigured,
-  } = useThreadSearch(open ? query : '', 6);
-
   // Debounce the query for file search API calls (300ms — fast)
   useEffect(() => {
     if (query.length < 2) {
@@ -433,10 +424,6 @@ export function CommandPalette() {
   const queryLongEnough = query.trim().length >= 2;
   const textQueryLongEnough = query.trim().length >= 3;
 
-  // Thread search pending state
-  const isThreadPending = queryLongEnough && isThreadSearching;
-  const hasThreadResults = threadResults.length > 0;
-
   // LSS pending state (includes debounce wait)
   const isLssDebouncing = queryLongEnough && query !== lssDebouncedQuery;
   const isLssPending = isLssDebouncing || isLssSearching;
@@ -455,17 +442,11 @@ export function CommandPalette() {
   const hasTextResults = filteredTextResults.length > 0;
   const hasSlashCommandResults = filteredSlashCommands.length > 0;
   const hasAnyResults =
-    hasSessionResults || hasFileResults || hasLssResults || hasThreadResults || hasTextResults || hasSlashCommandResults;
+    hasSessionResults || hasFileResults || hasLssResults || hasTextResults || hasSlashCommandResults;
 
   // Show semantic search section (results or skeletons)
   const showLssSection = hasQuery && queryLongEnough;
   const showLssSkeletons = showLssSection && isLssPending && !hasLssResults;
-
-  // Show thread search section (results or skeletons)
-  const showThreadSection =
-    hasQuery && queryLongEnough && isThreadSearchConfigured;
-  const showThreadSkeletons =
-    showThreadSection && isThreadPending && !hasThreadResults;
 
   // Show text search section
   const showTextSection = hasQuery && textQueryLongEnough;
@@ -474,16 +455,15 @@ export function CommandPalette() {
   const showQuickActions = !hasQuery;
 
   // Overall pending state
-  const isAnyPending = isLssPending || isFilePending || isThreadPending || isTextPending;
+  const isAnyPending = isLssPending || isFilePending || isTextPending;
   // "Hard" pending = an actual network fetch is in flight (not just debounce timer)
-  const isAnyFetching = isFileSearching || isLssSearching || isTextSearching || isThreadSearching;
+  const isAnyFetching = isFileSearching || isLssSearching || isTextSearching;
   const showGlobalLoading =
     hasQuery &&
     queryLongEnough &&
     isAnyFetching &&
     !hasAnyResults &&
     !showLssSkeletons &&
-    !showThreadSkeletons &&
     !showTextSkeletons;
   // Show "no results" when nothing found and no active fetches
   // (debounce timers alone don't block showing the empty state)
@@ -573,23 +553,6 @@ export function CommandPalette() {
       handleSelectFile(match.path);
     },
     [handleSelectFile],
-  );
-
-  /**
-   * Navigate to a thread search result.
-   * Uses the project page since thread_id != session.id (different systems).
-   */
-  const handleSelectThread = useCallback(
-    (threadId: string, projectId: string | null) => {
-      if (projectId) {
-        router.push(`/projects/${projectId}`);
-      } else {
-        // Fallback: navigate to dashboard if no project
-        router.push('/dashboard');
-      }
-      close();
-    },
-    [router, close],
   );
 
   const handleToggleTheme = useCallback(() => {
@@ -687,16 +650,6 @@ export function CommandPalette() {
       <Sparkles className="h-3 w-3" />
       Semantic Search
       {isLssPending && hasLssResults && (
-        <Loader2 className="h-3 w-3 animate-spin ml-0.5 text-muted-foreground" />
-      )}
-    </span>
-  );
-
-  const threadHeading = (
-    <span className="inline-flex items-center gap-1.5">
-      <MessagesSquare className="h-3 w-3" />
-      Conversations
-      {isThreadPending && hasThreadResults && (
         <Loader2 className="h-3 w-3 animate-spin ml-0.5 text-muted-foreground" />
       )}
     </span>
@@ -803,49 +756,6 @@ export function CommandPalette() {
               ))}
             </CommandGroup>
           )}
-
-          {/* Conversation content search (backend semantic search) */}
-          {showThreadSection &&
-            (hasThreadResults || showThreadSkeletons) && (
-              <CommandGroup heading={threadHeading}>
-                {hasThreadResults &&
-                  threadResults.map((result, index) => (
-                    <CommandItem
-                      key={`thread-${result.thread_id}-${index}`}
-                      value={`thread-${result.thread_id}-${index}-${result.text_preview?.slice(0, 20)}`}
-                      onSelect={() =>
-                        handleSelectThread(
-                          result.thread_id,
-                          result.project_id,
-                        )
-                      }
-                    >
-                      <MessagesSquare className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                      <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate font-medium text-sm">
-                            {result.project_name || 'Untitled'}
-                          </span>
-                          {result.updated_at && (
-                            <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
-                              {formatRelativeTimeFromISO(result.updated_at)}
-                            </span>
-                          )}
-                        </div>
-                        {result.text_preview && (
-                          <span className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
-                            {result.text_preview}
-                          </span>
-                        )}
-                      </div>
-                    </CommandItem>
-                  ))}
-
-                {showThreadSkeletons && (
-                  <SearchSkeletons count={2} variant="conversation" />
-                )}
-              </CommandGroup>
-            )}
 
           {/* Semantic file search (LSS — BM25 + embeddings) */}
           {showLssSection && (hasLssResults || showLssSkeletons) && (

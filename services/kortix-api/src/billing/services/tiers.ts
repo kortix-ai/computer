@@ -6,8 +6,6 @@ export const MINIMUM_CREDIT_FOR_RUN = 0.01;
 export const DEFAULT_TOKEN_COST = 0.000002;
 export const CREDITS_PER_DOLLAR = 100;
 
-const UNLIMITED = 100_000;
-
 const FREE_DAILY_CREDITS: DailyCreditConfig = {
   dailyAmount: 3,
   refreshIntervalHours: 24,
@@ -24,8 +22,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: false,
     models: [],
     limits: {
-      projects: 0,
-      threads: 0,
       concurrentRuns: 0,
       customWorkers: 0,
       scheduledTriggers: 0,
@@ -44,8 +40,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: false,
     models: ['haiku'],
     limits: {
-      projects: 20,
-      threads: 10,
       concurrentRuns: 2,
       customWorkers: 0,
       scheduledTriggers: 0,
@@ -64,8 +58,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: false,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: UNLIMITED,
       concurrentRuns: 3,
       customWorkers: 5,
       scheduledTriggers: 5,
@@ -84,8 +76,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: false,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: UNLIMITED,
       concurrentRuns: 5,
       customWorkers: 20,
       scheduledTriggers: 10,
@@ -104,8 +94,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: true,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: UNLIMITED,
       concurrentRuns: 20,
       customWorkers: 100,
       scheduledTriggers: 50,
@@ -124,8 +112,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: false,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: 1000,
       concurrentRuns: 5,
       customWorkers: 20,
       scheduledTriggers: 10,
@@ -144,8 +130,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: true,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: 5000,
       concurrentRuns: 20,
       customWorkers: 100,
       scheduledTriggers: 50,
@@ -164,8 +148,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: true,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: 10000,
       concurrentRuns: 50,
       customWorkers: 200,
       scheduledTriggers: 100,
@@ -184,8 +166,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: true,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: 25000,
       concurrentRuns: 50,
       customWorkers: 200,
       scheduledTriggers: 100,
@@ -204,8 +184,6 @@ const TIERS: Record<string, TierConfig> = {
     canPurchaseCredits: true,
     models: ['all'],
     limits: {
-      projects: UNLIMITED,
-      threads: 25000,
       concurrentRuns: 50,
       customWorkers: 200,
       scheduledTriggers: 100,
