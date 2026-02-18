@@ -55,9 +55,10 @@ import { getObservationById } from "./memory/db"
 // =============================================================================
 
 export const MemoryPlugin: Plugin = async ({ directory, client }) => {
-	// ── Logging helper (disabled) ─────────────────────────────────────
-	const log = (_level: "debug" | "info" | "warn" | "error", _message: string) => {
-		// Memory logging is currently disabled.
+	// ── Logging helper (warn/error only) ──────────────────────────────
+	const log = (level: "debug" | "info" | "warn" | "error", message: string) => {
+		if (level === "debug" || level === "info") return
+		console.log(`[mem:${level}] ${message}`)
 	}
 
 	// Initialize SQLite database
@@ -65,7 +66,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	try {
 		db = initMemDb()
 	} catch (err) {
-		// log("error", `[mem] FAILED to initialize database: ${err}`)
+		log("error", `[mem] FAILED to initialize database: ${err}`)
 		return {}
 	}
 
@@ -73,7 +74,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 	try {
 		ensureMemDir()
 	} catch (err) {
-		// log("warn", `[mem] LSS mem directory creation failed: ${err}`)
+		log("warn", `[mem] LSS mem directory creation failed: ${err}`)
 	}
 
 	// log("info", "[mem] Init: ready")
@@ -181,7 +182,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				completeSession(db, sessionId)
 			}
 		} catch (err) {
-			// log("warn", `[mem] Summary generation error: ${err}`)
+			log("warn", `[mem] Summary generation error: ${err}`)
 		}
 	}
 
@@ -196,7 +197,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 			// Skip summarization for trivial sessions (fewer than 3 prompts)
 			if (promptCount <= 2) return
 			generateSummaryForSession(sessionId, false).catch((err) => {
-				// log("warn", `[mem] Summary interval failed: ${err}`)
+				log("warn", `[mem] Summary interval failed: ${err}`)
 			})
 		}, SUMMARY_INTERVAL_MS)
 	}
@@ -511,11 +512,11 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 							// Non-critical
 						}
 					}).catch((err) => {
-						// log("warn", `[mem:ai] Compression failed for #${obsId}: ${err}`)
+						log("warn", `[mem:ai] Compression failed for #${obsId}: ${err}`)
 					})
 				}
 			} catch (err) {
-				// log("warn", `[mem] ⚠ tool.execute.after FAILED for ${input.tool}: ${err}`)
+				log("warn", `[mem] tool.execute.after failed for ${input.tool}: ${err}`)
 			}
 		},
 
@@ -536,7 +537,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					// log("info", `[mem] UserPrompt: #${promptCount}`)
 				}
 			} catch (err) {
-				// log("warn", `[mem] ⚠ chat.message error: ${err}`)
+				log("warn", `[mem] chat.message error: ${err}`)
 			}
 		},
 
@@ -593,7 +594,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					}
 				}
 			} catch (err) {
-				// log("warn", `[mem] ⚠ Event handler error (${event.type}): ${err}`)
+				log("warn", `[mem] Event handler error (${event.type}): ${err}`)
 			}
 		},
 
@@ -614,7 +615,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					}
 				}
 			} catch (err) {
-				// log("warn", `[mem] Context injection error: ${err}`)
+				log("warn", `[mem] Context injection error: ${err}`)
 			}
 		},
 
@@ -628,7 +629,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					output.context.push(context)
 				}
 			} catch (err) {
-				// log("warn", `[mem] ⚠ Compaction injection error: ${err}`)
+				log("warn", `[mem] Compaction injection error: ${err}`)
 			}
 		},
 	}
