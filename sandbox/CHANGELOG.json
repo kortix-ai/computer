@@ -1,27 +1,178 @@
 [
   {
+    "version": "0.5.4",
+    "date": "2026-02-18",
+    "title": "Onboarding, memory & unified secrets",
+    "description": "Dedicated onboarding page, re-enabled memory plugin with personalization layer, unified secrets/env API, todo panel, SSE-driven data layer, full filesystem explorer, and legacy code cleanup.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Dedicated /onboarding page with macOS-style bootup flow"
+      },
+      {
+        "type": "feature",
+        "text": "Todo panel above chat input with context modal on click"
+      },
+      {
+        "type": "feature",
+        "text": "Token progress click opens context modal"
+      },
+      {
+        "type": "feature",
+        "text": "File explorer starts at filesystem root (/)"
+      },
+      {
+        "type": "feature",
+        "text": "Skip and redo onboarding via query params (?skip_onboarding, ?redo)"
+      },
+      {
+        "type": "feature",
+        "text": "Local PostgreSQL Docker and cron trigger support"
+      },
+      {
+        "type": "improvement",
+        "text": "Re-enabled memory plugin with personalization layer (SOUL.md, USER.md, MEMORY.md)"
+      },
+      {
+        "type": "improvement",
+        "text": "Unified secrets into single /env API with per-key error resilience"
+      },
+      {
+        "type": "improvement",
+        "text": "Replaced React Query + polling with Zustand sync store driven by SSE"
+      },
+      {
+        "type": "improvement",
+        "text": "Consolidated Providers into Secrets Manager page"
+      },
+      {
+        "type": "improvement",
+        "text": "Purged legacy @kortix/shared dead code and old thread system"
+      },
+      {
+        "type": "fix",
+        "text": "Reuse onboarding session on reconnect, await command before setting sessionId"
+      },
+      {
+        "type": "fix",
+        "text": "s6 env dir permissions for kortix-master writes"
+      },
+      {
+        "type": "fix",
+        "text": "Router model names and usage display"
+      },
+      {
+        "type": "fix",
+        "text": "Softened aggressive red error states to muted neutral tones"
+      },
+      {
+        "type": "fix",
+        "text": "Restored missing tool deps (firecrawl, replicate, tavily)"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/opencode-ai@0.5.4",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.5.4",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.5.4",
+        "target": "npm"
+      },
+      {
+        "name": "v0.5.4",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.5.4",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.5.4",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.5.4",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.5.4",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.5.2",
     "date": "2026-02-17",
     "title": "Update UI, Docker images & release pipeline",
     "description": "Frontend update banner and changelog page, multi-platform Docker images on Docker Hub, hardened release script with artifact tracking and idempotent publish.",
     "changes": [
-      { "type": "feature", "text": "Update banner — see what's new before updating, dismiss per version" },
-      { "type": "feature", "text": "Changelog page at /changelog — full version history with artifact checklist" },
-      { "type": "feature", "text": "Sidebar update indicator in the left panel" },
-      { "type": "improvement", "text": "Docker images rebuilt multi-platform (amd64 + arm64) on Docker Hub" },
-      { "type": "improvement", "text": "Release script checks all prerequisites upfront and tracks artifacts" },
-      { "type": "improvement", "text": "Idempotent CLI publish — resumes safely after partial failures" },
-      { "type": "improvement", "text": "Dockerfile falls back to latest CLI if pinned version not yet on npm" }
+      {
+        "type": "feature",
+        "text": "Update banner — see what's new before updating, dismiss per version"
+      },
+      {
+        "type": "feature",
+        "text": "Changelog page at /changelog — full version history with artifact checklist"
+      },
+      {
+        "type": "feature",
+        "text": "Sidebar update indicator in the left panel"
+      },
+      {
+        "type": "improvement",
+        "text": "Docker images rebuilt multi-platform (amd64 + arm64) on Docker Hub"
+      },
+      {
+        "type": "improvement",
+        "text": "Release script checks all prerequisites upfront and tracks artifacts"
+      },
+      {
+        "type": "improvement",
+        "text": "Idempotent CLI publish — resumes safely after partial failures"
+      },
+      {
+        "type": "improvement",
+        "text": "Dockerfile falls back to latest CLI if pinned version not yet on npm"
+      }
     ],
     "artifacts": [
-      { "name": "@kortix/opencode-ai@0.5.2", "target": "npm" },
-      { "name": "@kortix/opencode-sdk@0.5.2", "target": "npm" },
-      { "name": "@kortix/sandbox@0.5.2", "target": "npm" },
-      { "name": "v0.5.2", "target": "github-release" },
-      { "name": "kortix/computer:0.5.2", "target": "docker-hub" },
-      { "name": "kortix/kortix-api:0.5.2", "target": "docker-hub" },
-      { "name": "kortix/kortix-frontend:0.5.2", "target": "docker-hub" },
-      { "name": "kortix-sandbox-v0.5.2", "target": "daytona" }
+      {
+        "name": "@kortix/opencode-ai@0.5.2",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.5.2",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.5.2",
+        "target": "npm"
+      },
+      {
+        "name": "v0.5.2",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/computer:0.5.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-api:0.5.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.5.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.5.2",
+        "target": "daytona"
+      }
     ]
   },
   {
@@ -30,13 +181,28 @@
     "title": "Docker image refresh",
     "description": "Rebuilt all Docker images with v0.5.0 code baked in. Frontend now shows changelog preview, API serves changelog data, sandbox includes CHANGELOG.json.",
     "changes": [
-      { "type": "improvement", "text": "Docker images rebuilt with changelog UI and unified versioning" },
-      { "type": "improvement", "text": "Frontend shows what's new before updating" },
-      { "type": "improvement", "text": "API serves changelog from GitHub for update checks" }
+      {
+        "type": "improvement",
+        "text": "Docker images rebuilt with changelog UI and unified versioning"
+      },
+      {
+        "type": "improvement",
+        "text": "Frontend shows what's new before updating"
+      },
+      {
+        "type": "improvement",
+        "text": "API serves changelog from GitHub for update checks"
+      }
     ],
     "artifacts": [
-      { "name": "@kortix/opencode-ai@0.5.1", "target": "npm" },
-      { "name": "v0.5.1", "target": "github-release" }
+      {
+        "name": "@kortix/opencode-ai@0.5.1",
+        "target": "npm"
+      },
+      {
+        "name": "v0.5.1",
+        "target": "github-release"
+      }
     ]
   },
   {
@@ -45,22 +211,64 @@
     "title": "Unified versioning & upstream sync",
     "description": "Synced with OpenCode upstream v1.2.6, unified all dependency versioning into sandbox/package.json, added changelog system so users see what changed before updating.",
     "changes": [
-      { "type": "feature", "text": "Changelog system — see what's new before updating" },
-      { "type": "feature", "text": "Live update now also updates CLI binary and agent-browser" },
-      { "type": "feature", "text": "Python dependencies managed centrally via package.json" },
-      { "type": "feature", "text": "Unified release script — one command publishes everything" },
-      { "type": "improvement", "text": "All versions read from sandbox/package.json (single source of truth)" },
-      { "type": "improvement", "text": "Dockerfile and postinstall.sh both read versions from package.json" },
-      { "type": "fix", "text": "Fixed s6 service path in postinstall (s6-rc.d not services.d)" },
-      { "type": "fix", "text": "Removed stale build version from health endpoint" },
-      { "type": "fix", "text": "Fixed agent-browser version conflict (aligned to ^0.10.0)" },
-      { "type": "upstream", "text": "Synced with OpenCode v1.2.6 (Database/Drizzle migration, 145 commits)" }
+      {
+        "type": "feature",
+        "text": "Changelog system — see what's new before updating"
+      },
+      {
+        "type": "feature",
+        "text": "Live update now also updates CLI binary and agent-browser"
+      },
+      {
+        "type": "feature",
+        "text": "Python dependencies managed centrally via package.json"
+      },
+      {
+        "type": "feature",
+        "text": "Unified release script — one command publishes everything"
+      },
+      {
+        "type": "improvement",
+        "text": "All versions read from sandbox/package.json (single source of truth)"
+      },
+      {
+        "type": "improvement",
+        "text": "Dockerfile and postinstall.sh both read versions from package.json"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed s6 service path in postinstall (s6-rc.d not services.d)"
+      },
+      {
+        "type": "fix",
+        "text": "Removed stale build version from health endpoint"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed agent-browser version conflict (aligned to ^0.10.0)"
+      },
+      {
+        "type": "upstream",
+        "text": "Synced with OpenCode v1.2.6 (Database/Drizzle migration, 145 commits)"
+      }
     ],
     "artifacts": [
-      { "name": "@kortix/opencode-ai@0.5.0", "target": "npm" },
-      { "name": "@kortix/opencode-sdk@0.5.0", "target": "npm" },
-      { "name": "@kortix/sandbox@0.5.0", "target": "npm" },
-      { "name": "v0.5.0", "target": "github-release" }
+      {
+        "name": "@kortix/opencode-ai@0.5.0",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.5.0",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.5.0",
+        "target": "npm"
+      },
+      {
+        "name": "v0.5.0",
+        "target": "github-release"
+      }
     ]
   },
   {
@@ -69,8 +277,14 @@
     "title": "Stability & pip dependency management",
     "description": "Bug fixes, branding polish, added centralized pip package management to postinstall.",
     "changes": [
-      { "type": "improvement", "text": "Pip packages managed via postinstall.sh" },
-      { "type": "fix", "text": "Various stability fixes" }
+      {
+        "type": "improvement",
+        "text": "Pip packages managed via postinstall.sh"
+      },
+      {
+        "type": "fix",
+        "text": "Various stability fixes"
+      }
     ]
   },
   {
@@ -79,11 +293,26 @@
     "title": "Browser automation & skills system",
     "description": "Added agent-browser integration, skills framework, secret store, and LSS semantic search.",
     "changes": [
-      { "type": "feature", "text": "Agent browser integration for web automation" },
-      { "type": "feature", "text": "Skills framework for extensible agent capabilities" },
-      { "type": "feature", "text": "Secret store for secure credential management" },
-      { "type": "feature", "text": "Local semantic search (LSS) integration" },
-      { "type": "feature", "text": "s6-overlay service management" }
+      {
+        "type": "feature",
+        "text": "Agent browser integration for web automation"
+      },
+      {
+        "type": "feature",
+        "text": "Skills framework for extensible agent capabilities"
+      },
+      {
+        "type": "feature",
+        "text": "Secret store for secure credential management"
+      },
+      {
+        "type": "feature",
+        "text": "Local semantic search (LSS) integration"
+      },
+      {
+        "type": "feature",
+        "text": "s6-overlay service management"
+      }
     ]
   },
   {
@@ -92,9 +321,18 @@
     "title": "Live update system",
     "description": "Introduced the sandbox live update system with kortix-master proxy and s6 service management.",
     "changes": [
-      { "type": "feature", "text": "Sandbox live update system via npm" },
-      { "type": "feature", "text": "kortix-master proxy server" },
-      { "type": "feature", "text": "Environment variable management" }
+      {
+        "type": "feature",
+        "text": "Sandbox live update system via npm"
+      },
+      {
+        "type": "feature",
+        "text": "kortix-master proxy server"
+      },
+      {
+        "type": "feature",
+        "text": "Environment variable management"
+      }
     ]
   },
   {
@@ -103,7 +341,10 @@
     "title": "Project scanning",
     "description": "Added Project.scan() for automatic git repo discovery in workspace.",
     "changes": [
-      { "type": "feature", "text": "Project.scan() — automatic git repo discovery" }
+      {
+        "type": "feature",
+        "text": "Project.scan() — automatic git repo discovery"
+      }
     ]
   },
   {
@@ -112,7 +353,10 @@
     "title": "Initial release",
     "description": "First sandbox release with basic OpenCode integration.",
     "changes": [
-      { "type": "feature", "text": "Initial sandbox release with OpenCode integration" }
+      {
+        "type": "feature",
+        "text": "Initial sandbox release with OpenCode integration"
+      }
     ]
   }
 ]

@@ -29,7 +29,7 @@
     "CHANGELOG.json"
   ],
   "dependencies": {
-    "@kortix/opencode-ai": "0.5.2",
+    "@kortix/opencode-ai": "0.5.4",
     "agent-browser": "^0.10.0"
   },
   "peerDependencies": {},
