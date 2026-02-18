@@ -51,8 +51,7 @@ export function SidebarRight() {
   const activeServer = useServerStore((s) => {
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
   });
-  const serverUrl = activeServer?.url || 'http://localhost:4096';
-  const mappedPorts = activeServer?.mappedPorts;
+  const serverUrl = activeServer?.url || '';
 
   // Create new PTY terminal → opens as a tab
   const createPty = useCreatePty();
@@ -74,8 +73,8 @@ export function SidebarRight() {
 
   /**
    * Open a well-known sandbox service as a preview tab using a DIRECT URL.
-   * Resolves the random Docker host port (or Daytona path) from the active server's mappedPorts.
-   * Falls back to the proxy if no direct URL can be resolved.
+   * Uses getDirectPortUrl for the preview proxy URL.
+   * Falls back to the proxy base URL if no direct URL can be resolved.
    */
   const openSandboxServiceTab = useCallback(
     (containerPort: string, title: string) => {
@@ -84,7 +83,7 @@ export function SidebarRight() {
         ? getDirectPortUrl(activeServer, containerPort)
         : null;
       // Fall back to proxy-based URL if direct resolution fails
-      const url = directUrl || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, mappedPorts);
+      const url = directUrl || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl);
 
       const tabId = `preview:${containerPort}`;
       const tabHref = `/preview/${containerPort}`;
@@ -101,7 +100,7 @@ export function SidebarRight() {
         },
       });
     },
-    [activeServer, serverUrl, mappedPorts],
+    [activeServer, serverUrl],
   );
 
   const handleOpenDesktop = useCallback(() => {
@@ -116,7 +115,7 @@ export function SidebarRight() {
       url = directUrl;
     } else {
       // Proxy access — tell noVNC to route its WebSocket through the proxy path
-      const proxyBase = getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, mappedPorts);
+      const proxyBase = getProxyBaseUrl(parseInt(containerPort, 10), serverUrl);
       url = `${proxyBase.replace(/\/$/, '')}/vnc_lite.html?path=proxy/${containerPort}/websockify&autoconnect=true&resize=scale`;
     }
 
@@ -129,7 +128,7 @@ export function SidebarRight() {
       href: tabHref,
       metadata: { url, port: parseInt(containerPort, 10), originalUrl: `http://localhost:${containerPort}/` },
     });
-  }, [activeServer, serverUrl, mappedPorts]);
+  }, [activeServer, serverUrl]);
 
   const handleOpenAgentBrowser = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');

@@ -4,8 +4,8 @@
  * Detects localhost URLs in agent output (e.g. "Website is live at http://localhost:8080")
  * and rewrites them to be accessible through the proxy layer:
  *
- * Cloud mode:  http://localhost:8080 → {BACKEND_URL}/preview/{sandboxId}/8000/proxy/8080/
- * Local mode:  http://localhost:8080 → {serverUrl}/proxy/8080/
+ * All modes:   http://localhost:8080 → {serverUrl}/proxy/8080/
+ *              (serverUrl is always {BACKEND_URL}/preview/{sandboxId}/8000)
  */
 
 import { SANDBOX_PORTS } from '@/lib/platform-client';
@@ -96,54 +96,22 @@ export function hasLocalhostUrls(text: string): boolean {
 /**
  * Rewrite a localhost URL to go through the sandbox proxy.
  *
+ * Since all server URLs route through the backend preview proxy
+ * (`{BACKEND_URL}/preview/{sandboxId}/8000`), the proxy URL is simply:
+ *   `{serverUrl}/proxy/{port}{path}`
+ *
  * @param port - The port number to proxy
  * @param path - The path to append (e.g. "/api/docs")
- * @param serverUrl - The active OpenCode server URL (e.g. "{BACKEND_URL}/preview/abc123/8000" or "http://localhost:4096")
- * @param mappedPorts - Optional container-port → host-port map from Docker (for local_docker multi-sandbox)
+ * @param serverUrl - The active OpenCode server URL (e.g. "{BACKEND_URL}/preview/abc123/8000")
  * @returns The proxied URL
  */
 export function rewriteLocalhostUrl(
   port: number,
   path: string,
   serverUrl: string,
-  mappedPorts?: Record<string, string>,
 ): string {
-  // Server URL points to the OpenCode API (:4096 or via kortix-master on :8000).
-  // In cloud mode: {BACKEND_URL}/preview/{sandboxId}/8000
-  // In local mode: http://localhost:4096 (but kortix-master is on :8000)
-
-  const isCloud = serverUrl.includes('/preview/');
-
-  if (isCloud) {
-    // Cloud: {BACKEND_URL}/preview/{sandboxId}/8000/proxy/{port}{path}
-    // serverUrl already points to /8000 (kortix-master)
-    const base = serverUrl.replace(/\/+$/, '');
-    return `${base}/proxy/${port}${path}`;
-  }
-
-  // Local mode: use kortix-master's proxy endpoint.
-  // serverUrl typically already points to Kortix Master (e.g. http://localhost:14000
-  // when Docker maps host 14000 → container 8000). Only override the port when:
-  //   1. mappedPorts explicitly has a Kortix Master host port, OR
-  //   2. serverUrl points directly to OpenCode (port 4096), not Kortix Master
-  try {
-    const url = new URL(serverUrl);
-    if (mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER]) {
-      // Multi-sandbox Docker: use the explicit host port for Kortix Master
-      url.port = mappedPorts[SANDBOX_PORTS.KORTIX_MASTER];
-      return `${url.origin}/proxy/${port}${path}`;
-    } else if (url.port === '4096') {
-      // Direct OpenCode connection (no Docker): switch to Kortix Master container port
-      url.port = SANDBOX_PORTS.KORTIX_MASTER;
-      return `${url.origin}/proxy/${port}${path}`;
-    }
-    // VPS / reverse-proxy mode: serverUrl has a path (e.g. https://host/server)
-    // url.origin would strip the path, so use the full base URL instead
-    const base = serverUrl.replace(/\/+$/, '');
-    return `${base}/proxy/${port}${path}`;
-  } catch {
-    return `${serverUrl.replace(/\/+$/, '')}/proxy/${port}${path}`;
-  }
+  const base = serverUrl.replace(/\/+$/, '');
+  return `${base}/proxy/${port}${path}`;
 }
 
 /**
@@ -153,9 +121,8 @@ export function rewriteLocalhostUrl(
 export function getProxyBaseUrl(
   port: number,
   serverUrl: string,
-  mappedPorts?: Record<string, string>,
 ): string {
-  return rewriteLocalhostUrl(port, '/', serverUrl, mappedPorts);
+  return rewriteLocalhostUrl(port, '/', serverUrl);
 }
 
 /**
@@ -193,7 +160,6 @@ export function isProxiableLocalhostUrl(url: string): boolean {
 export function proxyLocalhostUrl(
   url: string | undefined,
   serverUrl: string,
-  mappedPorts?: Record<string, string>,
 ): string | undefined {
   if (!url) return url;
   // Don't rewrite URLs pointing at the app itself
@@ -204,5 +170,5 @@ export function proxyLocalhostUrl(
   if (!match) return url;
   const port = parseInt(match[1], 10);
   const path = match[2] || '/';
-  return rewriteLocalhostUrl(port, path, serverUrl, mappedPorts);
+  return rewriteLocalhostUrl(port, path, serverUrl);
 }

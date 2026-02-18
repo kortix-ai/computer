@@ -106,29 +106,6 @@ export function useSandboxConnection() {
         resetSandboxFail();
         setSandboxStatus('connected');
 
-        // Fetch port mappings once on first successful connection.
-        // This populates mappedPorts so all service URLs use direct host ports
-        // instead of going through the proxy.
-        if (!portsFetchedRef.current) {
-          portsFetchedRef.current = true;
-          try {
-            const portsRes = await fetch(`${url}/kortix/ports`, {
-              signal: AbortSignal.timeout(3000),
-              headers,
-            });
-            if (portsRes.ok) {
-              const data = await portsRes.json();
-              if (data.ports && Object.keys(data.ports).length > 0) {
-                const activeId = useServerStore.getState().activeServerId;
-                useServerStore.getState().updateServerSilent(activeId, {
-                  mappedPorts: data.ports,
-                  provider: 'local_docker',
-                });
-              }
-            }
-          } catch { /* non-critical — proxy fallback still works */ }
-        }
-
         // Fetch sandbox version from /kortix/health once on connect
         if (!versionFetchedRef.current) {
           versionFetchedRef.current = true;

@@ -287,21 +287,9 @@ ${DOMAIN} {
 ${tls_config}
 ${auth_block}
 
-  # API routes — proxy to kortix-api
+  # API routes — proxy to kortix-api (includes /v1/preview/* sandbox proxy)
   handle /v1/* {
     reverse_proxy kortix-api:8008
-  }
-
-  # Sandbox — proxy to sandbox master
-  handle /server/* {
-    uri strip_prefix /server
-    reverse_proxy sandbox:8000
-  }
-
-  # WebSocket support for sandbox
-  handle /server/ws/* {
-    uri strip_prefix /server
-    reverse_proxy sandbox:8000
   }
 
   # Default — serve frontend
@@ -360,7 +348,6 @@ services:
     environment:
       - NEXT_PUBLIC_ENV_MODE=local
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1
-      - NEXT_PUBLIC_OPENCODE_URL=http://localhost:14000
     depends_on:
       kortix-api:
         condition: service_started
@@ -665,7 +652,6 @@ case "${1:-help}" in
       echo "  ${G}Kortix is running!${N}"
       echo "  Dashboard:  ${B}http://localhost:3000${N}"
       echo "  API:        ${B}http://localhost:8008${N}"
-      echo "  Sandbox:    ${B}http://localhost:14000${N}"
     fi
     echo ""
     ;;
@@ -939,7 +925,6 @@ pull_and_start() {
     echo ""
     echo "  ${CYAN}Dashboard:${NC}   ${BOLD}http://localhost:3000${NC}"
     echo "  ${CYAN}API:${NC}         ${BOLD}http://localhost:8008${NC}"
-    echo "  ${CYAN}Sandbox:${NC}     ${BOLD}http://localhost:14000${NC}"
     echo ""
 
     info "Opening setup in browser..."

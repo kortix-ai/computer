@@ -422,14 +422,13 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
   const activeServer = useServerStore((s) => {
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
   });
-  const serverUrl = activeServer?.url || 'http://localhost:4096';
-  const mappedPorts = activeServer?.mappedPorts;
+  const serverUrl = activeServer?.url || '';
 
   const detected = useMemo(() => detectLocalhostUrls(safeContent), [safeContent]);
 
   const proxyUrls = useMemo(
-    () => detected.map((d) => rewriteLocalhostUrl(d.port, d.path, serverUrl, mappedPorts)),
-    [detected, serverUrl, mappedPorts],
+    () => detected.map((d) => rewriteLocalhostUrl(d.port, d.path, serverUrl)),
+    [detected, serverUrl],
   );
 
   if (detected.length === 0) {

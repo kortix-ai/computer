@@ -18,7 +18,6 @@ import {
   getSandbox,
   getProviders,
   getSandboxUrl,
-  extractMappedPorts,
   type SandboxInfo,
   type SandboxProviderName,
 } from '@/lib/platform-client';
@@ -48,19 +47,17 @@ function registerSandboxServer(sandbox: SandboxInfo) {
     return;
   }
 
-  const mappedPorts = extractMappedPorts(sandbox);
   const label = sandbox.name || (sandbox.provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
   const existing = store.servers.find((s) => s.id === SANDBOX_SERVER_ID);
 
   if (existing) {
-    // Silently update URL / mappedPorts / provider / sandboxId — no serverVersion bump.
-    // This avoids nuking the SSE stream and query caches on port changes.
+    // Silently update URL / provider / sandboxId — no serverVersion bump.
+    // This avoids nuking the SSE stream and query caches on changes.
     store.updateServerSilent(SANDBOX_SERVER_ID, {
       url,
       label: sandbox.name || existing.label,
-      mappedPorts,
       provider: sandbox.provider,
-      sandboxId: sandbox.external_id,
+      sandboxId: sandbox.external_id || (sandbox.provider === 'local_docker' ? 'local' : undefined),
     });
   } else {
     // Add new server entry for the sandbox
@@ -73,8 +70,7 @@ function registerSandboxServer(sandbox: SandboxInfo) {
           label,
           url,
           provider: sandbox.provider,
-          sandboxId: sandbox.external_id,
-          mappedPorts,
+          sandboxId: sandbox.external_id || (sandbox.provider === 'local_docker' ? 'local' : undefined),
         },
       ],
     }));

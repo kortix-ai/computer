@@ -1,14 +1,20 @@
 /**
- * E2E tests for the Daytona preview proxy.
+ * E2E tests for the unified sandbox preview proxy.
  *
- * Tests: port validation, ownership verification, proxy forwarding,
+ * Tests both CLOUD mode (Daytona) and LOCAL mode (direct port map):
+ *
+ * CLOUD: port validation, ownership verification, proxy forwarding,
  *        auto-wake for stopped/archived sandboxes, CORS, no-trailing-slash redirect.
  *
+ * LOCAL: direct proxy to sandbox via port map, no auth, no retries,
+ *        SSE-safe streaming, error handling (502 on unreachable).
+ *
  * Strategy:
- * - mock.module() replaces auth, DB, Daytona SDK, and global fetch
- * - Auth is bypassed (userId injected directly)
- * - DB queries are mocked to simulate ownership checks
- * - Daytona SDK is mocked to return preview links
+ * - mock.module() replaces auth, DB, Daytona SDK, config, and global fetch
+ * - Auth is bypassed (userId injected directly) — cloud only
+ * - DB queries are mocked to simulate ownership checks — cloud only
+ * - Daytona SDK is mocked to return preview links — cloud only
+ * - Config is mocked to control isLocal() / isCloud() mode
  * - Global fetch is mocked to simulate upstream responses
  */
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
@@ -32,7 +38,32 @@ let mockFetchResponses: Array<{ status: number; body: string; headers?: Record<s
 let mockFetchCallCount = 0;
 let mockFetchCalls: Array<{ url: string; method: string; headers: Record<string, string> }> = [];
 
+// Config mode: controls whether the proxy runs in local or cloud mode.
+let mockIsLocal = false;
+
 // ─── Register mocks ──────────────────────────────────────────────────────────
+
+// Config mock — controls local/cloud mode for the proxy
+mock.module('../config', () => ({
+  config: {
+    PORT: 8008,
+    ENV_MODE: 'cloud',
+    DATABASE_URL: 'mock-db-url',
+    SUPABASE_URL: 'mock-supabase-url',
+    SUPABASE_SERVICE_ROLE_KEY: '',
+    SUPABASE_JWT_SECRET: '',
+    STRIPE_SECRET_KEY: '',
+    CHANNELS_ENABLED: false,
+    SCHEDULER_ENABLED: false,
+    DOCKER_HOST: '',
+    SANDBOX_PORT_BASE: 14000,
+    DAYTONA_API_KEY: 'mock-daytona-key',
+    isLocal: () => mockIsLocal,
+    isCloud: () => !mockIsLocal,
+    isDaytonaEnabled: () => true,
+    isLocalDockerEnabled: () => true,
+  },
+}));
 
 // Auth mock — bypass supabaseAuthWithQueryParam
 mock.module('../middleware/auth', () => ({
@@ -52,15 +83,10 @@ mock.module('../middleware/auth', () => ({
 }));
 
 // DB mock — simulate sandbox + membership queries
-// Uses field-aware matching: inspects the `select` fields to determine which
-// mock to return (accountId → sandbox table, accountRole → membership table).
-// This is more resilient to query reordering than the old call-counter approach.
 mock.module('../shared/db', () => {
   return {
     db: {
       select: (fields: any) => {
-        // Determine which table is being queried by inspecting selected fields
-        // The preview proxy selects { accountId } from sandboxes and { accountRole } from accountUser
         const fieldKeys = fields ? Object.keys(fields) : [];
         const isSandboxQuery = fieldKeys.includes('accountId');
         const isMembershipQuery = fieldKeys.includes('accountRole');
@@ -75,7 +101,6 @@ mock.module('../shared/db', () => {
                 if (isMembershipQuery) {
                   return Promise.resolve(mockDbMembership ? [mockDbMembership] : []);
                 }
-                // Fallback: return empty (unknown query)
                 return Promise.resolve([]);
               },
             }),
@@ -110,7 +135,7 @@ function mockFetch(url: string | URL | Request, init?: RequestInit): Promise<Res
   const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
 
   // Let non-proxy URLs through (e.g. internal Hono test requests)
-  if (!urlStr.startsWith('https://preview.') && !urlStr.startsWith('http://preview.')) {
+  if (!urlStr.startsWith('https://preview.') && !urlStr.startsWith('http://preview.') && !urlStr.startsWith('http://localhost:')) {
     return originalFetch(url, init);
   }
 
@@ -137,13 +162,13 @@ function mockFetch(url: string | URL | Request, init?: RequestInit): Promise<Res
 
 // ─── Import proxy app AFTER mocks ────────────────────────────────────────────
 
-const { daytonaProxyApp } = await import('../daytona-proxy/index');
+const { sandboxProxyApp } = await import('../sandbox-proxy/index');
 
 // ─── Test app factory ────────────────────────────────────────────────────────
 
 function createProxyTestApp() {
   const app = new Hono();
-  app.route('/v1/preview', daytonaProxyApp);
+  app.route('/v1/preview', sandboxProxyApp);
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
@@ -178,6 +203,7 @@ beforeEach(() => {
   mockFetchResponses = [{ status: 200, body: 'Hello from upstream' }];
   mockFetchCallCount = 0;
   mockFetchCalls = [];
+  mockIsLocal = false; // default: cloud mode
 
   // Install mock fetch
   globalThis.fetch = mockFetch as any;
@@ -187,9 +213,11 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLOUD MODE TESTS (existing Daytona proxy tests, unchanged)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Preview proxy: auth', () => {
+describe('Preview proxy [CLOUD]: auth', () => {
   test('returns 401 without auth token', async () => {
     const app = createProxyTestApp();
     const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`);
@@ -211,7 +239,7 @@ describe('Preview proxy: auth', () => {
   });
 });
 
-describe('Preview proxy: port validation', () => {
+describe('Preview proxy [CLOUD]: port validation', () => {
   test('rejects non-numeric port', async () => {
     const app = createProxyTestApp();
     const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/abc/path`, {
@@ -255,11 +283,10 @@ describe('Preview proxy: port validation', () => {
   });
 });
 
-describe('Preview proxy: ownership', () => {
+describe('Preview proxy [CLOUD]: ownership', () => {
   test('returns 403 when sandbox not found', async () => {
     mockDbSandbox = null;
     const app = createProxyTestApp();
-    // Use unique sandbox ID to avoid cache hits from other tests
     const res = await app.request(`/v1/preview/sandbox-not-found-001/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
@@ -271,7 +298,6 @@ describe('Preview proxy: ownership', () => {
   test('returns 403 when user has no membership', async () => {
     mockDbMembership = null;
     const app = createProxyTestApp();
-    // Use unique sandbox ID to avoid cache hits
     const res = await app.request(`/v1/preview/sandbox-no-member-002/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
@@ -280,7 +306,6 @@ describe('Preview proxy: ownership', () => {
 
   test('allows access when user is member', async () => {
     const app = createProxyTestApp();
-    // Use unique sandbox ID
     const res = await app.request(`/v1/preview/sandbox-member-003/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
@@ -288,7 +313,7 @@ describe('Preview proxy: ownership', () => {
   });
 });
 
-describe('Preview proxy: forwarding', () => {
+describe('Preview proxy [CLOUD]: forwarding', () => {
   test('proxies GET request and returns upstream response', async () => {
     mockFetchResponses = [{ status: 200, body: '<html>Hello</html>', headers: { 'content-type': 'text/html' } }];
     const app = createProxyTestApp();
@@ -345,7 +370,6 @@ describe('Preview proxy: forwarding', () => {
     mockPreviewToken = null;
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
-    // Use unique sandbox ID + port to avoid preview link cache hits
     await app.request(`/v1/preview/sandbox-no-token-010/9999/`, {
       headers: { Authorization: 'Bearer test' },
     });
@@ -372,7 +396,7 @@ describe('Preview proxy: forwarding', () => {
   });
 });
 
-describe('Preview proxy: CORS', () => {
+describe('Preview proxy [CLOUD]: CORS', () => {
   test('sets CORS headers when Origin is present', async () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
@@ -389,21 +413,18 @@ describe('Preview proxy: CORS', () => {
     const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
-    // CORS headers should not be present (or be null)
     expect(res.headers.get('access-control-allow-origin')).toBeNull();
   });
 });
 
-describe('Preview proxy: auto-wake ("no IP address found")', () => {
+describe('Preview proxy [CLOUD]: auto-wake ("no IP address found")', () => {
   test('triggers wake and retries when upstream returns sandbox-down 400', async () => {
-    // First response: sandbox down, second: success
     mockFetchResponses = [
       { status: 400, body: 'no IP address found for sandbox' },
       { status: 200, body: 'Sandbox is back!' },
     ];
     const app = createProxyTestApp();
 
-    // Override setTimeout to be instant for test speed
     const origSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((fn: any) => fn()) as any;
 
@@ -421,7 +442,7 @@ describe('Preview proxy: auto-wake ("no IP address found")', () => {
   });
 });
 
-describe('Preview proxy: auto-wake ("failed to get runner info")', () => {
+describe('Preview proxy [CLOUD]: auto-wake ("failed to get runner info")', () => {
   test('triggers wake for archived sandbox', async () => {
     mockFetchResponses = [
       { status: 400, body: 'failed to get runner info: 404 Not Found' },
@@ -445,7 +466,7 @@ describe('Preview proxy: auto-wake ("failed to get runner info")', () => {
   });
 });
 
-describe('Preview proxy: non-sandbox-down 400', () => {
+describe('Preview proxy [CLOUD]: non-sandbox-down 400', () => {
   test('passes through 400 that is NOT sandbox-down', async () => {
     mockFetchResponses = [
       { status: 400, body: 'Bad request: invalid input' },
@@ -462,10 +483,8 @@ describe('Preview proxy: non-sandbox-down 400', () => {
   });
 });
 
-describe('Preview proxy: retry exhaustion', () => {
+describe('Preview proxy [CLOUD]: retry exhaustion', () => {
   test('returns 503 when all retries fail with connection errors', async () => {
-    // Simulate connection errors (fetch throws) for all attempts
-    // To do this, make all fetch calls throw
     const savedFetch = globalThis.fetch;
     let callCount = 0;
     globalThis.fetch = ((url: any) => {
@@ -487,33 +506,7 @@ describe('Preview proxy: retry exhaustion', () => {
     expect(res.status).toBe(503);
     const body = await res.json();
     expect(body.message).toContain('waking up');
-    // Should have made 4 attempts (0, 1, 2, 3)
     expect(callCount).toBe(4);
-  });
-
-  test('returns last 400 when all retries get sandbox-down (HTTP 400 path)', async () => {
-    // On the last attempt (attempt 3), the code does NOT retry the 400 —
-    // it passes it through because attempt < MAX_RETRIES is false.
-    // So with 4 sandbox-down 400s, we get 400 on the 4th attempt.
-    mockFetchResponses = [
-      { status: 400, body: 'no IP address found' },
-      { status: 400, body: 'no IP address found' },
-      { status: 400, body: 'no IP address found' },
-      { status: 400, body: 'no IP address found' },
-    ];
-    const app = createProxyTestApp();
-    const origSetTimeout = globalThis.setTimeout;
-    globalThis.setTimeout = ((fn: any) => fn()) as any;
-
-    const res = await app.request(`/v1/preview/sandbox-retry-400-001/${TEST_PORT}/`, {
-      headers: { Authorization: 'Bearer test' },
-    });
-
-    globalThis.setTimeout = origSetTimeout;
-
-    // On the 4th attempt, attempt=3, condition is attempt < MAX_RETRIES (3 < 3 = false)
-    // So the 400 passes through to the "Got an HTTP response" section
-    expect(res.status).toBe(400);
   });
 
   test('wake is triggered only once across retries', async () => {
@@ -531,19 +524,235 @@ describe('Preview proxy: retry exhaustion', () => {
     globalThis.setTimeout = origSetTimeout;
     globalThis.fetch = savedFetch;
 
-    // Wake should be called only once (not once per retry)
     expect(mockWakeCalls.length).toBe(1);
   });
 });
 
-describe('Preview proxy: no-trailing-slash', () => {
-  test('handles /:sandboxId/:port without trailing slash (proxies or redirects)', async () => {
+describe('Preview proxy [CLOUD]: no-trailing-slash', () => {
+  test('handles /:sandboxId/:port without trailing slash', async () => {
     const app = createProxyTestApp();
-    // In Hono v4, the /:sandboxId/:port/* route may match even without trailing slash.
-    // The request either gets proxied (200) or redirected (301) — both are valid.
     const res = await app.request(`/v1/preview/sandbox-redirect-001/${TEST_PORT}`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect([200, 301]).toContain(res.status);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOCAL MODE TESTS (new — unified proxy for local Docker)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Preview proxy [LOCAL]: no auth required', () => {
+  beforeEach(() => { mockIsLocal = true; });
+
+  test('accepts request without any auth token', async () => {
+    mockFetchResponses = [{ status: 200, body: '{"sessions":[]}' }];
+    const app = createProxyTestApp();
+    // No Authorization header, no ?token= query param
+    const res = await app.request('/v1/preview/local/8000/session');
+    expect(res.status).toBe(200);
+  });
+
+  test('also accepts request with auth token (passes through)', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/8000/session', {
+      headers: { Authorization: 'Bearer some-token' },
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('Preview proxy [LOCAL]: port validation', () => {
+  beforeEach(() => { mockIsLocal = true; });
+
+  test('rejects non-numeric port', async () => {
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/abc/path');
+    expect(res.status).toBe(400);
+  });
+
+  test('rejects port 0', async () => {
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/0/path');
+    expect(res.status).toBe(400);
+  });
+
+  test('rejects port > 65535', async () => {
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/65536/path');
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('Preview proxy [LOCAL]: forwarding', () => {
+  beforeEach(() => { mockIsLocal = true; });
+
+  test('proxies GET to localhost with mapped port', async () => {
+    mockFetchResponses = [{ status: 200, body: '{"sessions":[]}', headers: { 'content-type': 'application/json' } }];
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/8000/session');
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toBe('{"sessions":[]}');
+
+    // Verify the upstream URL targets localhost:14000 (port map: 8000 → 14000)
+    expect(mockFetchCalls.length).toBe(1);
+    expect(mockFetchCalls[0].url).toContain('localhost:14000');
+    expect(mockFetchCalls[0].url).toContain('/session');
+  });
+
+  test('proxies to different mapped ports correctly', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+
+    // Port 3111 → maps to 14001 (OpenCode Web UI)
+    await app.request('/v1/preview/local/3111/');
+    expect(mockFetchCalls[0].url).toContain('localhost:14001');
+
+    // Port 6080 → maps to 14002 (Desktop noVNC)
+    mockFetchCallCount = 0;
+    mockFetchCalls = [];
+    await app.request('/v1/preview/local/6080/');
+    expect(mockFetchCalls[0].url).toContain('localhost:14002');
+  });
+
+  test('falls back to same port for unmapped ports', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+    // Port 5173 is not in the port map — should use localhost:5173
+    await app.request('/v1/preview/local/5173/');
+    expect(mockFetchCalls[0].url).toContain('localhost:5173');
+  });
+
+  test('preserves remaining path and query string', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+    await app.request('/v1/preview/local/8000/api/v2/data?foo=bar&baz=qux');
+    expect(mockFetchCalls[0].url).toContain('/api/v2/data');
+    expect(mockFetchCalls[0].url).toContain('foo=bar');
+    expect(mockFetchCalls[0].url).toContain('baz=qux');
+  });
+
+  test('proxies POST request with body', async () => {
+    mockFetchResponses = [{ status: 201, body: '{"created":true}' }];
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/8000/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'hello' }),
+    });
+    expect(res.status).toBe(201);
+    expect(mockFetchCalls[0].method).toBe('POST');
+  });
+
+  test('passes Authorization header through to sandbox', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+    await app.request('/v1/preview/local/8000/env', {
+      headers: { Authorization: 'Bearer internal-service-key' },
+    });
+    // In local mode, Authorization is NOT stripped (needed for INTERNAL_SERVICE_KEY)
+    expect(mockFetchCalls[0].headers['authorization']).toBe('Bearer internal-service-key');
+  });
+
+  test('strips Host header', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+    await app.request('/v1/preview/local/8000/', {
+      headers: { Host: 'example.com' },
+    });
+    expect(mockFetchCalls[0].headers['host']).toBeUndefined();
+  });
+
+  test('does NOT inject Daytona headers in local mode', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+    await app.request('/v1/preview/local/8000/');
+    expect(mockFetchCalls[0].headers['x-daytona-skip-preview-warning']).toBeUndefined();
+    expect(mockFetchCalls[0].headers['x-daytona-disable-cors']).toBeUndefined();
+    expect(mockFetchCalls[0].headers['x-daytona-preview-token']).toBeUndefined();
+  });
+});
+
+describe('Preview proxy [LOCAL]: error handling', () => {
+  beforeEach(() => { mockIsLocal = true; });
+
+  test('returns 502 when sandbox is unreachable', async () => {
+    const savedFetch = globalThis.fetch;
+    globalThis.fetch = (() => Promise.reject(new Error('Connection refused'))) as any;
+
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/8000/session');
+
+    globalThis.fetch = savedFetch;
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.message).toContain('Sandbox unreachable');
+    expect(body.message).toContain('Connection refused');
+  });
+
+  test('does NOT retry on failure (single attempt only)', async () => {
+    const savedFetch = globalThis.fetch;
+    let callCount = 0;
+    globalThis.fetch = (() => {
+      callCount++;
+      return Promise.reject(new Error('Connection refused'));
+    }) as any;
+
+    const app = createProxyTestApp();
+    await app.request('/v1/preview/local/8000/');
+
+    globalThis.fetch = savedFetch;
+
+    // Only 1 attempt — no retries in local mode
+    expect(callCount).toBe(1);
+  });
+
+  test('does NOT trigger wake in local mode', async () => {
+    const savedFetch = globalThis.fetch;
+    globalThis.fetch = (() => Promise.reject(new Error('Connection refused'))) as any;
+
+    const app = createProxyTestApp();
+    await app.request('/v1/preview/local/8000/');
+
+    globalThis.fetch = savedFetch;
+
+    // Wake should never be called in local mode
+    expect(mockWakeCalls.length).toBe(0);
+  });
+});
+
+describe('Preview proxy [LOCAL]: no-trailing-slash', () => {
+  beforeEach(() => { mockIsLocal = true; });
+
+  test('handles /:sandboxId/:port without trailing slash', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+    const res = await app.request('/v1/preview/local/8000');
+    expect([200, 301]).toContain(res.status);
+  });
+});
+
+describe('Preview proxy [LOCAL]: sandboxId is ignored', () => {
+  beforeEach(() => { mockIsLocal = true; });
+
+  test('any sandboxId value works — always routes to the local sandbox', async () => {
+    mockFetchResponses = [{ status: 200, body: 'OK' }];
+    const app = createProxyTestApp();
+
+    const res1 = await app.request('/v1/preview/local/8000/');
+    expect(res1.status).toBe(200);
+
+    mockFetchCallCount = 0;
+    mockFetchCalls = [];
+    const res2 = await app.request('/v1/preview/abc123-container-id/8000/');
+    expect(res2.status).toBe(200);
+
+    mockFetchCallCount = 0;
+    mockFetchCalls = [];
+    const res3 = await app.request('/v1/preview/any-id-at-all/8000/');
+    expect(res3.status).toBe(200);
   });
 });

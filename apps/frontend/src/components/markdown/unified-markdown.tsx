@@ -295,12 +295,11 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   const activeServer = useServerStore((s) =>
     s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
   );
-  const serverUrl = activeServer?.url || 'http://localhost:4096';
-  const mappedPorts = activeServer?.mappedPorts;
+  const serverUrl = activeServer?.url || '';
 
   /** Rewrite a localhost:PORT URL through the sandbox proxy, or pass through. */
   const proxy = (url: string | undefined) =>
-    proxyLocalhostUrl(url, serverUrl, mappedPorts);
+    proxyLocalhostUrl(url, serverUrl);
 
   const safeContent = typeof content === 'string' ? content : (content ? String(content) : '');
   

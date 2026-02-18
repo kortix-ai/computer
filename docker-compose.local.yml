@@ -5,7 +5,7 @@
 # ║    1. postgres   — PostgreSQL + pg_cron + pg_net  (localhost:54322)         ║
 # ║    2. frontend   — Next.js dashboard              (http://localhost:3000)   ║
 # ║    3. kortix-api — Backend API (Bun/Hono)         (http://localhost:8008)   ║
-# ║    4. sandbox    — AI agent environment            (http://localhost:14000) ║
+# ║    4. sandbox    — AI agent environment            (via API proxy)          ║
 # ║                                                                            ║
 # ║  Usage:                                                                    ║
 # ║    docker compose -f docker-compose.local.yml up                           ║
@@ -61,7 +61,6 @@ services:
         # NEXT_PUBLIC_* must be build args (baked into JS bundle at build time)
         NEXT_PUBLIC_ENV_MODE: local
         NEXT_PUBLIC_BACKEND_URL: http://localhost:8008/v1
-        NEXT_PUBLIC_OPENCODE_URL: http://localhost:14000
     ports:
       - "3000:3000"
     environment:
@@ -69,7 +68,6 @@ services:
       # them visible in `docker inspect` and available to server-side code)
       - NEXT_PUBLIC_ENV_MODE=local
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1
-      - NEXT_PUBLIC_OPENCODE_URL=http://localhost:14000
     env_file:
       - path: apps/frontend/.env
         required: false

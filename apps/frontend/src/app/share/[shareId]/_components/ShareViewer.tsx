@@ -62,7 +62,10 @@ interface ShareData {
 // Data fetching — uses the standard OpenCode session & message APIs
 // ============================================================================
 
-const OPENCODE_BASE_URL = (process.env.NEXT_PUBLIC_OPENCODE_URL || 'http://localhost:4096').replace(/\/+$/, '');
+/** Base URL for fetching shared session data — routes through the backend preview proxy */
+const OPENCODE_BASE_URL = `${
+  (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1')
+}/preview/local/${8000}`.replace(/\/+$/, '');
 
 async function fetchShareData(shareId: string): Promise<ShareData> {
   const sessionsRes = await fetch(`${OPENCODE_BASE_URL}/session`, {

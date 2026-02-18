@@ -47,9 +47,8 @@ export function LocalhostLinkInterceptor() {
       const state = useServerStore.getState();
       const activeServer =
         state.servers.find((s) => s.id === state.activeServerId) ?? null;
-      const serverUrl = activeServer?.url || 'http://localhost:4096';
-      const mappedPorts = activeServer?.mappedPorts;
-      const proxyUrl = rewriteLocalhostUrl(port, path, serverUrl, mappedPorts);
+      const serverUrl = activeServer?.url || '';
+      const proxyUrl = rewriteLocalhostUrl(port, path, serverUrl);
 
       e.preventDefault();
       e.stopPropagation();

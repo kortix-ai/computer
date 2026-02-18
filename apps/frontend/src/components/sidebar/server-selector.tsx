@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
-import { ensureSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
+import { ensureSandbox, getSandboxUrl, removeSandbox, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
 import { useProviders } from '@/hooks/platform/use-sandbox';
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { SANDBOX_SERVER_ID } from '@/hooks/platform/use-sandbox';
@@ -483,7 +483,6 @@ export function InstanceManagerDialog({
           label,
           provider: sandbox.provider,
           sandboxId: sandbox.external_id,
-          mappedPorts: extractMappedPorts(sandbox),
         });
       } else {
         useServerStore.setState((state) => ({
@@ -495,7 +494,6 @@ export function InstanceManagerDialog({
               url,
               provider: sandbox.provider,
               sandboxId: sandbox.external_id,
-              mappedPorts: extractMappedPorts(sandbox),
             },
           ],
         }));

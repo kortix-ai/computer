@@ -21,7 +21,6 @@ if [ -n "$KORTIX_PUBLIC_URL" ]; then
     sed -i \
       -e "s|http://localhost:8008/v1|${PUBLIC_URL}/v1|g" \
       -e "s|http://localhost:8008|${PUBLIC_URL}|g" \
-      -e "s|http://localhost:14000|${PUBLIC_URL}/server|g" \
       "$file"
   done
 

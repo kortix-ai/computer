@@ -36,29 +36,24 @@ export const SANDBOX_PORTS = {
 /**
  * Get a direct URL to a sandbox service via the preview proxy.
  *
- * - Local Docker: resolves via `mappedPorts` → `http://localhost:{hostPort}`
- * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
- * - Manual/unknown: returns null (caller should fall back to proxy)
+ * ALL providers route through the backend preview proxy:
+ *   `{BACKEND_URL}/preview/{sandboxId}/{containerPort}`
+ *
+ * For local_docker, sandboxId is 'local' (the backend resolves it to localhost).
+ * For daytona, sandboxId is the external_id from the platform.
  */
 export function getDirectPortUrl(
   server: ServerEntry,
   containerPort: string,
 ): string | null {
-  // Cloud: route through the preview proxy (guard against undefined sandboxId)
+  // Cloud: route through the preview proxy
   if (server.provider === 'daytona' && server.sandboxId && server.sandboxId !== 'undefined') {
     return `${PLATFORM_URL}/preview/${server.sandboxId}/${containerPort}`;
   }
 
-  // Local Docker: look up the random host port from mappedPorts
-  if (server.provider === 'local_docker' && server.mappedPorts) {
-    const hostPort = server.mappedPorts[containerPort];
-    if (!hostPort) return null;
-    try {
-      const base = new URL(server.url);
-      return `${base.protocol}//${base.hostname}:${hostPort}`;
-    } catch {
-      return `http://localhost:${hostPort}`;
-    }
+  // Local Docker: also route through the preview proxy
+  if (server.provider === 'local_docker') {
+    return `${PLATFORM_URL}/preview/local/${containerPort}`;
   }
 
   return null;
@@ -151,76 +146,47 @@ async function platformFetch<T>(
 
 /**
  * Build the OpenCode server URL for a sandbox.
- * - Local Docker: uses the base_url directly (http://localhost:{port})
- * - Daytona (cloud): {BACKEND_URL}/preview/{externalId}/8000
  *
- * Guards against missing external_id to prevent broken URLs.
+ * ALL providers route through the backend preview proxy:
+ *   `{BACKEND_URL}/preview/{sandboxId}/8000`
+ *
+ * For local_docker, uses 'local' as the sandboxId.
+ * For daytona, uses the external_id.
  */
 export function getSandboxUrl(sandbox: SandboxInfo): string {
-  // Local Docker always uses base_url (direct localhost port mapping)
-  if (sandbox.provider === 'local_docker') {
-    return sandbox.base_url;
-  }
+  // Determine the sandbox identifier for the preview proxy
+  const sandboxId =
+    sandbox.provider === 'local_docker'
+      ? 'local'
+      : sandbox.external_id;
 
-  // Daytona requires a valid external_id for URL construction
-  if (!sandbox.external_id) {
-    // Fallback: if base_url is set, use it directly
-    if (sandbox.base_url) return sandbox.base_url;
+  if (!sandboxId) {
     throw new Error(
       `Cannot build sandbox URL: missing external_id for ${sandbox.provider} sandbox "${sandbox.sandbox_id}"`,
     );
   }
 
-  return `${PLATFORM_URL}/preview/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
+  return `${PLATFORM_URL}/preview/${sandboxId}/${SANDBOX_PORTS.KORTIX_MASTER}`;
 }
 
 /**
  * Build a URL to access a specific container port on a sandbox.
  *
- * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
- * - Local Docker: reads `metadata.mappedPorts[containerPort]` →
- *   `http://localhost:{hostPort}`. Returns null if no mapping exists.
- * - Falls back to null if the port can't be resolved.
+ * ALL providers route through the backend preview proxy:
+ *   `{BACKEND_URL}/preview/{sandboxId}/{containerPort}`
  */
 export function getSandboxPortUrl(
   sandbox: SandboxInfo,
   containerPort: string,
 ): string | null {
-  if ((sandbox.provider === 'daytona' || (!sandbox.provider && sandbox.external_id)) && sandbox.external_id) {
-    return `${PLATFORM_URL}/preview/${sandbox.external_id}/${containerPort}`;
-  }
+  const sandboxId =
+    sandbox.provider === 'local_docker'
+      ? 'local'
+      : sandbox.external_id;
 
-  if (sandbox.provider === 'local_docker') {
-    const mappedPorts = sandbox.metadata?.mappedPorts as
-      | Record<string, string>
-      | undefined;
-    const hostPort = mappedPorts?.[containerPort];
-    if (!hostPort) return null;
-    // base_url is http://localhost:{somePort} — extract the hostname
-    try {
-      const base = new URL(sandbox.base_url);
-      return `${base.protocol}//${base.hostname}:${hostPort}`;
-    } catch {
-      return `http://localhost:${hostPort}`;
-    }
-  }
+  if (!sandboxId) return null;
 
-  return null;
-}
-
-/**
- * Extract mappedPorts from sandbox metadata (convenience for storing in ServerEntry).
- * Returns undefined if not available.
- */
-export function extractMappedPorts(
-  sandbox: SandboxInfo,
-): Record<string, string> | undefined {
-  if (sandbox.provider !== 'local_docker') return undefined;
-  const ports = sandbox.metadata?.mappedPorts;
-  if (ports && typeof ports === 'object' && !Array.isArray(ports)) {
-    return ports as Record<string, string>;
-  }
-  return undefined;
+  return `${PLATFORM_URL}/preview/${sandboxId}/${containerPort}`;
 }
 
 /**

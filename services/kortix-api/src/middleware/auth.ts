@@ -143,7 +143,7 @@ export async function dualAuth(c: Context, next: Next) {
 }
 
 /**
- * Supabase JWT from header OR query param (for daytona-proxy SSE).
+ * Supabase JWT from header OR query param (for sandbox-proxy SSE).
  * EventSource/SSE can't set headers, so we also check ?token=<token>.
  */
 export async function supabaseAuthWithQueryParam(c: Context, next: Next) {

@@ -12,12 +12,6 @@ export interface ServerEntry {
   provider?: SandboxProvider;
   /** Platform sandbox ID, if this server is a managed sandbox */
   sandboxId?: string;
-  /**
-   * Container-port → host-port map from Docker (local_docker provider).
-   * e.g. { "6080": "32001", "8000": "32005", "9223": "32007" }
-   * For Daytona, ports are accessed via subdomain routing, so this is unused.
-   */
-  mappedPorts?: Record<string, string>;
 }
 
 interface ServerStore {
@@ -40,19 +34,25 @@ interface ServerStore {
   addServer: (label: string, url: string) => ServerEntry;
   updateServer: (id: string, updates: Partial<Pick<ServerEntry, 'label' | 'url'>>) => void;
   /**
-   * Silently update a server's URL, ports, provider, and/or sandboxId
+   * Silently update a server's URL, provider, and/or sandboxId
    * without triggering a full reconnect (no serverVersion bump). Only
    * bumps urlVersion so the connection monitor re-verifies.
    */
-  updateServerSilent: (id: string, updates: Partial<Pick<ServerEntry, 'url' | 'provider' | 'sandboxId'>> & { mappedPorts?: Record<string, string>; label?: string }) => void;
+  updateServerSilent: (id: string, updates: Partial<Pick<ServerEntry, 'url' | 'provider' | 'sandboxId'>> & { label?: string }) => void;
   removeServer: (id: string) => void;
   setActiveServer: (id: string, options?: { auto?: boolean }) => void;
   getActiveServerUrl: () => string;
   clearStatuses: () => void;
 }
 
-const DEFAULT_OPENCODE_URL =
-  process.env.NEXT_PUBLIC_OPENCODE_URL || 'http://localhost:14000';
+/**
+ * Default server URL — routes through the backend preview proxy.
+ * In local mode: http://localhost:8008/v1/preview/local/8000
+ * In VPS/cloud: {BACKEND_URL}/preview/local/8000
+ */
+const DEFAULT_SERVER_URL = `${
+  process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1'
+}/preview/local/8000`;
 
 function generateId(): string {
   return `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -62,8 +62,8 @@ const DEFAULT_SERVER_ID = 'default';
 
 const createDefaultServer = (): ServerEntry => ({
   id: DEFAULT_SERVER_ID,
-  label: DEFAULT_OPENCODE_URL.replace(/^https?:\/\//, ''),
-  url: DEFAULT_OPENCODE_URL,
+  label: 'Local Sandbox',
+  url: DEFAULT_SERVER_URL,
   isDefault: true,
 });
 
@@ -115,13 +115,10 @@ export const useServerStore = create<ServerStore>()(
         if (!existing) return;
 
         const urlChanged = updates.url != null && updates.url !== existing.url;
-        const portsChanged =
-          updates.mappedPorts != null &&
-          JSON.stringify(existing.mappedPorts) !== JSON.stringify(updates.mappedPorts);
         const providerChanged = updates.provider != null && updates.provider !== existing.provider;
         const sandboxIdChanged = updates.sandboxId != null && updates.sandboxId !== existing.sandboxId;
 
-        if (!urlChanged && !portsChanged && !updates.label && !providerChanged && !sandboxIdChanged) return;
+        if (!urlChanged && !providerChanged && !sandboxIdChanged) return;
 
         set((state) => ({
           servers: state.servers.map((s) =>
@@ -130,7 +127,6 @@ export const useServerStore = create<ServerStore>()(
                   ...s,
                   ...(updates.url ? { url: updates.url.replace(/\/+$/, '') } : {}),
                   ...(updates.label ? { label: updates.label } : {}),
-                  ...(updates.mappedPorts ? { mappedPorts: updates.mappedPorts } : {}),
                   ...(updates.provider != null ? { provider: updates.provider } : {}),
                   ...(updates.sandboxId != null ? { sandboxId: updates.sandboxId } : {}),
                 }
@@ -140,7 +136,7 @@ export const useServerStore = create<ServerStore>()(
           // For URL/port-only changes, only bump urlVersion (silent re-verify).
           ...(isActive && sandboxIdChanged
             ? { serverVersion: state.serverVersion + 1 }
-            : isActive && (urlChanged || portsChanged)
+            : isActive && urlChanged
               ? { urlVersion: state.urlVersion + 1 }
               : {}),
         }));
@@ -175,7 +171,7 @@ export const useServerStore = create<ServerStore>()(
       getActiveServerUrl: () => {
         const state = get();
         const active = state.servers.find((s) => s.id === state.activeServerId);
-        return active?.url || DEFAULT_OPENCODE_URL;
+        return active?.url || DEFAULT_SERVER_URL;
       },
 
       clearStatuses: () => {
@@ -197,7 +193,7 @@ export const useServerStore = create<ServerStore>()(
         } else {
           state.servers = state.servers.map((s) =>
             s.id === DEFAULT_SERVER_ID
-              ? { ...s, url: DEFAULT_OPENCODE_URL, label: DEFAULT_OPENCODE_URL.replace(/^https?:\/\//, '') }
+              ? { ...s, url: DEFAULT_SERVER_URL, label: 'Local Sandbox' }
               : s,
           );
         }
@@ -215,19 +211,10 @@ export function getActiveOpenCodeUrl(): string {
 }
 
 /**
- * Get the full active ServerEntry (including mappedPorts, provider, etc.).
+ * Get the full active ServerEntry (including provider, etc.).
  * Returns null if the active server can't be found (shouldn't happen).
  */
 export function getActiveServer(): ServerEntry | null {
   const state = useServerStore.getState();
   return state.servers.find((s) => s.id === state.activeServerId) ?? null;
-}
-
-/**
- * Get the host port for a given container port on the active server.
- * Returns null if no mapping exists (e.g. Daytona, default server, or unknown port).
- */
-export function getActiveServerMappedPort(containerPort: string): string | null {
-  const server = getActiveServer();
-  return server?.mappedPorts?.[containerPort] ?? null;
 }
