@@ -22,7 +22,7 @@ export const CompletionStep = () => {
       <div className="absolute inset-0 pointer-events-none">
         {[...Array(12)].map((_, i) => (
           <m.div
-            key={`_-${i}`}
+            key={`_-${+i}`}
             className="absolute"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{

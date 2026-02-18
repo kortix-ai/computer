@@ -429,10 +429,10 @@ export function AnimatedBg({ variant = 'hero', blurMultiplier = 1, sizeMultiplie
         >
             <div className="absolute inset-0">
                 {left.map((cfg, i) => (
-                    <Arc key={`L${i}`} left cfg={cfg} />
+                    <Arc key={`L${+i}`} left cfg={cfg} />
                 ))}
                 {right.map((cfg, i) => (
-                    <Arc key={`R${i}`} cfg={cfg} />
+                    <Arc key={`R${+i}`} cfg={cfg} />
                 ))}
             </div>
             {/* Bottom gradient fade overlay */}

@@ -152,7 +152,7 @@ export default function ThreadUsage() {
                 </TableHeader>
                 <TableBody>
                   {[...Array(5)].map((_, i) => (
-                    <TableRow key={`_-${i}`}>
+                    <TableRow key={`_-${+i}`}>
                       <TableCell>
                         <Skeleton className="h-5 w-48" />
                       </TableCell>
@@ -241,7 +241,7 @@ export default function ThreadUsage() {
                     {showPaginationSkeleton ? (
                       // Show skeleton rows during pagination
                       [...Array(5)].map((_, i) => (
-                        <TableRow key={`skeleton-${i}`}>
+                        <TableRow key={`skeleton-${+i}`}>
                           <TableCell>
                             <Skeleton className="h-5 w-48" />
                           </TableCell>

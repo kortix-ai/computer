@@ -302,7 +302,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
           <div className="flex items-center gap-1">
             {WEEKDAY_BUTTONS.map(({ value: day, label }, idx) => (
               <button
-                key={`${day}-${idx}`}
+                key={`${day}-${+idx}`}
                 type="button"
                 onClick={() => toggleWeekday(day)}
                 className={cn(

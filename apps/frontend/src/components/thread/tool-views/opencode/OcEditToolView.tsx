@@ -69,7 +69,7 @@ function DiffLinesView({ patch, filename }: { patch: string; filename: string })
 
         if (isHunk || line === '') {
           return (
-            <div key={`line-${i}`} className={cls}>
+            <div key={`line-${+i}`} className={cls}>
               {line || ' '}
             </div>
           );
@@ -81,7 +81,7 @@ function DiffLinesView({ patch, filename }: { patch: string; filename: string })
         if (highlightedTokens) {
           const html = $renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={`line-${i}`} className={cls}>
+            <div key={`line-${+i}`} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -97,7 +97,7 @@ function DiffLinesView({ patch, filename }: { patch: string; filename: string })
 
         return (
           <div
-            key={`${i}-${typeof line === 'string' ? line : i}`}
+            key={`${+i}-${typeof line === 'string' ? line : i}`}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -225,7 +225,7 @@ function SideBySideDiffView({ patch, filename }: { patch: string; filename: stri
             const isLeftHunk = row.left.content.startsWith('@@');
 
             return (
-              <tr key={`row-${i}`}>
+              <tr key={`row-${+i}`}>
                 {/* Left side (old) */}
                 <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
                   {row.left.num ?? ''}

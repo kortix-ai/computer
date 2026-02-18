@@ -27,7 +27,7 @@ export function FileGrid({
                 <div className="flex flex-wrap gap-2">
                     {compactFiles.map((file, index) => (
                         <div
-                            key={`compact-${index}`}
+                            key={`compact-${+index}`}
                             className="relative group overflow-visible flex-1 min-w-full sm:min-w-[180px] max-w-full"
                         >
                             {children(file, files.indexOf(file))}
@@ -39,7 +39,7 @@ export function FileGrid({
             {/* Previewable files each on their own row */}
             {previewableFiles.map((file, index) => (
                 <div
-                    key={`preview-${index}`}
+                    key={`preview-${+index}`}
                     className="relative group overflow-visible w-full"
                 >
                     {children(file, files.indexOf(file))}

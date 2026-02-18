@@ -41,7 +41,7 @@ export function UsageLimitsCard() {
         <CardContent>
           <div className="animate-pulse space-y-4">
             {[...Array(6)].map((_, i) => (
-              <div key={`_-${i}`} className="space-y-2">
+              <div key={`_-${+i}`} className="space-y-2">
                 <div className="flex justify-between">
                   <div className="h-4 w-24 bg-muted rounded" />
                   <div className="h-4 w-16 bg-muted rounded" />

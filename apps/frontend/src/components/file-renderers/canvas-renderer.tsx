@@ -274,7 +274,7 @@ function SnapGuidesOverlay({
 
           return (
             <div
-              key={`guide-${idx}`}
+              key={`guide-${+idx}`}
               style={{
                 position: 'absolute',
                 left: screenX,
@@ -294,7 +294,7 @@ function SnapGuidesOverlay({
 
           return (
             <div
-              key={`guide-${idx}`}
+              key={`guide-${+idx}`}
               style={{
                 position: 'absolute',
                 left: frameLeft,

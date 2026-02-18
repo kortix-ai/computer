@@ -131,7 +131,7 @@ export function CsvTable({
                 {/* Header row */}
                 {headers.map((header, index) => (
                     <div
-                        key={`header-${index}`}
+                        key={`header-${+index}`}
                         className={cn(
                             "sticky top-0 z-20 flex items-center px-4 font-medium",
                             resolvedTheme === 'dark' ? 'bg-muted' : 'bg-background'

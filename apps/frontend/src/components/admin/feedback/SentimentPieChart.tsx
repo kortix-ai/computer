@@ -70,7 +70,7 @@ export function SentimentPieChart() {
                   strokeWidth={0}
                 >
                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                    <Cell key={`cell-${+index}`} fill={entry.fill} />
                   ))}
                 </Pie>
                 <ChartTooltip 

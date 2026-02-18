@@ -247,7 +247,7 @@ function MultiFileList({
 
         return (
           <div
-            key={`fp-${i}`}
+            key={`fp-${+i}`}
             className="flex items-center gap-2.5 px-4 py-1.5 cursor-pointer hover:bg-muted transition-colors group"
             role="button"
             tabIndex={0}

@@ -50,11 +50,11 @@ export function AdminFeedbackTable() {
       <div className="flex items-center gap-1">
         {[...Array(5)].map((_, i) => {
           if (i < fullStars) {
-            return <Star key={`_-${i}`} className="h-4 w-4 fill-yellow-500 text-yellow-500" />;
+            return <Star key={`_-${+i}`} className="h-4 w-4 fill-yellow-500 text-yellow-500" />;
           } else if (i === fullStars && hasHalfStar) {
-            return <Star key={`_-${i}`} className="h-4 w-4 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
+            return <Star key={`_-${+i}`} className="h-4 w-4 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
           } else {
-            return <Star key={`_-${i}`} className="h-4 w-4 text-muted-foreground/30" />;
+            return <Star key={`_-${+i}`} className="h-4 w-4 text-muted-foreground/30" />;
           }
         })}
         <span className="ml-1 text-sm font-medium">{rating.toFixed(1)}</span>
@@ -246,7 +246,7 @@ export function AdminFeedbackTable() {
           {isLoading ? (
             <div className="p-6 space-y-3">
               {[...Array(5)].map((_, i) => (
-                <div key={`_-${i}`} className="flex items-center space-x-4">
+                <div key={`_-${+i}`} className="flex items-center space-x-4">
                   <Skeleton className="h-12 w-full" />
                 </div>
               ))}

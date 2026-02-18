@@ -131,7 +131,7 @@ export function OcApplyPatchToolView({
                 const hasDiff = file.type !== 'delete' && (file.before || file.after);
 
                 return (
-                  <div key={`file-${i}`} className={i > 0 ? 'border-t border-border/60' : ''}>
+                  <div key={`file-${+i}`} className={i > 0 ? 'border-t border-border/60' : ''}>
                     {/* File header */}
                     <div
                       className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-muted transition-colors"
@@ -264,7 +264,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
 
           if (isHunk || line === '') {
             return (
-              <div key={`line-${i}`} className={cls}>
+              <div key={`line-${+i}`} className={cls}>
                 {line || ' '}
               </div>
             );
@@ -276,7 +276,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
           if (highlightedTokens) {
             const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
             return (
-              <div key={`line-${i}`} className={cls}>
+              <div key={`line-${+i}`} className={cls}>
                 <span
                   className={cn(
                     isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -292,7 +292,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
 
           return (
             <div
-              key={`${i}-${typeof line === 'string' ? line : i}`}
+              key={`${+i}-${typeof line === 'string' ? line : i}`}
               className={cn(
                 cls,
                 isAdd && 'text-emerald-600 dark:text-emerald-400',

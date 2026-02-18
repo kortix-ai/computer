@@ -474,7 +474,7 @@ function AttachmentPreview({
         const Icon = getFileTypeIcon(type);
 
         return (
-          <div key={`af-${i}`} className="relative group">
+          <div key={`af-${+i}`} className="relative group">
             {af.isImage ? (
               <div className="h-[54px] w-[54px] rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1464,7 +1464,7 @@ export function SessionChatInput({
                 >
                   {highlightSegments.map((seg, i) => (
                     <span
-                      key={`seg-${i}`}
+                      key={`seg-${+i}`}
                       className={cn(
                         seg.kind === 'file' && 'text-blue-500 font-medium',
                         seg.kind === 'agent' && 'text-purple-500 font-medium',

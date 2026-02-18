@@ -22,11 +22,11 @@ export function CriticalFeedbackList() {
       <div className="flex items-center gap-0.5">
         {[...Array(5)].map((_, i) => {
           if (i < fullStars) {
-            return <Star key={`_-${i}`} className="h-3 w-3 fill-yellow-500 text-yellow-500" />;
+            return <Star key={`_-${+i}`} className="h-3 w-3 fill-yellow-500 text-yellow-500" />;
           } else if (i === fullStars && hasHalfStar) {
-            return <Star key={`_-${i}`} className="h-3 w-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
+            return <Star key={`_-${+i}`} className="h-3 w-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
           } else {
-            return <Star key={`_-${i}`} className="h-3 w-3 text-muted-foreground/30" />;
+            return <Star key={`_-${+i}`} className="h-3 w-3 text-muted-foreground/30" />;
           }
         })}
         <span className="ml-1 text-xs font-medium text-red-600 dark:text-red-400">{rating.toFixed(1)}</span>
@@ -47,7 +47,7 @@ export function CriticalFeedbackList() {
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={`_-${i}`} className="h-20 w-full" />
+              <Skeleton key={`_-${+i}`} className="h-20 w-full" />
             ))}
           </div>
         ) : !criticalFeedback || criticalFeedback.length === 0 ? (

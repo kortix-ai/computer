@@ -196,7 +196,7 @@ export function OcImageSearchToolView({
                   const isActive = idx === safeQueryIndex;
                   return (
                     <button
-                      key={`bi-${idx}`}
+                      key={`bi-${+idx}`}
                       type="button"
                       onClick={() => setCurrentQueryIndex(idx)}
                       className={`

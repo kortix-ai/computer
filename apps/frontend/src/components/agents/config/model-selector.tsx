@@ -335,7 +335,7 @@ export function AgentModelSelector({
     const outputCost = formatCost(model.outputCostPerMillionTokens);
 
     return (
-      <Tooltip key={`model-${model.id}-${index}`}>
+      <Tooltip key={`model-${model.id}-${+index}`}>
         <TooltipTrigger asChild>
             <div className='w-full'>
               <DropdownMenuItem
@@ -563,7 +563,7 @@ export function AgentModelSelector({
                             const outputCost = formatCost(model.outputCostPerMillionTokens);
 
                             return (
-                              <Tooltip key={`premium-${model.id}-${index}`}>
+                              <Tooltip key={`premium-${model.id}-${+index}`}>
                                 <TooltipTrigger asChild>
                                     <div className='w-full'>
                                       <DropdownMenuItem

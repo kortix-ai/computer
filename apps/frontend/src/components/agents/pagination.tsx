@@ -241,7 +241,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           {totalPages > 1 ? (
             <div className="flex items-center space-x-1">
               {visiblePages.map((page, index) => (
-                <React.Fragment key={`page-${index}`}>
+                <React.Fragment key={`page-${+index}`}>
                   {page === '...' ? (
                     <div className="flex h-8 w-8 items-center justify-center">
                       <MoreHorizontal className="h-4 w-4" />

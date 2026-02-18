@@ -91,7 +91,7 @@ export function RatingDistributionChart() {
                 maxBarSize={24}
               >
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                  <Cell key={`cell-${+index}`} fill={entry.fill} />
                 ))}
               </Bar>
             </BarChart>

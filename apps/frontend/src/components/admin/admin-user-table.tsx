@@ -192,7 +192,7 @@ export function AdminUserTable({ onUserSelect }: AdminUserTableProps) {
           {isLoading ? (
             <div className="p-6 space-y-3">
               {[...Array(5)].map((_, i) => (
-                <div key={`_-${i}`} className="flex items-center space-x-4">
+                <div key={`_-${+i}`} className="flex items-center space-x-4">
                   <Skeleton className="h-12 w-full" />
                 </div>
               ))}

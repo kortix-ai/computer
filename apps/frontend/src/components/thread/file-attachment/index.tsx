@@ -464,7 +464,7 @@ export function FileAttachmentGrid({
 
                             return (
                                 <span
-                                    key={`url-${index}`}
+                                    key={`url-${+index}`}
                                     className="block my-5"
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -498,7 +498,7 @@ export function FileAttachmentGrid({
 
                         return (
                             <div
-                                key={`url-${index}`}
+                                key={`url-${+index}`}
                                 className={cn(
                                     "group relative w-full",
                                     "rounded-xl border bg-card overflow-hidden pt-10",

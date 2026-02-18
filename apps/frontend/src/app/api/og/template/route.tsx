@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '40px' }}>
                 {template.tags.slice(0, 5).map((tag: string, index: number) => (
                   <div
-                    key={`item-${index}`}
+                    key={`item-${+index}`}
                     style={{
                       backgroundColor: '#1e293b',
                       borderRadius: '8px',

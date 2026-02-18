@@ -286,7 +286,7 @@ const IntegrationLogos: React.FC<{ data: BaseAgentData; maxLogos?: number }> = (
     <div className="flex items-center gap-1.5 flex-wrap">
       {displayIntegrations.map((integration, index) => (
         <IntegrationLogo
-          key={`int-${index}`}
+          key={`int-${+index}`}
           qualifiedName={integration.qualified_name}
           displayName={integration.display_name}
           customType={integration.custom_type}

@@ -330,7 +330,7 @@ export function ExampleShowcase() {
                   const isTyping = isCurrentStep && aiText.length < (step.aiText?.length || 0);
 
                   return (
-                    <div key={`step-${idx}`} className="flex justify-start">
+                    <div key={`step-${+idx}`} className="flex justify-start">
                       <div className="max-w-[90%] space-y-1">
                         <div className="flex items-center gap-1 mb-1">
                           <Image
@@ -575,7 +575,7 @@ export function ExampleShowcase() {
                     <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1.5">
                       {displayedContent.contentSlides.map((_, idx) => (
                         <div
-                          key={`_-${idx}`}
+                          key={`_-${+idx}`}
                           className={`transition-all ${idx === currentSlide
                             ? 'w-4 h-1 rounded-full bg-primary'
                             : 'w-1 h-1 rounded-full bg-muted-foreground/30'
@@ -608,7 +608,7 @@ export function ExampleShowcase() {
                             ['2024-05', 'Sales', '298,000', '101,000'],
                             ['2024-06', 'Sales', '334,000', '105,000'],
                           ].map((row, idx) => (
-                            <tr key={`row-${idx}`} className="border-b last:border-b-0">
+                            <tr key={`row-${+idx}`} className="border-b last:border-b-0">
                               <td className="px-2 py-1 text-foreground">{row[0]}</td>
                               <td className="px-2 py-1 text-foreground">{row[1]}</td>
                               <td className="px-2 py-1 text-right text-foreground">{row[2]}</td>
@@ -676,24 +676,24 @@ export function ExampleShowcase() {
                           };
 
                           if (line.startsWith('# ')) {
-                            return <h1 key={`line-${idx}`} className="text-sm font-bold text-foreground mb-2">{line.slice(2)}</h1>;
+                            return <h1 key={`line-${+idx}`} className="text-sm font-bold text-foreground mb-2">{line.slice(2)}</h1>;
                           }
                           if (line.startsWith('## ')) {
-                            return <h2 key={`line-${idx}`} className="text-xs font-bold text-foreground mt-3 mb-1.5">{line.slice(3)}</h2>;
+                            return <h2 key={`line-${+idx}`} className="text-xs font-bold text-foreground mt-3 mb-1.5">{line.slice(3)}</h2>;
                           }
                           if (line.startsWith('### ')) {
-                            return <h3 key={`line-${idx}`} className="text-[11px] font-semibold text-foreground mt-2 mb-1">{line.slice(4)}</h3>;
+                            return <h3 key={`line-${+idx}`} className="text-[11px] font-semibold text-foreground mt-2 mb-1">{line.slice(4)}</h3>;
                           }
                           if (line.startsWith('- ')) {
-                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">• {$renderText(line.slice(2), '')}</p>;
+                            return <p key={`line-${+idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">• {$renderText(line.slice(2), '')}</p>;
                           }
                           if (line.match(/^\d+\./)) {
-                            return <p key={`line-${idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">{$renderText(line, '')}</p>;
+                            return <p key={`line-${+idx}`} className="text-[10px] text-muted-foreground ml-3 leading-relaxed">{$renderText(line, '')}</p>;
                           }
                           if (line.trim() === '') {
-                            return <div key={`${idx}-${typeof line === 'string' ? line : idx}`} className="h-2" />;
+                            return <div key={`${+idx}-${typeof line === 'string' ? line : idx}`} className="h-2" />;
                           }
-                          return <p key={`${idx}-${typeof line === 'string' ? line : idx}`} className="leading-relaxed">{$renderText(line, 'text-[10px] text-muted-foreground')}</p>;
+                          return <p key={`${+idx}-${typeof line === 'string' ? line : idx}`} className="leading-relaxed">{$renderText(line, 'text-[10px] text-muted-foreground')}</p>;
                         })}
                       </div>
                     </div>

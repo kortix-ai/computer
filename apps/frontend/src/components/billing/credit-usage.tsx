@@ -90,7 +90,7 @@ export default function CreditUsage() {
           <CardContent>
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
-                <Skeleton key={`_-${i}`} className="h-12 w-full" />
+                <Skeleton key={`_-${+i}`} className="h-12 w-full" />
               ))}
             </div>
           </CardContent>

@@ -189,7 +189,7 @@ function FileGroupSection({
         <div className="ml-3 border-l border-border/30 pl-1 mb-1">
           {group.diagnostics.map((d, i) => (
             <DiagnosticRow
-              key={`${d.line}:${d.column}:${i}`}
+              key={`${d.line}:${d.column}:${+i}`}
               diagnostic={d}
               onClick={() => onDiagnosticClick(d)}
             />

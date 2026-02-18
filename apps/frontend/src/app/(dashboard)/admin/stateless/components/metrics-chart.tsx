@@ -303,7 +303,7 @@ export function DonutChart({
                     nameKey="name"
                   >
                     {data.map((entry, index) => (
-                      <Cell key={`entry-${index}`} fill={entry.color} stroke="transparent" />
+                      <Cell key={`entry-${+index}`} fill={entry.color} stroke="transparent" />
                     ))}
                   </Pie>
                 </PieChart>

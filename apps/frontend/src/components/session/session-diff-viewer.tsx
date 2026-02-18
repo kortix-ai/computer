@@ -57,7 +57,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         // For hunk headers or empty lines, render plain
         if (isHunk || line === '') {
           return (
-            <div key={`line-${i}`} className={cls}>
+            <div key={`line-${+i}`} className={cls}>
               {line || ' '}
             </div>
           );
@@ -69,7 +69,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         if (highlightedTokens) {
           const html = $renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={`line-${i}`} className={cls}>
+            <div key={`line-${+i}`} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -86,7 +86,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         // Fallback: no highlighting available
         return (
           <div
-            key={`item-${i}`}
+            key={`item-${+i}`}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -219,7 +219,7 @@ function SideBySideDiff({ patch, filename }: { patch: string; filename: string }
             const isLeftHunk = row.left.content.startsWith('@@');
 
             return (
-              <tr key={`row-${i}`}>
+              <tr key={`row-${+i}`}>
                 {/* Left side (old) */}
                 <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
                   {row.left.num ?? ''}
@@ -587,7 +587,7 @@ export function SessionDiffViewer({ sessionId, isFullscreen, onToggleFullscreen 
         <div className="flex-1 flex items-center justify-center">
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-5">
+              <div key={+i} className="flex items-center gap-3 px-5">
                 <div className="h-3 w-3 bg-muted/30 rounded animate-pulse" />
                 <div className="h-3 bg-muted/20 rounded animate-pulse" style={{ width: 120 + i * 40 }} />
               </div>
@@ -642,7 +642,7 @@ export function SessionDiffViewer({ sessionId, isFullscreen, onToggleFullscreen 
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
           {diffs.map((diff, i) => (
-            <FileDiffCard key={`${diff.file}-${i}`} diff={diff} viewMode={viewMode} isFullscreen={isFullscreen} />
+            <FileDiffCard key={`${diff.file}-${+i}`} diff={diff} viewMode={viewMode} isFullscreen={isFullscreen} />
           ))}
         </div>
       </ScrollArea>

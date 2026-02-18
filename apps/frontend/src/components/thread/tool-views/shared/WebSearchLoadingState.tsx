@@ -298,7 +298,7 @@ export function WebSearchLoadingState({
 
               return (
                 <m.div
-                  key={`${query}-${index}`}
+                  key={`${query}-${+index}`}
                   initial={{ opacity: 0, y: 20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{

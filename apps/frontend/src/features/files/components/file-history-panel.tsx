@@ -138,7 +138,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
 
         if (isHunk || isHeader || line === '') {
           return (
-            <div key={`line-${i}`} className={cls}>
+            <div key={`line-${+i}`} className={cls}>
               {line || ' '}
             </div>
           );
@@ -150,7 +150,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         if (highlightedTokens) {
           const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={`line-${i}`} className={cls}>
+            <div key={`line-${+i}`} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -166,7 +166,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
 
         return (
           <div
-            key={`item-${i}`}
+            key={`item-${+i}`}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -424,7 +424,7 @@ export function FileHistoryPanel() {
         {isLoading && (
           <div className="p-3 space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="space-y-2">
+              <div key={+i} className="space-y-2">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-12 w-full rounded-lg" />
               </div>

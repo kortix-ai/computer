@@ -202,7 +202,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'warning':
             return (
               <div
-                key={`section-${i}`}
+                key={`section-${+i}`}
                 className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-yellow-500/5 border border-yellow-500/15"
               >
                 <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-yellow-500" />
@@ -215,7 +215,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'error':
             return (
               <div
-                key={`section-${i}`}
+                key={`section-${+i}`}
                 className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/15"
               >
                 <Ban className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-red-400" />
@@ -234,7 +234,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
 
           case 'traceback':
             return (
-              <div key={`${i}-${typeof section === 'string' ? section : i}`}>
+              <div key={`${+i}-${typeof section === 'string' ? section : i}`}>
                 <button
                   onClick={() => setShowTrace((v) => !v)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
@@ -278,7 +278,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'install':
             return (
               <div
-                key={`item-${i}`}
+                key={`item-${+i}`}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15"
               >
                 <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
@@ -291,7 +291,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'info':
             return (
               <div
-                key={`item-${i}`}
+                key={`item-${+i}`}
                 className="flex items-center gap-2.5 px-3 py-1.5 text-xs text-muted-foreground font-mono"
               >
                 <span className="size-1.5 rounded-full bg-muted-foreground/30 flex-shrink-0" />
@@ -302,7 +302,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'plain':
             return (
               <pre
-                key={`item-${i}`}
+                key={`item-${+i}`}
                 className="px-3 py-1.5 font-mono text-xs leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
               >
                 {section.text}

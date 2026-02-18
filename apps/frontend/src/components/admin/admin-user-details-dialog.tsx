@@ -318,7 +318,7 @@ export function AdminUserDetailsDialog({
                     {threadsLoading ? (
                       <div className="space-y-2">
                         {[...Array(3)].map((_, i) => (
-                          <Skeleton key={`_-${i}`} className="h-16 w-full" />
+                          <Skeleton key={`_-${+i}`} className="h-16 w-full" />
                         ))}
                       </div>
                     ) : userThreads && userThreads.data.length > 0 ? (
@@ -408,7 +408,7 @@ export function AdminUserDetailsDialog({
                     {transactionsLoading ? (
                       <div className="space-y-2">
                         {[...Array(3)].map((_, i) => (
-                          <Skeleton key={`_-${i}`} className="h-16 w-full" />
+                          <Skeleton key={`_-${+i}`} className="h-16 w-full" />
                         ))}
                       </div>
                     ) : userTransactions && userTransactions.data?.length > 0 ? (
@@ -477,7 +477,7 @@ export function AdminUserDetailsDialog({
                     {activityLoading ? (
                       <div className="space-y-2">
                         {[...Array(3)].map((_, i) => (
-                          <Skeleton key={`_-${i}`} className="h-16 w-full" />
+                          <Skeleton key={`_-${+i}`} className="h-16 w-full" />
                         ))}
                       </div>
                     ) : userActivity && userActivity.data?.length > 0 ? (

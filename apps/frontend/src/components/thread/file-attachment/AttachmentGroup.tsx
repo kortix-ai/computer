@@ -146,7 +146,7 @@ export function AttachmentGroup({
                     {uniqueFiles.slice(0, visibleCount).map((file, index) => {
                         const path = getFilePath(file);
                         return (
-                            <div key={`file-${index}`} className="relative group overflow-visible">
+                            <div key={`file-${+index}`} className="relative group overflow-visible">
                                 <FileAttachment
                                     filepath={path}
                                     onClick={() => handleFileClick(path)}
@@ -223,7 +223,7 @@ export function AttachmentGroup({
                         {uniqueFiles.map((file, index) => {
                             const path = getFilePath(file);
                             return (
-                                <div key={`file-${index}`} className="relative group overflow-visible">
+                                <div key={`file-${+index}`} className="relative group overflow-visible">
                                     <FileAttachment
                                         filepath={path}
                                         onClick={(p) => {

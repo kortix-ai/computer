@@ -53,7 +53,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
           <span>[</span>
           <div className="ml-4">
             {obj.map((item, index) => (
-              <div key={`item-${index}`}>
+              <div key={`item-${+index}`}>
                 {formatJson(item, indent + 1)}
                 {index < obj.length - 1 && <span>,</span>}
               </div>

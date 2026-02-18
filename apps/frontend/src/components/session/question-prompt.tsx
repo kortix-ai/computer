@@ -192,7 +192,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
         <div className="flex items-center gap-1 px-3 pt-3 pb-1 overflow-x-auto">
           {questions.map((q, i) => (
             <button
-              key={`q-${i}`}
+              key={`q-${+i}`}
               onClick={() => { setTab(i); setEditing(false); }}
               className={cn(
                 'px-3 py-1.5 text-[11px] font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap',
@@ -229,7 +229,7 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
             {questions.map((q, i) => {
               const ans = answers[i] ?? [];
               return (
-                <div key={`q-${i}`} className="flex items-start gap-2 text-xs">
+                <div key={`q-${+i}`} className="flex items-start gap-2 text-xs">
                   <span className="text-muted-foreground font-medium min-w-0 shrink-0">
                     {q.header || q.question}:
                   </span>

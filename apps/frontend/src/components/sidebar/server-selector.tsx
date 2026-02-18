@@ -301,7 +301,7 @@ function DialogInstanceRow({
               <p className="font-medium">{sandboxUpdate.changelog.title}</p>
               <ul className="list-disc list-inside">
                 {sandboxUpdate.changelog.changes.slice(0, 3).map((c, i) => (
-                  <li key={`c-${i}`} className="truncate">{c.text}</li>
+                  <li key={`c-${+i}`} className="truncate">{c.text}</li>
                 ))}
                 {sandboxUpdate.changelog.changes.length > 3 && (
                   <li className="text-muted-foreground/50">+{sandboxUpdate.changelog.changes.length - 3} more</li>

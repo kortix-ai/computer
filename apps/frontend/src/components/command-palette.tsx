@@ -196,7 +196,7 @@ function SearchSkeletons({
   return (
     <div className="space-y-0.5">
       {Array.from({ length: count }).map((_, i) => (
-        <Row key={i} />
+        <Row key={+i} />
       ))}
     </div>
   );
@@ -787,7 +787,7 @@ export function CommandPalette() {
                 {hasThreadResults &&
                   threadResults.map((result, index) => (
                     <CommandItem
-                      key={`thread-${result.thread_id}-${index}`}
+                      key={`thread-${result.thread_id}-${+index}`}
                       value={`thread-${result.thread_id}-${index}-${result.text_preview?.slice(0, 20)}`}
                       onSelect={() =>
                         handleSelectThread(
@@ -887,7 +887,7 @@ export function CommandPalette() {
 
                   return (
                     <CommandItem
-                      key={`text-${match.path}-${match.line_number}-${index}`}
+                      key={`text-${match.path}-${match.line_number}-${+index}`}
                       value={`text-${match.path}-${match.line_number}-${index}`}
                       onSelect={() => handleSelectTextResult(match)}
                     >

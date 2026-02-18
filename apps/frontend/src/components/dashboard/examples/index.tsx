@@ -152,7 +152,7 @@ export const Examples = ({
         <div className="flex gap-2 justify-center py-2 flex-wrap">
           {displayedPrompts.map((prompt, index) => (
             <m.div
-              key={`${prompt.title}-${index}`}
+              key={`${prompt.title}-${+index}`}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{

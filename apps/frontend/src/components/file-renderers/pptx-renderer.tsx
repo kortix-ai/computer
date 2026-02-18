@@ -476,7 +476,7 @@ export function PptxRenderer({
           <div className="flex gap-2">
             {slides.map((s, idx) => (
               <button
-                key={`s-${idx}`}
+                key={`s-${+idx}`}
                 onClick={() => setCurrentSlide(idx)}
                 className={cn(
                   'shrink-0 w-20 h-14 rounded-md border text-xs flex items-center justify-center transition-colors',
