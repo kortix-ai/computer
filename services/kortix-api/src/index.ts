@@ -23,7 +23,7 @@ import { secretsApp } from './secrets/routes';
 
 const app = new Hono();
 
-// === Global Middleware ===
+// === Global Middleware === 
 
 app.use(
   '*',
