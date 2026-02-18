@@ -1,5 +1,15 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import type { UnifiedMessage, ParsedContent, ParsedMetadata } from '../types';
+import type {
+  AckEvent,
+  EstimateEvent,
+  PrepStageEvent,
+  ThinkingEvent,
+  StreamErrorEvent,
+  ContextUsageEvent,
+  DegradationEvent,
+} from '../types/streaming-events';
+import { BILLING_ERROR_KEYWORDS, TERMINAL_STATUSES } from '../constants/shared-constants';
 import type { TextChunk } from './text-ordering';
 import { safeJsonParse } from '../utils';
 import {
@@ -28,6 +38,14 @@ export interface StreamConfig {
   handleBillingError?: (errorMessage: string, balance?: string | null) => void;
   showToast?: (message: string, type?: 'error' | 'success' | 'warning') => void;
   clearToolTracking?: () => void;
+  /** Heartbeat timeout in ms — how long to wait without any message before checking agent status (default: 600000 = 10 min) */
+  heartbeatTimeoutMs?: number;
+  /** Connection timeout in ms — how long to wait for onopen before treating as error (default: 15000) */
+  connectionTimeoutMs?: number;
+  /** Maximum delay between reconnection attempts in ms (default: 30000) */
+  reconnectMaxDelayMs?: number;
+  /** Whether to add random jitter to reconnect backoff to prevent thundering herd (default: true) */
+  reconnectJitter?: boolean;
 }
 
 export interface UseAgentStreamCoreCallbacks {
@@ -39,6 +57,20 @@ export interface UseAgentStreamCoreCallbacks {
   onAssistantChunk?: (chunk: { content: string }) => void;
   onToolCallChunk?: (message: UnifiedMessage) => void;
   onToolOutputStream?: (data: { tool_call_id: string; tool_name: string; output: string; is_final: boolean }) => void;
+  /** Called when the backend acknowledges the run */
+  onAck?: (event: AckEvent) => void;
+  /** Called with an estimated run duration */
+  onEstimate?: (event: EstimateEvent) => void;
+  /** Called during sandbox / environment initialization stages */
+  onPrepStage?: (event: PrepStageEvent) => void;
+  /** Called when the model starts/continues/finishes reasoning */
+  onThinking?: (event: ThinkingEvent) => void;
+  /** Called with a structured, potentially recoverable stream error */
+  onStreamError?: (event: StreamErrorEvent) => void;
+  /** Called with token budget / context usage information */
+  onContextUsage?: (event: ContextUsageEvent) => void;
+  /** Called when a partial outage or performance degradation is detected */
+  onDegradation?: (event: DegradationEvent) => void;
 }
 
 export interface UseAgentStreamCoreResult {
@@ -49,6 +81,8 @@ export interface UseAgentStreamCoreResult {
   error: string | null;
   agentRunId: string | null;
   retryCount: number;
+  /** Last SSE event ID received — used for resumption on reconnect */
+  lastEventId: string | null;
   startStreaming: (runId: string) => Promise<void>;
   stopStreaming: () => Promise<void>;
   resumeStream: () => Promise<void>; // Call when app comes back to foreground
@@ -103,9 +137,12 @@ export function useAgentStreamCore(
   // Heartbeat detection refs
   const lastMessageTimeRef = useRef<number>(0);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // 10 minutes - tools can take a VERY long time, this is just to detect dead connections
-  // Not for detecting "no response" - that's the connection timeout's job
-  const HEARTBEAT_TIMEOUT_MS = 10 * 60 * 1000;
+  // Configurable heartbeat timeout (default: 10 minutes)
+  const HEARTBEAT_TIMEOUT_MS = config.heartbeatTimeoutMs ?? 10 * 60 * 1000;
+  
+  // Last SSE event ID for resumption on reconnect
+  const lastEventIdRef = useRef<string | null>(null);
+  const [lastEventId, setLastEventId] = useState<string | null>(null);
   
   // Reconnection refs for graceful handling of bad network
   const retryCountRef = useRef<number>(0);
@@ -114,6 +151,8 @@ export function useAgentStreamCore(
   const [retryCount, setRetryCount] = useState<number>(0);
   const MAX_RETRIES = 5;
   const BASE_RETRY_DELAY_MS = 1000;
+  const RECONNECT_MAX_DELAY_MS = config.reconnectMaxDelayMs ?? 30000;
+  const RECONNECT_JITTER = config.reconnectJitter ?? true;
   
   // Refs for breaking circular dependencies
   const attemptReconnectRef = useRef<((runId: string) => Promise<boolean>) | null>(null);
@@ -221,7 +260,7 @@ export function useAgentStreamCore(
     if (newStatus === 'error' && error) {
       callbacksRef.current.onError?.(error);
     }
-    if (['completed', 'stopped', 'failed', 'error', 'agent_not_running'].includes(newStatus)) {
+    if ((TERMINAL_STATUSES as readonly string[]).includes(newStatus)) {
       callbacksRef.current.onClose?.(newStatus);
     }
   }, [error]);
@@ -289,13 +328,6 @@ export function useAgentStreamCore(
 
   // Handle billing errors
   const handleBillingError = useCallback((errorMessage: string) => {
-    const messageLower = errorMessage.toLowerCase();
-    const isCreditsExhausted = 
-      messageLower.includes('insufficient credits') ||
-      messageLower.includes('out of credits') ||
-      messageLower.includes('no credits') ||
-      messageLower.includes('balance');
-    
     const balanceMatch = errorMessage.match(/balance is (-?\d+)\s*credits/i);
     const balance = balanceMatch ? balanceMatch[1] : null;
     
@@ -329,18 +361,18 @@ export function useAgentStreamCore(
     try {
       const jsonData = JSON.parse(processedData);
       
+      // Track last event ID for reconnection resumption
+      if (jsonData._event_id) {
+        lastEventIdRef.current = jsonData._event_id;
+        setLastEventId(jsonData._event_id);
+      }
+      
       if (jsonData.status === 'error') {
         const errorMessage = jsonData.message || 'Unknown error occurred';
         const messageLower = errorMessage.toLowerCase();
-        const isBillingError = 
-          messageLower.includes('insufficient credits') ||
-          messageLower.includes('credit') ||
-          messageLower.includes('balance') ||
-          messageLower.includes('out of credits') ||
-          messageLower.includes('no credits') ||
-          messageLower.includes('billing check failed');
+        const isBillingErr = BILLING_ERROR_KEYWORDS.some(kw => messageLower.includes(kw));
         
-        if (isBillingError) {
+        if (isBillingErr) {
           handleBillingError(errorMessage);
           finalizeStream('error', currentRunIdRef.current);
           return;
@@ -359,16 +391,9 @@ export function useAgentStreamCore(
       // Handle stopped status (normal completion or billing error)
       if (jsonData.type === 'status' && jsonData.status === 'stopped') {
         if (jsonData.message) {
-          const message = jsonData.message.toLowerCase();
-          const isBillingError = 
-            message.includes('insufficient credits') ||
-            message.includes('credit') ||
-            message.includes('balance') ||
-            message.includes('out of credits') ||
-            message.includes('no credits') ||
-            message.includes('billing check failed');
-          
-          if (isBillingError) {
+          const msgLower = jsonData.message.toLowerCase();
+          const isBillingErr = BILLING_ERROR_KEYWORDS.some(kw => msgLower.includes(kw));
+          if (isBillingErr) {
             handleBillingError(jsonData.message);
           }
         }
@@ -395,6 +420,81 @@ export function useAgentStreamCore(
       
       // Handle ping messages
       if (jsonData.type === 'ping' && !jsonData.content) {
+        return;
+      }
+      
+      // ----- Rich UX events (optional callbacks) -----
+      
+      if (jsonData.type === 'ack') {
+        callbacksRef.current.onAck?.({
+          message: jsonData.message,
+          agent_run_id: jsonData.agent_run_id,
+          timestamp: jsonData.timestamp,
+        });
+        return;
+      }
+      
+      if (jsonData.type === 'estimate') {
+        callbacksRef.current.onEstimate?.({
+          estimated_seconds: jsonData.estimated_seconds,
+          confidence: jsonData.confidence,
+          message: jsonData.message,
+          breakdown: jsonData.breakdown,
+          timestamp: jsonData.timestamp,
+        });
+        return;
+      }
+      
+      if (jsonData.type === 'prep_stage') {
+        callbacksRef.current.onPrepStage?.({
+          stage: jsonData.stage,
+          detail: jsonData.detail,
+          progress: jsonData.progress,
+          message: jsonData.message,
+          timestamp: jsonData.timestamp,
+        });
+        return;
+      }
+      
+      if (jsonData.type === 'thinking') {
+        callbacksRef.current.onThinking?.({
+          status: jsonData.status,
+          message: jsonData.message,
+          timestamp: jsonData.timestamp,
+        });
+        return;
+      }
+      
+      if (jsonData.type === 'degradation') {
+        callbacksRef.current.onDegradation?.({
+          component: jsonData.component,
+          severity: jsonData.severity,
+          message: jsonData.message,
+          user_impact: jsonData.user_impact,
+          timestamp: jsonData.timestamp,
+        });
+        return;
+      }
+      
+      if (jsonData.type === 'error' && jsonData.error_code) {
+        callbacksRef.current.onStreamError?.({
+          error: jsonData.error,
+          error_code: jsonData.error_code,
+          message: jsonData.message,
+          recoverable: jsonData.recoverable,
+          recovery_actions: jsonData.recovery_actions || jsonData.actions,
+          timestamp: jsonData.timestamp,
+        });
+        return;
+      }
+      
+      if (jsonData.type === 'context_usage') {
+        callbacksRef.current.onContextUsage?.({
+          current_tokens: jsonData.current_tokens,
+          max_tokens: jsonData.max_tokens,
+          message_count: jsonData.message_count,
+          compressed: jsonData.compressed,
+        });
         return;
       }
     } catch {
@@ -652,7 +752,7 @@ export function useAgentStreamCore(
     const currentStatus = status;
 
     // If already finalized, don't show error
-    if (['completed', 'stopped', 'error', 'agent_not_running'].includes(currentStatus)) {
+    if ((TERMINAL_STATUSES as readonly string[]).includes(currentStatus)) {
       return;
     }
 
@@ -671,7 +771,7 @@ export function useAgentStreamCore(
       if (currentRunIdRef.current !== runId) return;
 
       // Double-check status wasn't finalized while waiting
-      if (['completed', 'stopped', 'error', 'agent_not_running'].includes(status)) {
+      if ((TERMINAL_STATUSES as readonly string[]).includes(status)) {
         return;
       }
 
@@ -680,7 +780,7 @@ export function useAgentStreamCore(
         .then((agentStatus: { status: string; error?: string }) => {
           if (!isMountedRef.current) return;
           if (currentRunIdRef.current !== runId) return;
-          if (['completed', 'stopped', 'error', 'agent_not_running'].includes(status)) {
+          if ((TERMINAL_STATUSES as readonly string[]).includes(status)) {
             return;
           }
 
@@ -693,15 +793,9 @@ export function useAgentStreamCore(
           } else if (agentStatus.status === 'stopped' && agentStatus.error) {
             const errorMessage = agentStatus.error;
             const lower = errorMessage.toLowerCase();
-            const isBillingError = 
-              lower.includes('insufficient credits') ||
-              lower.includes('credit') ||
-              lower.includes('balance') ||
-              lower.includes('out of credits') ||
-              lower.includes('no credits') ||
-              lower.includes('billing check failed');
+            const isBillingErr = BILLING_ERROR_KEYWORDS.some(kw => lower.includes(kw));
             
-            if (isBillingError) {
+            if (isBillingErr) {
               handleBillingError(errorMessage);
             }
             
@@ -737,13 +831,20 @@ export function useAgentStreamCore(
   const setupEventSource = useCallback(async (runId: string, isReconnect: boolean = false): Promise<boolean> => {
     if (!isMountedRef.current) return false;
     
-    // Create EventSource
+    // Create EventSource — include lastEventId for reconnection resumption
     const token = await config.getAuthToken();
-    const streamUrl = `${config.apiUrl}/agent-run/${runId}/stream${token ? `?token=${token}` : ''}`;
+    const params = new URLSearchParams();
+    if (token) params.append('token', token);
+    const currentLastEventId = lastEventIdRef.current;
+    if (isReconnect && currentLastEventId && currentLastEventId !== '0') {
+      params.append('last_id', currentLastEventId);
+    }
+    const queryString = params.toString();
+    const streamUrl = `${config.apiUrl}/agent-run/${runId}/stream${queryString ? `?${queryString}` : ''}`;
     const eventSource = config.createEventSource(streamUrl);
 
-    // Connection timeout - if onopen doesn't fire within 15 seconds, treat as error
-    const CONNECTION_TIMEOUT_MS = 15000;
+    // Connection timeout - configurable (default 15s)
+    const CONNECTION_TIMEOUT_MS = config.connectionTimeoutMs ?? 15000;
     let connectionTimeoutId: ReturnType<typeof setTimeout> | null = null;
     let connectionOpened = false;
 
@@ -965,8 +1066,16 @@ export function useAgentStreamCore(
     setRetryCount(retryCountRef.current);
     isReconnectingRef.current = true;
     
-    // Calculate exponential backoff delay
-    const delay = BASE_RETRY_DELAY_MS * Math.pow(2, retryCountRef.current - 1);
+    // Calculate exponential backoff delay with optional jitter
+    let delay = Math.min(
+      BASE_RETRY_DELAY_MS * Math.pow(2, retryCountRef.current - 1),
+      RECONNECT_MAX_DELAY_MS,
+    );
+    if (RECONNECT_JITTER) {
+      // Random jitter: 0.5x to 1.5x multiplier to prevent thundering herd
+      const jitterMultiplier = 0.5 + Math.random();
+      delay = Math.round(delay * jitterMultiplier);
+    }
     console.log(`[useAgentStreamCore] Reconnecting (attempt ${retryCountRef.current}/${MAX_RETRIES}) in ${delay}ms...`);
     
     setStatus('reconnecting');
@@ -1052,6 +1161,10 @@ export function useAgentStreamCore(
     retryCountRef.current = 0;
     setRetryCount(0);
     isReconnectingRef.current = false;
+    
+    // Reset lastEventId for fresh stream
+    lastEventIdRef.current = null;
+    setLastEventId(null);
     
     // Clear reasoning content when starting a new stream
     setReasoningContent('');
@@ -1210,6 +1323,7 @@ export function useAgentStreamCore(
     error,
     agentRunId,
     retryCount,
+    lastEventId,
     startStreaming,
     stopStreaming,
     resumeStream,

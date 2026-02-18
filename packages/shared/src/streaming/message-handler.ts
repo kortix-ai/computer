@@ -4,6 +4,7 @@
  */
 
 import type { UnifiedMessage, ParsedContent, ParsedMetadata } from '../types';
+import { COMPLETION_MESSAGE_PATTERNS } from '../constants/shared-constants';
 import { safeJsonParse } from '../utils';
 import type { ToolCallAccumulatorState, ReconstructedToolCall } from './tool-accumulator';
 import { accumulateToolCallDeltas, reconstructToolCalls, markToolCallCompleted } from './tool-accumulator';
@@ -40,10 +41,10 @@ export function preprocessStreamData(rawData: string): string {
  */
 export function isCompletionMessage(processedData: string): boolean {
   return (
-    (processedData.includes('"type": "status"') &&
-      processedData.includes('"status": "completed"')) ||
-    processedData.includes('Run data not available for streaming') ||
-    processedData.includes('Stream ended with status: completed') ||
+    (processedData.includes(COMPLETION_MESSAGE_PATTERNS[0]) &&
+      processedData.includes(COMPLETION_MESSAGE_PATTERNS[1])) ||
+    processedData.includes(COMPLETION_MESSAGE_PATTERNS[2]) ||
+    processedData.includes(COMPLETION_MESSAGE_PATTERNS[3]) ||
     processedData === '{"type": "status", "status": "completed", "message": "Worker run completed successfully"}'
   );
 }
