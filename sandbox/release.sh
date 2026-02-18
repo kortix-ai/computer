@@ -413,7 +413,7 @@ fi
 
 # ─── Step 8: Docker (optional) ──────────────────────────────────────────────
 if $BUILD_DOCKER && ! $DRY_RUN; then
-  DOCKER_ORG="kortixmarko"
+  DOCKER_ORG="kortix"
   PLATFORMS="linux/amd64,linux/arm64"
 
   # Docker socket detection (OrbStack)
@@ -594,20 +594,20 @@ if ! $DRY_RUN; then
 
   # Docker
   if $BUILD_DOCKER; then
-    for img in sandbox; do
-      if docker manifest inspect "${DOCKER_ORG:-kortixmarko}/$img:$VERSION" &>/dev/null 2>&1; then
-        ok "Docker Hub: ${DOCKER_ORG:-kortixmarko}/$img:$VERSION"
+    for img in computer; do
+      if docker manifest inspect "${DOCKER_ORG:-kortix}/$img:$VERSION" &>/dev/null 2>&1; then
+        ok "Docker Hub: ${DOCKER_ORG:-kortix}/$img:$VERSION"
       else
-        fail "Docker Hub: ${DOCKER_ORG:-kortixmarko}/$img:$VERSION NOT FOUND"
+        fail "Docker Hub: ${DOCKER_ORG:-kortix}/$img:$VERSION NOT FOUND"
         VALID=false
       fi
     done
     if ! $DOCKER_SANDBOX_ONLY; then
       for img in kortix-api kortix-frontend; do
-        if docker manifest inspect "${DOCKER_ORG:-kortixmarko}/$img:$VERSION" &>/dev/null 2>&1; then
-          ok "Docker Hub: ${DOCKER_ORG:-kortixmarko}/$img:$VERSION"
+        if docker manifest inspect "${DOCKER_ORG:-kortix}/$img:$VERSION" &>/dev/null 2>&1; then
+          ok "Docker Hub: ${DOCKER_ORG:-kortix}/$img:$VERSION"
         else
-          fail "Docker Hub: ${DOCKER_ORG:-kortixmarko}/$img:$VERSION NOT FOUND"
+          fail "Docker Hub: ${DOCKER_ORG:-kortix}/$img:$VERSION NOT FOUND"
           VALID=false
         fi
       done

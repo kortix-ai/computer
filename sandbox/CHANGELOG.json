@@ -18,9 +18,9 @@
       { "name": "@kortix/opencode-sdk@0.5.2", "target": "npm" },
       { "name": "@kortix/sandbox@0.5.2", "target": "npm" },
       { "name": "v0.5.2", "target": "github-release" },
-      { "name": "kortixmarko/sandbox:0.5.2", "target": "docker-hub" },
-      { "name": "kortixmarko/kortix-api:0.5.2", "target": "docker-hub" },
-      { "name": "kortixmarko/kortix-frontend:0.5.2", "target": "docker-hub" },
+      { "name": "kortix/computer:0.5.2", "target": "docker-hub" },
+      { "name": "kortix/kortix-api:0.5.2", "target": "docker-hub" },
+      { "name": "kortix/kortix-frontend:0.5.2", "target": "docker-hub" },
       { "name": "kortix-sandbox-v0.5.2", "target": "daytona" }
     ]
   },

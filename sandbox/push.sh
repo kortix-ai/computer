@@ -54,10 +54,10 @@ for arg in "$@"; do
       echo "  --skip-daytona    Push to Docker Hub only, skip Daytona snapshot"
       echo "  --skip-frontend   Skip frontend build+push"
       echo ""
-      echo "Images pushed to Docker Hub (kortixmarko/):"
-      echo "  kortixmarko/sandbox:{version} + :latest"
-      echo "  kortixmarko/kortix-api:{version} + :latest"
-      echo "  kortixmarko/kortix-frontend:{version} + :latest"
+      echo "Images pushed to Docker Hub (kortix/):"
+      echo "  kortix/computer:{version} + :latest"
+      echo "  kortix/kortix-api:{version} + :latest"
+      echo "  kortix/kortix-frontend:{version} + :latest"
       exit 0
       ;;
     *)
@@ -74,7 +74,7 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 
-DOCKER_ORG="kortixmarko"
+DOCKER_ORG="kortix"
 PLATFORMS="linux/amd64,linux/arm64"
 DAYTONA_SNAPSHOT_NAME="kortix-sandbox-v${VERSION}"
 
@@ -110,11 +110,11 @@ PUSHED=()
 info "Building + pushing sandbox..."
 docker buildx build --platform "${PLATFORMS}" \
   -f sandbox/Dockerfile \
-  -t "${DOCKER_ORG}/sandbox:${VERSION}" \
-  -t "${DOCKER_ORG}/sandbox:latest" \
+  -t "${DOCKER_ORG}/computer:${VERSION}" \
+  -t "${DOCKER_ORG}/computer:latest" \
   --push "$REPO_ROOT"
-ok "sandbox → Docker Hub (${VERSION} + latest)"
-PUSHED+=("${DOCKER_ORG}/sandbox:${VERSION}")
+ok "computer → Docker Hub (${VERSION} + latest)"
+PUSHED+=("${DOCKER_ORG}/computer:${VERSION}")
 
 # ── API ─────────────────────────────────────────────────────────────────────
 if ! $SANDBOX_ONLY; then
@@ -152,7 +152,7 @@ fi
 if ! $SKIP_DAYTONA; then
   info "Creating Daytona snapshot from Docker Hub image..."
   daytona snapshot create "${DAYTONA_SNAPSHOT_NAME}" \
-    --image "${DOCKER_ORG}/sandbox:${VERSION}" \
+    --image "${DOCKER_ORG}/computer:${VERSION}" \
     --cpu 4 \
     --memory 8 \
     --disk 20

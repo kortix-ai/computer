@@ -26,9 +26,9 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-FRONTEND_IMAGE="kortixmarko/kortix-frontend:latest"
-API_IMAGE="kortixmarko/kortix-api:latest"
-SANDBOX_IMAGE="kortixmarko/sandbox:latest"
+FRONTEND_IMAGE="kortix/kortix-frontend:latest"
+API_IMAGE="kortix/kortix-api:latest"
+SANDBOX_IMAGE="kortix/computer:latest"
 CADDY_IMAGE="caddy:2-alpine"
 CLI_SOURCE_URL="https://raw.githubusercontent.com/kortix-ai/computer/main/scripts/get-kortix.sh"
 
@@ -681,9 +681,9 @@ case "${1:-help}" in
     printf "  Delete Docker images? [y/N]: "
     read -r del_images
     if echo "$del_images" | grep -qi '^y'; then
-      docker rmi kortixmarko/kortix-frontend:latest 2>/dev/null || true
-      docker rmi kortixmarko/kortix-api:latest 2>/dev/null || true
-      docker rmi kortixmarko/sandbox:latest 2>/dev/null || true
+      docker rmi kortix/kortix-frontend:latest 2>/dev/null || true
+      docker rmi kortix/kortix-api:latest 2>/dev/null || true
+      docker rmi kortix/computer:latest 2>/dev/null || true
       docker rmi caddy:2-alpine 2>/dev/null || true
       echo "  ${G}Images removed.${N}"
     else
