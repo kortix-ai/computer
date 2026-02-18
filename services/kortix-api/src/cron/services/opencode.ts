@@ -70,7 +70,7 @@ async function fetchWithRetry(
   throw lastError!;
 }
 
-/**
+/** 
  * Build the prompt body in OpenCode's expected format.
  * OpenCode expects: { parts: [{ type: "text", text: "..." }] }
  */
