@@ -728,8 +728,7 @@ function parseDCPNotifications(text: string): { cleanText: string; notifications
     const summary = summaryMatch ? unescapeXml(summaryMatch[1]) : undefined;
 
     notifications.push({
-      type,
-      tokensSaved,
+      type, tokensSaved,
       batchSaved,
       prunedCount,
       extractedTokens,
@@ -1145,7 +1144,7 @@ function detectCommandFromText(
   return undefined;
 }
 
-const UserMessageRow = React.memo(function UserMessageRow({ message, agentNames, commandInfo, commands }: { message: MessageWithParts; agentNames?: string[]; commandInfo?: { name: string; args?: string }; commands?: Command[] }) {
+const UserMessageRow = identity(function UserMessageRow({ message, agentNames, commandInfo, commands }: { message: MessageWithParts; agentNames?: string[]; commandInfo?: { name: string; args?: string }; commands?: Command[] }) {
   const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
   const { attachments, stickyParts } = useMemo(
     () => splitUserParts(message.parts),
@@ -2183,7 +2182,7 @@ interface SessionChatProps {
   sessionId: string;
 }
 
-export const SessionChat = React.memo(function SessionChat({ sessionId }: SessionChatProps) {
+export const SessionChat = identity(function SessionChat({ sessionId }: SessionChatProps) {
   const [debugMode, setDebugMode] = React.useState(false);
 
   // ---- KortixComputer side panel ----

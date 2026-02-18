@@ -21,6 +21,7 @@ import { downloadFile, uploadFile, readFileAsBlob } from '../api/opencode-files'
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { RawHTML } from '@/components/ui/raw-html';
+import { identity } from '@/lib/utils/identity';
 
 // Lazy-load heavy renderers to keep initial bundle small
 const PdfRenderer = lazy(() =>
@@ -216,7 +217,7 @@ function useBinaryBlob(filePath: string | null, category: FileCategory) {
 // Component
 // ---------------------------------------------------------------------------
 
-export const FileViewer = React.memo(function FileViewer() {
+export const FileViewer = identity(function FileViewer() {
   const selectedFilePath = useFilesStore((s) => s.selectedFilePath);
   const filePathList = useFilesStore((s) => s.filePathList);
   const currentFileIndex = useFilesStore((s) => s.currentFileIndex);

@@ -168,12 +168,11 @@ export function UserMenu({ user }: UserMenuProps) {
     openTabAndNavigate({
       id: `page:${href}`,
       title: label,
-      type,
-      href,
+      type, href,
     }, router);
   };
 
-  const renderMenuItem = (item: MenuItemConfig) => {
+  const $renderMenuItem = (item: MenuItemConfig) => {
     const Icon = item.icon;
     if (item.href) {
       return (
@@ -256,7 +255,7 @@ export function UserMenu({ user }: UserMenuProps) {
               {/* General */}
               <DropdownMenuLabel className="text-muted-foreground text-xs px-2 py-1.5">General</DropdownMenuLabel>
               <DropdownMenuGroup>
-                {generalItems.map(renderMenuItem)}
+                {generalItems.map($renderMenuItem)}
                 <DropdownMenuItem
                   onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                   className="gap-2 p-2"
@@ -286,7 +285,7 @@ export function UserMenu({ user }: UserMenuProps) {
                   <DropdownMenuSeparator className="my-1" />
                   <DropdownMenuLabel className="text-muted-foreground text-xs px-2 py-1.5">Advanced</DropdownMenuLabel>
                   <DropdownMenuGroup>
-                    {adminItems.map(renderMenuItem)}
+                    {adminItems.map($renderMenuItem)}
                   </DropdownMenuGroup>
                 </>
               )}

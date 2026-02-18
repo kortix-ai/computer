@@ -286,8 +286,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
 
       return [...prev, {
         id: windowId,
-        type,
-        zIndex: maxZIndex + 1,
+        type, zIndex: maxZIndex + 1,
         position: getInitialPosition(prev.length),
         size: windowSize,
         isMinimized: false,

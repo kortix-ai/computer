@@ -8,8 +8,9 @@ import { ArrowLeft } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { identity } from '@/lib/utils/identity';
 
-const LegalContent = React.memo(function LegalContent() {
+const LegalContent = identity(function LegalContent() {
   const searchParams = useSearchParamsCompat();
   const router = useRouter();
   const pathname = usePathname();
@@ -1605,8 +1606,7 @@ const LegalContent = React.memo(function LegalContent() {
                           websites, our web servers log your Internet Protocol
                           (IP) address and information about your device,
                           including device identifiers, device type, operating
-                          system, browser, and other software including type,
-                          version, language, settings, and configuration.
+                          system, browser, and other software including type, version, language, settings, and configuration.
                         </li>
                         <li>
                           Geolocation data. Depending on your device and app

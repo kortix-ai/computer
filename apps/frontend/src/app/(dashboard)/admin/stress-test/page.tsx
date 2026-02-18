@@ -28,8 +28,9 @@ import {
 } from 'lucide-react';
 import { useStressTest, StressTestResult } from '@/hooks/admin/use-stress-test';
 import { cn } from '@/lib/utils';
+import { identity } from '@/lib/utils/identity';
 
-const AdminStressTestPage = React.memo(function AdminStressTestPage() {
+const AdminStressTestPage = identity(function AdminStressTestPage() {
   const [numRequestsInput, setNumRequestsInput] = useState('5');
   const numRequests = Math.min(200, Math.max(1, parseInt(numRequestsInput) || 5));
   

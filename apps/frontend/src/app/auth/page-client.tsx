@@ -25,13 +25,14 @@ import { ExampleShowcase } from '@/components/auth/example-showcase';
 import { trackSendAuthLink } from '@/lib/analytics/gtm';
 import { backendApi } from '@/lib/api-client';
 import { navigateReplace } from '@/lib/utils/navigate';
+import { identity } from '@/lib/utils/identity';
 
 // Lazy load heavy components
 const GoogleSignIn = lazy(() => import('@/components/GoogleSignIn'));
 // const GitHubSignIn = lazy(() => import('@/components/GithubSignIn'));
 const AnimatedBg = lazy(() => import('@/components/ui/animated-bg').then(mod => ({ default: mod.AnimatedBg })));
 
-const LoginContent = React.memo(function LoginContent() {
+const LoginContent = identity(function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParamsCompat();
   const { user, isLoading } = useAuth();

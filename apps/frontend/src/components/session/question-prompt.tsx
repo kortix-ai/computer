@@ -19,6 +19,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Check, X, ChevronRight, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { QuestionRequest, QuestionAnswer, QuestionInfo } from '@/ui';
+import { identity } from '@/lib/utils/identity';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -34,7 +35,7 @@ interface QuestionPromptProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export const QuestionPrompt = React.memo(function QuestionPrompt({ request, onReply, onReject }: QuestionPromptProps) {
+export const QuestionPrompt = identity(function QuestionPrompt({ request, onReply, onReject }: QuestionPromptProps) {
   const questions = request.questions;
   const isSingle = questions.length === 1 && !questions[0].multiple;
 
@@ -57,7 +58,7 @@ export const QuestionPrompt = React.memo(function QuestionPrompt({ request, onRe
   const showCustom = currentQuestion?.custom !== false;
 
   // Auto-focus input when editing
-  useEffect(() => {
+  React.useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
     }

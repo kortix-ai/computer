@@ -38,6 +38,7 @@ import { useTheme } from 'next-themes';
 import ColorThief from 'colorthief';
 import { AgentAvatar } from '@/components/thread/content/agent-avatar';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
+import { identity } from '@/lib/utils/identity';
 
 interface MarketplaceTemplate {
   template_id: string;
@@ -104,7 +105,7 @@ const IntegrationIcon: React.FC<{
 
 
 
-const TemplateSharePageClient = React.memo(function TemplateSharePageClient() {
+const TemplateSharePageClient = identity(function TemplateSharePageClient() {
   const params = useParams();
   const templateId = params.shareId as string; // Note: keeping shareId param name for URL compatibility
   const router = useRouter();

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { NextIntlClientProvider } from 'next-intl';
 import { ReactNode, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { locales, defaultLocale, type Locale } from '@/i18n/config';
@@ -75,7 +76,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const localeRef = useRef(locale);
 
   // Update ref when locale changes
-  useEffect(() => {
+  React.useEffect(() => {
     localeRef.current = locale;
   }, [locale]);
 
@@ -119,7 +120,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Initial load - check user metadata, then cookie/localStorage, then geo-detect
-  useEffect(() => {
+  React.useEffect(() => {
     let mounted = true;
     
     function initializeLocale() {
@@ -160,7 +161,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [loadTranslations, user]);
 
   // Listen for locale change events from useLanguage hook
-  useEffect(() => {
+  React.useEffect(() => {
     const handleLocaleChange = (e: CustomEvent<Locale>) => {
       const newLocale = e.detail;
       // Use ref to check current locale to avoid stale closure
@@ -177,7 +178,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [loadTranslations]);
 
   // Listen for storage changes (when language is changed in another tab/window)
-  useEffect(() => {
+  React.useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'locale' && e.newValue && locales.includes(e.newValue as Locale)) {
         loadTranslations(e.newValue as Locale);

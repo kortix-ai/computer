@@ -34,6 +34,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { identity } from '@/lib/utils/identity';
 
 
 // ============================================================================
@@ -93,8 +94,7 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     return {
       id: `page:${pathname}`,
       title: staticMatch.title,
-      type: staticMatch.type,
-      href: pathname,
+      type: staticMatch.type, href: pathname,
     };
   }
 
@@ -136,7 +136,7 @@ interface ContextMenuProps {
 function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
@@ -153,7 +153,7 @@ function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) 
     };
   }, [onClose]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
     if (rect.right > window.innerWidth) {
@@ -220,7 +220,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (
         menuRef.current && !menuRef.current.contains(e.target as Node) &&
@@ -241,12 +241,12 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
   }, [onClose, anchorRef]);
 
   // Auto-focus the search input
-  useEffect(() => {
+  React.useEffect(() => {
     requestAnimationFrame(() => searchInputRef.current?.focus());
   }, []);
 
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
-  useEffect(() => {
+  React.useEffect(() => {
     if (anchorRef.current) {
       const rect = anchorRef.current.getBoundingClientRect();
       setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
@@ -263,7 +263,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
   const sessionTabs = filteredTabs.filter((t) => t.type === 'session');
   const otherTabs = filteredTabs.filter((t) => t.type !== 'session');
 
-  const renderTabRow = (tab: Tab) => {
+  const $renderTabRow = (tab: Tab) => {
     const Icon = TAB_ICONS[tab.type];
     const isActive = tab.id === activeTabId;
     const { isBusy, pendingCount } = tab.type === 'session' ? getStatus(tab.id) : { isBusy: false, pendingCount: 0 };
@@ -329,7 +329,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
                 Sessions
               </div>
             )}
-            {sessionTabs.map(renderTabRow)}
+            {sessionTabs.map($renderTabRow)}
           </>
         )}
         {otherTabs.length > 0 && (
@@ -339,7 +339,7 @@ function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, ge
                 Pages
               </div>
             )}
-            {otherTabs.map(renderTabRow)}
+            {otherTabs.map($renderTabRow)}
           </>
         )}
         {filteredTabs.length === 0 && (
@@ -562,7 +562,7 @@ function TabItem({
 // Tab Bar
 // ============================================================================
 
-export const TabBar = React.memo(function TabBar() {
+export const TabBar = identity(function TabBar() {
   const router = useRouter();
   const pathname = usePathname();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -616,7 +616,7 @@ export const TabBar = React.memo(function TabBar() {
   const activeServerId = useServerStore((s) => s.activeServerId);
 
   // Sync session titles to tab titles
-  useEffect(() => {
+  React.useEffect(() => {
     if (!sessions) return;
     for (const session of sessions) {
       const tab = tabs[session.id];
@@ -634,7 +634,7 @@ export const TabBar = React.memo(function TabBar() {
 
   // When activeServerId changes, mark sessions as not-yet-ready for the new server.
   // When sessions subsequently reloads (goes through loading → loaded), mark as ready.
-  useEffect(() => {
+  React.useEffect(() => {
     if (lastPrunedServerRef.current !== activeServerId) {
       // Server just switched — sessions data is stale, don't prune yet
       sessionsReadyForServer.current = false;
@@ -647,7 +647,7 @@ export const TabBar = React.memo(function TabBar() {
 
   // Prune tabs for sessions that no longer exist on the server.
   // Only runs once sessions data is confirmed fresh for the current server.
-  useEffect(() => {
+  React.useEffect(() => {
     if (!sessions || sessionsLoading || !sessionsReadyForServer.current) return;
     const sessionIds = new Set(sessions.map(s => s.id));
     const { tabs: currentTabs, tabOrder: currentOrder } = useTabStore.getState();
@@ -663,7 +663,7 @@ export const TabBar = React.memo(function TabBar() {
   }, [sessions, sessionsLoading, activeServerId]);
 
   // Prefetch session + messages data for all open tabs so switching is instant
-  useEffect(() => {
+  React.useEffect(() => {
     for (const id of tabOrder) {
       const tab = tabs[id];
       if (tab?.type !== 'session' || id === activeTabId) continue;
@@ -696,7 +696,7 @@ export const TabBar = React.memo(function TabBar() {
   );
 
   // Sync active tab with current route
-  useEffect(() => {
+  React.useEffect(() => {
     if (!pathname) return;
 
     closingTabIds.current.forEach((id) => {
@@ -926,7 +926,7 @@ export const TabBar = React.memo(function TabBar() {
   // Keyboard shortcuts — full browser-style tab keybinds
   // Respects user preference for modifier key (Cmd vs Ctrl)
   // ---------------------------------------------------------------------------
-  useEffect(() => {
+  React.useEffect(() => {
     /** Navigate to a tab, updating URL appropriately based on tab type */
     const navigateToTab = (tab: Tab) => {
       setActiveTab(tab.id);
@@ -1040,7 +1040,7 @@ export const TabBar = React.memo(function TabBar() {
   }, [setActiveTab, router, handleClose]);
 
   // Scroll active tab into view when it changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (!activeTabId || !scrollRef.current) return;
     const container = scrollRef.current;
     const activeEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;

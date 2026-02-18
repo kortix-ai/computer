@@ -60,8 +60,9 @@ import type {
   MonthlyActual,
   ARRSimulatorProps,
 } from '../../types';
+import { identity } from '@/lib/utils/identity';
 
-export const ARRSimulator = React.memo(function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
+export const ARRSimulator = identity(function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
   // Fetch config from database
   const { data: configData, isLoading: configLoading } = useARRSimulatorConfig();
   const updateConfigMutation = useUpdateARRSimulatorConfig();

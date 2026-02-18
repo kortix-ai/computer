@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { memo, useRef, useEffect, useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
@@ -180,7 +181,7 @@ export const SSHTerminal = memo(function SSHTerminal({ sandboxId, className }: S
       
       try {
         const message = JSON.parse(event.data);
-        console.log('[SSHTerminal] Message:', message.type, message.message || '');
+        console.log('[SSHTerminal] Message:', message.type, essage.message || '');
         
         switch (message.type) {
           case 'status':
@@ -241,7 +242,7 @@ export const SSHTerminal = memo(function SSHTerminal({ sandboxId, className }: S
     }
   }, [disconnect, session?.access_token, connectWebSocket]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!terminalRef.current) return;
 
     let disposed = false;
@@ -326,19 +327,19 @@ export const SSHTerminal = memo(function SSHTerminal({ sandboxId, className }: S
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disconnect, invalidateFileQueries]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (fitAddonRef.current) {
       setTimeout(() => fitAddonRef.current?.fit(), 100);
     }
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (xtermRef.current) {
       xtermRef.current.options.theme = isDark ? darkTheme : lightTheme;
     }
   }, [isDark]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!session?.access_token || !sandboxId || !xtermRef.current || !termReady || wsRef.current) {
       return;
     }

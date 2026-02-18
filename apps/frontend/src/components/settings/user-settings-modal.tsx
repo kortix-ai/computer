@@ -104,6 +104,7 @@ import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifica
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
 import { previewSound } from '@/lib/sounds';
 import Image from 'next/image';
+import { identity } from '@/lib/utils/identity';
 type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'usage' | 'providers' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
 
 interface Tab {
@@ -311,7 +312,7 @@ export function UserSettingsModal({
 }
 
 
-const GeneralTab = React.memo(function GeneralTab({ onClose }: { onClose: () => void }) {
+const GeneralTab = identity(function GeneralTab({ onClose }: { onClose: () => void }) {
     const t = useTranslations('settings.general');
     const tCommon = useTranslations('common');
     const [userName, setUserName] = React.useState('');
@@ -1181,7 +1182,7 @@ function NotificationToggle({ icon: Icon, label, description, enabled, onToggle,
 }
 
 // Billing Tab Component - Usage, credits, subscription management
-const BillingTab = React.memo(function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: string; onOpenPlanModal: () => void; isActive: boolean }) {
+const BillingTab = identity(function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: string; onOpenPlanModal: () => void; isActive: boolean }) {
     const { session, isLoading: authLoading } = useAuth();
     const [showCreditPurchaseModal, setShowCreditPurchaseModal] = React.useState(false);
     const [showCancelDialog, setShowCancelDialog] = React.useState(false);

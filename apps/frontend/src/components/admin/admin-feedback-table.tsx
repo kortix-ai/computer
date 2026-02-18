@@ -42,7 +42,7 @@ export function AdminFeedbackTable() {
     });
   };
 
-  const renderStars = (rating: number) => {
+  const $renderStars = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     
@@ -66,7 +66,7 @@ export function AdminFeedbackTable() {
     {
       id: 'rating',
       header: 'Rating',
-      cell: (feedback) => renderStars(feedback.rating),
+      cell: (feedback) => $renderStars(feedback.rating),
       width: 'w-48',
     },
     {

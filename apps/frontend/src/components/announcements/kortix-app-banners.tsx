@@ -9,6 +9,7 @@ import { featureFlags } from '@/lib/feature-flags';
 import { AppDownloadQR, APP_DOWNLOAD_URL } from '@/components/common/app-download-qr';
 import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported } from '@/lib/web-notifications';
+import { identity } from '@/lib/utils/identity';
 
 const MOBILE_STORAGE_KEY = 'kortix-mobile-banner-dismissed';
 const DESKTOP_STORAGE_KEY = 'kortix-desktop-banner-dismissed';
@@ -82,7 +83,7 @@ function detectDesktopPlatform(): DesktopPlatform {
   return 'mac';
 }
 
-export const KortixAppBanners = React.memo(function KortixAppBanners(props: KortixAppBannersProps) {
+export const KortixAppBanners = identity(function KortixAppBanners(props: KortixAppBannersProps) {
   const disableMobileAdvertising =
     props.disableMobileAdvertising ?? featureFlags.disableMobileAdvertising;
 

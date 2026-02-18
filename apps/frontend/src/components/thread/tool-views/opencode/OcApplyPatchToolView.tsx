@@ -22,7 +22,7 @@ import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { useOcFileOpen } from './useOcFileOpen';
 import { createTwoFilesPatch } from 'diff';
-import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
+import { useDiffHighlight, $renderHighlightedLine } from '@/hooks/use-diff-highlight';
 import { RawHTML } from '@/components/ui/raw-html';
 
 interface PatchFile {
@@ -274,7 +274,7 @@ function PatchFileDiff({ before, after, filePath }: { before: string; after: str
           const highlightedTokens = highlighted?.[i];
 
           if (highlightedTokens) {
-            const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
+            const html = $renderHighlightedLine(highlightedTokens, codeLines[i]);
             return (
               <div key={`line-${+i}`} className={cls}>
                 <span

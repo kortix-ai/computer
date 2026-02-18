@@ -293,5 +293,3 @@ export const QuickLaunch = memo(function QuickLaunch({
 });
 
 QuickLaunch.displayName = 'QuickLaunch';
-
-export { QuickLaunch };

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ExternalLink,
   Globe,
@@ -54,7 +54,7 @@ async function probePort(
 }
 
 function usePortReachability(proxyUrl: string): ReachabilityStatus {
-  const [status, setStatus] = useState<ReachabilityStatus>('checking');
+  const [status, setStatus] = React.useState<ReachabilityStatus>('checking');
 
   React.useEffect(() => {
     let cancelled = false;
@@ -87,10 +87,10 @@ function InlineIframePreview({
   // Inject auth token for cloud preview proxy URLs
   const authenticatedUrl = useAuthenticatedPreviewUrl(proxyUrl);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [hasError, setHasError] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
+  const [refreshKey, setRefreshKey] = React.useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -221,8 +221,8 @@ function SandboxPreviewCard({
   detected: DetectedLocalhostUrl;
   proxyUrl: string;
 }) {
-  const [copied, setCopied] = useState(false);
-  const [showInlinePreview, setShowInlinePreview] = useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [showInlinePreview, setShowInlinePreview] = React.useState(false);
   const reachability = usePortReachability(proxyUrl);
 
   const isReachable = reachability === 'reachable';

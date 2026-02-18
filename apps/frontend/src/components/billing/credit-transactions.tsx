@@ -204,7 +204,7 @@ export default function CreditTransactions({ accountId }: Props) {
                         </TableCell>
                         <TableCell className="text-sm">
                           <div className="flex items-center gap-2">
-                            {getTransactionIcon(tx.type, tx.amount)}
+                            {getTransactionIcon(tx.type, x.amount)}
                             {tx.description || 'No description'}
                           </div>
                         </TableCell>

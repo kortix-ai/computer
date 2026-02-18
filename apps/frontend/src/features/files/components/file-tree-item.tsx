@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   Folder,
@@ -146,7 +147,7 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, on
   }, [isRenaming, renameName, siblingNames, node.name]);
 
   // Auto-focus and select when entering rename mode
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isRenaming)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {

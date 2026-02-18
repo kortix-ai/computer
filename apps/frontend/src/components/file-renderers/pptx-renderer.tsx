@@ -14,6 +14,7 @@ import { KortixLoader } from '@/components/ui/kortix-loader';
 import JSZip from 'jszip';
 import { readFileAsBlob } from '@/features/files/api/opencode-files';
 import Image from 'next/image';
+import { identity } from '@/lib/utils/identity';
 
 // ---------------------------------------------------------------------------
 // Optional: keep the public-URL path for document rendering
@@ -185,7 +186,7 @@ async function parsePptxBlob(blob: Blob): Promise<SlideData[]> {
 // Component
 // ---------------------------------------------------------------------------
 
-export const PptxRenderer = React.memo(function PptxRenderer({
+export const PptxRenderer = identity(function PptxRenderer({
   blob,
   binaryUrl,
   filePath,

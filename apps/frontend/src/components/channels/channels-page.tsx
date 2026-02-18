@@ -157,7 +157,7 @@ export function ChannelsPage() {
   const queryClient = useQueryClient();
 
   // Handle Slack OAuth redirect
-  useEffect(() => {
+  React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const slackParam = params.get('slack');
     if (!slackParam) return;

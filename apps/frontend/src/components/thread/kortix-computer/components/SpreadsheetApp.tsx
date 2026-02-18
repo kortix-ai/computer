@@ -1,6 +1,7 @@
 'use client';
 
-import { memo, useState, useRef, useCallback, useEffect } from 'react';
+import React from 'react';
+import { memo, useRef, useCallback, useEffect } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { SpreadsheetComponent } from '@syncfusion/ej2-react-spreadsheet';
 import { registerLicense } from '@syncfusion/ej2-base';
@@ -83,8 +84,8 @@ const SpreadsheetEditor = memo(function SpreadsheetEditor({
 }) {
   const onUnsavedChange = useCallback((hasChanges: boolean) => onTabUnsavedChange(tabId, hasChanges), [tabId, onTabUnsavedChange]);
   const ssRef = useRef<SpreadsheetComponent>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
+  const [isDownloading, setIsDownloading] = React.useState(false);
   const onUnsavedChangeRef = useRef(onUnsavedChange);
   const prevPendingChangesRef = useRef<boolean | null>(null);
   const prevIsActiveRef = useRef(isActive);
@@ -109,7 +110,7 @@ const SpreadsheetEditor = memo(function SpreadsheetEditor({
   });
 
   // Expose actions to parent
-  useEffect(() => {
+  React.useEffect(() => {
     if (isActive && onActionsReady) {
       onActionsReady({
         forceRefresh: actions.forceRefresh,
@@ -123,14 +124,14 @@ const SpreadsheetEditor = memo(function SpreadsheetEditor({
     };
   }, [isActive, onActionsReady, actions.forceRefresh, isSyncLoading, syncState.status]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isActive && !prevIsActiveRef.current && !isInitialLoad) {
       actions.forceRefresh();
     }
     prevIsActiveRef.current = isActive;
   }, [isActive, isInitialLoad, actions]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isSyncLoading && syncState.status !== 'idle' && isInitialLoad) {
       setIsInitialLoad(false);
     }
@@ -138,7 +139,7 @@ const SpreadsheetEditor = memo(function SpreadsheetEditor({
 
   const showLoader = isSyncLoading && isInitialLoad;
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (prevPendingChangesRef.current !== syncState.pendingChanges) {
       prevPendingChangesRef.current = syncState.pendingChanges;
       onUnsavedChangeRef.current(syncState.pendingChanges);
@@ -233,12 +234,12 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
   onFileOpen,
 }: SpreadsheetAppProps) {
   const queryClient = useQueryClient();
-  const [tabs, setTabs] = useState<SpreadsheetTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [showHome, setShowHome] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [activeEditorHandle, setActiveEditorHandle] = useState<SpreadsheetEditorHandle | null>(null);
+  const [tabs, setTabs] = React.useState<SpreadsheetTab[]>([]);
+  const [activeTabId, setActiveTabId] = React.useState<string | null>(null);
+  const [showHome, setShowHome] = React.useState(true);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [activeEditorHandle, setActiveEditorHandle] = React.useState<SpreadsheetEditorHandle | null>(null);
 
   const { data: workspaceFiles = [] } = useFileList('/workspace/spreadsheets', {
     enabled: !!sandboxId,
@@ -252,7 +253,7 @@ export const SpreadsheetApp = memo(function SpreadsheetApp({
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(initialFilePath)) {
       openFileInTab(initialFilePath);
     }

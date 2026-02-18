@@ -1,16 +1,14 @@
 'use client';
 
-import {
-  useState,
-  useMemo,
+import React from 'react';
+import { useMemo,
   useEffect,
   useCallback,
   useRef,
   type ReactNode,
-  type ComponentType,
-} from 'react';
+  type ComponentType, } from 'react';
 import { createTwoFilesPatch } from 'diff';
-import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
+import { useDiffHighlight, $renderHighlightedLine } from '@/hooks/use-diff-highlight';
 import {
   Terminal,
   FileCode2,
@@ -212,9 +210,9 @@ function BasicTool({
   locked,
   onSubtitleClick,
 }: BasicToolProps) {
-  const [open, setOpen] = useState(() => defaultOpen);
+  const [open, setOpen] = React.useState(() => defaultOpen);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(forceOpen)) setOpen(true);
   }, [forceOpen]);
 
@@ -366,7 +364,7 @@ function InlineDiffView({
         const highlightedTokens = highlighted?.[i];
 
         if (highlightedTokens) {
-          const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
+          const html = $renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
             <div key={`line-${+i}`} className={cls}>
               <span className={cn(isAdd && 'text-emerald-500', isDel && 'text-red-500')}>
@@ -431,7 +429,7 @@ function DiffChanges({ additions, deletions }: { additions: number; deletions: n
  * Render parsed structured output sections with semantic styling.
  */
 function StructuredOutput({ sections }: { sections: OutputSection[] }) {
-  const [showTrace, setShowTrace] = useState(false);
+  const [showTrace, setShowTrace] = React.useState(false);
 
   return (
     <div className="space-y-1.5 p-2.5">
@@ -1363,7 +1361,7 @@ function InlineFileList({ paths, onFileClick, toDisplayPath }: { paths: string[]
 // ============================================================================
 
 function InlineGrepResults({ groups, onFileClick, toDisplayPath }: { groups: GrepFileGroup[]; onFileClick: (path: string) => void; toDisplayPath: (p: string) => string }) {
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(groups.length === 1 ? 0 : null);
+  const [expandedIndex, setExpandedIndex] = React.useState<number | null>(groups.length === 1 ? 0 : null);
 
   return (
     <div className="py-0.5">
@@ -1740,7 +1738,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const queryResults = useMemo(() => parseWebSearchOutput(rawOutput ?? output), [rawOutput, output]);
   const totalSources = useMemo(() => queryResults.reduce((n, q) => n + q.sources.length, 0), [queryResults]);
   const hasAnswers = queryResults.some((q) => q.answer);
-  const [expandedQuery, setExpandedQuery] = useState<number | null>(null);
+  const [expandedQuery, setExpandedQuery] = React.useState<number | null>(null);
 
   // Compact trigger badge
   const triggerBadge = status === 'completed' && queryResults.length > 0
@@ -2615,7 +2613,7 @@ function TaskThreadCard({
   const userScrolledRef = useRef(false);
 
   // Detect user scroll within the tool list
-  useEffect(() => {
+  React.useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const handleScroll = () => {
@@ -2627,7 +2625,7 @@ function TaskThreadCard({
   }, []);
 
   // Auto-scroll tool list when new items are added (respects user scroll)
-  useEffect(() => {
+  React.useEffect(() => {
     const el = scrollRef.current;
     if (el && !userScrolledRef.current) {
       el.scrollTop = el.scrollHeight;
@@ -3353,7 +3351,7 @@ function parseObservationTable(output: string): { total: number; observations: O
   return { total, observations };
 }
 
-/** Map the emoji type indicator to a readable label + pill styling. */
+/** Map the emoji type, indicator to a readable label + pill styling. */
 function observationTypeInfo(type: string): { label: string; bg: string; text: string; dot: string } {
   const t = type.trim();
   if (t.includes('🔵') || t.includes('💠'))
@@ -3596,7 +3594,7 @@ function parseMemGetOutput(output: string): MemGetObservation[] {
   return observations;
 }
 
-/** Map the type string/emoji from mem_get to label + styles. */
+/** Map the type, string/emoji from mem_get to label + styles. */
 function memGetTypeInfo(typeEmoji: string, type: string): { label: string; bg: string; text: string; dot: string } {
   const e = typeEmoji.trim();
   if (e.includes('\u{1F535}') || type === 'discovery')
@@ -4258,7 +4256,7 @@ function parseErrorContent(error: string): {
 }
 
 function ToolError({ error, toolName }: { error: string; toolName?: string }) {
-  const [showTrace, setShowTrace] = useState(false);
+  const [showTrace, setShowTrace] = React.useState(false);
 
   // Normalize and try structured rendering
   const structuredSections = useMemo(() => {
@@ -4547,10 +4545,10 @@ interface PermissionPromptInlineProps {
 }
 
 function PermissionPromptInline({ permission, onReply }: PermissionPromptInlineProps) {
-  const [visible, setVisible] = useState(false);
-  const [replying, setReplying] = useState(false);
+  const [visible, setVisible] = React.useState(false);
+  const [replying, setReplying] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 50);
     return () => clearTimeout(timer);
   }, []);

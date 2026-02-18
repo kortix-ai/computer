@@ -38,7 +38,7 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Track container width for responsive scaling - always fit to width
-  useEffect(() => {
+  React.useEffect(() => {
     if (!containerRef.current) return;
     
     const element = containerRef.current;
@@ -100,7 +100,7 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
   }, [pageNumber, goToPage]);
 
   // Keyboard navigation
-  useEffect(() => {
+  React.useEffect(() => {
     if (compact) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {

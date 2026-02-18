@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, FileText, Folder, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -18,13 +19,13 @@ export function FileSearch() {
   const navigateToPath = useFilesStore((s) => s.navigateToPath);
 
   // Debounce the query
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 200);
     return () => clearTimeout(timer);
   }, [query]);
 
   // Auto-focus on mount
-  useEffect(() => {
+  React.useEffect(() => {
     inputRef.current?.focus();
   }, []);
 

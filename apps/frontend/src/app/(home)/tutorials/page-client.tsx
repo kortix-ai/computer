@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { m } from 'framer-motion';
 import { SimpleFooter } from '@/components/home/simple-footer';
 import { 
@@ -223,7 +224,7 @@ export default function TutorialsPageClient() {
   const [activeId, setActiveId] = useState(tutorials[0]?.id || '');
 
   // Track active section based on scroll position
-  useEffect(() => {
+  React.useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {

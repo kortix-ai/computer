@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,12 +33,12 @@ export function DashboardPromoBanner() {
   const shouldShow = mounted && !isDismissed && isDashboardPage && !isLoading && isFreeTier && shouldShowPromo;
 
   // Update the store whenever visibility changes
-  useEffect(() => {
+  React.useEffect(() => {
     setIsVisible(shouldShow ?? false);
     return () => setIsVisible(false);
   }, [shouldShow, setIsVisible]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     setMounted(true);
     const dismissed = localStorage.getItem(BANNER_DISMISSED_KEY);
     if (dismissed) {

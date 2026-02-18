@@ -33,6 +33,7 @@ import {
   hasStructuredContent,
   parseStructuredOutput,
 } from '@/lib/utils/structured-output';
+import { identity } from '@/lib/utils/identity';
 
 /** Strip XML wrapper tags like <skill_content> and detect if content looks like markdown */
 function extractMarkdownContent(text: string): { content: string; isMarkdown: boolean } {
@@ -47,7 +48,7 @@ function extractMarkdownContent(text: string): { content: string; isMarkdown: bo
   return { content, isMarkdown };
 }
 
-export const GenericToolView = React.memo(function GenericToolView({
+export const GenericToolView = identity(function GenericToolView({
   toolCall,
   toolResult,
   assistantTimestamp,

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { X, ExternalLink, LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
@@ -59,7 +60,7 @@ export function AlertBanner({
 
   const storageKey = `alert-dismissed-${dismissKey}`;
 
-  useEffect(() => {
+  React.useEffect(() => {
     setIsMounted(true);
     try {
       const dismissed = localStorage.getItem(storageKey);

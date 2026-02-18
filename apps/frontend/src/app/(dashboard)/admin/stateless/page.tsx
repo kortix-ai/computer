@@ -55,6 +55,7 @@ import {
   RateLimitersPanel,
   RunLookup,
 } from "./components";
+import { identity } from '@/lib/utils/identity';
 
 // Format metrics history for charts
 function formatMetricsHistory(history: Array<{
@@ -86,7 +87,7 @@ function formatMetricsHistory(history: Array<{
   });
 }
 
-const StatelessAdminPage = React.memo(function StatelessAdminPage() {
+const StatelessAdminPage = identity(function StatelessAdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 

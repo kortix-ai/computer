@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useRef, useEffect, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Terminal as XTerm, ITheme } from '@xterm/xterm';
@@ -145,7 +146,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
   }, [pty.id, updatePty]);
 
   // Initialize xterm + connect WebSocket (all in one effect to avoid stale closures)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!terminalRef.current) return;
 
     const container = terminalRef.current;
@@ -283,7 +284,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
   }, [pty.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-fit and focus when becoming visible (tab switch)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!hidden) {
       requestAnimationFrame(() => {
         safeFit(fitAddonRef.current, terminalRef.current);

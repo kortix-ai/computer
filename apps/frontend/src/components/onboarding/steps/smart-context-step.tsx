@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { m } from 'framer-motion';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -45,7 +46,7 @@ export const SmartContextStep = () => {
   };
 
   // Auto-progress after context is filled
-  useEffect(() => {
+  React.useEffect(() => {
     const hasBasicInfo = localContext.websiteUrl && localContext.websiteUrl.trim().length > 10;
 
     if (hasBasicInfo) {

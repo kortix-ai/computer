@@ -49,6 +49,7 @@ import { FileSearch } from './file-search';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useDiagnosticsStore } from '@/stores/diagnostics-store';
+import { identity } from '@/lib/utils/identity';
 
 /** Drop target for the ".." (parent directory) row */
 function ParentDropTarget({
@@ -109,7 +110,7 @@ function ParentDropTarget({
   );
 }
 
-export const FileBrowser = React.memo(function FileBrowser() {
+export const FileBrowser = identity(function FileBrowser() {
   const currentPath = useFilesStore((s) => s.currentPath);
   const navigateToPath = useFilesStore((s) => s.navigateToPath);
   const openFile = useFilesStore((s) => s.openFile);
@@ -163,7 +164,7 @@ export const FileBrowser = React.memo(function FileBrowser() {
   const [newFileName, setNewFileName] = React.useState('');
 
   // Auto-focus and select all text when folder input appears
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isCreatingFolder)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -178,7 +179,7 @@ export const FileBrowser = React.memo(function FileBrowser() {
   }, [isCreatingFolder]);
 
   // Auto-focus and select file name (before extension) when file input appears
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isCreatingFile)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -514,7 +515,7 @@ export const FileBrowser = React.memo(function FileBrowser() {
   }, [clipboard, currentPath, files, copyMutation, renameMutation, mkdirMutation, clearClipboard]);
 
   // Keyboard shortcuts
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept when user is typing in inputs
       const target = e.target as HTMLElement;
@@ -654,7 +655,7 @@ export const FileBrowser = React.memo(function FileBrowser() {
         {isLoading && (
           <div className="p-3 space-y-1.5">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 w-full rounded-md" />
+              <Skeleton key={+i} className="h-8 w-full rounded-md" />
             ))}
           </div>
         )}

@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { AgentAvatar } from '@/components/thread/content/agent-avatar';
+import { identity } from '@/lib/utils/identity';
 
 // Unified agent card variants
 type AgentCardVariant = 
@@ -326,7 +327,7 @@ const CapabilitiesList: React.FC<{ capabilities?: string[]; maxCapabilities?: nu
 );
 
 // Main unified agent card component
-export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = React.memo(({
+export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = identity(function UnifiedAgentCard({
   variant,
   data,
   actions = EMPTY_ACTIONS,
@@ -335,7 +336,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = React.memo(({
   size = 'md',
   delay = 0,
   currentUserId
-}) => {
+}) {
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   
   const {

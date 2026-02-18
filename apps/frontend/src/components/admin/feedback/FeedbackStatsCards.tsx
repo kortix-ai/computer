@@ -9,7 +9,7 @@ export function FeedbackStatsCards() {
   const { data: stats, isLoading: statsLoading } = useAdminFeedbackStats();
   const { data: sentiment, isLoading: sentimentLoading } = useAdminSentimentSummary();
 
-  const renderStarRating = (rating: number) => {
+  const $renderStarRating = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     
@@ -44,7 +44,7 @@ export function FeedbackStatsCards() {
           {statsLoading ? (
             <Skeleton className="h-10 w-32" />
           ) : (
-            renderStarRating(stats?.average_rating || 0)
+            $renderStarRating(stats?.average_rating || 0)
           )}
         </CardContent>
       </Card>

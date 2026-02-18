@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Search,
   RefreshCw,
@@ -41,6 +41,7 @@ import type { FileNode } from '@/features/files/types';
 import { toast } from '@/lib/toast';
 import { useTabStore, openTabAndNavigate } from '@/stores/tab-store';
 import { useDiagnosticsStore } from '@/stores/diagnostics-store';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Panel type
@@ -101,7 +102,7 @@ function SidebarParentDropTarget({
   onClick: () => void;
   onDropMove: (sourcePath: string, targetDirPath: string) => void;
 }) {
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [isDragOver, setIsDragOver] = React.useState(false);
   const counterRef = useRef(0);
 
   const parentPath = useMemo(() => {
@@ -159,7 +160,7 @@ interface SidebarFileBrowserProps {
   openFileAsTab?: boolean;
 }
 
-export const SidebarFileBrowser = React.memo(function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowserProps) {
+export const SidebarFileBrowser = identity(function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowserProps) {
   const currentPath = useFilesStore((s) => s.currentPath);
   const navigateToPath = useFilesStore((s) => s.navigateToPath);
   const openFileWithList = useFilesStore((s) => s.openFileWithList);
@@ -201,13 +202,13 @@ export const SidebarFileBrowser = React.memo(function SidebarFileBrowser({ openF
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [isCreatingFile, setIsCreatingFile] = useState(false);
-  const [newFileName, setNewFileName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = React.useState(false);
+  const [newFolderName, setNewFolderName] = React.useState('');
+  const [isCreatingFile, setIsCreatingFile] = React.useState(false);
+  const [newFileName, setNewFileName] = React.useState('');
 
   // Auto-focus and select all text when folder input appears
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isCreatingFolder)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -222,7 +223,7 @@ export const SidebarFileBrowser = React.memo(function SidebarFileBrowser({ openF
   }, [isCreatingFolder]);
 
   // Auto-focus for file create input
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isCreatingFile)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -587,7 +588,7 @@ export const SidebarFileBrowser = React.memo(function SidebarFileBrowser({ openF
         {isLoading && (
           <div className="p-2 space-y-1">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-7 w-full rounded-md" />
+              <Skeleton key={+i} className="h-7 w-full rounded-md" />
             ))}
           </div>
         )}

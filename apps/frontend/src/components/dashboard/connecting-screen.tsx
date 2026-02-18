@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { useSandboxConnectionStore } from '@/stores/sandbox-connection-store';
 import { useServerStore } from '@/stores/server-store';
@@ -103,7 +104,7 @@ export function useConnectionToasts() {
   // Track previous status to detect transitions
   const prevStatusRef = useState<SandboxConnectionStatus | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!initialCheckDone) return;
 
     const prev = prevStatusRef[0];
@@ -262,7 +263,7 @@ function UnreachableState({
 function useElapsedTime(since: number | null): string | null {
   const [now, setNow] = useState(() => Date.now());
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!since) return;
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);

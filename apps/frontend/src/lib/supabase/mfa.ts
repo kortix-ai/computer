@@ -195,7 +195,7 @@ export const supabaseMFAService = {
             friendly_name: factor.friendly_name,
             factor_type: factor.factor_type,
             status: factor.status,
-            phone: (factor as any).phone, // Phone property may not be in the type definition
+            phone: (factor as any).phone, // Phone property may not be in the type, definition
             created_at: factor.created_at,
             updated_at: factor.updated_at,
           });

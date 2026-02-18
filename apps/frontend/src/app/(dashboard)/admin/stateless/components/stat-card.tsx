@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode } from 'react';
 import { cn } from "@/lib/utils";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import dynamic from "next/dynamic";

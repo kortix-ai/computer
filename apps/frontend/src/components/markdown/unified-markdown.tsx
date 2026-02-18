@@ -111,7 +111,7 @@ export function HighlightedCode({ code, language, children }: { code: string; la
   const [html, setHtml] = useState<string | null>(null);
   const theme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
 
-  useEffect(() => {
+  React.useEffect(() => {
     let cancelled = false;
 
     const normalizedLang = normalizeLanguage(language);
@@ -162,7 +162,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
   const preRef = useRef<HTMLPreElement>(null);
   const [codeText, setCodeText] = useState('');
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (preRef.current) {
       const codeElement = preRef.current.querySelector('code');
       if (codeElement) {

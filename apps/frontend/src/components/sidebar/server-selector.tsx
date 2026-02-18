@@ -33,6 +33,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Connection status
@@ -374,7 +375,7 @@ function DialogInstanceRow({
 // Instance Manager Dialog
 // ============================================================================
 
-export const InstanceManagerDialog = React.memo(function InstanceManagerDialog({
+export const InstanceManagerDialog = identity(function InstanceManagerDialog({
   open,
   onOpenChange,
 }: {

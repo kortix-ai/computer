@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Maximize2, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { RawHTML } from '@/components/ui/raw-html';
+import { identity } from '@/lib/utils/identity';
 
 // Global cache for rendered Mermaid diagrams
 const mermaidCache = new Map<string, string>();
@@ -39,17 +40,17 @@ interface MermaidRendererProps {
   enableFullscreen?: boolean;
 }
 
-export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
+export const MermaidRenderer: React.FC<MermaidRendererProps> = identity(function MermaidRenderer({
   chart,
   className,
   enableFullscreen = true
-}) => {
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [renderedContent, setRenderedContent] = useState<string>('');
-  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
-  const [fullscreenRenderedContent, setFullscreenRenderedContent] = useState<string>('');
+  const [error, setError] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [renderedContent, setRenderedContent] = React.useState<string>('');
+  const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false);
+  const [fullscreenRenderedContent, setFullscreenRenderedContent] = React.useState<string>('');
 
   // Create a stable hash for the chart content to enable caching
   const chartHash = useMemo(() => {
@@ -65,10 +66,10 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
 
   // Canvas state for fullscreen viewer
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = React.useState(1);
+  const [panOffset, setPanOffset] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null);
 
   // Set up periodic cleanup of Mermaid error messages
@@ -250,11 +251,11 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
       setPanOffset({ x: 0, y: 0 });
       setIsDragging(false);
       // Render diagram for fullscreen
-      renderChartForFullscreen();
+      $renderChartForFullscreen();
     }
   };
 
-  const renderChartForFullscreen = async () => {
+  const $renderChartForFullscreen = async () => {
     try {
       // Check cache first for fullscreen
       const cachedResult = mermaidCache.get(chartHash);
@@ -342,7 +343,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
   React.useEffect(() => {
     let mounted = true;
 
-    const renderChart = async () => {
+    const $renderChart = async () => {
       if (!chart.trim()) {
         if (mounted) setIsLoading(false);
         return;
@@ -466,7 +467,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
           // Check if it's an unsupported diagram type
           if (errorMessage.includes('UnknownDiagramError') || errorMessage.includes('No diagram type detected')) {
             // For unsupported diagrams, show as code block instead of large error
-            console.log('🔄 Unsupported Mermaid diagram type, falling back to code block');
+            console.log('🔄 Unsupported Mermaid diagram type falling back to code block');
             setError('unsupported_diagram_type');
           } else {
             setError(errorMessage);
@@ -480,7 +481,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
       }
     };
 
-    renderChart();
+    $renderChart();
 
     return () => {
       mounted = false;

@@ -30,7 +30,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = memo(function VoiceRe
     const transcriptionMutation = useTranscription();
 
     // Auto-stop recording after 15 minutes
-    useEffect(() => {
+    React.useEffect(() => {
         if (state === 'recording') {
             recordingStartTimeRef.current = Date.now();
             maxTimeoutRef.current = setTimeout(() => {

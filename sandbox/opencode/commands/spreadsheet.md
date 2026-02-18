@@ -18,7 +18,7 @@ Send `@kortix-sheets` a detailed prompt including:
 - What spreadsheet to create/edit and the requirements
 - User formatting preferences from memory
 - Any relevant data sources
-- Instruction to load the `kortix-xlsx` skill first
+- Instruction to load the `xlsx` skill first
 
 ## After completion
 

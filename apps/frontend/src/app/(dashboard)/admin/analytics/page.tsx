@@ -43,6 +43,7 @@ import { AdminUserDetailsDialog } from '@/components/admin/admin-user-details-di
 import { useAdminUserList, useRefreshUserData, type UserSummary } from '@/hooks/admin/use-admin-users';
 
 import { UserEmailLink, MetricCard, ThreadBrowser, RetentionTab, ARRSimulator } from './components';
+import { identity } from '@/lib/utils/identity';
 
 // Get current date in Berlin timezone
 function getBerlinToday(): Date {
@@ -52,7 +53,7 @@ function getBerlinToday(): Date {
   return new Date(year, month - 1, day);
 }
 
-const AdminAnalyticsPage = React.memo(function AdminAnalyticsPage() {
+const AdminAnalyticsPage = identity(function AdminAnalyticsPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
     from: getBerlinToday(),
     to: getBerlinToday(),

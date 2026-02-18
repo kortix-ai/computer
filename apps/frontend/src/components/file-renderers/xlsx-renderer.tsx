@@ -21,6 +21,7 @@ import {
   Filter,
   ChevronDown,
 } from 'lucide-react';
+import { identity } from '@/lib/utils/identity';
 
 interface XlsxRendererProps {
   content?: string | null;
@@ -286,7 +287,7 @@ async function parseXlsFormat(arrayBuffer: ArrayBuffer): Promise<ParsedWorkbook>
   return { sheets, sheetNames };
 }
 
-export const XlsxRenderer = React.memo(function XlsxRenderer({
+export const XlsxRenderer = identity(function XlsxRenderer({
   filePath,
   fileName,
   className,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, type HTMLAttributes, type ElementType } from "react";
+import { useRef, useEffect, type HTMLAttributes, type ElementType } from 'react';
 
 type RawHTMLProps<T extends keyof JSX.IntrinsicElements = "div"> = {
   as?: T;

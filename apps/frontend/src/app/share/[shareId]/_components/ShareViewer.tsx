@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import {
@@ -94,9 +94,9 @@ async function fetchShareData(shareId: string): Promise<ShareData> {
 // ============================================================================
 
 export function ShareViewer({ shareId }: { shareId: string }) {
-  const [data, setData] = useState<ShareData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = React.useState<ShareData | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -196,7 +196,7 @@ export function ShareViewer({ shareId }: { shareId: string }) {
 // ============================================================================
 
 function ShareHeader({ sessionTitle }: { sessionTitle: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = React.useState(false);
 
   const copyShareLink = async () => {
     try {
@@ -330,9 +330,9 @@ function AssistantBlock({
 // ============================================================================
 
 function MessageActions({ text, className }: { text: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [disliked, setDisliked] = useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [liked, setLiked] = React.useState(false);
+  const [disliked, setDisliked] = React.useState(false);
 
   const handleCopy = useCallback(async () => {
     try {

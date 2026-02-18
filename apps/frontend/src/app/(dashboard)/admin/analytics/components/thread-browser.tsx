@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,7 @@ export function ThreadBrowser({
   const prevDateFromRef = useRef(filterDateFrom);
   const prevDateToRef = useRef(filterDateTo);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const changed = prevCategoryRef.current !== categoryFilter ||
       prevTierRef.current !== tierFilter ||
       prevDateFromRef.current !== filterDateFrom ||

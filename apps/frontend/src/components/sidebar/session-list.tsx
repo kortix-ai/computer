@@ -64,6 +64,7 @@ import { useSandboxConnectionStore } from '@/stores/sandbox-connection-store';
 import { childMapByParent, sortSessions, allDescendantIds } from '@/ui';
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import Link from 'next/link';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Session Item (supports depth for tree rendering)
@@ -389,7 +390,7 @@ interface SessionListProps {
   projectId?: string | null;
 }
 
-export const SessionList = React.memo(function SessionList({ projectId }: SessionListProps = {}) {
+export const SessionList = identity(function SessionList({ projectId }: SessionListProps = {}) {
   const { isMobile, state, setOpenMobile } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -406,7 +407,7 @@ export const SessionList = React.memo(function SessionList({ projectId }: Sessio
   // Auto-refetch sessions when connection recovers from error state
   const connectionStatus = useSandboxConnectionStore((s) => s.status);
   const prevConnectionRef = useRef(connectionStatus);
-  useEffect(() => {
+  React.useEffect(() => {
     const prev = prevConnectionRef.current;
     prevConnectionRef.current = connectionStatus;
     if (prev !== 'connected' && connectionStatus === 'connected' && error) {
@@ -757,7 +758,7 @@ export const SessionList = React.memo(function SessionList({ projectId }: Sessio
         {isLoading ? (
           <div className="space-y-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg">
+              <div key={+i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg">
                 <div className="h-3.5 w-24 bg-muted rounded animate-pulse" />
               </div>
             ))}

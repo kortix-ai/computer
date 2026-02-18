@@ -53,6 +53,7 @@ import { SlackIcon } from '@/components/ui/icons/slack';
 import { TelegramIcon } from '@/components/ui/icons/telegram';
 import { DiscordIcon } from '@/components/ui/icons/discord';
 import { WhatsAppIcon } from '@/components/ui/icons/whatsapp';
+import { identity } from '@/lib/utils/identity';
 
 const getChannelIcon = (channelType: string): React.ComponentType<{ className?: string }> => {
   switch (channelType) {
@@ -90,7 +91,7 @@ interface ChannelEditDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export const ChannelEditDialog = React.memo(function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDialogProps) {
+export const ChannelEditDialog = identity(function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDialogProps) {
   const [tab, setTab] = useState<'settings' | 'messages'>('settings');
   const [name, setName] = React.useState(channel.name);
   const [sessionStrategy, setSessionStrategy] = useState<SessionStrategy>(channel.sessionStrategy);

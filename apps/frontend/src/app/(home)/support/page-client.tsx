@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { AnimatedBg } from '@/components/ui/animated-bg';
 import { useIsMobile } from '@/hooks/utils';
 import { Button } from '@/components/ui/button';
+import { identity } from '@/lib/utils/identity';
 
 const SectionHeader = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -42,7 +43,7 @@ const FAQItem = ({ question, answer }: { question: string; answer: React.ReactNo
   );
 };
 
-const SupportPageContent = React.memo(function SupportPageContent() {
+const SupportPageContent = identity(function SupportPageContent() {
   const isMobile = useIsMobile();
   const searchParams = useSearchParamsCompat();
   const accountDeleteRef = useRef<HTMLElement>(null);

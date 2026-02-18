@@ -16,6 +16,7 @@ import {
   Download,
 } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
+import { identity } from '@/lib/utils/identity';
 
 interface VideoRendererProps {
   url: string;
@@ -32,7 +33,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export const VideoRenderer = React.memo(function VideoRenderer({
+export const VideoRenderer = identity(function VideoRenderer({
   url,
   className,
   compact = false,
@@ -62,7 +63,7 @@ export const VideoRenderer = React.memo(function VideoRenderer({
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle fullscreen changes
-  useEffect(() => {
+  React.useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
@@ -83,7 +84,7 @@ export const VideoRenderer = React.memo(function VideoRenderer({
     }
   }, [isPlaying, compact]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     resetControlsTimeout();
     return () => {
       if (controlsTimeoutRef.current) {

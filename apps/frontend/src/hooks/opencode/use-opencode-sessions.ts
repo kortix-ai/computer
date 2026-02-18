@@ -36,7 +36,7 @@ export interface MessageWithParts {
 
 /**
  * Provider list response — matches the actual SDK response from `client.provider.list()`.
- * The SDK's inline model shape differs from the `Model` type, so we use the SDK's
+ * The SDK's inline model shape differs from the `Model` type so we use the SDK's
  * response type directly.
  */
 export type ProviderListResponse = SdkProviderListResponse;

@@ -23,6 +23,7 @@ import {
 import { constructHtmlPreviewUrl } from '@/lib/utils/url';
 import { downloadPresentation, DownloadFormat, handleGoogleSlidesUpload } from '../utils/presentation-utils';
 import { useDownloadRestriction } from '@/hooks/billing';
+import { identity } from '@/lib/utils/identity';
 
 interface SlideMetadata {
   title: string;
@@ -49,7 +50,7 @@ interface FullScreenPresentationViewerProps {
   initialSlide?: number;
 }
 
-export const FullScreenPresentationViewer = React.memo(function FullScreenPresentationViewer({
+export const FullScreenPresentationViewer = identity(function FullScreenPresentationViewer({
   isOpen,
   onClose,
   presentationName,
@@ -329,8 +330,8 @@ export const FullScreenPresentationViewer = React.memo(function FullScreenPresen
 
   // Memoized slide iframe component with proper scaling (matching PresentationViewer)
   const SlideIframe = useMemo(() => {
-    const SlideIframeComponent = React.memo(({ slide }: { slide: SlideMetadata & { number: number } }) => {
-      const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
+    const SlideIframeComponent = identity(function SlideIframeComponent({ slide }: { slide: SlideMetadata & { number: number } }) {
+      const [containerRef, setContainerRef] = React.useState<HTMLDivElement | null>(null);
       const [scale, setScale] = React.useState(1);
 
       React.useEffect(() => {
@@ -429,7 +430,7 @@ export const FullScreenPresentationViewer = React.memo(function FullScreenPresen
   }, [sandboxUrl, refreshTimestamp, showEditor]);
 
   // Render slide iframe with proper scaling
-  const renderSlide = useMemo(() => {
+  const $renderSlide = useMemo(() => {
     if (!currentSlideData || !sandboxUrl) return null;
 
     return <SlideIframe slide={currentSlideData} />;
@@ -543,7 +544,7 @@ export const FullScreenPresentationViewer = React.memo(function FullScreenPresen
           <div className="w-full h-full flex flex-col">
             {/* Presentation Container */}
             <div className="flex-1 bg-transparent rounded-xl overflow-hidden" style={{ aspectRatio: '16 / 9' }}>
-              {renderSlide}
+              {$renderSlide}
             </div>
             
             {/* Controls below presentation */}

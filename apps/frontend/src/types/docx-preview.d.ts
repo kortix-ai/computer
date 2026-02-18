@@ -17,7 +17,7 @@ declare module 'docx-preview' {
     debug?: boolean;
   }
 
-  export function renderAsync(
+  export function $renderAsync(
     data: ArrayBuffer | Blob,
     container: HTMLElement,
     styleContainer?: HTMLElement | null,

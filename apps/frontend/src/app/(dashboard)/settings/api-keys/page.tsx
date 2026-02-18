@@ -51,6 +51,7 @@ import {
   APIKeyCreateResponse,
 } from '@/lib/api/api-keys';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
+import { identity } from '@/lib/utils/identity';
 
 interface NewAPIKeyData {
   title: string;
@@ -58,7 +59,7 @@ interface NewAPIKeyData {
   expiresInDays: string;
 }
 
-const APIKeysPage = React.memo(function APIKeysPage() {
+const APIKeysPage = identity(function APIKeysPage() {
   const activeSandboxId = useKortixComputerStore((s) => s.currentSandboxId);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyData, setNewKeyData] = useState<NewAPIKeyData>({

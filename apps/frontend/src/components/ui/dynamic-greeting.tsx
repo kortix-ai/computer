@@ -121,7 +121,7 @@ export function DynamicGreeting({ className }: DynamicGreetingProps) {
                 const index = globalLetterIndex++;
                 return (
                   <span
-                    key={index}
+                    key={+index}
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}
                     className="inline-block cursor-default transition-transform duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]"

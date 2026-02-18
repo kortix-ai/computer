@@ -24,7 +24,7 @@ export function DocxRenderer({ url, blob, className }: DocxRendererProps) {
     const blobRef = useRef<Blob | null>(null);
 
     // Debug logging
-    useEffect(() => {
+    React.useEffect(() => {
         console.log('[DocxRenderer] Props:', {
             url,
             hasBlob: blob instanceof Blob,
@@ -36,7 +36,7 @@ export function DocxRenderer({ url, blob, className }: DocxRendererProps) {
         });
     }, [url, blob, isRendering, isRendered, error]);
 
-    const renderDocx = useCallback(async () => {
+    const $renderDocx = useCallback(async () => {
         // Skip if already rendering or rendered
         if (isRendering || isRendered) {
             console.log('[DocxRenderer] Skipping render - already rendering or rendered');
@@ -128,14 +128,14 @@ export function DocxRenderer({ url, blob, className }: DocxRendererProps) {
     }, [url, blob, isRendering, isRendered]);
 
     // Trigger render when container becomes available or dependencies change
-    useEffect(() => {
+    React.useEffect(() => {
         if (containerRef.current && (url || blob) && !isRendered && !isRendering) {
-            renderDocx();
+            $renderDocx();
         }
-    }, [url, blob, isRendered, isRendering, renderDocx]);
+    }, [url, blob, isRendered, isRendering, $renderDocx]);
 
     // Reset when url/blob changes
-    useEffect(() => {
+    React.useEffect(() => {
         setIsRendered(false);
         setError(null);
         blobRef.current = null;

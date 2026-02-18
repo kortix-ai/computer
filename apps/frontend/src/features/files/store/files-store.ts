@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 type FilesView = 'browser' | 'viewer' | 'history';
 
-/** Clipboard operation type for copy/cut */
+/** Clipboard operation type, for copy/cut */
 type ClipboardOperation = 'copy' | 'cut';
 
 /** Clipboard item representing a file or directory */

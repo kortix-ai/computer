@@ -31,8 +31,9 @@ import {
   useSandboxPoolCleanup,
   useSandboxPoolRestart,
 } from "@/hooks/admin/use-sandbox-pool";
+import { identity } from '@/lib/utils/identity';
 
-const SandboxPoolAdminPage = React.memo(function SandboxPoolAdminPage() {
+const SandboxPoolAdminPage = identity(function SandboxPoolAdminPage() {
   const [createCount, setCreateCount] = useState(1);
 
   const { data: health, isLoading: healthLoading } = useSandboxPoolHealth();

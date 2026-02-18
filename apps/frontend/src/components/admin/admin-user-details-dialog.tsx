@@ -50,6 +50,7 @@ import {
 } from '@/hooks/billing';
 import type { UserSummary } from '@/hooks/admin/use-admin-users';
 import { formatCredits, dollarsToCredits, formatCreditsWithSign } from '@kortix/shared';
+import { identity } from '@/lib/utils/identity';
 
 interface AdminUserDetailsDialogProps {
   user: UserSummary | null;
@@ -58,7 +59,7 @@ interface AdminUserDetailsDialogProps {
   onRefresh?: () => void;
 }
 
-export const AdminUserDetailsDialog = React.memo(function AdminUserDetailsDialog({
+export const AdminUserDetailsDialog = identity(function AdminUserDetailsDialog({
   user,
   isOpen,
   onClose,

@@ -8,7 +8,7 @@ export interface ServerEntry {
   label: string;
   url: string;
   isDefault?: boolean;
-  /** Sandbox provider type, if this server was provisioned via platform API */
+  /** Sandbox provider type if this server was provisioned via platform API */
   provider?: SandboxProvider;
   /** Platform sandbox ID, if this server is a managed sandbox */
   sandboxId?: string;

@@ -50,6 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import type { StuckRun } from "@/hooks/admin/use-stateless";
+import { identity } from '@/lib/utils/identity';
 
 interface StuckRunsTableProps {
   runs: StuckRun[];
@@ -85,7 +86,7 @@ const reasonConfig: Record<string, { label: string; color: string; description: 
   },
 };
 
-export const StuckRunsTable = React.memo(function StuckRunsTable({
+export const StuckRunsTable = identity(function StuckRunsTable({
   runs,
   isLoading,
   onComplete,

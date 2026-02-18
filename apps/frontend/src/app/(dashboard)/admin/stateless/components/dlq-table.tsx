@@ -49,6 +49,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import type { DLQEntry } from "@/hooks/admin/use-stateless";
+import { identity } from '@/lib/utils/identity';
 
 interface DLQTableProps {
   entries: DLQEntry[];
@@ -69,7 +70,7 @@ const writeTypeConfig: Record<WriteType, { label: string; color: string; bgColor
   status: { label: "Status", color: "text-purple-400", bgColor: "bg-purple-500/10 border-purple-500/30" },
 };
 
-export const DLQTable = React.memo(function DLQTable({
+export const DLQTable = identity(function DLQTable({
   entries,
   isLoading,
   onRetry,
@@ -133,7 +134,7 @@ export const DLQTable = React.memo(function DLQTable({
     return grouped;
   }, [entries]);
 
-  // Group by error type for summary
+  // Group by error type, for summary
   const errorSummary = useMemo(() => {
     const errors = new Map<string, number>();
     entries.forEach((e) => {

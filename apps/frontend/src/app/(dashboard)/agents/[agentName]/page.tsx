@@ -30,6 +30,7 @@ import { getSupabaseAccessToken } from '@/lib/auth-token';
 import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { identity } from '@/lib/utils/identity';
 
 // ---------------------------------------------------------------------------
 // File write helper (same pattern as skills API)
@@ -113,7 +114,7 @@ function getAgentFilePath(agentName: string): string {
 // Agent Detail Page
 // ---------------------------------------------------------------------------
 
-const AgentDetailPage = React.memo(function AgentDetailPage() {
+const AgentDetailPage = identity(function AgentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();

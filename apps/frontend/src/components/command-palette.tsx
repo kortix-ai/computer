@@ -67,6 +67,7 @@ import { CompactDialog } from '@/components/session/compact-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
 import { TodoDialog } from '@/components/session/todo-dialog';
 import { InitProjectDialog } from '@/components/session/init-project-dialog';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Helpers
@@ -221,7 +222,7 @@ const KEYBOARD_SHORTCUTS = [
 // Command Palette
 // ============================================================================
 
-export const CommandPalette = React.memo(function CommandPalette() {
+export const CommandPalette = identity(function CommandPalette() {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');

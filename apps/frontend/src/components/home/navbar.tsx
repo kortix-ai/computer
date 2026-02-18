@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { ThemeToggle } from '@/components/home/theme-toggle';
 import { siteConfig } from '@/lib/site-config';
 import { cn } from '@/lib/utils';
@@ -149,7 +150,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
     lastScrollY.current = currentScrollY;
   }, [hasScrolled, filteredNavLinks]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Use passive listener for better scroll performance
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Initial check

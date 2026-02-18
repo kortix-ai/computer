@@ -7,6 +7,7 @@ import { Computer, CornerDownLeft, Paperclip, Mic, Zap, FolderOpen, Globe, Prese
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { m } from 'framer-motion';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
+import { identity } from '@/lib/utils/identity';
 
 type ViewType = 'terminal' | 'files' | 'browser';
 type IconType = 'computer' | 'presentation' | 'chart' | 'file' | 'search' | 'image' | 'database';
@@ -195,7 +196,7 @@ const exampleShowcases = [
   },
 ];
 
-export const ExampleShowcase = React.memo(function ExampleShowcase() {
+export const ExampleShowcase = identity(function ExampleShowcase() {
   const [activeExample, setActiveExample] = React.useState(0);
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0);
   const [aiText, setAiText] = React.useState('');

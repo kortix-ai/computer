@@ -63,6 +63,7 @@ import {
 } from '@/hooks/opencode/use-opencode-mcp';
 import type { McpStatus } from '@/hooks/opencode/use-opencode-mcp';
 import { toast } from '@/lib/toast';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Constants
@@ -569,7 +570,7 @@ function StatusBadge({ status }: { status: McpStatus }) {
   );
 }
 
-const McpServersSection = React.memo(function McpServersSection() {
+const McpServersSection = identity(function McpServersSection() {
   const { data: mcpStatus, isLoading } = useOpenCodeMcpStatus();
   const { data: toolIds } = useOpenCodeToolIds();
   const addMutation = useAddMcpServer();

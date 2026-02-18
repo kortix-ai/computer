@@ -1,6 +1,7 @@
 'use client';
 
 
+import React from 'react';
 import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -26,7 +27,7 @@ function PasswordAuthContent() {
   const [isSignUp, setIsSignUp] = useState(false);
 
   // Redirect if already authenticated
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isLoading && user) {
       navigateTo(router, returnUrl || '/dashboard');
     }

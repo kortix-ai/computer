@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState } from 'react';
 import { Search, Loader2, Server, Clock, User, Database, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

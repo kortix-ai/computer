@@ -42,6 +42,7 @@ import {
 } from '@/hooks/scheduled-tasks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { identity } from '@/lib/utils/identity';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -117,7 +118,7 @@ interface TaskDetailPanelProps {
   onClose: () => void;
 }
 
-export const TaskDetailPanel = React.memo(function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
+export const TaskDetailPanel = identity(function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
   const [tab, setTab] = useState<'settings' | 'executions'>('settings');
   const [name, setName] = React.useState(trigger.name);
   const [cronExpr, setCronExpr] = React.useState(trigger.cronExpr);

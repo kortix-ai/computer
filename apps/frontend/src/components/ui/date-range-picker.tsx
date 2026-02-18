@@ -102,7 +102,7 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
     typeof window !== 'undefined' ? window.innerWidth < 960 : false
   )
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleResize = (): void => {
       setIsSmallScreen(window.innerWidth < 960)
     }
@@ -209,7 +209,7 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
     setSelectedPreset(undefined)
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     checkPreset()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range])

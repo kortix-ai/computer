@@ -69,7 +69,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
 
   // Fallback: if onLoad doesn't fire within 5s, dismiss the loading state.
   // Cross-origin iframes frequently fail to fire onLoad events.
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isLoading) return;
     clearLoadTimeout();
     loadTimeoutRef.current = setTimeout(() => {

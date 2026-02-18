@@ -64,6 +64,7 @@ import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { createClient } from '@/lib/supabase/client';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Floating Mobile Menu Button
@@ -119,7 +120,7 @@ function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: 
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
   }, []);
 
-  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+  React.useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
 
   const buttonEl = (
     <button
@@ -404,7 +405,7 @@ function UserProfileSection({ user }: { user: { name: string; email: string; ava
 // Main Sidebar
 // ============================================================================
 
-export const SidebarLeft = React.memo(function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export const SidebarLeft = identity(function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state, setOpen, setOpenMobile } = useSidebar();
   const isMobile = useIsMobile();
   const router = useRouter();
@@ -416,7 +417,7 @@ export const SidebarLeft = React.memo(function SidebarLeft({ ...props }: React.C
     return match ? match[1] : null;
   });
 
-  useEffect(() => {
+  React.useEffect(() => {
     const match = pathname?.match(/^\/projects\/([^/]+)/);
     if (match) {
       setSelectedProjectId(match[1]);
@@ -441,7 +442,7 @@ export const SidebarLeft = React.memo(function SidebarLeft({ ...props }: React.C
       : { name: 'Loading...', email: '', avatar: '', isAdmin: false },
   );
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isLocal) return; // No Supabase auth in local mode
 
     const fetchUserData = async () => {
@@ -483,12 +484,12 @@ export const SidebarLeft = React.memo(function SidebarLeft({ ...props }: React.C
     }
   }, [createSession, router, isMobile, setOpenMobile]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isMobile)) setOpenMobile(false);
   }, [pathname, searchParams, isMobile, setOpenMobile]);
 
   // Listen for right sidebar expansion → collapse left
-  useEffect(() => {
+  React.useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.expanded && state === 'expanded') {
@@ -507,7 +508,7 @@ export const SidebarLeft = React.memo(function SidebarLeft({ ...props }: React.C
   // Dispatch sidebar-left-toggled event when the sidebar state changes so the
   // right sidebar can auto-collapse (mutual exclusion).
   const prevStateRef = useRef(state);
-  useEffect(() => {
+  React.useEffect(() => {
     if (prevStateRef.current !== state) {
       prevStateRef.current = state;
       window.dispatchEvent(
@@ -519,7 +520,7 @@ export const SidebarLeft = React.memo(function SidebarLeft({ ...props }: React.C
   }, [state]);
 
   // Cmd+J shortcut for new session
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isDocumentModalOpen) return;
 

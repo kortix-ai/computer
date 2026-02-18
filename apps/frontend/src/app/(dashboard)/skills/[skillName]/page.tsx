@@ -28,6 +28,7 @@ import { getSkillSource, SOURCE_META, parseSkillFileContent } from '@/features/s
 import type { SkillSource } from '@/features/skills/types';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { toast } from 'sonner';
+import { identity } from '@/lib/utils/identity';
 
 // ---------------------------------------------------------------------------
 // Source icon mapping
@@ -43,7 +44,7 @@ const SOURCE_ICONS: Record<SkillSource, typeof Sparkles> = {
 // Skill Detail Page
 // ---------------------------------------------------------------------------
 
-const SkillDetailPage = React.memo(function SkillDetailPage() {
+const SkillDetailPage = identity(function SkillDetailPage() {
   const params = useParams();
   const router = useRouter();
   const skillName = decodeURIComponent(params.skillName as string);

@@ -31,12 +31,13 @@ import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
 import { getDirectPortUrl, SANDBOX_PORTS } from '@/lib/platform-client';
+import { identity } from '@/lib/utils/identity';
 
 // ============================================================================
 // Main Right Sidebar — Explorer + action buttons
 // ============================================================================
 
-export const SidebarRight = React.memo(function SidebarRight() {
+export const SidebarRight = identity(function SidebarRight() {
   const {
     state,
     open,

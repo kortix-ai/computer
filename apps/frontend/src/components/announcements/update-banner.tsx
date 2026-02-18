@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { m, AnimatePresence } from 'framer-motion';
@@ -31,7 +32,7 @@ export function UpdateBanner() {
 
   const dismissKey = `update-banner-dismissed-${latestVersion}`;
 
-  useEffect(() => {
+  React.useEffect(() => {
     setMounted(true);
     try {
       if (localStorage.getItem(dismissKey) === 'true') {

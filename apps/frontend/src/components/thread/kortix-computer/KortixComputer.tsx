@@ -3,7 +3,7 @@
 import { Project } from '@/lib/api/threads';
 import { HIDE_BROWSER_TAB } from '@/components/thread/utils';
 import { isHiddenTool } from '@kortix/shared/tools';
-import React, { memo, useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import React, { memo, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ApiMessageType } from '@/components/thread/types';
 import { useIsMobile } from '@/hooks/utils';
@@ -102,15 +102,15 @@ export const KortixComputer = memo(function KortixComputer({
   headerSlot,
 }: KortixComputerProps) {
   const t = useTranslations('thread');
-  const [dots, setDots] = useState('');
-  const [internalIndex, setInternalIndex] = useState(0);
-  const [navigationMode, setNavigationMode] = useState<NavigationMode>('live');
-  const [toolCallSnapshots, setToolCallSnapshots] = useState<ToolCallSnapshot[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [vncRefreshKey, setVncRefreshKey] = useState(0);
-  const [isMaximized, setIsMaximized] = useState(false);
-  const [isSuiteMode, setIsSuiteMode] = useState(false);
-  const [preSuiteSize, setPreSuiteSize] = useState<number | null>(null);
+  const [dots, setDots] = React.useState('');
+  const [internalIndex, setInternalIndex] = React.useState(0);
+  const [navigationMode, setNavigationMode] = React.useState<NavigationMode>('live');
+  const [toolCallSnapshots, setToolCallSnapshots] = React.useState<ToolCallSnapshot[]>([]);
+  const [isInitialized, setIsInitialized] = React.useState(false);
+  const [vncRefreshKey, setVncRefreshKey] = React.useState(0);
+  const [isMaximized, setIsMaximized] = React.useState(false);
+  const [isSuiteMode, setIsSuiteMode] = React.useState(false);
+  const [preSuiteSize, setPreSuiteSize] = React.useState<number | null>(null);
 
   const isMobile = useIsMobile();
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();

@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
+import { identity } from '@/lib/utils/identity';
 
-const NotificationManagementPage = React.memo(function NotificationManagementPage() {
+const NotificationManagementPage = identity(function NotificationManagementPage() {
   const [workflowId, setWorkflowId] = React.useState("");
   const [payload, setPayload] = React.useState(
     () => JSON.stringify(

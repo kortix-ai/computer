@@ -70,7 +70,7 @@ export const SessionLayout = memo(function SessionLayout({
   const activeTabId = useTabStore((s) => s.activeTabId);
   const isActiveTab = activeTabId === sessionId;
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isActiveTab)) {
       setActiveSession(sessionId);
     }
@@ -78,7 +78,7 @@ export const SessionLayout = memo(function SessionLayout({
 
   const hasToolCalls = toolCalls.length > 0;
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (shouldOpenPanel && !isSidePanelOpen) {
       setIsSidePanelOpen(true);
       clearShouldOpenPanel();
@@ -109,7 +109,7 @@ export const SessionLayout = memo(function SessionLayout({
   // Including sessionId ensures panels are correctly sized after navigating
   // between sessions (e.g. fork → parent), since the ResizablePanelGroup may
   // retain stale sizes from the previous session's layout.
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(shouldShowPanel)) {
       if (isExpanded) {
         sidePanelRef.current?.resize(100);
@@ -124,8 +124,8 @@ export const SessionLayout = memo(function SessionLayout({
     }
   }, [shouldShowPanel, isExpanded, sessionId]);
 
-  const renderAssistantMessage = useCallback(() => null, []);
-  const renderToolResult = useCallback(() => null, []);
+  const $renderAssistantMessage = useCallback(() => null, []);
+  const $renderToolResult = useCallback(() => null, []);
 
   const agentName = session?.title || 'OpenCode';
 
@@ -145,8 +145,8 @@ export const SessionLayout = memo(function SessionLayout({
           currentIndex={currentToolIndex}
           onNavigate={handleSidePanelNavigate}
           externalNavigateToIndex={externalNavIndex}
-          renderAssistantMessage={renderAssistantMessage}
-          renderToolResult={renderToolResult}
+          $renderAssistantMessage={$renderAssistantMessage}
+          $renderToolResult={$renderToolResult}
           isLoading={false}
           agentName={agentName}
           disableInitialAnimation={true}
@@ -215,8 +215,8 @@ export const SessionLayout = memo(function SessionLayout({
                 currentIndex={currentToolIndex}
                 onNavigate={handleSidePanelNavigate}
                 externalNavigateToIndex={externalNavIndex}
-                renderAssistantMessage={renderAssistantMessage}
-                renderToolResult={renderToolResult}
+                $renderAssistantMessage={$renderAssistantMessage}
+                $renderToolResult={$renderToolResult}
                 isLoading={false}
                 agentName={agentName}
                 disableInitialAnimation={true}

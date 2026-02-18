@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { m } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -75,7 +76,7 @@ export const DesktopIcons = memo(function DesktopIcons({
     toast.success(`Cut "${file.name}" to clipboard`);
   }, [cutToClipboard]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Only run when transitioning from false to true
     if (isCreatingNewFolder && !wasCreatingRef.current) {
       const suggestedName = getNextFolderName(files);

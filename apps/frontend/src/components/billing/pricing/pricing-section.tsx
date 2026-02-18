@@ -40,6 +40,7 @@ import { useUserCurrency } from '@/hooks/use-user-currency';
 import { useLanguage } from '@/hooks/use-language';
 import { convertPriceString, parsePriceAmount, formatPrice } from '@/lib/utils/currency';
 import { usePromo } from '@/hooks/utils/use-promo';
+import { identity } from '@/lib/utils/identity';
 
 // Constants
 const SUBSCRIPTION_PLANS = {
@@ -100,7 +101,7 @@ function PriceDisplay({ price, isCompact }: PriceDisplayProps) {
   );
 }
 
-const PricingTier = React.memo(function PricingTier({
+const PricingTier = identity(function PricingTier({
   tier,
   isCompact = false,
   currentSubscription,
@@ -1009,7 +1010,7 @@ interface PricingSectionProps {
   showBuyCredits?: boolean;
 }
 
-export const PricingSection = React.memo(function PricingSection({
+export const PricingSection = identity(function PricingSection({
   returnUrl = typeof window !== 'undefined' ? window.location.href : '/',
   showTitleAndTabs = true,
   hideFree = false,
@@ -1091,7 +1092,7 @@ export const PricingSection = React.memo(function PricingSection({
   const [planLoadingStates, setPlanLoadingStates] = useState<Record<string, boolean>>({});
   const [showCreditPurchaseModal, setShowCreditPurchaseModal] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (promoCopyTimeoutRef.current) {
         clearTimeout(promoCopyTimeoutRef.current);

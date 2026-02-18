@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef, useMemo, useSyncExternalStore } from 'react';
-import dynamic from 'next/dynamic';
-
-const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { identity } from '@/lib/utils/identity';
+import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { xcodeLight } from '@uiw/codemirror-theme-xcode';
 import { langs } from '@uiw/codemirror-extensions-langs';
-// Lazy-loaded codemirror extensions via dynamic require (heavy library, code-split with CodeMirror)
-/* eslint-disable @typescript-eslint/no-require-imports */
-const getCmView = () => require('@codemirror/view') as { EditorView: any; keymap: any };
-const getCmCommands = () => require('@codemirror/commands') as { indentWithTab: any };
-/* eslint-enable @typescript-eslint/no-require-imports */
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { EditorView, keymap } = require('@codemirror/view') as typeof import('@codemirror/view');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { indentWithTab } = require('@codemirror/commands') as typeof import('@codemirror/commands');
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Badge } from '@/components/ui/badge';
@@ -29,87 +27,6 @@ import {
 // Note: langs object from @uiw/codemirror-extensions-langs is keyed by file extensions
 // Using type assertion because TypeScript types are incomplete
 const langsTyped = langs as Record<string, (() => any) | undefined>;
-
-function CodeEditorSaveButton({
-  readOnly,
-  onSave,
-  saveState,
-  handleSave,
-  hasChanges,
-}: {
-  readOnly?: boolean;
-  onSave?: () => void;
-  saveState: string;
-  handleSave: () => void;
-  hasChanges: boolean;
-}) {
-  if (readOnly || !onSave) return null;
-  
-  switch (saveState) {
-    case 'saving':
-      return (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled
-          className="gap-1.5 h-7 px-2 text-xs"
-        >
-          <KortixLoader size="small" />
-          <span className="hidden sm:inline">Saving</span>
-        </Button>
-      );
-    case 'saved':
-      return (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled
-          className="gap-1.5 h-7 px-2 text-xs text-green-600"
-        >
-          <Check className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Saved</span>
-        </Button>
-      );
-    case 'error':
-      return (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSave}
-          className="gap-1.5 h-7 px-2 text-xs text-red-500 hover:bg-red-50 hover:text-red-600"
-        >
-          <AlertCircle className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Retry</span>
-        </Button>
-      );
-    default:
-      return (
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSave}
-                disabled={!hasChanges}
-                className="gap-1.5 h-7 px-2 text-xs"
-              >
-                <Save className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Save</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {hasChanges ? (
-                <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
-              ) : (
-                'No changes to save'
-              )}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-  }
-}
 
 // Debug: uncomment to inspect available CodeMirror languages
 // if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -377,7 +294,7 @@ interface CodeEditorProps {
   showLineNumbers?: boolean;
 }
 
-export const CodeEditor = React.memo(function CodeEditor({
+export const CodeEditor = identity(function CodeEditor({
   content,
   originalContent,
   hasUnsavedChanges: externalHasUnsaved,
@@ -392,9 +309,9 @@ export const CodeEditor = React.memo(function CodeEditor({
   showLineNumbers = true,
 }: CodeEditorProps) {
   const { resolvedTheme } = useTheme();
-  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const [mounted, setMounted] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [localContent, setLocalContent] = useState(() => content);
+  const [localContent, setLocalContent] = useState(content);
   // Use originalContent if provided, otherwise fall back to content (for backwards compatibility)
   const savedContent = useRef<string>(originalContent ?? content);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -428,7 +345,11 @@ export const CodeEditor = React.memo(function CodeEditor({
   }, [originalContent]);
 
   // Set mounted state
-// Calculate editor height based on container - never exceed container bounds
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Calculate editor height based on container - never exceed container bounds
   // For read-only mode, use auto height to let content expand naturally (better for preview contexts)
   React.useEffect(() => {
     // In read-only mode, let CodeMirror auto-expand based on content
@@ -590,24 +511,86 @@ export const CodeEditor = React.memo(function CodeEditor({
       }
     }
     
-    // Always add these core extensions (lazy-loaded)
-    try {
-      const { EditorView, keymap } = getCmView();
-      const { indentWithTab } = getCmCommands();
-      exts.push(
-        EditorView.lineWrapping,
-        keymap.of([indentWithTab])
-      );
-    } catch {
-      // Extensions will be added once codemirror is loaded
-    }
+    // Always add these core extensions
+    exts.push(
+      EditorView.lineWrapping,
+      keymap.of([indentWithTab])
+    );
     
     return exts;
   }, [langExtension]);
 
+  const SaveButton = () => {
+    if (readOnly || !onSave) return null;
+    
+    switch (saveState) {
+      case 'saving':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            className="gap-1.5 h-7 px-2 text-xs"
+          >
+            <KortixLoader size="small" />
+            <span className="hidden sm:inline">Saving</span>
+          </Button>
+        );
+      case 'saved':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            className="gap-1.5 h-7 px-2 text-xs text-green-600"
+          >
+            <Check className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Saved</span>
+          </Button>
+        );
+      case 'error':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSave}
+            className="gap-1.5 h-7 px-2 text-xs text-red-500 hover:bg-red-50 hover:text-red-600"
+          >
+            <AlertCircle className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Retry</span>
+          </Button>
+        );
+      default:
+        return (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+          <Button
+                  variant="ghost"
+            size="sm"
+            onClick={handleSave}
+                  disabled={!hasChanges}
+                  className="gap-1.5 h-7 px-2 text-xs"
+          >
+            <Save className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Save</span>
+          </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {hasChanges ? (
+                  <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
+                ) : (
+                  'No changes to save'
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+    }
+  };
+
   return (
     <div 
-      suppressHydrationWarning
       className={cn(
         'flex flex-col max-w-full',
         readOnly 
@@ -622,13 +605,7 @@ export const CodeEditor = React.memo(function CodeEditor({
         <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30 flex-shrink-0 max-w-full min-w-0">
           {/* Left: Save/Discard/Unsaved */}
           <div className="flex items-center gap-1 min-w-0">
-            <CodeEditorSaveButton
-              readOnly={readOnly}
-              onSave={onSave}
-              saveState={saveState}
-              handleSave={handleSave}
-              hasChanges={hasChanges}
-            />
+            <SaveButton />
             {hasChanges && (
               <TooltipProvider delayDuration={300}>
                 <Tooltip>
@@ -711,6 +688,8 @@ export const CodeEditor = React.memo(function CodeEditor({
         )}
       </div>
     </div>
-  );
-})
+   );
+});
+
+
 

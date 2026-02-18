@@ -41,6 +41,7 @@ import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 import Image from 'next/image';
+import { identity } from '@/lib/utils/identity';
 
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -772,7 +773,7 @@ interface SessionChatInputProps {
   providers?: ProviderListResponse;
 }
 
-export const SessionChatInput = React.memo(function SessionChatInput({
+export const SessionChatInput = identity(function SessionChatInput({
   onSend,
   isBusy = false,
   onStop,

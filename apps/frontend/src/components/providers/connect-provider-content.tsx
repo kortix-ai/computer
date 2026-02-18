@@ -28,6 +28,7 @@ import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
+import { identity } from '@/lib/utils/identity';
 
 // =============================================================================
 // Constants
@@ -72,7 +73,7 @@ function Tag({ children, variant = 'default' }: { children: React.ReactNode; var
 // ConnectProviderContent
 // =============================================================================
 
-export const ConnectProviderContent = React.memo(function ConnectProviderContent({
+export const ConnectProviderContent = identity(function ConnectProviderContent({
   providers,
   onClose,
   onProviderConnected,

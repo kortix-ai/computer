@@ -1,7 +1,7 @@
-import dynamic from 'next/dynamic';
 "use client";
+import dynamic from 'next/dynamic';
 
-import { useMemo } from "react";
+import { useMemo } from 'react';
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {

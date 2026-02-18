@@ -19,6 +19,7 @@ import { useOpenCodeAgents, useOpenCodeCommands, useOpenCodeToolIds, useOpenCode
 import { useSkills } from '@/features/skills/hooks';
 import { getSkillSource } from '@/features/skills/types';
 import { openTabAndNavigate } from '@/stores/tab-store';
+import { identity } from '@/lib/utils/identity';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,7 +85,7 @@ const SCOPE_CONFIG: Record<ItemScope, { label: string; color: string }> = {
 // Workspace Page
 // ---------------------------------------------------------------------------
 
-const WorkspacePage = React.memo(function WorkspacePage() {
+const WorkspacePage = identity(function WorkspacePage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');

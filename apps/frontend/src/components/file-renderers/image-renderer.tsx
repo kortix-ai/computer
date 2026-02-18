@@ -42,7 +42,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
     url?.toLowerCase().endsWith('.svg') || url?.includes('image/svg');
 
   // Reset position when zoom changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isFitToScreen)) {
       setPosition({ x: 0, y: 0 });
     }

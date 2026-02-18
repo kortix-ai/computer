@@ -26,7 +26,7 @@ import { useFilesStore } from '../store/files-store';
 import { useFileHistory, useFileCommitDiff } from '../hooks/use-file-history';
 import type { GitCommit } from '../types';
 import { createTwoFilesPatch } from 'diff';
-import { useDiffHighlight, renderHighlightedLine } from '@/hooks/use-diff-highlight';
+import { useDiffHighlight, $renderHighlightedLine } from '@/hooks/use-diff-highlight';
 import { RawHTML } from '@/components/ui/raw-html';
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         const highlightedTokens = highlighted?.[i];
 
         if (highlightedTokens) {
-          const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
+          const html = $renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
             <div key={`line-${+i}`} className={cls}>
               <span

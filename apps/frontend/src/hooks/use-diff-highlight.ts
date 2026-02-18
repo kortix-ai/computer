@@ -152,7 +152,7 @@ export function useDiffHighlight(
  * Renders a single highlighted line as a safe HTML string.
  * If `tokens` is undefined/null, returns the raw text escaped.
  */
-export function renderHighlightedLine(
+export function $renderHighlightedLine(
   tokens: HighlightedLine | undefined | null,
   fallbackText: string,
 ): string {
