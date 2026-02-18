@@ -56,7 +56,7 @@ async function probePort(
 function usePortReachability(proxyUrl: string): ReachabilityStatus {
   const [status, setStatus] = useState<ReachabilityStatus>('checking');
 
-  useEffect(() => {
+  React.useEffect(() => {
     let cancelled = false;
 
     const onReachable = () => { if (!cancelled) setStatus('reachable'); };
@@ -118,7 +118,7 @@ function InlineIframePreview({
 
   // Fallback: cross-origin iframes often don't fire onLoad.
   // Dismiss loading state after 5s regardless.
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isLoading) return;
     clearLoadTimeout();
     loadTimeoutRef.current = setTimeout(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, type Editor as TiptapEditor } from '@tiptap/react';
 import { BubbleMenu, FloatingMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -103,7 +103,7 @@ interface MarkdownEditorProps {
   sandboxId?: string; // Sandbox ID for uploading images
 }
 
-export function MarkdownEditor({
+export const MarkdownEditor = React.memo(function MarkdownEditor({
   content,
   originalContent,
   hasUnsavedChanges: externalHasUnsaved,
@@ -792,5 +792,5 @@ export function MarkdownEditor({
       </div>
     </div>
   );
-}
+})
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 import {
   Search,
   RefreshCw,
@@ -60,7 +60,7 @@ function ParentDropTarget({
   onClick: () => void;
   onDropMove: (sourcePath: string, targetDirPath: string) => void;
 }) {
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [isDragOver, setIsDragOver] = React.useState(false);
   const counterRef = useRef(0);
 
   const parentPath = useMemo(() => {
@@ -109,7 +109,7 @@ function ParentDropTarget({
   );
 }
 
-export function FileBrowser() {
+export const FileBrowser = React.memo(function FileBrowser() {
   const currentPath = useFilesStore((s) => s.currentPath);
   const navigateToPath = useFilesStore((s) => s.navigateToPath);
   const openFile = useFilesStore((s) => s.openFile);
@@ -155,12 +155,12 @@ export function FileBrowser() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Folder creation state
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = React.useState(false);
+  const [newFolderName, setNewFolderName] = React.useState('');
 
   // File creation state
-  const [isCreatingFile, setIsCreatingFile] = useState(false);
-  const [newFileName, setNewFileName] = useState('');
+  const [isCreatingFile, setIsCreatingFile] = React.useState(false);
+  const [newFileName, setNewFileName] = React.useState('');
 
   // Auto-focus and select all text when folder input appears
   useEffect(() => {
@@ -931,4 +931,4 @@ export function FileBrowser() {
       </AlertDialog>
     </div>
   );
-}
+})

@@ -104,18 +104,18 @@ const IntegrationIcon: React.FC<{
 
 
 
-export default function TemplateSharePageClient() {
+const TemplateSharePageClient = React.memo(function TemplateSharePageClient() {
   const params = useParams();
   const templateId = params.shareId as string; // Note: keeping shareId param name for URL compatibility
   const router = useRouter();
   const { theme, resolvedTheme, setTheme } = useTheme();
   const [colorPalette, setColorPalette] = useState<string[]>([]);
   const imageRef = useRef<HTMLImageElement>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [isPromptExpanded, setIsPromptExpanded] = useState(false);
-  const [activeSection, setActiveSection] = useState('');
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [isPromptExpanded, setIsPromptExpanded] = React.useState(false);
+  const [activeSection, setActiveSection] = React.useState('');
   const { scrollY } = useScroll();
-  const [hasScrolled, setHasScrolled] = useState(false);
+  const [hasScrolled, setHasScrolled] = React.useState(false);
 
   // Helper functions and variables for navigation
   const scrollToSection = (sectionId: string) => {
@@ -128,7 +128,7 @@ export default function TemplateSharePageClient() {
   };
 
   // Scroll detection for navbar
-  useEffect(() => {
+  React.useEffect(() => {
     const unsubscribe = scrollY.on('change', (latest) => {
       setHasScrolled(latest > 10);
     });
@@ -136,7 +136,7 @@ export default function TemplateSharePageClient() {
   }, [scrollY]);
 
   // Navigation state management
-  useEffect(() => {
+  React.useEffect(() => {
     const handleScroll = () => {
       const sections = ['system-prompt', 'integrations', 'tools'];
       let currentSection = '';
@@ -199,7 +199,7 @@ export default function TemplateSharePageClient() {
     }).join('');
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (template?.icon_name && template?.icon_background) {
       // For icons, use the icon background color as the primary color
       const iconBg = template.icon_background || '#e5e5e5';
@@ -640,4 +640,5 @@ export default function TemplateSharePageClient() {
       </div>
     </div>
   );
-} 
+}) 
+export default TemplateSharePageClient;

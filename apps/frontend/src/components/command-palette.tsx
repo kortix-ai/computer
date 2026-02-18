@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 
@@ -221,17 +221,17 @@ const KEYBOARD_SHORTCUTS = [
 // Command Palette
 // ============================================================================
 
-export function CommandPalette() {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [lssDebouncedQuery, setLssDebouncedQuery] = useState('');
-  const [textSearchDebouncedQuery, setTextSearchDebouncedQuery] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [compactOpen, setCompactOpen] = useState(false);
-  const [diffOpen, setDiffOpen] = useState(false);
-  const [todoOpen, setTodoOpen] = useState(false);
-  const [initOpen, setInitOpen] = useState(false);
+export const CommandPalette = React.memo(function CommandPalette() {
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
+  const [debouncedQuery, setDebouncedQuery] = React.useState('');
+  const [lssDebouncedQuery, setLssDebouncedQuery] = React.useState('');
+  const [textSearchDebouncedQuery, setTextSearchDebouncedQuery] = React.useState('');
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [compactOpen, setCompactOpen] = React.useState(false);
+  const [diffOpen, setDiffOpen] = React.useState(false);
+  const [todoOpen, setTodoOpen] = React.useState(false);
+  const [initOpen, setInitOpen] = React.useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -253,7 +253,7 @@ export function CommandPalette() {
   } = useThreadSearch(open ? query : '', 6);
 
   // Debounce the query for file search API calls (300ms — fast)
-  useEffect(() => {
+  React.useEffect(() => {
     if (query.length < 2) {
       setDebouncedQuery('');
       return;
@@ -263,7 +263,7 @@ export function CommandPalette() {
   }, [query]);
 
   // Separate debounce for LSS search (500ms — heavier operation)
-  useEffect(() => {
+  React.useEffect(() => {
     if (query.length < 2) {
       setLssDebouncedQuery('');
       return;
@@ -273,7 +273,7 @@ export function CommandPalette() {
   }, [query]);
 
   // Debounce for text search (600ms — ripgrep over workspace)
-  useEffect(() => {
+  React.useEffect(() => {
     if (query.length < 3) {
       setTextSearchDebouncedQuery('');
       return;
@@ -309,7 +309,7 @@ export function CommandPalette() {
   });
 
   // Global keyboard shortcut
-  useEffect(() => {
+  React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -328,7 +328,7 @@ export function CommandPalette() {
   }, []);
 
   // Reset query when dialog closes
-  useEffect(() => {
+  React.useEffect(() => {
     if (!open) {
       setQuery('');
       setDebouncedQuery('');
@@ -1178,4 +1178,4 @@ export function CommandPalette() {
       )}
     </>
   );
-}
+})

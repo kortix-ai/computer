@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -52,11 +52,11 @@ export function SessionSiteHeader({
   isMobileView,
   canOpenSidePanel = true,
 }: SessionSiteHeaderProps) {
-  const [exportOpen, setExportOpen] = useState(false);
-  const [diffOpen, setDiffOpen] = useState(false);
-  const [todoOpen, setTodoOpen] = useState(false);
-  const [initOpen, setInitOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = React.useState(false);
+  const [diffOpen, setDiffOpen] = React.useState(false);
+  const [todoOpen, setTodoOpen] = React.useState(false);
+  const [initOpen, setInitOpen] = React.useState(false);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const isMobile = useIsMobile() || isMobileView;
   const { setOpen: setSidebarOpen, setOpenMobile } = useSidebar();
 

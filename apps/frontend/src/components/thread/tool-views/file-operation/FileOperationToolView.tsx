@@ -203,7 +203,7 @@ function extractSlideNumber(filepath: string): number | null {
   return null;
 }
 
-export function FileOperationToolView({
+export const FileOperationToolView = React.memo(function FileOperationToolView({
   toolCall,
   toolResult,
   assistantTimestamp,
@@ -245,7 +245,7 @@ export function FileOperationToolView({
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef<number>(0);
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isStreaming) {
       setThrottledStreamingSource(rawStreamingSource);
       return;
@@ -1294,4 +1294,4 @@ export function FileOperationToolView({
       </Tabs>
     </Card>
   );
-}
+})

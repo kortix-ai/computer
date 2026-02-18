@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { Settings, Clock } from "lucide-react";
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { toast } from "@/lib/toast";
@@ -21,22 +21,22 @@ export default function AdminUtilsPage() {
   const updateMaintenance = useUpdateMaintenanceNotice();
   const updateTechnicalIssue = useUpdateTechnicalIssue();
 
-  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
-  const [technicalIssueDialogOpen, setTechnicalIssueDialogOpen] = useState(false);
+  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = React.useState(false);
+  const [technicalIssueDialogOpen, setTechnicalIssueDialogOpen] = React.useState(false);
 
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceEnabled, setMaintenanceEnabled] = React.useState(false);
   const [maintenanceStartDate, setMaintenanceStartDate] = useState<Date | undefined>(undefined);
   const [maintenanceEndDate, setMaintenanceEndDate] = useState<Date | undefined>(undefined);
 
-  const [technicalIssueEnabled, setTechnicalIssueEnabled] = useState(false);
-  const [technicalIssueMessage, setTechnicalIssueMessage] = useState('');
+  const [technicalIssueEnabled, setTechnicalIssueEnabled] = React.useState(false);
+  const [technicalIssueMessage, setTechnicalIssueMessage] = React.useState('');
   const [technicalIssueSeverity, setTechnicalIssueSeverity] = useState<'degraded' | 'outage' | 'maintenance'>('degraded');
-  const [technicalIssueDescription, setTechnicalIssueDescription] = useState('');
-  const [technicalIssueResolution, setTechnicalIssueResolution] = useState('');
+  const [technicalIssueDescription, setTechnicalIssueDescription] = React.useState('');
+  const [technicalIssueResolution, setTechnicalIssueResolution] = React.useState('');
   const [technicalIssueServices, setTechnicalIssueServices] = useState<string[]>([]);
-  const [technicalIssueStatusUrl, setTechnicalIssueStatusUrl] = useState('/status');
+  const [technicalIssueStatusUrl, setTechnicalIssueStatusUrl] = React.useState('/status');
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(status)) {
       setMaintenanceEnabled(status.maintenance_notice.enabled);
       setMaintenanceStartDate(status.maintenance_notice.start_time ? new Date(status.maintenance_notice.start_time) : undefined);

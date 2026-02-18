@@ -11,7 +11,7 @@
  * All provider connection flows go through this one component.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Search,
   Plus,
@@ -72,7 +72,7 @@ function Tag({ children, variant = 'default' }: { children: React.ReactNode; var
 // ConnectProviderContent
 // =============================================================================
 
-export function ConnectProviderContent({
+export const ConnectProviderContent = React.memo(function ConnectProviderContent({
   providers,
   onClose,
   onProviderConnected,
@@ -90,22 +90,22 @@ export function ConnectProviderContent({
     | { type: 'connect'; providerID: string }
 
   const [view, setView] = useState<View>({ type: 'list' });
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = React.useState('');
 
   // --- Connect flow state ---
   const [authMethods, setAuthMethods] = useState<Array<{ type: string; label: string }>>([]);
   const [methodIndex, setMethodIndex] = useState<number | undefined>(undefined);
-  const [apiKey, setApiKey] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [apiKey, setApiKey] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
   const [oauthState, setOauthState] = useState<'idle' | 'pending' | 'complete' | 'error'>('idle');
-  const [oauthUrl, setOauthUrl] = useState('');
+  const [oauthUrl, setOauthUrl] = React.useState('');
   const [oauthMethod, setOauthMethod] = useState<'code' | 'auto' | undefined>(undefined);
-  const [oauthCode, setOauthCode] = useState('');
-  const [oauthInstructions, setOauthInstructions] = useState('');
+  const [oauthCode, setOauthCode] = React.useState('');
+  const [oauthInstructions, setOauthInstructions] = React.useState('');
 
   // --- Custom provider state ---
-  const [customForm, setCustomForm] = useState({
+  const [customForm, setCustomForm] = React.useState({
     providerID: '',
     name: '',
     baseURL: '',
@@ -627,4 +627,4 @@ export function ConnectProviderContent({
       )}
     </>
   );
-}
+})

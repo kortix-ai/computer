@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Search,
   ChevronUp,
@@ -182,7 +182,7 @@ export function ManageModelsDialog({
   modelStore: ReturnType<typeof useModelStore>;
   onConnectProvider: () => void;
 }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = React.useState('');
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -346,11 +346,11 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ models, selectedModel, onSelect, providers }: ModelSelectorProps) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [manageModelsOpen, setManageModelsOpen] = useState(false);
-  const [connectProviderOpen, setConnectProviderOpen] = useState(false);
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
+  const [manageModelsOpen, setManageModelsOpen] = React.useState(false);
+  const [connectProviderOpen, setConnectProviderOpen] = React.useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const modelStore = useModelStore(models);
@@ -409,7 +409,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
   const flatList = useMemo(() => grouped.flatMap((g) => g.models), [grouped]);
 
   // Reset on close
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(open)) {
       setTimeout(() => searchRef.current?.focus(), 50);
     } else {

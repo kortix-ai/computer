@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -132,7 +132,7 @@ function useBinaryBlob(filePath: string | null, category: FileCategory) {
   const [blobError, setBlobError] = useState<string | null>(null);
   const prevPathRef = useRef<string | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Only fetch for categories that need a blob
     if (!filePath || !isBlobCategory(category)) {
       setBlobUrl(null);
@@ -202,7 +202,7 @@ function useBinaryBlob(filePath: string | null, category: FileCategory) {
   }, [filePath, category]);
 
   // Cleanup on unmount
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
@@ -216,7 +216,7 @@ function useBinaryBlob(filePath: string | null, category: FileCategory) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function FileViewer() {
+export const FileViewer = React.memo(function FileViewer() {
   const selectedFilePath = useFilesStore((s) => s.selectedFilePath);
   const filePathList = useFilesStore((s) => s.filePathList);
   const currentFileIndex = useFilesStore((s) => s.currentFileIndex);
@@ -242,7 +242,7 @@ export function FileViewer() {
   const { resolvedTheme } = useTheme();
 
   // Scroll to target line when set (after Shiki render completes)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!targetLine || !codeContainerRef.current || !highlightedHtml) return;
     // Shiki renders lines as <span class="line"> inside <pre><code>
     // Use a small delay to ensure the DOM has been painted
@@ -299,7 +299,7 @@ export function FileViewer() {
 
   // Syntax highlight with Shiki
   const shikiTheme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
-  useEffect(() => {
+  React.useEffect(() => {
     if (isEditing || !displayContent || language === 'plaintext') {
       return;
     }
@@ -644,4 +644,4 @@ export function FileViewer() {
       )}
     </div>
   );
-}
+})

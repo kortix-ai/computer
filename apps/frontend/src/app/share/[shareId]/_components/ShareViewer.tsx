@@ -98,7 +98,7 @@ export function ShareViewer({ shareId }: { shareId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);

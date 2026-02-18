@@ -72,7 +72,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null);
 
   // Set up periodic cleanup of Mermaid error messages
-  useEffect(() => {
+  React.useEffect(() => {
     const cleanupInterval = setInterval(cleanupMermaidErrors, 5000); // Clean up every 5 seconds
     
     // Initial cleanup on mount
@@ -218,7 +218,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
   }, [zoom, panOffset]);
 
   // Attach wheel event listener manually with passive: false
-  useEffect(() => {
+  React.useEffect(() => {
     const canvasElement = canvasRef.current;
     if (canvasElement && isFullscreenOpen) {
       // Non-passive wheel listener for zoom preventDefault
@@ -306,7 +306,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
   };
 
   // Keyboard shortcuts for fullscreen viewer
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isFullscreenOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -339,7 +339,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreenOpen]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let mounted = true;
 
     const renderChart = async () => {

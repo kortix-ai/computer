@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Search,
   RefreshCw,
@@ -159,7 +159,7 @@ interface SidebarFileBrowserProps {
   openFileAsTab?: boolean;
 }
 
-export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowserProps) {
+export const SidebarFileBrowser = React.memo(function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowserProps) {
   const currentPath = useFilesStore((s) => s.currentPath);
   const navigateToPath = useFilesStore((s) => s.navigateToPath);
   const openFileWithList = useFilesStore((s) => s.openFileWithList);
@@ -785,4 +785,4 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
       )}
     </div>
   );
-}
+})

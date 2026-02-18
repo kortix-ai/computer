@@ -16,7 +16,7 @@ function CheckoutContent() {
   const [stripeLoaded, setStripeLoaded] = useState(false);
 
   // Check if Stripe is already loaded
-  useEffect(() => {
+  React.useEffect(() => {
     const checkStripe = () => {
       if (typeof window !== 'undefined' && typeof window.Stripe !== 'undefined') {
         console.log('✅ Stripe already loaded on window!');
@@ -51,7 +51,7 @@ function CheckoutContent() {
     };
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('🔍 Effect running - clientSecret:', clientSecret ? 'YES' : 'NO', 'stripeLoaded:', stripeLoaded);
     
     if (!clientSecret) {

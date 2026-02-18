@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-export default function CreditsPageClient() {
+const CreditsPageClient = React.memo(function CreditsPageClient() {
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
@@ -341,4 +341,6 @@ export default function CreditsPageClient() {
       </div>
     </div>
   );
-}
+})
+
+export default CreditsPageClient;

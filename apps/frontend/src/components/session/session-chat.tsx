@@ -2,7 +2,7 @@
 
 
 import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
   ChevronDown,
@@ -182,11 +182,11 @@ function SubSessionBar({
   const { data: parentSession } = useOpenCodeSession(parentID);
 
   // Dialog states for actions menu
-  const [diffOpen, setDiffOpen] = useState(false);
-  const [todoOpen, setTodoOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [compactOpen, setCompactOpen] = useState(false);
-  const [initOpen, setInitOpen] = useState(false);
+  const [diffOpen, setDiffOpen] = React.useState(false);
+  const [todoOpen, setTodoOpen] = React.useState(false);
+  const [exportOpen, setExportOpen] = React.useState(false);
+  const [compactOpen, setCompactOpen] = React.useState(false);
+  const [initOpen, setInitOpen] = React.useState(false);
 
   const handleBackToParent = useCallback(() => {
     if (parentSession) {
@@ -774,7 +774,7 @@ function formatDCPTokens(tokens: number): string {
 }
 
 function DCPNotificationCard({ notification }: { notification: DCPNotification }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = React.useState(false);
   const isPrune = notification.type === 'prune';
   const hasItems = notification.items.length > 0;
   const hasDetails = hasItems || notification.distilled || notification.summary;
@@ -902,10 +902,10 @@ function EditPartDialog({
   onSave: (text: string) => void;
   loading?: boolean;
 }) {
-  const [text, setText] = useState(() => initialText);
+  const [text, setText] = React.useState(() => initialText);
 
   // Reset text when dialog opens with new content
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(open)) setText(initialText);
   }, [open, initialText]);
 
@@ -980,8 +980,8 @@ function PartActions({
   isBusy: boolean;
   className?: string;
 }) {
-  const [editOpen, setEditOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const updatePart = useUpdatePart();
   const deletePart = useDeletePart();
 
@@ -1144,7 +1144,7 @@ function detectCommandFromText(
   return undefined;
 }
 
-function UserMessageRow({ message, agentNames, commandInfo, commands }: { message: MessageWithParts; agentNames?: string[]; commandInfo?: { name: string; args?: string }; commands?: Command[] }) {
+const UserMessageRow = React.memo(function UserMessageRow({ message, agentNames, commandInfo, commands }: { message: MessageWithParts; agentNames?: string[]; commandInfo?: { name: string; args?: string }; commands?: Command[] }) {
   const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
   const { attachments, stickyParts } = useMemo(
     () => splitUserParts(message.parts),
@@ -1184,12 +1184,12 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
   // Agent mentions
   const agentParts = stickyParts.filter(isAgentPart) as AgentPart[];
 
-  const [expanded, setExpanded] = useState(false);
-  const [canExpand, setCanExpand] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = React.useState(false);
+  const [canExpand, setCanExpand] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
   const textRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const el = textRef.current;
     if (!el || expanded) return;
     setCanExpand(el.scrollHeight > el.clientHeight + 2);
@@ -1463,7 +1463,7 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
       )}
     </div>
   );
-}
+})
 
 // ============================================================================
 // Throttled Markdown — limits re-renders during streaming (100ms)
@@ -1511,7 +1511,7 @@ interface SessionTurnProps {
   commands?: Command[];
 }
 
-function SessionTurn({
+const SessionTurn = React.memo(function SessionTurn({
   turn,
   allMessages,
   sessionId,
@@ -1534,11 +1534,11 @@ function SessionTurn({
   commandMessages,
   commands,
 }: SessionTurnProps) {
-  const [copied, setCopied] = useState(false);
-  const [userCopied, setUserCopied] = useState(false);
-  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [connectProviderOpen, setConnectProviderOpen] = useState(false);
-  const [revertLoading, setRevertLoading] = useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [userCopied, setUserCopied] = React.useState(false);
+  const [revertDialogOpen, setRevertDialogOpen] = React.useState(false);
+  const [connectProviderOpen, setConnectProviderOpen] = React.useState(false);
+  const [revertLoading, setRevertLoading] = React.useState(false);
 
   // Handler for action buttons on turn errors (e.g. "Check settings" opens provider dialog)
   const handleTurnErrorAction = useCallback(() => {
@@ -1646,9 +1646,9 @@ function SessionTurn({
   const childMessages = undefined as MessageWithParts[] | undefined; // placeholder for child session delegation
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rawStatus = useMemo(() => getTurnStatus(allParts, childMessages), [allParts]);
-  const [throttledStatus, setThrottledStatus] = useState('');
+  const [throttledStatus, setThrottledStatus] = React.useState('');
 
-  useEffect(() => {
+  React.useEffect(() => {
     const newStatus = rawStatus;
     if (newStatus === throttledStatus || !newStatus) return;
     const elapsed = Date.now() - lastStatusChangeRef.current;
@@ -1667,8 +1667,8 @@ function SessionTurn({
   }, [allParts, rawStatus, throttledStatus]);
 
   // ---- Retry countdown ----
-  const [retrySecondsLeft, setRetrySecondsLeft] = useState(0);
-  useEffect(() => {
+  const [retrySecondsLeft, setRetrySecondsLeft] = React.useState(0);
+  React.useEffect(() => {
     if (!retryInfo) { setRetrySecondsLeft(0); return; }
     const update = () => setRetrySecondsLeft(Math.max(0, Math.round((retryInfo.next - Date.now()) / 1000)));
     update();
@@ -1677,8 +1677,8 @@ function SessionTurn({
   }, [retryInfo]);
 
   // ---- Duration ticking ----
-  const [duration, setDuration] = useState('');
-  useEffect(() => {
+  const [duration, setDuration] = React.useState('');
+  React.useEffect(() => {
     const startTime = (turn.userMessage.info as any)?.time?.created;
     if (!startTime) return;
 
@@ -2166,7 +2166,7 @@ function SessionTurn({
       />
     </div>
   );
-}
+})
 
 // ============================================================================
 // Billing: track billed turn IDs to prevent double-deduction
@@ -2182,8 +2182,8 @@ interface SessionChatProps {
   sessionId: string;
 }
 
-export function SessionChat({ sessionId }: SessionChatProps) {
-  const [debugMode, setDebugMode] = useState(false);
+export const SessionChat = React.memo(function SessionChat({ sessionId }: SessionChatProps) {
+  const [debugMode, setDebugMode] = React.useState(false);
 
   // ---- KortixComputer side panel ----
   const { isSidePanelOpen, setIsSidePanelOpen, openFileInComputer } = useKortixComputerStore();
@@ -2217,7 +2217,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const pendingPromptHandled = useRef(false);
 
   // ---- Polling fallback & optimistic send ----
-  const [pollingActive, setPollingActive] = useState(false);
+  const [pollingActive, setPollingActive] = React.useState(false);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [pendingCommand, setPendingCommand] = useState<{ name: string; description?: string } | null>(null);
   // Map of user message IDs → command info, so UserMessageRow can render
@@ -2227,10 +2227,10 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // even if the busy signal arrives before the message list updates.
   const pendingCommandStashRef = useRef<{ name: string; args?: string } | null>(null);
   // Track whether we're retrying a failed send (keeps loader visible)
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [isRetrying, setIsRetrying] = React.useState(false);
   // Track whether a pending prompt send is in flight (dashboard→session flow).
   // Keeps isBusy true until the server acknowledges with a busy status.
-  const [pendingSendInFlight, setPendingSendInFlight] = useState(false);
+  const [pendingSendInFlight, setPendingSendInFlight] = React.useState(false);
   // Grace period: don't stop polling immediately on idle after a recent send
   const lastSendTimeRef = useRef<number>(0);
   useSessionBusyPolling(sessionId, pollingActive);
@@ -2250,7 +2250,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // We send the message from here (not the dashboard) so that SSE listeners and polling
   // are already active when the response starts streaming back.
   // Retries up to 3 times on failure (e.g. "Unable to connect" errors).
-  useEffect(() => {
+  React.useEffect(() => {
     if (pendingPromptHandled.current) return;
     const pendingPrompt = sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
     if (pendingPrompt) {
@@ -2315,7 +2315,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [sessionId]);
 
   // Clear optimistic prompt once real messages arrive
-  useEffect(() => {
+  React.useEffect(() => {
     if (optimisticPrompt && messages && messages.length > 0) {
       setOptimisticPrompt(null);
     }
@@ -2340,7 +2340,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     [messages],
   );
   const lastUserMsgIdRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
+  React.useEffect(() => {
     if (!lastUserMessage) return;
     if (lastUserMsgIdRef.current === lastUserMessage.info.id) return;
     lastUserMsgIdRef.current = lastUserMessage.info.id;
@@ -2371,7 +2371,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const queueMoveUp = useMessageQueueStore((s) => s.moveUp);
   const queueMoveDown = useMessageQueueStore((s) => s.moveDown);
   const queueClearSession = useMessageQueueStore((s) => s.clearSession);
-  const [queueExpanded, setQueueExpanded] = useState(true);
+  const [queueExpanded, setQueueExpanded] = React.useState(true);
 
   // Track previous *server* busy state to detect idle transitions.
   // We use `isServerBusy` (the actual server status) instead of the derived
@@ -2383,7 +2383,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const drainScheduledRef = useRef(false);
 
   // Auto-drain: when server transitions from busy → idle, send the next queued message
-  useEffect(() => {
+  React.useEffect(() => {
     const wasBusy = prevServerBusyRef.current;
     prevServerBusyRef.current = isServerBusy;
 
@@ -2411,7 +2411,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // drain the queue. This covers cases where the SSE missed the busy event
   // entirely (e.g. status went undefined → idle, so isServerBusy was never
   // true and the primary drain above never fires).
-  useEffect(() => {
+  React.useEffect(() => {
     if (isBusy || drainScheduledRef.current) return;
     const sessionQueue = useMessageQueueStore.getState().messages.filter(
       (m) => m.sessionId === sessionId,
@@ -2447,7 +2447,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // Stop polling when session goes idle (via SSE or polling fallback).
   // Grace period: if we sent a message recently (within 5s), don't stop polling
   // on the first idle status — the server may not have started processing yet.
-  useEffect(() => {
+  React.useEffect(() => {
     if (pollingActive && sessionStatus?.type === 'idle') {
       const timeSinceSend = Date.now() - lastSendTimeRef.current;
       if (timeSinceSend < 5000) {
@@ -2470,7 +2470,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // or once assistant messages arrive (server processed so fast we missed busy).
   // This bridges the gap between the optimistic prompt clearing and the
   // server status updating — keeps isBusy true so the turn shows a loader.
-  useEffect(() => {
+  React.useEffect(() => {
     if (!pendingSendInFlight) return;
     if (isServerBusy) {
       setPendingSendInFlight(false);
@@ -2486,7 +2486,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // Safety timeout: clear pendingSendInFlight after 30s even if the server
   // never acknowledged. Prevents the UI from being stuck forever in "busy"
   // when the send succeeded (HTTP 204) but the server never started processing.
-  useEffect(() => {
+  React.useEffect(() => {
     if (!pendingSendInFlight) return;
     const timer = setTimeout(() => {
       setPendingSendInFlight(false);
@@ -2499,7 +2499,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // session at all — meaning it's idle), force the status to idle — recovering
   // from a silently dropped SSE stream or missed event.
   // First check after 5s, then every 15s.
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isServerBusy) return;
 
     const check = async () => {
@@ -2532,7 +2532,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // Message-based idle detection: if the last assistant message has
   // time.completed set, the server has finished generating. If our session
   // status still says busy, the SSE idle event was missed — force idle.
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isServerBusy || !messages || messages.length === 0) return;
     // Find the last assistant message
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -2561,7 +2561,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // When a command was pending, associate the newest user message with the
   // command info so UserMessageRow can render a nice pill instead of raw template text.
   const prevMsgLenRef = useRef(messages?.length || 0);
-  useEffect(() => {
+  React.useEffect(() => {
     if (!pendingUserMessage) return;
     // Server reported busy → it received our prompt, real messages incoming
     if (isServerBusy) {
@@ -2579,7 +2579,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
 
   // Associate stashed command info with the newest user message when messages arrive.
   // Runs separately so it captures the mapping even if busy fires before messages update.
-  useEffect(() => {
+  React.useEffect(() => {
     const stash = pendingCommandStashRef.current;
     if (!stash || !messages) return;
     const len = messages.length;
@@ -2594,7 +2594,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
     }
   }, [messages]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     prevMsgLenRef.current = messages?.length || 0;
   }, [messages?.length]);
 
@@ -2607,7 +2607,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // Uses scrollToBottom() from the hook so the programmatic-scroll guard works
   // correctly and doesn't interfere with user-intent detection.
   const initialScrollDoneRef = useRef<string | null>(null);
-  useEffect(() => {
+  React.useEffect(() => {
     // Reset on session change so we scroll on first render of new session
     if (initialScrollDoneRef.current !== sessionId) {
       initialScrollDoneRef.current = null;
@@ -2615,7 +2615,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [sessionId]);
 
   const messageCount = messages?.length ?? 0;
-  useEffect(() => {
+  React.useEffect(() => {
     if (initialScrollDoneRef.current === sessionId) return;
     if (messageCount === 0) return;
     initialScrollDoneRef.current = sessionId;
@@ -2695,7 +2695,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   // Auto-expand last turn when session is busy (use isBusy to avoid race with SSE sessionStatus)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!messages || messages.length === 0) return;
     const lastUserId = [...messages].reverse().find((m) => m.info.role === 'user')?.info.id;
     if (lastUserId && (sessionStatus?.type !== 'idle' || isBusy)) {
@@ -2704,7 +2704,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, [sessionStatus, messages, isBusy]);
 
   // Reset on session change
-  useEffect(() => {
+  React.useEffect(() => {
     setExpanded({});
     setPollingActive(false);
     setPendingUserMessage(null);
@@ -2722,7 +2722,7 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   // Billing: deduct credits after agent run completes
   // ============================================================================
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!messages || messages.length === 0 || isBusy) return;
 
     const currentTurns = groupMessagesIntoTurns(messages);
@@ -3375,4 +3375,4 @@ export function SessionChat({ sessionId }: SessionChatProps) {
       />
     </div>
   );
-}
+})

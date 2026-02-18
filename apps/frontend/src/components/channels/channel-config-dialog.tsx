@@ -65,10 +65,10 @@ const SESSION_STRATEGIES: { value: SessionStrategy; label: string; description: 
 export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelConfigDialogProps) {
   const [step, setStep] = useState<'type' | 'config'>('type');
   const [channelType, setChannelType] = useState<ChannelType | null>(null);
-  const [name, setName] = useState('');
-  const [botToken, setBotToken] = useState('');
+  const [name, setName] = React.useState('');
+  const [botToken, setBotToken] = React.useState('');
   const [sessionStrategy, setSessionStrategy] = useState<SessionStrategy>('per-user');
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [systemPrompt, setSystemPrompt] = React.useState('');
 
   const { sandbox } = useSandbox();
   const createMutation = useCreateChannel();

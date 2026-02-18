@@ -100,7 +100,7 @@ function PriceDisplay({ price, isCompact }: PriceDisplayProps) {
   );
 }
 
-function PricingTier({
+const PricingTier = React.memo(function PricingTier({
   tier,
   isCompact = false,
   currentSubscription,
@@ -175,7 +175,7 @@ function PricingTier({
   const scheduleDowngradeMutation = useScheduleDowngrade();
 
   // Confirmation modal state for downgrades
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = React.useState(false);
   const [pendingTierKey, setPendingTierKey] = useState<string | null>(null);
 
   const handleButtonClick = (tierKey: string, isDowngrade: boolean) => {
@@ -993,7 +993,7 @@ function PricingTier({
       )}
     </div>
   );
-}
+})
 
 interface PricingSectionProps {
   returnUrl?: string;
@@ -1009,7 +1009,7 @@ interface PricingSectionProps {
   showBuyCredits?: boolean;
 }
 
-export function PricingSection({
+export const PricingSection = React.memo(function PricingSection({
   returnUrl = typeof window !== 'undefined' ? window.location.href : '/',
   showTitleAndTabs = true,
   hideFree = false,
@@ -1025,7 +1025,7 @@ export function PricingSection({
   const t = useTranslations('billing');
   const { user } = useAuth();
   const promo = usePromo();
-  const [promoCodeCopied, setPromoCodeCopied] = useState(false);
+  const [promoCodeCopied, setPromoCodeCopied] = React.useState(false);
   const promoCopyTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUserAuthenticated = !!user;
   const queryClient = useQueryClient();
@@ -1089,7 +1089,7 @@ export function PricingSection({
   const currentBillingPeriod = getCurrentBillingPeriod();
 
   const [planLoadingStates, setPlanLoadingStates] = useState<Record<string, boolean>>({});
-  const [showCreditPurchaseModal, setShowCreditPurchaseModal] = useState(false);
+  const [showCreditPurchaseModal, setShowCreditPurchaseModal] = React.useState(false);
 
   useEffect(() => {
     return () => {
@@ -1116,7 +1116,7 @@ export function PricingSection({
     return index >= 0 ? index : 1; // Default to Pro plan (index 1) if tier not found
   };
 
-  const [selectedPaidTierIndex, setSelectedPaidTierIndex] = useState(getCurrentTierIndex);
+  const [selectedPaidTierIndex, setSelectedPaidTierIndex] = React.useState(getCurrentTierIndex);
   const selectedPaidTier = paidTiers[selectedPaidTierIndex] || null;
 
   // Update selected tier when subscription data loads
@@ -1485,5 +1485,5 @@ export function PricingSection({
       />
     </section>
   );
-}
+})
 

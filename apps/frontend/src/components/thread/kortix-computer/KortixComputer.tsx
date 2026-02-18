@@ -128,7 +128,7 @@ export const KortixComputer = memo(function KortixComputer({
 
   const currentViewRef = useRef(activeView);
 
-  useEffect(() => {
+  React.useEffect(() => {
     currentViewRef.current = activeView;
   }, [activeView]);
 
@@ -137,7 +137,7 @@ export const KortixComputer = memo(function KortixComputer({
   const prevSandboxIdRef = useRef<string | null>(null);
   
   // Reset local state when switching projects/threads or sandboxes
-  useEffect(() => {
+  React.useEffect(() => {
     const projectChanged = prevProjectIdRef.current !== null && prevProjectIdRef.current !== projectId;
     const sandboxChanged = prevSandboxIdRef.current !== null && prevSandboxIdRef.current !== sandboxId && sandboxId !== null;
     
@@ -167,7 +167,7 @@ export const KortixComputer = memo(function KortixComputer({
     ].includes(lowerName);
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Skip browser tab switching if flag is enabled
     if (HIDE_BROWSER_TAB) return;
     
@@ -196,7 +196,7 @@ export const KortixComputer = memo(function KortixComputer({
     }
   }, [toolCallSnapshots, isInitialized, isBrowserTool, agentStatus, setActiveView]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Skip browser tab switching if flag is enabled
     if (HIDE_BROWSER_TAB) return;
     
@@ -253,7 +253,7 @@ export const KortixComputer = memo(function KortixComputer({
     }));
   }, [visibleToolCalls]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const hadSnapshots = toolCallSnapshots.length > 0;
     const hasNewSnapshots = newSnapshots.length > toolCallSnapshots.length;
     setToolCallSnapshots(newSnapshots);
@@ -320,7 +320,7 @@ export const KortixComputer = memo(function KortixComputer({
     }
   }, [toolCalls, navigationMode, toolCallSnapshots.length, isInitialized, internalIndex, agentStatus, newSnapshots, isBrowserTool, activeView, setActiveView]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if ((!isInitialized || navigationMode === 'manual') && toolCallSnapshots.length > 0) {
       setInternalIndex(Math.min(currentIndex, toolCallSnapshots.length - 1));
     }
@@ -361,7 +361,7 @@ export const KortixComputer = memo(function KortixComputer({
   const prevDisplayToolCallRef = useRef<ToolCallInput | undefined>(undefined);
   
   // Log when a tool is rendered
-  useEffect(() => {
+  React.useEffect(() => {
     if (displayToolCall && displayToolCall !== prevDisplayToolCallRef.current) {
       const toolCallId = displayToolCall.toolCall?.tool_call_id;
       const functionName = displayToolCall.toolCall?.function_name;
@@ -446,7 +446,7 @@ export const KortixComputer = memo(function KortixComputer({
     internalNavigate(bounded, 'user_explicit');
   }, [latestIndex, internalNavigate]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -475,7 +475,7 @@ export const KortixComputer = memo(function KortixComputer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleClose, isDocumentModalOpen]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) return;
     const handleSidebarToggle = (event: CustomEvent) => {
       if (event.detail.expanded) {
@@ -494,14 +494,14 @@ export const KortixComputer = memo(function KortixComputer({
       );
   }, [isOpen, handleClose]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (externalNavigateToIndex !== undefined && externalNavigateToIndex >= 0 && externalNavigateToIndex < totalCalls) {
       setActiveView('tools');
       internalNavigate(externalNavigateToIndex, 'external_click');
     }
   }, [externalNavigateToIndex, totalCalls, internalNavigate, setActiveView]);
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (pendingToolNavIndex !== null && pendingToolNavIndex >= 0 && pendingToolNavIndex < totalCalls) {
       setActiveView('tools');
       internalNavigate(pendingToolNavIndex, 'external_click');
@@ -509,7 +509,7 @@ export const KortixComputer = memo(function KortixComputer({
     }
   }, [pendingToolNavIndex, totalCalls, internalNavigate, setActiveView, clearPendingToolNav]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isStreaming) return;
     const interval = setInterval(() => {
       setDots((prev) => {

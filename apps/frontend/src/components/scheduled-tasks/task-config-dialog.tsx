@@ -49,12 +49,12 @@ const TIMEZONES = [
 ];
 
 export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDialogProps) {
-  const [name, setName] = useState('');
-  const [cronExpr, setCronExpr] = useState('0 0 9 * * *');
-  const [timezone, setTimezone] = useState('UTC');
-  const [prompt, setPrompt] = useState('');
+  const [name, setName] = React.useState('');
+  const [cronExpr, setCronExpr] = React.useState('0 0 9 * * *');
+  const [timezone, setTimezone] = React.useState('UTC');
+  const [prompt, setPrompt] = React.useState('');
   const [sessionMode, setSessionMode] = useState<SessionMode>('new');
-  const [agentName, setAgentName] = useState('');
+  const [agentName, setAgentName] = React.useState('');
 
   const { sandbox } = useSandbox();
   const createMutation = useCreateTrigger();

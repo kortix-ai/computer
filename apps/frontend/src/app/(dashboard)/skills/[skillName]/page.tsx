@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -43,7 +43,7 @@ const SOURCE_ICONS: Record<SkillSource, typeof Sparkles> = {
 // Skill Detail Page
 // ---------------------------------------------------------------------------
 
-export default function SkillDetailPage() {
+const SkillDetailPage = React.memo(function SkillDetailPage() {
   const params = useParams();
   const router = useRouter();
   const skillName = decodeURIComponent(params.skillName as string);
@@ -390,4 +390,6 @@ export default function SkillDetailPage() {
       </div>
     </div>
   );
-}
+})
+
+export default SkillDetailPage;

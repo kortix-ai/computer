@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from 'react';
 import { useTriggerWorkflow, useWorkflows } from "@/hooks/admin/use-notification-workflow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,9 @@ import {
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 
-export default function NotificationManagementPage() {
-  const [workflowId, setWorkflowId] = useState("");
-  const [payload, setPayload] = useState(
+const NotificationManagementPage = React.memo(function NotificationManagementPage() {
+  const [workflowId, setWorkflowId] = React.useState("");
+  const [payload, setPayload] = React.useState(
     () => JSON.stringify(
       {
         message: "Your custom message here",
@@ -37,10 +37,10 @@ export default function NotificationManagementPage() {
       2
     )
   );
-  const [subscriberId, setSubscriberId] = useState("");
-  const [subscriberEmail, setSubscriberEmail] = useState("");
-  const [broadcast, setBroadcast] = useState(true);
-  const [useEmail, setUseEmail] = useState(true);
+  const [subscriberId, setSubscriberId] = React.useState("");
+  const [subscriberEmail, setSubscriberEmail] = React.useState("");
+  const [broadcast, setBroadcast] = React.useState(true);
+  const [useEmail, setUseEmail] = React.useState(true);
 
   const { data: workflowsData, isLoading: loadingWorkflows } = useWorkflows();
   const triggerWorkflowMutation = useTriggerWorkflow({
@@ -434,4 +434,6 @@ New feature!
       </div>
     </div>
   );
-}
+})
+
+export default NotificationManagementPage;

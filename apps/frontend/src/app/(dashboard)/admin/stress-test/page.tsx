@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ import {
 import { useStressTest, StressTestResult } from '@/hooks/admin/use-stress-test';
 import { cn } from '@/lib/utils';
 
-export default function AdminStressTestPage() {
+const AdminStressTestPage = React.memo(function AdminStressTestPage() {
   const [numRequestsInput, setNumRequestsInput] = useState('5');
   const numRequests = Math.min(200, Math.max(1, parseInt(numRequestsInput) || 5));
   
@@ -719,4 +719,6 @@ export default function AdminStressTestPage() {
       </div>
     </div>
   );
-}
+})
+
+export default AdminStressTestPage;

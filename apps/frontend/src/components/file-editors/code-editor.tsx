@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo, useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 
 const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
@@ -377,7 +377,7 @@ interface CodeEditorProps {
   showLineNumbers?: boolean;
 }
 
-export function CodeEditor({
+export const CodeEditor = React.memo(function CodeEditor({
   content,
   originalContent,
   hasUnsavedChanges: externalHasUnsaved,
@@ -413,7 +413,7 @@ export function CodeEditor({
   const prevHasChanges = useRef(false);
   
   // Notify parent when hasChanges state changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (prevHasChanges.current !== hasChanges) {
       prevHasChanges.current = hasChanges;
       onUnsavedChangeRef.current?.(hasChanges);
@@ -421,7 +421,7 @@ export function CodeEditor({
   }, [hasChanges]);
   
   // Update savedContent ref when originalContent prop changes (e.g., after external save)
-  useEffect(() => {
+  React.useEffect(() => {
     if (originalContent !== undefined) {
       savedContent.current = originalContent;
     }
@@ -430,7 +430,7 @@ export function CodeEditor({
   // Set mounted state
 // Calculate editor height based on container - never exceed container bounds
   // For read-only mode, use auto height to let content expand naturally (better for preview contexts)
-  useEffect(() => {
+  React.useEffect(() => {
     // In read-only mode, let CodeMirror auto-expand based on content
     if (readOnly) {
       setEditorHeight('auto');
@@ -541,7 +541,7 @@ export function CodeEditor({
   );
 
   // Update local content when external content changes (but not if we have unsaved local changes)
-  useEffect(() => {
+  React.useEffect(() => {
     // For read-only mode (preview/streaming), always update when content changes
     // For editable mode, only update if we don't have local modifications
     const hasNoLocalChanges = readOnly || localContent === savedContent.current || !localContent;
@@ -570,7 +570,7 @@ export function CodeEditor({
     [readOnly, handleSave]
   );
 
-  useEffect(() => {
+  React.useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
@@ -712,5 +712,5 @@ export function CodeEditor({
       </div>
     </div>
   );
-}
+})
 

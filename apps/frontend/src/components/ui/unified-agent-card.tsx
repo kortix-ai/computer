@@ -326,7 +326,7 @@ const CapabilitiesList: React.FC<{ capabilities?: string[]; maxCapabilities?: nu
 );
 
 // Main unified agent card component
-export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
+export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = React.memo(({
   variant,
   data,
   actions = EMPTY_ACTIONS,
@@ -708,7 +708,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     default:
       return $renderStandardCard();
   }
-};
+});
 
 // Export legacy component names for backward compatibility
 const AgentCard = UnifiedAgentCard;

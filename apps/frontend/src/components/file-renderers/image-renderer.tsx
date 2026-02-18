@@ -19,20 +19,20 @@ interface ImageRendererProps {
 }
 
 export function ImageRenderer({ url, className }: ImageRendererProps) {
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [isPanning, setIsPanning] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [startPanPosition, setStartPanPosition] = useState({ x: 0, y: 0 });
-  const [isFitToScreen, setIsFitToScreen] = useState(true);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgError, setImgError] = useState(false);
+  const [zoom, setZoom] = React.useState(1);
+  const [rotation, setRotation] = React.useState(0);
+  const [isPanning, setIsPanning] = React.useState(false);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [startPanPosition, setStartPanPosition] = React.useState({ x: 0, y: 0 });
+  const [isFitToScreen, setIsFitToScreen] = React.useState(true);
+  const [imgLoaded, setImgLoaded] = React.useState(false);
+  const [imgError, setImgError] = React.useState(false);
   const [imgInfo, setImgInfo] = useState<{
     width: number;
     height: number;
     type: string;
   } | null>(null);
-  const [showControls, setShowControls] = useState(false);
+  const [showControls, setShowControls] = React.useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -132,7 +132,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
   const translateTransform = `translate(${position.x}px, ${position.y}px)`;
 
   // Show image info
-  const [showInfo, setShowInfo] = useState(false);
+  const [showInfo, setShowInfo] = React.useState(false);
 
   return (
     <div 

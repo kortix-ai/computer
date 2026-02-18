@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   Download,
   FileWarning,
@@ -111,7 +111,7 @@ function useBinaryBlob(filePath: string | null, category: FileCategory) {
   const [blobLoading, setBlobLoading] = useState(false);
   const [blobError, setBlobError] = useState<string | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!filePath || !isBlobCategory(category)) {
       setBlobUrl(null);
       setBlob(null);
@@ -205,7 +205,7 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
   const displayContent = editedContent ?? fileContent?.content ?? '';
 
   // Update tab dirty state
-  useEffect(() => {
+  React.useEffect(() => {
     useTabStore.getState().setTabDirty(tabId, hasUnsavedChanges);
   }, [tabId, hasUnsavedChanges]);
 
@@ -220,7 +220,7 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
 
   // Syntax highlight with Shiki
   const shikiTheme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
-  useEffect(() => {
+  React.useEffect(() => {
     if (isEditing || !displayContent || language === 'plaintext') return;
     let cancelled = false;
     codeToHtml(displayContent, {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -58,21 +58,21 @@ interface AdminUserDetailsDialogProps {
   onRefresh?: () => void;
 }
 
-export function AdminUserDetailsDialog({
+export const AdminUserDetailsDialog = React.memo(function AdminUserDetailsDialog({
   user,
   isOpen,
   onClose,
   onRefresh,
 }: AdminUserDetailsDialogProps) {
-  const [adjustAmount, setAdjustAmount] = useState('');
-  const [adjustReason, setAdjustReason] = useState('');
-  const [refundAmount, setRefundAmount] = useState('');
-  const [refundReason, setRefundReason] = useState('');
-  const [adjustIsExpiring, setAdjustIsExpiring] = useState(true);
-  const [refundIsExpiring, setRefundIsExpiring] = useState(false);
-  const [threadsPage, setThreadsPage] = useState(1);
-  const [transactionsPage, setTransactionsPage] = useState(1);
-  const [activityPage, setActivityPage] = useState(1);
+  const [adjustAmount, setAdjustAmount] = React.useState('');
+  const [adjustReason, setAdjustReason] = React.useState('');
+  const [refundAmount, setRefundAmount] = React.useState('');
+  const [refundReason, setRefundReason] = React.useState('');
+  const [adjustIsExpiring, setAdjustIsExpiring] = React.useState(true);
+  const [refundIsExpiring, setRefundIsExpiring] = React.useState(false);
+  const [threadsPage, setThreadsPage] = React.useState(1);
+  const [transactionsPage, setTransactionsPage] = React.useState(1);
+  const [activityPage, setActivityPage] = React.useState(1);
 
   const { data: userDetails, isLoading } = useAdminUserDetails(user?.id || null);
   const { data: billingSummary, refetch: refetchBilling } = useUserBillingSummary(user?.id || null);
@@ -639,4 +639,4 @@ export function AdminUserDetailsDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}) 

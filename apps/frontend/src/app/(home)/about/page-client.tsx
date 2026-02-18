@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { SimpleFooter } from '@/components/home/simple-footer';
 import { m, useScroll, useMotionValueEvent } from 'framer-motion';
-import { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 type ParagraphItem = 
   | string 
@@ -154,7 +154,7 @@ export default function AboutPageClient() {
   const [isLocked, setIsLocked] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
-  useEffect(() => {
+  React.useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -188,7 +188,7 @@ export default function AboutPageClient() {
   });
 
   // On mobile, manually track scroll of main element
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isMobile || !mainRef.current || !containerRef.current) return;
     
     const main = mainRef.current;

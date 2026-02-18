@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from 'react';
 import {
   Loader2,
   RotateCcw,
@@ -69,7 +69,7 @@ const writeTypeConfig: Record<WriteType, { label: string; color: string; bgColor
   status: { label: "Status", color: "text-purple-400", bgColor: "bg-purple-500/10 border-purple-500/30" },
 };
 
-export function DLQTable({
+export const DLQTable = React.memo(function DLQTable({
   entries,
   isLoading,
   onRetry,
@@ -79,7 +79,7 @@ export function DLQTable({
   onBulkRetry,
   onBulkDelete,
 }: DLQTableProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
   const [detailEntry, setDetailEntry] = useState<DLQEntry | null>(null);
@@ -722,7 +722,7 @@ export function DLQTable({
       </Dialog>
     </>
   );
-}
+})
 
 function extractErrorType(error: string): string {
   const match = error.match(/([a-zA-Z]+\.errors\.[a-zA-Z]+)/);

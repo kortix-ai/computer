@@ -82,19 +82,19 @@ function detectDesktopPlatform(): DesktopPlatform {
   return 'mac';
 }
 
-export function KortixAppBanners(props: KortixAppBannersProps) {
+export const KortixAppBanners = React.memo(function KortixAppBanners(props: KortixAppBannersProps) {
   const disableMobileAdvertising =
     props.disableMobileAdvertising ?? featureFlags.disableMobileAdvertising;
 
-  const [isVisible, setIsVisible] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(false);
   
   // Mobile banner state
-  const [mobileVisible, setMobileVisible] = useState(true);
+  const [mobileVisible, setMobileVisible] = React.useState(true);
   
   // Desktop banner state
-  const [desktopVisible, setDesktopVisible] = useState(true);
+  const [desktopVisible, setDesktopVisible] = React.useState(true);
   const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>('mac');
 
   // Notification prompt state
@@ -105,7 +105,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
   const dismissNotifPrompt = useWebNotificationStore((s) => s.dismissPrompt);
   const showNotifPrompt = !notifEnabled && !notifPromptDismissed && isNotificationSupported() && notifPermission !== 'denied';
 
-  useEffect(() => {
+  React.useEffect(() => {
     setMounted(true);
     setDesktopPlatform(detectDesktopPlatform());
     
@@ -133,7 +133,7 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
   }, [disableMobileAdvertising]);
 
   // Also show the popup if only the notification prompt should appear
-  useEffect(() => {
+  React.useEffect(() => {
     if (showNotifPrompt && !isVisible && mounted) {
       const timer = setTimeout(() => {
         setIsVisible(true);
@@ -437,5 +437,5 @@ export function KortixAppBanners(props: KortixAppBannersProps) {
       </div>
     </m.div>
   );
-}
+})
 

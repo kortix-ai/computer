@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, DataTableColumn } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
@@ -16,11 +16,11 @@ import type { FeedbackWithUser } from '@/hooks/admin/use-admin-feedback';
 
 export function AdminFeedbackTable() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [page, setPage] = React.useState(1);
+  const [pageSize] = React.useState(20);
   const [ratingFilter, setRatingFilter] = useState<string>('all');
   const [hasTextFilter, setHasTextFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState('created_at');
+  const [sortBy, setSortBy] = React.useState('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   const { data: feedbackListResponse, isLoading, error } = useAdminFeedbackList({

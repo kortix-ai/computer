@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -34,13 +34,13 @@ export function PhoneVerificationPage({
 }: PhoneVerificationPageProps) {
   const t = useTranslations('auth.phoneVerification');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [factorId, setFactorId] = useState('');
-  const [challengeId, setChallengeId] = useState('');
+  const [phoneNumber, setPhoneNumber] = React.useState('');
+  const [factorId, setFactorId] = React.useState('');
+  const [challengeId, setChallengeId] = React.useState('');
   const [success, setSuccess] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [isSubmittingPhone, setIsSubmittingPhone] = useState(false);
-  const [hasExistingFactor, setHasExistingFactor] = useState(false);
+  const [isSubmittingPhone, setIsSubmittingPhone] = React.useState(false);
+  const [hasExistingFactor, setHasExistingFactor] = React.useState(false);
   const router = useRouter();
 
   // Use React Query hooks
@@ -54,7 +54,7 @@ export function PhoneVerificationPage({
   const { data: aalData } = useGetAAL();
 
   // Check for existing verified factors on component mount
-  useEffect(() => {
+  React.useEffect(() => {
     // Don't interfere while we're submitting a phone number
     if (isSubmittingPhone) {
       return;

@@ -351,7 +351,7 @@ function calculateSnapResult(
 const EMPTY_FRAMES: FrameCanvasElement[] = [];
 
 // Image element with drag and resize
-function CanvasImageElement({
+const CanvasImageElement = React.memo(function CanvasImageElement({
   element,
   isSelected,
   onSelect,
@@ -379,7 +379,7 @@ function CanvasImageElement({
   onSnapChange?: (guides: SnapGuide[]) => void; // Callback to update snap guides
 }) {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = React.useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dragState, setDragState] = useState<{
     type: 'move' | 'resize';
@@ -392,7 +392,7 @@ function CanvasImageElement({
     startHeight: number;
   } | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // For temp merge placeholders with no src, just show loading state
     if (!element.src) {
       setLoading(true);
@@ -460,7 +460,7 @@ function CanvasImageElement({
     });
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!dragState) return;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -681,7 +681,7 @@ function CanvasImageElement({
       )}
     </div>
   );
-}
+})
 
 // Frame element - a container/viewport that can be exported
 function CanvasFrameElement({
@@ -758,7 +758,7 @@ function CanvasFrameElement({
     });
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!dragState) return;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -954,7 +954,7 @@ function CropOverlay({
     });
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!dragState) return;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -1083,7 +1083,7 @@ function CropOverlay({
 }
 
 // Floating AI Toolbar Component
-function FloatingToolbar({
+const FloatingToolbar = React.memo(function FloatingToolbar({
   element,
   scale,
   stagePosition,
@@ -1124,29 +1124,29 @@ function FloatingToolbar({
   authToken?: string;
   sandboxId?: string;
 }) {
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [editPrompt, setEditPrompt] = useState('');
+  const [editPrompt, setEditPrompt] = React.useState('');
 
   // Text edit mode state
-  const [textEditMode, setTextEditMode] = useState(false);
-  const [isDetectingText, setIsDetectingText] = useState(false);
+  const [textEditMode, setTextEditMode] = React.useState(false);
+  const [isDetectingText, setIsDetectingText] = React.useState(false);
   const [detectedTextRegions, setDetectedTextRegions] = useState<TextRegion[]>([]);
   const [selectedTextRegion, setSelectedTextRegion] = useState<TextRegion | null>(null);
-  const [newTextContent, setNewTextContent] = useState('');
+  const [newTextContent, setNewTextContent] = React.useState('');
   const [ocrImageSize, setOcrImageSize] = useState<{ width: number; height: number } | null>(null);
-  const [showTextEditDialog, setShowTextEditDialog] = useState(false);
-  const [isLowQualityOcr, setIsLowQualityOcr] = useState(false); // Skip bboxes, just prompt
+  const [showTextEditDialog, setShowTextEditDialog] = React.useState(false);
+  const [isLowQualityOcr, setIsLowQualityOcr] = React.useState(false); // Skip bboxes, just prompt
 
   // Crop mode state
-  const [cropMode, setCropMode] = useState(false);
+  const [cropMode, setCropMode] = React.useState(false);
   const [cropRect, setCropRect] = useState<{ x: number; y: number; width: number; height: number }>({
     x: 0.1, y: 0.1, width: 0.8, height: 0.8 // Normalized 0-1
   });
-  const [isCropping, setIsCropping] = useState(false);
+  const [isCropping, setIsCropping] = React.useState(false);
 
   // Sync with external selected region (from canvas-level clicks)
-  useEffect(() => {
+  React.useEffect(() => {
     if (externalSelectedRegion && externalSelectedRegion.id !== selectedTextRegion?.id) {
       setSelectedTextRegion(externalSelectedRegion);
       // Only pre-fill text if confidence is high enough (> 0.6), otherwise let user type
@@ -1158,7 +1158,7 @@ function FloatingToolbar({
   }, [externalSelectedRegion]);
 
   // Reset text edit mode when element changes (user clicks different image)
-  useEffect(() => {
+  React.useEffect(() => {
     // Cancel any ongoing text edit mode when switching elements
     setTextEditMode(false);
     setIsDetectingText(false);
@@ -1800,10 +1800,10 @@ function FloatingToolbar({
       </div>
     </div>
   );
-}
+})
 
 // Floating toolbar for Frame elements - simpler than image toolbar
-function FrameFloatingToolbar({
+const FrameFloatingToolbar = React.memo(function FrameFloatingToolbar({
   element,
   elements,
   scale,
@@ -1826,16 +1826,16 @@ function FrameFloatingToolbar({
   sandboxId?: string;
   authToken?: string;
 }) {
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const [showSizePopover, setShowSizePopover] = useState(false);
-  const [showNamePopover, setShowNamePopover] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [tempWidth, setTempWidth] = useState(String(Math.round(element.width)));
-  const [tempHeight, setTempHeight] = useState(String(Math.round(element.height)));
-  const [tempName, setTempName] = useState(element.name);
+  const [showColorPicker, setShowColorPicker] = React.useState(false);
+  const [showSizePopover, setShowSizePopover] = React.useState(false);
+  const [showNamePopover, setShowNamePopover] = React.useState(false);
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [tempWidth, setTempWidth] = React.useState(String(Math.round(element.width)));
+  const [tempHeight, setTempHeight] = React.useState(String(Math.round(element.height)));
+  const [tempName, setTempName] = React.useState(element.name);
 
   // Sync temp values when element changes
-  useEffect(() => {
+  React.useEffect(() => {
     setTempWidth(String(Math.round(element.width)));
     setTempHeight(String(Math.round(element.height)));
     setTempName(element.name);
@@ -2135,7 +2135,7 @@ function FrameFloatingToolbar({
       </div>
     </div>
   );
-}
+})
 
 // Multi-select toolbar for merging multiple images
 function MultiSelectToolbar({
@@ -2161,9 +2161,9 @@ function MultiSelectToolbar({
   authToken?: string;
   sandboxId?: string;
 }) {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [mergePrompt, setMergePrompt] = useState('');
-  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [mergePrompt, setMergePrompt] = React.useState('');
+  const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [imageOrder, setImageOrder] = useState<string[]>([]); // IDs in order
 
   // Initialize image order when dialog opens
@@ -2404,7 +2404,7 @@ function MultiSelectToolbar({
   );
 }
 
-export function CanvasRenderer({ content, filePath, fileName, sandboxId, className, onSave }: CanvasRendererProps) {
+export const CanvasRenderer = React.memo(function CanvasRenderer({ content, filePath, fileName, sandboxId, className, onSave }: CanvasRendererProps) {
   const { session } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2433,19 +2433,19 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
 
   const [canvasData, setCanvasData] = useState<CanvasData | null>(null);
-  const [scale, setScale] = useState(1);
-  const [stagePosition, setStagePosition] = useState({ x: 50, y: 50 });
+  const [scale, setScale] = React.useState(1);
+  const [stagePosition, setStagePosition] = React.useState({ x: 50, y: 50 });
   const [toolMode, setToolMode] = useState<'select' | 'pan'>('select');
-  const [isPanning, setIsPanning] = useState(false);
+  const [isPanning, setIsPanning] = React.useState(false);
   const isMounted = useSyncExternalStore(() => () => {}, () => true, () => false);
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const [containerSize, setContainerSize] = React.useState({ width: 800, height: 600 });
   const [selectionRect, setSelectionRect] = useState<{ startX: number; startY: number; x: number; y: number; w: number; h: number } | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
 
   // AI Generate state
-  const [generatePrompt, setGeneratePrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatePrompt, setGeneratePrompt] = React.useState('');
+  const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatedPreviews, setGeneratedPreviews] = useState<string[]>([]);
 
   const panStartRef = useRef<{ x: number; y: number; stageX: number; stageY: number } | null>(null);
@@ -2462,10 +2462,10 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
   );
 
   // Keep ref in sync with state
-  useEffect(() => { isSavingRef.current = isSaving; }, [isSaving]);
+  React.useEffect(() => { isSavingRef.current = isSaving; }, [isSaving]);
 
   // Parse content - handle empty, invalid, and valid JSON
-  useEffect(() => {
+  React.useEffect(() => {
     if (!content) {
       // No content yet - create empty canvas structure
       const emptyCanvas: CanvasData = {
@@ -2518,7 +2518,7 @@ export function CanvasRenderer({ content, filePath, fileName, sandboxId, classNa
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, fileName]);
-useEffect(() => {
+React.useEffect(() => {
     if (!containerRef.current) return;
     const updateSize = () => {
       if (containerRef.current) {
@@ -2538,7 +2538,7 @@ useEffect(() => {
   const elementsRef = useRef(elements);
 
   // Keep elementsRef in sync
-  useEffect(() => {
+  React.useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
 
@@ -2615,7 +2615,7 @@ useEffect(() => {
   }, [sandboxId, filePath, authToken]);
 
   // Listen for canvas-tool-updated events to trigger immediate refresh
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('[CANVAS_LIVE_DEBUG] Setting up canvas-tool-updated listener for filePath:', filePath);
 
     const handleCanvasUpdate = (event: CustomEvent<{ canvasPath: string; timestamp: number }>) => {
@@ -2663,7 +2663,7 @@ useEffect(() => {
     };
   }, [filePath, forceFetch]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!sandboxId || !filePath || !authToken) return;
 
     // Poll interval: 1.5 seconds for faster AI updates, skip when user is editing
@@ -2737,7 +2737,7 @@ useEffect(() => {
   }, [sandboxId, filePath, authToken]);
 
   // Center canvas and fit content on initial load only
-  useEffect(() => {
+  React.useEffect(() => {
     if (hasCenteredRef.current) return; // Already centered, don't run again
     if (elements.length === 0 || containerSize.width === 0 || containerSize.height === 0) return;
 
@@ -2780,11 +2780,11 @@ useEffect(() => {
   const scaleRef = useRef(scale);
   const stagePositionRef = useRef(stagePosition);
 
-  useEffect(() => { scaleRef.current = scale; }, [scale]);
-  useEffect(() => { stagePositionRef.current = stagePosition; }, [stagePosition]);
+  React.useEffect(() => { scaleRef.current = scale; }, [scale]);
+  React.useEffect(() => { stagePositionRef.current = stagePosition; }, [stagePosition]);
 
   // Attach wheel listener with passive: false
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isMounted) return;
 
     const currentContainer = containerRef.current;
@@ -2871,7 +2871,7 @@ useEffect(() => {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isPanning && !selectionRect) return;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -2957,7 +2957,7 @@ useEffect(() => {
 
   // Track unsaved changes - compare sanitized versions to avoid false positives
   const hasUnsavedChangesRef = useRef(false);
-  useEffect(() => {
+  React.useEffect(() => {
     if (canvasData && elements.length > 0) {
       // Sanitize both to ensure fair comparison (raw data might be missing defaults)
       const currentElementsJson = JSON.stringify(elements);
@@ -3062,7 +3062,7 @@ useEffect(() => {
     }
   }, [getNextImagePosition]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
@@ -4183,4 +4183,4 @@ useEffect(() => {
       </div>
     </div>
   );
-}
+})

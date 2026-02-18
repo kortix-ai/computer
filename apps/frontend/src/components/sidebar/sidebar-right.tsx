@@ -36,7 +36,7 @@ import { getDirectPortUrl, SANDBOX_PORTS } from '@/lib/platform-client';
 // Main Right Sidebar — Explorer + action buttons
 // ============================================================================
 
-export function SidebarRight() {
+export const SidebarRight = React.memo(function SidebarRight() {
   const {
     state,
     open,
@@ -362,4 +362,4 @@ export function SidebarRight() {
       </div>
     </>
   );
-}
+})

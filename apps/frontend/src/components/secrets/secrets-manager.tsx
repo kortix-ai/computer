@@ -4,7 +4,7 @@
  * SecretsManager — simple raw KV editor for sandbox environment variables.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Eye,
   EyeOff,
@@ -27,13 +27,13 @@ export function SecretsManager() {
   const setSecret = useSetSecret();
   const deleteSecret = useDeleteSecret();
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = React.useState('');
   const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [addingNew, setAddingNew] = useState(false);
-  const [newKey, setNewKey] = useState('');
-  const [newValue, setNewValue] = useState('');
+  const [editValue, setEditValue] = React.useState('');
+  const [addingNew, setAddingNew] = React.useState(false);
+  const [newKey, setNewKey] = React.useState('');
+  const [newValue, setNewValue] = React.useState('');
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
 
   const rows = useMemo(() => {

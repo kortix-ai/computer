@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Settings,
   Shield,
@@ -197,7 +197,7 @@ function ProvidersSection({
   const queryClient = useQueryClient();
   const { data: providers } = useOpenCodeProviders();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [connectView, setConnectView] = useState(false);
+  const [connectView, setConnectView] = React.useState(false);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
   const allProviders = useMemo(() => providers?.all ?? [], [providers]);
@@ -569,7 +569,7 @@ function StatusBadge({ status }: { status: McpStatus }) {
   );
 }
 
-function McpServersSection() {
+const McpServersSection = React.memo(function McpServersSection() {
   const { data: mcpStatus, isLoading } = useOpenCodeMcpStatus();
   const { data: toolIds } = useOpenCodeToolIds();
   const addMutation = useAddMcpServer();
@@ -582,19 +582,19 @@ function McpServersSection() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   // Add form state
-  const [addForm, setAddForm] = useState({
+  const [addForm, setAddForm] = React.useState({
     name: '',
     transportType: 'stdio' as 'stdio' | 'http',
     command: '',
     url: '',
     envPairs: [] as Array<{ key: string; value: string }>,
   });
-  const [addError, setAddError] = useState('');
+  const [addError, setAddError] = React.useState('');
 
   // Auth state
-  const [authUrl, setAuthUrl] = useState('');
-  const [authCode, setAuthCode] = useState('');
-  const [authError, setAuthError] = useState('');
+  const [authUrl, setAuthUrl] = React.useState('');
+  const [authCode, setAuthCode] = React.useState('');
+  const [authError, setAuthError] = React.useState('');
 
   const servers = useMemo(() => {
     if (!mcpStatus) return [];
@@ -1101,7 +1101,7 @@ function McpServersSection() {
       )}
     </div>
   );
-}
+})
 
 // ============================================================================
 // Main Dialog

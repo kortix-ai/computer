@@ -185,7 +185,7 @@ async function parsePptxBlob(blob: Blob): Promise<SlideData[]> {
 // Component
 // ---------------------------------------------------------------------------
 
-export function PptxRenderer({
+export const PptxRenderer = React.memo(function PptxRenderer({
   blob,
   binaryUrl,
   filePath,
@@ -196,17 +196,17 @@ export function PptxRenderer({
   isDownloading,
 }: PptxRendererProps) {
   const [slides, setSlides] = useState<SlideData[] | null>(null);
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentSlide, setCurrentSlide] = React.useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [retryCount, setRetryCount] = React.useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Check if we have a public URL for the doc-viewer path
   const hasPublicUrl = !!(project?.sandbox?.sandbox_url && filePath);
 
   // Parse PPTX from blob
-  useEffect(() => {
+  React.useEffect(() => {
     if (hasPublicUrl) {
       // Will use DocViewer instead
       setIsLoading(false);
@@ -291,7 +291,7 @@ export function PptxRenderer({
     setCurrentSlide((c) => Math.max(c - 1, 0));
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const el = containerRef.current;
     if (!el || !slides || slides.length <= 1) return;
 
@@ -493,4 +493,4 @@ export function PptxRenderer({
       )}
     </div>
   );
-}
+})

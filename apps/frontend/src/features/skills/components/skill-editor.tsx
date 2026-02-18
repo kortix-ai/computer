@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -42,9 +42,9 @@ export function SkillEditor() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   // Form state
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [body, setBody] = useState('');
+  const [name, setName] = React.useState('');
+  const [description, setDescription] = React.useState('');
+  const [body, setBody] = React.useState('');
 
   // Validation state
   const [nameError, setNameError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export function SkillEditor() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Reset form when dialog opens or skill changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isEditorOpen) return;
 
     if (editingSkill && editorMode === 'edit') {

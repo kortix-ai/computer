@@ -15,7 +15,7 @@
 
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Check, X, ChevronRight, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { QuestionRequest, QuestionAnswer, QuestionInfo } from '@/ui';
@@ -34,19 +34,19 @@ interface QuestionPromptProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptProps) {
+export const QuestionPrompt = React.memo(function QuestionPrompt({ request, onReply, onReject }: QuestionPromptProps) {
   const questions = request.questions;
   const isSingle = questions.length === 1 && !questions[0].multiple;
 
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = React.useState(0);
   const [answers, setAnswers] = useState<QuestionAnswer[]>(() =>
     questions.map(() => []),
   );
   const [customInputs, setCustomInputs] = useState<string[]>(() =>
     questions.map(() => ''),
   );
-  const [editing, setEditing] = useState(false);
-  const [replying, setReplying] = useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [replying, setReplying] = React.useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isConfirm = tab === questions.length;
@@ -379,4 +379,4 @@ export function QuestionPrompt({ request, onReply, onReject }: QuestionPromptPro
       </div>
     </div>
   );
-}
+})

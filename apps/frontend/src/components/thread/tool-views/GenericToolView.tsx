@@ -47,7 +47,7 @@ function extractMarkdownContent(text: string): { content: string; isMarkdown: bo
   return { content, isMarkdown };
 }
 
-export function GenericToolView({
+export const GenericToolView = React.memo(function GenericToolView({
   toolCall,
   toolResult,
   assistantTimestamp,
@@ -424,7 +424,7 @@ export function GenericToolView({
       </div>
     </Card>
   );
-}
+})
 
 /** Render parsed structured output sections with semantic styling (for detail panel). */
 function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }) {

@@ -164,7 +164,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
   const [rawCron, setRawCron] = useState(() => value);
   const [isCustom, setIsCustom] = useState(() => cronToState(value) === null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const parsed = cronToState(value);
     if (parsed) { setState(parsed); setIsCustom(false); }
     else { setIsCustom(true); }

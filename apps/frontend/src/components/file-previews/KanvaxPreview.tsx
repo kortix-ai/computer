@@ -117,7 +117,7 @@ export function KanvaxPreview({
   const [localError, setLocalError] = useState<Error | null>(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!localPreviewUrl) {
       setLocalData(null);
       return;

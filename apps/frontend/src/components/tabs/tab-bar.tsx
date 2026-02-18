@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -218,7 +218,7 @@ interface TabListDropdownProps {
 function TabListDropdown({ tabs, activeTabId, onActivate, onClose, anchorRef, getStatus }: TabListDropdownProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -562,7 +562,7 @@ function TabItem({
 // Tab Bar
 // ============================================================================
 
-export function TabBar() {
+export const TabBar = React.memo(function TabBar() {
   const router = useRouter();
   const pathname = usePathname();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -575,7 +575,7 @@ export function TabBar() {
   } | null>(null);
 
   // Tab list dropdown state
-  const [showTabList, setShowTabList] = useState(false);
+  const [showTabList, setShowTabList] = React.useState(false);
   const tabListBtnRef = useRef<HTMLButtonElement>(null);
 
   // Refs for the tab bar container, chrome-style curve elements, and scroll fade
@@ -1237,4 +1237,4 @@ export function TabBar() {
       )}
     </>
   );
-}
+})

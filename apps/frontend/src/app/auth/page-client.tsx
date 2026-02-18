@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useMediaQuery } from '@/hooks/utils';
-import { useState, useEffect, Suspense, lazy, useRef, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useRef, useSyncExternalStore } from 'react';
 import { signUp, verifyOtp } from './actions';
 import { useRouter } from 'next/navigation';
 import { Mail, MailCheck, Clock, ExternalLink } from 'lucide-react';
@@ -31,7 +31,7 @@ const GoogleSignIn = lazy(() => import('@/components/GoogleSignIn'));
 // const GitHubSignIn = lazy(() => import('@/components/GithubSignIn'));
 const AnimatedBg = lazy(() => import('@/components/ui/animated-bg').then(mod => ({ default: mod.AnimatedBg })));
 
-function LoginContent() {
+const LoginContent = React.memo(function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParamsCompat();
   const { user, isLoading } = useAuth();
@@ -44,16 +44,16 @@ function LoginContent() {
   const t = useTranslations('auth');
 
   const isSignUp = mode !== 'signin';
-  const [referralCode, setReferralCode] = useState(referralCodeParam);
-  const [showReferralInput, setShowReferralInput] = useState(false);
-  const [showReferralDialog, setShowReferralDialog] = useState(false);
+  const [referralCode, setReferralCode] = React.useState(referralCodeParam);
+  const [showReferralInput, setShowReferralInput] = React.useState(false);
+  const [showReferralDialog, setShowReferralDialog] = React.useState(false);
   const isMobile = useMediaQuery('(max-width: 768px)');
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false); // GDPR requires explicit opt-in
+  const [acceptedTerms, setAcceptedTerms] = React.useState(false); // GDPR requires explicit opt-in
 
   const { wasLastMethod: wasEmailLastMethod, markAsUsed: markEmailAsUsed } = useAuthMethodTracking('email');
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Redirect to dashboard if user is logged in
     if (!isLoading && user) {
       navigateReplace(router, returnUrl || '/dashboard');
@@ -68,25 +68,25 @@ function LoginContent() {
 
   // Registration success state
   const [registrationSuccess, setRegistrationSuccess] =
-    useState(!!isSuccessMessage);
-  const [registrationEmail, setRegistrationEmail] = useState('');
+    React.useState(!!isSuccessMessage);
+  const [registrationEmail, setRegistrationEmail] = React.useState('');
 
   // Expired link state
-  const [linkExpired, setLinkExpired] = useState(isExpired);
-  const [expiredEmailState, setExpiredEmailState] = useState(expiredEmail);
-  const [resendEmail, setResendEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [newCodeSent, setNewCodeSent] = useState(false);
-  const [autoSendingCode, setAutoSendingCode] = useState(false);
-  const [autoSendError, setAutoSendError] = useState(false);
+  const [linkExpired, setLinkExpired] = React.useState(isExpired);
+  const [expiredEmailState, setExpiredEmailState] = React.useState(expiredEmail);
+  const [resendEmail, setResendEmail] = React.useState('');
+  const [otpCode, setOtpCode] = React.useState('');
+  const [newCodeSent, setNewCodeSent] = React.useState(false);
+  const [autoSendingCode, setAutoSendingCode] = React.useState(false);
+  const [autoSendError, setAutoSendError] = React.useState(false);
   const autoSendAttempted = useRef(false);
-useEffect(() => {
+React.useEffect(() => {
     if (Boolean(isSuccessMessage)) {
       setRegistrationSuccess(true);
     }
   }, [isSuccessMessage]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isExpired)) {
       setLinkExpired(true);
       if (expiredEmail) {
@@ -96,7 +96,7 @@ useEffect(() => {
   }, [isExpired, expiredEmail]);
 
   // Auto-send new OTP code when link expires (if we have the email)
-  useEffect(() => {
+  React.useEffect(() => {
     const autoSendNewCode = async () => {
       if (!isExpired || !expiredEmail || autoSendAttempted.current || isLoading || user) {
         return;
@@ -786,7 +786,7 @@ useEffect(() => {
       </div>
     </div>
   );
-}
+})
 
 export default function LoginClient() {
   return (

@@ -53,7 +53,7 @@ function PaymentForm({
 }) {
   const stripe = useStripe();
   const elements = useElements();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Use actual amount from Stripe if available (includes discounts), otherwise calculate from plan
@@ -230,11 +230,11 @@ function PlanPicker({
   defaultPeriod?: BillingPeriod;
 }) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>(defaultPeriod || 'yearly');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
   const promo = usePromo();
   const accountState = useSubscriptionStore((state) => state.accountState);
-  const [promoCode, setPromoCode] = useState(promo?.promoCode || '');
-  const [showPromoInput, setShowPromoInput] = useState(false);
+  const [promoCode, setPromoCode] = React.useState(promo?.promoCode || '');
+  const [showPromoInput, setShowPromoInput] = React.useState(false);
 
   // Get current tier's credits to filter available upgrade plans (converted to display format: 1$ = 100 credits)
   const isAccountLoaded = accountState !== null;

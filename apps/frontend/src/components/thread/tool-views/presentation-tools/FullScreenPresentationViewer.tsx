@@ -49,7 +49,7 @@ interface FullScreenPresentationViewerProps {
   initialSlide?: number;
 }
 
-export function FullScreenPresentationViewer({
+export const FullScreenPresentationViewer = React.memo(function FullScreenPresentationViewer({
   isOpen,
   onClose,
   presentationName,
@@ -57,17 +57,17 @@ export function FullScreenPresentationViewer({
   initialSlide = 1,
 }: FullScreenPresentationViewerProps) {
   const [metadata, setMetadata] = useState<PresentationMetadata | null>(null);
-  const [currentSlide, setCurrentSlide] = useState(() => initialSlide);
-  const [isLoading, setIsLoading] = useState(false);
+  const [currentSlide, setCurrentSlide] = React.useState(() => initialSlide);
+  const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [retryAttempt, setRetryAttempt] = React.useState(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasLoadedRef = useRef(false);
-  const [showControls, setShowControls] = useState(true);
-  const [showEditor, setShowEditor] = useState(false);
-  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
-  const [isDownloadingPPTX, setIsDownloadingPPTX] = useState(false);
-  const [isDownloadingGoogleSlides, setIsDownloadingGoogleSlides] = useState(false);
+  const [showControls, setShowControls] = React.useState(true);
+  const [showEditor, setShowEditor] = React.useState(false);
+  const [isDownloadingPDF, setIsDownloadingPDF] = React.useState(false);
+  const [isDownloadingPPTX, setIsDownloadingPPTX] = React.useState(false);
+  const [isDownloadingGoogleSlides, setIsDownloadingGoogleSlides] = React.useState(false);
   
   // Track the previous isOpen state to detect when modal opens
   const wasOpenRef = useRef(false);
@@ -163,7 +163,7 @@ export function FullScreenPresentationViewer({
   }, [presentationName, sandboxUrl]);
 
   // Sync currentSlide with initialSlide when modal opens (not on every initialSlide change)
-  useEffect(() => {
+  React.useEffect(() => {
     const justOpened = isOpen && !wasOpenRef.current;
     wasOpenRef.current = isOpen;
     
@@ -196,7 +196,7 @@ export function FullScreenPresentationViewer({
   }, [isOpen, presentationName, sandboxUrl, initialSlide, loadMetadata]);
 
   // Cleanup retry timeout on unmount
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
@@ -205,7 +205,7 @@ export function FullScreenPresentationViewer({
   }, []);
 
   // Reload metadata when exiting editor mode to refresh with latest changes
-  useEffect(() => {
+  React.useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
     if (!showEditor && isOpen) {
@@ -240,7 +240,7 @@ export function FullScreenPresentationViewer({
   }, [currentSlide]);
 
   // Keyboard navigation
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -286,7 +286,7 @@ export function FullScreenPresentationViewer({
 
 
   // Always show controls
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isOpen)) {
       setShowControls(true);
     }
@@ -331,9 +331,9 @@ export function FullScreenPresentationViewer({
   const SlideIframe = useMemo(() => {
     const SlideIframeComponent = React.memo(({ slide }: { slide: SlideMetadata & { number: number } }) => {
       const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
-      const [scale, setScale] = useState(1);
+      const [scale, setScale] = React.useState(1);
 
-      useEffect(() => {
+      React.useEffect(() => {
         if (Boolean(containerRef)) {
           const updateScale = () => {
             const containerWidth = containerRef.offsetWidth;
@@ -620,4 +620,4 @@ export function FullScreenPresentationViewer({
       </div>
     </div>
   );
-}
+})

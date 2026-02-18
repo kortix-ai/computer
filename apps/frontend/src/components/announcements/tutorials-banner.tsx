@@ -14,7 +14,7 @@ export function TutorialsBanner() {
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
 
-  useEffect(() => {
+  React.useEffect(() => {
     setMounted(true);
     
     // Only show for logged-in users who haven't dismissed

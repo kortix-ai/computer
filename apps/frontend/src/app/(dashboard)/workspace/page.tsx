@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Bot,
@@ -84,7 +84,7 @@ const SCOPE_CONFIG: Record<ItemScope, { label: string; color: string }> = {
 // Workspace Page
 // ---------------------------------------------------------------------------
 
-export default function WorkspacePage() {
+const WorkspacePage = React.memo(function WorkspacePage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
@@ -428,4 +428,6 @@ export default function WorkspacePage() {
       </div>
     </div>
   );
-}
+})
+
+export default WorkspacePage;

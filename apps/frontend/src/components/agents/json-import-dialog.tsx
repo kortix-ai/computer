@@ -22,18 +22,18 @@ interface JsonImportDialogProps {
   initialJsonText?: string;
 }
 
-export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
+export const JsonImportDialog: React.FC<JsonImportDialogProps> = React.memo(({
   open,
   onOpenChange,
   onSuccess,
   initialJsonText
 }) => {
   const [step, setStep] = useState<'paste' | 'setup' | 'importing'>('paste');
-  const [jsonText, setJsonText] = useState('');
-  const [instanceName, setInstanceName] = useState('');
+  const [jsonText, setJsonText] = React.useState('');
+  const [instanceName, setInstanceName] = React.useState('');
   const [analysis, setAnalysis] = useState<JsonAnalysisResult | null>(null);
   const [setupSteps, setSetupSteps] = useState<SetupStep[]>([]);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = React.useState(0);
   const [profileMappings, setProfileMappings] = useState<Record<string, string>>({});
   const [customMcpConfigs, setCustomMcpConfigs] = useState<Record<string, Record<string, any>>>({});
 
@@ -390,4 +390,4 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-}; 
+});

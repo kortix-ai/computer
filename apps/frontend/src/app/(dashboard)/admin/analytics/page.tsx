@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -52,18 +52,18 @@ function getBerlinToday(): Date {
   return new Date(year, month - 1, day);
 }
 
-export default function AdminAnalyticsPage() {
+const AdminAnalyticsPage = React.memo(function AdminAnalyticsPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
     from: getBerlinToday(),
     to: getBerlinToday(),
   });
   const clickedDateRef = useRef<Date | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = React.useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [tierViewMode, setTierViewMode] = useState<'revenue' | 'cost' | 'profit'>('revenue');
-  const [includeStuckTasks, setIncludeStuckTasks] = useState(false);
+  const [includeStuckTasks, setIncludeStuckTasks] = React.useState(false);
 
   const handleCategoryFilter = (category: string | null) => {
     setCategoryFilter(category);
@@ -77,7 +77,7 @@ export default function AdminAnalyticsPage() {
 
   // User details dialog state
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
-  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [isUserDialogOpen, setIsUserDialogOpen] = React.useState(false);
   const [pendingUserEmail, setPendingUserEmail] = useState<string | null>(null);
 
   const { data: userSearchResult, isLoading: isSearchingUser, isFetching: isUserFetching } = useAdminUserList({
@@ -88,7 +88,7 @@ export default function AdminAnalyticsPage() {
 
   const { refreshUserList, refreshUserStats } = useRefreshUserData();
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!pendingUserEmail || isSearchingUser || isUserFetching) return;
 
     if (userSearchResult?.data && userSearchResult.data.length > 0) {
@@ -968,4 +968,6 @@ export default function AdminAnalyticsPage() {
       </div>
     </div>
   );
-}
+})
+
+export default AdminAnalyticsPage;

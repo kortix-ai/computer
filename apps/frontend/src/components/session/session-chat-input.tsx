@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ArrowUp,
   ChevronDown,
@@ -135,13 +135,13 @@ function AgentSelector({
   selectedAgent: string | null;
   onSelect: (agentName: string | null) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [flash, setFlash] = useState(false);
+  const [open, setOpen] = React.useState(false);
+  const [flash, setFlash] = React.useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const prevAgentRef = useRef(selectedAgent);
 
   // Flash highlight when agent changes (e.g. via Tab cycling)
-  useEffect(() => {
+  React.useEffect(() => {
     if (prevAgentRef.current !== selectedAgent && prevAgentRef.current !== null) {
       setFlash(true);
       const timer = setTimeout(() => setFlash(false), 400);
@@ -151,11 +151,11 @@ function AgentSelector({
   }, [selectedAgent]);
 
   // Update ref after flash starts
-  useEffect(() => {
+  React.useEffect(() => {
     prevAgentRef.current = selectedAgent;
   }, [selectedAgent]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
@@ -270,7 +270,7 @@ const AUTO_COMPACT_THRESHOLD = 0.9;
 function TokenProgress({ messages, sessionId, models, selectedModel }: { messages: MessageWithParts[] | undefined; sessionId?: string; models?: FlatModel[]; selectedModel?: { providerID: string; modelID: string } | null }) {
   const summarize = useSummarizeOpenCodeSession();
   const autoCompactTriggered = useRef(false);
-  const [isCompacting, setIsCompacting] = useState(false);
+  const [isCompacting, setIsCompacting] = React.useState(false);
 
   // Use the LAST assistant message's input tokens as the context window fill level.
   // Each API call's input tokens represent the full prompt size (all prior context),
@@ -305,14 +305,14 @@ function TokenProgress({ messages, sessionId, models, selectedModel }: { message
   const ratio = contextTokens > 0 ? Math.min(contextTokens / contextLimit, 1) : 0;
 
   // Reset auto-compact flag if ratio drops below threshold (e.g. after compaction)
-  useEffect(() => {
+  React.useEffect(() => {
     if (ratio < AUTO_COMPACT_THRESHOLD) {
       autoCompactTriggered.current = false;
     }
   }, [ratio]);
 
   // Auto-compact at 90% threshold
-  useEffect(() => {
+  React.useEffect(() => {
     if (
       ratio >= AUTO_COMPACT_THRESHOLD &&
       !autoCompactTriggered.current &&
@@ -536,7 +536,7 @@ function SlashCommandPopover({
   }, [commands, filter]);
 
   // Scroll selected item into view
-  useEffect(() => {
+  React.useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
     const item = container.children[selectedIndex] as HTMLElement | undefined;
@@ -615,7 +615,7 @@ function MentionPopover({
   const listRef = useRef<HTMLDivElement>(null);
 
   // Scroll selected item into view
-  useEffect(() => {
+  React.useEffect(() => {
     const el = listRef.current?.querySelector(`[data-mention-index="${selectedIndex}"]`) as HTMLElement | null;
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
@@ -772,7 +772,7 @@ interface SessionChatInputProps {
   providers?: ProviderListResponse;
 }
 
-export function SessionChatInput({
+export const SessionChatInput = React.memo(function SessionChatInput({
   onSend,
   isBusy = false,
   onStop,
@@ -812,15 +812,15 @@ export function SessionChatInput({
     ],
     [placeholder],
   );
-  const [text, setText] = useState('');
-  const [showAnimatedPlaceholder, setShowAnimatedPlaceholder] = useState(true);
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [text, setText] = React.useState('');
+  const [showAnimatedPlaceholder, setShowAnimatedPlaceholder] = React.useState(true);
+  const [placeholderIndex, setPlaceholderIndex] = React.useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [slashFilter, setSlashFilter] = useState<string | null>(null);
-  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashIndex, setSlashIndex] = React.useState(0);
   const [stagedCommand, setStagedCommand] = useState<Command | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
@@ -834,10 +834,10 @@ export function SessionChatInput({
 
   // @ mention state
   const [mentionQuery, setMentionQuery] = useState<{ query: string; triggerPos: number } | null>(null);
-  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionIndex, setMentionIndex] = React.useState(0);
   const [mentions, setMentions] = useState<TrackedMention[]>([]);
   const [fileResults, setFileResults] = useState<string[]>([]);
-  const [fileSearchLoading, setFileSearchLoading] = useState(false);
+  const [fileSearchLoading, setFileSearchLoading] = React.useState(false);
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileSearchSeq = useRef(0); // sequence counter to discard stale results
   // Cache of all file results seen during the current mention session.
@@ -849,7 +849,7 @@ export function SessionChatInput({
   // Sessions for @ mention search
   const { data: allSessions } = useOpenCodeSessions();
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (text.trim().length > 0) {
       setShowAnimatedPlaceholder(false);
       return;
@@ -875,7 +875,7 @@ export function SessionChatInput({
   // is activated from the sidebar or dashboard). Only the visible textarea
   // (inside the active, non-hidden tab) will respond. Retries briefly in case
   // the event fires before React has finished rendering the new tab.
-  useEffect(() => {
+  React.useEffect(() => {
     const handler = () => {
       const tryFocus = (retries: number) => {
         const el = textareaRef.current;
@@ -928,7 +928,7 @@ export function SessionChatInput({
   // Focus the textarea whenever it becomes visible (handles mount, tab switch,
   // and new-session creation where the component may mount inside a hidden div
   // that is revealed after a Zustand state update).
-  useEffect(() => {
+  React.useEffect(() => {
     if (!shouldAutoFocus) return;
     const el = textareaRef.current;
     if (!el) return;
@@ -987,7 +987,7 @@ export function SessionChatInput({
   // Debounced file search for @ mentions
   // Uses a persistent cache (fileResultsCache) so that narrowing a query never
   // loses results — even if the API returns empty for longer queries.
-  useEffect(() => {
+  React.useEffect(() => {
     clearTimeout(fileSearchTimer.current);
     if (!mentionQuery) {
       setFileResults([]);
@@ -1088,7 +1088,7 @@ export function SessionChatInput({
   }, [mentionQuery, agents, allSessions, sessionId, fileResults]);
 
   // Clamp mention index when items change to prevent out-of-bounds selection
-  useEffect(() => {
+  React.useEffect(() => {
     if (mentionItems.length > 0) {
       setMentionIndex((i) => Math.min(i, mentionItems.length - 1));
     }
@@ -1608,4 +1608,4 @@ export function SessionChatInput({
       </div>
     </div>
   );
-}
+})

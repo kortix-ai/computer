@@ -117,15 +117,15 @@ interface TaskDetailPanelProps {
   onClose: () => void;
 }
 
-export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
+export const TaskDetailPanel = React.memo(function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
   const [tab, setTab] = useState<'settings' | 'executions'>('settings');
-  const [name, setName] = useState(trigger.name);
-  const [cronExpr, setCronExpr] = useState(trigger.cronExpr);
-  const [timezone, setTimezone] = useState(trigger.timezone);
-  const [prompt, setPrompt] = useState(trigger.prompt);
+  const [name, setName] = React.useState(trigger.name);
+  const [cronExpr, setCronExpr] = React.useState(trigger.cronExpr);
+  const [timezone, setTimezone] = React.useState(trigger.timezone);
+  const [prompt, setPrompt] = React.useState(trigger.prompt);
   const [sessionMode, setSessionMode] = useState<SessionMode>(trigger.sessionMode as SessionMode);
-  const [agentName, setAgentName] = useState(trigger.agentName || '');
-  const [isDirty, setIsDirty] = useState(false);
+  const [agentName, setAgentName] = React.useState(trigger.agentName || '');
+  const [isDirty, setIsDirty] = React.useState(false);
 
   const updateMutation = useUpdateTrigger();
   const deleteMutation = useDeleteTrigger();
@@ -434,12 +434,12 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
       </div>
     </div>
   );
-}
+})
 
 // ─── Execution Item ─────────────────────────────────────────────────────────
 
 function ExecutionItem({ execution }: { execution: Execution }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = React.useState(false);
 
   return (
     <div

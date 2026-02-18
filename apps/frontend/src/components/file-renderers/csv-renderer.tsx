@@ -68,11 +68,11 @@ export function CsvRenderer({
     compact = false,
     containerHeight = 300,
 }: CsvRendererProps) {
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = React.useState('');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
     const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
-    const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage] = useState(50);
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const [rowsPerPage] = React.useState(50);
 
     const parsedData = parseCSV(content);
     const isEmpty = parsedData.data.length === 0;

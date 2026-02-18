@@ -95,7 +95,7 @@ function ArrayEditor({
   onChange: (v: string[]) => void;
   placeholder: string;
 }) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = React.useState('');
 
   const add = () => {
     const trimmed = input.trim();
@@ -302,9 +302,9 @@ function RulesTab({
 }) {
   const [agentsMd, setAgentsMd] = useState<string | null>(null);
   const [agentsMdDraft, setAgentsMdDraft] = useState<string | null>(null);
-  const [loadingMd, setLoadingMd] = useState(true);
+  const [loadingMd, setLoadingMd] = React.useState(true);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let cancelled = false;
     setLoadingMd(true);
     readFile('AGENTS.md')
@@ -458,8 +458,8 @@ function ProvidersTab({
   const enabledProviders = (draft.enabled_providers as string[]) ?? config.enabled_providers;
   const customProviders = (draft.provider ?? config.provider ?? {}) as Record<string, any>;
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [connectProviderOpen, setConnectProviderOpen] = useState(false);
-  const [manageModelsOpen, setManageModelsOpen] = useState(false);
+  const [connectProviderOpen, setConnectProviderOpen] = React.useState(false);
+  const [manageModelsOpen, setManageModelsOpen] = React.useState(false);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
   const allProviders = useMemo(() => providers?.all ?? [], [providers]);
@@ -704,11 +704,11 @@ function McpTab({
   const { data: mcpStatusData } = useOpenCodeMcpStatus();
   const mcpConfig = (draft.mcp ?? config.mcp ?? {}) as Record<string, any>;
 
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [newName, setNewName] = React.useState('');
   const [newType, setNewType] = useState<'local' | 'remote'>('local');
-  const [newCommand, setNewCommand] = useState('');
-  const [newUrl, setNewUrl] = useState('');
+  const [newCommand, setNewCommand] = React.useState('');
+  const [newUrl, setNewUrl] = React.useState('');
 
   const handleAdd = () => {
     const name = newName.trim();
@@ -1081,10 +1081,10 @@ function AdvancedTab({
   const formatter = draft.formatter ?? config.formatter;
   const lsp = draft.lsp ?? config.lsp;
 
-  const [rawJson, setRawJson] = useState('');
-  const [showRaw, setShowRaw] = useState(false);
+  const [rawJson, setRawJson] = React.useState('');
+  const [showRaw, setShowRaw] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(showRaw)) {
       const raw: Record<string, unknown> = {};
       if (formatter !== undefined) raw.formatter = formatter;

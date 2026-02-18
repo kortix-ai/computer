@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
@@ -195,7 +195,7 @@ interface MarkdownToolbarProps {
   sandboxId?: string; // Sandbox ID for uploading images
 }
 
-export function MarkdownToolbar({ 
+export const MarkdownToolbar = React.memo(function MarkdownToolbar({ 
   editor, 
   saveState = 'idle', 
   onSave, 
@@ -207,12 +207,12 @@ export function MarkdownToolbar({
   hasChanges = false,
   sandboxId,
 }: MarkdownToolbarProps) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
-  const [imageUrl, setImageUrl] = useState('');
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [isImageDialogOpen, setIsImageDialogOpen] = React.useState(false);
+  const [imageUrl, setImageUrl] = React.useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use Tiptap's proper state hooks for reactive state management
@@ -964,5 +964,5 @@ export function MarkdownToolbar({
       {imageDialog}
     </TooltipProvider>
   );
-}
+})
 

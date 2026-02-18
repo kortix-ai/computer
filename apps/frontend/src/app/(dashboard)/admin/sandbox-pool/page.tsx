@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from 'react';
 import { 
   Box, 
   RefreshCw, 
@@ -32,7 +32,7 @@ import {
   useSandboxPoolRestart,
 } from "@/hooks/admin/use-sandbox-pool";
 
-export default function SandboxPoolAdminPage() {
+const SandboxPoolAdminPage = React.memo(function SandboxPoolAdminPage() {
   const [createCount, setCreateCount] = useState(1);
 
   const { data: health, isLoading: healthLoading } = useSandboxPoolHealth();
@@ -448,4 +448,6 @@ export default function SandboxPoolAdminPage() {
       </div>
     </div>
   );
-}
+})
+
+export default SandboxPoolAdminPage;

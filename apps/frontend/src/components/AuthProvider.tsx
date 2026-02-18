@@ -85,7 +85,7 @@ function CloudAuthProvider({
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const getInitialSession = async () => {
       try {
         const {

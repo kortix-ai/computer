@@ -286,7 +286,7 @@ async function parseXlsFormat(arrayBuffer: ArrayBuffer): Promise<ParsedWorkbook>
   return { sheets, sheetNames };
 }
 
-export function XlsxRenderer({
+export const XlsxRenderer = React.memo(function XlsxRenderer({
   filePath,
   fileName,
   className,
@@ -294,13 +294,13 @@ export function XlsxRenderer({
   project
 }: XlsxRendererProps) {
   const { session } = useAuth();
-  const [sheetIndex, setSheetIndex] = useState(0);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [sheetIndex, setSheetIndex] = React.useState(0);
+  const [searchTerm, setSearchTerm] = React.useState('');
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [rowsPerPage] = React.useState(50);
   const [sortConfig, setSortConfig] = useState<{ column: string; direction: 'asc' | 'desc' | null }>({ column: '', direction: null });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedWorkbook>({ sheets: [], sheetNames: [] });
 
@@ -635,4 +635,4 @@ export function XlsxRenderer({
       )}
     </div>
   );
-}
+})

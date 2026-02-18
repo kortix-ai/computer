@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { m, AnimatePresence } from 'framer-motion';
 
@@ -59,7 +59,7 @@ export function MobileAppInterstitial() {
   const [isVisible, setIsVisible] = useState(false);
   const [platform, setPlatform] = useState<Platform | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const detected = detectPlatform();
     setPlatform(detected);
 

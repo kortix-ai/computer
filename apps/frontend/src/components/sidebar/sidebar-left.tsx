@@ -404,7 +404,7 @@ function UserProfileSection({ user }: { user: { name: string; email: string; ava
 // Main Sidebar
 // ============================================================================
 
-export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export const SidebarLeft = React.memo(function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state, setOpen, setOpenMobile } = useSidebar();
   const isMobile = useIsMobile();
   const router = useRouter();
@@ -794,6 +794,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       <SidebarRail />
     </Sidebar>
   );
-}
+})
 
 export { FloatingMobileMenuButton };

@@ -79,7 +79,7 @@ import type {
   ReactElement,
   ReactNode,
 } from 'react';
-import {
+import React, {
   cloneElement,
   createContext,
   useContext,
@@ -578,7 +578,7 @@ export const CodeBlockContent = ({
   const [highlightedCode, setHighlightedCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState(() => syntaxHighlighting);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!syntaxHighlighting) {
       setIsLoading(false);
       return;

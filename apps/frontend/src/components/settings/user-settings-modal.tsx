@@ -129,7 +129,7 @@ export function UserSettingsModal({
     const router = useRouter();
     const isMobile = useIsMobile();
     const [activeTab, setActiveTab] = useState<TabId>(() => defaultTab);
-    const [showPlanModal, setShowPlanModal] = useState(false);
+    const [showPlanModal, setShowPlanModal] = React.useState(false);
     const isLocal = isLocalMode();
     const tabs: Tab[] = [
         { id: 'general', label: 'General', icon: Settings },
@@ -311,20 +311,20 @@ export function UserSettingsModal({
 }
 
 
-function GeneralTab({ onClose }: { onClose: () => void }) {
+const GeneralTab = React.memo(function GeneralTab({ onClose }: { onClose: () => void }) {
     const t = useTranslations('settings.general');
     const tCommon = useTranslations('common');
-    const [userName, setUserName] = useState('');
-    const [userEmail, setUserEmail] = useState('');
-    const [avatarUrl, setAvatarUrl] = useState('');
+    const [userName, setUserName] = React.useState('');
+    const [userEmail, setUserEmail] = React.useState('');
+    const [avatarUrl, setAvatarUrl] = React.useState('');
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
-    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showCancelDialog, setShowCancelDialog] = useState(false);
-    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+    const [showCancelDialog, setShowCancelDialog] = React.useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = React.useState('');
     const [deletionType, setDeletionType] = useState<'grace-period' | 'immediate'>('grace-period');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
@@ -335,7 +335,7 @@ function GeneralTab({ onClose }: { onClose: () => void }) {
     const cancelDeletion = useCancelAccountDeletion();
     const deleteImmediately = useDeleteAccountImmediately();
 
-    useEffect(() => {
+    React.useEffect(() => {
         const fetchUserData = async () => {
             setIsLoading(true);
             const { data } = await supabase.auth.getUser();
@@ -802,7 +802,7 @@ function GeneralTab({ onClose }: { onClose: () => void }) {
             )}
         </div>
     );
-}
+})
 
 // ============================================================================
 // Keyboard Shortcuts Tab
@@ -1027,7 +1027,7 @@ function NotificationsTab() {
     const setPreference = useWebNotificationStore((s) => s.setPreference);
     const syncPermission = useWebNotificationStore((s) => s.syncPermission);
 
-    useEffect(() => {
+    React.useEffect(() => {
         syncPermission();
     }, [syncPermission]);
 
@@ -1181,10 +1181,10 @@ function NotificationToggle({ icon: Icon, label, description, enabled, onToggle,
 }
 
 // Billing Tab Component - Usage, credits, subscription management
-function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: string; onOpenPlanModal: () => void; isActive: boolean }) {
+const BillingTab = React.memo(function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: string; onOpenPlanModal: () => void; isActive: boolean }) {
     const { session, isLoading: authLoading } = useAuth();
-    const [showCreditPurchaseModal, setShowCreditPurchaseModal] = useState(false);
-    const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [showCreditPurchaseModal, setShowCreditPurchaseModal] = React.useState(false);
+    const [showCancelDialog, setShowCancelDialog] = React.useState(false);
     const queryClient = useQueryClient();
 
     const isLocal = isLocalMode();
@@ -1258,7 +1258,7 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
 
     // Refetch billing info whenever the billing tab becomes active (only once per activation)
     const prevIsActiveRef = useRef(false);
-    useEffect(() => {
+    React.useEffect(() => {
         // Only refetch if tab just became active (not on every render)
         if (isActive && !prevIsActiveRef.current && session && !authLoading) {
             console.log('🔄 Billing tab activated, refetching billing info...');
@@ -1660,7 +1660,7 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
             />
         </div>
     );
-}
+})
 
 function CreditsHelpAlert() {
   return (

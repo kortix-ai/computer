@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import Image from 'next/image';
 import { Computer, CornerDownLeft, Paperclip, Mic, Zap, FolderOpen, Globe, Presentation, BarChart3, FileText, Search, Image as ImageIcon, ChevronRight, File, Database } from 'lucide-react';
@@ -195,12 +195,12 @@ const exampleShowcases = [
   },
 ];
 
-export function ExampleShowcase() {
-  const [activeExample, setActiveExample] = useState(0);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [aiText, setAiText] = useState('');
+export const ExampleShowcase = React.memo(function ExampleShowcase() {
+  const [activeExample, setActiveExample] = React.useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = React.useState(0);
+  const [aiText, setAiText] = React.useState('');
   const [selectedView, setSelectedView] = useState<ViewType>('terminal');
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentSlide, setCurrentSlide] = React.useState(0);
   const [displayedContent, setDisplayedContent] = useState<Step | null>(null);
 
   const currentExample = exampleShowcases[activeExample];
@@ -214,7 +214,7 @@ export function ExampleShowcase() {
   const SLIDE_DURATION = 1500; // Time per slide
 
   // Auto-play - switch examples
-  useEffect(() => {
+  React.useEffect(() => {
     const autoplayTimer = setTimeout(() => {
       setActiveExample((prev) => (prev + 1) % exampleShowcases.length);
       setCurrentStepIndex(0);
@@ -237,7 +237,7 @@ export function ExampleShowcase() {
   }
 
   // Animate through steps
-  useEffect(() => {
+  React.useEffect(() => {
     const step = currentExample.steps[currentStepIndex];
     if (!step) return;
 
@@ -706,4 +706,4 @@ export function ExampleShowcase() {
       </Card>
     </div>
   );
-}
+})

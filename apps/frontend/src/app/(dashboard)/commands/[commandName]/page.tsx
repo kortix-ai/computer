@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -105,20 +105,20 @@ function stripFrontmatter(text: string): string {
 // Command Detail Page
 // ---------------------------------------------------------------------------
 
-export default function CommandDetailPage() {
+const CommandDetailPage = React.memo(function CommandDetailPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const commandName = decodeURIComponent(params.commandName as string);
 
   const { data: commands, isLoading, error } = useOpenCodeCommands();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = React.useState(false);
 
   // Edit state
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDescription, setEditDescription] = useState('');
-  const [editBody, setEditBody] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editDescription, setEditDescription] = React.useState('');
+  const [editBody, setEditBody] = React.useState('');
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const command = useMemo(() => {
     if (!commands) return null;
@@ -487,4 +487,6 @@ export default function CommandDetailPage() {
       </div>
     </div>
   );
-}
+})
+
+export default CommandDetailPage;

@@ -2,7 +2,7 @@
 
 
 import dynamic from 'next/dynamic';
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,24 +61,24 @@ import type {
   ARRSimulatorProps,
 } from '../../types';
 
-export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
+export const ARRSimulator = React.memo(function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
   // Fetch config from database
   const { data: configData, isLoading: configLoading } = useARRSimulatorConfig();
   const updateConfigMutation = useUpdateARRSimulatorConfig();
 
   // Local state for config (initialized from DB, saved on blur)
-  const [startingSubs, setStartingSubs] = useState(639);
-  const [startingMRR, setStartingMRR] = useState(21646);
-  const [weeklyVisitors, setWeeklyVisitors] = useState(40000);
-  const [landingConversion, setLandingConversion] = useState(25);
-  const [signupToPaid, setSignupToPaid] = useState(1);
-  const [arpu, setArpu] = useState(34);
-  const [monthlyChurn, setMonthlyChurn] = useState(25);
-  const [visitorGrowth, setVisitorGrowth] = useState(5);
-  const [targetARR, setTargetARR] = useState(10000000);
+  const [startingSubs, setStartingSubs] = React.useState(639);
+  const [startingMRR, setStartingMRR] = React.useState(21646);
+  const [weeklyVisitors, setWeeklyVisitors] = React.useState(40000);
+  const [landingConversion, setLandingConversion] = React.useState(25);
+  const [signupToPaid, setSignupToPaid] = React.useState(1);
+  const [arpu, setArpu] = React.useState(34);
+  const [monthlyChurn, setMonthlyChurn] = React.useState(25);
+  const [visitorGrowth, setVisitorGrowth] = React.useState(5);
+  const [targetARR, setTargetARR] = React.useState(10000000);
 
   // Initialize state from database when config loads
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(configData)) {
       setStartingSubs(configData.starting_subs);
       setStartingMRR(configData.starting_mrr);
@@ -408,7 +408,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
   const [pendingOverrides, setPendingOverrides] = useState<Record<string, boolean>>({});
   
   // Clear pending overrides when actual data updates (API call completed)
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(arrActualsData)) {
       setPendingOverrides({});
     }
@@ -608,7 +608,7 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
   const [pendingMonthlyOverrides, setPendingMonthlyOverrides] = useState<Record<string, boolean>>({});
   
   // Clear pending monthly overrides when data updates
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(arrMonthlyActualsData)) {
       setPendingMonthlyOverrides({});
     }
@@ -2537,4 +2537,4 @@ export function ARRSimulator({ analyticsSource }: ARRSimulatorProps) {
 
     </div>
   );
-}
+})

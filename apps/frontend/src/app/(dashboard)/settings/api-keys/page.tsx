@@ -58,7 +58,7 @@ interface NewAPIKeyData {
   expiresInDays: string;
 }
 
-export default function APIKeysPage() {
+const APIKeysPage = React.memo(function APIKeysPage() {
   const activeSandboxId = useKortixComputerStore((s) => s.currentSandboxId);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyData, setNewKeyData] = useState<NewAPIKeyData>({
@@ -594,4 +594,6 @@ export default function APIKeysPage() {
       </div>
     </div>
   );
-}
+})
+
+export default APIKeysPage;

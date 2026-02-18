@@ -32,7 +32,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function VideoRenderer({
+export const VideoRenderer = React.memo(function VideoRenderer({
   url,
   className,
   compact = false,
@@ -43,16 +43,16 @@ export function VideoRenderer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [showInfo, setShowInfo] = useState(false);
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [isMuted, setIsMuted] = React.useState(false);
+  const [volume, setVolume] = React.useState(1);
+  const [currentTime, setCurrentTime] = React.useState(0);
+  const [duration, setDuration] = React.useState(0);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [hasError, setHasError] = React.useState(false);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [showControls, setShowControls] = React.useState(true);
+  const [showInfo, setShowInfo] = React.useState(false);
   const [videoInfo, setVideoInfo] = useState<{
     width: number;
     height: number;
@@ -431,7 +431,7 @@ export function VideoRenderer({
       )}
     </div>
   );
-}
+})
 
 // Compact video player for inline tool views
 function InlineVideoPlayer({

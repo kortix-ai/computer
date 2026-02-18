@@ -33,7 +33,7 @@ export function MobileAppBanner({ shareId }: MobileAppBannerProps) {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const dismissed = sessionStorage.getItem('mobile-app-banner-dismissed');
     if (dismissed) {
       setIsDismissed(true);

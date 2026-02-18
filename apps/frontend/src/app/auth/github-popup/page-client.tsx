@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 
@@ -16,7 +16,7 @@ export default function GitHubOAuthPopupClient() {
   );
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  useEffect(() => {
+  React.useEffect(() => {
     const supabase = createClient();
 
     // Get return URL from sessionStorage (set by parent component)

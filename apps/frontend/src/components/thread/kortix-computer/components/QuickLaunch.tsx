@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -79,7 +79,7 @@ export const QuickLaunch = memo(function QuickLaunch({
 
   const totalResults = allResults.length;
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(isOpen)) {
       setQuery('');
       setSelectedIndex(0);
@@ -132,7 +132,7 @@ export const QuickLaunch = memo(function QuickLaunch({
     }
   }, [totalResults, selectedIndex, handleSelect, onClose]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) return;
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -145,7 +145,7 @@ export const QuickLaunch = memo(function QuickLaunch({
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isOpen, onClose]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const selectedElement = listRef.current?.children[selectedIndex] as HTMLElement;
     if (selectedElement) {
       selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });

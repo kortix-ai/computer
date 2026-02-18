@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, lazy, useRef } from 'react';
+import React, { useEffect, useState, Suspense, lazy, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
@@ -23,7 +23,7 @@ export default function SettingUpPageClient() {
   const hasAttemptedInit = useRef(false);
   const isInitializing = useRef(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!user) return;
     if (hasAttemptedInit.current) return;
     if (status !== 'checking') return;

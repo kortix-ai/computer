@@ -3,7 +3,7 @@
 
 import { useSearchParamsCompat } from '@/hooks/utils/use-search-params-compat';
 import { Mail, Clock, Shield, ChevronDown, UserX } from 'lucide-react';
-import { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { AnimatedBg } from '@/components/ui/animated-bg';
 import { useIsMobile } from '@/hooks/utils';
@@ -42,7 +42,7 @@ const FAQItem = ({ question, answer }: { question: string; answer: React.ReactNo
   );
 };
 
-function SupportPageContent() {
+const SupportPageContent = React.memo(function SupportPageContent() {
   const isMobile = useIsMobile();
   const searchParams = useSearchParamsCompat();
   const accountDeleteRef = useRef<HTMLElement>(null);
@@ -417,7 +417,7 @@ function SupportPageContent() {
       </div>
     </main>
   );
-}
+})
 
 export default function SupportPageClient() {
   return (

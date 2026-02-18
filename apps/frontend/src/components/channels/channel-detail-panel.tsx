@@ -90,15 +90,15 @@ interface ChannelEditDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDialogProps) {
+export const ChannelEditDialog = React.memo(function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDialogProps) {
   const [tab, setTab] = useState<'settings' | 'messages'>('settings');
-  const [name, setName] = useState(channel.name);
+  const [name, setName] = React.useState(channel.name);
   const [sessionStrategy, setSessionStrategy] = useState<SessionStrategy>(channel.sessionStrategy);
-  const [systemPrompt, setSystemPrompt] = useState(channel.systemPrompt || '');
-  const [isDirty, setIsDirty] = useState(false);
+  const [systemPrompt, setSystemPrompt] = React.useState(channel.systemPrompt || '');
+  const [isDirty, setIsDirty] = React.useState(false);
 
   const [instances, setInstances] = useState<SandboxInfo[]>([]);
-  const [showInstancePicker, setShowInstancePicker] = useState(false);
+  const [showInstancePicker, setShowInstancePicker] = React.useState(false);
 
   const updateMutation = useUpdateChannel();
   const deleteMutation = useDeleteChannel();
@@ -453,4 +453,4 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
       </DialogContent>
     </Dialog>
   );
-}
+})

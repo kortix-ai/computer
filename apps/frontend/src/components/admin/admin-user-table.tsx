@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DataTable, DataTableColumn } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,14 +29,14 @@ interface AdminUserTableProps {
 }
 
 export function AdminUserTable({ onUserSelect }: AdminUserTableProps) {
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [searchEmail, setSearchEmail] = useState('');
+  const [page, setPage] = React.useState(1);
+  const [pageSize] = React.useState(20);
+  const [searchEmail, setSearchEmail] = React.useState('');
   const [tierFilter, setTierFilter] = useState<string>('');
-  const [sortBy, setSortBy] = useState('created_at');
+  const [sortBy, setSortBy] = React.useState('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
-  const [debouncedSearch, setDebouncedSearch] = useState(searchEmail);
+  const [debouncedSearch, setDebouncedSearch] = React.useState(searchEmail);
   
   const { data: userListResponse, isLoading, error } = useAdminUserList({
     page,
@@ -49,7 +49,7 @@ export function AdminUserTable({ onUserSelect }: AdminUserTableProps) {
 
   const { data: stats } = useAdminUserStats();
 
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchEmail);
       setPage(1);

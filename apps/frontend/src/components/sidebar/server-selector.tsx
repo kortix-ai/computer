@@ -374,7 +374,7 @@ function DialogInstanceRow({
 // Instance Manager Dialog
 // ============================================================================
 
-export function InstanceManagerDialog({
+export const InstanceManagerDialog = React.memo(function InstanceManagerDialog({
   open,
   onOpenChange,
 }: {
@@ -765,7 +765,7 @@ export function InstanceManagerDialog({
       </DialogContent>
     </Dialog>
   );
-}
+})
 
 // ============================================================================
 // ServerSelector - the dropdown inline component

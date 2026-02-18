@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, startTransition, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, startTransition, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   MoreHorizontal,
@@ -104,7 +104,7 @@ function SessionItem({
   onArchive,
   onCompact,
 }: SessionItemProps) {
-  const [isHovering, setIsHovering] = useState(false);
+  const [isHovering, setIsHovering] = React.useState(false);
 
   return (
     <Link
@@ -389,15 +389,15 @@ interface SessionListProps {
   projectId?: string | null;
 }
 
-export function SessionList({ projectId }: SessionListProps = {}) {
+export const SessionList = React.memo(function SessionList({ projectId }: SessionListProps = {}) {
   const { isMobile, state, setOpenMobile } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = React.useState(false);
   const [sessionToArchive, setSessionToArchive] = useState<{ id: string; name: string } | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
+  const [showArchived, setShowArchived] = React.useState(false);
 
   const { data: sessions, isLoading, error, refetch } = useOpenCodeSessions();
   const { mutate: deleteSession, isPending: isDeleting } = useDeleteOpenCodeSession();
@@ -415,7 +415,7 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   }, [connectionStatus, error, refetch]);
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
   const [compactSessionId, setCompactSessionId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = React.useState('');
   const statuses = useOpenCodeSessionStatusStore((s) => s.statuses);
   const permissions = useOpenCodePendingStore((s) => s.permissions);
   const questions = useOpenCodePendingStore((s) => s.questions);
@@ -923,4 +923,4 @@ export function SessionList({ projectId }: SessionListProps = {}) {
       </Dialog>
     </div>
   );
-}
+})

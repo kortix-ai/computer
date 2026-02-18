@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from 'react';
 import {
   Loader2,
   CheckCircle,
@@ -85,7 +85,7 @@ const reasonConfig: Record<string, { label: string; color: string; description: 
   },
 };
 
-export function StuckRunsTable({
+export const StuckRunsTable = React.memo(function StuckRunsTable({
   runs,
   isLoading,
   onComplete,
@@ -95,7 +95,7 @@ export function StuckRunsTable({
   isFailing,
   isResuming,
 }: StuckRunsTableProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedReasons, setSelectedReasons] = useState<Set<string>>(new Set());
   const [selectedRuns, setSelectedRuns] = useState<Set<string>>(new Set());
   const [detailRun, setDetailRun] = useState<StuckRun | null>(null);
@@ -706,4 +706,4 @@ export function StuckRunsTable({
       </Dialog>
     </>
   );
-}
+})

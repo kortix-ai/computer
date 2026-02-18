@@ -76,7 +76,7 @@ interface AgentModelSelectorProps {
   className?: string;
 }
 
-export function AgentModelSelector({
+export const AgentModelSelector = React.memo(function AgentModelSelector({
   value,
   onChange,
   disabled = false,
@@ -95,15 +95,15 @@ export function AgentModelSelector({
     removeCustomModel: storeRemoveCustomModel,
     modelsData // Now available directly from the hook
   } = useModelSelection();
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const openPricingModal = usePricingModalStore((state) => state.openPricingModal);
   const isFreeTier = subscriptionStatus !== 'active';
 
-  const [isCustomModelDialogOpen, setIsCustomModelDialogOpen] = useState(false);
+  const [isCustomModelDialogOpen, setIsCustomModelDialogOpen] = React.useState(false);
   const [dialogInitialData, setDialogInitialData] = useState<CustomModelFormData>({ id: '', label: '' });
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
@@ -192,7 +192,7 @@ export function AgentModelSelector({
 
   const shouldDisplayAll = !isLocalMode() && premiumModels.length > 0;
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen && searchInputRef.current) {
       setTimeout(() => {
         searchInputRef.current?.focus();
@@ -668,4 +668,4 @@ export function AgentModelSelector({
       )}
     </div>
   );
-}
+})

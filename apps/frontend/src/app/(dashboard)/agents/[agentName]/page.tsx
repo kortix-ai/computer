@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -113,7 +113,7 @@ function getAgentFilePath(agentName: string): string {
 // Agent Detail Page
 // ---------------------------------------------------------------------------
 
-export default function AgentDetailPage() {
+const AgentDetailPage = React.memo(function AgentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -480,4 +480,6 @@ export default function AgentDetailPage() {
       </div>
     </div>
   );
-}
+})
+
+export default AgentDetailPage;

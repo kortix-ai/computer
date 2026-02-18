@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -86,7 +86,7 @@ function formatMetricsHistory(history: Array<{
   });
 }
 
-export default function StatelessAdminPage() {
+const StatelessAdminPage = React.memo(function StatelessAdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -577,7 +577,7 @@ export default function StatelessAdminPage() {
       </div>
     </div>
   );
-}
+})
 
 function extractErrorType(error: string): string {
   const match = error.match(/([a-zA-Z]+\.errors\.[a-zA-Z]+)/);
@@ -586,3 +586,5 @@ function extractErrorType(error: string): string {
   if (pyMatch) return pyMatch[1];
   return error.slice(0, 20) + (error.length > 20 ? "..." : "");
 }
+
+export default StatelessAdminPage;

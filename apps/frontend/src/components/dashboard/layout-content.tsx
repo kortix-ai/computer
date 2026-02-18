@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Suspense, lazy } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useSystemStatusQuery } from '@/hooks/edge-flags';
@@ -282,7 +282,7 @@ export default function DashboardLayoutContent({
   const { data: adminRoleData, isLoading: isCheckingAdminRole } = useAdminRole();
   const isAdmin = adminRoleData?.isAdmin ?? false;
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (Boolean(user)) {
       backendApi.post('/prewarm', undefined, { showErrors: false });
     }
@@ -290,7 +290,7 @@ export default function DashboardLayoutContent({
 
 
   // Check authentication status
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isLoading && !user) {
       navigateTo(router, '/auth');
     }
@@ -299,7 +299,7 @@ export default function DashboardLayoutContent({
   // Hard gate: show setup overlay if onboarding not complete (local mode only)
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showSetupOverlay, setShowSetupOverlay] = useState(false);
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isLocalMode()) {
       setOnboardingChecked(true);
       return;

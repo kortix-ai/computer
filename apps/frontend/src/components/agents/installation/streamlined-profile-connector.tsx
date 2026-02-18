@@ -40,7 +40,7 @@ export const ProfileConnector: React.FC<ProfileConnectorProps> = ({
   
   // configProperties and requiredFields are computed inside CreateProfileStep useMemo
 
-  useEffect(() => {
+  React.useEffect(() => {
     setProfileStep('select');
     setIsCreatingProfile(false);
     setNewProfileName('');

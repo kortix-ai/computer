@@ -1,7 +1,7 @@
 'use client';
 
 import { Wrench, Clock } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertBanner } from './alert-banner';
 
 interface MaintenanceCountdownBannerProps {
@@ -19,7 +19,7 @@ export function MaintenanceCountdownBanner({
   const [isActive, setIsActive] = useState(false);
   const [isOver, setIsOver] = useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const updateCountdown = () => {
       try {
         const now = new Date();

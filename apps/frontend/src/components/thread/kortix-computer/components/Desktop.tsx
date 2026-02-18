@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import React, { memo, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Folder, Globe, TerminalSquare, Info, Table } from 'lucide-react';
 import { AppWindow } from './AppWindow';
@@ -75,7 +75,7 @@ const DesktopFileViewer = memo(function DesktopFileViewer({ filePath }: { filePa
   const openFile = useFilesStore((s) => s.openFile);
   const view = useFilesStore((s) => s.view);
   const historyFilePath = useFilesStore((s) => s.historyFilePath);
-  useEffect(() => {
+  React.useEffect(() => {
     openFile(filePath);
   }, [filePath, openFile]);
 
@@ -91,7 +91,7 @@ const DesktopFileViewer = memo(function DesktopFileViewer({ filePath }: { filePa
  */
 const DesktopFolderBrowser = memo(function DesktopFolderBrowser({ folderPath }: { folderPath?: string }) {
   const navigateToPath = useFilesStore((s) => s.navigateToPath);
-  useEffect(() => {
+  React.useEffect(() => {
     navigateToPath(folderPath || '.');
   }, [folderPath, navigateToPath]);
   return <FileBrowser />;
@@ -206,7 +206,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
     extension: file.name.includes('.') ? file.name.split('.').pop() : undefined,
   }));
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault();
@@ -378,19 +378,19 @@ export const SandboxDesktop = memo(function SandboxDesktop({
     }
   }, [maxZIndex, openWindows, onNavigate, onViewChange]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (toolCalls.length > 0 && openWindows.length === 0) {
       openToolWindow(currentIndex);
     }
   }, [toolCalls.length, openWindows.length, currentIndex, openToolWindow]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (toolCalls.length > 0 && currentIndex >= 0 && currentIndex < toolCalls.length) {
       openToolWindow(currentIndex);
     }
   }, [currentIndex, toolCalls.length, openToolWindow]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (toolCalls.length > 0 && latestIndex >= 0) {
       openToolWindow(latestIndex);
     }
@@ -398,7 +398,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
 
   // When activeView changes externally (e.g., clicking Edit in FileOperationToolView), open the corresponding window
   const previousViewRef = useRef(currentView);
-  useEffect(() => {
+  React.useEffect(() => {
     // Only act if view actually changed
     if (previousViewRef.current === currentView) return;
     previousViewRef.current = currentView;
