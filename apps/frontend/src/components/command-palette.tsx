@@ -35,7 +35,13 @@ import {
   Keyboard,
   Slash,
   ArrowRightLeft,
-  BookOpen,
+  FolderOpen,
+  Blocks,
+  Wrench,
+  KeyRound,
+  MessageSquare,
+  Calendar,
+  ScrollText,
 } from 'lucide-react';
 
 import {
@@ -1102,30 +1108,61 @@ export function CommandPalette() {
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
                 </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/projects', 'Projects')}>
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  <span>Projects</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/workspace', 'Workspace')}>
+                  <Blocks className="mr-2 h-4 w-4" />
+                  <span>Workspace</span>
+                </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/agents', 'Agents')}>
                   <Bot className="mr-2 h-4 w-4" />
                   <span>Agents</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/knowledge', 'Knowledge')}>
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  <span>Knowledge</span>
-                </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/skills', 'Skills')}>
-                  <Database className="mr-2 h-4 w-4" />
+                  <Sparkles className="mr-2 h-4 w-4" />
                   <span>Skills</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/commands', 'Commands')}>
+                  <Slash className="mr-2 h-4 w-4" />
+                  <span>Commands</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/tools', 'Tools')}>
+                  <Wrench className="mr-2 h-4 w-4" />
+                  <span>Tools</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/files', 'Files')}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  <span>Files</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/channels', 'Channels')}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  <span>Channels</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/scheduled-tasks', 'Scheduled Tasks')}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <span>Scheduled Tasks</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/changelog', 'Changelog')}>
+                  <ScrollText className="mr-2 h-4 w-4" />
+                  <span>Changelog</span>
                 </CommandItem>
               </CommandGroup>
 
               <CommandSeparator />
 
               <CommandGroup heading="Settings">
+                <CommandItem
+                  onSelect={() => handleNavigate('/settings/credentials', 'Secrets Manager')}
+                  value="secrets manager credentials env environment variables integrations keys"
+                >
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  <span>Secrets Manager</span>
+                </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/settings/api-keys', 'API Keys')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>API Keys</span>
-                </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/settings/credentials', 'Integrations')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Integrations</span>
                 </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/configuration', 'Configuration')}>
                   <Cog className="mr-2 h-4 w-4" />

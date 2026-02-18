@@ -19,7 +19,7 @@ Send `@kortix-slides` a detailed prompt including:
 - The presentation topic and requirements
 - User style preferences from memory
 - Any relevant research content
-- Instruction to load the `kortix-presentations` skill first
+- Instruction to load the `presentations` skill first
 - Where to save the output
 
 ## After completion
