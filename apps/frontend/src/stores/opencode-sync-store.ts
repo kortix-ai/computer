@@ -102,6 +102,10 @@ interface SyncState {
 
 // ============================================================================
 // Store Implementation
+// Track optimistic message IDs so we can remove them when the server sends
+// the real user message (which has a different, server-generated ID).
+const optimisticIds = new Set<string>();
+
 // ============================================================================
 
 export const useSyncStore = create<SyncState>()((set, get) => ({
@@ -241,23 +245,26 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
     todos: { ...s.todos, [sessionID]: todos },
   })),
 
-  optimisticAdd: (sessionID, message, messageParts) => set((s) => {
-    const list = s.messages[sessionID] ?? [];
-    const result = Binary.search(list, message.id, (m) => m.id);
-    const nextMsgs = [...list];
-    if (result.found) {
-      nextMsgs[result.index] = message; // already exists — update in place
-    } else {
-      nextMsgs.splice(result.index, 0, message);
-    }
-    const sorted = messageParts.filter((p) => !!p?.id).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    return {
-      messages: { ...s.messages, [sessionID]: nextMsgs },
-      parts: { ...s.parts, [message.id]: sorted },
-    };
-  }),
+  optimisticAdd: (sessionID, message, messageParts) => {
+    optimisticIds.add(message.id);
+    set((s) => {
+      const list = s.messages[sessionID] ?? [];
+      const result = Binary.search(list, message.id, (m) => m.id);
+      const nextMsgs = [...list];
+      if (result.found) {
+        nextMsgs[result.index] = message;
+      } else {
+        nextMsgs.splice(result.index, 0, message);
+      }
+      const sorted = messageParts.filter((p) => !!p?.id).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      return {
+        messages: { ...s.messages, [sessionID]: nextMsgs },
+        parts: { ...s.parts, [message.id]: sorted },
+      };
+    });
+  },
 
-  optimisticRemove: (sessionID, messageID) => set((s) => {
+  optimisticRemove: (sessionID, messageID) => { optimisticIds.delete(messageID); set((s) => {
     const list = s.messages[sessionID];
     if (!list) return s;
     const result = Binary.search(list, messageID, (m) => m.id);
@@ -269,28 +276,63 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
       messages: { ...s.messages, [sessionID]: nextMsgs },
       parts: restParts,
     };
-  }),
+  }); },
 
   hydrate: (sessionID, msgs) => set((s) => {
-    const sorted = msgs
+    const incoming = msgs
       .filter((m) => !!m?.info?.id)
       .map((m) => m.info)
       .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+    // Merge incoming messages with existing ones — never delete messages
+    // that exist in the sync store but are missing from the fetch (they may
+    // be from a newer turn that the server hasn't persisted yet).
+    const existing = s.messages[sessionID] ?? [];
+    const merged: typeof existing = [];
+    const seen = new Set<string>();
+
+    // Start with all incoming messages
+    for (const m of incoming) {
+      merged.push(m);
+      seen.add(m.id);
+    }
+    // Add any existing messages not in incoming (optimistic or from live SSE)
+    for (const m of existing) {
+      if (!seen.has(m.id)) {
+        const r = Binary.search(merged, m.id, (x) => x.id);
+        merged.splice(r.index, 0, m);
+      }
+    }
+
+    // Merge parts — incoming parts fill in, but don't overwrite parts that
+    // already have more content (e.g. live streaming text > stale fetch).
     const newParts = { ...s.parts };
     for (const m of msgs) {
       if (!m?.info?.id) continue;
-      newParts[m.info.id] = m.parts
+      const incomingParts = m.parts
         .filter((p) => !!p?.id)
         .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    }
-    // Merge: keep any optimistic messages that aren't in the fetched set
-    const existing = s.messages[sessionID] ?? [];
-    const fetchedIds = new Set(sorted.map((m) => m.id));
-    const optimistic = existing.filter((m) => !fetchedIds.has(m.id));
-    const merged = [...sorted];
-    for (const m of optimistic) {
-      const r = Binary.search(merged, m.id, (x) => x.id);
-      if (!r.found) merged.splice(r.index, 0, m);
+      const existingParts = newParts[m.info.id];
+      if (!existingParts || existingParts.length === 0) {
+        newParts[m.info.id] = incomingParts;
+      } else {
+        // Keep existing parts if they have more content (streaming)
+        // Only update parts that are missing or have less content
+        const partMap = new Map(existingParts.map((p) => [p.id, p]));
+        for (const p of incomingParts) {
+          const ep = partMap.get(p.id);
+          if (!ep) {
+            partMap.set(p.id, p);
+          } else {
+            // Keep whichever has more text content
+            const epText = (ep as any).text?.length || 0;
+            const pText = (p as any).text?.length || 0;
+            if (pText > epText) partMap.set(p.id, p);
+          }
+        }
+        newParts[m.info.id] = [...partMap.values()]
+          .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      }
     }
     return {
       messages: { ...s.messages, [sessionID]: merged },
@@ -328,6 +370,18 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
       case 'message.updated': {
         const info = (event.properties as { info: Message }).info;
         if (!info?.sessionID) return;
+        // When a real user message arrives from the server, remove any
+        // optimistic user messages for this session (they have client-generated
+        // IDs that differ from the server-generated ID).
+        if (info.role === 'user' && !optimisticIds.has(info.id)) {
+          const msgs = get().messages[info.sessionID];
+          if (msgs) {
+            const toRemove = msgs.filter((m) => m.role === 'user' && optimisticIds.has(m.id));
+            for (const m of toRemove) {
+              store.optimisticRemove(info.sessionID, m.id);
+            }
+          }
+        }
         store.upsertMessage(info.sessionID, info);
         return;
       }
@@ -339,7 +393,18 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
       }
       case 'message.part.updated': {
         const part = (event.properties as { part: Part }).part;
-        if (!part?.messageID) return;
+        if (!part?.messageID || !part?.sessionID) return;
+
+        const existingMsgs = get().messages[part.sessionID];
+        const exists = existingMsgs && Binary.search(existingMsgs, part.messageID, (m) => m.id).found;
+        if (!exists) {
+          store.upsertMessage(part.sessionID, {
+            id: part.messageID,
+            sessionID: part.sessionID,
+            role: 'assistant',
+          } as Message);
+        }
+
         store.upsertPart(part.messageID, part);
         return;
       }

@@ -6,25 +6,26 @@ import {
   AlertTriangle,
   AlertCircle,
   Ban,
-  Clock,
   Wrench,
   Copy,
   Check,
-  XCircle,
   ChevronRight,
+  ChevronDown,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolViewProps } from './types';
-import { formatTimestamp, getToolTitle } from './utils';
+import { getToolTitle } from './utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from '@/components/ui/button';
 import { LoadingState } from './shared/LoadingState';
 import { toast } from '@/lib/toast';
-import { AppIcon } from './shared/AppIcon';
 import { SmartJsonViewer } from './shared/SmartJsonViewer';
 import { ToolViewIconTitle } from './shared/ToolViewIconTitle';
+import { ToolViewFooter } from './shared/ToolViewFooter';
 import { useSmoothStream } from '@/lib/streaming';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import {
@@ -142,6 +143,10 @@ export function GenericToolView({
   const [isCopyingInput, setIsCopyingInput] = React.useState(false);
   const [isCopyingOutput, setIsCopyingOutput] = React.useState(false);
 
+  // Collapsible state for input/output sections
+  const [inputExpanded, setInputExpanded] = React.useState(true);
+  const [outputExpanded, setOutputExpanded] = React.useState(true);
+
   // Copy functions
   const copyToClipboard = React.useCallback(async (text: string) => {
     try {
@@ -159,9 +164,9 @@ export function GenericToolView({
     setIsCopyingInput(true);
     const success = await copyToClipboard(formattedAssistantContent);
     if (success) {
-      toast.success('File content copied to clipboard');
+      toast.success('Input copied to clipboard');
     } else {
-      toast.error('Failed to copy file content');
+      toast.error('Failed to copy input');
     }
     setTimeout(() => setIsCopyingInput(false), 500);
   }, [formattedAssistantContent, copyToClipboard]);
@@ -172,9 +177,9 @@ export function GenericToolView({
     setIsCopyingOutput(true);
     const success = await copyToClipboard(formattedToolContent);
     if (success) {
-      toast.success('File content copied to clipboard');
+      toast.success('Output copied to clipboard');
     } else {
-      toast.error('Failed to copy file content');
+      toast.error('Failed to copy output');
     }
     setTimeout(() => setIsCopyingOutput(false), 500);
   }, [formattedToolContent, copyToClipboard]);
@@ -223,37 +228,33 @@ export function GenericToolView({
   const name = toolCall.function_name.replace(/_/g, '-').toLowerCase();
   const toolTitle = (toolCall as any)._display_hint || getToolTitle(name);
 
+  // Count input keys for badge
+  const inputKeyCount = typeof parsedAssistantContent === 'object' && parsedAssistantContent !== null
+    ? Object.keys(parsedAssistantContent).length
+    : null;
+
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
       <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="relative p-2 rounded-lg border bg-muted border-border flex-shrink-0">
-              <AppIcon toolCall={toolCall} size={20} className="w-5 h-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-base font-medium text-foreground truncate">
-                {toolTitle}
-              </CardTitle>
-            </div>
-          </div>
+          <ToolViewIconTitle
+            icon={Wrench}
+            title={toolTitle}
+          />
         </div>
       </CardHeader>
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden relative">
         {isStreaming ? (
           <LoadingState
-            icon={Wrench}
-            iconColor="text-orange-500 dark:text-orange-400"
-            bgColor="bg-gradient-to-b from-orange-100 to-orange-50 shadow-inner dark:from-orange-800/40 dark:to-orange-900/60 dark:shadow-orange-950/20"
             title={toolTitle}
-            filePath={name}
+            subtitle={name}
             showProgress={true}
           />
         ) : isError ? (
           <div className="flex flex-col h-full">
             <ScrollArea className="flex-1 w-full">
-              <div className="p-4 space-y-4">
+              <div className="p-3 space-y-2">
                 {/* Structured error display */}
                 <GenericToolErrorDisplay
                   errorMessage={errorMessage}
@@ -261,170 +262,200 @@ export function GenericToolView({
                   parsedToolContent={parsedToolContent}
                 />
 
-                {/* Input section */}
+                {/* Input section (collapsed by default for errors) */}
                 {formattedAssistantContent && (
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-foreground flex items-center justify-between">
-                      <div className="flex items-center">Input</div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCopyInput}
-                        disabled={isCopyingInput}
-                        className="h-6 w-6 p-0"
-                        title="Copy input"
-                      >
-                        {isCopyingInput ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                      </Button>
-                    </div>
-                    <div className="border-muted bg-muted/20 rounded-lg overflow-hidden border">
-                      <div className="p-4">
-                        {typeof parsedAssistantContent === 'object' && parsedAssistantContent !== null ? (
-                          <SmartJsonViewer data={parsedAssistantContent} />
-                        ) : (
-                          <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
-                            {formattedAssistantContent}
-                          </pre>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <CollapsibleSection
+                    label="Input"
+                    icon={ArrowUpFromLine}
+                    expanded={false}
+                    keyCount={inputKeyCount}
+                    onCopy={handleCopyInput}
+                    isCopying={isCopyingInput}
+                  >
+                    {typeof parsedAssistantContent === 'object' && parsedAssistantContent !== null ? (
+                      <SmartJsonViewer data={parsedAssistantContent} />
+                    ) : (
+                      <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+                        {formattedAssistantContent}
+                      </pre>
+                    )}
+                  </CollapsibleSection>
                 )}
               </div>
             </ScrollArea>
           </div>
         ) : formattedAssistantContent || formattedToolContent ? (
           <ScrollArea className="h-full w-full">
-            <div className="p-4 space-y-4">
+            <div className="p-3 space-y-2">
+              {/* Input section */}
               {formattedAssistantContent && (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-foreground flex items-center justify-between">
-                    <div className="flex items-center">
-                      Input
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCopyInput}
-                      disabled={isCopyingInput}
-                      className="h-6 w-6 p-0"
-                      title="Copy file content"
-                    >
-                      {isCopyingInput ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </div>
-                  <div className="border-muted bg-muted/20 rounded-lg overflow-hidden border">
-                    <div className="p-4">
-                      {typeof parsedAssistantContent === 'object' && parsedAssistantContent !== null ? (
-                        <SmartJsonViewer data={parsedAssistantContent} />
-                      ) : (
-                        <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
-                          {formattedAssistantContent}
-                          {isAssistantAnimating && <span className="animate-pulse text-muted-foreground">▌</span>}
-                        </pre>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <CollapsibleSection
+                  label="Input"
+                  icon={ArrowUpFromLine}
+                  expanded={inputExpanded}
+                  onToggle={() => setInputExpanded(!inputExpanded)}
+                  keyCount={inputKeyCount}
+                  onCopy={handleCopyInput}
+                  isCopying={isCopyingInput}
+                >
+                  {typeof parsedAssistantContent === 'object' && parsedAssistantContent !== null ? (
+                    <SmartJsonViewer data={parsedAssistantContent} />
+                  ) : (
+                    <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+                      {formattedAssistantContent}
+                      {isAssistantAnimating && <span className="animate-pulse text-muted-foreground">|</span>}
+                    </pre>
+                  )}
+                </CollapsibleSection>
               )}
 
+              {/* Output section */}
               {formattedToolContent && (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-foreground flex items-center justify-between">
-                    <div className="flex items-center">
-                      Output
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCopyOutput}
-                      disabled={isCopyingOutput}
-                      className="h-6 w-6 p-0"
-                      title="Copy file content"
-                    >
-                      {isCopyingOutput ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </div>
-                  <div className="border-muted bg-muted/20 rounded-lg overflow-hidden border">
-                    <div className="p-4">
-                      {typeof parsedToolContent === 'object' && parsedToolContent !== null ? (
-                        <SmartJsonViewer data={parsedToolContent} />
-                      ) : (() => {
-                        // Try structured output rendering for warnings/tracebacks
-                        const normalized = normalizeToolOutput(formattedToolContent || '');
-                        if (hasStructuredContent(normalized)) {
-                          const sections = parseStructuredOutput(normalized);
-                          return <GenericStructuredOutputDisplay sections={sections} />;
-                        }
-                        const { content, isMarkdown } = extractMarkdownContent(formattedToolContent || '');
-                        return isMarkdown ? (
-                          <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-                            <UnifiedMarkdown content={content} isStreaming={false} />
-                          </div>
-                        ) : (
-                          <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
-                            {formattedToolContent}
-                          </pre>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
+                <CollapsibleSection
+                  label="Output"
+                  icon={ArrowDownToLine}
+                  expanded={outputExpanded}
+                  onToggle={() => setOutputExpanded(!outputExpanded)}
+                  onCopy={handleCopyOutput}
+                  isCopying={isCopyingOutput}
+                >
+                  {typeof parsedToolContent === 'object' && parsedToolContent !== null ? (
+                    <SmartJsonViewer data={parsedToolContent} />
+                  ) : (() => {
+                    // Try structured output rendering for warnings/tracebacks
+                    const normalized = normalizeToolOutput(formattedToolContent || '');
+                    if (hasStructuredContent(normalized)) {
+                      const sections = parseStructuredOutput(normalized);
+                      return <GenericStructuredOutputDisplay sections={sections} />;
+                    }
+                    const { content, isMarkdown } = extractMarkdownContent(formattedToolContent || '');
+                    return isMarkdown ? (
+                      <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                        <UnifiedMarkdown content={content} isStreaming={false} />
+                      </div>
+                    ) : (
+                      <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+                        {formattedToolContent}
+                      </pre>
+                    );
+                  })()}
+                </CollapsibleSection>
               )}
             </div>
           </ScrollArea>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-background to-muted/50">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-muted to-muted/50 shadow-inner">
-              <Wrench className="h-10 w-10 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center h-full py-12 px-6">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-muted">
+              <Wrench className="h-5 w-5 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-foreground">
+            <h3 className="text-sm font-medium mb-1 text-foreground">
               No Content Available
             </h3>
-            <p className="text-sm text-muted-foreground text-center max-w-md">
+            <p className="text-xs text-muted-foreground text-center max-w-md">
               This tool execution did not produce any input or output content to display.
             </p>
           </div>
         )}
       </CardContent>
 
-      <div className="px-4 py-2 h-10 bg-gradient-to-r bg-muted/50 backdrop-blur-sm border-t border-border flex justify-between items-center gap-4">
-        <div className="h-full flex items-center gap-2 text-sm text-muted-foreground">
-          {!isStreaming && (formattedAssistantContent || formattedToolContent || isError) && (
-            isError ? (
-              <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
-                <AlertCircle className="h-3 w-3" />
-                Failed
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="h-6 py-0.5 bg-muted">
-                <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
-                Completed
-              </Badge>
-            )
-          )}
-        </div>
-
-        <div className="text-xs text-muted-foreground flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5" />
-          {toolTimestamp && !isStreaming
-            ? formatTimestamp(toolTimestamp)
-            : assistantTimestamp
-              ? formatTimestamp(assistantTimestamp)
-              : ''}
-        </div>
-      </div>
+      <ToolViewFooter
+        assistantTimestamp={assistantTimestamp}
+        toolTimestamp={toolTimestamp}
+        isStreaming={isStreaming}
+      >
+        {!isStreaming && (formattedAssistantContent || formattedToolContent || isError) && (
+          isError ? (
+            <Badge variant="outline" className="h-6 py-0.5 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300">
+              <AlertCircle className="h-3 w-3" />
+              Failed
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
+              Completed
+            </Badge>
+          )
+        )}
+      </ToolViewFooter>
     </Card>
   );
 }
+
+/* ---------- Collapsible Section ---------- */
+
+function CollapsibleSection({
+  label,
+  icon: Icon,
+  expanded: controlledExpanded,
+  onToggle,
+  keyCount,
+  onCopy,
+  isCopying,
+  children,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  expanded?: boolean;
+  onToggle?: () => void;
+  keyCount?: number | null;
+  onCopy?: () => void;
+  isCopying?: boolean;
+  children: React.ReactNode;
+}) {
+  const [internalExpanded, setInternalExpanded] = useState(controlledExpanded ?? true);
+  const isExpanded = onToggle ? (controlledExpanded ?? true) : internalExpanded;
+  const handleToggle = onToggle ?? (() => setInternalExpanded(v => !v));
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden bg-card">
+      {/* Section header */}
+      <div
+        className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors group"
+        onClick={handleToggle}
+      >
+        {isExpanded ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        )}
+        <Icon className="h-3.5 w-3.5 text-muted-foreground/70 flex-shrink-0" />
+        <span className="text-xs font-medium text-foreground flex-1">
+          {label}
+        </span>
+        {keyCount != null && keyCount > 0 && !isExpanded && (
+          <span className="text-[10px] text-muted-foreground/50 font-mono">
+            {keyCount} {keyCount === 1 ? 'field' : 'fields'}
+          </span>
+        )}
+        {onCopy && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); onCopy(); }}
+            disabled={isCopying}
+            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+            title={`Copy ${label.toLowerCase()}`}
+          >
+            {isCopying ? (
+              <Check className="h-3 w-3 text-emerald-500" />
+            ) : (
+              <Copy className="h-3 w-3 text-muted-foreground" />
+            )}
+          </Button>
+        )}
+      </div>
+
+      {/* Section content */}
+      {isExpanded && (
+        <div className="border-t border-border px-3 py-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Structured Output Display ---------- */
 
 /** Render parsed structured output sections with semantic styling (for detail panel). */
 function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }) {
@@ -551,6 +582,8 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
     </div>
   );
 }
+
+/* ---------- Error Display ---------- */
 
 /** Structured error display with collapsible traceback */
 function GenericToolErrorDisplay({

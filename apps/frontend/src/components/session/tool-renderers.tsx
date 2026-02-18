@@ -2785,29 +2785,28 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       locked={locked}
     >
       {todos.length > 0 && (
-        <div className="px-3 py-2.5 space-y-1.5">
+        <div className="px-3 py-1.5 space-y-px max-h-[200px] overflow-y-auto scrollbar-hide">
           {todos.map((todo: Record<string, unknown>, i: number) => (
-            <label key={i} className="flex items-start gap-2.5 text-xs cursor-default">
+            <div key={i} className={cn(
+              'flex items-center gap-2 py-0.5 text-[11px] cursor-default',
+              todo.status === 'completed' && 'opacity-40',
+            )}>
               <span className={cn(
-                'mt-0.5 size-3.5 rounded flex-shrink-0 flex items-center justify-center border',
-                todo.status === 'completed'
-                  ? 'bg-emerald-500/15 border-emerald-500/30'
-                  : todo.status === 'in_progress'
-                    ? 'bg-primary/10 border-primary/30'
-                    : 'border-border/60',
+                'size-3 rounded-sm flex-shrink-0 flex items-center justify-center border border-border/60',
+                todo.status === 'completed' && 'bg-muted',
               )}>
-                {todo.status === 'completed' && <Check className="size-2.5 text-emerald-500" />}
-                {todo.status === 'in_progress' && <Loader2 className="size-2.5 text-primary animate-spin" />}
+                {todo.status === 'completed' && <Check className="size-2 text-muted-foreground" />}
+                {todo.status === 'in_progress' && <Loader2 className="size-2 text-muted-foreground animate-spin" />}
               </span>
               <span
                 className={cn(
-                  'leading-relaxed',
+                  'leading-tight truncate',
                   todo.status === 'completed' && 'line-through text-muted-foreground',
                 )}
               >
                 {String(todo.content || '')}
               </span>
-            </label>
+            </div>
           ))}
         </div>
       )}
@@ -2984,29 +2983,14 @@ ToolRegistry.register('plan_enter', PlanToolRenderer);
 // --- Question ---
 function QuestionSkeletonOptions() {
   return (
-    <div className="p-3 space-y-3 animate-pulse">
-      {/* Question text skeleton */}
-      <div className="space-y-1.5">
-        <div className="h-3.5 w-3/4 bg-muted/40 rounded-md" />
-      </div>
-      {/* Option skeletons */}
-      <div className="space-y-1.5">
-        {[0.85, 0.7, 0.6, 0.75].map((w, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border/20 bg-muted/10"
-          >
-            <div className="flex-1 flex items-center gap-2">
-              <div className="h-3 rounded-md bg-muted/40" style={{ width: `${w * 50}%` }} />
-              <div className="h-3 rounded-md bg-muted/20" style={{ width: `${w * 30}%` }} />
-            </div>
-            <div className="size-3.5 rounded bg-muted/20 shrink-0" />
+    <div className="px-3 py-2 space-y-1.5 animate-pulse">
+      <div className="h-3 w-3/4 bg-muted/40 rounded" />
+      <div className="space-y-1">
+        {[0.85, 0.7, 0.6].map((w, i) => (
+          <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/20">
+            <div className="h-2.5 rounded bg-muted/40" style={{ width: `${w * 50}%` }} />
           </div>
         ))}
-      </div>
-      {/* Dismiss skeleton */}
-      <div className="flex justify-end pt-2 border-t border-border/10">
-        <div className="h-5 w-14 rounded-md bg-muted/20" />
       </div>
     </div>
   );
@@ -3029,7 +3013,6 @@ function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked, hasActiveQ
 
   const isAnswered = answers.length > 0;
   const isRunning = status === 'running' || status === 'pending';
-  // Show skeleton only when running AND the QuestionPrompt hasn't taken over yet
   const showSkeleton = isRunning && !hasActiveQuestion;
   const subtitle = questions.length > 0
     ? isAnswered
@@ -3048,15 +3031,15 @@ function QuestionToolRenderer({ part, defaultOpen, forceOpen, locked, hasActiveQ
       locked={locked}
     >
       {isAnswered ? (
-        <div className="p-2 space-y-2">
+        <div className="px-3 py-2 space-y-1">
           {questions.map((q, i) => {
             const answer = answers[i] || [];
             return (
-              <div key={i} className="space-y-0.5">
-                <p className="text-xs font-medium text-foreground">{q.question}</p>
-                <p className="text-xs text-muted-foreground">
+              <div key={i} className="flex items-baseline gap-1.5 text-[11px]">
+                <span className="font-medium text-foreground shrink-0">{q.question}</span>
+                <span className="text-muted-foreground truncate">
                   {answer.join(', ') || 'No answer'}
-                </p>
+                </span>
               </div>
             );
           })}
@@ -3604,19 +3587,42 @@ function memGetTypeInfo(typeEmoji: string, type: string): { label: string; bg: s
   return { label: 'Note', bg: 'bg-muted/40', text: 'text-muted-foreground', dot: 'bg-muted-foreground/50' };
 }
 
+/** Try to parse output as a JSON file-read result (with path + content fields). */
+function parseMemGetFileResult(output: string): { path: string; content: string; total_lines: number } | null {
+  if (!output) return null;
+  const trimmed = output.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object' && typeof parsed.path === 'string' && typeof parsed.content === 'string') {
+      return { path: parsed.path, content: parsed.content, total_lines: parsed.total_lines || 0 };
+    }
+  } catch { /* not JSON */ }
+  return null;
+}
+
 function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const input = partInput(part);
   const output = partOutput(part);
   const status = partStatus(part);
   const ids = input.ids ? String(input.ids) : '';
+  const path = input.path ? String(input.path) : '';
 
-  const observations = useMemo(() => parseMemGetOutput(output), [output]);
+  // Try file-read result first, then observations
+  const fileResult = useMemo(() => parseMemGetFileResult(output), [output]);
+  const observations = useMemo(() => fileResult ? [] : parseMemGetOutput(output), [output, fileResult]);
   const hasResults = observations.length > 0;
+  const hasFileResult = !!fileResult;
 
+  const triggerSubtitle = path || ids || (fileResult ? fileResult.path : '');
   const triggerBadge = status === 'completed'
-    ? hasResults
-      ? `${observations.length} loaded`
-      : 'empty'
+    ? hasFileResult
+      ? 'loaded'
+      : hasResults
+        ? `${observations.length} loaded`
+        : output
+          ? 'loaded'
+          : 'empty'
     : undefined;
 
   return (
@@ -3624,12 +3630,12 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       icon={<Brain className="size-3.5 flex-shrink-0" />}
       trigger={
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="font-medium text-xs text-foreground whitespace-nowrap">Mem Get</span>
-          {ids && <span className="text-muted-foreground text-xs truncate font-mono">{ids}</span>}
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Memory</span>
+          {triggerSubtitle && <span className="text-muted-foreground text-xs truncate font-mono">{triggerSubtitle}</span>}
           {triggerBadge && (
             <span className={cn(
               'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
-              hasResults ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
+              (hasResults || hasFileResult) ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
             )}>
               {triggerBadge}
             </span>
@@ -3640,7 +3646,43 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       forceOpen={forceOpen}
       locked={locked}
     >
-      {status === 'completed' && hasResults ? (
+      {/* File-read result: render markdown content */}
+      {status === 'completed' && hasFileResult ? (
+        <div data-scrollable className="max-h-[400px] overflow-auto">
+          <div className="px-3 pb-2.5">
+            {/* File path + line count */}
+            <div className="flex items-center gap-1.5 mt-1 mb-2">
+              <FileText className="size-3 text-muted-foreground/40 flex-shrink-0" />
+              <span className="text-[10px] text-muted-foreground/50 font-mono truncate">{fileResult!.path}</span>
+              {fileResult!.total_lines > 0 && (
+                <>
+                  <span className="text-muted-foreground/20">&middot;</span>
+                  <span className="text-[10px] text-muted-foreground/40 flex items-center gap-0.5 flex-shrink-0">
+                    <Hash className="size-2.5" />
+                    {fileResult!.total_lines}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Rendered markdown */}
+            <div className="prose prose-sm dark:prose-invert max-w-none
+              prose-headings:text-foreground prose-headings:font-medium
+              prose-h1:text-xs prose-h1:mb-1.5 prose-h1:mt-0
+              prose-h2:text-[11px] prose-h2:mb-1 prose-h2:mt-3
+              prose-h3:text-[11px] prose-h3:mb-0.5 prose-h3:mt-2
+              prose-p:text-[11px] prose-p:text-muted-foreground/70 prose-p:leading-relaxed prose-p:my-1
+              prose-li:text-[11px] prose-li:text-muted-foreground/70 prose-li:my-0
+              prose-ul:my-0.5 prose-ol:my-0.5
+              prose-strong:text-foreground/90 prose-strong:font-medium
+              prose-code:text-[10px] prose-code:bg-muted/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+              prose-hr:border-border/50 prose-hr:my-2
+            ">
+              <UnifiedMarkdown content={fileResult!.content} isStreaming={false} />
+            </div>
+          </div>
+        </div>
+      ) : status === 'completed' && hasResults ? (
         <div data-scrollable className="max-h-[400px] overflow-auto">
           <div className="px-3 pb-2.5">
             {/* Section label */}
@@ -3743,7 +3785,16 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         </div>
       ) : status === 'completed' && output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
+          <div className="prose prose-sm dark:prose-invert max-w-none px-1
+            prose-headings:text-foreground prose-headings:font-medium
+            prose-h1:text-xs prose-h2:text-[11px] prose-h3:text-[11px]
+            prose-p:text-[11px] prose-p:text-muted-foreground/70
+            prose-li:text-[11px] prose-li:text-muted-foreground/70
+            prose-strong:text-foreground/90
+            prose-code:text-[10px] prose-code:bg-muted/60 prose-code:px-1 prose-code:rounded
+          ">
+            <UnifiedMarkdown content={output.slice(0, 3000)} isStreaming={false} />
+          </div>
         </div>
       ) : null}
     </BasicTool>
@@ -3751,6 +3802,8 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 }
 ToolRegistry.register('mem-get', MemGetTool);
 ToolRegistry.register('mem_get', MemGetTool);
+ToolRegistry.register('memory-get', MemGetTool);
+ToolRegistry.register('memory_get', MemGetTool);
 
 // ============================================================================
 // MemSaveTool — renders the "mem-save" / "mem_save" tool result
@@ -3839,6 +3892,8 @@ function MemSaveTool({ part }: ToolProps) {
 }
 ToolRegistry.register('mem-save', MemSaveTool);
 ToolRegistry.register('mem_save', MemSaveTool);
+ToolRegistry.register('memory-save', MemSaveTool);
+ToolRegistry.register('memory_save', MemSaveTool);
 
 // ============================================================================
 // MemTimelineTool — renders the "mem-timeline" / "mem_timeline" tool result
@@ -4021,6 +4076,8 @@ function MemTimelineTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 }
 ToolRegistry.register('mem-timeline', MemTimelineTool);
 ToolRegistry.register('mem_timeline', MemTimelineTool);
+ToolRegistry.register('memory-timeline', MemTimelineTool);
+ToolRegistry.register('memory_timeline', MemTimelineTool);
 
 // ============================================================================
 // DCP Tools (distill, compress, prune, context_info)

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+
 import {
   ChevronDown,
   ChevronRight,
@@ -38,7 +39,6 @@ import {
 } from '@/components/ui/tooltip';
 import {
   useOpenCodeSession,
-  useOpenCodeMessages,
   useSendOpenCodeMessage,
   useAbortOpenCodeSession,
   useOpenCodeAgents,
@@ -54,12 +54,14 @@ import {
   replyToQuestion,
   rejectQuestion,
   findOpenCodeFiles,
+  ascendingId,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
+import { useSyncStore } from '@/stores/opencode-sync-store';
 import { getClient } from '@/lib/opencode-sdk';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
-import { useMessageQueueStore } from '@/stores/message-queue-store';
+import { useMessageQueueStore, type QueuedMessage } from '@/stores/message-queue-store';
 import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { useThrottledValue } from '@/hooks/use-throttled-value';
 import { SessionSiteHeader } from '@/components/session/session-site-header';
@@ -110,7 +112,6 @@ import {
   getShellModePart,
   isLastUserMessage,
   getWorkingState,
-  shouldHideResponsePart,
   getHiddenToolParts,
   isToolPartHidden,
   getAnsweredQuestionParts,
@@ -130,6 +131,7 @@ import {
 import { SessionChatInput, type AttachedFile, type TrackedMention } from '@/components/session/session-chat-input';
 import { uploadFile } from '@/features/files/api/opencode-files';
 import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
+import { useSessionSync } from '@/hooks/opencode/use-session-sync';
 import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { SessionWelcome } from '@/components/session/session-welcome';
 import { ToolPartRenderer } from '@/components/session/tool-renderers';
@@ -1194,11 +1196,11 @@ function UserMessageRow({ message, agentNames, commandInfo, commands }: { messag
 }
 
 // ============================================================================
-// Throttled Markdown — limits re-renders during streaming (100ms)
+// Throttled Markdown — limits re-renders during streaming (~30fps)
 // ============================================================================
 
 function ThrottledMarkdown({ content, isStreaming }: { content: string; isStreaming: boolean }) {
-  const throttled = useThrottledValue(content, 100);
+  const throttled = useThrottledValue(content, 33);
   return <UnifiedMarkdown content={isStreaming ? throttled : content} isStreaming={isStreaming} />;
 }
 
@@ -1298,10 +1300,11 @@ function SessionTurn({
   }, [allParts]);
   const lastTextPart = useMemo(() => findLastTextPart(allParts), [allParts]);
   const responsePartId = lastTextPart?.id;
-  const response = lastTextPart?.text?.trim();
+  const responseRaw = lastTextPart?.text ?? '';
+  const response = working ? responseRaw : responseRaw.trim();
   const hideResponse = useMemo(
-    () => shouldHideResponsePart(working, responsePartId),
-    [working, responsePartId],
+    () => !!responsePartId,
+    [responsePartId],
   );
 
   // Retry info (only on last turn)
@@ -1318,7 +1321,24 @@ function SessionTurn({
 
   // Permission/question matching for this session
   const nextPermission = useMemo(() => permissions.filter((p) => p.sessionID === sessionId)[0], [permissions, sessionId]);
-  const nextQuestion = useMemo(() => questions.filter((q) => q.sessionID === sessionId)[0], [questions, sessionId]);
+  // Only assign a question to this turn if:
+  // 1. It has a tool ref whose messageID belongs to one of this turn's assistant messages, OR
+  // 2. It has no tool ref and this is the last turn, OR
+  // 3. It has a tool ref that doesn't match any turn's messages and this is the last turn (fallback)
+  const nextQuestion = useMemo(() => {
+    const sessionQuestions = questions.filter((q) => q.sessionID === sessionId);
+    if (sessionQuestions.length === 0) return undefined;
+    const turnMessageIds = new Set(turn.assistantMessages.map((m) => m.info.id));
+    // First: find a question whose tool ref matches this turn
+    const matched = sessionQuestions.find((q) => q.tool && turnMessageIds.has(q.tool.messageID));
+    if (matched) return matched;
+    // For the last turn: also accept questions without a tool ref, or with a tool ref
+    // that doesn't match any specific turn (fallback to prevent questions from being invisible)
+    if (isLast) {
+      return sessionQuestions[0];
+    }
+    return undefined;
+  }, [questions, sessionId, turn.assistantMessages, isLast]);
 
   // Hidden tool parts (when permission/question is active)
   const hidden = useMemo(() => getHiddenToolParts(nextPermission, nextQuestion), [nextPermission, nextQuestion]);
@@ -1745,8 +1765,8 @@ function SessionTurn({
         </div>
       )}
 
-      {/* Response section (final text, shown when done) */}
-      {!working && response && (
+      {/* Response section (streams in real time while the turn is working) */}
+      {response && (
         <div className="mt-3">
           {/* Kortix logo — shown when there are no steps (otherwise logo is already above) */}
           {!hasSteps && (
@@ -1761,15 +1781,19 @@ function SessionTurn({
             </div>
           )}
           <div className="text-sm">
-            <SandboxUrlDetector content={response} isStreaming={false} />
+            {working ? (
+              <ThrottledMarkdown content={response} isStreaming={true} />
+            ) : (
+              <SandboxUrlDetector content={response} isStreaming={false} />
+            )}
           </div>
-          <div className="sr-only" aria-live="polite">
-            {response}
-          </div>
+          {!working && (
+            <div className="sr-only" aria-live="polite">
+              {response}
+            </div>
+          )}
         </div>
       )}
-
-      {/* Streaming text is only visible inside expanded steps (matching SolidJS reference) */}
 
 
       {/* Error — always visible. Shown here (outside steps) when steps are collapsed OR when there are no steps at all */}
@@ -1912,7 +1936,12 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
 
   // ---- Hooks ----
   const { data: session, isLoading: sessionLoading } = useOpenCodeSession(sessionId);
-  const { data: messages, isLoading: messagesLoading } = useOpenCodeMessages(sessionId);
+  // useSessionSync is the SINGLE source of truth for messages (matches OpenCode SolidJS).
+  // It fetches on first access, then SSE events keep it up to date.
+  // No React Query fallback — prevents stale refetches from overwriting live data.
+  const { messages: syncMessages, isLoading: syncMessagesLoading } = useSessionSync(sessionId);
+  const messages = syncMessages.length > 0 ? syncMessages : undefined;
+  const messagesLoading = syncMessagesLoading;
   const { data: agents } = useOpenCodeAgents();
   const { data: commands } = useOpenCodeCommands();
   const { data: providers } = useOpenCodeProviders();
@@ -1932,6 +1961,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // ---- Polling fallback & optimistic send ----
   const [pollingActive, setPollingActive] = useState(false);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
+  const [pendingUserMessageId, setPendingUserMessageId] = useState<string | null>(null);
   const [pendingCommand, setPendingCommand] = useState<{ name: string; description?: string } | null>(null);
   // Map of user message IDs → command info, so UserMessageRow can render
   // a compact command pill instead of the raw expanded template text.
@@ -1944,6 +1974,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // Track whether a pending prompt send is in flight (dashboard→session flow).
   // Keeps isBusy true until the server acknowledges with a busy status.
   const [pendingSendInFlight, setPendingSendInFlight] = useState(false);
+  const [pendingSendMessageId, setPendingSendMessageId] = useState<string | null>(null);
   // Grace period: don't stop polling immediately on idle after a recent send
   const lastSendTimeRef = useRef<number>(0);
   // ---- Optimistic prompt (from dashboard/project page) ----
@@ -1955,6 +1986,32 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     }
     return null;
   });
+
+  const addOptimisticUserMessage = useCallback((messageId: string, text: string, partIds?: string[]) => {
+    const parts = text.trim()
+      ? [
+          {
+            id: partIds?.[0] ?? ascendingId('prt'),
+            sessionID: sessionId,
+            messageID: messageId,
+            type: 'text',
+            text,
+          } as any,
+        ]
+      : [];
+    const info = {
+      id: messageId,
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: Date.now() },
+    } as any;
+
+    useSyncStore.getState().optimisticAdd(sessionId, info, parts as any);
+  }, [sessionId]);
+
+  const removeOptimisticUserMessage = useCallback((messageId: string) => {
+    useSyncStore.getState().optimisticRemove(sessionId, messageId);
+  }, [sessionId]);
 
   // Hydrate options from sessionStorage and send the pending prompt for new sessions.
   // The dashboard/project page stores the prompt in sessionStorage and navigates here.
@@ -1991,39 +2048,33 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       // outer retry (2 attempts total at this level) to cover cases where the
       // SDK client itself fails to initialize or the server takes longer to start.
       const sendOpts = Object.keys(options).length > 0 ? options as any : undefined;
-      const maxOuterRetries = 2;
-      let outerAttempt = 0;
+      const messageID = ascendingId('msg');
+      const textPartId = ascendingId('prt');
+      setPendingSendMessageId(messageID);
+      addOptimisticUserMessage(messageID, pendingPrompt, [textPartId]);
       lastSendTimeRef.current = Date.now();
-      const trySend = () => {
-        outerAttempt++;
-        sendMessage.mutateAsync({
-          sessionId,
-          parts: [{ type: 'text', text: pendingPrompt }],
-          options: sendOpts,
-        }).then(() => {
-          // Send succeeded — update send time for grace period and clear retrying.
-          // Keep pendingSendInFlight true until server status goes busy (cleared below).
-          lastSendTimeRef.current = Date.now();
-          setIsRetrying(false);
-        }).catch(() => {
-          if (outerAttempt < maxOuterRetries) {
-            // Show retrying indicator and keep loader visible
-            setIsRetrying(true);
-            // Wait 3s before outer retry (inner retries already used 1s + 2s)
-            setTimeout(trySend, 3000);
-          } else {
-            // All retries failed — clear optimistic display so user can retry manually
-            setIsRetrying(false);
-            setPendingSendInFlight(false);
-            setOptimisticPrompt(null);
-            setPollingActive(false);
-          }
-        });
-      };
-      trySend();
+
+      // Fire-and-forget via promptAsync. Don't send messageID — let the
+      // server generate it with its own clock to avoid clock-skew issues.
+      const client = getClient();
+      void client.session.promptAsync({
+        sessionID: sessionId,
+        parts: [{ type: 'text', text: pendingPrompt }],
+        ...(sendOpts?.agent && { agent: sendOpts.agent }),
+        ...(sendOpts?.model && { model: sendOpts.model }),
+        ...(sendOpts?.variant && { variant: sendOpts.variant }),
+      } as any).catch(() => {
+        removeOptimisticUserMessage(messageID);
+        useSyncStore.getState().setStatus(sessionId, { type: 'idle' });
+        setIsRetrying(false);
+        setPendingSendInFlight(false);
+        setPendingSendMessageId(null);
+        setOptimisticPrompt(null);
+        setPollingActive(false);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, addOptimisticUserMessage, removeOptimisticUserMessage]);
 
   // Clear optimistic prompt once real messages arrive
   useEffect(() => {
@@ -2062,13 +2113,27 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   }, [lastUserMessage?.info.id]);
 
   // ---- Session status ----
-  const sessionStatus = useOpenCodeSessionStatusStore(
+  // Use sync store as primary (matches OpenCode), fall back to status store
+  const syncStatus = useSyncStore((s) => s.sessionStatus[sessionId]);
+  const legacyStatus = useOpenCodeSessionStatusStore(
     (s) => s.statuses[sessionId],
   );
+  const sessionStatus = syncStatus ?? legacyStatus;
   const isServerBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
-  const isBusy = isServerBusy || !!pendingUserMessage || pendingSendInFlight;
+  // Match OpenCode: isBusy is driven ONLY by the session status (single source of truth).
+  // pendingUserMessage/pendingSendInFlight are no longer part of isBusy — they caused
+  // the input to queue messages instead of sending them, breaking 2nd+ turns.
+  const isBusy = isServerBusy;
 
   // ---- Message Queue ----
+  // Hydrate the queue from the backend on first mount (survives page reloads).
+  const queueHydrated = useMessageQueueStore((s) => s.hydrated);
+  useEffect(() => {
+    if (!queueHydrated) {
+      useMessageQueueStore.getState().hydrateFromBackend();
+    }
+  }, [queueHydrated]);
+
   // Select the full array (stable ref) and derive the filtered list via useMemo
   // to avoid the "getSnapshot should be cached" infinite-loop error that occurs
   // when .filter() creates a new array reference on every selector call.
@@ -2093,28 +2158,56 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   // Guard against double-drain: tracks whether a drain is already scheduled
   const drainScheduledRef = useRef(false);
 
-  // Auto-drain: when server transitions from busy → idle, send the next queued message
+  // Sync queue from backend when session goes idle. The backend drainer may
+  // have already processed messages while the tab was closed/backgrounded.
+  // This re-fetches the persisted queue so the frontend stays in sync.
   useEffect(() => {
     const wasBusy = prevServerBusyRef.current;
     prevServerBusyRef.current = isServerBusy;
 
     if (wasBusy && !isServerBusy) {
-      // Server confirmed idle — check for queued messages
-      const sessionQueue = useMessageQueueStore.getState().messages.filter(
-        (m) => m.sessionId === sessionId,
-      );
-      if (sessionQueue.length > 0) {
-        // Small delay to let the UI settle before auto-sending
-        drainScheduledRef.current = true;
-        const timer = setTimeout(() => {
-          drainScheduledRef.current = false;
-          const next = queueDequeue(sessionId);
-          if (next) {
-            handleSend(next.text, next.files);
-          }
-        }, 500);
-        return () => { clearTimeout(timer); drainScheduledRef.current = false; };
-      }
+      // Re-sync from backend first, then drain from local store
+      void (async () => {
+        // Refresh queue from backend (the drainer may have consumed messages)
+        try {
+          const { fetchSessionQueue } = await import('@/lib/api/queue');
+          const backendMsgs = await fetchSessionQueue(sessionId);
+          const state = useMessageQueueStore.getState();
+          // Replace session's messages with backend truth, preserving local file refs
+          const otherMsgs = state.messages.filter((m) => m.sessionId !== sessionId);
+          const merged = backendMsgs.map((bm) => {
+            // Preserve local file attachments if the message still exists locally
+            const local = state.messages.find((m) => m.id === bm.id);
+            return {
+              id: bm.id,
+              sessionId: bm.sessionId,
+              text: bm.text,
+              timestamp: bm.timestamp,
+              files: local?.files,
+            } as QueuedMessage;
+          });
+          useMessageQueueStore.setState({ messages: [...otherMsgs, ...merged] });
+        } catch {
+          // Backend unreachable — use local state as fallback
+        }
+
+        // Now drain: check if there are still queued messages to send
+        const sessionQueue = useMessageQueueStore.getState().messages.filter(
+          (m) => m.sessionId === sessionId,
+        );
+        if (sessionQueue.length > 0) {
+          drainScheduledRef.current = true;
+          setTimeout(() => {
+            drainScheduledRef.current = false;
+            const next = queueDequeue(sessionId);
+            if (next) {
+              handleSend(next.text, next.files);
+            }
+          }, 500);
+        }
+      })();
+
+      return () => { drainScheduledRef.current = false; };
     }
   }, [isServerBusy, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2185,14 +2278,23 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     if (!pendingSendInFlight) return;
     if (isServerBusy) {
       setPendingSendInFlight(false);
+      setPendingSendMessageId(null);
       return;
     }
-    // If messages include assistant content, the server already processed it
-    const hasAssistant = messages?.some((m) => m.info.role === 'assistant');
-    if (hasAssistant) {
+    // If we got an assistant reply for the pending user message, the server
+    // already accepted and processed this send even if status events were missed.
+    const hasAssistantReply = pendingSendMessageId
+      ? !!messages?.some(
+          (m) =>
+            m.info.role === 'assistant' &&
+            (m.info as any).parentID === pendingSendMessageId,
+        )
+      : false;
+    if (hasAssistantReply) {
       setPendingSendInFlight(false);
+      setPendingSendMessageId(null);
     }
-  }, [pendingSendInFlight, isServerBusy, messages]);
+  }, [pendingSendInFlight, isServerBusy, messages, pendingSendMessageId]);
 
   // Safety timeout: clear pendingSendInFlight after 30s even if the server
   // never acknowledged. Prevents the UI from being stuck forever in "busy"
@@ -2201,6 +2303,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     if (!pendingSendInFlight) return;
     const timer = setTimeout(() => {
       setPendingSendInFlight(false);
+      setPendingSendMessageId(null);
     }, 30_000);
     return () => clearTimeout(timer);
   }, [pendingSendInFlight]);
@@ -2265,26 +2368,29 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     }
   }, [isServerBusy, messages, sessionId]);
 
-  // Clear pending user message when server acknowledges (status becomes busy)
-  // or when new messages arrive from the server.
+  // Clear pending user message when we can confirm the message is in cache
+  // (by ID), or when new messages arrive (fallback for command sends).
   // When a command was pending, associate the newest user message with the
   // command info so UserMessageRow can render a nice pill instead of raw template text.
   const prevMsgLenRef = useRef(messages?.length || 0);
   useEffect(() => {
     if (!pendingUserMessage) return;
-    // Server reported busy → it received our prompt, real messages incoming
-    if (isServerBusy) {
+    const hasPendingMessage = pendingUserMessageId
+      ? !!messages?.some((m) => m.info.id === pendingUserMessageId)
+      : false;
+    if (hasPendingMessage) {
       setPendingUserMessage(null);
+      setPendingUserMessageId(null);
       setPendingCommand(null);
       return;
     }
-    // New messages arrived from server → clear optimistic display
     const len = messages?.length || 0;
     if (len > prevMsgLenRef.current) {
       setPendingUserMessage(null);
+      setPendingUserMessageId(null);
       setPendingCommand(null);
     }
-  }, [isServerBusy, messages?.length, pendingUserMessage]);
+  }, [messages, messages?.length, pendingUserMessage, pendingUserMessageId]);
 
   // Associate stashed command info with the newest user message when messages arrive.
   // Runs separately so it captures the mapping even if busy fires before messages update.
@@ -2417,8 +2523,10 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     setExpanded({});
     setPollingActive(false);
     setPendingUserMessage(null);
+    setPendingUserMessageId(null);
     setPendingCommand(null);
     setPendingSendInFlight(false);
+    setPendingSendMessageId(null);
     setIsRetrying(false);
     lastSendTimeRef.current = 0;
   }, [sessionId]);
@@ -2504,11 +2612,34 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     async (text: string, files?: AttachedFile[], mentions?: TrackedMention[]) => {
       // Play send sound
       playSound('send');
+      const messageID = ascendingId('msg');
 
-      // Optimistic: show message immediately and start polling fallback
-      setPendingUserMessage(text);
-      setPollingActive(true);
-      lastSendTimeRef.current = Date.now();
+      // Generate part IDs upfront so the optimistic message and the server
+      // request use the SAME IDs. When the server echoes parts via
+      // message.part.updated, the sync store's upsertPart will UPDATE
+      // (not duplicate) the optimistic parts. This matches OpenCode's
+      // SolidJS approach where part IDs are sent with the prompt request.
+      const textPartId = ascendingId('prt');
+
+      // Build optimistic text that includes session ref XML so that
+      // HighlightMentions / UserMessageRow can detect multi-word session
+      // mentions (e.g. "@Intro message") before the server echoes back.
+      const sessionMentionsForOptimistic = mentions?.filter((m) => m.kind === 'session' && m.value);
+      let optimisticText = text;
+      if (sessionMentionsForOptimistic && sessionMentionsForOptimistic.length > 0) {
+        const refs = sessionMentionsForOptimistic
+          .map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
+          .join('\n');
+        optimisticText = `${text}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
+      }
+
+      // Optimistic: show message immediately in sync store + set busy
+      // Matches OpenCode: sync.set("session_status", session.id, { type: "busy" })
+      addOptimisticUserMessage(messageID, optimisticText, [textPartId]);
+      useSyncStore.getState().setStatus(sessionId, { type: 'busy' });
+
+      // Scroll to bottom after the optimistic message renders
+      requestAnimationFrame(() => scrollToBottom());
 
       const options: Record<string, unknown> = {};
       if (local.agent.current) options.agent = local.agent.current.name;
@@ -2518,9 +2649,9 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       // Build parts: text first, then upload attached files to /workspace/uploads/
       // and send as XML text references (agent reads from disk on demand, not loaded into context)
       const parts: Array<
-        | { type: 'text'; text: string }
-        | { type: 'file'; mime: string; url: string; filename?: string }
-      > = [{ type: 'text', text }];
+        | { id: string; type: 'text'; text: string }
+        | { id: string; type: 'file'; mime: string; url: string; filename?: string }
+      > = [{ id: textPartId, type: 'text', text }];
 
       if (files && files.length > 0) {
         const uploadResults = await Promise.all(
@@ -2542,6 +2673,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         );
         for (const f of uploadResults) {
           parts.push({
+            id: ascendingId('prt'),
             type: 'text',
             text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
           });
@@ -2555,27 +2687,41 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
           .map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
           .join('\n');
         parts.push({
+          id: ascendingId('prt'),
           type: 'text',
           text: `\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`,
         });
       }
 
-      try {
-        await sendMessage.mutateAsync({
-          sessionId,
-          parts,
-          options: Object.keys(options).length > 0 ? options as any : undefined,
-        });
-        // Send succeeded — update send time for grace period
-        lastSendTimeRef.current = Date.now();
-      } catch {
-        // If send fails (after all internal retries), clear optimistic state
-        setPendingUserMessage(null);
-        setPollingActive(false);
-      }
+      // Fire-and-forget via session.prompt (matching OpenCode app's approach).
+      // SSE events drive all incremental UI updates via sync store.
+      // prompt() blocks until the full response is ready, but since we don't
+      // await the result, it effectively runs in the background. This is exactly
+      // how OpenCode's web app sends messages.
+      // Don't send part IDs or messageID — let the server generate them with
+      // its own clock. Client-generated IDs can sort before server IDs due to
+      // clock skew (browser vs Docker container), causing the server's loop to
+      // exit immediately thinking the prompt was already answered.
+      const mappedParts = parts.map((p: any) => {
+        if (p.type === 'file') return { type: 'file' as const, mime: p.mime, url: p.url, filename: p.filename };
+        return { type: 'text' as const, text: p.text };
+      });
+      const sendOpts = Object.keys(options).length > 0 ? options : undefined;
+      const client = getClient();
+      void client.session.promptAsync({
+        sessionID: sessionId,
+        parts: mappedParts,
+        ...(sendOpts?.agent && { agent: sendOpts.agent }),
+        ...(sendOpts?.model && { model: sendOpts.model }),
+        ...(sendOpts?.variant && { variant: sendOpts.variant }),
+      } as any).catch(() => {
+        // On failure, set status to idle and remove optimistic message
+        useSyncStore.getState().setStatus(sessionId, { type: 'idle' });
+        removeOptimisticUserMessage(messageID);
+      });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current],
+    [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current, addOptimisticUserMessage, removeOptimisticUserMessage, scrollToBottom],
   );
 
   const handleStop = useCallback(() => {
@@ -2589,6 +2735,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       setPendingCommand({ name: cmd.name, description: args || cmd.description });
       pendingCommandStashRef.current = { name: cmd.name, args: args || cmd.description };
       setPendingUserMessage(label);
+      setPendingUserMessageId(null);
       setPollingActive(true);
       lastSendTimeRef.current = Date.now();
       executeCommand.mutate(
@@ -2597,6 +2744,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
           onError: () => {
             setPendingCommand(null);
             setPendingUserMessage(null);
+            setPendingUserMessageId(null);
             setPollingActive(false);
           },
         },
@@ -2712,7 +2860,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         <div className="relative flex-1 min-h-0">
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full [scroll-behavior:auto]"
+            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-32 bg-background h-full [scroll-behavior:auto]"
           >
             <div
               ref={contentRef}
@@ -2823,52 +2971,8 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                   );
                 })}
 
-                {/* Optimistic user message / command for in-session sends */}
-                {pendingUserMessage && !showOptimistic && (
-                  <>
-                    {pendingCommand ? (
-                      /* Command execution card — distinct from regular user messages */
-                      <div className="flex justify-end">
-                        <div className="inline-flex flex-col gap-1.5 px-4 py-2.5 rounded-2xl border border-border/60 bg-muted/40">
-                          <div className="flex items-center gap-2">
-                            <Terminal className="size-3.5 text-muted-foreground shrink-0" />
-                            <span className="font-mono text-sm text-foreground">/{pendingCommand.name}</span>
-                          </div>
-                          {pendingCommand.description && (
-                            <div className="text-xs text-muted-foreground break-words max-w-[400px]" style={{ paddingLeft: '1.375rem' }}>
-                              {pendingCommand.description}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex justify-end">
-                        <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
-                            <HighlightMentions text={pendingUserMessage} agentNames={agentNames} onFileClick={openFileInComputer} />
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/kortix-logomark-white.svg"
-                        alt="Kortix"
-                        className="dark:invert-0 invert flex-shrink-0"
-                        style={{ height: '14px', width: 'auto' }}
-                      />
-                      {isRetrying && (
-                        <span className="text-xs text-amber-500">
-                          Retrying connection...
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-
                 {/* Busy indicator when no turns yet but session is busy */}
-                {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
+                {!showOptimistic && isBusy && turns.length === 0 && (
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -2909,129 +3013,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         <SessionWelcome />
       )}
 
-      {/* Queued messages popup — expandable/collapsible above input */}
-      {queuedMessages.length > 0 && (
-        <div className="mx-auto w-full max-w-3xl px-2 sm:px-4">
-          <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-sm overflow-hidden mb-1">
-            {/* Header — always visible, acts as toggle */}
-            <button
-              type="button"
-              onClick={() => setQueueExpanded((v) => !v)}
-              className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <ListPlus className="size-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">
-                  Queued
-                </span>
-                <span className="text-[10px] tabular-nums text-muted-foreground/60 bg-muted/60 px-1.5 py-0.5 rounded-md">
-                  {queuedMessages.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
-                      className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      <Trash2 className="size-3" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top"><p className="text-xs">Clear all</p></TooltipContent>
-                </Tooltip>
-                <ChevronUp className={cn('size-3.5 text-muted-foreground/50 transition-transform', !queueExpanded && 'rotate-180')} />
-              </div>
-            </button>
-
-            {/* Expandable body */}
-            {queueExpanded && (
-              <div className="border-t border-border/40">
-                {/* Max 5 items visible by height (~240px), scroll if more */}
-                <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: '240px' }}>
-                  <div className="flex flex-col gap-0.5 p-1.5">
-                    {queuedMessages.map((qm, idx) => (
-                      <div
-                        key={qm.id}
-                        className="group/queued flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors"
-                      >
-                        {/* Index indicator */}
-                        <span className="text-[10px] tabular-nums text-muted-foreground/40 mt-1 shrink-0 w-4 text-center">
-                          {idx + 1}
-                        </span>
-
-                        {/* Message text */}
-                        <p className="flex-1 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words line-clamp-2 min-w-0">
-                          {qm.text}
-                        </p>
-
-                        {/* Action buttons — visible on hover */}
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover/queued:opacity-100 transition-opacity shrink-0">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => handleQueueSendNow(qm.id)}
-                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                              >
-                                <Send className="size-3" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
-                          </Tooltip>
-                          {idx > 0 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => queueMoveUp(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                >
-                                  <ArrowUp className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Move up</p></TooltipContent>
-                            </Tooltip>
-                          )}
-                          {idx < queuedMessages.length - 1 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => queueMoveDown(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                >
-                                  <ArrowDown className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Move down</p></TooltipContent>
-                            </Tooltip>
-                          )}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => queueRemove(qm.id)}
-                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"><p className="text-xs">Remove</p></TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Queue UI moved into the chat input card via inputSlot */}
 
       {/* Input */}
       <SessionChatInput
@@ -3055,6 +3037,80 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         providers={providers}
         threadContext={threadContext}
         onContextClick={() => setContextModalOpen(true)}
+        inputSlot={queuedMessages.length > 0 ? (
+          <div className="rounded-xl bg-muted/50 overflow-hidden">
+            {/* Compact header row */}
+            <button
+              type="button"
+              onClick={() => setQueueExpanded((v) => !v)}
+              className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
+            >
+              <ListPlus className="size-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-xs text-muted-foreground flex-1 text-left truncate">
+                {queuedMessages.length} message{queuedMessages.length !== 1 ? 's' : ''} queued
+                {queuedMessages.length > 0 && (
+                  <span className="text-foreground/80 font-medium"> · {queuedMessages[0].text.slice(0, 50)}{queuedMessages[0].text.length > 50 ? '…' : ''}</span>
+                )}
+              </span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
+                  className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <X className="size-3" />
+                </span>
+                <ChevronUp className={cn('size-3 text-muted-foreground/40 transition-transform', !queueExpanded && 'rotate-180')} />
+              </div>
+            </button>
+
+            {/* Expanded list */}
+            {queueExpanded && queuedMessages.length > 1 && (
+              <div className="border-t border-border/30 max-h-[160px] overflow-y-auto scrollbar-hide">
+                <div className="flex flex-col px-1.5 py-1">
+                  {queuedMessages.map((qm, idx) => (
+                    <div
+                      key={qm.id}
+                      className="group/q flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted/60 transition-colors"
+                    >
+                      <span className="text-[10px] tabular-nums text-muted-foreground/40 shrink-0 w-3 text-center">
+                        {idx + 1}
+                      </span>
+                      <p className="flex-1 text-xs text-muted-foreground truncate min-w-0">
+                        {qm.text}
+                      </p>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover/q:opacity-100 transition-opacity shrink-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" onClick={() => handleQueueSendNow(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
+                              <Send className="size-2.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
+                        </Tooltip>
+                        {idx > 0 && (
+                          <button type="button" onClick={() => queueMoveUp(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
+                            <ArrowUp className="size-2.5" />
+                          </button>
+                        )}
+                        {idx < queuedMessages.length - 1 && (
+                          <button type="button" onClick={() => queueMoveDown(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
+                            <ArrowDown className="size-2.5" />
+                          </button>
+                        )}
+                        <button type="button" onClick={() => queueRemove(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer">
+                          <X className="size-2.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : undefined}
       />
     </div>
   );

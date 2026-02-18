@@ -1,5 +1,59 @@
 [
   {
+    "version": "0.5.5",
+    "date": "2026-02-18",
+    "title": "License: Elastic License 2.0 (ELv2)",
+    "description": "All Kortix artifacts are now published under the Elastic License 2.0 (ELv2). LICENSE is included in npm packages and baked into all Docker images.",
+    "changes": [
+      {
+        "type": "improvement",
+        "text": "Replaced custom KPSL v1.0 with standard Elastic License 2.0 (ELv2)"
+      },
+      {
+        "type": "improvement",
+        "text": "LICENSE file included in @kortix/sandbox npm tarball"
+      },
+      {
+        "type": "improvement",
+        "text": "LICENSE baked into all Docker images at /LICENSE"
+      },
+      {
+        "type": "improvement",
+        "text": "All @kortix npm packages now declare license: Elastic-2.0"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/opencode-ai@0.5.5",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.5.5",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.5.5",
+        "target": "npm"
+      },
+      {
+        "name": "v0.5.5",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.5.5",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-api:0.5.5",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.5.5",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.5.4",
     "date": "2026-02-18",
     "title": "Onboarding, memory & unified secrets",

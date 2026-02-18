@@ -16,3 +16,6 @@
 
 # Whitelist entrypoint script (VPS URL rewriting)
 !apps/frontend/docker-entrypoint.sh
+
+# License (COPY LICENSE /LICENSE in Dockerfile)
+!LICENSE

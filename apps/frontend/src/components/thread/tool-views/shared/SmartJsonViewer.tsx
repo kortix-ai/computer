@@ -19,10 +19,16 @@ const getType = (value: any) => {
   return typeof value;
 };
 
+/** Truncate long strings for collapsed preview */
+function truncateString(val: string, maxLen: number = 80): string {
+  if (val.length <= maxLen) return val;
+  return val.slice(0, maxLen) + '...';
+}
+
 const ValueRenderer = ({ value }: { value: any }) => {
   const type = getType(value);
 
-  if (type === 'null') return <span className="text-muted-foreground/60 italic">null</span>;
+  if (type === 'null') return <span className="text-muted-foreground/50 italic">null</span>;
   if (type === 'string') {
     // URL detection
     if (value.startsWith('http://') || value.startsWith('https://')) {
@@ -33,17 +39,17 @@ const ValueRenderer = ({ value }: { value: any }) => {
           rel="noopener noreferrer" 
           className="text-blue-500 hover:underline inline-flex items-center gap-1 break-all"
         >
-          "{value}"
-          <ExternalLink className="h-3 w-3 inline" />
+          &quot;{truncateString(value)}&quot;
+          <ExternalLink className="h-3 w-3 inline flex-shrink-0" />
         </a>
       );
     }
-    // Image detection (basic)
-    if (value.match(/\.(jpeg|jpg|gif|png|webp)$/i)) {
-      // Could show a preview on hover or inline, but keeping it simple for now
-      return <span className="text-muted-foreground">"{value}"</span>;
+    // File path detection
+    if (value.startsWith('/') && !value.includes('\n') && value.length < 300) {
+      return <span className="text-foreground/70 break-all">&quot;{value}&quot;</span>;
     }
-    return <span className="text-muted-foreground break-all">"{value}"</span>;
+    // Long string truncation in collapsed view
+    return <span className="text-foreground/60 break-all">&quot;{value}&quot;</span>;
   }
   if (type === 'number') return <span className="text-blue-600 dark:text-blue-400">{value}</span>;
   if (type === 'boolean') return <span className="text-amber-600 dark:text-amber-400">{String(value)}</span>;
@@ -52,7 +58,10 @@ const ValueRenderer = ({ value }: { value: any }) => {
 };
 
 const KeyRenderer = ({ name }: { name: string }) => (
-  <span className="text-muted-foreground mr-1 font-medium">"{name}":</span>
+  <span className="text-muted-foreground/80 mr-1">
+    <span className="font-medium">{name}</span>
+    <span className="text-muted-foreground/40">:</span>
+  </span>
 );
 
 export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({ 
@@ -103,7 +112,7 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
     >
       <div 
         className={cn(
-          "flex items-start gap-1 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded px-1 -ml-1 py-0.5 transition-colors group",
+          "flex items-start gap-1 cursor-pointer hover:bg-muted/50 rounded px-1 -ml-1 py-0.5 transition-colors group",
           !isExpanded && "items-center"
         )}
         onClick={(e) => {
@@ -111,7 +120,7 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
           if (!isEmpty) setIsExpanded(!isExpanded);
         }}
       >
-        <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-50 group-hover:opacity-100">
+        <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
           {!isEmpty && (
             isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />
           )}
@@ -120,19 +129,19 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
         <div className="flex-1 flex items-center flex-wrap gap-1">
           {name && <KeyRenderer name={name} />}
           
-          <span className="text-muted-foreground font-bold">{brackets[0]}</span>
+          <span className="text-muted-foreground/50">{brackets[0]}</span>
           
           {!isExpanded && !isEmpty && (
-            <span className="text-muted-foreground flex items-center gap-1 mx-1">
+            <span className="text-muted-foreground/50 flex items-center gap-1.5 mx-0.5">
                <MoreHorizontal className="h-3 w-3" />
-               <span className="text-[10px] bg-muted px-1 rounded-sm">{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+               <span className="text-[10px] bg-muted/60 px-1.5 py-0.5 rounded">{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
             </span>
           )}
 
-          {isEmpty && <span className="text-muted-foreground"></span>}
+          {isEmpty && <span className="text-muted-foreground/40"></span>}
 
           {(!isExpanded || isEmpty) && (
-            <span className="text-muted-foreground font-bold">{brackets[1]}</span>
+            <span className="text-muted-foreground/50">{brackets[1]}</span>
           )}
         </div>
 
@@ -143,14 +152,14 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
              className="h-4 w-4 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
              onClick={handleCopy}
            >
-             {copied ? <Check className="h-3 w-3 text-muted-foreground" /> : <Copy className="h-3 w-3" />}
+             {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
            </Button>
         )}
       </div>
 
       {isExpanded && !isEmpty && (
         <div className="flex flex-col">
-          <div className="pl-4 ml-2 border-l border-border">
+          <div className="pl-4 ml-2 border-l border-border/50">
             {keys.map((key) => (
               <SmartJsonViewer
                 key={key}
@@ -161,7 +170,7 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
               />
             ))}
           </div>
-          <div className="pl-6 py-0.5 text-muted-foreground font-bold">
+          <div className="pl-6 py-0.5 text-muted-foreground/50">
             {brackets[1]}
           </div>
         </div>

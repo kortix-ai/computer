@@ -95,12 +95,26 @@ export function useSandboxConnection() {
         const token = await getSupabaseAccessToken();
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        await fetch(`${url}/session`, {
+        const res = await fetch(`${url}/session`, {
           method: 'GET',
           signal: controller.signal,
           headers,
         });
         clearTimeout(timer);
+
+        // On 401/403, the token likely expired during a connection drop.
+        // Attempt an explicit session refresh so the next health check
+        // (and all SDK requests) use a fresh token.
+        if (res.status === 401 || res.status === 403) {
+          try {
+            const { createClient } = await import('@/lib/supabase/client');
+            const supabase = createClient();
+            await supabase.auth.refreshSession();
+          } catch { /* refresh failed — will retry on next poll */ }
+          // Treat auth failure as a connection failure so the retry loop
+          // kicks in with fast polling.
+          throw new Error(`Auth error: ${res.status}`);
+        }
 
         if (!alive) return;
         resetSandboxFail();

@@ -19,6 +19,7 @@ import { setupApp } from './setup';
 import { providersApp } from './providers/routes';
 import { secretsApp } from './secrets/routes';
 import { integrationsApp } from './integrations';
+import { queueApp, startDrainer, stopDrainer } from './queue';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -147,6 +148,8 @@ if (config.isLocal()) {
   app.route('/v1/providers', providersApp);   // /v1/providers, /v1/providers/schema, /v1/providers/:id/connect, /v1/providers/:id/disconnect, /v1/providers/health
   app.route('/v1/secrets', secretsApp);       // /v1/secrets, /v1/secrets/:key (PUT/DELETE)
 }
+// Message queue — persists queued messages to filesystem and drains them server-side.
+app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queue/messages/:id, /v1/queue/all, /v1/queue/status
 
 // Daytona Proxy is cloud-only (requires Daytona API). In local mode the catch-all
 // /:sandboxId/:port/* pattern would intercept every unmatched request and throw
@@ -219,6 +222,7 @@ console.log(`
 ║    /v1/deployments (deploy lifecycle)                      ║
 ║    /v1/integrations (OAuth integrations)                    ║
 ║    /v1/setup      (local setup & env management)           ║
+║    /v1/queue      (persistent message queue)               ║
 ║    /v1/preview    (sandbox preview proxy)                  ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
@@ -231,12 +235,14 @@ console.log(`
 
 startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
 startChannelService();
+startDrainer();
 
 // Graceful shutdown
 function shutdown(signal: string) {
   console.log(`\n[${signal}] Shutting down gracefully...`);
   stopScheduler();
   stopChannelService();
+  stopDrainer();
   process.exit(0);
 }
 

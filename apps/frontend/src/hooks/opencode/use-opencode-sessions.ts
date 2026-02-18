@@ -321,28 +321,16 @@ export function useSendOpenCodeMessage() {
         ...(options?.variant && { variant: options.variant }),
       };
 
-      // Retry up to 2 times on transient connection errors
-      let lastError: Error | null = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const client = getClient();
-          const result = await client.session.promptAsync(payload);
-          // promptAsync returns void (204) — no unwrap needed, but check for errors
-          if (result.error) {
-            const err = result.error as any;
-            throw new Error(err?.data?.message || err?.message || 'Failed to send message');
-          }
-          return; // success
-        } catch (err: any) {
-          lastError = err instanceof Error ? err : new Error(String(err));
-          const msg = lastError.message.toLowerCase();
-          const isTransient = msg.includes('unable to connect') || msg.includes('fetch') || msg.includes('network') || msg.includes('econnrefused') || msg.includes('timeout');
-          if (!isTransient || attempt >= 2) throw lastError;
-          // Wait before retry: 1s, 2s
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        }
+      // Match OpenCode exactly: use session.prompt() (blocking endpoint).
+      // The call blocks until the AI finishes, but we fire-and-forget from
+      // the UI side (handleSend doesn't await the mutation result).
+      // SSE events drive all incremental UI updates via the sync store.
+      const client = getClient();
+      const result = await client.session.prompt(payload as any);
+      if (result.error) {
+        const err = result.error as any;
+        throw new Error(err?.data?.message || err?.message || 'Failed to send message');
       }
-      if (lastError) throw lastError;
     },
   });
 }

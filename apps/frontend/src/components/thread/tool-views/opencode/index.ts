@@ -164,14 +164,20 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   // Memory get (full observation details)
   'oc-mem-get': OcMemGetToolView,
   'oc-mem_get': OcMemGetToolView,
+  'oc-memory-get': OcMemGetToolView,
+  'oc-memory_get': OcMemGetToolView,
 
   // Memory save (create observation)
   'oc-mem-save': OcMemSaveToolView,
   'oc-mem_save': OcMemSaveToolView,
+  'oc-memory-save': OcMemSaveToolView,
+  'oc-memory_save': OcMemSaveToolView,
 
   // Memory timeline (chronological context)
   'oc-mem-timeline': OcMemTimelineToolView,
   'oc-mem_timeline': OcMemTimelineToolView,
+  'oc-memory-timeline': OcMemTimelineToolView,
+  'oc-memory_timeline': OcMemTimelineToolView,
 
   // MCP tools and other unknown tools will fall through to the
   // registry's default (GenericToolView). The OcGenericToolView

@@ -8,6 +8,8 @@ import {
   AlertCircle,
   FileText,
   Wrench,
+  Hash,
+  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolViewProps } from '../types';
@@ -16,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
+import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 
 // ============================================================================
 // Types & Parsing
@@ -34,6 +37,46 @@ interface MemGetObservation {
   concepts: string[];
   filesRead: string[];
   filesModified: string[];
+}
+
+/** Structured file-read result from the memory-get tool. */
+interface MemoryFileResult {
+  path: string;
+  absolute_path?: string;
+  total_lines: number;
+  showing?: { start: number; end: number; count: number };
+  content: string;
+}
+
+/** Try to parse output as a JSON file-read result (with path + content fields). */
+function parseFileReadResult(output: string): MemoryFileResult | null {
+  if (!output) return null;
+
+  // If it's already an object (stringified JSON), try parsing
+  const trimmed = output.trim();
+  if (!trimmed.startsWith('{')) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.path === 'string' &&
+      typeof parsed.content === 'string'
+    ) {
+      return {
+        path: parsed.path,
+        absolute_path: parsed.absolute_path,
+        total_lines: parsed.total_lines || 0,
+        showing: parsed.showing,
+        content: parsed.content,
+      };
+    }
+  } catch {
+    // Not JSON
+  }
+
+  return null;
 }
 
 /** Parse the rich markdown output produced by formatObservations() in the mem_get tool. */
@@ -134,6 +177,12 @@ function memGetTypeInfo(typeEmoji: string, type: string): { label: string; bg: s
   return { label: 'Note', bg: 'bg-muted/40', text: 'text-muted-foreground', dot: 'bg-muted-foreground/50' };
 }
 
+/** Extract a short filename from a path. */
+function getFilename(path: string): string {
+  const parts = path.split('/');
+  return parts[parts.length - 1] || path;
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -149,11 +198,29 @@ export function OcMemGetToolView({
   const args = toolCall?.arguments || {};
   const ocState = args._oc_state as any;
   const ids = (args.ids as string) || (ocState?.input?.ids as string) || '';
+  const path = (args.path as string) || (ocState?.input?.path as string) || '';
   const rawOutput = toolResult?.output || ocState?.output || '';
-  const output = typeof rawOutput === 'string' ? rawOutput : String(rawOutput);
+  const output = typeof rawOutput === 'string' ? rawOutput : (typeof rawOutput === 'object' ? JSON.stringify(rawOutput) : String(rawOutput));
 
   const isError = toolResult?.success === false || !!toolResult?.error;
-  const observations = useMemo(() => parseMemGetOutput(output), [output]);
+
+  // Try to parse as file-read result first
+  const fileResult = useMemo(() => {
+    // If output is already a JSON object (not stringified)
+    if (typeof rawOutput === 'object' && rawOutput !== null && 'path' in rawOutput && 'content' in rawOutput) {
+      return rawOutput as MemoryFileResult;
+    }
+    return parseFileReadResult(output);
+  }, [rawOutput, output]);
+
+  // Then try to parse as observations (only if not a file result)
+  const observations = useMemo(() => {
+    if (fileResult) return [];
+    return parseMemGetOutput(output);
+  }, [output, fileResult]);
+
+  // Determine subtitle from context
+  const subtitle = path || ids || (fileResult ? fileResult.path : '');
 
   // --- Loading ---
   if (isStreaming && !toolResult) {
@@ -161,7 +228,7 @@ export function OcMemGetToolView({
       <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
         <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
           <div className="flex flex-row items-center justify-between">
-            <ToolViewIconTitle icon={Brain} title="Mem Get" subtitle={ids} />
+            <ToolViewIconTitle icon={Brain} title="Memory" subtitle={subtitle} />
           </div>
         </CardHeader>
         <CardContent className="p-0 h-full flex-1 overflow-hidden relative">
@@ -169,9 +236,9 @@ export function OcMemGetToolView({
             <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Brain className="size-5 text-primary animate-pulse" />
             </div>
-            <p className="text-sm text-muted-foreground">Loading observations...</p>
-            {ids && (
-              <p className="text-xs text-muted-foreground/50 font-mono">{ids}</p>
+            <p className="text-sm text-muted-foreground">Loading memory...</p>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground/50 font-mono">{subtitle}</p>
             )}
           </div>
         </CardContent>
@@ -179,11 +246,81 @@ export function OcMemGetToolView({
     );
   }
 
+  // --- File read result (MEMORY.md style) ---
+  if (fileResult) {
+    const filename = getFilename(fileResult.path);
+    return (
+      <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
+        <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+          <div className="flex flex-row items-center justify-between">
+            <ToolViewIconTitle icon={Brain} title="Memory" subtitle={filename} />
+            <div className="flex items-center gap-2 text-xs flex-shrink-0">
+              {fileResult.total_lines > 0 && (
+                <span className="flex items-center gap-0.5 text-muted-foreground">
+                  <Hash className="h-3 w-3" />
+                  {fileResult.total_lines} lines
+                </span>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0 h-full flex-1 overflow-hidden">
+          <ScrollArea className="h-full w-full">
+            <div className="p-3 space-y-2">
+              {/* File path info */}
+              <div className="flex items-center gap-2 px-1 py-1">
+                <FolderOpen className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
+                <span className="text-[11px] text-muted-foreground/50 font-mono truncate">
+                  {fileResult.path}
+                </span>
+              </div>
+
+              {/* Rendered markdown content */}
+              <div className="rounded-lg border border-border overflow-hidden bg-card">
+                <div className="px-4 py-3">
+                  <div className="prose prose-sm dark:prose-invert max-w-none
+                    prose-headings:text-foreground prose-headings:font-medium
+                    prose-h1:text-base prose-h1:mb-2 prose-h1:mt-0
+                    prose-h2:text-sm prose-h2:mb-1.5 prose-h2:mt-4
+                    prose-h3:text-xs prose-h3:mb-1 prose-h3:mt-3
+                    prose-p:text-xs prose-p:text-muted-foreground/80 prose-p:leading-relaxed prose-p:my-1.5
+                    prose-li:text-xs prose-li:text-muted-foreground/80 prose-li:my-0.5
+                    prose-ul:my-1 prose-ol:my-1
+                    prose-strong:text-foreground prose-strong:font-medium
+                    prose-code:text-[11px] prose-code:bg-muted/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+                    prose-hr:border-border/50 prose-hr:my-3
+                  ">
+                    <UnifiedMarkdown content={fileResult.content} isStreaming={false} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </CardContent>
+
+        <ToolViewFooter
+          assistantTimestamp={assistantTimestamp}
+          toolTimestamp={toolTimestamp}
+          isStreaming={isStreaming}
+        >
+          {!isStreaming && (
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
+              Loaded
+            </Badge>
+          )}
+        </ToolViewFooter>
+      </Card>
+    );
+  }
+
+  // --- Observations display ---
   return (
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
       <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
-          <ToolViewIconTitle icon={Brain} title="Mem Get" subtitle={ids} />
+          <ToolViewIconTitle icon={Brain} title="Memory" subtitle={subtitle} />
           {observations.length > 0 && (
             <Badge variant="outline" className="h-6 py-0.5 bg-muted flex-shrink-0 ml-2">
               <Brain className="h-3 w-3 mr-1 opacity-70" />
@@ -297,19 +434,21 @@ export function OcMemGetToolView({
           </ScrollArea>
         ) : output && !isError ? (
           <ScrollArea className="h-full w-full">
-            <div className="p-3 text-sm text-muted-foreground whitespace-pre-wrap font-mono">
-              {output.slice(0, 3000)}
+            <div className="p-3">
+              <div className="prose prose-sm dark:prose-invert max-w-none px-1">
+                <UnifiedMarkdown content={output.slice(0, 3000)} isStreaming={false} />
+              </div>
             </div>
           </ScrollArea>
         ) : isError ? (
           <div className="flex items-start gap-2.5 px-4 py-6 text-muted-foreground">
             <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-            <p className="text-sm">{output || 'Failed to load observations'}</p>
+            <p className="text-sm">{output || 'Failed to load memory'}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full py-12 px-6">
             <Brain className="h-8 w-8 text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground">No observations found</p>
+            <p className="text-sm text-muted-foreground">No memory data found</p>
           </div>
         )}
       </CardContent>
@@ -329,6 +468,11 @@ export function OcMemGetToolView({
             <Badge variant="outline" className="h-6 py-0.5 bg-muted">
               <CheckCircle className="h-3 w-3 text-muted-foreground" />
               {observations.length} {observations.length === 1 ? 'observation' : 'observations'}
+            </Badge>
+          ) : output ? (
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
+              Loaded
             </Badge>
           ) : null
         )}

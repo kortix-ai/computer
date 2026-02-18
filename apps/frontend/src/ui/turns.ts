@@ -155,12 +155,20 @@ export function groupMessagesIntoTurns(messages: MessageWithParts[]): Turn[] {
     // Fall back to sequential ordering
     if (lastTurn) {
       lastTurn.assistantMessages.push(msg);
-    } else {
-      // Orphan assistant message — create a synthetic turn.
-      // Use a minimal wrapper so the UI can still render something.
-      const syntheticTurn: Turn = { userMessage: msg, assistantMessages: [] };
-      turns.push(syntheticTurn);
+      continue;
     }
+
+    // If ordering is temporarily out of sync (e.g. part events arrive before
+    // full assistant metadata), attach to the latest known user turn so
+    // in-progress streaming text appears in the active turn immediately.
+    if (turns.length > 0) {
+      turns[turns.length - 1].assistantMessages.push(msg);
+      continue;
+    }
+
+    // No user messages at all — create a synthetic turn.
+    const syntheticTurn: Turn = { userMessage: msg, assistantMessages: [] };
+    turns.push(syntheticTurn);
   }
 
   return turns;
@@ -906,5 +914,4 @@ export function allDescendantIds(
   }
   return result;
 }
-
 
