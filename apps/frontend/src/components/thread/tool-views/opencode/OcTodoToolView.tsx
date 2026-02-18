@@ -69,40 +69,32 @@ export function OcTodoToolView({
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
-          <div className="p-3 space-y-2">
+          <div className="p-3 space-y-px">
             {todos.length > 0 ? (
               todos.map((todo, i) => (
-                <label key={todo.id || i} className="flex items-start gap-3 py-1.5">
-                  <input
-                    type="checkbox"
-                    checked={todo.status === 'completed'}
-                    readOnly
-                    className="mt-0.5 rounded border-border"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className={cn(
-                        'text-sm leading-relaxed',
-                        todo.status === 'completed' && 'line-through text-muted-foreground',
-                        todo.status === 'in_progress' && 'text-foreground font-medium',
-                      )}
-                    >
-                      {todo.content}
-                    </span>
-                    {todo.priority && todo.priority !== 'medium' && (
-                      <span
-                        className={cn(
-                          'ml-2 text-[10px] px-1.5 py-0.5 rounded-full',
-                          todo.priority === 'high'
-                            ? 'bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400'
-                            : 'bg-muted text-muted-foreground',
-                        )}
-                      >
-                        {todo.priority}
-                      </span>
+                <div key={todo.id || i} className={cn(
+                  'flex items-center gap-2 py-1',
+                  todo.status === 'completed' && 'opacity-40',
+                )}>
+                  <span className={cn(
+                    'size-3.5 rounded-sm flex-shrink-0 flex items-center justify-center border border-border/60',
+                    todo.status === 'completed' && 'bg-muted',
+                  )}>
+                    {todo.status === 'completed' && (
+                      <svg viewBox="0 0 12 12" fill="none" width="9" height="9"><path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-muted-foreground" /></svg>
                     )}
-                  </div>
-                </label>
+                    {todo.status === 'in_progress' && <div className="size-1.5 rounded-full bg-foreground" />}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-[13px] leading-tight truncate',
+                      todo.status === 'completed' && 'line-through text-muted-foreground',
+                      todo.status === 'in_progress' && 'text-foreground',
+                    )}
+                  >
+                    {todo.content}
+                  </span>
+                </div>
               ))
             ) : (
               <div className="text-sm text-muted-foreground">No tasks defined.</div>
@@ -124,7 +116,7 @@ export function OcTodoToolView({
             </Badge>
           ) : (
             <Badge variant="outline" className="h-6 py-0.5 bg-muted">
-              <CheckCircle className="h-3 w-3 text-emerald-500" />
+              <CheckCircle className="h-3 w-3 text-muted-foreground" />
               Updated
             </Badge>
           )

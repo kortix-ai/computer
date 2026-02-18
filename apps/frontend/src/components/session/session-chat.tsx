@@ -2860,7 +2860,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         <div className="relative flex-1 min-h-0">
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full [scroll-behavior:auto]"
+            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-32 bg-background h-full [scroll-behavior:auto]"
           >
             <div
               ref={contentRef}
@@ -3013,129 +3013,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         <SessionWelcome />
       )}
 
-      {/* Queued messages popup — expandable/collapsible above input */}
-      {queuedMessages.length > 0 && (
-        <div className="mx-auto w-full max-w-3xl px-2 sm:px-4">
-          <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-sm overflow-hidden mb-1">
-            {/* Header — always visible, acts as toggle */}
-            <button
-              type="button"
-              onClick={() => setQueueExpanded((v) => !v)}
-              className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <ListPlus className="size-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">
-                  Queued
-                </span>
-                <span className="text-[10px] tabular-nums text-muted-foreground/60 bg-muted/60 px-1.5 py-0.5 rounded-md">
-                  {queuedMessages.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
-                      className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      <Trash2 className="size-3" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top"><p className="text-xs">Clear all</p></TooltipContent>
-                </Tooltip>
-                <ChevronUp className={cn('size-3.5 text-muted-foreground/50 transition-transform', !queueExpanded && 'rotate-180')} />
-              </div>
-            </button>
-
-            {/* Expandable body */}
-            {queueExpanded && (
-              <div className="border-t border-border/40">
-                {/* Max 5 items visible by height (~240px), scroll if more */}
-                <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: '240px' }}>
-                  <div className="flex flex-col gap-0.5 p-1.5">
-                    {queuedMessages.map((qm, idx) => (
-                      <div
-                        key={qm.id}
-                        className="group/queued flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors"
-                      >
-                        {/* Index indicator */}
-                        <span className="text-[10px] tabular-nums text-muted-foreground/40 mt-1 shrink-0 w-4 text-center">
-                          {idx + 1}
-                        </span>
-
-                        {/* Message text */}
-                        <p className="flex-1 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words line-clamp-2 min-w-0">
-                          {qm.text}
-                        </p>
-
-                        {/* Action buttons — visible on hover */}
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover/queued:opacity-100 transition-opacity shrink-0">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => handleQueueSendNow(qm.id)}
-                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                              >
-                                <Send className="size-3" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
-                          </Tooltip>
-                          {idx > 0 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => queueMoveUp(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                >
-                                  <ArrowUp className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Move up</p></TooltipContent>
-                            </Tooltip>
-                          )}
-                          {idx < queuedMessages.length - 1 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => queueMoveDown(qm.id)}
-                                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                                >
-                                  <ArrowDown className="size-3" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top"><p className="text-xs">Move down</p></TooltipContent>
-                            </Tooltip>
-                          )}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => queueRemove(qm.id)}
-                                className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"><p className="text-xs">Remove</p></TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Queue UI moved into the chat input card via inputSlot */}
 
       {/* Input */}
       <SessionChatInput
@@ -3159,6 +3037,80 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         providers={providers}
         threadContext={threadContext}
         onContextClick={() => setContextModalOpen(true)}
+        inputSlot={queuedMessages.length > 0 ? (
+          <div className="rounded-xl bg-muted/50 overflow-hidden">
+            {/* Compact header row */}
+            <button
+              type="button"
+              onClick={() => setQueueExpanded((v) => !v)}
+              className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
+            >
+              <ListPlus className="size-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-xs text-muted-foreground flex-1 text-left truncate">
+                {queuedMessages.length} message{queuedMessages.length !== 1 ? 's' : ''} queued
+                {queuedMessages.length > 0 && (
+                  <span className="text-foreground/80 font-medium"> · {queuedMessages[0].text.slice(0, 50)}{queuedMessages[0].text.length > 50 ? '…' : ''}</span>
+                )}
+              </span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
+                  className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <X className="size-3" />
+                </span>
+                <ChevronUp className={cn('size-3 text-muted-foreground/40 transition-transform', !queueExpanded && 'rotate-180')} />
+              </div>
+            </button>
+
+            {/* Expanded list */}
+            {queueExpanded && queuedMessages.length > 1 && (
+              <div className="border-t border-border/30 max-h-[160px] overflow-y-auto scrollbar-hide">
+                <div className="flex flex-col px-1.5 py-1">
+                  {queuedMessages.map((qm, idx) => (
+                    <div
+                      key={qm.id}
+                      className="group/q flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted/60 transition-colors"
+                    >
+                      <span className="text-[10px] tabular-nums text-muted-foreground/40 shrink-0 w-3 text-center">
+                        {idx + 1}
+                      </span>
+                      <p className="flex-1 text-xs text-muted-foreground truncate min-w-0">
+                        {qm.text}
+                      </p>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover/q:opacity-100 transition-opacity shrink-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" onClick={() => handleQueueSendNow(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
+                              <Send className="size-2.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
+                        </Tooltip>
+                        {idx > 0 && (
+                          <button type="button" onClick={() => queueMoveUp(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
+                            <ArrowUp className="size-2.5" />
+                          </button>
+                        )}
+                        {idx < queuedMessages.length - 1 && (
+                          <button type="button" onClick={() => queueMoveDown(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
+                            <ArrowDown className="size-2.5" />
+                          </button>
+                        )}
+                        <button type="button" onClick={() => queueRemove(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer">
+                          <X className="size-2.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : undefined}
       />
     </div>
   );

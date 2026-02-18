@@ -5,7 +5,6 @@ import {
   ArrowUp,
   ArrowUpLeft,
   ChevronDown,
-  ChevronUp,
   Check,
   GitFork,
   Loader2,
@@ -21,6 +20,7 @@ import {
   Archive,
   Database,
   ListPlus,
+  ListTodo,
   MessageSquare,
   Terminal,
 } from 'lucide-react';
@@ -819,61 +819,76 @@ function loadPromptHistory(key: string): string[] {
 // SessionChatInput - The unified chat input
 // ============================================================================
 
-// --- Todo Panel (floating above chat input) ---
+// --- Todo Chip (inline inside the chat input card, same style as sub-session context) ---
 
-function TodoPanel({ sessionId }: { sessionId: string }) {
+function TodoChip({ sessionId }: { sessionId: string }) {
   const { data: todos } = useOpenCodeSessionTodo(sessionId);
-  const [open, setOpen] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   if (!todos || todos.length === 0) return null;
 
   const completed = todos.filter((t: any) => t.status === 'completed').length;
   const total = todos.length;
+  const inProgress = todos.find((t: any) => t.status === 'in_progress');
+
+  // Sort: in_progress first, then pending, then completed/cancelled
+  const sorted = [...todos].sort((a: any, b: any) => {
+    const order: Record<string, number> = { in_progress: 0, pending: 1, completed: 2, cancelled: 3 };
+    return (order[a.status] ?? 2) - (order[b.status] ?? 2);
+  });
 
   return (
-    <div className="absolute bottom-full left-3 right-3 mb-1.5 z-20">
-      <div className="rounded-[24px] border border-border bg-card overflow-hidden">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex items-center justify-between w-full h-8 px-4 cursor-default select-none"
-        >
-          <span className="text-xs font-medium text-foreground">
-            {completed} of {total} todos completed
-          </span>
-          <ChevronUp className={cn(
-            'size-3 text-muted-foreground transition-transform duration-150',
-            !open && 'rotate-180',
-          )} />
-        </button>
-        {open && (
-          <div className="px-4 pb-3 flex flex-col gap-2">
-            {todos.map((todo: any, i: number) => {
-              const done = todo.status === 'completed';
-              const active = todo.status === 'in_progress';
-              return (
-                <div key={todo.id || i} className="flex items-center gap-3">
-                  <span className={cn(
-                    'size-4 rounded-[4px] flex-shrink-0 flex items-center justify-center border',
-                    done ? 'border-border bg-muted' : 'border-border',
-                  )}>
-                    {done && (
-                      <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" /></svg>
-                    )}
-                    {active && <div className="size-1.5 rounded-full bg-foreground" />}
-                  </span>
-                  <span className={cn(
-                    'text-xs',
-                    done && 'line-through text-muted-foreground',
-                    !done && 'text-foreground',
-                  )}>
-                    {todo.content}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+    <div className="rounded-xl bg-muted/50 overflow-hidden">
+      {/* Header row */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
+      >
+        <ListTodo className="size-3.5 text-muted-foreground flex-shrink-0" />
+        <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
+          {completed} of {total} tasks done
+          {inProgress && (
+            <span className="text-foreground/80 font-medium"> · {inProgress.content}</span>
+          )}
+        </span>
+        <ChevronDown className={cn('size-3 text-muted-foreground/40 transition-transform', expanded && 'rotate-180')} />
+      </button>
+
+      {/* Expanded task list */}
+      {expanded && (
+        <div className="border-t border-border/30 max-h-[160px] overflow-y-auto scrollbar-hide px-3 py-1.5 space-y-px">
+          {sorted.map((todo: any, i: number) => {
+            const done = todo.status === 'completed';
+            const cancelled = todo.status === 'cancelled';
+            const active = todo.status === 'in_progress';
+            if (cancelled) return null;
+            return (
+              <div key={todo.id || i} className={cn(
+                'flex items-center gap-2 py-0.5',
+                done && 'opacity-40',
+              )}>
+                <span className={cn(
+                  'size-3 rounded-sm flex-shrink-0 flex items-center justify-center border',
+                  done ? 'border-border bg-muted' : active ? 'border-foreground/30' : 'border-border',
+                )}>
+                  {done && (
+                    <svg viewBox="0 0 12 12" fill="none" width="8" height="8"><path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" /></svg>
+                  )}
+                  {active && <div className="size-1 rounded-full bg-foreground" />}
+                </span>
+                <span className={cn(
+                  'text-[11px] leading-tight truncate',
+                  done && 'line-through text-muted-foreground',
+                  !done && 'text-foreground',
+                )}>
+                  {todo.content}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -916,6 +931,9 @@ export interface SessionChatInputProps {
 
   /** Callback when the context usage indicator is clicked */
   onContextClick?: () => void;
+
+  /** Slot rendered inside the input card, above the textarea (e.g. queue chip) */
+  inputSlot?: React.ReactNode;
 }
 
 export function SessionChatInput({
@@ -943,6 +961,7 @@ export function SessionChatInput({
   providers,
   threadContext,
   onContextClick,
+  inputSlot,
 }: SessionChatInputProps) {
   const placeholderVariants = useMemo(
     () => [
@@ -1534,8 +1553,7 @@ export function SessionChatInput({
 
   return (
     <div className="mx-auto w-full max-w-4xl relative shrink-0 px-2 sm:px-4 pb-6">
-      {/* Todo panel — floating above the input card */}
-      {sessionId && <TodoPanel sessionId={sessionId} />}
+      {/* Todo panel removed — now inline inside the card as TodoChip */}
       <div ref={cardRef} className="w-full bg-card border border-border rounded-[24px] overflow-visible relative z-10">
         <div className="relative flex flex-col w-full gap-2 overflow-visible">
           {/* Slash command popover (portalled to body to escape overflow-hidden ancestors) */}
@@ -1560,22 +1578,28 @@ export function SessionChatInput({
             />
           )}
 
-          {/* Sub-session context — integrated inside the input card */}
-          {threadContext && (
-            <button
-              onClick={threadContext.onBackToParent}
-              className={cn(
-                'flex items-center gap-2 mx-3 mt-3 mb-0 px-3 py-2 rounded-xl',
-                'bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer group',
+          {/* Inline chips: thread context, todos, queue — unified spacing */}
+          {(threadContext || sessionId || inputSlot) && (
+            <div className="flex flex-col gap-1.5 mx-3 mt-2.5 empty:hidden">
+              {threadContext && (
+                <button
+                  onClick={threadContext.onBackToParent}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-xl',
+                    'bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer group',
+                  )}
+                >
+                  <ArrowUpLeft className="size-3.5 text-muted-foreground group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
+                  <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
+                    {threadContext.variant === 'fork' ? 'Fork of' : 'Sub-session of'}
+                    {' '}
+                    <span className="text-foreground/80 font-medium">{threadContext.parentTitle}</span>
+                  </span>
+                </button>
               )}
-            >
-              <ArrowUpLeft className="size-3.5 text-muted-foreground group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
-              <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
-                {threadContext.variant === 'fork' ? 'Fork of' : 'Sub-session of'}
-                {' '}
-                <span className="text-foreground/80 font-medium">{threadContext.parentTitle}</span>
-              </span>
-            </button>
+              {sessionId && <TodoChip sessionId={sessionId} />}
+              {inputSlot}
+            </div>
           )}
 
           {/* Attached files preview */}
