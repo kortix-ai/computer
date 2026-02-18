@@ -77,7 +77,7 @@ This produces `.next/standalone/` with `apps/frontend/server.js` and all traced 
 
 ```bash
 cd /path/to/computer  # Must be repo root!
-docker build --no-cache -f apps/frontend/Dockerfile -t kortixmarko/kortix-frontend:latest .
+docker build --no-cache -f apps/frontend/Dockerfile -t kortix/kortix-frontend:latest .
 ```
 
 > **Always use `--no-cache`** for the frontend Docker build. The `COPY` layer caches aggressively and won't pick up new standalone output without it.
@@ -92,7 +92,7 @@ The Dockerfile is a simple runner-only image (~100MB):
 
 ```bash
 cd /path/to/computer
-docker build --build-arg SERVICE=kortix-api -f services/Dockerfile -t kortixmarko/kortix-api:latest .
+docker build --build-arg SERVICE=kortix-api -f services/Dockerfile -t kortix/kortix-api:latest .
 ```
 
 Straightforward Bun image. No special considerations. Can be built **in parallel** with the frontend host build and sandbox build.
