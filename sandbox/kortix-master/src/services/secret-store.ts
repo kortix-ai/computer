@@ -9,12 +9,6 @@ interface SecretsData {
   version: number
 }
 
-function maskValue(value: string): string {
-  if (value.length >= 8) return value.slice(0, 4) + '...' + value.slice(-4)
-  if (value.length > 0) return '****'
-  return ''
-}
-
 export class SecretStore {
   private secretsPath: string
   private saltPath: string
@@ -142,16 +136,6 @@ export class SecretStore {
       }
     }
     return result
-  }
-
-  /** Get all secrets with masked values (for frontend display). */
-  async getAllMasked(): Promise<Record<string, string>> {
-    const all = await this.getAll()
-    const masked: Record<string, string> = {}
-    for (const [key, value] of Object.entries(all)) {
-      masked[key] = maskValue(value)
-    }
-    return masked
   }
 
   async setEnv(key: string, value: string): Promise<void> {

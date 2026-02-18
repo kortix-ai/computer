@@ -16,7 +16,7 @@
 | `@kortix/sandbox` | `0.4.16` | npm | manual `npm publish` |
 | `@kortix/opencode-ai` (CLI) | `0.3.0` | npm (11 platform binaries) | `publish-kortix.yml` GH workflow (manual dispatch) |
 | `@kortix/opencode-sdk` | `0.4.0` | npm | same workflow |
-| Docker images | `kortixmarko/sandbox:latest` | Docker Hub + Daytona | manual `push.sh` |
+| Docker images | `kortix/sandbox:latest` | Docker Hub + Daytona | manual `push.sh` |
 | Embedded CLI (`get-kortix.sh`) | `0.2.0` | raw GitHub (`get.kortix.ai/install`) | hardcoded line 557 |
 | GitHub Releases | none | — | doesn't exist |
 | Kortix API | `1.0.0` | VPS via SSH | `deploy-api.yml` on push to `main` |
@@ -67,7 +67,7 @@
 - Version: Must match unified version
 - Note: `--skip-sdk` when API surface unchanged.
 
-### 4. Docker Image (`kortixmarko/sandbox:X.Y.Z`)
+### 4. Docker Image (`kortix/sandbox:X.Y.Z`)
 - Full sandbox image — Alpine + webtop + all runtimes
 - Published by: `sandbox/push.sh` → Daytona snapshot + Docker Hub
 - Version: Read from `sandbox/package.json` at build time

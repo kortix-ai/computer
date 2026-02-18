@@ -55,19 +55,10 @@ import { getObservationById } from "./memory/db"
 // =============================================================================
 
 export const MemoryPlugin: Plugin = async ({ directory, client }) => {
-	// ── Logging helper ─────────────────────────────────────────────────
-	// Logs to BOTH: OpenCode internal API (client.app.log) AND stdout (console.log)
-	// so logs appear in `docker logs` as well as OpenCode's log system.
+	// ── Logging helper (warn/error only) ──────────────────────────────
 	const log = (level: "debug" | "info" | "warn" | "error", message: string) => {
-		const prefix = `[mem:${level}]`
-		console.log(`${prefix} ${message}`)
-		try {
-			client.app.log({
-				body: { service: "mem", level, message },
-			})
-		} catch {
-			// Ignore if client.app.log fails (e.g., during init)
-		}
+		if (level === "debug" || level === "info") return
+		console.log(`[mem:${level}] ${message}`)
 	}
 
 	// Initialize SQLite database
@@ -86,7 +77,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 		log("warn", `[mem] LSS mem directory creation failed: ${err}`)
 	}
 
-	log("info", "[mem] Init: ready")
+	// log("info", "[mem] Init: ready")
 
 	// ── Session State ──────────────────────────────────────────────────
 	// In-memory state for the current session (persists across tool calls
@@ -185,7 +176,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				// Non-critical: LSS indexing is best-effort
 			}
 
-			log("info", `[mem] Summary: "${(summaryFields.completed || "").slice(0, 80)}"`)
+			// log("info", `[mem] Summary: "${(summaryFields.completed || "").slice(0, 80)}"`)
 
 			if (markComplete) {
 				completeSession(db, sessionId)
@@ -509,7 +500,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					for (const f of observation.filesRead) sessionFilesRead.add(f)
 					for (const f of observation.filesModified) sessionFilesModified.add(f)
 
-					log("info", `[mem] PostToolUse: #${obsId} [${observation.type}] "${observation.title}"`)
+					// log("info", `[mem] PostToolUse: #${obsId} [${observation.type}] "${observation.title}"`)
 
 					// Fire-and-forget: AI enrichment (non-blocking)
 					// After enrichment succeeds, re-write the companion file with AI-enhanced data
@@ -525,7 +516,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					})
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ tool.execute.after FAILED for ${input.tool}: ${err}`)
+				log("warn", `[mem] tool.execute.after failed for ${input.tool}: ${err}`)
 			}
 		},
 
@@ -543,10 +534,10 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				// Increment prompt count
 				if (currentSessionId) {
 					promptCount = incrementPromptCount(db, currentSessionId)
-					log("info", `[mem] UserPrompt: #${promptCount}`)
+					// log("info", `[mem] UserPrompt: #${promptCount}`)
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ chat.message error: ${err}`)
+				log("warn", `[mem] chat.message error: ${err}`)
 			}
 		},
 
@@ -578,7 +569,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					cachedContextBlock = generateContextBlock(db, currentProjectId ?? undefined)
 					contextInjectedForSession = false
 
-					log("info", `[mem] SessionStart: ${sessionID.slice(0, 12)}...`)
+					// log("info", `[mem] SessionStart: ${sessionID.slice(0, 12)}...`)
 					// Start hourly summary interval for this session
 					startSummaryInterval(sessionID)
 				}
@@ -599,11 +590,11 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 						sessionFilesModified.clear()
 						cachedContextBlock = ""
 						contextInjectedForSession = false
-						log("info", `[mem] SessionEnd: ${sessionID?.slice(0, 12)}...`)
+						// log("info", `[mem] SessionEnd: ${sessionID?.slice(0, 12)}...`)
 					}
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ Event handler error (${event.type}): ${err}`)
+				log("warn", `[mem] Event handler error (${event.type}): ${err}`)
 			}
 		},
 
@@ -619,7 +610,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 				if (cachedContextBlock) {
 					output.system.push(cachedContextBlock)
 					if (!contextInjectedForSession) {
-						log("info", `[mem] ContextInjection: ~${cachedContextBlock.length} chars`)
+						// log("info", `[mem] ContextInjection: ~${cachedContextBlock.length} chars`)
 						contextInjectedForSession = true
 					}
 				}
@@ -638,7 +629,7 @@ export const MemoryPlugin: Plugin = async ({ directory, client }) => {
 					output.context.push(context)
 				}
 			} catch (err) {
-				log("warn", `[mem] ⚠ Compaction injection error: ${err}`)
+				log("warn", `[mem] Compaction injection error: ${err}`)
 			}
 		},
 	}

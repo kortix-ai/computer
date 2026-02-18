@@ -168,7 +168,7 @@ echo "  Container Health"
 echo ""
 
 if command -v docker &>/dev/null; then
-  for svc in caddy frontend kortix-api kortix-sandbox; do
+  for svc in caddy frontend kortix-api postgres kortix-sandbox; do
     CONTAINER_STATUS=$(docker ps --filter "name=${svc}" --format "{{.Status}}" 2>/dev/null | head -1)
     if echo "$CONTAINER_STATUS" | grep -qi 'up'; then
       pass "container '${svc}' is running"

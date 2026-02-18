@@ -1,16 +1,5 @@
 import { toast } from '@/lib/toast';
-import { 
-  AgentRunLimitError, 
-  ProjectLimitError, 
-  BillingError,
-  TriggerLimitError,
-  ModelAccessDeniedError,
-  CustomWorkerLimitError,
-  ThreadLimitError,
-  AgentCountLimitError,
-  formatTierErrorForUI,
-  isTierRestrictionError
-} from './api/errors';
+import { BillingError, isBillingError, formatBillingErrorForUI } from './api/errors';
 import { usePricingModalStore } from '@/stores/pricing-modal-store';
 
 export interface ApiError extends Error {
@@ -60,34 +49,6 @@ const getStatusMessage = (status: number): string => {
 const extractErrorMessage = (error: any): string => {
   if (error instanceof BillingError) {
     return error.detail?.message || error.message || 'Billing issue detected';
-  }
-
-  if (error instanceof AgentRunLimitError) {
-    return error.detail?.message || error.message || 'Worker run limit exceeded';
-  }
-
-  if (error instanceof ProjectLimitError) {
-    return error.detail?.message || error.message || 'Project limit exceeded';
-  }
-
-  if (error instanceof AgentCountLimitError) {
-    return error.detail?.message || error.message || 'Worker limit exceeded';
-  }
-
-  if (error instanceof TriggerLimitError) {
-    return error.detail?.message || error.message || 'Trigger limit exceeded';
-  }
-
-  if (error instanceof ModelAccessDeniedError) {
-    return error.detail?.message || error.message || 'Model access denied';
-  }
-
-  if (error instanceof CustomWorkerLimitError) {
-    return error.detail?.message || error.message || 'Custom worker limit exceeded';
-  }
-
-  if (error instanceof ThreadLimitError) {
-    return error.detail?.message || error.message || 'Thread limit exceeded';
   }
 
   if (error instanceof Error) {
@@ -168,8 +129,8 @@ export const handleApiError = (error: any, context?: ErrorContext): void => {
   const rawMessage = extractErrorMessage(error);
   const formattedMessage = formatErrorMessage(rawMessage, context);
 
-  // Handle tier restriction errors using shared formatting function
-  const errorUI = formatTierErrorForUI(error);
+  // Handle billing errors by opening pricing modal
+  const errorUI = formatBillingErrorForUI(error);
   if (errorUI) {
     usePricingModalStore.getState().openPricingModal({ 
       isAlert: true, 
@@ -241,10 +202,9 @@ export const handleApiInfo = (message: string, description?: string): void => {
 };
 
 /**
- * Check if an error is a billing/limit error that should open the pricing modal.
- * This is an alias for isTierRestrictionError from shared package for backwards compatibility.
+ * Re-export for backwards compatibility.
  */
-export const isBillingError = isTierRestrictionError;
+export { isBillingError };
 
 /**
  * Handle billing errors by opening the pricing modal with appropriate message.
@@ -252,10 +212,10 @@ export const isBillingError = isTierRestrictionError;
  * Use this in mutation onError callbacks.
  */
 export const handleBillingError = (error: any): boolean => {
-  if (!isTierRestrictionError(error)) {
+  if (!isBillingError(error)) {
     return false;
   }
   
   handleApiError(error);
   return true;
-}; 
+};

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pagination } from '@/components/agents/pagination';
+import { Pagination } from '@/components/ui/pagination';
 import { DataTable, DataTableColumn } from '@/components/ui/data-table';
 import { toast } from '@/lib/toast';
 import { ExternalLink, Languages, Search } from 'lucide-react';

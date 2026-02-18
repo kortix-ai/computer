@@ -95,7 +95,12 @@ write_env "services/kortix-api/.env" \
   "$(kv SERPER_API_KEY)" \
   "$(kv FIRECRAWL_API_KEY)" \
   "$(kv REPLICATE_API_TOKEN)" \
-  "$(kv CONTEXT7_API_KEY)"
+  "$(kv CONTEXT7_API_KEY)" \
+  "" \
+  "$(kv CRON_TICK_SECRET)" \
+  "$(kv CRON_API_URL)" \
+  "$(kv SCHEDULER_ENABLED true)" \
+  "$(kv CHANNELS_ENABLED true)"
 
 write_env "apps/frontend/.env" \
   "$(kv NEXT_PUBLIC_ENV_MODE "$(e ENV_MODE local)")" \

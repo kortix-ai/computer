@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation';
 import { useAdminRole } from '@/hooks/admin';
 import { featureFlags } from '@/lib/feature-flags';
 
-import { useProjects } from '@/hooks/threads/use-project';
 import { AppProviders } from '@/components/layout/app-providers';
 import { backendApi } from '@/lib/api-client';
 import { AnnouncementDialog } from '../announcements/announcement-dialog';
@@ -273,7 +272,6 @@ export default function DashboardLayoutContent({
   // Sandbox reachability is handled by ConnectingScreen (overlay, not
   // early return), which never unmounts children.
 
-  const { data: projects } = useProjects();
   const { data: adminRoleData, isLoading: isCheckingAdminRole } = useAdminRole();
   const isAdmin = adminRoleData?.isAdmin ?? false;
   

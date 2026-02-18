@@ -153,8 +153,42 @@ export default function OnboardingPage() {
   const isDark = !mounted || resolvedTheme !== 'light';
   const raysColor = isDark ? '#ffffff' : '#000000';
 
+  // ── Query param controls ───────────────────────────────────────
+  // ?skip_onboarding → mark complete & go to dashboard
+  // ?redo            → clear ONBOARDING_COMPLETE so the flow reruns
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const instanceUrl = getInstanceUrl();
+
+    if (params.has('skip_onboarding')) {
+      fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 'true' }),
+      })
+        .catch(() => {})
+        .finally(() => router.replace('/dashboard'));
+      return;
+    }
+
+    if (params.has('redo')) {
+      // Reset onboarding flag so the full flow runs again
+      fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 'false' }),
+      }).catch(() => {});
+      // Strip ?redo from URL so it doesn't loop on refresh
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete('redo');
+      window.history.replaceState({}, '', clean.pathname + clean.search);
+    }
+  }, [router]);
+
   // ── Redirect if already onboarded ─────────────────────────────
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('skip_onboarding') || params.has('redo')) return; // handled above
     const check = async () => {
       try {
         const instanceUrl = getInstanceUrl();
@@ -180,6 +214,7 @@ export default function OnboardingPage() {
   }, [user, isLoading, router]);
 
   // ── Onboarding session lifecycle ──────────────────────────────
+  // Resume existing session or create new one + fire /onboarding command.
   const MAX_RETRIES = 3;
 
   useEffect(() => {
@@ -190,13 +225,26 @@ export default function OnboardingPage() {
     creatingRef.current = true;
 
     let retryTimer: ReturnType<typeof setTimeout>;
+    const instanceUrl = getInstanceUrl();
 
     (async () => {
       try {
+        // 1. Try to resume an existing onboarding session
+        const res = await fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`).catch(() => null);
+        const existing = res?.ok ? (await res.json()).ONBOARDING_SESSION_ID : null;
+
+        if (existing && existing !== '') {
+          // Existing session found — just resume, don't re-send /onboarding command
+          setSessionId(existing);
+          creatingRef.current = false;
+          return;
+        }
+
+        // 2. No existing session — create + persist + fire command in one flow
         const session = await createSessionRef.current.mutateAsync({ title: 'Kortix Onboarding' });
-        setSessionId(session.id);
         persistOnboardingSessionId(session.id);
-        executeCommandRef.current.mutate({ sessionId: session.id, command: 'onboarding' });
+        await executeCommandRef.current.mutateAsync({ sessionId: session.id, command: 'onboarding' });
+        setSessionId(session.id);
         retriesRef.current = 0;
       } catch {
         creatingRef.current = false;

@@ -7,13 +7,34 @@ description: "Cron trigger management for scheduled agent execution. Use when th
 
 The Kortix Cron service runs outside the sandbox as a platform service. It manages scheduled triggers that fire agents inside sandboxes on cron schedules using **pg_cron** — each trigger gets its own PostgreSQL-native cron job.
 
+## Quick Start — Local Mode
+
+**In local mode (`ENV_MODE=local`), no authentication is needed.** The API accepts unauthenticated requests and injects a mock user automatically. Don't waste time searching for tokens — just make the requests:
+
+```bash
+CRON_URL="${KORTIX_API_URL%/router}"  # strips /router → e.g. http://kortix-api:8008/v1
+SANDBOX_ID="${SANDBOX_ID:-kortix-sandbox}"
+
+# Just works — no auth header needed in local mode
+curl -X POST "$CRON_URL/cron/triggers" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"sandbox_id\": \"$SANDBOX_ID\",
+    \"name\": \"My Task\",
+    \"cron_expr\": \"0 */5 * * * *\",
+    \"prompt\": \"Do the thing\"
+  }"
+```
+
+**Auth strategy:** Always try WITHOUT auth first. If you get a 401, THEN look for `$KORTIX_TOKEN`. Never spend time searching for tokens before making the first request.
+
 ## Architecture
 
 - **Service**: `kortix-api` (Bun + Hono)
 - **Database**: `kortix` schema in Supabase PostgreSQL (Drizzle ORM)
 - **Scheduler**: **pg_cron** — each trigger = one `cron.schedule()` job. No polling, no application-level timers.
 - **Executor**: Provider-agnostic. Uses `SandboxProvider.resolveEndpoint()` to reach the sandbox, then calls OpenCode `POST /session/:id/prompt_async`.
-- **Auth**: `CRON_TICK_SECRET` header for pg_cron→API, user JWT for all CRUD operations.
+- **Auth**: `CRON_TICK_SECRET` header for pg_cron→API, user JWT for CRUD. **In local mode: no auth required.**
 
 ## How It Works
 
@@ -58,17 +79,20 @@ The Kortix Cron service runs outside the sandbox as a platform service. It manag
 
 Base URL: The platform API URL (e.g. `https://new-api.kortix.com` or `http://localhost:8008`).
 
-All `/v1/cron/*` endpoints require `Authorization: Bearer <supabase-jwt>` (except tick endpoints which use `x-cron-secret`).
+**Authentication:**
+- **Local mode** (`ENV_MODE=local`): No auth needed. Omit the `Authorization` header entirely.
+- **Cloud mode**: Use `Authorization: Bearer $KORTIX_TOKEN` (`sbt_...` sandbox token). Also accepts Supabase JWTs.
+- Tick endpoints use `x-cron-secret` (internal, not user-facing).
 
-**Authentication from inside the sandbox**: Use the `KORTIX_TOKEN` environment variable (available as `sbt_...`). The cron API accepts both Supabase JWTs (frontend) and `sbt_` sandbox tokens (agents).
+**Always try without auth first.** If you get a 401/403, add `$KORTIX_TOKEN`.
 
 ```bash
-TOKEN="$KORTIX_TOKEN"
-# KORTIX_API_URL points to /v1/router — replace with /v1 to access cron routes
-CRON_URL="${KORTIX_API_URL%/router}"  # e.g. https://new-api.kortix.com/v1
+CRON_URL="${KORTIX_API_URL%/router}"  # strips /router → e.g. http://kortix-api:8008/v1
+SANDBOX_ID="${SANDBOX_ID:-kortix-sandbox}"
 ```
 
 All examples below use `$CRON_URL` as the base (NOT `$KORTIX_API_URL` which includes `/router`).
+For cloud mode, add `-H "Authorization: Bearer $KORTIX_TOKEN"` to each request.
 
 ### Trigger Management
 
@@ -196,12 +220,11 @@ curl "$CRON_URL/cron/executions/{id}" \
 Agents can create and manage their own cron triggers from inside the sandbox:
 
 ```bash
-# Get your sandbox ID (from env)
-SANDBOX_ID=$(curl -s "$CRON_URL/cron/sandboxes" -H "Authorization: Bearer $KORTIX_TOKEN" | jq -r '.data[0].sandboxId')
+CRON_URL="${KORTIX_API_URL%/router}"
+SANDBOX_ID="${SANDBOX_ID:-kortix-sandbox}"
 
-# Schedule a daily backup at 2 AM
+# Schedule a daily backup at 2 AM (no auth needed in local mode)
 curl -X POST "$CRON_URL/cron/triggers" \
-  -H "Authorization: Bearer $KORTIX_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
     \"sandbox_id\": \"$SANDBOX_ID\",
@@ -213,11 +236,9 @@ curl -X POST "$CRON_URL/cron/triggers" \
   }"
 
 # List your triggers
-curl "$CRON_URL/cron/triggers?sandbox_id=$SANDBOX_ID" \
-  -H "Authorization: Bearer $KORTIX_TOKEN"
+curl "$CRON_URL/cron/triggers?sandbox_id=$SANDBOX_ID"
 
 # Check execution history for a trigger
 TRIGGER_ID="the-trigger-uuid"
-curl "$CRON_URL/cron/executions/by-trigger/$TRIGGER_ID" \
-  -H "Authorization: Bearer $KORTIX_TOKEN"
+curl "$CRON_URL/cron/executions/by-trigger/$TRIGGER_ID"
 ```

@@ -22,12 +22,6 @@ export function UsageLimitsCard() {
   const t = useTranslations('dashboard');
   const { data: accountState, isLoading } = useAccountState();
   const limits = accountState?.limits;
-  const UNLIMITED_THRESHOLD = 100_000;
-
-  const formatMax = (max: number | undefined) => {
-    const value = max || 0;
-    return value >= UNLIMITED_THRESHOLD ? 'Unlimited' : value;
-  };
 
   if (isLoading) {
     return (
@@ -66,29 +60,6 @@ export function UsageLimitsCard() {
       <CardContent>
         <TooltipProvider>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex justify-between text-sm cursor-help">
-                    <span className="text-muted-foreground">Chats</span>
-                    <span className="font-medium">
-                      {limits?.threads?.current || 0} / {formatMax(limits?.threads?.max)}
-                    </span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Total conversations with your AI Workers</p>
-                </TooltipContent>
-              </Tooltip>
-              <Progress 
-                className="h-2"
-                value={
-                  (limits?.threads?.max || 0) >= UNLIMITED_THRESHOLD
-                    ? 0
-                    : ((limits?.threads?.current || 0) / (limits?.threads?.max || 1)) * 100
-                }
-              />
-            </div>
             <div className="space-y-2">
               <Tooltip>
                 <TooltipTrigger asChild>

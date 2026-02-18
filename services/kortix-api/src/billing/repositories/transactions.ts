@@ -1,4 +1,4 @@
-import { eq, desc, sql, and, gte, lte } from 'drizzle-orm';
+import { eq, desc, sql, and, gte } from 'drizzle-orm';
 import { creditLedger, creditUsage, creditPurchases } from '../../shared/db-schema';
 import { db } from '../../shared/db';
 
@@ -74,34 +74,6 @@ export async function getUsageRecords(
     .where(eq(creditUsage.accountId, accountId));
 
   return { rows, total: Number(countResult?.count ?? 0) };
-}
-
-export async function getUsageByThread(
-  accountId: string,
-  limit: number,
-  offset: number,
-  startDate?: string,
-  endDate?: string,
-) {
-  const conditions = [eq(creditUsage.accountId, accountId)];
-  if (startDate) conditions.push(gte(creditUsage.createdAt, startDate));
-  if (endDate) conditions.push(lte(creditUsage.createdAt, endDate));
-
-  const rows = await db
-    .select({
-      threadId: creditUsage.threadId,
-      totalCost: sql<string>`sum(amount_dollars)`,
-      messageCount: sql<number>`count(*)`,
-      lastUsedAt: sql<string>`max(created_at)`,
-    })
-    .from(creditUsage)
-    .where(and(...conditions))
-    .groupBy(creditUsage.threadId)
-    .orderBy(sql`max(created_at) desc`)
-    .limit(limit)
-    .offset(offset);
-
-  return rows;
 }
 
 export async function insertPurchase(data: typeof creditPurchases.$inferInsert) {

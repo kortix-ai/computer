@@ -88,8 +88,6 @@ export const creditLedger = pgTable('credit_ledger', {
   isExpiring: boolean('is_expiring').default(true),
   expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }),
   stripeEventId: varchar('stripe_event_id', { length: 255 }),
-  messageId: uuid('message_id'),
-  threadId: uuid('thread_id'),
 }, (table) => [
   unique('unique_stripe_event').on(table.stripeEventId),
 ]);
@@ -100,8 +98,6 @@ export const creditUsage = pgTable('credit_usage', {
   id: uuid().defaultRandom().primaryKey().notNull(),
   accountId: uuid('account_id').notNull(),
   amountDollars: numeric('amount_dollars', { precision: 10, scale: 2 }).notNull(),
-  threadId: uuid('thread_id'),
-  messageId: uuid('message_id'),
   description: text(),
   usageType: text('usage_type').default('token_overage'),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).defaultNow(),

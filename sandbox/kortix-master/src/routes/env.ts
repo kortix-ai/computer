@@ -58,16 +58,11 @@ async function restartServices(): Promise<void> {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
-// GET /env — list all. ?masked=1 returns masked values (for frontend UI).
+// GET /env — list all secrets (full values).
 envRouter.get('/', async (c) => {
   try {
-    const masked = c.req.query('masked') === '1'
-    if (masked) {
-      const secrets = await secretStore.getAllMasked()
-      return c.json({ secrets })
-    }
     const envVars = await secretStore.getAll()
-    return c.json(envVars)
+    return c.json({ secrets: envVars })
   } catch (error) {
     console.error('[ENV API] Error listing:', error)
     return c.json({ error: 'Failed to list environment variables' }, 500)

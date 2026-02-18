@@ -10,13 +10,14 @@ export const secretsKeys = {
 };
 
 /**
- * Fetch all secrets (key → masked value) via /env?masked=1.
+ * Fetch all secrets (key → full value) via GET /env.
+ * The frontend handles masking in the UI.
  */
 export function useSecrets() {
   return useQuery({
     queryKey: secretsKeys.all,
     queryFn: async (): Promise<Record<string, string>> => {
-      const res = await fetch(`${getInstanceUrl()}/env?masked=1`);
+      const res = await fetch(`${getInstanceUrl()}/env`);
       if (!res.ok) throw new Error('Failed to fetch secrets');
       const data = await res.json();
       return data.secrets ?? {};
@@ -46,10 +47,7 @@ export function useSetSecret() {
       await qc.cancelQueries({ queryKey: secretsKeys.all });
       const prev = qc.getQueryData<Record<string, string>>(secretsKeys.all);
       if (prev) {
-        const masked = value.length >= 8
-          ? value.slice(0, 4) + '...' + value.slice(-4)
-          : '****';
-        qc.setQueryData(secretsKeys.all, { ...prev, [key]: masked });
+        qc.setQueryData(secretsKeys.all, { ...prev, [key]: value });
       }
       return { prev };
     },

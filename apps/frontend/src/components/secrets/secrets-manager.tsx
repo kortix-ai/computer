@@ -38,10 +38,10 @@ export function SecretsManager() {
 
   const rows = useMemo(() => {
     if (!secrets) return [];
-    let entries = Object.entries(secrets).map(([key, maskedValue]) => ({
+    let entries = Object.entries(secrets).map(([key, value]) => ({
       key,
-      maskedValue,
-      hasValue: !!maskedValue && maskedValue !== '',
+      value,
+      hasValue: !!value && value !== '',
     }));
     if (search) {
       const q = search.toLowerCase();
@@ -206,7 +206,7 @@ export function SecretsManager() {
                         'text-xs font-mono truncate',
                         row.hasValue ? 'text-muted-foreground' : 'text-muted-foreground/30'
                       )}>
-                        {row.hasValue ? (isRevealed ? row.maskedValue : '········') : 'empty'}
+                        {row.hasValue ? (isRevealed ? row.value : '········') : 'empty'}
                       </code>
                       {row.hasValue && (
                         <button

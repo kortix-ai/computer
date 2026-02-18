@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Pagination } from '@/components/agents/pagination';
+import { Pagination } from '@/components/ui/pagination';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, Mail, ExternalLink } from 'lucide-react';
 import { useAdminFeedbackList } from '@/hooks/admin/use-admin-feedback';
@@ -122,7 +122,7 @@ export function AdminFeedbackTable() {
               className="h-8 gap-2"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/agents/${feedback.thread_id}`);
+                router.push(`/share/${feedback.thread_id}`);
               }}
               title={`View thread ${feedback.thread_id.substring(0, 8)}...`}
             >

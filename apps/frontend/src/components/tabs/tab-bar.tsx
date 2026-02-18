@@ -577,8 +577,6 @@ export function TabBar() {
 
   // Refs for the tab bar container, chrome-style curve elements, and scroll fade
   const tabBarRef = useRef<HTMLDivElement>(null);
-  const curveLeftRef = useRef<HTMLDivElement>(null);
-  const curveRightRef = useRef<HTMLDivElement>(null);
   const scrollFadeRef = useRef<HTMLDivElement>(null);
 
   // Drag-and-drop state
@@ -1051,39 +1049,10 @@ export function TabBar() {
   }, [activeTabId]);
 
   // ---------------------------------------------------------------------------
-  // Chrome-style curve positioning: measure the active tab's position relative
-  // to the tab bar and update the curve DOM elements directly (no setState)
-  // so they stay perfectly in sync even during fast scrolling.
+  // Scroll fade: hide the gradient when scrolled fully right (or no overflow).
   // ---------------------------------------------------------------------------
   useLayoutEffect(() => {
-    const measure = () => {
-      const lEl = curveLeftRef.current;
-      const rEl = curveRightRef.current;
-      if (!lEl || !rEl) return;
-
-      if (!activeTabId || !scrollRef.current || !tabBarRef.current) {
-        lEl.style.display = 'none';
-        rEl.style.display = 'none';
-        return;
-      }
-      const wrapper = scrollRef.current.querySelector(
-        `[data-tab-id="${activeTabId}"]`
-      ) as HTMLElement | null;
-      const tabEl = wrapper?.firstElementChild as HTMLElement | null;
-      if (!tabEl) {
-        lEl.style.display = 'none';
-        rEl.style.display = 'none';
-        return;
-      }
-      const barRect = tabBarRef.current.getBoundingClientRect();
-      const tabRect = tabEl.getBoundingClientRect();
-
-      lEl.style.display = '';
-      lEl.style.left = `${tabRect.left - barRect.left - 8}px`;
-      rEl.style.display = '';
-      rEl.style.left = `${tabRect.right - barRect.left}px`;
-
-      // Hide the scroll fade when fully scrolled to the right (or no overflow)
+    const updateFade = () => {
       const sc = scrollRef.current;
       if (scrollFadeRef.current && sc) {
         const atEnd = sc.scrollWidth - sc.scrollLeft - sc.clientWidth < 2;
@@ -1091,18 +1060,17 @@ export function TabBar() {
       }
     };
 
-    measure();
+    updateFade();
 
-    // Sync on every scroll frame — no re-render needed
     const el = scrollRef.current;
-    el?.addEventListener('scroll', measure, { passive: true });
-    window.addEventListener('resize', measure);
+    el?.addEventListener('scroll', updateFade, { passive: true });
+    window.addEventListener('resize', updateFade);
 
     return () => {
-      el?.removeEventListener('scroll', measure);
-      window.removeEventListener('resize', measure);
+      el?.removeEventListener('scroll', updateFade);
+      window.removeEventListener('resize', updateFade);
     };
-  }, [activeTabId, orderedTabs]);
+  }, [orderedTabs]);
 
   const handleNewTab = useCallback(() => {
     router.push('/dashboard');
@@ -1122,25 +1090,6 @@ export function TabBar() {
       >
         {/* The content area's border-t provides the floor line; no extra line needed here */}
 
-        {/* Chrome-style curved connectors — rendered at tab-bar level (outside
-            the scroll container) so they aren't clipped by overflow-x-auto.
-            Positioned via refs for instant sync during scroll (no re-render). */}
-        <div
-          ref={curveLeftRef}
-          className="absolute bottom-0 w-2 h-2 pointer-events-none z-[11]"
-          style={{
-            display: 'none',
-            background: 'radial-gradient(circle at 0 0, transparent 7px, var(--muted) 8px)',
-          }}
-        />
-        <div
-          ref={curveRightRef}
-          className="absolute bottom-0 w-2 h-2 pointer-events-none z-[11]"
-          style={{
-            display: 'none',
-            background: 'radial-gradient(circle at 100% 0, transparent 7px, var(--muted) 8px)',
-          }}
-        />
         <div
           ref={scrollRef}
           onWheel={handleWheel}

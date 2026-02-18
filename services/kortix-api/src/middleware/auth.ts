@@ -14,6 +14,13 @@ import { config } from '../config';
  * - Other tokens    = treat as account_id directly (backward compat / fallback)
  */
 export async function apiKeyAuth(c: Context, next: Next) {
+  // Local mode: skip auth, inject mock account — matching supabaseAuth behavior
+  if (config.isLocal()) {
+    c.set('accountId', '00000000-0000-0000-0000-000000000000');
+    await next();
+    return;
+  }
+
   const authHeader = c.req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -140,6 +147,14 @@ export async function dualAuth(c: Context, next: Next) {
  * EventSource/SSE can't set headers, so we also check ?token=<token>.
  */
 export async function supabaseAuthWithQueryParam(c: Context, next: Next) {
+  // Local mode: skip auth, inject mock user
+  if (config.isLocal()) {
+    c.set('userId', '00000000-0000-0000-0000-000000000000');
+    c.set('userEmail', 'local@localhost');
+    await next();
+    return;
+  }
+
   const authHeader = c.req.header('Authorization');
   let token: string | undefined;
 

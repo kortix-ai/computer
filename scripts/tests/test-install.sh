@@ -82,6 +82,38 @@ else
   fail "writes docker-compose.yml"
 fi
 
+# ── PostgreSQL ──
+
+if grep -q 'POSTGRES_IMAGE\|kortix/postgres' "$SCRIPT"; then
+  pass "references postgres image"
+else
+  fail "references postgres image"
+fi
+
+if grep -q 'pg_cron\|pg_net' "$SCRIPT"; then
+  pass "compose includes pg_cron and pg_net"
+else
+  fail "compose includes pg_cron and pg_net"
+fi
+
+if grep -q 'DATABASE_URL.*postgres' "$SCRIPT"; then
+  pass "compose sets DATABASE_URL for kortix-api"
+else
+  fail "compose sets DATABASE_URL for kortix-api"
+fi
+
+if grep -q 'CRON_TICK_SECRET' "$SCRIPT"; then
+  pass "generates CRON_TICK_SECRET"
+else
+  fail "generates CRON_TICK_SECRET"
+fi
+
+if grep -q 'postgres-data' "$SCRIPT"; then
+  pass "compose has postgres-data volume"
+else
+  fail "compose has postgres-data volume"
+fi
+
 # ── VPS features ──
 
 if grep -q 'write_caddyfile()' "$SCRIPT"; then

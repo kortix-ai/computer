@@ -99,8 +99,6 @@ export interface TierConfig {
   canPurchaseCredits: boolean;
   models: string[];
   limits: {
-    projects: number;
-    threads: number;
     concurrentRuns: number;
     customWorkers: number;
     scheduledTriggers: number;
@@ -233,8 +231,6 @@ export interface ModelInfo {
 }
 
 export interface AccountLimits {
-  projects: ResourceLimit;
-  threads: ResourceLimit;
   concurrent_runs: { running_count: number; limit: number; can_start: boolean; tier_name: string };
   ai_worker_count: CountLimit;
   custom_mcp_count: CountLimit;
@@ -243,13 +239,6 @@ export interface AccountLimits {
     app: { current_count: number; limit: number; can_create: boolean };
     tier_name: string;
   };
-}
-
-export interface ResourceLimit {
-  current: number;
-  max: number;
-  can_create: boolean;
-  tier_name: string;
 }
 
 export interface CountLimit {
@@ -299,8 +288,6 @@ export interface TokenUsageRequest {
   prompt_tokens: number;
   completion_tokens: number;
   model: string;
-  thread_id?: string;
-  message_id?: string;
 }
 
 export interface DeductResult {

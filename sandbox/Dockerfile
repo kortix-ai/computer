@@ -18,6 +18,9 @@ RUN gcc -shared -o /build/librust_pty.so \
 # ── Stage 2: Main image ─────────────────────────────────────────────────────
 FROM lscr.io/linuxserver/webtop:latest
 
+# ── License ──────────────────────────────────────────────────────────────────
+COPY LICENSE /LICENSE
+
 # ── Branding ─────────────────────────────────────────────────────────────────
 COPY sandbox/assets/wallpaper.png       /usr/share/wallpapers/heyagi/wallpaper.png
 COPY sandbox/assets/kortix-symbol.svg   /usr/share/icons/heyagi/kortix-symbol.svg
@@ -210,6 +213,8 @@ COPY sandbox/config/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env
 RUN chmod +x /custom-cont-init.d/98-kortix-env
 COPY sandbox/config/customize.sh /custom-cont-init.d/99-customize
 RUN chmod +x /custom-cont-init.d/99-customize
+COPY sandbox/config/memory-init.sh /custom-cont-init.d/99-memory-init
+RUN chmod +x /custom-cont-init.d/99-memory-init
 
 # ── Daytona entrypoint ───────────────────────────────────────────────────────
 COPY sandbox/startup.sh /opt/startup.sh

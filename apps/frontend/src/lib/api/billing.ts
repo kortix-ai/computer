@@ -69,18 +69,6 @@ export interface AccountState {
     recommended: boolean;
   }>;
   limits: {
-    projects: {
-      current: number;
-      max: number;
-      can_create: boolean;
-      tier_name: string;
-    };
-    threads: {
-      current: number;
-      max: number;
-      can_create: boolean;
-      tier_name: string;
-    };
     concurrent_runs: {
       running_count: number;
       limit: number;
@@ -99,7 +87,6 @@ export interface AccountState {
       can_create: boolean;
       tier_name: string;
     };
-
   };
   tier: {
     name: string;
@@ -122,8 +109,6 @@ export interface TokenUsage {
   prompt_tokens: number;
   completion_tokens: number;
   model: string;
-  thread_id?: string;
-  message_id?: string;
 }
 
 export interface DeductResult {
@@ -371,18 +356,6 @@ export const billingApi = {
         },
         models: [],
         limits: {
-          projects: {
-            current: 0,
-            max: 0,
-            can_create: false,
-            tier_name: 'none'
-          },
-          threads: {
-            current: 0,
-            max: 0,
-            can_create: false,
-            tier_name: 'none'
-          },
           concurrent_runs: {
             running_count: 0,
             limit: 0,
@@ -401,7 +374,6 @@ export const billingApi = {
             can_create: false,
             tier_name: 'none'
           },
-
         },
         tier: {
           name: 'none',
@@ -414,7 +386,7 @@ export const billingApi = {
     return response.data!;
   },
 
-  async deductUsage(params: { amount: number; thread_id?: string; description?: string }) {
+  async deductUsage(params: { amount: number; description?: string }) {
     const response = await backendApi.post<DeductResult>('/billing/deduct-usage', params, { showErrors: false });
     if (response.error) throw response.error;
     return response.data!;
@@ -584,7 +556,7 @@ export const billingApi = {
 // =============================================================================
 
 export const getAccountState = (skipCache?: boolean) => billingApi.getAccountState(skipCache);
-export const deductUsage = (params: { amount: number; thread_id?: string; description?: string }) =>
+export const deductUsage = (params: { amount: number; description?: string }) =>
   billingApi.deductUsage(params);
 export const deductTokenUsage = (usage: TokenUsage) => billingApi.deductTokenUsage(usage);
 export const createCheckoutSession = (request: CreateCheckoutSessionRequest) => 
