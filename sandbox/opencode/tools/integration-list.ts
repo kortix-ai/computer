@@ -41,8 +41,9 @@ export default tool({
             success: true,
             integrations: [],
             message:
-              "No integrations connected to this sandbox. " +
-              "Ask the user to connect integrations from the Kortix dashboard.",
+              "No integrations connected yet. " +
+              "Use integration_connect to connect an app (e.g. integration_connect({app: 'gmail'})). " +
+              "Use integration_search to find available app slugs.",
           },
           null,
           2,

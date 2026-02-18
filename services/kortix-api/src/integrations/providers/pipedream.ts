@@ -7,6 +7,10 @@ import type {
   AppListResult,
   ProxyRequest,
   ProxyResponse,
+  ActionListResult,
+  ActionSummary,
+  ActionParam,
+  ActionRunResult,
 } from './types';
 
 interface PipedreamConfig {
@@ -27,6 +31,9 @@ export class PipedreamProvider implements AuthProvider {
 
   private accessToken: string | null = null;
   private tokenExpiresAt = 0;
+
+  private actionsCache = new Map<string, { data: ActionListResult; expiresAt: number }>();
+  private static readonly ACTIONS_CACHE_TTL = 30 * 60 * 1000;
 
   constructor(cfg: PipedreamConfig) {
     this.clientId = cfg.clientId;
@@ -307,5 +314,108 @@ export class PipedreamProvider implements AuthProvider {
         hasMore: apps.length >= limit,
       },
     };
+  }
+
+  async listActions(app: string, query?: string, limit = 50): Promise<ActionListResult> {
+    const cacheKey = `${app}:${query || ''}:${limit}`;
+    const cached = this.actionsCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data;
+    }
+
+    const params = new URLSearchParams();
+    params.set('app', app);
+    if (query) params.set('q', query);
+    params.set('limit', String(limit));
+
+    const data = await this.apiRequest<{
+      data: Array<{
+        key: string;
+        name: string;
+        description?: string;
+        configurable_props?: Array<{
+          name: string;
+          type: string;
+          optional?: boolean;
+          description?: string;
+        }>;
+      }>;
+    }>('GET', `/v1/connect/${this.projectId}/actions?${params.toString()}`);
+
+    const actions: ActionSummary[] = (data.data || []).map((a) => {
+      const params: ActionParam[] = (a.configurable_props || [])
+        .filter((p) => p.name !== 'app')
+        .map((p) => ({
+          name: p.name,
+          type: p.type,
+          required: !p.optional,
+          description: p.description,
+        }));
+
+      return {
+        key: a.key,
+        name: a.name,
+        description: a.description,
+        params,
+      };
+    });
+
+    const result: ActionListResult = { actions, app };
+
+    this.actionsCache.set(cacheKey, {
+      data: result,
+      expiresAt: Date.now() + PipedreamProvider.ACTIONS_CACHE_TTL,
+    });
+
+    return result;
+  }
+
+  async runAction(
+    accountId: string,
+    actionKey: string,
+    props: Record<string, unknown>,
+    app: string,
+  ): Promise<ActionRunResult> {
+    const accounts = await this.listAccounts(accountId);
+    const account = accounts.find((a) => a.app === app);
+
+    if (!account) {
+      return {
+        success: false,
+        error: `No connected account found for app "${app}". The user needs to connect it first.`,
+      };
+    }
+
+    try {
+      // Pipedream Connect API requires:
+      // - `id` (the action key)
+      // - `configured_props` with the app auth as {app_slug: {authProvisionId: account_id}}
+      // - `external_user_id`
+      const configured_props: Record<string, unknown> = {
+        [app]: { authProvisionId: account.id },
+        ...props,
+      };
+
+      const data = await this.apiRequest<{
+        exports?: Record<string, unknown>;
+        ret?: unknown;
+        os?: unknown[];
+        [key: string]: unknown;
+      }>('POST', `/v1/connect/${this.projectId}/actions/run`, {
+        id: actionKey,
+        external_user_id: accountId,
+        configured_props,
+      });
+
+      return {
+        success: true,
+        result: data.ret ?? data.exports ?? data,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: `Action execution failed: ${err}`,
+      };
+    }
   }
 }

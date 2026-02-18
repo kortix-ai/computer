@@ -104,4 +104,121 @@ integrationsRouter.get('/list', async (c) => {
   }
 })
 
+integrationsRouter.get('/actions', async (c) => {
+  try {
+    const appSlug = c.req.query('app')
+    const query = c.req.query('q')
+    const limit = c.req.query('limit')
+
+    const params = new URLSearchParams()
+    if (appSlug) params.set('app', appSlug)
+    if (query) params.set('q', query)
+    if (limit) params.set('limit', limit)
+
+    const apiUrl = config.KORTIX_API_URL.replace(/\/v1\/router\/?$/, '/v1')
+    const res = await fetch(`${apiUrl}/integrations/actions?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${config.KORTIX_TOKEN}`,
+      },
+      signal: AbortSignal.timeout(15_000),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return c.json(data, res.status as any)
+    }
+
+    return c.json(data)
+  } catch (err) {
+    console.error('[Integrations Proxy] Actions list error:', err)
+    return c.json({ error: 'Failed to list actions' }, 502)
+  }
+})
+
+integrationsRouter.post('/connect', async (c) => {
+  try {
+    const body = await c.req.json()
+    const apiUrl = config.KORTIX_API_URL.replace(/\/v1\/router\/?$/, '/v1')
+    const res = await fetch(`${apiUrl}/integrations/connect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.KORTIX_TOKEN}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return c.json(data, res.status as any)
+    }
+
+    return c.json(data)
+  } catch (err) {
+    console.error('[Integrations Proxy] Connect error:', err)
+    return c.json({ error: 'Failed to create connect token' }, 502)
+  }
+})
+
+integrationsRouter.get('/search-apps', async (c) => {
+  try {
+    const query = c.req.query('q')
+    const limit = c.req.query('limit')
+
+    const params = new URLSearchParams()
+    if (query) params.set('q', query)
+    if (limit) params.set('limit', limit)
+
+    const apiUrl = config.KORTIX_API_URL.replace(/\/v1\/router\/?$/, '/v1')
+    const res = await fetch(`${apiUrl}/integrations/search-apps?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${config.KORTIX_TOKEN}`,
+      },
+      signal: AbortSignal.timeout(15_000),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return c.json(data, res.status as any)
+    }
+
+    return c.json(data)
+  } catch (err) {
+    console.error('[Integrations Proxy] Search apps error:', err)
+    return c.json({ error: 'Failed to search apps' }, 502)
+  }
+})
+
+integrationsRouter.post('/run-action', async (c) => {
+  try {
+    const body = await c.req.json()
+    const apiUrl = config.KORTIX_API_URL.replace(/\/v1\/router\/?$/, '/v1')
+    const res = await fetch(`${apiUrl}/integrations/run-action`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.KORTIX_TOKEN}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return c.json(data, res.status as any)
+    }
+
+    c.header('Cache-Control', 'no-store')
+    return c.json(data)
+  } catch (err) {
+    console.error('[Integrations Proxy] Run action error:', err)
+    return c.json({ error: 'Failed to run action' }, 502)
+  }
+})
+
 export default integrationsRouter

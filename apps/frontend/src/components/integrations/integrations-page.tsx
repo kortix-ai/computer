@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import {
   useIntegrationApps,
   useIntegrationConnections,
@@ -14,6 +14,7 @@ import {
 } from '@/hooks/integrations';
 import { createFrontendClient } from '@pipedream/sdk/browser';
 import { useAuth } from '@/components/AuthProvider';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -415,11 +416,14 @@ const LoadingGrid = () => (
 
 export function IntegrationsPage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [connectingApp, setConnectingApp] = useState<string | null>(null);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [linkDialogConnection, setLinkDialogConnection] =
     useState<IntegrationConnection | null>(null);
+  const autoConnectTriggered = useRef(false);
 
   // Default apps (no search) — for connected app icons
   const { data: defaultAppsData } = useIntegrationApps(undefined);
@@ -507,6 +511,29 @@ export function IntegrationsPage() {
     },
     [createToken, saveConnection, user],
   );
+
+  // Auto-connect when ?connect=<app_slug> is present (used by agent tools)
+  useEffect(() => {
+    const connectApp = searchParams.get('connect');
+    if (!connectApp || autoConnectTriggered.current || !user || appsLoading) return;
+    autoConnectTriggered.current = true;
+
+    // Clean the URL
+    router.replace('/integrations', { scroll: false });
+
+    // Find the app in the loaded list, or create a minimal app object
+    const app = apps.find((a) => a.slug === connectApp);
+    if (app) {
+      handleConnect(app);
+    } else {
+      // App not in current page — trigger connect with minimal info
+      handleConnect({
+        slug: connectApp,
+        name: connectApp,
+        categories: [],
+      } as IntegrationApp);
+    }
+  }, [searchParams, user, apps, appsLoading, handleConnect, router]);
 
   const handleDisconnect = useCallback(
     async (connection: IntegrationConnection) => {

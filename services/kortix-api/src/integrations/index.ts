@@ -13,6 +13,10 @@ integrationsApp.use('/connections/save', supabaseAuth);
 integrationsApp.use('/token', apiKeyAuth);
 integrationsApp.use('/proxy', apiKeyAuth);
 integrationsApp.use('/list', apiKeyAuth);
+integrationsApp.use('/actions', apiKeyAuth);
+integrationsApp.use('/run-action', apiKeyAuth);
+integrationsApp.use('/connect', apiKeyAuth);
+integrationsApp.use('/search-apps', apiKeyAuth);
 
 integrationsApp.route('/', createIntegrationsRouter());
 integrationsApp.route('/', createIntegrationsTokenRouter());

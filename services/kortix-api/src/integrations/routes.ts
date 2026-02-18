@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { HTTPException } from 'hono/http-exception';
 import { createAuthProvider } from './providers';
+import { config } from '../config';
 import {
   insertIntegration,
   listIntegrationsByAccount,
@@ -41,6 +42,12 @@ const proxyRequestSchema = z.object({
 
 const linkSchema = z.object({
   sandbox_id: z.string().uuid(),
+});
+
+const runActionSchema = z.object({
+  app: z.string().min(1),
+  action_key: z.string().min(1),
+  props: z.record(z.unknown()).default({}),
 });
 
 const webhookSchema = z.object({
@@ -380,6 +387,122 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
         status: l.integration.status,
       })),
     });
+  });
+
+  app.get('/actions', async (c) => {
+    const sandboxId = c.get('sandboxId') as string;
+
+    if (!sandboxId) {
+      throw new HTTPException(403, { message: 'This endpoint requires a sandbox token (sbt_)' });
+    }
+
+    const appSlug = c.req.query('app');
+    if (!appSlug) {
+      throw new HTTPException(400, { message: 'app query parameter is required' });
+    }
+
+    const query = c.req.query('q');
+    const limit = parseInt(c.req.query('limit') || '50', 10);
+
+    try {
+      const provider = createAuthProvider();
+      const result = await provider.listActions(appSlug, query, limit);
+      return c.json(result);
+    } catch (err) {
+      console.error(`[INTEGRATIONS] Error listing actions for ${appSlug}:`, err);
+      return c.json({ error: `Failed to list actions for "${appSlug}"` }, 500);
+    }
+  });
+
+  app.post('/connect', async (c) => {
+    const sandboxId = c.get('sandboxId') as string;
+    const accountId = c.get('accountId') as string;
+
+    if (!sandboxId) {
+      throw new HTTPException(403, { message: 'This endpoint requires a sandbox token (sbt_)' });
+    }
+
+    const body = await c.req.json();
+    const parsed = tokenRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new HTTPException(400, { message: 'app is required' });
+    }
+
+    const { app: appSlug } = parsed.data;
+
+    try {
+      const provider = createAuthProvider();
+      const result = await provider.createConnectToken(accountId, appSlug);
+
+      const dashboardUrl = `${config.FRONTEND_URL}/integrations?connect=${encodeURIComponent(appSlug)}`;
+      console.log(`[INTEGRATIONS] Connect token created: app=${appSlug} sandbox=${sandboxId} account=${accountId}`);
+      return c.json({
+        connectUrl: dashboardUrl,
+        token: result.token,
+        app: appSlug,
+      });
+    } catch (err) {
+      console.error(`[INTEGRATIONS] Connect token failed for ${appSlug}:`, err);
+      throw new HTTPException(502, { message: `Failed to create connect token for "${appSlug}"` });
+    }
+  });
+
+  app.get('/search-apps', async (c) => {
+    const sandboxId = c.get('sandboxId') as string;
+
+    if (!sandboxId) {
+      throw new HTTPException(403, { message: 'This endpoint requires a sandbox token (sbt_)' });
+    }
+
+    const query = c.req.query('q');
+    const limit = parseInt(c.req.query('limit') || '20', 10);
+
+    try {
+      const provider = createAuthProvider();
+      const result = await provider.listApps(query, limit);
+      return c.json(result);
+    } catch (err) {
+      console.error('[INTEGRATIONS] Error searching apps:', err);
+      return c.json({ error: 'Failed to search apps' }, 500);
+    }
+  });
+
+  app.post('/run-action', async (c) => {
+    const sandboxId = c.get('sandboxId') as string;
+    const accountId = c.get('accountId') as string;
+
+    if (!sandboxId) {
+      throw new HTTPException(403, { message: 'This endpoint requires a sandbox token (sbt_)' });
+    }
+
+    const body = await c.req.json();
+    const parsed = runActionSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new HTTPException(400, { message: 'app, action_key are required' });
+    }
+
+    const { app: appSlug, action_key, props } = parsed.data;
+
+    const linked = await getIntegrationForSandbox(sandboxId, appSlug, accountId);
+    if (!linked) {
+      throw new HTTPException(403, {
+        message: `No connected integration for "${appSlug}" linked to this sandbox`,
+      });
+    }
+
+    try {
+      const provider = createAuthProvider();
+      const result = await provider.runAction(accountId, action_key, props, appSlug);
+
+      console.log(`[INTEGRATIONS] Action run: ${action_key} app=${appSlug} sandbox=${sandboxId} success=${result.success}`);
+      await updateIntegrationLastUsed(linked.integrationId as string);
+
+      c.header('Cache-Control', 'no-store');
+      return c.json(result);
+    } catch (err) {
+      console.error(`[INTEGRATIONS] Action run failed for ${action_key}:`, err);
+      throw new HTTPException(502, { message: `Action execution failed: ${err}` });
+    }
   });
 
   return app;

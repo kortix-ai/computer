@@ -52,9 +52,33 @@ export interface ProxyResponse {
   body: unknown;
 }
 
+export interface ActionParam {
+  name: string;
+  type: string;
+  required: boolean;
+  description?: string;
+}
+
+export interface ActionSummary {
+  key: string;
+  name: string;
+  description?: string;
+  params: ActionParam[];
+}
+
+export interface ActionListResult {
+  actions: ActionSummary[];
+  app: string;
+}
+
+export interface ActionRunResult {
+  success: boolean;
+  result?: unknown;
+  error?: string;
+}
+
 export interface AuthProvider {
   readonly name: string;
-
   createConnectToken(accountId: string, app?: string): Promise<ConnectTokenResult>;
   listAccounts(accountId: string): Promise<ConnectedAccount[]>;
   getAccount(accountId: string, accountProviderId: string): Promise<ConnectedAccount | null>;
@@ -62,4 +86,6 @@ export interface AuthProvider {
   deleteAccount(accountId: string, accountProviderId: string): Promise<void>;
   listApps(query?: string, limit?: number, cursor?: string): Promise<AppListResult>;
   proxyRequest(accountId: string, app: string, request: ProxyRequest): Promise<ProxyResponse>;
+  listActions(app: string, query?: string, limit?: number): Promise<ActionListResult>;
+  runAction(accountId: string, actionKey: string, props: Record<string, unknown>, app: string): Promise<ActionRunResult>;
 }
