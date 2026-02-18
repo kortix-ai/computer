@@ -3604,19 +3604,42 @@ function memGetTypeInfo(typeEmoji: string, type: string): { label: string; bg: s
   return { label: 'Note', bg: 'bg-muted/40', text: 'text-muted-foreground', dot: 'bg-muted-foreground/50' };
 }
 
+/** Try to parse output as a JSON file-read result (with path + content fields). */
+function parseMemGetFileResult(output: string): { path: string; content: string; total_lines: number } | null {
+  if (!output) return null;
+  const trimmed = output.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object' && typeof parsed.path === 'string' && typeof parsed.content === 'string') {
+      return { path: parsed.path, content: parsed.content, total_lines: parsed.total_lines || 0 };
+    }
+  } catch { /* not JSON */ }
+  return null;
+}
+
 function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
   const input = partInput(part);
   const output = partOutput(part);
   const status = partStatus(part);
   const ids = input.ids ? String(input.ids) : '';
+  const path = input.path ? String(input.path) : '';
 
-  const observations = useMemo(() => parseMemGetOutput(output), [output]);
+  // Try file-read result first, then observations
+  const fileResult = useMemo(() => parseMemGetFileResult(output), [output]);
+  const observations = useMemo(() => fileResult ? [] : parseMemGetOutput(output), [output, fileResult]);
   const hasResults = observations.length > 0;
+  const hasFileResult = !!fileResult;
 
+  const triggerSubtitle = path || ids || (fileResult ? fileResult.path : '');
   const triggerBadge = status === 'completed'
-    ? hasResults
-      ? `${observations.length} loaded`
-      : 'empty'
+    ? hasFileResult
+      ? 'loaded'
+      : hasResults
+        ? `${observations.length} loaded`
+        : output
+          ? 'loaded'
+          : 'empty'
     : undefined;
 
   return (
@@ -3624,12 +3647,12 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       icon={<Brain className="size-3.5 flex-shrink-0" />}
       trigger={
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="font-medium text-xs text-foreground whitespace-nowrap">Mem Get</span>
-          {ids && <span className="text-muted-foreground text-xs truncate font-mono">{ids}</span>}
+          <span className="font-medium text-xs text-foreground whitespace-nowrap">Memory</span>
+          {triggerSubtitle && <span className="text-muted-foreground text-xs truncate font-mono">{triggerSubtitle}</span>}
           {triggerBadge && (
             <span className={cn(
               'text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0',
-              hasResults ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
+              (hasResults || hasFileResult) ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
             )}>
               {triggerBadge}
             </span>
@@ -3640,7 +3663,43 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
       forceOpen={forceOpen}
       locked={locked}
     >
-      {status === 'completed' && hasResults ? (
+      {/* File-read result: render markdown content */}
+      {status === 'completed' && hasFileResult ? (
+        <div data-scrollable className="max-h-[400px] overflow-auto">
+          <div className="px-3 pb-2.5">
+            {/* File path + line count */}
+            <div className="flex items-center gap-1.5 mt-1 mb-2">
+              <FileText className="size-3 text-muted-foreground/40 flex-shrink-0" />
+              <span className="text-[10px] text-muted-foreground/50 font-mono truncate">{fileResult!.path}</span>
+              {fileResult!.total_lines > 0 && (
+                <>
+                  <span className="text-muted-foreground/20">&middot;</span>
+                  <span className="text-[10px] text-muted-foreground/40 flex items-center gap-0.5 flex-shrink-0">
+                    <Hash className="size-2.5" />
+                    {fileResult!.total_lines}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Rendered markdown */}
+            <div className="prose prose-sm dark:prose-invert max-w-none
+              prose-headings:text-foreground prose-headings:font-medium
+              prose-h1:text-xs prose-h1:mb-1.5 prose-h1:mt-0
+              prose-h2:text-[11px] prose-h2:mb-1 prose-h2:mt-3
+              prose-h3:text-[11px] prose-h3:mb-0.5 prose-h3:mt-2
+              prose-p:text-[11px] prose-p:text-muted-foreground/70 prose-p:leading-relaxed prose-p:my-1
+              prose-li:text-[11px] prose-li:text-muted-foreground/70 prose-li:my-0
+              prose-ul:my-0.5 prose-ol:my-0.5
+              prose-strong:text-foreground/90 prose-strong:font-medium
+              prose-code:text-[10px] prose-code:bg-muted/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+              prose-hr:border-border/50 prose-hr:my-2
+            ">
+              <UnifiedMarkdown content={fileResult!.content} isStreaming={false} />
+            </div>
+          </div>
+        </div>
+      ) : status === 'completed' && hasResults ? (
         <div data-scrollable className="max-h-[400px] overflow-auto">
           <div className="px-3 pb-2.5">
             {/* Section label */}
@@ -3743,7 +3802,16 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
         </div>
       ) : status === 'completed' && output ? (
         <div data-scrollable className="p-2 max-h-72 overflow-auto">
-          <pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">{output}</pre>
+          <div className="prose prose-sm dark:prose-invert max-w-none px-1
+            prose-headings:text-foreground prose-headings:font-medium
+            prose-h1:text-xs prose-h2:text-[11px] prose-h3:text-[11px]
+            prose-p:text-[11px] prose-p:text-muted-foreground/70
+            prose-li:text-[11px] prose-li:text-muted-foreground/70
+            prose-strong:text-foreground/90
+            prose-code:text-[10px] prose-code:bg-muted/60 prose-code:px-1 prose-code:rounded
+          ">
+            <UnifiedMarkdown content={output.slice(0, 3000)} isStreaming={false} />
+          </div>
         </div>
       ) : null}
     </BasicTool>
