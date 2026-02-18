@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+
 import {
   ChevronDown,
   ChevronRight,
@@ -39,7 +39,6 @@ import {
 } from '@/components/ui/tooltip';
 import {
   useOpenCodeSession,
-  useOpenCodeMessages,
   useSendOpenCodeMessage,
   useAbortOpenCodeSession,
   useOpenCodeAgents,
@@ -55,7 +54,6 @@ import {
   replyToQuestion,
   rejectQuestion,
   findOpenCodeFiles,
-  opencodeKeys,
   ascendingId,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
@@ -133,6 +131,7 @@ import {
 import { SessionChatInput, type AttachedFile, type TrackedMention } from '@/components/session/session-chat-input';
 import { uploadFile } from '@/features/files/api/opencode-files';
 import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
+import { useSessionSync } from '@/hooks/opencode/use-session-sync';
 import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { SessionWelcome } from '@/components/session/session-welcome';
 import { ToolPartRenderer } from '@/components/session/tool-renderers';
@@ -1909,7 +1908,6 @@ interface SessionChatProps {
 }
 
 export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: SessionChatProps) {
-  const queryClient = useQueryClient();
   // ---- Context modal ----
   const [contextModalOpen, setContextModalOpen] = useState(false);
 
@@ -1921,7 +1919,12 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
 
   // ---- Hooks ----
   const { data: session, isLoading: sessionLoading } = useOpenCodeSession(sessionId);
-  const { data: queryMessages, isLoading: messagesLoading } = useOpenCodeMessages(sessionId);
+  // useSessionSync is the SINGLE source of truth for messages (matches OpenCode SolidJS).
+  // It fetches on first access, then SSE events keep it up to date.
+  // No React Query fallback — prevents stale refetches from overwriting live data.
+  const { messages: syncMessages, isLoading: syncMessagesLoading } = useSessionSync(sessionId);
+  const messages = syncMessages.length > 0 ? syncMessages : undefined;
+  const messagesLoading = syncMessagesLoading;
   const { data: agents } = useOpenCodeAgents();
   const { data: commands } = useOpenCodeCommands();
   const { data: providers } = useOpenCodeProviders();
@@ -1932,28 +1935,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   const forkSession = useForkSession();
   const revertSession = useRevertSession();
   const unrevertSession = useUnrevertSession();
-
-  // Hydrate sync store from React Query on initial load / session switch.
-  // After this, sync store is the SINGLE source of truth (SSE events update it).
-  useEffect(() => {
-    if (!queryMessages || queryMessages.length === 0) return;
-    useSyncStore.getState().hydrate(sessionId, queryMessages as any);
-  }, [sessionId, queryMessages]);
-
-  // Messages come ONLY from sync store — never from React Query directly.
-  // This matches OpenCode where the SolidJS store is the sole source.
-  const syncedMessageInfos = useSyncStore((s) => s.messages[sessionId]);
-  const syncedParts = useSyncStore((s) => s.parts);
-  const messages = useMemo<MessageWithParts[] | undefined>(() => {
-    if (!syncedMessageInfos || syncedMessageInfos.length === 0) {
-      // Sync store not yet hydrated — fall back to query data for initial render
-      return queryMessages;
-    }
-    return syncedMessageInfos.map((info) => ({
-      info: info as any,
-      parts: (syncedParts[info.id] ?? []) as any,
-    }));
-  }, [syncedMessageInfos, syncedParts, queryMessages]);
 
   // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
   const local = useOpenCodeLocal({ agents, providers, config });
@@ -1989,11 +1970,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     return null;
   });
 
-  const addOptimisticUserMessage = useCallback((messageId: string, text: string) => {
+  const addOptimisticUserMessage = useCallback((messageId: string, text: string, partIds?: string[]) => {
     const parts = text.trim()
       ? [
           {
-            id: ascendingId('prt'),
+            id: partIds?.[0] ?? ascendingId('prt'),
             sessionID: sessionId,
             messageID: messageId,
             type: 'text',
@@ -2009,27 +1990,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     } as any;
 
     useSyncStore.getState().optimisticAdd(sessionId, info, parts as any);
-
-    queryClient.setQueryData<MessageWithParts[]>(opencodeKeys.messages(sessionId), (old) => {
-      const list = old ? [...old] : [];
-      if (list.some((m) => m.info.id === messageId)) return list;
-
-      list.push({
-        info,
-        parts: parts as any,
-      });
-      list.sort((a, b) => a.info.id.localeCompare(b.info.id));
-      return list;
-    });
-  }, [queryClient, sessionId]);
+  }, [sessionId]);
 
   const removeOptimisticUserMessage = useCallback((messageId: string) => {
     useSyncStore.getState().optimisticRemove(sessionId, messageId);
-    queryClient.setQueryData<MessageWithParts[]>(opencodeKeys.messages(sessionId), (old) => {
-      if (!old) return old;
-      return old.filter((m) => m.info.id !== messageId);
-    });
-  }, [queryClient, sessionId]);
+  }, [sessionId]);
 
   // Hydrate options from sessionStorage and send the pending prompt for new sessions.
   // The dashboard/project page stores the prompt in sessionStorage and navigates here.
@@ -2066,42 +2031,30 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       // outer retry (2 attempts total at this level) to cover cases where the
       // SDK client itself fails to initialize or the server takes longer to start.
       const sendOpts = Object.keys(options).length > 0 ? options as any : undefined;
-      const maxOuterRetries = 2;
-      let outerAttempt = 0;
       const messageID = ascendingId('msg');
+      const textPartId = ascendingId('prt');
       setPendingSendMessageId(messageID);
-      addOptimisticUserMessage(messageID, pendingPrompt);
+      addOptimisticUserMessage(messageID, pendingPrompt, [textPartId]);
       lastSendTimeRef.current = Date.now();
-      const trySend = () => {
-        outerAttempt++;
-        sendMessage.mutateAsync({
-          sessionId,
-          parts: [{ type: 'text', text: pendingPrompt }],
-          options: sendOpts,
-          messageID,
-        }).then(() => {
-          // Send succeeded — update send time for grace period and clear retrying.
-          // Keep pendingSendInFlight true until server status goes busy (cleared below).
-          lastSendTimeRef.current = Date.now();
-          setIsRetrying(false);
-        }).catch(() => {
-          if (outerAttempt < maxOuterRetries) {
-            // Show retrying indicator and keep loader visible
-            setIsRetrying(true);
-            // Wait 3s before outer retry (inner retries already used 1s + 2s)
-            setTimeout(trySend, 3000);
-          } else {
-            // All retries failed — clear optimistic display so user can retry manually
-            removeOptimisticUserMessage(messageID);
-            setIsRetrying(false);
-            setPendingSendInFlight(false);
-            setPendingSendMessageId(null);
-            setOptimisticPrompt(null);
-            setPollingActive(false);
-          }
-        });
-      };
-      trySend();
+
+      // Fire-and-forget via promptAsync. Don't send messageID — let the
+      // server generate it with its own clock to avoid clock-skew issues.
+      const client = getClient();
+      void client.session.promptAsync({
+        sessionID: sessionId,
+        parts: [{ type: 'text', text: pendingPrompt }],
+        ...(sendOpts?.agent && { agent: sendOpts.agent }),
+        ...(sendOpts?.model && { model: sendOpts.model }),
+        ...(sendOpts?.variant && { variant: sendOpts.variant }),
+      } as any).catch(() => {
+        removeOptimisticUserMessage(messageID);
+        useSyncStore.getState().setStatus(sessionId, { type: 'idle' });
+        setIsRetrying(false);
+        setPendingSendInFlight(false);
+        setPendingSendMessageId(null);
+        setOptimisticPrompt(null);
+        setPollingActive(false);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, addOptimisticUserMessage, removeOptimisticUserMessage]);
@@ -2150,7 +2103,10 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
   );
   const sessionStatus = syncStatus ?? legacyStatus;
   const isServerBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
-  const isBusy = isServerBusy || !!pendingUserMessage || pendingSendInFlight;
+  // Match OpenCode: isBusy is driven ONLY by the session status (single source of truth).
+  // pendingUserMessage/pendingSendInFlight are no longer part of isBusy — they caused
+  // the input to queue messages instead of sending them, breaking 2nd+ turns.
+  const isBusy = isServerBusy;
 
   // ---- Message Queue ----
   // Select the full array (stable ref) and derive the filtered list via useMemo
@@ -2605,10 +2561,17 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       playSound('send');
       const messageID = ascendingId('msg');
 
-      // Optimistic: show message immediately in sync store
-      addOptimisticUserMessage(messageID, text);
-      setPendingUserMessage(text);
-      setPendingUserMessageId(messageID);
+      // Generate part IDs upfront so the optimistic message and the server
+      // request use the SAME IDs. When the server echoes parts via
+      // message.part.updated, the sync store's upsertPart will UPDATE
+      // (not duplicate) the optimistic parts. This matches OpenCode's
+      // SolidJS approach where part IDs are sent with the prompt request.
+      const textPartId = ascendingId('prt');
+
+      // Optimistic: show message immediately in sync store + set busy
+      // Matches OpenCode: sync.set("session_status", session.id, { type: "busy" })
+      addOptimisticUserMessage(messageID, text, [textPartId]);
+      useSyncStore.getState().setStatus(sessionId, { type: 'busy' });
 
       const options: Record<string, unknown> = {};
       if (local.agent.current) options.agent = local.agent.current.name;
@@ -2618,9 +2581,9 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       // Build parts: text first, then upload attached files to /workspace/uploads/
       // and send as XML text references (agent reads from disk on demand, not loaded into context)
       const parts: Array<
-        | { type: 'text'; text: string }
-        | { type: 'file'; mime: string; url: string; filename?: string }
-      > = [{ type: 'text', text }];
+        | { id: string; type: 'text'; text: string }
+        | { id: string; type: 'file'; mime: string; url: string; filename?: string }
+      > = [{ id: textPartId, type: 'text', text }];
 
       if (files && files.length > 0) {
         const uploadResults = await Promise.all(
@@ -2642,6 +2605,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         );
         for (const f of uploadResults) {
           parts.push({
+            id: ascendingId('prt'),
             type: 'text',
             text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
           });
@@ -2655,20 +2619,34 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
           .map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
           .join('\n');
         parts.push({
+          id: ascendingId('prt'),
           type: 'text',
           text: `\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`,
         });
       }
 
-      // Fire-and-forget — exactly like OpenCode's `void send().catch(...)`.
-      // The blocking prompt() call runs in the background.
-      // All incremental UI updates come from SSE → sync store.
-      sendMessage.mutateAsync({
-        sessionId,
-        parts,
-        options: Object.keys(options).length > 0 ? options as any : undefined,
-        messageID,
-      }).catch(() => {
+      // Fire-and-forget via session.prompt (matching OpenCode app's approach).
+      // SSE events drive all incremental UI updates via sync store.
+      // prompt() blocks until the full response is ready, but since we don't
+      // await the result, it effectively runs in the background. This is exactly
+      // how OpenCode's web app sends messages.
+      // Don't send part IDs or messageID — let the server generate them with
+      // its own clock. Client-generated IDs can sort before server IDs due to
+      // clock skew (browser vs Docker container), causing the server's loop to
+      // exit immediately thinking the prompt was already answered.
+      const mappedParts = parts.map((p: any) => {
+        if (p.type === 'file') return { type: 'file' as const, mime: p.mime, url: p.url, filename: p.filename };
+        return { type: 'text' as const, text: p.text };
+      });
+      const sendOpts = Object.keys(options).length > 0 ? options : undefined;
+      const client = getClient();
+      void client.session.promptAsync({
+        sessionID: sessionId,
+        parts: mappedParts,
+        ...(sendOpts?.agent && { agent: sendOpts.agent }),
+        ...(sendOpts?.model && { model: sendOpts.model }),
+        ...(sendOpts?.variant && { variant: sendOpts.variant }),
+      } as any).catch(() => {
         // On failure, set status to idle and remove optimistic message
         useSyncStore.getState().setStatus(sessionId, { type: 'idle' });
         removeOptimisticUserMessage(messageID);
@@ -2925,52 +2903,8 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
                   );
                 })}
 
-                {/* Optimistic user message / command for in-session sends */}
-                {pendingUserMessage && !showOptimistic && (
-                  <>
-                    {pendingCommand ? (
-                      /* Command execution card — distinct from regular user messages */
-                      <div className="flex justify-end">
-                        <div className="inline-flex flex-col gap-1.5 px-4 py-2.5 rounded-2xl border border-border/60 bg-muted/40">
-                          <div className="flex items-center gap-2">
-                            <Terminal className="size-3.5 text-muted-foreground shrink-0" />
-                            <span className="font-mono text-sm text-foreground">/{pendingCommand.name}</span>
-                          </div>
-                          {pendingCommand.description && (
-                            <div className="text-xs text-muted-foreground break-words max-w-[400px]" style={{ paddingLeft: '1.375rem' }}>
-                              {pendingCommand.description}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex justify-end">
-                        <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
-                            <HighlightMentions text={pendingUserMessage} agentNames={agentNames} onFileClick={openFileInComputer} />
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/kortix-logomark-white.svg"
-                        alt="Kortix"
-                        className="dark:invert-0 invert flex-shrink-0"
-                        style={{ height: '14px', width: 'auto' }}
-                      />
-                      {isRetrying && (
-                        <span className="text-xs text-amber-500">
-                          Retrying connection...
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-
                 {/* Busy indicator when no turns yet but session is busy */}
-                {!showOptimistic && !pendingUserMessage && isBusy && turns.length === 0 && (
+                {!showOptimistic && isBusy && turns.length === 0 && (
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img

@@ -142,13 +142,14 @@ export function useOpenCodeEventStream() {
           } as any);
           const { stream } = result;
 
-          // On successful reconnection, refresh data to catch up on missed events.
-          // Use refetchQueries instead of invalidateQueries — invalidation marks
-          // queries as stale which causes components to show loading spinners
-          // while refetching. refetchQueries fetches in the background and only
-          // updates the UI once the new data arrives, avoiding the loading flash.
+          // On reconnect, refresh non-message data (sessions list, config, etc).
+          // Do NOT refetch messages — sync store is the source of truth and
+          // stale refetch data can overwrite live streaming state.
+          // SSE events will bring the sync store up to date.
           if (retryCount > 0) {
-            queryClient.refetchQueries({ queryKey: opcodeKeys.all });
+            queryClient.refetchQueries({
+              queryKey: opcodeKeys.sessions(),
+            });
           }
           retryCount = 0;
 
@@ -183,11 +184,15 @@ export function useOpenCodeEventStream() {
           flush();
         }
 
-        // Stream ended or errored — retry with exponential backoff
+        // Stream ended or errored — reconnect immediately on first attempt,
+        // then use exponential backoff. ERR_INCOMPLETE_CHUNKED_ENCODING is normal
+        // when the server closes the SSE connection between response cycles.
         if (abortController.signal.aborted) break;
         retryCount++;
-        logger.warn('SSE event stream reconnecting', { retryCount });
-        const delay = Math.min(1000 * Math.pow(2, Math.min(retryCount, 5)), 30000);
+        if (retryCount > 1) {
+          logger.warn('SSE event stream reconnecting', { retryCount });
+        }
+        const delay = retryCount <= 1 ? 100 : Math.min(1000 * Math.pow(2, Math.min(retryCount - 1, 5)), 30000);
         await new Promise<void>((resolve) => {
           const timer = setTimeout(resolve, delay);
           const onAbort = () => { clearTimeout(timer); resolve(); };
@@ -259,8 +264,11 @@ export function useOpenCodeEventStream() {
         case 'session.compacted': {
           const sessionID = (event.properties as any).sessionID;
           if (sessionID) {
-            // Full refetch after compaction since messages changed significantly
-            queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionID) });
+            // Full refetch after compaction since messages changed significantly.
+            // Rehydrate the sync store (the single source of truth for messages).
+            getClient().session.messages({ sessionID }).then((res) => {
+              if (res.data) useSyncStore.getState().hydrate(sessionID, res.data as any);
+            }).catch(() => {});
             // Also invalidate session to clear time.compacting
             queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionID) });
           }
