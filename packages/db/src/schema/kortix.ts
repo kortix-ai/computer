@@ -82,6 +82,13 @@ export const apiKeyStatusEnum = kortixSchema.enum('api_key_status', [
   'expired',
 ]);
 
+export const integrationStatusEnum = kortixSchema.enum('integration_status', [
+  'active',
+  'revoked',
+  'expired',
+  'error',
+]);
+
 export interface ChannelCredentials {
   [key: string]: unknown;
 }
@@ -344,12 +351,58 @@ export const kortixApiKeys = kortixSchema.table(
   ],
 );
 
+// ─── Integrations (account-level OAuth connections) ─────────────────────────
+
+export const integrations = kortixSchema.table(
+  'integrations',
+  {
+    integrationId: uuid('integration_id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').notNull(),
+    app: varchar('app', { length: 255 }).notNull(),
+    appName: varchar('app_name', { length: 255 }),
+    providerName: varchar('provider_name', { length: 50 }).notNull(),
+    providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
+    status: integrationStatusEnum('status').default('active').notNull(),
+    scopes: jsonb('scopes').default([]).$type<string[]>(),
+    metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
+    connectedAt: timestamp('connected_at', { withTimezone: true }).defaultNow().notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_integrations_account').on(table.accountId),
+    index('idx_integrations_app').on(table.app),
+    index('idx_integrations_provider_account').on(table.providerAccountId),
+    uniqueIndex('idx_integrations_account_app').on(table.accountId, table.app, table.providerName),
+  ],
+);
+
+export const sandboxIntegrations = kortixSchema.table(
+  'sandbox_integrations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    sandboxId: uuid('sandbox_id')
+      .notNull()
+      .references(() => sandboxes.sandboxId, { onDelete: 'cascade' }),
+    integrationId: uuid('integration_id')
+      .notNull()
+      .references(() => integrations.integrationId, { onDelete: 'cascade' }),
+    grantedAt: timestamp('granted_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_sandbox_integration_unique').on(table.sandboxId, table.integrationId),
+    index('idx_sandbox_integrations_sandbox').on(table.sandboxId),
+  ],
+);
+
 export const sandboxesRelations = relations(sandboxes, ({ many }) => ({
   triggers: many(triggers),
   executions: many(executions),
   deployments: many(deployments),
   channelConfigs: many(channelConfigs),
   apiKeys: many(kortixApiKeys),
+  sandboxIntegrationLinks: many(sandboxIntegrations),
 }));
 
 export const triggersRelations = relations(triggers, ({ one, many }) => ({
@@ -413,5 +466,20 @@ export const kortixApiKeysRelations = relations(kortixApiKeys, ({ one }) => ({
   sandbox: one(sandboxes, {
     fields: [kortixApiKeys.sandboxId],
     references: [sandboxes.sandboxId],
+  }),
+}));
+
+export const integrationsRelations = relations(integrations, ({ many }) => ({
+  sandboxIntegrationLinks: many(sandboxIntegrations),
+}));
+
+export const sandboxIntegrationsRelations = relations(sandboxIntegrations, ({ one }) => ({
+  sandbox: one(sandboxes, {
+    fields: [sandboxIntegrations.sandboxId],
+    references: [sandboxes.sandboxId],
+  }),
+  integration: one(integrations, {
+    fields: [sandboxIntegrations.integrationId],
+    references: [integrations.integrationId],
   }),
 }));

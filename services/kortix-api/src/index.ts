@@ -18,6 +18,7 @@ import { deploymentsApp } from './deployments';
 import { setupApp } from './setup';
 import { providersApp } from './providers/routes';
 import { secretsApp } from './secrets/routes';
+import { integrationsApp } from './integrations';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ app.route('/v1/billing', billingApp);   // /v1/billing/account-state, /v1/billin
 app.route('/v1/platform', platformApp); // /v1/platform/providers, /v1/platform/sandbox/*, /v1/platform/sandbox/version
 app.route('/v1/cron', cronApp);         // /v1/cron/sandboxes/*, /v1/cron/triggers/*, /v1/cron/executions/*
 app.route('/v1/deployments', deploymentsApp); // /v1/deployments/*
+app.route('/v1/integrations', integrationsApp); // /v1/integrations/*
 app.route('/', channelsApp);                 // /v1/channels/*, /webhooks/*
 // Setup routes — local-only. Provides .env management and system status.
 if (config.isLocal()) {
@@ -215,6 +217,7 @@ console.log(`
 ║    /v1/platform   (sandbox lifecycle)                      ║
 ║    /v1/cron       (scheduled triggers)                     ║
 ║    /v1/deployments (deploy lifecycle)                      ║
+║    /v1/integrations (OAuth integrations)                    ║
 ║    /v1/setup      (local setup & env management)           ║
 ║    /v1/preview    (sandbox preview proxy)                  ║
 ╠═══════════════════════════════════════════════════════════╣

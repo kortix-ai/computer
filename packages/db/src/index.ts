@@ -25,6 +25,10 @@ export {
   channelMessages,
   channelIdentityMap,
   kortixApiKeys,
+  integrations,
+  sandboxIntegrations,
+  // Enums (integrations)
+  integrationStatusEnum,
   // Relations
   sandboxesRelations,
   triggersRelations,
@@ -35,6 +39,8 @@ export {
   channelMessagesRelations,
   channelIdentityMapRelations,
   kortixApiKeysRelations,
+  integrationsRelations,
+  sandboxIntegrationsRelations,
 } from './schema/kortix';
 
 export type {
@@ -74,4 +80,8 @@ export type {
   NewChannelIdentity,
   KortixApiKey,
   NewKortixApiKey,
+  Integration,
+  NewIntegration,
+  SandboxIntegration,
+  NewSandboxIntegration,
 } from './types';

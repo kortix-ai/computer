@@ -15,6 +15,7 @@ import {
   Search,
   Blocks,
   ArrowDownToLine,
+  Plug,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -671,6 +672,18 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               }, router);
             }}
           />
+          <CollapsedIconButton
+            icon={<Plug className="h-[18px] w-[18px]" />}
+            label="Integrations"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/integrations',
+                title: 'Integrations',
+                type: 'page',
+                href: '/integrations',
+              }, router);
+            }}
+          />
         </div>
 
         {/* --- Expanded layout --- */}
@@ -760,6 +773,26 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             >
               <Blocks className="h-[18px] w-[18px] flex-shrink-0" />
               <span>Workspace</span>
+            </button>
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/integrations',
+                  title: 'Integrations',
+                  type: 'page',
+                  href: '/integrations',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className={cn(
+                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer',
+                pathname === '/integrations'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <Plug className="h-[18px] w-[18px] flex-shrink-0" />
+              <span>Integrations</span>
             </button>
           </nav>
 
