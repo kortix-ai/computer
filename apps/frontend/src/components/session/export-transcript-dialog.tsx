@@ -23,9 +23,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  useOpenCodeMessages,
   useOpenCodeSession,
 } from '@/hooks/opencode/use-opencode-sessions';
+import { useSessionSync } from '@/hooks/opencode/use-session-sync';
 import {
   formatTranscript,
   getTranscriptFilename,
@@ -53,7 +53,7 @@ export function ExportTranscriptDialog({
   const [copied, setCopied] = useState(false);
 
   const { data: session } = useOpenCodeSession(sessionId);
-  const { data: messages, isLoading: isLoadingMessages } = useOpenCodeMessages(sessionId);
+  const { messages, isLoading: isLoadingMessages } = useSessionSync(sessionId);
 
   const transcript = useMemo(() => {
     if (!session || !messages) return '';

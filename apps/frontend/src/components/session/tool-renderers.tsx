@@ -63,7 +63,7 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from '@/components/ui/tooltip';
-import { useOpenCodeMessages } from '@/hooks/opencode/use-opencode-sessions';
+import { useSessionSync } from '@/hooks/opencode/use-session-sync';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
@@ -2487,7 +2487,7 @@ function TaskTool({ part, sessionId, defaultOpen, forceOpen, locked, onPermissio
   const description = (input.description as string) || '';
 
   // Fetch child session messages
-  const { data: childMessages } = useOpenCodeMessages(childSessionId || '');
+  const { messages: childMessages } = useSessionSync(childSessionId || '');
 
   // Get child session permissions from pending store
   const allPermissions = useOpenCodePendingStore((s) => s.permissions);

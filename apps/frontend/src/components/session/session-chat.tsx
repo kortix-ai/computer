@@ -34,7 +34,6 @@ import {
 } from '@/components/ui/tooltip';
 import {
   useOpenCodeSession,
-  useOpenCodeMessages,
   useSendOpenCodeMessage,
   useAbortOpenCodeSession,
   useOpenCodeAgents,
@@ -51,8 +50,8 @@ import {
   rejectQuestion,
   findOpenCodeFiles,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
-import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import { useSessionSync } from '@/hooks/opencode/use-session-sync';
+import { useSyncStore, ascendingId } from '@/stores/opencode-sync-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 import { useAutoScroll } from '@/hooks/use-auto-scroll';
@@ -1907,7 +1906,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
 
   // ---- Hooks ----
   const { data: session, isLoading: sessionLoading } = useOpenCodeSession(sessionId);
-  const { data: messages, isLoading: messagesLoading } = useOpenCodeMessages(sessionId);
+  const { messages, status: sessionStatus, isBusy, isLoading: messagesLoading, permissions: pendingPermissions, questions: pendingQuestions } = useSessionSync(sessionId);
   const { data: agents } = useOpenCodeAgents();
   const { data: commands } = useOpenCodeCommands();
   const { data: providers } = useOpenCodeProviders();
@@ -1951,11 +1950,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastUserMessage?.info.id]);
 
-  // ---- Session status (purely server-driven, matching SolidJS) ----
-  const sessionStatus = useOpenCodeSessionStatusStore(
-    (s) => s.statuses[sessionId],
-  );
-  const isBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
+  // ---- Session status comes from useSessionSync above ----
 
   // ---- Message Queue ----
   const allQueuedMessages = useMessageQueueStore((s) => s.messages);
@@ -2024,7 +2019,6 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       // ignore
     }
 
-<<<<<<< HEAD
   // Clear pendingSendInFlight once the server acknowledges it's working,
   // or when new messages arrive from the server.
   // This bridges the gap between the optimistic prompt clearing and the
@@ -2171,21 +2165,9 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
     }
   }, [sessionId]);
 
-  // ---- Pending permissions & questions ----
-  const allPermissions = useOpenCodePendingStore((s) => s.permissions);
-  const allQuestions = useOpenCodePendingStore((s) => s.questions);
-  const pendingPermissions = useMemo(
-    () => Object.values(allPermissions).filter((p) => p.sessionID === sessionId),
-    [allPermissions, sessionId],
-  );
-  const pendingQuestions = useMemo(
-    () => Object.values(allQuestions).filter((q) => q.sessionID === sessionId),
-    [allQuestions, sessionId],
-  );
+  // ---- Pending permissions & questions come from useSessionSync above ----
 
   // ---- Permission/question reply handlers (with double-click guard) ----
-  const removePermission = useOpenCodePendingStore((s) => s.removePermission);
-  const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
   const [responding, setResponding] = useState(false);
 
   const handlePermissionReply = useCallback(
@@ -2193,11 +2175,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       if (responding) return;
       setResponding(true);
       replyToPermission(requestId, reply)
-        .then(() => removePermission(requestId))
         .catch(() => {})
         .finally(() => setResponding(false));
+      // Removal handled by SSE permission.replied event → sync store
     },
-    [responding, removePermission],
+    [responding],
   );
 
   const handleQuestionReply = useCallback(
@@ -2205,11 +2187,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       if (responding) return;
       setResponding(true);
       replyToQuestion(requestId, answers)
-        .then(() => removeQuestion(requestId))
         .catch(() => {})
         .finally(() => setResponding(false));
+      // Removal handled by SSE question.replied event → sync store
     },
-    [responding, removeQuestion],
+    [responding],
   );
 
   const handleQuestionReject = useCallback(
@@ -2217,11 +2199,11 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
       if (responding) return;
       setResponding(true);
       rejectQuestion(requestId)
-        .then(() => removeQuestion(requestId))
         .catch(() => {})
         .finally(() => setResponding(false));
+      // Removal handled by SSE question.rejected event → sync store
     },
-    [responding, removeQuestion],
+    [responding],
   );
 
   // ---- Group messages into turns ----
@@ -2370,13 +2352,34 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         });
       }
 
-      // Fire-and-forget: SSE will deliver the messages
+      // Generate ascending ID and insert optimistic user message into sync store
+      const messageID = ascendingId();
+      const optimisticParts = parts.map((p) => ({
+        id: ascendingId('prt'),
+        type: p.type as 'text',
+        sessionID: sessionId,
+        messageID,
+        ...(p.type === 'text' ? { text: (p as { text: string }).text } : {}),
+      })) as any[];
+
+      useSyncStore.getState().optimisticAdd(sessionId, {
+        id: messageID,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: Date.now() },
+        ...(local.agent.current && { agent: local.agent.current.name }),
+        ...(local.model.currentKey && { model: local.model.currentKey }),
+      } as any, optimisticParts);
+
+      // Fire and forget — SSE reconciles
       sendMessage.mutateAsync({
         sessionId,
         parts,
         options: Object.keys(options).length > 0 ? options as any : undefined,
+        messageID,
       }).catch(() => {
-        // Send failed after retries — user can re-submit manually
+        // Send failed — remove optimistic message
+        useSyncStore.getState().optimisticRemove(sessionId, messageID);
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2492,7 +2495,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         <div className="relative flex-1 min-h-0">
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full [scroll-behavior:auto]"
+            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-32 bg-background h-full [scroll-behavior:auto]"
           >
             <div
               ref={contentRef}

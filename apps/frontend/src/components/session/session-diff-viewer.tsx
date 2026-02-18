@@ -15,7 +15,8 @@ import {
   Minimize2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useOpenCodeSessionDiff, useOpenCodeMessages } from '@/hooks/opencode/use-opencode-sessions';
+import { useOpenCodeSessionDiff } from '@/hooks/opencode/use-opencode-sessions';
+import { useSessionSync } from '@/hooks/opencode/use-session-sync';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createTwoFilesPatch } from 'diff';
 import type { FileDiff, ApplyPatchFile } from '@/ui/types';
@@ -565,7 +566,7 @@ interface SessionDiffViewerProps {
 
 export function SessionDiffViewer({ sessionId, isFullscreen, onToggleFullscreen }: SessionDiffViewerProps) {
   const { data: apiDiffs, isLoading, error } = useOpenCodeSessionDiff(sessionId);
-  const { data: messages } = useOpenCodeMessages(sessionId);
+  const { messages } = useSessionSync(sessionId);
   const [viewMode, setViewMode] = useState<'unified' | 'split'>('unified');
 
   // Fall back to extracting diffs from tool part metadata when the API returns empty

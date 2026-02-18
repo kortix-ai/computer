@@ -14,9 +14,9 @@ import {
   useKortixComputerStore,
 } from '@/stores/kortix-computer-store';
 import {
-  useOpenCodeMessages,
   useOpenCodeSession,
 } from '@/hooks/opencode/use-opencode-sessions';
+import { useSessionSync } from '@/hooks/opencode/use-session-sync';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useTabStore } from '@/stores/tab-store';
 import {
@@ -40,7 +40,7 @@ export const SessionLayout = memo(function SessionLayout({
 }: SessionLayoutProps) {
   const isMobile = useIsMobile();
 
-  const { data: messages } = useOpenCodeMessages(sessionId);
+  const { messages } = useSessionSync(sessionId);
   const { data: session } = useOpenCodeSession(sessionId);
 
   const sessionStatus = useOpenCodeSessionStatusStore(
