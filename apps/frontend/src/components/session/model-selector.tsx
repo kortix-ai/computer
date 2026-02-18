@@ -467,7 +467,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
           side="top"
           align="start"
           sideOffset={8}
-          className="w-72 p-2 overflow-hidden rounded-xl border shadow-md"
+          className="w-72 p-2 overflow-hidden rounded-xl border"
           style={{ height: '320px' }}
         >
           <div className="flex flex-col h-full overflow-hidden">

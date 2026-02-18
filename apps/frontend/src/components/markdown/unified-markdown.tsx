@@ -552,7 +552,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
                   className={cn(
                     "max-w-full h-auto rounded-xl",
                     "border border-border/40",
-                    "shadow-sm"
+                    ""
                   )}
                   loading="lazy"
                 />
