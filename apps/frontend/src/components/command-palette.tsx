@@ -28,8 +28,6 @@ import {
   MessagesSquare,
   Layers,
   GitCompareArrows,
-  History,
-  ListTodo,
   TextSearch,
   Hash,
   Keyboard,
@@ -79,8 +77,6 @@ import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { THEMES, getThemeById } from '@/lib/themes';
 import { CompactDialog } from '@/components/session/compact-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
-import { SnapshotDialog } from '@/components/session/snapshot-dialog';
-import { TodoDialog } from '@/components/session/todo-dialog';
 import { InitProjectDialog } from '@/components/session/init-project-dialog';
 
 // ============================================================================
@@ -245,8 +241,6 @@ export function CommandPalette() {
   const [isCreating, setIsCreating] = useState(false);
   const [compactOpen, setCompactOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
-  const [snapshotOpen, setSnapshotOpen] = useState(false);
-  const [todoOpen, setTodoOpen] = useState(false);
   const [initOpen, setInitOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -664,17 +658,7 @@ export function CommandPalette() {
     setDiffOpen(true);
   }, [currentSessionId, close]);
 
-  const handleViewSnapshots = useCallback(() => {
-    if (!currentSessionId) return;
-    close();
-    setSnapshotOpen(true);
-  }, [currentSessionId, close]);
-
-  const handleViewTasks = useCallback(() => {
-    if (!currentSessionId) return;
-    close();
-    setTodoOpen(true);
-  }, [currentSessionId, close]);
+  // View tasks is now shown in the chat input todo panel — no modal needed
 
   const handleInitProject = useCallback(() => {
     if (!currentSessionId) return;
@@ -1019,18 +1003,6 @@ export function CommandPalette() {
                   </CommandItem>
                 )}
                 {currentSessionId && (
-                  <CommandItem onSelect={handleViewSnapshots}>
-                    <History className="mr-2 h-4 w-4" />
-                    <span>View Snapshots</span>
-                  </CommandItem>
-                )}
-                {currentSessionId && (
-                  <CommandItem onSelect={handleViewTasks}>
-                    <ListTodo className="mr-2 h-4 w-4" />
-                    <span>View Tasks</span>
-                  </CommandItem>
-                )}
-                {currentSessionId && (
                   <CommandItem onSelect={handleInitProject}>
                     <Sparkles className="mr-2 h-4 w-4" />
                     <span>Initialize Project</span>
@@ -1173,7 +1145,7 @@ export function CommandPalette() {
               <CommandSeparator />
 
               <CommandGroup heading="Appearance">
-                <CommandItem onSelect={handleToggleTheme}>
+                <CommandItem onSelect={() => handleToggleTheme()}>
                   <ThemeIcon className="mr-2 h-4 w-4" />
                   <span>{themeLabel}</span>
                 </CommandItem>
@@ -1196,7 +1168,7 @@ export function CommandPalette() {
               </CommandGroup>
 
               <CommandGroup heading="View">
-                <CommandItem onSelect={handleToggleSidebar}>
+                <CommandItem onSelect={() => handleToggleSidebar()}>
                   {sidebarOpen ? (
                     <PanelLeftClose className="mr-2 h-4 w-4" />
                   ) : (
@@ -1242,16 +1214,6 @@ export function CommandPalette() {
             sessionId={currentSessionId}
             open={diffOpen}
             onOpenChange={setDiffOpen}
-          />
-          <SnapshotDialog
-            sessionId={currentSessionId}
-            open={snapshotOpen}
-            onOpenChange={setSnapshotOpen}
-          />
-          <TodoDialog
-            sessionId={currentSessionId}
-            open={todoOpen}
-            onOpenChange={setTodoOpen}
           />
           <InitProjectDialog
             sessionId={currentSessionId}

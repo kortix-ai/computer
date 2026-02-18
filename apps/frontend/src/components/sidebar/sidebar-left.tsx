@@ -449,7 +449,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
         setUser({
           name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User',
           email: data.user.email || '',
-          avatar: data.user.user_metadata?.avatar_url || '',
+          avatar: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || '',
           isAdmin,
         });
       }

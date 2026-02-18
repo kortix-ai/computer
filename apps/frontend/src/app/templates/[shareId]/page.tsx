@@ -276,7 +276,7 @@ export default function TemplateSharePage() {
           <div className="text-center">
             <h2 className="text-2xl font-semibold mb-2">Template not found</h2>
             <p className="text-muted-foreground mb-4">The template you're looking for doesn't exist or has been removed.</p>
-            <Button onClick={() => router.push('/agents?tab=my-agents')} className="rounded-lg">
+            <Button onClick={() => router.push('/agents?tab=my-agents')}>
               Browse Agents
             </Button>
           </div>

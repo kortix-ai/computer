@@ -414,7 +414,7 @@ function LoginContent() {
                 <form className="w-full space-y-3">
                   <SubmitButton
                     formAction={handleVerifyOtp}
-                    className="w-full h-12 rounded-xl text-[15px] font-medium"
+                    className="w-full h-12 text-[15px]"
                     pendingText="Verifying..."
                     disabled={otpCode.length !== 6}
                   >
@@ -422,7 +422,7 @@ function LoginContent() {
                   </SubmitButton>
 
                   {provider && (
-                    <Button asChild variant="outline" size="lg" className="w-full h-12 rounded-xl">
+                    <Button asChild variant="outline" size="lg" className="w-full h-12">
                       <a
                         href={provider.url}
                         target="_blank"
@@ -508,13 +508,13 @@ function LoginContent() {
                       placeholder={t('emailAddress')}
                       required
                       onChange={(e) => setResendEmail(e.target.value)}
-                      className="h-12 rounded-xl text-[15px]"
+                      className="h-12 text-[15px]"
                     />
                   )}
 
-                  <SubmitButton
+                    <SubmitButton
                     formAction={handleSendOtpCode}
-                    className="w-full h-12 rounded-xl text-[15px] font-medium"
+                    className="w-full h-12 text-[15px]"
                     pendingText="Sending..."
                     disabled={!expiredEmailState && !resendEmail}
                   >
@@ -604,7 +604,7 @@ function LoginContent() {
                 asChild
                 size="lg"
                 variant="outline"
-                className="w-full h-12 rounded-lg font-medium"
+                className="w-full h-12"
               >
                 <a
                   href={provider.url}

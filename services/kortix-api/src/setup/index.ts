@@ -398,62 +398,100 @@ setupApp.get('/health', async (c) => {
 });
 
 /**
- * GET /v1/setup/onboarding-status
- * Check if onboarding is complete
+ * Helper: read all onboarding env keys from repo .env or sandbox secret store.
  */
-setupApp.get('/onboarding-status', async (c) => {
+async function getOnboardingEnv(): Promise<Record<string, string>> {
   const repoRoot = findRepoRoot();
-
-  // Repo/dev mode: check repo .env first, then fall back to sandbox secret store.
-  // The onboarding-complete tool writes to the sandbox secret store, so we need
-  // to check both sources.
   if (repoRoot) {
     const rootEnv = parseEnvFile(resolve(repoRoot, '.env'));
-    if (rootEnv['ONBOARDING_COMPLETE'] === 'true') {
-      return c.json({ complete: true });
-    }
-    // Fallback: check sandbox secret store (the onboarding tool writes here)
-    try {
-      const sandboxEnv = await getSandboxEnv();
-      if (sandboxEnv['ONBOARDING_COMPLETE'] === 'true') {
-        // Sync it back to repo .env so future checks are fast
-        writeEnvFile(resolve(repoRoot, '.env'), { ONBOARDING_COMPLETE: 'true' });
-        return c.json({ complete: true });
+    // Also check sandbox as fallback (onboarding tool writes there)
+    if (rootEnv['ONBOARDING_COMPLETE'] !== 'true') {
+      try {
+        const sandboxEnv = await getSandboxEnv();
+        if (sandboxEnv['ONBOARDING_COMPLETE'] === 'true') {
+          // Sync back to repo .env
+          const sync: Record<string, string> = { ONBOARDING_COMPLETE: 'true' };
+          if (sandboxEnv['ONBOARDING_SESSION_ID']) sync['ONBOARDING_SESSION_ID'] = sandboxEnv['ONBOARDING_SESSION_ID'];
+          writeEnvFile(resolve(repoRoot, '.env'), sync);
+          return { ...rootEnv, ...sandboxEnv };
+        }
+      } catch {
+        // Sandbox not reachable
       }
-    } catch {
-      // Sandbox not reachable — use repo .env result only
     }
-    return c.json({ complete: false });
+    return rootEnv;
   }
+  // Docker/installed mode
+  return getSandboxEnv();
+}
 
-  // Installed/local Docker mode: read from sandbox secret store
-  const env = await getSandboxEnv();
-  const complete = env['ONBOARDING_COMPLETE'] === 'true';
-  return c.json({ complete });
+/**
+ * Helper: write onboarding env keys to repo .env or sandbox secret store.
+ */
+async function setOnboardingEnv(entries: Record<string, string>): Promise<boolean> {
+  const repoRoot = findRepoRoot();
+  if (repoRoot) {
+    writeEnvFile(resolve(repoRoot, '.env'), entries);
+    return true;
+  }
+  try {
+    await setSandboxEnv(entries, false);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * GET /v1/setup/onboarding-status
+ * Returns { complete, session_id? } — the frontend uses session_id to resume
+ * an existing onboarding session instead of creating a new one.
+ */
+setupApp.get('/onboarding-status', async (c) => {
+  try {
+    const env = await getOnboardingEnv();
+    const complete = env['ONBOARDING_COMPLETE'] === 'true';
+    const sessionId = env['ONBOARDING_SESSION_ID'] || null;
+    return c.json({ complete, session_id: sessionId });
+  } catch {
+    return c.json({ complete: false, session_id: null });
+  }
+});
+
+/**
+ * POST /v1/setup/onboarding-session
+ * Store the onboarding session ID so it persists across page reloads.
+ * Called by the frontend when it creates the onboarding session.
+ * Body: { session_id: string }
+ */
+setupApp.post('/onboarding-session', async (c) => {
+  try {
+    const body = await c.req.json<{ session_id: string }>();
+    if (!body.session_id) return c.json({ ok: false, error: 'Missing session_id' }, 400);
+    const ok = await setOnboardingEnv({ ONBOARDING_SESSION_ID: body.session_id });
+    return ok ? c.json({ ok: true }) : c.json({ ok: false, error: 'Failed to persist' }, 500);
+  } catch (e: any) {
+    return c.json({ ok: false, error: e?.message || String(e) }, 500);
+  }
 });
 
 /**
  * POST /v1/setup/onboarding-complete
- * Mark onboarding as complete (called by the onboarding tool or frontend)
+ * Mark onboarding as complete (called by the onboarding tool or frontend).
+ * Optionally accepts { session_id } in body to store it alongside completion.
  */
 setupApp.post('/onboarding-complete', async (c) => {
-  const repoRoot = findRepoRoot();
-
-  // Repo/dev mode: write to repo .env
-  if (repoRoot) {
-    const rootEnvPath = resolve(repoRoot, '.env');
-    writeEnvFile(rootEnvPath, { ONBOARDING_COMPLETE: 'true' });
-    return c.json({ ok: true });
-  }
-
-  // Installed/local Docker mode: write to sandbox secret store (no restart)
   try {
-    await setSandboxEnv({ ONBOARDING_COMPLETE: 'true' }, false);
-    return c.json({ ok: true });
+    const entries: Record<string, string> = { ONBOARDING_COMPLETE: 'true' };
+    try {
+      const body = await c.req.json<{ session_id?: string }>();
+      if (body?.session_id) entries['ONBOARDING_SESSION_ID'] = body.session_id;
+    } catch {
+      // No body or invalid JSON — that's fine, just mark complete
+    }
+    const ok = await setOnboardingEnv(entries);
+    return ok ? c.json({ ok: true }) : c.json({ ok: false, error: 'Failed to persist' }, 500);
   } catch (e: any) {
-    return c.json(
-      { ok: false, error: 'Failed to mark onboarding complete', details: e?.message || String(e) },
-      500,
-    );
+    return c.json({ ok: false, error: e?.message || String(e) }, 500);
   }
 });

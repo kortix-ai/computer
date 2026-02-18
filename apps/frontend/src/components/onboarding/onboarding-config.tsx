@@ -17,7 +17,7 @@ export const onboardingSteps: OnboardingStep[] = [
     description: 'Introduction from our CEO',
     content: <CEOIntroStep />,
     canSkip: false,
-    actionLabel: 'Get Started'
+    actionLabel: 'Launch Your Kortix'
   },
   {
     id: 'user-type',
