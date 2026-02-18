@@ -99,7 +99,14 @@ COPY sandbox/browser-viewer/ /opt/agent-browser-viewer/
 # Initial install for Docker image; postinstall.sh handles version updates.
 # npm installs the glibc binary by default; force-install the musl variant
 # and symlink it over the glibc one so the wrapper script finds it.
+# Falls back to "latest" if the pinned version isn't on npm yet (e.g. Docker
+# build runs before or without CLI publish).
 RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['@kortix/opencode-ai']||'latest')" 2>/dev/null || echo "latest") \
+    && echo "Attempting CLI install @kortix/opencode-ai@$CLI_VERSION..." \
+    && if ! npm view "@kortix/opencode-ai@$CLI_VERSION" version >/dev/null 2>&1; then \
+         echo "Version $CLI_VERSION not on npm — falling back to latest"; \
+         CLI_VERSION="latest"; \
+       fi \
     && npm install -g "@kortix/opencode-ai@$CLI_VERSION" \
     && ARCH=$(uname -m) \
     && if [ "$ARCH" = "x86_64" ]; then \

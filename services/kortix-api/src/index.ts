@@ -23,7 +23,7 @@ import { secretsApp } from './secrets/routes';
 
 const app = new Hono();
 
-// === Global Middleware ===
+// === Global Middleware === 
 
 app.use(
   '*',
@@ -226,7 +226,7 @@ console.log(`
 ╚═══════════════════════════════════════════════════════════╝
 `);
 
-startScheduler();
+startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
 startChannelService();
 
 // Graceful shutdown

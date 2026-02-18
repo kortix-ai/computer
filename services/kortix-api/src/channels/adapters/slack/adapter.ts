@@ -368,7 +368,7 @@ export class SlackAdapter extends BaseAdapter {
       sandboxId: sandboxId || null,
       accountId: resolvedAccountId,
     });
-    const scopes = 'chat:write,chat:write.customize,reactions:read,reactions:write,app_mentions:read,im:history,im:write,channels:history,channels:read,channels:join,channels:manage,groups:history,mpim:history,commands,files:read,files:write,links:read,links:write,users:read,users:read.email,users.profile:read,search:read.public,search:read.files,search:read.users,pins:read,pins:write,usergroups:read,bookmarks:read,bookmarks:write,reminders:write,reminders:read,dnd:read,team:read,emoji:read';
+    const scopes = 'chat:write,chat:write.customize,reactions:read,reactions:write,app_mentions:read,im:history,im:write,channels:history,channels:read,channels:join,channels:manage,groups:history,mpim:history,commands,files:read,files:write,links:read,links:write,users:read,users:read.email,users.profile:read,search:read.public,search:read.files,search:read.users,pins:read,pins:write,usergroups:read,bookmarks:read,bookmarks:write,dnd:read,team:read,emoji:read';
 
     const slackUrl = new URL('https://slack.com/oauth/v2/authorize');
     slackUrl.searchParams.set('client_id', clientId);

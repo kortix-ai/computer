@@ -8,6 +8,7 @@ import {
   incrementSandboxFail,
   resetSandboxFail,
   markInitialCheckDone,
+  setSandboxVersion,
 } from '@/stores/sandbox-connection-store';
 import { getSupabaseAccessToken } from '@/lib/auth-token';
 
@@ -53,6 +54,7 @@ export function useSandboxConnection() {
   const abortRef = useRef<AbortController | null>(null);
   const prevServerVersionRef = useRef(serverVersion);
   const portsFetchedRef = useRef(false);
+  const versionFetchedRef = useRef(false);
 
   useEffect(() => {
     const isServerSwitch = serverVersion !== prevServerVersionRef.current;
@@ -64,6 +66,8 @@ export function useSandboxConnection() {
         setSandboxStatus('connecting');
       }
       portsFetchedRef.current = false; // re-fetch ports for new server
+      versionFetchedRef.current = false; // re-fetch version for new server
+      setSandboxVersion(null);
     }
     resetSandboxFail();
 
@@ -123,6 +127,23 @@ export function useSandboxConnection() {
               }
             }
           } catch { /* non-critical — proxy fallback still works */ }
+        }
+
+        // Fetch sandbox version from /kortix/health once on connect
+        if (!versionFetchedRef.current) {
+          versionFetchedRef.current = true;
+          try {
+            const hRes = await fetch(`${url}/kortix/health`, {
+              signal: AbortSignal.timeout(3000),
+              headers,
+            });
+            if (hRes.ok) {
+              const hData = await hRes.json();
+              if (hData.version) {
+                setSandboxVersion(hData.version);
+              }
+            }
+          } catch { /* non-critical */ }
         }
       } catch {
         if (!alive) return;

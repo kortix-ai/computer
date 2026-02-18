@@ -549,38 +549,6 @@ export class SlackApi {
   }
 
 
-  async remindersAdd(
-    text: string,
-    time: string,
-    user?: string,
-  ): Promise<{
-    ok: boolean;
-    reminder?: { id: string; text: string; time: number };
-    error?: string;
-  }> {
-    const body: Record<string, string> = { text, time };
-    if (user) body.user = user;
-    const res = await fetch(`${SLACK_API}/reminders.add`, {
-      method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify(body),
-    });
-    return res.json() as Promise<any>;
-  }
-
-  async remindersList(): Promise<{
-    ok: boolean;
-    reminders?: Array<{ id: string; text: string; time: number; complete_ts: number }>;
-    error?: string;
-  }> {
-    const res = await fetch(`${SLACK_API}/reminders.list`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${this.botToken}` },
-    });
-    return res.json() as Promise<any>;
-  }
-
-
   async dndInfo(user?: string): Promise<{
     ok: boolean;
     dnd_enabled?: boolean;

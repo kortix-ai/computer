@@ -6,6 +6,7 @@ import { triggers, sandboxes, executions } from '@kortix/db';
 import { NotFoundError, ValidationError } from '../../errors';
 import { executeTrigger } from '../services/opencode';
 import { isValidCronExpression, getNextRun } from '../services/cron';
+import { schedulePgCronJob, unschedulePgCronJob } from '../services/scheduler';
 import type { AppEnv } from '../../types';
 
 const app = new Hono<AppEnv>();
@@ -20,6 +21,8 @@ const createTriggerSchema = z.object({
   }),
   timezone: z.string().default('UTC'),
   agent_name: z.string().optional(),
+  model_provider_id: z.string().max(255).optional(),
+  model_id: z.string().max(255).optional(),
   prompt: z.string().min(1),
   session_mode: z.enum(['new', 'reuse']).default('new'),
   session_id: z.string().optional(),
@@ -41,6 +44,8 @@ const updateTriggerSchema = z.object({
     .optional(),
   timezone: z.string().optional(),
   agent_name: z.string().nullable().optional(),
+  model_provider_id: z.string().max(255).nullable().optional(),
+  model_id: z.string().max(255).nullable().optional(),
   prompt: z.string().min(1).optional(),
   session_mode: z.enum(['new', 'reuse']).optional(),
   session_id: z.string().nullable().optional(),
@@ -52,7 +57,7 @@ const updateTriggerSchema = z.object({
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
-// POST /v1/triggers - Create a cron trigger
+// POST /v1/triggers - Create trigger
 app.post('/', async (c) => {
   const userId = c.get('userId') as string;
   const body = await c.req.json();
@@ -62,7 +67,6 @@ app.post('/', async (c) => {
     throw new ValidationError(parsed.error.issues.map((i) => i.message).join(', '));
   }
 
-  // Verify sandbox ownership
   const [sandbox] = await db
     .select()
     .from(sandboxes)
@@ -84,6 +88,8 @@ app.post('/', async (c) => {
       cronExpr: parsed.data.cron_expr,
       timezone: parsed.data.timezone,
       agentName: parsed.data.agent_name ?? null,
+      modelProviderId: parsed.data.model_provider_id ?? null,
+      modelId: parsed.data.model_id ?? null,
       prompt: parsed.data.prompt,
       sessionMode: parsed.data.session_mode,
       sessionId: parsed.data.session_id ?? null,
@@ -94,26 +100,24 @@ app.post('/', async (c) => {
     })
     .returning();
 
+  // Schedule pg_cron job
+  await schedulePgCronJob(trigger.triggerId, trigger.cronExpr).catch((err) =>
+    console.error(`[triggers] Failed to schedule pg_cron job for ${trigger.triggerId}:`, err),
+  );
+
   return c.json({ success: true, data: trigger }, 201);
 });
 
-// GET /v1/triggers - List triggers (filter by sandbox, active)
+// GET /v1/triggers - List triggers
 app.get('/', async (c) => {
   const userId = c.get('userId') as string;
   const sandboxId = c.req.query('sandbox_id');
   const active = c.req.query('active');
 
   const conditions = [eq(triggers.accountId, userId)];
-
-  if (sandboxId) {
-    conditions.push(eq(triggers.sandboxId, sandboxId));
-  }
-
-  if (active === 'true') {
-    conditions.push(eq(triggers.isActive, true));
-  } else if (active === 'false') {
-    conditions.push(eq(triggers.isActive, false));
-  }
+  if (sandboxId) conditions.push(eq(triggers.sandboxId, sandboxId));
+  if (active === 'true') conditions.push(eq(triggers.isActive, true));
+  else if (active === 'false') conditions.push(eq(triggers.isActive, false));
 
   const results = await db
     .select()
@@ -124,7 +128,7 @@ app.get('/', async (c) => {
   return c.json({ success: true, data: results, total: results.length });
 });
 
-// GET /v1/triggers/:id - Get trigger details
+// GET /v1/triggers/:id
 app.get('/:id', async (c) => {
   const userId = c.get('userId') as string;
   const triggerId = c.req.param('id');
@@ -134,10 +138,7 @@ app.get('/:id', async (c) => {
     .from(triggers)
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)));
 
-  if (!trigger) {
-    throw new NotFoundError('Trigger', triggerId);
-  }
-
+  if (!trigger) throw new NotFoundError('Trigger', triggerId);
   return c.json({ success: true, data: trigger });
 });
 
@@ -152,20 +153,19 @@ app.patch('/:id', async (c) => {
     throw new ValidationError(parsed.error.issues.map((i) => i.message).join(', '));
   }
 
-  // Get current trigger to compute next run if cron changed
   const [current] = await db
     .select()
     .from(triggers)
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)));
 
-  if (!current) {
-    throw new NotFoundError('Trigger', triggerId);
-  }
+  if (!current) throw new NotFoundError('Trigger', triggerId);
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
   if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
   if (parsed.data.agent_name !== undefined) updateData.agentName = parsed.data.agent_name;
+  if (parsed.data.model_provider_id !== undefined) updateData.modelProviderId = parsed.data.model_provider_id;
+  if (parsed.data.model_id !== undefined) updateData.modelId = parsed.data.model_id;
   if (parsed.data.prompt !== undefined) updateData.prompt = parsed.data.prompt;
   if (parsed.data.session_mode !== undefined) updateData.sessionMode = parsed.data.session_mode;
   if (parsed.data.session_id !== undefined) updateData.sessionId = parsed.data.session_id;
@@ -174,7 +174,6 @@ app.patch('/:id', async (c) => {
   if (parsed.data.timeout_ms !== undefined) updateData.timeoutMs = parsed.data.timeout_ms;
   if (parsed.data.metadata !== undefined) updateData.metadata = parsed.data.metadata;
 
-  // Recompute next run if cron expression or timezone changed
   const cronExpr = parsed.data.cron_expr ?? current.cronExpr;
   const timezone = parsed.data.timezone ?? current.timezone;
   if (parsed.data.cron_expr !== undefined) updateData.cronExpr = parsed.data.cron_expr;
@@ -190,10 +189,21 @@ app.patch('/:id', async (c) => {
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)))
     .returning();
 
+  // Reschedule pg_cron if cron changed or re-activated
+  if (updated.isActive) {
+    await schedulePgCronJob(updated.triggerId, updated.cronExpr).catch((err) =>
+      console.error(`[triggers] Failed to reschedule pg_cron job for ${triggerId}:`, err),
+    );
+  } else {
+    await unschedulePgCronJob(triggerId).catch((err) =>
+      console.error(`[triggers] Failed to unschedule pg_cron job for ${triggerId}:`, err),
+    );
+  }
+
   return c.json({ success: true, data: updated });
 });
 
-// DELETE /v1/triggers/:id - Delete trigger
+// DELETE /v1/triggers/:id
 app.delete('/:id', async (c) => {
   const userId = c.get('userId') as string;
   const triggerId = c.req.param('id');
@@ -203,14 +213,17 @@ app.delete('/:id', async (c) => {
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)))
     .returning();
 
-  if (!deleted) {
-    throw new NotFoundError('Trigger', triggerId);
-  }
+  if (!deleted) throw new NotFoundError('Trigger', triggerId);
+
+  // Remove pg_cron job
+  await unschedulePgCronJob(triggerId).catch((err) =>
+    console.error(`[triggers] Failed to unschedule pg_cron job for ${triggerId}:`, err),
+  );
 
   return c.json({ success: true, message: 'Trigger deleted' });
 });
 
-// POST /v1/triggers/:id/pause - Pause trigger
+// POST /v1/triggers/:id/pause
 app.post('/:id/pause', async (c) => {
   const userId = c.get('userId') as string;
   const triggerId = c.req.param('id');
@@ -221,27 +234,27 @@ app.post('/:id/pause', async (c) => {
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)))
     .returning();
 
-  if (!updated) {
-    throw new NotFoundError('Trigger', triggerId);
-  }
+  if (!updated) throw new NotFoundError('Trigger', triggerId);
+
+  // Remove pg_cron job
+  await unschedulePgCronJob(triggerId).catch((err) =>
+    console.error(`[triggers] Failed to unschedule pg_cron job for ${triggerId}:`, err),
+  );
 
   return c.json({ success: true, data: updated });
 });
 
-// POST /v1/triggers/:id/resume - Resume trigger
+// POST /v1/triggers/:id/resume
 app.post('/:id/resume', async (c) => {
   const userId = c.get('userId') as string;
   const triggerId = c.req.param('id');
 
-  // Get current to recompute next run
   const [current] = await db
     .select()
     .from(triggers)
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)));
 
-  if (!current) {
-    throw new NotFoundError('Trigger', triggerId);
-  }
+  if (!current) throw new NotFoundError('Trigger', triggerId);
 
   const nextRun = getNextRun(current.cronExpr, current.timezone);
 
@@ -251,34 +264,33 @@ app.post('/:id/resume', async (c) => {
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)))
     .returning();
 
+  // Schedule pg_cron job
+  await schedulePgCronJob(updated!.triggerId, updated!.cronExpr).catch((err) =>
+    console.error(`[triggers] Failed to schedule pg_cron job for ${triggerId}:`, err),
+  );
+
   return c.json({ success: true, data: updated });
 });
 
-// POST /v1/triggers/:id/run - Manual trigger (fire immediately)
+// POST /v1/triggers/:id/run - Manual fire
 app.post('/:id/run', async (c) => {
   const userId = c.get('userId') as string;
   const triggerId = c.req.param('id');
 
-  // Get trigger with sandbox info
   const [trigger] = await db
     .select()
     .from(triggers)
     .where(and(eq(triggers.triggerId, triggerId), eq(triggers.accountId, userId)));
 
-  if (!trigger) {
-    throw new NotFoundError('Trigger', triggerId);
-  }
+  if (!trigger) throw new NotFoundError('Trigger', triggerId);
 
   const [sandbox] = await db
     .select()
     .from(sandboxes)
     .where(eq(sandboxes.sandboxId, trigger.sandboxId));
 
-  if (!sandbox) {
-    throw new NotFoundError('Sandbox', trigger.sandboxId);
-  }
+  if (!sandbox) throw new NotFoundError('Sandbox', trigger.sandboxId);
 
-  // Create execution record
   const [execution] = await db
     .insert(executions)
     .values({
@@ -290,9 +302,11 @@ app.post('/:id/run', async (c) => {
     })
     .returning();
 
-  // Execute asynchronously — respond immediately
+  // Execute async — respond immediately
   executeTrigger(sandbox, trigger.prompt, {
     agentName: trigger.agentName ?? undefined,
+    modelProviderId: trigger.modelProviderId ?? undefined,
+    modelId: trigger.modelId ?? undefined,
     sessionMode: trigger.sessionMode as 'new' | 'reuse',
     sessionId: trigger.sessionId,
     timeoutMs: trigger.timeoutMs,

@@ -220,7 +220,7 @@ else
   fail "no git clone/pull (Docker-only)"
 fi
 
-if grep -q 'kortixmarko/kortix-frontend' "$SCRIPT" && grep -q 'kortixmarko/kortix-api' "$SCRIPT"; then
+if grep -q 'kortix/kortix-frontend' "$SCRIPT" && grep -q 'kortix/kortix-api' "$SCRIPT"; then
   pass "uses pre-built Docker images"
 else
   fail "uses pre-built Docker images"

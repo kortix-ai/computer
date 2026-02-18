@@ -13,6 +13,7 @@ import type {
   CreateSandboxOpts,
   ProvisionResult,
   SandboxStatus,
+  ResolvedEndpoint,
 } from './index';
 
 export class DaytonaProvider implements SandboxProvider {
@@ -84,5 +85,30 @@ export class DaytonaProvider implements SandboxProvider {
     } catch {
       return 'unknown';
     }
+  }
+
+  async resolveEndpoint(externalId: string): Promise<ResolvedEndpoint> {
+    const daytona = getDaytona();
+    const sandbox = await daytona.get(externalId);
+    const link = await (sandbox as any).getPreviewLink(8000);
+    const url = (link.url || String(link)).replace(/\/$/, '');
+    const token = link.token || null;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Daytona-Skip-Preview-Warning': 'true',
+      'X-Daytona-Disable-CORS': 'true',
+    };
+    if (token) {
+      headers['X-Daytona-Preview-Token'] = token;
+    }
+    return { url, headers };
+  }
+
+  async ensureRunning(externalId: string): Promise<void> {
+    const status = await this.getStatus(externalId);
+    if (status === 'running') return;
+    console.log(`[DAYTONA] Sandbox ${externalId} is ${status}, waking up...`);
+    await this.start(externalId);
   }
 }

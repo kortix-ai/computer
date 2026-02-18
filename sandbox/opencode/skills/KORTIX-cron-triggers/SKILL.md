@@ -5,14 +5,25 @@ description: "Cron trigger management for scheduled agent execution. Use when th
 
 # Cron Trigger Service
 
-The Kortix Cron service runs outside the sandbox as a platform service. It manages scheduled triggers that fire agents inside sandboxes on cron schedules.
+The Kortix Cron service runs outside the sandbox as a platform service. It manages scheduled triggers that fire agents inside sandboxes on cron schedules using **pg_cron** — each trigger gets its own PostgreSQL-native cron job.
 
 ## Architecture
 
-- **Service**: `kortix-api` (Bun + Hono) running at port 8008
+- **Service**: `kortix-api` (Bun + Hono)
 - **Database**: `kortix` schema in Supabase PostgreSQL (Drizzle ORM)
-- **Scheduler**: Polling loop (1s tick) that checks for due triggers
-- **Executor**: Calls OpenCode API inside sandbox to create sessions and send prompts
+- **Scheduler**: **pg_cron** — each trigger = one `cron.schedule()` job. No polling, no application-level timers.
+- **Executor**: Provider-agnostic. Uses `SandboxProvider.resolveEndpoint()` to reach the sandbox, then calls OpenCode `POST /session/:id/prompt_async`.
+- **Auth**: `CRON_TICK_SECRET` header for pg_cron→API, user JWT for all CRUD operations.
+
+## How It Works
+
+1. User creates a trigger via API or UI
+2. Backend calls `cron.schedule()` to create a pg_cron job
+3. pg_cron fires at the scheduled time → calls `pg_net.http_post()` to `POST /v1/cron/tick/trigger/:id/execute`
+4. Tick endpoint validates `x-cron-secret` header, fetches trigger + sandbox from DB
+5. Executor calls `SandboxProvider.ensureRunning()` + `resolveEndpoint()` (provider-agnostic — works with Daytona, local Docker, VPS)
+6. Creates OpenCode session and sends prompt via `POST /session/:id/prompt_async` (fire-and-forget, 204 response)
+7. Execution result recorded in `kortix.executions` table
 
 ## Cron Expression Format
 
@@ -29,11 +40,12 @@ The Kortix Cron service runs outside the sandbox as a platform service. It manag
 * * * * * *
 ```
 
+**Note**: pg_cron only supports 5-field expressions (no seconds). The seconds field is stripped internally via `toPgCronExpr()`. Minimum resolution is 1 minute.
+
 ### Common Patterns
 
 | Pattern | Expression |
 |---------|-----------|
-| Every 30 seconds | `*/30 * * * * *` |
 | Every 5 minutes | `0 */5 * * * *` |
 | Every hour | `0 0 * * * *` |
 | Daily at 9:00 AM | `0 0 9 * * *` |
@@ -44,37 +56,25 @@ The Kortix Cron service runs outside the sandbox as a platform service. It manag
 
 ## API Reference
 
-Base URL: `http://localhost:8008` (local) or the deployed service URL.
+Base URL: The platform API URL (e.g. `https://new-api.kortix.com` or `http://localhost:8008`).
 
-All `/v1/cron/*` endpoints require `Authorization: Bearer <supabase-jwt>`.
+All `/v1/cron/*` endpoints require `Authorization: Bearer <supabase-jwt>` (except tick endpoints which use `x-cron-secret`).
 
-### Sandbox Management
+**Authentication from inside the sandbox**: Use the `KORTIX_TOKEN` environment variable (available as `sbt_...`). The cron API accepts both Supabase JWTs (frontend) and `sbt_` sandbox tokens (agents).
 
 ```bash
-# Register a sandbox
-curl -X POST http://localhost:8008/v1/cron/sandboxes \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Local Sandbox",
-    "base_url": "http://localhost:8000",
-    "auth_token": "user:password"
-  }'
-
-# List sandboxes
-curl http://localhost:8008/v1/cron/sandboxes \
-  -H "Authorization: Bearer $TOKEN"
-
-# Check sandbox health
-curl -X POST http://localhost:8008/v1/cron/sandboxes/{id}/health \
-  -H "Authorization: Bearer $TOKEN"
+TOKEN="$KORTIX_TOKEN"
+# KORTIX_API_URL points to /v1/router — replace with /v1 to access cron routes
+CRON_URL="${KORTIX_API_URL%/router}"  # e.g. https://new-api.kortix.com/v1
 ```
+
+All examples below use `$CRON_URL` as the base (NOT `$KORTIX_API_URL` which includes `/router`).
 
 ### Trigger Management
 
 ```bash
 # Create a trigger - daily report at 9 AM UTC
-curl -X POST http://localhost:8008/v1/cron/triggers \
+curl -X POST "$CRON_URL/cron/triggers" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -82,80 +82,85 @@ curl -X POST http://localhost:8008/v1/cron/triggers \
     "name": "Daily Report",
     "cron_expr": "0 0 9 * * *",
     "timezone": "UTC",
-    "agent_name": "@kortix-main",
+    "agent_name": "kortix-main",
+    "model_provider_id": "kortix",
+    "model_id": "kortix/basic",
     "prompt": "Generate the daily status report and save it to /workspace/reports/",
     "session_mode": "new"
   }'
 
-# Create a trigger - every 5 minutes health check
-curl -X POST http://localhost:8008/v1/cron/triggers \
+# List triggers
+curl "$CRON_URL/cron/triggers" \
+  -H "Authorization: Bearer $TOKEN"
+
+# List triggers for a specific sandbox
+curl "$CRON_URL/cron/triggers?sandbox_id=UUID" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get a specific trigger
+curl "$CRON_URL/cron/triggers/{id}" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Update a trigger
+curl -X PATCH "$CRON_URL/cron/triggers/{id}" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "sandbox_id": "uuid-of-sandbox",
-    "name": "Health Monitor",
-    "cron_expr": "0 */5 * * * *",
-    "prompt": "Check system health and report any issues",
-    "session_mode": "new",
-    "timeout_ms": 60000
+    "prompt": "Updated prompt text",
+    "model_provider_id": "kortix",
+    "model_id": "kortix/power"
   }'
 
-# List triggers
-curl http://localhost:8008/v1/cron/triggers \
+# Pause a trigger (removes pg_cron job)
+curl -X POST "$CRON_URL/cron/triggers/{id}/pause" \
   -H "Authorization: Bearer $TOKEN"
 
-# Pause a trigger
-curl -X POST http://localhost:8008/v1/cron/triggers/{id}/pause \
-  -H "Authorization: Bearer $TOKEN"
-
-# Resume a trigger
-curl -X POST http://localhost:8008/v1/cron/triggers/{id}/resume \
+# Resume a trigger (re-creates pg_cron job)
+curl -X POST "$CRON_URL/cron/triggers/{id}/resume" \
   -H "Authorization: Bearer $TOKEN"
 
 # Fire a trigger immediately (manual run)
-curl -X POST http://localhost:8008/v1/cron/triggers/{id}/run \
+curl -X POST "$CRON_URL/cron/triggers/{id}/run" \
   -H "Authorization: Bearer $TOKEN"
 
 # Delete a trigger
-curl -X DELETE http://localhost:8008/v1/cron/triggers/{id} \
+curl -X DELETE "$CRON_URL/cron/triggers/{id}" \
   -H "Authorization: Bearer $TOKEN"
+```
+
+### Sandbox Discovery
+
+```bash
+# List available models on a sandbox
+curl "$CRON_URL/cron/sandboxes/{sandbox_id}/models" \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: { success: true, data: [{ id: "kortix", name: "kortix", models: [{ id: "kortix/basic", name: "Sonnet" }, ...] }] }
+
+# List available agents on a sandbox
+curl "$CRON_URL/cron/sandboxes/{sandbox_id}/agents" \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: { success: true, data: [{ name: "kortix-main", description: "...", mode: "primary" }, ...] }
 ```
 
 ### Execution History
 
 ```bash
 # List all executions
-curl "http://localhost:8008/v1/cron/executions?limit=20" \
+curl "$CRON_URL/cron/executions?limit=20" \
   -H "Authorization: Bearer $TOKEN"
 
 # Filter by status
-curl "http://localhost:8008/v1/cron/executions?status=failed" \
-  -H "Authorization: Bearer $TOKEN"
-
-# Filter by date range
-curl "http://localhost:8008/v1/cron/executions?since=2026-02-01T00:00:00Z&until=2026-02-11T00:00:00Z" \
+curl "$CRON_URL/cron/executions?status=failed" \
   -H "Authorization: Bearer $TOKEN"
 
 # Executions for a specific trigger
-curl http://localhost:8008/v1/cron/executions/by-trigger/{triggerId} \
+curl "$CRON_URL/cron/executions/by-trigger/{triggerId}" \
   -H "Authorization: Bearer $TOKEN"
 
 # Get execution details
-curl http://localhost:8008/v1/cron/executions/{id} \
+curl "$CRON_URL/cron/executions/{id}" \
   -H "Authorization: Bearer $TOKEN"
 ```
-
-### Health Check (no auth)
-
-```bash
-curl http://localhost:8008/health
-# Returns: { status, service, timestamp, scheduler: { running, tickCount, lastTick } }
-```
-
-## Session Modes
-
-- **`new`** (default): Creates a fresh OpenCode session for each trigger execution. Best for independent tasks.
-- **`reuse`**: Sends prompt to an existing session (specified by `session_id`). Best for ongoing monitoring or conversations that need context continuity.
 
 ## Trigger Properties
 
@@ -163,11 +168,56 @@ curl http://localhost:8008/health
 |-------|----------|-------------|
 | `sandbox_id` | Yes | UUID of the target sandbox |
 | `name` | Yes | Human-readable trigger name |
-| `cron_expr` | Yes | 6-field cron expression |
+| `cron_expr` | Yes | 6-field cron expression (seconds stripped for pg_cron) |
 | `prompt` | Yes | The prompt to send to the agent |
 | `timezone` | No | IANA timezone (default: UTC) |
-| `agent_name` | No | Target agent (e.g., `@kortix-main`) |
+| `agent_name` | No | Target agent name (e.g., `kortix-main`) |
+| `model_provider_id` | No | Model provider (e.g., `kortix`). Paired with `model_id`. |
+| `model_id` | No | Model ID (e.g., `kortix/basic` = Sonnet, `kortix/power` = Opus). If not set, defaults to `kortix/basic`. |
 | `session_mode` | No | `new` or `reuse` (default: `new`) |
 | `session_id` | No | Session ID for `reuse` mode |
 | `max_retries` | No | 0-10 (default: 0) |
-| `timeout_ms` | No | 1000-3600000 ms (default: 300000) |
+| `timeout_ms` | No | 1000-3600000 ms (default: 300000 = 5 min) |
+
+## Available Models
+
+| Provider ID | Model ID | Description |
+|------------|----------|-------------|
+| `kortix` | `kortix/basic` | Claude Sonnet (default) |
+| `kortix` | `kortix/power` | Claude Opus 4.6 |
+
+## Session Modes
+
+- **`new`** (default): Creates a fresh OpenCode session for each trigger execution. Best for independent tasks.
+- **`reuse`**: Sends prompt to an existing session (specified by `session_id`). Best for ongoing monitoring or conversations that need context continuity.
+
+## Self-Management Examples
+
+Agents can create and manage their own cron triggers from inside the sandbox:
+
+```bash
+# Get your sandbox ID (from env)
+SANDBOX_ID=$(curl -s "$CRON_URL/cron/sandboxes" -H "Authorization: Bearer $KORTIX_TOKEN" | jq -r '.data[0].sandboxId')
+
+# Schedule a daily backup at 2 AM
+curl -X POST "$CRON_URL/cron/triggers" \
+  -H "Authorization: Bearer $KORTIX_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"sandbox_id\": \"$SANDBOX_ID\",
+    \"name\": \"Daily Backup\",
+    \"cron_expr\": \"0 0 2 * * *\",
+    \"prompt\": \"Run the backup script at /workspace/scripts/backup.sh and verify the output\",
+    \"model_provider_id\": \"kortix\",
+    \"model_id\": \"kortix/basic\"
+  }"
+
+# List your triggers
+curl "$CRON_URL/cron/triggers?sandbox_id=$SANDBOX_ID" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
+
+# Check execution history for a trigger
+TRIGGER_ID="the-trigger-uuid"
+curl "$CRON_URL/cron/executions/by-trigger/$TRIGGER_ID" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
+```

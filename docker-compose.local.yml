@@ -73,7 +73,7 @@ services:
 
   # ─── Sandbox (AI Agent Environment) ────────────────────────────────────────
   sandbox:
-    image: kortixmarko/sandbox:${SANDBOX_VERSION:-latest}
+    image: kortix/computer:${SANDBOX_VERSION:-latest}
     container_name: kortix-sandbox
     cap_add:
       - SYS_ADMIN

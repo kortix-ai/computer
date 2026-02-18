@@ -341,7 +341,7 @@ export function useOpenCodeAgents() {
     queryKey: opencodeKeys.agents(),
     queryFn: async () => {
       const client = getClient();
-      const result = await client.agent.list();
+      const result = await client.app.agents();
       return unwrap(result);
     },
     staleTime: 5 * 60 * 1000,
@@ -354,7 +354,7 @@ export function useOpenCodeAgent(agentName: string) {
     queryKey: [...opencodeKeys.agents(), agentName],
     queryFn: async () => {
       const client = getClient();
-      const result = await client.agent.list();
+      const result = await client.app.agents();
       const agents = unwrap(result);
       return agents.find((a: Agent) => a.name === agentName);
     },

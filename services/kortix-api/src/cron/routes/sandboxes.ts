@@ -5,6 +5,7 @@ import { db } from '../../shared/db';
 import { sandboxes } from '@kortix/db';
 import { NotFoundError, ValidationError } from '../../errors';
 import { OpenCodeClient } from '../services/opencode';
+import { getProvider, type ProviderName, type ResolvedEndpoint } from '../../platform/providers';
 import type { AppEnv } from '../../types';
 
 const app = new Hono<AppEnv>();
@@ -165,6 +166,106 @@ app.post('/:id/health', async (c) => {
       baseUrl: sandbox.baseUrl,
     },
   });
+});
+
+// ─── Proxy: list models available on a sandbox ─────────────────────────────
+
+async function resolveSandboxEndpoint(sandbox: typeof sandboxes.$inferSelect): Promise<ResolvedEndpoint> {
+  const providerName = sandbox.provider as ProviderName;
+  const externalId = sandbox.externalId;
+
+  if (!externalId) {
+    return {
+      url: sandbox.baseUrl.replace(/\/$/, ''),
+      headers: { 'Content-Type': 'application/json' },
+    };
+  }
+
+  const provider = getProvider(providerName);
+  return provider.resolveEndpoint(externalId);
+}
+
+// GET /v1/sandboxes/:id/models — proxy to OpenCode /config/providers
+app.get('/:id/models', async (c) => {
+  const userId = c.get('userId') as string;
+  const sandboxId = c.req.param('id');
+
+  const [sandbox] = await db
+    .select()
+    .from(sandboxes)
+    .where(and(eq(sandboxes.sandboxId, sandboxId), eq(sandboxes.accountId, userId)));
+
+  if (!sandbox) throw new NotFoundError('Sandbox', sandboxId);
+
+  try {
+    const { url, headers } = await resolveSandboxEndpoint(sandbox);
+    const res = await fetch(`${url}/config/providers`, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      return c.json({ success: true, data: [] });
+    }
+
+    const data = await res.json() as Record<string, unknown>;
+    const rawProviders: unknown[] = Array.isArray(data) ? data : ((data.providers || []) as unknown[]);
+
+    const providers = rawProviders.map((p: any) => {
+      const modelsMap = p.models || {};
+      const models = Object.values(modelsMap).map((m: any) => ({
+        id: m.id || '',
+        name: m.name || m.id || '',
+      }));
+      return { id: p.id || '', name: p.name || p.id || '', models };
+    });
+
+    return c.json({ success: true, data: providers });
+  } catch (err) {
+    console.warn(`[sandboxes] Failed to fetch models for ${sandboxId}:`, err);
+    return c.json({ success: true, data: [] });
+  }
+});
+
+// GET /v1/sandboxes/:id/agents — proxy to OpenCode /agent
+app.get('/:id/agents', async (c) => {
+  const userId = c.get('userId') as string;
+  const sandboxId = c.req.param('id');
+
+  const [sandbox] = await db
+    .select()
+    .from(sandboxes)
+    .where(and(eq(sandboxes.sandboxId, sandboxId), eq(sandboxes.accountId, userId)));
+
+  if (!sandbox) throw new NotFoundError('Sandbox', sandboxId);
+
+  try {
+    const { url, headers } = await resolveSandboxEndpoint(sandbox);
+    const res = await fetch(`${url}/agent`, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      return c.json({ success: true, data: [] });
+    }
+
+    const data = await res.json();
+    const agents: unknown[] = Array.isArray(data) ? data : (data.agents || Object.values(data));
+
+    const result = agents.map((a: any) => ({
+      name: a.name || '',
+      description: a.description,
+      mode: a.mode,
+    }));
+
+    return c.json({ success: true, data: result });
+  } catch (err) {
+    console.warn(`[sandboxes] Failed to fetch agents for ${sandboxId}:`, err);
+    return c.json({ success: true, data: [] });
+  }
 });
 
 export { app as sandboxesRouter };

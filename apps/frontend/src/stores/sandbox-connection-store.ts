@@ -20,6 +20,8 @@ interface SandboxConnectionStore {
   reconnectAttempts: number;
   /** Timestamp when status changed to unreachable/connecting (for "down since") */
   disconnectedAt: number | null;
+  /** Current sandbox version from /kortix/health (e.g. "0.5.1") */
+  sandboxVersion: string | null;
 }
 
 export const useSandboxConnectionStore = create<SandboxConnectionStore>(() => ({
@@ -30,6 +32,7 @@ export const useSandboxConnectionStore = create<SandboxConnectionStore>(() => ({
   wasConnected: false,
   reconnectAttempts: 0,
   disconnectedAt: null,
+  sandboxVersion: null,
 }));
 
 // ── Static actions (stable references, no re-render loops) ──
@@ -94,4 +97,10 @@ export function resetSandboxFail() {
   const { failCount } = useSandboxConnectionStore.getState();
   if (failCount === 0) return; // no-op — avoids unnecessary re-renders
   useSandboxConnectionStore.setState({ failCount: 0 });
+}
+
+export function setSandboxVersion(version: string | null) {
+  const current = useSandboxConnectionStore.getState().sandboxVersion;
+  if (current === version) return;
+  useSandboxConnectionStore.setState({ sandboxVersion: version });
 }

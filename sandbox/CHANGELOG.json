@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.5.2",
+    "date": "2026-02-17",
+    "title": "Update UI, Docker images & release pipeline",
+    "description": "Frontend update banner and changelog page, multi-platform Docker images on Docker Hub, hardened release script with artifact tracking and idempotent publish.",
+    "changes": [
+      { "type": "feature", "text": "Update banner — see what's new before updating, dismiss per version" },
+      { "type": "feature", "text": "Changelog page at /changelog — full version history with artifact checklist" },
+      { "type": "feature", "text": "Sidebar update indicator in the left panel" },
+      { "type": "improvement", "text": "Docker images rebuilt multi-platform (amd64 + arm64) on Docker Hub" },
+      { "type": "improvement", "text": "Release script checks all prerequisites upfront and tracks artifacts" },
+      { "type": "improvement", "text": "Idempotent CLI publish — resumes safely after partial failures" },
+      { "type": "improvement", "text": "Dockerfile falls back to latest CLI if pinned version not yet on npm" }
+    ],
+    "artifacts": [
+      { "name": "@kortix/opencode-ai@0.5.2", "target": "npm" },
+      { "name": "@kortix/opencode-sdk@0.5.2", "target": "npm" },
+      { "name": "@kortix/sandbox@0.5.2", "target": "npm" },
+      { "name": "v0.5.2", "target": "github-release" },
+      { "name": "kortix/computer:0.5.2", "target": "docker-hub" },
+      { "name": "kortix/kortix-api:0.5.2", "target": "docker-hub" },
+      { "name": "kortix/kortix-frontend:0.5.2", "target": "docker-hub" },
+      { "name": "kortix-sandbox-v0.5.2", "target": "daytona" }
+    ]
+  },
+  {
+    "version": "0.5.1",
+    "date": "2026-02-17",
+    "title": "Docker image refresh",
+    "description": "Rebuilt all Docker images with v0.5.0 code baked in. Frontend now shows changelog preview, API serves changelog data, sandbox includes CHANGELOG.json.",
+    "changes": [
+      { "type": "improvement", "text": "Docker images rebuilt with changelog UI and unified versioning" },
+      { "type": "improvement", "text": "Frontend shows what's new before updating" },
+      { "type": "improvement", "text": "API serves changelog from GitHub for update checks" }
+    ],
+    "artifacts": [
+      { "name": "@kortix/opencode-ai@0.5.1", "target": "npm" },
+      { "name": "v0.5.1", "target": "github-release" }
+    ]
+  },
+  {
     "version": "0.5.0",
     "date": "2026-02-17",
     "title": "Unified versioning & upstream sync",
@@ -15,6 +55,12 @@
       { "type": "fix", "text": "Removed stale build version from health endpoint" },
       { "type": "fix", "text": "Fixed agent-browser version conflict (aligned to ^0.10.0)" },
       { "type": "upstream", "text": "Synced with OpenCode v1.2.6 (Database/Drizzle migration, 145 commits)" }
+    ],
+    "artifacts": [
+      { "name": "@kortix/opencode-ai@0.5.0", "target": "npm" },
+      { "name": "@kortix/opencode-sdk@0.5.0", "target": "npm" },
+      { "name": "@kortix/sandbox@0.5.0", "target": "npm" },
+      { "name": "v0.5.0", "target": "github-release" }
     ]
   },
   {

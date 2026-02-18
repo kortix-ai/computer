@@ -13,16 +13,16 @@ export function FileBreadcrumbs() {
   const projectName = project?.name || project?.worktree?.split('/').pop() || 'Project';
 
   // Split the path into segments
-  const segments =
-    currentPath === '.' || currentPath === ''
-      ? []
-      : currentPath.split('/').filter(Boolean);
+  const isRoot = currentPath === '/' || currentPath === '.' || currentPath === '';
+  const segments = isRoot
+    ? []
+    : currentPath.split('/').filter(Boolean);
 
   return (
     <nav className="flex items-center gap-1 text-sm min-w-0 overflow-x-auto">
       {/* Root */}
       <button
-        onClick={() => navigateToPath('.')}
+        onClick={() => navigateToPath('/')}
         className={cn(
           'flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-pointer shrink-0',
           'hover:bg-muted',
@@ -32,12 +32,12 @@ export function FileBreadcrumbs() {
         )}
       >
         <FolderRoot className="h-3.5 w-3.5" />
-        <span className="truncate max-w-[120px]">{projectName}</span>
+        <span className="truncate max-w-[120px]">/</span>
       </button>
 
       {segments.map((segment, index) => {
         const isLast = index === segments.length - 1;
-        const pathToHere = segments.slice(0, index + 1).join('/');
+        const pathToHere = '/' + segments.slice(0, index + 1).join('/');
 
         return (
           <div key={pathToHere} className="flex items-center gap-1 min-w-0">

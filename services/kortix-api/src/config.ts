@@ -73,7 +73,7 @@ export const config = {
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: process.env.KORTIX_URL || '',
   SANDBOX_PROVIDER: (process.env.SANDBOX_PROVIDER || 'auto') as SandboxProviderType,
-  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'kortixmarko/sandbox:latest',
+  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'kortix/computer:latest',
   DOCKER_HOST: process.env.DOCKER_HOST || '',
   SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
   /**
@@ -83,8 +83,11 @@ export const config = {
   SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
 
   // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
-  SCHEDULER_TICK_INTERVAL_MS: parseInt(process.env.SCHEDULER_TICK_INTERVAL_MS || '1000', 10),
   SCHEDULER_ENABLED: process.env.SCHEDULER_ENABLED !== 'false',
+  /** If set, enables pg_cron mode: external ticks via POST /v1/cron/tick with this secret */
+  CRON_TICK_SECRET: process.env.CRON_TICK_SECRET || '',
+  /** URL pg_cron uses to call the tick endpoint */
+  CRON_API_URL: process.env.CRON_API_URL || '',
 
   // ─── Channels ───────────────────────────────────────────────────────────────
   CHANNELS_ENABLED: process.env.CHANNELS_ENABLED !== 'false',

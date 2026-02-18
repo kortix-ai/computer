@@ -343,12 +343,18 @@ export interface ChangelogChange {
   text: string;
 }
 
+export interface ChangelogArtifact {
+  name: string;
+  target: 'npm' | 'docker-hub' | 'github-release' | 'daytona';
+}
+
 export interface ChangelogEntry {
   version: string;
   date: string;
   title: string;
   description: string;
   changes: ChangelogChange[];
+  artifacts?: ChangelogArtifact[];
 }
 
 export interface SandboxVersionInfo {
@@ -377,6 +383,19 @@ export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
   });
   if (!res.ok) throw new Error(`Version check failed: ${res.status}`);
   return res.json();
+}
+
+/**
+ * Get the full changelog history from the platform.
+ * Returns all changelog entries (newest first).
+ */
+export async function getFullChangelog(): Promise<ChangelogEntry[]> {
+  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version/changelog`, {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Changelog fetch failed: ${res.status}`);
+  const data = await res.json();
+  return data.changelog ?? [];
 }
 
 /**

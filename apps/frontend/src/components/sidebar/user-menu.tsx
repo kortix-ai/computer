@@ -20,6 +20,7 @@ import {
   BarChart3,
   TrendingDown,
   MessageSquare,
+  Calendar,
   Heart,
   ChevronRight,
   LifeBuoy,
@@ -148,6 +149,7 @@ export function UserMenu({ user }: UserMenuProps) {
         { icon: SlidersHorizontal, label: 'Configuration', href: '/configuration' },
         { icon: Sparkles, label: 'Skills', href: '/skills' },
         { icon: MessageSquare, label: 'Channels', href: '/channels' },
+        { icon: Calendar, label: 'Scheduled Tasks', href: '/scheduled-tasks' },
         { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
       ];
 

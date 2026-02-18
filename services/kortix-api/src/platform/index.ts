@@ -9,7 +9,7 @@ import { apiKeysRouter } from './routes/api-keys';
 
 const platformApp = new Hono();
 
-// Sandbox version (no auth — npm registry lookup)
+// Sandbox version (no auth — npm registry lookup) 
 // Full path: /v1/platform/sandbox/version
 platformApp.route('/sandbox/version', versionRouter);
 

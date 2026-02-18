@@ -88,6 +88,10 @@ const MaintenanceCountdownBanner = lazy(() =>
   import('@/components/announcements/maintenance-countdown-banner').then(mod => ({ default: mod.MaintenanceCountdownBanner }))
 );
 
+const UpdateBanner = lazy(() =>
+  import('@/components/announcements/update-banner').then(mod => ({ default: mod.UpdateBanner }))
+);
+
 const CommandPalette = lazy(() =>
   import('@/components/command-palette').then(mod => ({ default: mod.CommandPalette }))
 );
@@ -400,6 +404,9 @@ export default function DashboardLayoutContent({
         
         <Suspense fallback={null}>
           <CommandPalette />
+        </Suspense>
+        <Suspense fallback={null}>
+          <UpdateBanner />
         </Suspense>
         <Suspense fallback={null}>
           <OnboardingProvider>

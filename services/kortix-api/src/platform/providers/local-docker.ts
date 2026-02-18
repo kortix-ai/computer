@@ -20,6 +20,7 @@ import type {
   CreateSandboxOpts,
   ProvisionResult,
   SandboxStatus,
+  ResolvedEndpoint,
 } from './index';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -107,12 +108,6 @@ export class LocalDockerProvider implements SandboxProvider {
 
   // ── Core: get-or-create the single sandbox ──────────────────────────────
 
-  /**
-   * Ensure the sandbox is running. Idempotent:
-   *   - If `kortix-sandbox` exists and is running → return it
-   *   - If it exists but is stopped → start it
-   *   - If it doesn't exist → create and start it
-   */
   async ensure(): Promise<SandboxInfo> {
     const existing = await this.find();
 
@@ -120,23 +115,17 @@ export class LocalDockerProvider implements SandboxProvider {
       if (existing.status === 'running') {
         return existing;
       }
-      // Stopped — start it
       console.log(`[LOCAL-DOCKER] Starting stopped sandbox...`);
       const container = this.docker.getContainer(existing.containerId);
       await container.start();
       return this.getSandboxInfo();
     }
 
-    // No container — create one
     console.log(`[LOCAL-DOCKER] Creating sandbox (image: ${config.SANDBOX_IMAGE})...`);
     await this.createContainer();
     return this.getSandboxInfo();
   }
 
-  /**
-   * Find the `kortix-sandbox` container (running or stopped).
-   * Returns null if it doesn't exist.
-   */
   async find(): Promise<SandboxInfo | null> {
     try {
       const container = this.docker.getContainer(CONTAINER_NAME);
@@ -148,9 +137,6 @@ export class LocalDockerProvider implements SandboxProvider {
     }
   }
 
-  /**
-   * Get sandbox info. Throws if not found.
-   */
   async getSandboxInfo(): Promise<SandboxInfo> {
     const info = await this.find();
     if (!info) throw new Error('Sandbox container not found');
@@ -181,7 +167,7 @@ export class LocalDockerProvider implements SandboxProvider {
     } catch {
       // May already be stopped
     }
-    await container.remove({ v: false }); // keep volumes
+    await container.remove({ v: false });
   }
 
   async getStatus(): Promise<SandboxStatus> {
@@ -214,6 +200,28 @@ export class LocalDockerProvider implements SandboxProvider {
     };
   }
 
+  // ── Cron / Endpoint resolution ───────────────────────────────────────
+
+  async resolveEndpoint(_externalId: string): Promise<ResolvedEndpoint> {
+    return {
+      url: BASE_URL,
+      headers: { 'Content-Type': 'application/json' },
+    };
+  }
+
+  async ensureRunning(_externalId: string): Promise<void> {
+    const info = await this.find();
+    if (info && info.status === 'running') return;
+    if (info) {
+      console.log('[LOCAL-DOCKER] Container stopped, starting for cron execution...');
+      const container = this.docker.getContainer(CONTAINER_NAME);
+      await container.start();
+      return;
+    }
+    console.log('[LOCAL-DOCKER] No container found, creating for cron execution...');
+    await this.ensure();
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────
 
   private _lastCreateOpts?: CreateSandboxOpts;
@@ -233,7 +241,6 @@ export class LocalDockerProvider implements SandboxProvider {
       'DISPLAY=:1',
       'LSS_DIR=/workspace/.lss',
       'KORTIX_WORKSPACE=/workspace',
-      // OpenCode is always unprotected in local mode (no auth)
       `KORTIX_API_URL=${config.KORTIX_URL || ''}`,
       `KORTIX_TOKEN=${authToken}`,
       `SANDBOX_ID=${CONTAINER_NAME}`,
@@ -251,7 +258,7 @@ export class LocalDockerProvider implements SandboxProvider {
         PortBindings: PORT_BINDINGS,
         CapAdd: ['SYS_ADMIN'],
         SecurityOpt: ['seccomp=unconfined'],
-        ShmSize: 2 * 1024 * 1024 * 1024, // 2GB
+        ShmSize: 2 * 1024 * 1024 * 1024,
         RestartPolicy: { Name: 'unless-stopped' },
         Binds: [
           `${CONTAINER_NAME}-workspace:/workspace`,
@@ -261,7 +268,6 @@ export class LocalDockerProvider implements SandboxProvider {
       },
       Labels: {
         'kortix.sandbox': 'true',
-        // Helpful for debugging / parity with cloud labeling
         'kortix.account': 'local',
         'kortix.user': 'local',
       },
