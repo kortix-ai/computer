@@ -165,7 +165,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = memo(function VoiceRe
                     onClick={handleClick}
                     onContextMenu={handleRightClick}
                     disabled={disabled || state === 'processing'}
-                    className={`h-8 w-8 p-0 bg-transparent border-none rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center justify-center transition-colors ${getButtonClass()}`}
+                    className={`h-8 w-8 p-0 bg-transparent border-none text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center justify-center transition-colors ${getButtonClass()}`}
                 >
                     {getIcon()}
                 </Button>

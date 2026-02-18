@@ -24,13 +24,11 @@ import {
   FileDown,
   MoreHorizontal,
   GitCompareArrows,
-  ListTodo,
   Sparkles,
   Settings,
 } from 'lucide-react';
 import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
-import { TodoDialog } from '@/components/session/todo-dialog';
 import { InitProjectDialog } from '@/components/session/init-project-dialog';
 import { OpenCodeSettingsDialog } from '@/components/session/opencode-settings-dialog';
 import { DiagnosticsBadge } from '@/components/session/diagnostics-panel';
@@ -57,7 +55,6 @@ export function SessionSiteHeader({
 }: SessionSiteHeaderProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
-  const [todoOpen, setTodoOpen] = useState(false);
   const [initOpen, setInitOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const isMobile = useIsMobile() || isMobileView;
@@ -117,12 +114,6 @@ export function SessionSiteHeader({
                   <DropdownMenuItem onClick={() => setDiffOpen(true)}>
                     <GitCompareArrows className="mr-2 h-4 w-4" />
                     View changes
-                  </DropdownMenuItem>
-
-                  {/* View Tasks */}
-                  <DropdownMenuItem onClick={() => setTodoOpen(true)}>
-                    <ListTodo className="mr-2 h-4 w-4" />
-                    View tasks
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
@@ -198,11 +189,6 @@ export function SessionSiteHeader({
         sessionId={sessionId}
         open={diffOpen}
         onOpenChange={setDiffOpen}
-      />
-      <TodoDialog
-        sessionId={sessionId}
-        open={todoOpen}
-        onOpenChange={setTodoOpen}
       />
       <InitProjectDialog
         sessionId={sessionId}

@@ -109,13 +109,13 @@ function SupportPageContent() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-                  <Button asChild size="lg" className="text-base h-14 w-48 rounded-full px-8">
+                  <Button asChild size="lg" className="text-base h-14 w-48 px-8">
                     <a href="mailto:support@kortix.com">
                       <Mail className="w-5 h-5"/>
                       Email Support
                     </a>
                   </Button>
-                  <Button asChild variant="outline" size="lg" className="text-base h-14 w-48 rounded-full px-8">
+                  <Button asChild variant="outline" size="lg" className="text-base h-14 w-48 px-8">
                     <a href="#faq">
                       Browse FAQs
                     </a>
@@ -395,7 +395,7 @@ function SupportPageContent() {
                 Our support team is ready to help you with any questions or issues you may have.
               </p>
               <div className="pt-4">
-                <Button asChild size="lg" className="text-base h-14 w-48 rounded-full px-8">
+                <Button asChild size="lg" className="text-base h-14 w-48 px-8">
                   <a href="mailto:support@kortix.com">
                     <Mail className="w-5 h-5" />
                     Contact Support

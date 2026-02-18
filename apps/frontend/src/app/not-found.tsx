@@ -51,7 +51,7 @@ export default function NotFound() {
           <Button
             asChild
             size="lg"
-            className="w-full h-12 rounded-lg font-medium"
+            className="w-full h-12"
           >
             <Link href="/" className="flex items-center justify-center gap-2">
               <ArrowLeft className="h-4 w-4" />

@@ -5,6 +5,7 @@ import {
   ArrowUp,
   ArrowUpLeft,
   ChevronDown,
+  ChevronUp,
   Check,
   GitFork,
   Loader2,
@@ -38,7 +39,7 @@ import type {
   Command,
   ProviderListResponse,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { useSummarizeOpenCodeSession, findOpenCodeFiles, useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
+import { useSummarizeOpenCodeSession, findOpenCodeFiles, useOpenCodeSessions, useOpenCodeSessionTodo } from '@/hooks/opencode/use-opencode-sessions';
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
@@ -849,6 +850,65 @@ function loadPromptHistory(key: string): string[] {
 // SessionChatInput - The unified chat input
 // ============================================================================
 
+// --- Todo Panel (floating above chat input) ---
+
+function TodoPanel({ sessionId }: { sessionId: string }) {
+  const { data: todos } = useOpenCodeSessionTodo(sessionId);
+  const [open, setOpen] = useState(true);
+
+  if (!todos || todos.length === 0) return null;
+
+  const completed = todos.filter((t: any) => t.status === 'completed').length;
+  const total = todos.length;
+
+  return (
+    <div className="absolute bottom-full left-3 right-3 mb-1.5 z-20">
+      <div className="rounded-[24px] border border-border bg-card overflow-hidden">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center justify-between w-full h-8 px-4 cursor-default select-none"
+        >
+          <span className="text-xs font-medium text-foreground">
+            {completed} of {total} todos completed
+          </span>
+          <ChevronUp className={cn(
+            'size-3 text-muted-foreground transition-transform duration-150',
+            !open && 'rotate-180',
+          )} />
+        </button>
+        {open && (
+          <div className="px-4 pb-3 flex flex-col gap-2">
+            {todos.map((todo: any, i: number) => {
+              const done = todo.status === 'completed';
+              const active = todo.status === 'in_progress';
+              return (
+                <div key={todo.id || i} className="flex items-center gap-3">
+                  <span className={cn(
+                    'size-4 rounded-[4px] flex-shrink-0 flex items-center justify-center border',
+                    done ? 'border-border bg-muted' : 'border-border',
+                  )}>
+                    {done && (
+                      <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" /></svg>
+                    )}
+                    {active && <div className="size-1.5 rounded-full bg-foreground" />}
+                  </span>
+                  <span className={cn(
+                    'text-xs',
+                    done && 'line-through text-muted-foreground',
+                    !done && 'text-foreground',
+                  )}>
+                    {todo.content}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export interface SessionChatInputProps {
   onSend: (text: string, files?: AttachedFile[], mentions?: TrackedMention[]) => void | Promise<void>;
   isBusy?: boolean;
@@ -1501,6 +1561,8 @@ export function SessionChatInput({
 
   return (
     <div className="mx-auto w-full max-w-4xl relative shrink-0 px-2 sm:px-4 pb-6">
+      {/* Todo panel — floating above the input card */}
+      {sessionId && <TodoPanel sessionId={sessionId} />}
       <div ref={cardRef} className="w-full bg-card border border-border rounded-[24px] overflow-visible relative z-10">
         <div className="relative flex flex-col w-full gap-2 overflow-visible">
           {/* Slash command popover (portalled to body to escape overflow-hidden ancestors) */}
