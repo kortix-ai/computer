@@ -69,18 +69,6 @@ export interface AccountState {
     recommended: boolean;
   }>;
   limits: {
-    projects: {
-      current: number;
-      max: number;
-      can_create: boolean;
-      tier_name: string;
-    };
-    threads: {
-      current: number;
-      max: number;
-      can_create: boolean;
-      tier_name: string;
-    };
     concurrent_runs: {
       running_count: number;
       limit: number;
@@ -99,7 +87,6 @@ export interface AccountState {
       can_create: boolean;
       tier_name: string;
     };
-
   };
   tier: {
     name: string;
@@ -369,18 +356,6 @@ export const billingApi = {
         },
         models: [],
         limits: {
-          projects: {
-            current: 0,
-            max: 0,
-            can_create: false,
-            tier_name: 'none'
-          },
-          threads: {
-            current: 0,
-            max: 0,
-            can_create: false,
-            tier_name: 'none'
-          },
           concurrent_runs: {
             running_count: 0,
             limit: 0,
@@ -399,7 +374,6 @@ export const billingApi = {
             can_create: false,
             tier_name: 'none'
           },
-
         },
         tier: {
           name: 'none',
