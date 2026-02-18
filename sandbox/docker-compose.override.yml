@@ -1,0 +1,5 @@
+services:
+  desktop:
+    ports:
+      - "15173:5173"  # Direct access to user app for testing
+      - "15000:3000"  # Direct access to user app for testing

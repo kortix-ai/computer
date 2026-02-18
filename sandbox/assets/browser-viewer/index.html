@@ -3,93 +3,256 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Browser Viewer</title>
+  <title>Agent Browser — Kortix</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0f0f1a;
-      display: flex; flex-direction: column; align-items: center;
-      min-height: 100vh; font-family: system-ui, -apple-system, sans-serif;
-      color: #c0c0d0; padding: 12px;
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --bg-surface: #111111;
+      --bg-elevated: #181818;
+      --border: #222222;
+      --border-subtle: #1a1a1a;
+      --text: #e8e8e8;
+      --text-secondary: #888888;
+      --text-tertiary: #555555;
+      --text-dim: #333333;
+      --accent: #ffffff;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --radius: 10px;
+      --radius-sm: 6px;
+      --radius-pill: 100px;
     }
+
+    body {
+      background: var(--bg);
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+      color: var(--text); padding: 12px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
     header {
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 8px; width: 100%; max-width: 1300px;
     }
-    header h1 { font-size: 15px; font-weight: 600; color: #e0e0f0; white-space: nowrap; }
+
+    .logo-group {
+      display: flex; align-items: center; gap: 8px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+
+    .logo-group svg {
+      width: 18px; height: 18px; opacity: 0.7;
+    }
+
+    .logo-group h1 {
+      font-size: 13px; font-weight: 500; color: var(--text-secondary);
+      letter-spacing: -0.01em;
+    }
+
+    .header-divider {
+      width: 1px; height: 16px; background: var(--border);
+      flex-shrink: 0;
+    }
+
+    /* ── Session Tabs ─────────────────────────────────────────── */
     #session-tabs {
       display: flex; gap: 4px; overflow-x: auto; flex: 1;
+      scrollbar-width: none;
     }
+    #session-tabs::-webkit-scrollbar { display: none; }
+
     .tab {
-      font-size: 12px; padding: 4px 12px; border-radius: 6px;
-      background: #1a1a2e; border: 1px solid #333; color: #888;
-      cursor: pointer; white-space: nowrap; transition: all 0.15s;
-      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; padding: 5px 12px; border-radius: var(--radius-sm);
+      background: transparent; border: 1px solid transparent; color: var(--text-tertiary);
+      cursor: pointer; white-space: nowrap; transition: all 0.15s ease;
+      display: flex; align-items: center; gap: 6px;
+      font-weight: 450; letter-spacing: -0.01em;
     }
-    .tab:hover { border-color: #555; color: #bbb; }
-    .tab.active { background: #1e3a5f; border-color: #4a8fe7; color: #e0e8f0; }
-    .tab.stale { opacity: 0.5; }
+    .tab:hover { color: var(--text-secondary); background: var(--bg-elevated); }
+    .tab.active {
+      background: var(--bg-elevated); border-color: var(--border);
+      color: var(--text);
+    }
+    .tab.stale { opacity: 0.4; }
+
     .tab .dot {
       display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      flex-shrink: 0;
     }
-    .tab .dot.live { background: #4caf50; }
-    .tab .dot.dead { background: #666; }
-    .tab .dot.stale { background: #ff9800; }
-    .tab .label { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    .tab .dot.live { background: var(--green); box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); }
+    .tab .dot.dead { background: var(--text-dim); }
+    .tab .dot.stale { background: var(--amber); }
+
+    .tab .label {
+      max-width: 180px; overflow: hidden; text-overflow: ellipsis;
+    }
+
     .tab .badge {
-      font-size: 9px; padding: 1px 5px; border-radius: 3px;
-      background: #2a4a6e; color: #8ab4e8; font-weight: 600;
+      font-size: 9px; padding: 1px 6px; border-radius: var(--radius-pill);
+      background: var(--bg-surface); border: 1px solid var(--border);
+      color: var(--text-tertiary); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.03em;
     }
+
     .tab .close-btn {
-      font-size: 14px; color: #666; cursor: pointer; margin-left: 2px;
-      line-height: 1;
+      font-size: 14px; color: var(--text-dim); cursor: pointer; margin-left: 2px;
+      line-height: 1; transition: color 0.15s;
     }
-    .tab .close-btn:hover { color: #f44336; }
+    .tab .close-btn:hover { color: var(--red); }
+
+    /* ── Status Badge ─────────────────────────────────────────── */
     #status {
-      font-size: 12px; padding: 3px 10px; border-radius: 12px;
-      background: #1a1a2e; border: 1px solid #333; white-space: nowrap;
+      font-size: 11px; padding: 4px 10px; border-radius: var(--radius-pill);
+      background: var(--bg-surface); border: 1px solid var(--border);
+      white-space: nowrap; font-weight: 500; letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 6px;
+      flex-shrink: 0;
     }
-    #status.connected { color: #4caf50; border-color: #2e5a30; }
-    #status.disconnected { color: #f44336; border-color: #5a2e2e; }
-    #status.connecting { color: #ff9800; border-color: #5a4a2e; }
-    #frame-info { font-size: 11px; color: #555; white-space: nowrap; }
+    #status::before {
+      content: ''; display: inline-block;
+      width: 5px; height: 5px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    #status.connected { color: var(--green); }
+    #status.connected::before { background: var(--green); box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); }
+    #status.disconnected { color: var(--red); }
+    #status.disconnected::before { background: var(--red); }
+    #status.connecting { color: var(--amber); }
+    #status.connecting::before { background: var(--amber); animation: pulse-dot 1.5s ease-in-out infinite; }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    #frame-info {
+      font-size: 10px; color: var(--text-dim); white-space: nowrap;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-weight: 400; letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+
+    /* ── Viewport ─────────────────────────────────────────────── */
     #viewport-wrap {
-      position: relative; background: #000; border-radius: 6px;
-      border: 1px solid #222; overflow: hidden;
+      position: relative; background: #000; border-radius: var(--radius);
+      border: 1px solid var(--border); overflow: hidden;
       max-width: 95vw; max-height: calc(100vh - 70px);
     }
+
     canvas {
       display: block; width: 100%; height: 100%;
       cursor: default;
     }
+
+    /* ── Empty State ──────────────────────────────────────────── */
     #empty-state {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 14px; padding: 60px 40px;
-      color: #555; text-align: center;
+      justify-content: center; gap: 20px; padding: 80px 40px;
+      text-align: center;
     }
-    #empty-state code {
-      background: #1a1a2e; padding: 6px 14px; border-radius: 6px;
-      font-size: 13px; color: #aaa; border: 1px solid #333;
+
+    #empty-state .icon-wrap {
+      width: 56px; height: 56px; border-radius: 14px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
     }
-    #empty-state .hint { font-size: 12px; max-width: 400px; line-height: 1.5; }
+
+    #empty-state .icon-wrap svg {
+      width: 24px; height: 24px; opacity: 0.5;
+    }
+
+    #empty-state .icon-badge {
+      position: absolute; bottom: -4px; right: -4px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--bg); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    #empty-state .icon-badge svg {
+      width: 10px; height: 10px; opacity: 0.35;
+    }
+
+    #empty-state h2 {
+      font-size: 14px; font-weight: 600; color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    #empty-state .hint {
+      font-size: 13px; max-width: 360px; line-height: 1.6;
+      color: var(--text-tertiary);
+    }
+
+    #empty-state .cmd-block {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-radius: 8px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+    }
+
+    #empty-state .cmd-block .cmd-icon {
+      width: 14px; height: 14px; opacity: 0.3; flex-shrink: 0;
+    }
+
+    #empty-state .cmd-block code {
+      font-size: 12px; color: var(--text-secondary);
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      letter-spacing: -0.01em;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Agent Browser</h1>
+    <div class="logo-group">
+      <!-- Kortix Symbol (inline SVG) -->
+      <svg viewBox="0 0 30 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M25.5614 24.916H29.8268C29.8268 19.6306 26.9378 15.0039 22.6171 12.4587C26.9377 9.91355 29.8267 5.28685 29.8267 0.00146484H25.5613C25.5613 5.00287 21.8906 9.18692 17.0654 10.1679V0.00146484H12.8005V10.1679C7.9526 9.20401 4.3046 5.0186 4.3046 0.00146484H0.0391572C0.0391572 5.28685 2.92822 9.91355 7.24884 12.4587C2.92818 15.0039 0.0390625 19.6306 0.0390625 24.916H4.30451C4.30451 19.8989 7.95259 15.7135 12.8005 14.7496V24.9206H17.0654V14.7496C21.9133 15.7134 25.5614 19.8989 25.5614 24.916Z" fill="white"/>
+      </svg>
+      <h1>Agent Browser</h1>
+    </div>
+
+    <div class="header-divider"></div>
+
     <div id="session-tabs"></div>
-    <div id="status" class="connecting">connecting...</div>
+    <div id="status" class="connecting">connecting…</div>
     <div id="frame-info"></div>
   </header>
 
   <div id="viewport-wrap">
     <div id="empty-state">
-      <div style="font-size: 28px; opacity: 0.3;">&#x1f310;</div>
-      <div class="hint">
-        No browser session active.<br>
-        Start one from the sandbox terminal:
+      <div class="icon-wrap">
+        <!-- Kortix Symbol -->
+        <svg viewBox="0 0 30 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M25.5614 24.916H29.8268C29.8268 19.6306 26.9378 15.0039 22.6171 12.4587C26.9377 9.91355 29.8267 5.28685 29.8267 0.00146484H25.5613C25.5613 5.00287 21.8906 9.18692 17.0654 10.1679V0.00146484H12.8005V10.1679C7.9526 9.20401 4.3046 5.0186 4.3046 0.00146484H0.0391572C0.0391572 5.28685 2.92822 9.91355 7.24884 12.4587C2.92818 15.0039 0.0390625 19.6306 0.0390625 24.916H4.30451C4.30451 19.8989 7.95259 15.7135 12.8005 14.7496V24.9206H17.0654V14.7496C21.9133 15.7134 25.5614 19.8989 25.5614 24.916Z" fill="white"/>
+        </svg>
+        <div class="icon-badge">
+          <!-- Globe icon -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>
+          </svg>
+        </div>
       </div>
-      <code>agent-browser --session kortix open https://example.com</code>
+
+      <h2>No browser session active</h2>
+
+      <div class="hint">
+        Start a session from the sandbox terminal to view the agent's browser in real-time.
+      </div>
+
+      <div class="cmd-block">
+        <!-- Terminal icon -->
+        <svg class="cmd-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+        <code>agent-browser --session kortix open https://example.com</code>
+      </div>
     </div>
     <canvas id="viewport" width="1280" height="720" style="display:none" tabindex="0"></canvas>
   </div>
@@ -112,19 +275,15 @@
     let previousSessionNames = new Set();
 
     // ── Proxy detection ──────────────────────────────────────────
-    // When loaded through the preview proxy, the URL looks like:
-    //   https://new-api.kortix.com/v1/preview/{sandboxId}/9224/?token=JWT
-    // We detect this pattern and route HTTP + WS through the proxy.
     const PREVIEW_PATH_RE = /^(.*\/preview\/[^/]+)\/\d+/;
     const proxyMatch = window.location.pathname.match(PREVIEW_PATH_RE);
-    const proxyBase = proxyMatch ? proxyMatch[1] : null; // e.g. "/v1/preview/{sandboxId}"
+    const proxyBase = proxyMatch ? proxyMatch[1] : null;
     const isProxied = !!proxyBase;
-    // Carry the auth token for proxied requests
     const proxyToken = isProxied ? new URLSearchParams(window.location.search).get('token') : null;
 
     // Track which sessions have received frames recently (for stale detection)
-    let sessionLastFrame = {}; // name -> timestamp
-    const STALE_THRESHOLD_MS = 10000; // 10s without frames = stale
+    let sessionLastFrame = {};
+    const STALE_THRESHOLD_MS = 10000;
 
     // ── URL parameter: ?session=name ─────────────────────────────
     function getUrlSession() {
@@ -138,7 +297,6 @@
       window.history.replaceState({}, '', url);
     }
 
-    // On load, check URL for target session
     const urlSession = getUrlSession();
     if (urlSession) {
       activeSession = urlSession;
@@ -147,7 +305,6 @@
     // ── Session discovery ─────────────────────────────────────────
     async function pollSessions() {
       try {
-        // When proxied, /sessions must go through the proxy path for port 9224
         const sessionsUrl = isProxied
           ? `${proxyBase}/9224/sessions${proxyToken ? '?token=' + encodeURIComponent(proxyToken) : ''}`
           : '/sessions';
@@ -155,11 +312,9 @@
         const newSessions = await res.json();
         const newNames = new Set(newSessions.map(s => s.name));
 
-        // Detect newly appeared sessions — auto-switch if no URL param lock
         if (!urlSession) {
           for (const s of newSessions) {
             if (!previousSessionNames.has(s.name) && previousSessionNames.size > 0) {
-              // A new session just appeared — switch to it
               activeSession = s.name;
               activePort = s.port;
               setUrlSession(s.name);
@@ -168,7 +323,6 @@
           }
         }
 
-        // If the URL-requested session just appeared, connect to it
         if (urlSession && newNames.has(urlSession) && !previousSessionNames.has(urlSession)) {
           const target = newSessions.find(s => s.name === urlSession);
           if (target) {
@@ -181,7 +335,6 @@
         previousSessionNames = newNames;
         sessions = newSessions;
 
-        // If active session is in the list, ensure port is correct
         const active = sessions.find(s => s.name === activeSession);
         if (active && active.port !== activePort) {
           activePort = active.port;
@@ -197,7 +350,6 @@
       const list = sessions.length > 0 ? sessions : [{ name: PRIMARY_SESSION, port: 9223 }];
       const now = Date.now();
 
-      // Sort: primary first, then alphabetically
       const sorted = [...list].sort((a, b) => {
         if (a.name === PRIMARY_SESSION) return -1;
         if (b.name === PRIMARY_SESSION) return 1;
@@ -238,8 +390,9 @@
             setUrlSession(name);
             canvas.style.display = 'none';
             emptyState.style.display = '';
-            emptyState.querySelector('.hint').innerHTML =
-              `Connecting to session <b>${name}</b>...`;
+            emptyState.querySelector('h2').textContent = 'Connecting…';
+            emptyState.querySelector('.hint').textContent =
+              `Switching to session ${name}`;
             reconnect();
             renderTabs();
           }
@@ -279,7 +432,7 @@
               canvas.style.display = 'block';
               emptyState.style.display = 'none';
             }
-            frameInfo.textContent = `${img.width}x${img.height} | ${fps}fps | #${frameCount}`;
+            frameInfo.textContent = `${img.width}×${img.height}  ${fps}fps  #${frameCount}`;
           };
           img.src = 'data:image/jpeg;base64,' + msg.data;
         }
@@ -287,11 +440,10 @@
     }
 
     function connect() {
-      statusEl.textContent = `connecting (${activeSession})...`;
+      statusEl.textContent = 'connecting…';
       statusEl.className = 'connecting';
 
       if (isProxied) {
-        // ── SSE mode: receive frames via server-sent events ──────
         const tokenParam = proxyToken ? '&token=' + encodeURIComponent(proxyToken) : '';
         const streamUrl = `${proxyBase}/9224/stream?port=${activePort}${tokenParam}`;
         eventSource = new EventSource(streamUrl);
@@ -323,7 +475,6 @@
           setTimeout(connect, 3000);
         };
       } else {
-        // ── WS mode: direct WebSocket to the stream port ─────────
         const wsHost = window.location.hostname || 'localhost';
         const wsUrl = `ws://${wsHost}:${activePort}`;
 
@@ -351,9 +502,6 @@
     }
 
     // ── Input forwarding ──────────────────────────────────────────
-    // Sends input to the browser session.
-    // Direct mode: ws.send()   Proxied mode: POST /input via preview proxy
-
     function sendInput(payload) {
       const json = JSON.stringify(payload);
       if (isProxied) {
