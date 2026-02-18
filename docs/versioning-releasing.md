@@ -22,7 +22,7 @@ One-time setup — these must be authed on your machine:
 ```bash
 npm login          # npm publish access to @kortix org
 gh auth login      # GitHub CLI access to kortix-ai/computer
-docker login       # Docker Hub (kortixmarko org) — only if using --docker
+docker login       # Docker Hub (kortix org) — only if using --docker
 ```
 
 Required on PATH: `node`, `bun`, `npm`, `gh`.
@@ -169,16 +169,16 @@ Docker is built **inline** in `release.sh` (not delegated to `push.sh`) so artif
 
 | Image | Dockerfile | Tags |
 |---|---|---|
-| `kortixmarko/sandbox` | `sandbox/Dockerfile` | `:{version}` + `:latest` |
-| `kortixmarko/kortix-api` | `services/Dockerfile` | `:{version}` + `:latest` |
-| `kortixmarko/kortix-frontend` | `apps/frontend/Dockerfile` | `:{version}` + `:latest` |
+| `kortix/sandbox` | `sandbox/Dockerfile` | `:{version}` + `:latest` |
+| `kortix/kortix-api` | `services/Dockerfile` | `:{version}` + `:latest` |
+| `kortix/kortix-frontend` | `apps/frontend/Dockerfile` | `:{version}` + `:latest` |
 
 **Frontend auto-build:** If `apps/frontend/.next/standalone` doesn't exist, the script
 auto-builds it with `NEXT_OUTPUT=standalone pnpm build` before creating the Docker image.
 With `--sandbox-only`, API and frontend images are skipped entirely.
 
 **Daytona snapshot:** After pushing the sandbox image to Docker Hub, creates a Daytona
-snapshot using `daytona snapshot create --image kortixmarko/sandbox:{version}`. This pulls
+snapshot using `daytona snapshot create --image kortix/sandbox:{version}`. This pulls
 from Docker Hub directly — no local image upload. Uses `--cpu 4 --memory 8 --disk 20`.
 
 **Important:** Daytona rejects `:latest` tags. Always use the versioned tag.
@@ -275,9 +275,9 @@ Example after a full release with Docker:
     { "name": "@kortix/opencode-sdk@0.6.0", "target": "npm" },
     { "name": "@kortix/sandbox@0.6.0", "target": "npm" },
     { "name": "v0.6.0", "target": "github-release" },
-    { "name": "kortixmarko/sandbox:0.6.0", "target": "docker-hub" },
-    { "name": "kortixmarko/kortix-api:0.6.0", "target": "docker-hub" },
-    { "name": "kortixmarko/kortix-frontend:0.6.0", "target": "docker-hub" },
+    { "name": "kortix/sandbox:0.6.0", "target": "docker-hub" },
+    { "name": "kortix/kortix-api:0.6.0", "target": "docker-hub" },
+    { "name": "kortix/kortix-frontend:0.6.0", "target": "docker-hub" },
     { "name": "kortix-sandbox-v0.6.0", "target": "daytona" }
   ]
 }

@@ -4,7 +4,7 @@
 # Build the frontend on the HOST first:
 #   cd apps/frontend && NEXT_OUTPUT=standalone pnpm run build
 # Then from repo root:
-#   docker build -f apps/frontend/Dockerfile -t kortixmarko/kortix-frontend:latest .
+#   docker build -f apps/frontend/Dockerfile -t kortix/kortix-frontend:latest .
 #
 FROM node:22-slim AS runner
 WORKDIR /app
