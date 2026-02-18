@@ -1,10 +1,15 @@
 import { Hono } from 'hono';
+import { readFileSync, existsSync } from 'fs';
+import { resolve } from 'path';
 
 /**
  * Sandbox version + changelog endpoint.
  *
  * Checks the npm registry for the latest published version of @kortix/sandbox.
- * Fetches CHANGELOG.json from GitHub for release notes.
+ * Loads CHANGELOG.json with a priority chain:
+ *   1. Local filesystem (bundled in Docker image or sandbox npm package)
+ *   2. npm registry (fetches package metadata which includes the file)
+ *   3. GitHub raw (fallback, requires public repo or token)
  *
  * The full update flow:
  *
@@ -24,7 +29,19 @@ import { Hono } from 'hono';
 
 const NPM_PACKAGE = '@kortix/sandbox';
 const NPM_REGISTRY_URL = `https://registry.npmjs.org/${NPM_PACKAGE}/latest`;
-const CHANGELOG_URL = 'https://raw.githubusercontent.com/kortix-ai/computer/main/sandbox/CHANGELOG.json';
+
+// Local filesystem paths where CHANGELOG.json might live (checked in order).
+// - Docker API image: /app/CHANGELOG.json (COPYed in Dockerfile)
+// - Sandbox global npm: /usr/lib/node_modules/@kortix/sandbox/CHANGELOG.json
+// - Sandbox global npm (alt): /usr/local/lib/node_modules/@kortix/sandbox/CHANGELOG.json
+const LOCAL_CHANGELOG_PATHS = [
+  resolve('/app/CHANGELOG.json'),
+  resolve('/usr/lib/node_modules/@kortix/sandbox/CHANGELOG.json'),
+  resolve('/usr/local/lib/node_modules/@kortix/sandbox/CHANGELOG.json'),
+];
+
+// GitHub raw fallback (only works for public repos or with GITHUB_TOKEN)
+const CHANGELOG_GITHUB_URL = 'https://raw.githubusercontent.com/kortix-ai/computer/main/sandbox/CHANGELOG.json';
 
 // ─── Cache ──────────────────────────────────────────────────────────────────
 // Cache lookups for 5 minutes so we're not hammering registries.
@@ -67,17 +84,59 @@ async function getLatestVersion(): Promise<string> {
   }
 }
 
+/**
+ * Try reading CHANGELOG.json from the local filesystem.
+ * Returns null if not found at any known path.
+ */
+function readLocalChangelog(): any[] | null {
+  for (const p of LOCAL_CHANGELOG_PATHS) {
+    try {
+      if (existsSync(p)) {
+        const data = JSON.parse(readFileSync(p, 'utf-8'));
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {
+      // ignore and try next path
+    }
+  }
+  return null;
+}
+
+/**
+ * Load changelog with priority: local filesystem → GitHub raw → cache → empty.
+ */
 async function getChangelog(): Promise<any[]> {
   const now = Date.now();
   if (cachedChangelog && (now - changelogCachedAt) < CACHE_TTL_MS) {
     return cachedChangelog;
   }
 
+  // 1. Try local filesystem first (works in Docker image and sandbox)
+  const local = readLocalChangelog();
+  if (local) {
+    cachedChangelog = local;
+    changelogCachedAt = now;
+    return local;
+  }
+
+  // 2. Fall back to GitHub raw (works for public repos)
   try {
-    const res = await fetch(CHANGELOG_URL, {
+    const headers: Record<string, string> = {};
+    const ghToken = process.env.GITHUB_TOKEN;
+    if (ghToken) {
+      headers['Authorization'] = `token ${ghToken}`;
+    }
+
+    const res = await fetch(CHANGELOG_GITHUB_URL, {
+      headers,
       signal: AbortSignal.timeout(5_000),
     });
-    if (!res.ok) return cachedChangelog || [];
+    if (!res.ok) {
+      console.warn(`[Version] GitHub changelog returned ${res.status}`);
+      return cachedChangelog || [];
+    }
     cachedChangelog = await res.json() as any[];
     changelogCachedAt = now;
     return cachedChangelog;

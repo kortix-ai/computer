@@ -18,6 +18,9 @@ RUN gcc -shared -o /build/librust_pty.so \
 # ── Stage 2: Main image ─────────────────────────────────────────────────────
 FROM lscr.io/linuxserver/webtop:latest
 
+# ── License ──────────────────────────────────────────────────────────────────
+COPY LICENSE /LICENSE
+
 # ── Branding ─────────────────────────────────────────────────────────────────
 COPY sandbox/assets/wallpaper.png       /usr/share/wallpapers/heyagi/wallpaper.png
 COPY sandbox/assets/kortix-symbol.svg   /usr/share/icons/heyagi/kortix-symbol.svg

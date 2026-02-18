@@ -15,6 +15,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# License
+COPY LICENSE /LICENSE
+
 # Copy pre-built standalone output from the host.
 COPY --chown=nextjs:nodejs apps/frontend/.next/standalone ./
 COPY --chown=nextjs:nodejs apps/frontend/.next/static ./apps/frontend/.next/static

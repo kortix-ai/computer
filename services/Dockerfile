@@ -35,6 +35,12 @@ ARG SERVICE
 
 ENV NODE_ENV=production
 
+# License
+COPY LICENSE /LICENSE
+
+# Changelog (read by version endpoint — avoids GitHub raw fetch for private repos)
+COPY sandbox/CHANGELOG.json /app/CHANGELOG.json
+
 # Copy installed node_modules and source from deps stage.
 # Root node_modules contains all hoisted deps (--shamefully-hoist).
 COPY --from=deps /app/node_modules ./node_modules
