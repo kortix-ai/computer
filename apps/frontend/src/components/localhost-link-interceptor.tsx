@@ -12,7 +12,7 @@
 
 import { useEffect } from 'react';
 import { useServerStore } from '@/stores/server-store';
-import { isProxiableLocalhostUrl, rewriteLocalhostUrl } from '@/lib/utils/sandbox-url';
+import { isProxiableLocalhostUrl, rewriteLocalhostUrl, toInternalUrl } from '@/lib/utils/sandbox-url';
 import { openTabAndNavigate } from '@/stores/tab-store';
 
 const LOCALHOST_HREF_RE =
@@ -54,12 +54,15 @@ export function LocalhostLinkInterceptor() {
       e.preventDefault();
       e.stopPropagation();
 
+      // Build the internal URL (what the user sees in the browser bar)
+      const internalUrl = toInternalUrl(port, path);
+
       openTabAndNavigate({
         id: `preview:${port}`,
         title: `localhost:${port}`,
         type: 'preview',
         href: `/preview/${port}`,
-        metadata: { url: proxyUrl, port, originalUrl: href, path },
+        metadata: { url: proxyUrl, port, originalUrl: internalUrl, path },
       });
     }
 

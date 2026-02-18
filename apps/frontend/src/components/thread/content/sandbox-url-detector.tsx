@@ -20,6 +20,7 @@ import { useServerStore } from '@/stores/server-store';
 import {
   detectLocalhostUrls,
   rewriteLocalhostUrl,
+  toInternalUrl,
   type DetectedLocalhostUrl,
 } from '@/lib/utils/sandbox-url';
 import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-url';
@@ -226,6 +227,9 @@ function SandboxPreviewCard({
   const tabId = `preview:${detected.port}`;
   const tabHref = `/preview/${detected.port}`;
 
+  // The internal URL is what the user sees (the container-side address)
+  const internalUrl = toInternalUrl(detected.port, detected.path);
+
   /** Open (or activate) the preview tab and navigate to it. */
   const navigateToPreviewTab = useCallback(() => {
     openTabAndNavigate({
@@ -236,10 +240,10 @@ function SandboxPreviewCard({
       metadata: {
         url: proxyUrl,
         port: detected.port,
-        originalUrl: detected.originalUrl,
+        originalUrl: internalUrl,
       },
     });
-  }, [detected, proxyUrl, tabId, tabHref]);
+  }, [detected, proxyUrl, internalUrl, tabId, tabHref]);
 
   const handleOpenExternal = useCallback(() => {
     window.open(proxyUrl, '_blank', 'noopener,noreferrer');

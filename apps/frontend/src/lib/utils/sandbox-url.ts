@@ -37,7 +37,7 @@ const LOCALHOST_URL_REGEX =
  * by the sandbox infrastructure (VNC, OpenCode Web, presentation viewer, etc.)
  */
 const EXCLUDED_PORTS = new Set([
-  3000,  // Next.js default dev port (the frontend itself)
+  parseInt(SANDBOX_PORTS.OPENCODE_UI, 10),  // Frontend UI (port 3111)
   4096,  // OpenCode API (proxied by Kortix Master)
   parseInt(SANDBOX_PORTS.KORTIX_MASTER, 10),  // Kortix Master itself
 ]);
@@ -205,4 +205,64 @@ export function proxyLocalhostUrl(
   const port = parseInt(match[1], 10);
   const path = match[2] || '/';
   return rewriteLocalhostUrl(port, path, serverUrl, mappedPorts);
+}
+
+/**
+ * Build the internal (container-side) localhost URL for a given port + path.
+ * This is what the user sees as the "real" address inside the sandbox.
+ *
+ * @example toInternalUrl(8080, '/api/docs') → 'http://localhost:8080/api/docs'
+ */
+export function toInternalUrl(port: number, path: string = '/'): string {
+  return `http://localhost:${port}${path}`;
+}
+
+/**
+ * Try to reverse-map a proxy URL back to its internal localhost equivalent.
+ *
+ * Handles patterns like:
+ *   - `http://host:PORT/proxy/{containerPort}{path}` → `http://localhost:{containerPort}{path}`
+ *   - `{BACKEND_URL}/preview/{sandboxId}/{containerPort}{path}` → `http://localhost:{containerPort}{path}`
+ *   - Direct mapped port URLs (e.g. `http://localhost:14002/...`) → `http://localhost:6080/...`
+ *
+ * Returns null if the URL can't be reverse-mapped.
+ */
+export function proxyUrlToInternal(
+  proxyUrl: string,
+  mappedPorts?: Record<string, string>,
+): string | null {
+  try {
+    const url = new URL(proxyUrl);
+
+    // Pattern 1: /proxy/{containerPort}/... (the most common case)
+    const proxyMatch = url.pathname.match(/^\/proxy\/(\d+)(\/.*)?$/);
+    if (proxyMatch) {
+      const containerPort = proxyMatch[1];
+      const path = proxyMatch[2] || '/';
+      return `http://localhost:${containerPort}${path}`;
+    }
+
+    // Pattern 2: /preview/{sandboxId}/{containerPort}/... (cloud mode)
+    const previewMatch = url.pathname.match(/^\/(?:v1\/)?preview\/[^/]+\/(\d+)(\/.*)?$/);
+    if (previewMatch) {
+      const containerPort = previewMatch[1];
+      const path = previewMatch[2] || '/';
+      return `http://localhost:${containerPort}${path}`;
+    }
+
+    // Pattern 3: Direct mapped port URL (e.g. http://localhost:14002/path)
+    // Reverse-lookup: find which container port maps to this host port
+    if (mappedPorts) {
+      const hostPort = url.port;
+      for (const [containerPort, mappedHostPort] of Object.entries(mappedPorts)) {
+        if (mappedHostPort === hostPort) {
+          return `http://localhost:${containerPort}${url.pathname}${url.search}`;
+        }
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
