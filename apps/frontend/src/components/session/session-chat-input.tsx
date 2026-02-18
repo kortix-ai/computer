@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { VoiceRecorder } from '@/components/thread/chat-input/voice-recorder';
@@ -380,134 +381,98 @@ function VariantSelector({
 
 const AUTO_COMPACT_THRESHOLD = 0.9;
 
-function TokenProgress({ messages, sessionId, models, selectedModel, onContextClick }: { messages: MessageWithParts[] | undefined; sessionId?: string; models?: FlatModel[]; selectedModel?: { providerID: string; modelID: string } | null; onContextClick?: () => void }) {
+interface TokenProgressProps {
+  messages: MessageWithParts[] | undefined;
+  sessionId?: string;
+  models?: FlatModel[];
+  selectedModel?: { providerID: string; modelID: string } | null;
+  onContextClick?: () => void;
+}
+
+function getLastAssistantTokenTotal(messages: MessageWithParts[] | undefined): number {
+  if (!messages) return 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.info.role !== 'assistant') continue;
+    const t = (msg.info as any).tokens;
+    if (!t) continue;
+    const total = (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0) + (t.cache?.read ?? 0) + (t.cache?.write ?? 0);
+    if (total > 0) return total;
+  }
+  return 0;
+}
+
+function getContextLimit(models: FlatModel[] | undefined, selectedModel: { providerID: string; modelID: string } | null | undefined): number {
+  if (selectedModel && models) {
+    const model = models.find(m => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID);
+    if (model?.contextWindow && model.contextWindow > 0) return model.contextWindow;
+  }
+  return 200000;
+}
+
+function TokenProgress({ messages, sessionId, models, selectedModel, onContextClick }: TokenProgressProps) {
   const summarize = useSummarizeOpenCodeSession();
   const autoCompactTriggered = useRef(false);
   const [isCompacting, setIsCompacting] = useState(false);
 
-  // Use the LAST assistant message's total token count as context window fill.
-  // Total = input + output + reasoning + cache.read + cache.write
-  const contextTokens = useMemo(() => {
-    if (!messages) return 0;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.info.role === 'assistant') {
-        const t = (msg.info as any).tokens;
-        if (!t) continue;
-        const total = (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0) + (t.cache?.read ?? 0) + (t.cache?.write ?? 0);
-        if (total > 0) return total;
-      }
-    }
-    return 0;
-  }, [messages]);
-
-  // Use the actual model's context window instead of a hardcoded value
-  const contextLimit = useMemo(() => {
-    if (selectedModel && models) {
-      const model = models.find(
-        (m) => m.providerID === selectedModel.providerID && m.modelID === selectedModel.modelID
-      );
-      if (model?.contextWindow && model.contextWindow > 0) {
-        return model.contextWindow;
-      }
-    }
-    return 200000; // fallback
-  }, [models, selectedModel]);
-
+  const contextTokens = useMemo(() => getLastAssistantTokenTotal(messages), [messages]);
+  const contextLimit = useMemo(() => getContextLimit(models, selectedModel), [models, selectedModel]);
   const ratio = contextTokens > 0 ? Math.min(contextTokens / contextLimit, 1) : 0;
 
-  // Reset auto-compact flag if ratio drops below threshold (e.g. after compaction)
   useEffect(() => {
-    if (ratio < AUTO_COMPACT_THRESHOLD) {
-      autoCompactTriggered.current = false;
-    }
+    if (ratio < AUTO_COMPACT_THRESHOLD) autoCompactTriggered.current = false;
   }, [ratio]);
 
-  // Auto-compact at 90% threshold
   useEffect(() => {
-    if (
-      ratio >= AUTO_COMPACT_THRESHOLD &&
-      !autoCompactTriggered.current &&
-      !isCompacting &&
-      !summarize.isPending &&
-      sessionId
-    ) {
+    if (ratio >= AUTO_COMPACT_THRESHOLD && !autoCompactTriggered.current && !isCompacting && !summarize.isPending && sessionId) {
       autoCompactTriggered.current = true;
       setIsCompacting(true);
       toast.info('Context is 90% full — auto-compacting session...');
-
       summarize.mutate({ sessionId }, {
-        onSuccess: () => {
-          toast.success('Session compacted successfully');
-          setIsCompacting(false);
-        },
-        onError: (error) => {
-          toast.error(error instanceof Error ? error.message : 'Failed to auto-compact session');
-          setIsCompacting(false);
-        },
+        onSuccess: () => { toast.success('Session compacted successfully'); setIsCompacting(false); },
+        onError: (err) => { toast.error(err instanceof Error ? err.message : 'Failed to auto-compact'); setIsCompacting(false); },
       });
     }
   }, [ratio, sessionId, isCompacting, summarize]);
 
-  // Hide entirely only if no session and no tokens
   if (contextTokens === 0 && !onContextClick) return null;
 
   const circumference = 2 * Math.PI * 7;
   const offset = circumference * (1 - ratio);
-
-  // Color thresholds: >90% = amber/yellow warning, >80% = orange, default = muted
-  const circleColor = isCompacting
-    ? 'text-blue-500 animate-pulse'
-    : ratio >= AUTO_COMPACT_THRESHOLD
-      ? 'text-amber-400'
-      : ratio > 0.8
-        ? 'text-orange-500'
-        : 'text-muted-foreground';
+  const color = isCompacting ? 'text-blue-500 animate-pulse'
+    : ratio >= AUTO_COMPACT_THRESHOLD ? 'text-amber-400'
+    : ratio > 0.8 ? 'text-orange-500'
+    : 'text-muted-foreground';
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className={cn('relative size-6 flex items-center justify-center', onContextClick ? 'cursor-pointer' : 'cursor-default')}
-          onClick={(e) => { e.preventDefault(); onContextClick?.(); }}
-        >
-          <svg className="size-5 -rotate-90" viewBox="0 0 18 18">
-            <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted" />
-            <circle
-              cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2"
-              strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-              className={circleColor}
-            />
-          </svg>
-          {/* Pulsing dot indicator when compacting */}
-          {isCompacting && (
-            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500 animate-pulse" />
-          )}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top">
-        <div className="text-xs font-mono space-y-1">
-          <div>Context: {(contextTokens / 1000).toFixed(1)}k / {(contextLimit / 1000).toFixed(0)}k tokens</div>
-          <div className="text-muted-foreground">{Math.round(ratio * 100)}% of context used</div>
-          {isCompacting && (
-            <div className="text-blue-500 font-sans pt-0.5">
-              Compacting session...
-            </div>
-          )}
-          {!isCompacting && ratio >= AUTO_COMPACT_THRESHOLD && (
-            <div className="text-amber-400 font-sans pt-0.5">
-              Context almost full — compaction will start automatically.
-            </div>
-          )}
-          {!isCompacting && ratio > 0.8 && ratio < AUTO_COMPACT_THRESHOLD && (
-            <div className="text-orange-500 font-sans pt-0.5">
-              Context getting full. Consider compacting.
-            </div>
-          )}
-        </div>
-      </TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="relative inline-flex">
+            <button
+              type="button"
+              className="size-6 flex items-center justify-center cursor-pointer"
+              onPointerDown={(e) => { e.stopPropagation(); }}
+              onClick={(e) => { e.stopPropagation(); onContextClick?.(); }}
+            >
+              <svg className="size-5 -rotate-90" viewBox="0 0 18 18">
+                <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted" />
+                <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className={color} />
+              </svg>
+              {isCompacting && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500 animate-pulse" />}
+            </button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <div className="text-xs font-mono space-y-0.5">
+            <div>Context: {(contextTokens / 1000).toFixed(1)}k / {(contextLimit / 1000).toFixed(0)}k tokens</div>
+            <div className="text-muted-foreground">{Math.round(ratio * 100)}% used</div>
+            {isCompacting && <div className="text-blue-500 font-sans">Compacting...</div>}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

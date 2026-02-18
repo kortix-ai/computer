@@ -2713,6 +2713,7 @@ export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: Sess
         onFileSearch={handleFileSearch}
         providers={providers}
         threadContext={threadContext}
+        onContextClick={() => setContextModalOpen(true)}
       />
     </div>
   );
