@@ -49,8 +49,8 @@ llm.post('/chat/completions', async (c) => {
   // Proxy to OpenRouter
   const response = await proxyToOpenRouter(body, isStreaming);
 
-  // If OpenRouter returned an error, pass it through
-  if (!response.ok && !isStreaming) {
+  // If OpenRouter returned an error, pass it through (for both streaming and non-streaming)
+  if (!response.ok) {
     const errorBody = await response.text();
     console.error(`[LLM] OpenRouter error ${response.status}: ${errorBody}`);
     return new Response(errorBody, {

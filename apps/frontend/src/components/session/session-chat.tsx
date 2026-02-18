@@ -156,9 +156,7 @@ import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-session
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { billingApi } from '@/lib/api/billing';
-import { invalidateAccountState } from '@/hooks/billing/use-account-state';
+// billingApi / invalidateAccountState / useQueryClient removed — billing is handled server-side by the router
 import { playSound } from '@/lib/sounds';
 
 // ============================================================================
@@ -2155,12 +2153,6 @@ function SessionTurn({
 }
 
 // ============================================================================
-// Billing: track billed turn IDs to prevent double-deduction
-// ============================================================================
-
-const billedTurnIds = new Set<string>();
-
-// ============================================================================
 // Main SessionChat Component
 // ============================================================================
 
@@ -2190,9 +2182,6 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   const forkSession = useForkSession();
   const revertSession = useRevertSession();
   const unrevertSession = useUnrevertSession();
-
-  // ---- Billing: query client for invalidation ----
-  const queryClient = useQueryClient();
 
   // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
   const local = useOpenCodeLocal({ agents, providers, config });
@@ -2705,39 +2694,11 @@ export function SessionChat({ sessionId }: SessionChatProps) {
   }, []);
 
   // ============================================================================
-  // Billing: deduct credits after agent run completes
+  // Billing: DISABLED — billing is handled server-side by the router
+  // (POST /v1/router/chat/completions deducts credits per LLM call).
+  // This frontend useEffect was causing double-billing once opencode.jsonc
+  // got cost config and step-finish.cost became non-zero.
   // ============================================================================
-
-  useEffect(() => {
-    if (!messages || messages.length === 0 || isBusy) return;
-
-    const currentTurns = groupMessagesIntoTurns(messages);
-    for (const turn of currentTurns) {
-      const turnId = turn.userMessage.info.id;
-      if (billedTurnIds.has(turnId)) continue;
-
-      const parts = collectTurnParts(turn);
-      const costInfo = getTurnCost(parts);
-      console.log('[Billing] Turn', turnId, 'costInfo:', costInfo);
-      if (!costInfo || costInfo.cost <= 0) continue;
-
-      // Mark as billed immediately to prevent double-deduction
-      billedTurnIds.add(turnId);
-
-      console.log('[Billing] Deducting', costInfo.cost, 'for turn', turnId);
-      // Fire-and-forget deduction
-      billingApi.deductUsage({
-        amount: costInfo.cost,
-        thread_id: sessionId,
-        description: `Agent run: ${formatCost(costInfo.cost)} (${formatTokens(costInfo.tokens.input + costInfo.tokens.output)} tokens)`,
-      }).then((result) => {
-        console.log('[Billing] Deduction successful:', result);
-        invalidateAccountState(queryClient);
-      }).catch((err) => {
-        console.warn('[Billing] Failed to deduct usage:', err);
-      });
-    }
-  }, [messages, isBusy, sessionId, queryClient]);
 
   // ============================================================================
   // Fork / Revert / Unrevert handlers
