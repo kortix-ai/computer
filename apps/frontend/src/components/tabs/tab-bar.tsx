@@ -18,6 +18,7 @@ import {
   Plus,
   Globe,
   TerminalSquare,
+  Columns2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType, DASHBOARD_TAB_ID } from '@/stores/tab-store';
@@ -195,6 +196,12 @@ function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) 
       {!tab.pinned && item('Close', 'close', <X className="h-3.5 w-3.5 text-muted-foreground" />, `${useUserPreferencesStore.getState().getModifierLabel()}+W`)}
       {item('Close others', 'closeOthers', <XCircle className="h-3.5 w-3.5 text-muted-foreground" />)}
       {item('Close to the right', 'closeRight', <ArrowRightToLine className="h-3.5 w-3.5 text-muted-foreground" />)}
+      {!tab.pinned && tab.id !== DASHBOARD_TAB_ID && (
+        <>
+          <div className="my-1 h-px bg-border/60" />
+          {item('Split right', 'splitRight', <Columns2 className="h-3.5 w-3.5 text-muted-foreground" />, '⌘\\')}
+        </>
+      )}
       <div className="my-1 h-px bg-border/60" />
       {item('Close all', 'closeAll', <XCircle className="h-3.5 w-3.5 text-muted-foreground" />, undefined, true)}
     </div>
@@ -592,6 +599,9 @@ export function TabBar() {
   const tabs = useTabStore((s) => s.tabs);
   const tabOrder = useTabStore((s) => s.tabOrder);
   const activeTabId = useTabStore((s) => s.activeTabId);
+  const splitTabOrder = useTabStore((s) => s.splitTabOrder);
+  const splitActiveTabId = useTabStore((s) => s.splitActiveTabId);
+  const focusedPane = useTabStore((s) => s.focusedPane);
   const openTab = useTabStore((s) => s.openTab);
   const setActiveTab = useTabStore((s) => s.setActiveTab);
   const moveTab = useTabStore((s) => s.moveTab);
@@ -599,6 +609,11 @@ export function TabBar() {
   const closeOtherTabs = useTabStore((s) => s.closeOtherTabs);
   const closeTabsToRight = useTabStore((s) => s.closeTabsToRight);
   const closeAllTabs = useTabStore((s) => s.closeAllTabs);
+
+  // Split-aware: determine which pane's tabs to display in the tab bar
+  const isSplit = splitTabOrder.length > 0;
+  const displayTabOrder = isSplit && focusedPane === 'split' ? splitTabOrder : tabOrder;
+  const displayActiveTabId = isSplit && focusedPane === 'split' ? splitActiveTabId : activeTabId;
 
   // Status stores
   const statuses = useOpenCodeSessionStatusStore((s) => s.statuses);
@@ -686,8 +701,8 @@ export function TabBar() {
   }, [tabOrder, tabs, activeTabId, queryClient]);
 
   const orderedTabs = useMemo(
-    () => tabOrder.map((id) => tabs[id]).filter(Boolean),
-    [tabs, tabOrder]
+    () => displayTabOrder.map((id) => tabs[id]).filter(Boolean),
+    [tabs, displayTabOrder]
   );
 
   // Sync active tab with current route
@@ -853,6 +868,9 @@ export function TabBar() {
           closeAllTabs();
           router.push('/dashboard');
           break;
+        case 'splitRight':
+          useTabStore.getState().splitTab(tabId);
+          break;
       }
     },
     [pinTab, handleClose, closeOtherTabs, closeTabsToRight, closeAllTabs, router]
@@ -934,12 +952,15 @@ export function TabBar() {
 
     /** Switch to the tab at the given offset from the active tab (+1 = next, -1 = prev) */
     const cycleTab = (direction: 1 | -1) => {
-      const { tabOrder: order, tabs: allTabs, activeTabId: active } = useTabStore.getState();
+      const state = useTabStore.getState();
+      const isSplitActive = state.splitTabOrder.length > 0;
+      const order = isSplitActive && state.focusedPane === 'split' ? state.splitTabOrder : state.tabOrder;
+      const active = isSplitActive && state.focusedPane === 'split' ? state.splitActiveTabId : state.activeTabId;
       if (order.length === 0) return;
       const currentIdx = active ? order.indexOf(active) : -1;
       // Wrap around: last → first, first → last
       const nextIdx = (currentIdx + direction + order.length) % order.length;
-      const targetTab = allTabs[order[nextIdx]];
+      const targetTab = state.tabs[order[nextIdx]];
       if (targetTab) navigateToTab(targetTab);
     };
 
@@ -972,9 +993,22 @@ export function TabBar() {
       // ── Close tab: Modifier + W ─────────────────────────────────────
       if (closeModHeld && !closeModOther && !e.shiftKey && !e.altKey && e.code === 'KeyW') {
         e.preventDefault();
-        const { activeTabId: active, tabs: allTabs } = useTabStore.getState();
-        if (active && allTabs[active] && !allTabs[active].pinned) {
+        const st = useTabStore.getState();
+        const isSplitActive = st.splitTabOrder.length > 0;
+        const active = isSplitActive && st.focusedPane === 'split' ? st.splitActiveTabId : st.activeTabId;
+        if (active && st.tabs[active] && !st.tabs[active].pinned) {
           handleClose(active);
+        }
+        return;
+      }
+
+      // ── Split tab: Modifier + \ (Backslash) ─────────────────────────
+      if (modHeld && !modOther && !e.shiftKey && !e.altKey && e.code === 'Backslash') {
+        e.preventDefault();
+        const { activeTabId: active, tabs: allTabs, focusedPane: fp, splitActiveTabId: splitActive } = useTabStore.getState();
+        const currentTabId = fp === 'split' ? splitActive : active;
+        if (currentTabId && allTabs[currentTabId] && !allTabs[currentTabId].pinned && currentTabId !== DASHBOARD_TAB_ID) {
+          useTabStore.getState().splitTab(currentTabId);
         }
         return;
       }
@@ -1018,10 +1052,12 @@ export function TabBar() {
           const num = parseInt(digitMatch[1], 10);
           if (num >= 1 && num <= 9) {
             e.preventDefault();
-            const { tabOrder: order, tabs: allTabs } = useTabStore.getState();
+            const st = useTabStore.getState();
+            const isSplitActive = st.splitTabOrder.length > 0;
+            const order = isSplitActive && st.focusedPane === 'split' ? st.splitTabOrder : st.tabOrder;
             const idx = num === 9 ? order.length - 1 : num - 1;
             if (idx >= 0 && idx < order.length) {
-              const targetTab = allTabs[order[idx]];
+              const targetTab = st.tabs[order[idx]];
               if (targetTab) navigateToTab(targetTab);
             }
             return;
@@ -1036,9 +1072,9 @@ export function TabBar() {
 
   // Scroll active tab into view when it changes
   useEffect(() => {
-    if (!activeTabId || !scrollRef.current) return;
+    if (!displayActiveTabId || !scrollRef.current) return;
     const container = scrollRef.current;
-    const activeEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
+    const activeEl = container.querySelector(`[data-tab-id="${displayActiveTabId}"]`) as HTMLElement | null;
     if (activeEl) {
       const containerRect = container.getBoundingClientRect();
       const tabRect = activeEl.getBoundingClientRect();
@@ -1046,7 +1082,7 @@ export function TabBar() {
         activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       }
     }
-  }, [activeTabId]);
+  }, [displayActiveTabId]);
 
   // ---------------------------------------------------------------------------
   // Scroll fade: hide the gradient when scrolled fully right (or no overflow).
@@ -1099,11 +1135,11 @@ export function TabBar() {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;
             const busy = tab.type === 'session' && pending === 0 && statuses[tab.id]?.type === 'busy';
             return (
-              <div key={tab.id} data-tab-id={tab.id} className={cn("flex items-end relative", tab.id === activeTabId ? "z-20" : "z-0")}>
+              <div key={tab.id} data-tab-id={tab.id} className={cn("flex items-end relative", tab.id === displayActiveTabId ? "z-20" : "z-0")}>
                 <TabItem
                   tab={tab}
                   index={index}
-                  isActive={tab.id === activeTabId}
+                  isActive={tab.id === displayActiveTabId}
                   isBusy={!!busy}
                   pendingCount={pending}
                   onActivate={handleActivate}
@@ -1141,6 +1177,45 @@ export function TabBar() {
             <TooltipContent side="bottom" className="text-xs">New tab</TooltipContent>
           </Tooltip>
 
+          {/* Split pane switcher — only shown when split is active */}
+          {isSplit && (
+            <div className="flex items-center gap-px mr-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => useTabStore.getState().focusPane('main')}
+                    className={cn(
+                      'flex items-center justify-center w-6 h-6 rounded-sm cursor-pointer text-[10px] font-medium transition-colors',
+                      focusedPane === 'main'
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-muted-foreground/40 hover:text-muted-foreground/70',
+                    )}
+                  >
+                    L
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Left pane</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => useTabStore.getState().focusPane('split')}
+                    className={cn(
+                      'flex items-center justify-center w-6 h-6 rounded-sm cursor-pointer text-[10px] font-medium transition-colors',
+                      focusedPane === 'split'
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-muted-foreground/40 hover:text-muted-foreground/70',
+                    )}
+                  >
+                    R
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Right pane</TooltipContent>
+              </Tooltip>
+              <div className="w-px h-4 bg-border/40 mx-0.5" />
+            </div>
+          )}
+
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -1164,7 +1239,7 @@ export function TabBar() {
       {showTabList && (
         <TabListDropdown
           tabs={orderedTabs}
-          activeTabId={activeTabId}
+          activeTabId={displayActiveTabId}
           onActivate={handleActivate}
           onClose={() => setShowTabList(false)}
           anchorRef={tabListBtnRef}

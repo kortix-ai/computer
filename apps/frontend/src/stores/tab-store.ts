@@ -10,6 +10,8 @@ import { useServerStore } from '@/stores/server-store';
 
 export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' | 'page' | 'preview' | 'terminal';
 
+export type FocusedPane = 'main' | 'split';
+
 /** The permanent dashboard/home tab. Always pinned, always first. */
 export const DASHBOARD_TAB_ID = 'page:/dashboard';
 
@@ -69,12 +71,22 @@ export interface Tab {
 interface TabState {
   /** All open tabs keyed by tab.id for O(1) lookup */
   tabs: Record<string, Tab>;
-  /** Ordered list of tab IDs (determines visual order) */
+  /** Ordered list of tab IDs (determines visual order) — main (left) pane */
   tabOrder: string[];
-  /** The currently active/focused tab ID */
+  /** The currently active/focused tab ID in the main pane */
   activeTabId: string | null;
   /** Stack of recently closed tabs (most recent first) for Mod+Shift+T reopen */
   recentlyClosedTabs: Tab[];
+
+  // --- Split pane (right side) ---
+  /** Tab IDs in the split (right) pane. Empty array = no split. */
+  splitTabOrder: string[];
+  /** Active tab in the split pane */
+  splitActiveTabId: string | null;
+  /** Which pane has focus — determines where new tabs open */
+  focusedPane: FocusedPane;
+  /** Panel sizes as percentages [main, split] */
+  splitSizes: [number, number];
 
   // --- Actions ---
 
@@ -116,6 +128,29 @@ interface TabState {
 
   /** Save current server-scoped tabs and restore tabs for a different server */
   swapForServer: (newServerId: string, currentServerId?: string) => void;
+
+  // --- Split actions ---
+
+  /** Move a tab from main to a new right pane (creates split if needed) */
+  splitTab: (tabId: string) => void;
+
+  /** Close the split pane, moving all split tabs back to main */
+  closeSplit: () => void;
+
+  /** Move a tab from main pane to split pane */
+  moveTabToSplit: (tabId: string) => void;
+
+  /** Move a tab from split pane to main pane */
+  moveTabToMain: (tabId: string) => void;
+
+  /** Focus a pane */
+  focusPane: (pane: FocusedPane) => void;
+
+  /** Update split panel sizes */
+  setSplitSizes: (sizes: [number, number]) => void;
+
+  /** Check if split is active */
+  isSplit: () => boolean;
 }
 
 export const useTabStore = create<TabState>()(
@@ -125,59 +160,106 @@ export const useTabStore = create<TabState>()(
       tabOrder: [],
       activeTabId: null,
       recentlyClosedTabs: [],
+      splitTabOrder: [],
+      splitActiveTabId: null,
+      focusedPane: 'main' as FocusedPane,
+      splitSizes: [50, 50] as [number, number],
 
       openTab: (tabInput) => {
-        const { tabs, tabOrder } = get();
+        const state = get();
 
-        // If tab already exists, just activate it
-        if (tabs[tabInput.id]) {
-          set({ activeTabId: tabInput.id });
+        // If tab already exists in main pane, activate it there
+        if (state.tabOrder.includes(tabInput.id)) {
+          set({ activeTabId: tabInput.id, focusedPane: 'main' });
           return;
         }
 
-        const newTab: Tab = {
-          ...tabInput,
-          openedAt: Date.now(),
-        };
+        // If tab already exists in split pane, activate it there
+        if (state.splitTabOrder.includes(tabInput.id)) {
+          set({ splitActiveTabId: tabInput.id, focusedPane: 'split' });
+          return;
+        }
 
-        const updated = ensureDashboardTab(
-          { ...tabs, [newTab.id]: newTab },
-          [...tabOrder, newTab.id],
-        );
+        const newTab: Tab = { ...tabInput, openedAt: Date.now() };
+        const newTabs = { ...state.tabs, [newTab.id]: newTab };
 
-        set({
-          ...updated,
-          activeTabId: newTab.id,
-        });
+        // If split is active and split pane is focused, open in split pane
+        if (state.splitTabOrder.length > 0 && state.focusedPane === 'split') {
+          set({
+            tabs: newTabs,
+            splitTabOrder: [...state.splitTabOrder, newTab.id],
+            splitActiveTabId: newTab.id,
+          });
+          return;
+        }
+
+        // Default: open in main pane
+        const updated = ensureDashboardTab(newTabs, [...state.tabOrder, newTab.id]);
+        set({ ...updated, activeTabId: newTab.id });
       },
 
       closeTab: (tabId) => {
-        const { tabs, tabOrder, activeTabId, recentlyClosedTabs } = get();
-        const tab = tabs[tabId];
-        // Prevent closing dashboard tab or any pinned tab
-        if (!tab || tab.pinned || tabId === DASHBOARD_TAB_ID) return activeTabId;
+        const state = get();
+        const tab = state.tabs[tabId];
+        if (!tab || tab.pinned || tabId === DASHBOARD_TAB_ID) return state.focusedPane === 'split' ? state.splitActiveTabId : state.activeTabId;
 
-        // Push closed tab onto recently-closed stack
-        const updatedClosedTabs = [tab, ...recentlyClosedTabs].slice(0, MAX_RECENTLY_CLOSED);
+        const updatedClosedTabs = [tab, ...state.recentlyClosedTabs].slice(0, MAX_RECENTLY_CLOSED);
+        const { [tabId]: _, ...remainingTabs } = state.tabs;
 
-        const { [tabId]: _, ...remainingTabs } = tabs;
-        const newOrder = tabOrder.filter((id) => id !== tabId);
+        // Check if tab is in split pane
+        if (state.splitTabOrder.includes(tabId)) {
+          const newSplitOrder = state.splitTabOrder.filter((id) => id !== tabId);
+          let nextSplitActive: string | null = null;
 
-        // Determine next active tab
+          if (state.splitActiveTabId === tabId) {
+            if (tab.parentSessionId && remainingTabs[tab.parentSessionId] && newSplitOrder.includes(tab.parentSessionId)) {
+              nextSplitActive = tab.parentSessionId;
+            } else {
+              const oldIndex = state.splitTabOrder.indexOf(tabId);
+              if (newSplitOrder.length > 0) {
+                nextSplitActive = newSplitOrder[Math.min(oldIndex, newSplitOrder.length - 1)];
+              }
+            }
+          } else {
+            nextSplitActive = state.splitActiveTabId;
+          }
+
+          // Auto-collapse: if split pane is now empty, close split
+          if (newSplitOrder.length === 0) {
+            set({
+              tabs: remainingTabs,
+              splitTabOrder: [],
+              splitActiveTabId: null,
+              focusedPane: 'main',
+              recentlyClosedTabs: updatedClosedTabs,
+            });
+            return state.activeTabId;
+          }
+
+          set({
+            tabs: remainingTabs,
+            splitTabOrder: newSplitOrder,
+            splitActiveTabId: nextSplitActive,
+            recentlyClosedTabs: updatedClosedTabs,
+          });
+          return nextSplitActive;
+        }
+
+        // Tab is in main pane
+        const newOrder = state.tabOrder.filter((id) => id !== tabId);
         let nextActiveId: string | null = null;
-        if (activeTabId === tabId) {
-          // For sub-session tabs: prefer activating the parent session tab
-          if (tab.parentSessionId && remainingTabs[tab.parentSessionId]) {
+
+        if (state.activeTabId === tabId) {
+          if (tab.parentSessionId && remainingTabs[tab.parentSessionId] && newOrder.includes(tab.parentSessionId)) {
             nextActiveId = tab.parentSessionId;
           } else {
-            // Fallback: activate the nearest tab (prefer right neighbor, then left)
-            const oldIndex = tabOrder.indexOf(tabId);
+            const oldIndex = state.tabOrder.indexOf(tabId);
             if (newOrder.length > 0) {
               nextActiveId = newOrder[Math.min(oldIndex, newOrder.length - 1)];
             }
           }
         } else {
-          nextActiveId = activeTabId;
+          nextActiveId = state.activeTabId;
         }
 
         set({
@@ -186,7 +268,6 @@ export const useTabStore = create<TabState>()(
           activeTabId: nextActiveId,
           recentlyClosedTabs: updatedClosedTabs,
         });
-
         return nextActiveId;
       },
 
@@ -217,8 +298,14 @@ export const useTabStore = create<TabState>()(
       },
 
       setActiveTab: (tabId) => {
-        if (get().tabs[tabId]) {
-          set({ activeTabId: tabId });
+        const state = get();
+        if (!state.tabs[tabId]) return;
+
+        // Check which pane the tab is in
+        if (state.splitTabOrder.includes(tabId)) {
+          set({ splitActiveTabId: tabId, focusedPane: 'split' });
+        } else if (state.tabOrder.includes(tabId)) {
+          set({ activeTabId: tabId, focusedPane: 'main' });
         }
       },
 
@@ -319,6 +406,10 @@ export const useTabStore = create<TabState>()(
         set({
           ...ensured,
           activeTabId: ensured.tabOrder[0] || null,
+          // Also close split
+          splitTabOrder: [],
+          splitActiveTabId: null,
+          focusedPane: 'main',
         });
       },
 
@@ -328,13 +419,17 @@ export const useTabStore = create<TabState>()(
       },
 
       swapForServer: (newServerId: string, currentServerId?: string) => {
-        const { tabs, tabOrder, activeTabId } = get();
+        const state = get();
 
         // Save the entire current tab state for the old server
         if (currentServerId) {
           try {
             const cache = JSON.parse(localStorage.getItem('kortix-tabs-per-server') || '{}');
-            cache[currentServerId] = { tabs, tabOrder, activeTabId };
+            cache[currentServerId] = {
+              tabs: state.tabs, tabOrder: state.tabOrder, activeTabId: state.activeTabId,
+              splitTabOrder: state.splitTabOrder, splitActiveTabId: state.splitActiveTabId,
+              focusedPane: state.focusedPane, splitSizes: state.splitSizes,
+            };
             localStorage.setItem('kortix-tabs-per-server', JSON.stringify(cache));
           } catch {}
         }
@@ -348,6 +443,10 @@ export const useTabStore = create<TabState>()(
             set({
               ...ensured,
               activeTabId: saved.activeTabId || DASHBOARD_TAB_ID,
+              splitTabOrder: saved.splitTabOrder || [],
+              splitActiveTabId: saved.splitActiveTabId || null,
+              focusedPane: saved.focusedPane || 'main',
+              splitSizes: saved.splitSizes || [50, 50],
             });
             return;
           }
@@ -355,8 +454,118 @@ export const useTabStore = create<TabState>()(
 
         // No saved state for new server — start with just the dashboard tab
         const ensured = ensureDashboardTab({}, []);
-        set({ ...ensured, activeTabId: DASHBOARD_TAB_ID });
+        set({
+          ...ensured, activeTabId: DASHBOARD_TAB_ID,
+          splitTabOrder: [], splitActiveTabId: null, focusedPane: 'main', splitSizes: [50, 50],
+        });
       },
+
+      // ================================================================
+      // Split actions — minimal horizontal split
+      // ================================================================
+
+      splitTab: (tabId) => {
+        const state = get();
+        const tab = state.tabs[tabId];
+        if (!tab || tab.pinned || tabId === DASHBOARD_TAB_ID) return;
+        // Already split? No-op
+        if (state.splitTabOrder.length > 0) return;
+        // Need at least 2 tabs in main to split (one stays, one moves)
+        if (state.tabOrder.length < 2) return;
+
+        const newMainOrder = state.tabOrder.filter((id) => id !== tabId);
+        const newMainActive = state.activeTabId === tabId
+          ? newMainOrder[Math.min(state.tabOrder.indexOf(tabId), newMainOrder.length - 1)] ?? null
+          : state.activeTabId;
+
+        set({
+          tabOrder: newMainOrder,
+          activeTabId: newMainActive,
+          splitTabOrder: [tabId],
+          splitActiveTabId: tabId,
+          focusedPane: 'split',
+          splitSizes: [50, 50],
+        });
+      },
+
+      closeSplit: () => {
+        const state = get();
+        if (state.splitTabOrder.length === 0) return;
+        // Move all split tabs back to main
+        const mergedOrder = [...state.tabOrder, ...state.splitTabOrder];
+        const ensured = ensureDashboardTab(state.tabs, mergedOrder);
+        set({
+          ...ensured,
+          activeTabId: state.focusedPane === 'split' && state.splitActiveTabId
+            ? state.splitActiveTabId
+            : state.activeTabId,
+          splitTabOrder: [],
+          splitActiveTabId: null,
+          focusedPane: 'main',
+        });
+      },
+
+      moveTabToSplit: (tabId) => {
+        const state = get();
+        const tab = state.tabs[tabId];
+        if (!tab || tab.pinned || tabId === DASHBOARD_TAB_ID) return;
+        if (!state.tabOrder.includes(tabId)) return;
+        if (state.splitTabOrder.length === 0) return; // must already be split
+
+        const newMainOrder = state.tabOrder.filter((id) => id !== tabId);
+        const newMainActive = state.activeTabId === tabId
+          ? newMainOrder[Math.min(state.tabOrder.indexOf(tabId), Math.max(0, newMainOrder.length - 1))] ?? null
+          : state.activeTabId;
+
+        set({
+          tabOrder: newMainOrder,
+          activeTabId: newMainActive,
+          splitTabOrder: [...state.splitTabOrder, tabId],
+          splitActiveTabId: tabId,
+          focusedPane: 'split',
+        });
+      },
+
+      moveTabToMain: (tabId) => {
+        const state = get();
+        const tab = state.tabs[tabId];
+        if (!tab) return;
+        if (!state.splitTabOrder.includes(tabId)) return;
+
+        const newSplitOrder = state.splitTabOrder.filter((id) => id !== tabId);
+        const newSplitActive = state.splitActiveTabId === tabId
+          ? (newSplitOrder[Math.min(state.splitTabOrder.indexOf(tabId), Math.max(0, newSplitOrder.length - 1))] ?? null)
+          : state.splitActiveTabId;
+
+        const newMainOrder = [...state.tabOrder, tabId];
+        const ensured = ensureDashboardTab(state.tabs, newMainOrder);
+
+        // Auto-collapse if split is now empty
+        if (newSplitOrder.length === 0) {
+          set({
+            ...ensured,
+            activeTabId: tabId,
+            splitTabOrder: [],
+            splitActiveTabId: null,
+            focusedPane: 'main',
+          });
+          return;
+        }
+
+        set({
+          ...ensured,
+          activeTabId: tabId,
+          splitTabOrder: newSplitOrder,
+          splitActiveTabId: newSplitActive,
+          focusedPane: 'main',
+        });
+      },
+
+      focusPane: (pane) => set({ focusedPane: pane }),
+
+      setSplitSizes: (sizes) => set({ splitSizes: sizes }),
+
+      isSplit: () => get().splitTabOrder.length > 0,
     }),
     {
       name: 'kortix-tabs',
@@ -365,6 +574,10 @@ export const useTabStore = create<TabState>()(
         tabOrder: state.tabOrder,
         activeTabId: state.activeTabId,
         recentlyClosedTabs: state.recentlyClosedTabs,
+        splitTabOrder: state.splitTabOrder,
+        splitActiveTabId: state.splitActiveTabId,
+        focusedPane: state.focusedPane,
+        splitSizes: state.splitSizes,
       }),
       // On rehydration, ensure dashboard tab is always present
       onRehydrateStorage: () => (state) => {
@@ -374,6 +587,21 @@ export const useTabStore = create<TabState>()(
           state.tabOrder = ensured.tabOrder;
           if (!state.activeTabId) {
             state.activeTabId = DASHBOARD_TAB_ID;
+          }
+          // Ensure split state defaults
+          if (!state.splitTabOrder) state.splitTabOrder = [];
+          if (!state.splitActiveTabId) state.splitActiveTabId = null;
+          if (!state.focusedPane) state.focusedPane = 'main';
+          if (!state.splitSizes) state.splitSizes = [50, 50];
+          // Validate split tabs still exist
+          state.splitTabOrder = state.splitTabOrder.filter((id: string) => state.tabs[id]);
+          if (state.splitActiveTabId && !state.tabs[state.splitActiveTabId]) {
+            state.splitActiveTabId = state.splitTabOrder[0] ?? null;
+          }
+          // Auto-collapse if split is empty
+          if (state.splitTabOrder.length === 0) {
+            state.splitActiveTabId = null;
+            state.focusedPane = 'main';
           }
         }
       },
@@ -434,6 +662,10 @@ useTabStore.subscribe((state) => {
         tabs: state.tabs,
         tabOrder: state.tabOrder,
         activeTabId: state.activeTabId,
+        splitTabOrder: state.splitTabOrder,
+        splitActiveTabId: state.splitActiveTabId,
+        focusedPane: state.focusedPane,
+        splitSizes: state.splitSizes,
       };
       localStorage.setItem('kortix-tabs-per-server', JSON.stringify(cache));
     } catch {}

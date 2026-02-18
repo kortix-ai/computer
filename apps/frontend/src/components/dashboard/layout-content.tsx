@@ -18,9 +18,14 @@ import { useSandbox } from '@/hooks/platform/use-sandbox';
 import { useSandboxConnection } from '@/hooks/platform/use-sandbox-connection';
 import { useConnectionToasts } from '@/components/dashboard/connecting-screen';
 import { TabBar } from '@/components/tabs/tab-bar';
-import { useTabStore } from '@/stores/tab-store';
+import { useTabStore, type FocusedPane } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { cn } from '@/lib/utils';
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable';
 
 function OpenCodeEventStreamProvider() {
   useOpenCodeEventStream();
@@ -144,19 +149,23 @@ function DashboardSkeleton() {
 }
 
 // ============================================================================
-// Pre-mounted session tabs: keeps all open sessions alive in the DOM so
-// switching between tabs is instant (no re-mount, no loading spinner).
+// Renders pre-mounted tab content for a list of tab IDs
 // ============================================================================
-function SessionTabsContainer({ children }: { children: React.ReactNode }) {
-  const tabs = useTabStore((s) => s.tabs);
-  const tabOrder = useTabStore((s) => s.tabOrder);
-  const activeTabId = useTabStore((s) => s.activeTabId);
-
-  // Collect tab IDs by type
-  const sessionTabIds = tabOrder.filter((id) => tabs[id]?.type === 'session');
-  const fileTabIds = tabOrder.filter((id) => tabs[id]?.type === 'file');
-  const previewTabIds = tabOrder.filter((id) => tabs[id]?.type === 'preview');
-  const terminalTabIds = tabOrder.filter((id) => tabs[id]?.type === 'terminal');
+function PaneContent({
+  tabIds,
+  activeTabId,
+  tabs,
+  children,
+}: {
+  tabIds: string[];
+  activeTabId: string | null;
+  tabs: Record<string, import('@/stores/tab-store').Tab>;
+  children?: React.ReactNode;
+}) {
+  const sessionTabIds = tabIds.filter((id) => tabs[id]?.type === 'session');
+  const fileTabIds = tabIds.filter((id) => tabs[id]?.type === 'file');
+  const previewTabIds = tabIds.filter((id) => tabs[id]?.type === 'preview');
+  const terminalTabIds = tabIds.filter((id) => tabs[id]?.type === 'terminal');
   const activeTab = activeTabId ? tabs[activeTabId] : null;
   const showingMountedTab = activeTab?.type === 'session'
     || activeTab?.type === 'file'
@@ -164,19 +173,9 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
     || activeTab?.type === 'terminal';
 
   return (
-    <div className={cn(
-      'bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative',
-      'md:rounded-tl-xl md:rounded-tr-xl md:border-t md:border-l md:border-r md:border-border/50',
-    )}>
-      {/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
+    <>
       {sessionTabIds.map((id) => (
-        <div
-          key={id}
-          className={cn(
-            'absolute inset-0 flex flex-col',
-            id !== activeTabId && 'hidden',
-          )}
-        >
+        <div key={id} className={cn('absolute inset-0 flex flex-col', id !== activeTabId && 'hidden')}>
           <Suspense fallback={null}>
             <SessionLayout sessionId={id}>
               <SessionChat sessionId={id} />
@@ -184,71 +183,108 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
           </Suspense>
         </div>
       ))}
-
-      {/* File tabs — rendered when active */}
       {fileTabIds.map((id) => {
-        const tab = tabs[id];
-        if (!tab) return null;
-        // Extract file path from tab id (strip "file:" prefix)
         const filePath = id.startsWith('file:') ? id.slice(5) : id;
         return (
-          <div
-            key={id}
-            className={cn(
-              'absolute inset-0 flex flex-col',
-              id !== activeTabId && 'hidden',
-            )}
-          >
+          <div key={id} className={cn('absolute inset-0 flex flex-col', id !== activeTabId && 'hidden')}>
             <Suspense fallback={null}>
               <FileTabContent tabId={id} filePath={filePath} />
             </Suspense>
           </div>
         );
       })}
-
-      {/* Preview tabs — iframe previews of sandbox services */}
       {previewTabIds.map((id) => (
-        <div
-          key={id}
-          className={cn(
-            'absolute inset-0 flex flex-col',
-            id !== activeTabId && 'hidden',
-          )}
-        >
+        <div key={id} className={cn('absolute inset-0 flex flex-col', id !== activeTabId && 'hidden')}>
           <Suspense fallback={null}>
             <PreviewTabContent tabId={id} />
           </Suspense>
         </div>
       ))}
-
-      {/* Terminal tabs — 1 tab = 1 PTY */}
       {terminalTabIds.map((id) => {
         const ptyId = id.startsWith('terminal:') ? id.slice(9) : id;
         return (
-          <div
-            key={id}
-            className={cn(
-              'absolute inset-0 flex flex-col',
-              id !== activeTabId && 'hidden',
-            )}
-          >
+          <div key={id} className={cn('absolute inset-0 flex flex-col', id !== activeTabId && 'hidden')}>
             <Suspense fallback={null}>
               <TerminalTabContent ptyId={ptyId} tabId={id} hidden={id !== activeTabId} />
             </Suspense>
           </div>
         );
       })}
+      {children && (
+        <div className={cn('flex-1 min-h-0 flex flex-col overflow-y-auto', showingMountedTab && 'hidden')}>
+          {children}
+        </div>
+      )}
+    </>
+  );
+}
 
-      {/* Route-based children (dashboard, settings, etc.)
-          Hidden when a pre-mounted tab is active. */}
-      <div
-        className={cn(
-          'flex-1 min-h-0 flex flex-col overflow-y-auto',
-          showingMountedTab && 'hidden',
-        )}
-      >
-        {children}
+// ============================================================================
+// Pre-mounted session tabs container with optional horizontal split
+// ============================================================================
+function SessionTabsContainer({ children }: { children: React.ReactNode }) {
+  const tabs = useTabStore((s) => s.tabs);
+  const tabOrder = useTabStore((s) => s.tabOrder);
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const splitTabOrder = useTabStore((s) => s.splitTabOrder);
+  const splitActiveTabId = useTabStore((s) => s.splitActiveTabId);
+  const focusedPane = useTabStore((s) => s.focusedPane);
+  const splitSizes = useTabStore((s) => s.splitSizes);
+  const setSplitSizes = useTabStore((s) => s.setSplitSizes);
+  const focusPaneFn = useTabStore((s) => s.focusPane);
+
+  const isSplit = splitTabOrder.length > 0;
+
+  const outerClass = cn(
+    'bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative',
+    'md:rounded-tl-xl md:rounded-tr-xl md:border-t md:border-l md:border-r md:border-border/50',
+  );
+
+  // No split — original single-pane rendering
+  if (!isSplit) {
+    return (
+      <div className={outerClass}>
+        <PaneContent tabIds={tabOrder} activeTabId={activeTabId} tabs={tabs}>
+          {children}
+        </PaneContent>
       </div>
+    );
+  }
+
+  // Split — two panes side by side
+  return (
+    <div className={outerClass}>
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="h-full"
+        onLayout={(sizes) => {
+          if (sizes.length === 2) setSplitSizes([sizes[0], sizes[1]]);
+        }}
+      >
+        {/* Main (left) pane */}
+        <ResizablePanel defaultSize={splitSizes[0]} minSize={20} className="overflow-hidden">
+          <div
+            className={cn('h-full relative overflow-hidden', focusedPane === 'main' && 'ring-1 ring-primary/30 ring-inset rounded-sm')}
+            onMouseDown={() => focusPaneFn('main')}
+          >
+            <PaneContent tabIds={tabOrder} activeTabId={activeTabId} tabs={tabs}>
+              {children}
+            </PaneContent>
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle className="w-0 z-20" />
+
+        {/* Split (right) pane */}
+        <ResizablePanel defaultSize={splitSizes[1]} minSize={20} className="overflow-hidden">
+          <div
+            className={cn('h-full relative overflow-hidden', focusedPane === 'split' && 'ring-1 ring-primary/30 ring-inset rounded-sm')}
+            onMouseDown={() => focusPaneFn('split')}
+          >
+            <PaneContent tabIds={splitTabOrder} activeTabId={splitActiveTabId} tabs={tabs} />
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
