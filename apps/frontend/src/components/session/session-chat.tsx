@@ -117,7 +117,6 @@ import {
 	formatTokens,
 	getHiddenToolParts,
 	getPermissionForTool,
-	getQuestionForTool,
 	getRetryInfo,
 	getShellModePart,
 	getTurnCost,
@@ -152,7 +151,6 @@ import {
 	type ToolPart,
 	type Turn,
 	type TurnCostInfo,
-	turnHasSteps,
 } from "@/ui";
 
 // ============================================================================
@@ -201,6 +199,50 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
 				</TooltipContent>
 			</Tooltip>
 			<div className="flex-1 h-px bg-border/50" />
+		</div>
+	);
+}
+
+// ============================================================================
+// Answered question card — collapsible summary of completed Q&A
+// ============================================================================
+
+function AnsweredQuestionCard({ part }: { part: ToolPart }) {
+	const [expanded, setExpanded] = useState(false);
+	const input = (part.state as any)?.input ?? {};
+	const metadata = (part.state as any)?.metadata ?? {};
+	const questions: Array<{ question: string; options?: { label: string }[] }> =
+		Array.isArray(input.questions) ? input.questions : [];
+	const answers: string[][] = Array.isArray(metadata.answers) ? metadata.answers : [];
+	if (questions.length === 0 || answers.length === 0) return null;
+
+	const answeredCount = answers.filter((a) => a.length > 0).length;
+
+	return (
+		<div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
+			<button
+				onClick={() => setExpanded(!expanded)}
+				className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer hover:bg-muted/30 transition-colors"
+			>
+				<MessageSquare className="size-3.5 text-muted-foreground shrink-0" />
+				<span className="text-xs font-medium text-foreground">Questions</span>
+				<span className="text-[11px] text-muted-foreground">{answeredCount} answered</span>
+				<ChevronDown className={cn('size-3 text-muted-foreground ml-auto transition-transform', expanded && 'rotate-180')} />
+			</button>
+			{expanded && (
+				<div className="border-t border-border/30 divide-y divide-border/30">
+					{questions.map((q, i) => {
+						const answer = answers[i] || [];
+						const answerText = answer.join(', ') || 'No answer';
+						return (
+							<div key={i} className="px-3.5 py-2.5">
+								<div className="text-xs text-muted-foreground">{q.question}</div>
+								<div className="text-xs font-medium text-foreground mt-0.5">{answerText}</div>
+							</div>
+						);
+					})}
+				</div>
+			)}
 		</div>
 	);
 }
@@ -1370,6 +1412,36 @@ function UserMessageRow({
 // Throttled Markdown — limits re-renders during streaming (~30fps)
 // ============================================================================
 
+/**
+ * Strip the incomplete trailing table row while streaming so the markdown
+ * parser doesn't render broken borders / pipe characters.
+ *
+ * A markdown table row must start with `|` and end with `|` followed by a
+ * newline. If the last line of the content looks like an incomplete row
+ * (starts with `|` but doesn't end with `|`), we trim it. We also trim a
+ * trailing separator row that is still being typed (e.g. `| --- | --`).
+ */
+function trimIncompleteTableRow(text: string): string {
+	// Fast path: no pipe at all → nothing to trim
+	if (!text.includes("|")) return text;
+
+	const lines = text.split("\n");
+	// Walk backwards and remove incomplete table lines from the end
+	while (lines.length > 0) {
+		const last = lines[lines.length - 1];
+		const trimmed = last.trim();
+		// Empty trailing line — skip but keep it
+		if (trimmed === "") break;
+		// A complete table row/separator ends with `|`
+		if (trimmed.startsWith("|") && !trimmed.endsWith("|")) {
+			lines.pop();
+		} else {
+			break;
+		}
+	}
+	return lines.join("\n");
+}
+
 function ThrottledMarkdown({
 	content,
 	isStreaming,
@@ -1378,9 +1450,10 @@ function ThrottledMarkdown({
 	isStreaming: boolean;
 }) {
 	const throttled = useThrottledValue(content, 33);
+	const displayContent = isStreaming ? trimIncompleteTableRow(throttled) : content;
 	return (
 		<UnifiedMarkdown
-			content={isStreaming ? throttled : content}
+			content={displayContent}
 			isStreaming={isStreaming}
 		/>
 	);
@@ -1460,7 +1533,19 @@ function SessionTurn({
 
 	// Derived state from shared helpers
 	const allParts = useMemo(() => collectTurnParts(turn), [turn]);
-	const hasSteps = useMemo(() => turnHasSteps(allParts), [allParts]);
+	// Check if there are visible steps that actually render inside the
+	// collapsible steps section. Tool parts that are rendered elsewhere
+	// (todowrite, task, question) don't count as "steps".
+	const hasSteps = useMemo(() => {
+		return allParts.some(({ part }) => {
+			if (part.type === 'compaction' || part.type === 'snapshot' || part.type === 'patch') return true;
+			if (isToolPart(part)) {
+				if (part.tool === 'todowrite' || part.tool === 'task' || part.tool === 'question') return false;
+				return shouldShowToolPart(part);
+			}
+			return false;
+		});
+	}, [allParts]);
 	const isLast = useMemo(
 		() => isLastUserMessage(turn.userMessage.info.id, allMessages),
 		[turn.userMessage.info.id, allMessages],
@@ -1527,7 +1612,6 @@ function SessionTurn({
 
 	// Answered question parts — shown when steps are collapsed (matches SolidJS)
 	const answeredQuestionParts = useMemo(() => {
-		if (stepsExpanded) return [];
 		if (questions.filter((q) => q.sessionID === sessionId).length > 0)
 			return [];
 		const result: { part: ToolPart; messageId: string }[] = [];
@@ -1544,6 +1628,10 @@ function SessionTurn({
 		}
 		return result;
 	}, [stepsExpanded, questions, sessionId, turn.assistantMessages]);
+
+	const taskToolParts = useMemo(() => {
+		return allParts.filter(({ part }) => isToolPart(part) && (part as ToolPart).tool === 'task');
+	}, [allParts]);
 
 	// Last assistant message ID — used for "fork from response" action
 	const lastAssistantMessageId = useMemo(() => {
@@ -1654,10 +1742,7 @@ function SessionTurn({
 					part={shellModePart}
 					sessionId={sessionId}
 					permission={nextPermission?.tool ? nextPermission : undefined}
-					question={nextQuestion?.tool ? nextQuestion : undefined}
 					onPermissionReply={onPermissionReply}
-					onQuestionReply={onQuestionReply}
-					onQuestionReject={onQuestionReject}
 					defaultOpen
 				/>
 				{turnError && (
@@ -1761,8 +1846,8 @@ function SessionTurn({
 				)}
 			</div>
 
-			{/* ── Kortix logo ── */}
-			{turn.assistantMessages.length > 0 && (
+			{/* Kortix logo header */}
+			{(working || hasSteps) && (
 				<div className="flex items-center gap-2 mt-3">
 					{/* eslint-disable-next-line @next/next/no-img-element */}
 					<img
@@ -1901,20 +1986,23 @@ function SessionTurn({
 						if (isToolPart(part)) {
 							if (!shouldShowToolPart(part)) return null;
 							if (part.tool === "todowrite") return null;
+							if (part.tool === "task") return null;
+							// Questions are NEVER rendered inside steps — always shown
+							// standalone at the bottom of the turn (after the response).
+							if (part.tool === "question") return null;
+
 							const perm = getPermissionForTool(permissions, part.callID);
-							const question = getQuestionForTool(questions, part.callID);
-							if (!question && isToolPartHidden(part, message.info.id, hidden))
-								return null;
+
+							// Hide tool parts that have active permission
+							if (isToolPartHidden(part, message.info.id, hidden)) return null;
+
 							return (
 								<div key={part.id}>
 									<ToolPartRenderer
 										part={part}
 										sessionId={sessionId}
 										permission={perm}
-										question={question}
 										onPermissionReply={onPermissionReply}
-										onQuestionReply={onQuestionReply}
-										onQuestionReject={onQuestionReject}
 									/>
 								</div>
 							);
@@ -1946,12 +2034,37 @@ function SessionTurn({
 				</div>
 			)}
 
-			{/* ── Answered question parts (when steps collapsed) ── */}
-			{!stepsExpanded && answeredQuestionParts.length > 0 && (
+			{/* Always-visible: Subsession/task cards */}
+			{taskToolParts.length > 0 && (
 				<div className="space-y-2">
-					{answeredQuestionParts.map(({ part }) => (
-						<ToolPartRenderer key={part.id} part={part} sessionId={sessionId} />
-					))}
+					{taskToolParts.map(({ part, message }) => {
+						const toolPart = part as ToolPart;
+						if (!shouldShowToolPart(toolPart)) return null;
+						const perm = getPermissionForTool(permissions, toolPart.callID);
+						if (isToolPartHidden(toolPart, message.info.id, hidden)) return null;
+						return (
+							<ToolPartRenderer
+								key={part.id}
+								part={toolPart}
+								sessionId={sessionId}
+								permission={perm}
+								onPermissionReply={onPermissionReply}
+							/>
+						);
+					})}
+				</div>
+			)}
+
+			{/* Kortix logo — shown when there are no steps and not working (otherwise logo is already above the steps trigger) */}
+			{!hasSteps && !working && (response || answeredQuestionParts.length > 0) && (
+				<div className="flex items-center gap-2 mt-3 mb-3">
+					{/* eslint-disable-next-line @next/next/no-img-element */}
+					<img
+						src="/kortix-logomark-white.svg"
+						alt="Kortix"
+						className="dark:invert-0 invert flex-shrink-0"
+						style={{ height: '14px', width: 'auto' }}
+					/>
 				</div>
 			)}
 
@@ -1960,12 +2073,19 @@ function SessionTurn({
 				{!working && response ? response : ""}
 			</div>
 
-			{/* ── Response section (ONLY when NOT working) ──
-          This is the extracted last text part, shown as the final response.
-          While working, text streams inside the steps block above. */}
+			{/* Response section (shown when NOT working — while working, text streams inside steps above) */}
 			{!working && response && (
-				<div className="mt-3 text-sm">
+				<div className="text-sm">
 					<SandboxUrlDetector content={response} isStreaming={false} />
+				</div>
+			)}
+
+			{/* Answered question parts — collapsible, shown after the response text */}
+			{answeredQuestionParts.length > 0 && (
+				<div className="space-y-2 mt-3">
+					{answeredQuestionParts.map(({ part }) => (
+						<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
+					))}
 				</div>
 			)}
 
@@ -1974,11 +2094,8 @@ function SessionTurn({
 				<TurnErrorDisplay errorText={turnError} />
 			)}
 
-			{/* ── Question prompt (fallback for non-tool-associated questions) ──
-          Tool-associated questions now render inside ToolPartRenderer (matching
-          SolidJS reference message-part.tsx line 664). This standalone prompt
-          only shows for questions that aren't tied to a specific tool call. */}
-			{nextQuestion && !nextQuestion.tool && (
+			{/* Question prompt — always rendered at the bottom of the turn, after the response */}
+			{nextQuestion && (
 				<QuestionPrompt
 					request={nextQuestion}
 					onReply={onQuestionReply}
@@ -2536,16 +2653,11 @@ export function SessionChat({
 				if (result.data) {
 					const statuses = result.data as Record<string, any>;
 					const serverStatus = statuses[sessionId];
-					if (serverStatus) {
-						useOpenCodeSessionStatusStore
-							.getState()
-							.setStatus(sessionId, serverStatus);
-					} else {
-						// Server didn't include this session — it's idle
-						useOpenCodeSessionStatusStore
-							.getState()
-							.setStatus(sessionId, { type: "idle" });
-					}
+					const resolvedStatus = serverStatus ?? { type: 'idle' as const };
+					// Update BOTH stores — sync store is the primary source of truth,
+					// but legacy store is also used as fallback.
+					useSyncStore.getState().setStatus(sessionId, resolvedStatus);
+					useOpenCodeSessionStatusStore.getState().setStatus(sessionId, resolvedStatus);
 				}
 			} catch {
 				// ignore — next interval will retry
@@ -2576,15 +2688,13 @@ export function SessionChat({
 				const assistantInfo = msg.info as any;
 				if (assistantInfo.time?.completed) {
 					const timer = setTimeout(() => {
-						const currentStatus =
-							useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-						if (
-							currentStatus?.type === "busy" ||
-							currentStatus?.type === "retry"
-						) {
-							useOpenCodeSessionStatusStore
-								.getState()
-								.setStatus(sessionId, { type: "idle" });
+						const syncStoreStatus = useSyncStore.getState().sessionStatus[sessionId];
+						const legacyStoreStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
+						const currentType = syncStoreStatus?.type ?? legacyStoreStatus?.type;
+						if (currentType === 'busy' || currentType === 'retry') {
+							const idle = { type: 'idle' as const };
+							useSyncStore.getState().setStatus(sessionId, idle);
+							useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
 						}
 					}, 2_000);
 					return () => clearTimeout(timer);
@@ -3156,7 +3266,7 @@ export function SessionChat({
 				<div className="relative flex-1 min-h-0">
 					<div
 						ref={scrollRef}
-						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-32 bg-background h-full [scroll-behavior:auto]"
+						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full [scroll-behavior:auto]"
 					>
 						<div
 							ref={contentRef}

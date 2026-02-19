@@ -147,13 +147,26 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 	upsertMessage: (sessionID, message) =>
 		set((s) => {
 			const list = s.messages[sessionID] ?? [];
+			// First try binary search (fast path for sorted lists).
 			const result = Binary.search(list, message.id, (m) => m.id);
-			const next = [...list];
-			if (result.found) {
+			// Verify the binary search result — the list may be temporarily
+			// unsorted due to optimistic messages appended at the end.
+			const bsValid = result.found && list[result.index]?.id === message.id;
+			if (bsValid) {
+				const next = [...list];
 				next[result.index] = message;
-			} else {
-				next.splice(result.index, 0, message);
+				return { messages: { ...s.messages, [sessionID]: next } };
 			}
+			// Fall back to linear scan to handle unsorted optimistic entries.
+			const linearIdx = list.findIndex((m) => m.id === message.id);
+			if (linearIdx !== -1) {
+				const next = [...list];
+				next[linearIdx] = message;
+				return { messages: { ...s.messages, [sessionID]: next } };
+			}
+			// New message — insert at sorted position via binary search.
+			const next = [...list];
+			next.splice(result.index, 0, message);
 			return { messages: { ...s.messages, [sessionID]: next } };
 		}),
 
@@ -161,10 +174,14 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 		set((s) => {
 			const list = s.messages[sessionID];
 			if (!list) return s;
+			// Try binary search first, fall back to linear for unsorted lists.
 			const result = Binary.search(list, messageID, (m) => m.id);
-			if (!result.found) return s;
+			const idx = (result.found && list[result.index]?.id === messageID)
+				? result.index
+				: list.findIndex((m) => m.id === messageID);
+			if (idx === -1) return s;
 			const next = [...list];
-			next.splice(result.index, 1);
+			next.splice(idx, 1);
 			const { [messageID]: _, ...restParts } = s.parts;
 			return {
 				messages: { ...s.messages, [sessionID]: next },
@@ -285,16 +302,12 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 		optimisticIds.add(message.id);
 		set((s) => {
 			const list = s.messages[sessionID] ?? [];
-			// Use sorted binary insert — same as upsertMessage.
-			// Our ascendingId() generates monotonic IDs so they always sort
-			// correctly relative to server IDs from the same time period.
-			const result = Binary.search(list, message.id, (m) => m.id);
-			const nextMsgs = [...list];
-			if (result.found) {
-				nextMsgs[result.index] = message;
-			} else {
-				nextMsgs.splice(result.index, 0, message);
-			}
+			// Always append optimistic messages at the end of the list.
+			// Client-generated IDs can sort before server IDs due to clock skew
+			// (browser vs Docker). Appending ensures the user message appears
+			// at the bottom of the chat. The list may be temporarily unsorted,
+			// but upsertMessage and optimisticRemove handle this correctly.
+			const nextMsgs = [...list.filter((m) => m.id !== message.id), message];
 			const sorted = messageParts
 				.filter((p) => !!p?.id)
 				.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -310,14 +323,9 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 		set((s) => {
 			const list = s.messages[sessionID];
 			if (!list) return s;
-			// Try binary search first (O(log n)), fall back to linear (O(n)).
-			// This is defensive — if the array is ever unsorted for any reason,
-			// we still find and remove the message.
-			const result = Binary.search(list, messageID, (m) => m.id);
-			let idx = result.found ? result.index : -1;
-			if (idx === -1) {
-				idx = list.findIndex((m) => m.id === messageID);
-			}
+			// Use linear search — optimistic messages may be appended out of
+			// sorted order, so Binary.search can miss them.
+			const idx = list.findIndex((m) => m.id === messageID);
 			if (idx === -1) return s;
 			const nextMsgs = [...list];
 			nextMsgs.splice(idx, 1);
@@ -337,18 +345,36 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				.filter((m) => !!m?.info?.id)
 				.map((m) => m.info)
 				.sort((a, b) => cmp(a.id, b.id));
-			const incomingIds = new Set(incoming.map((m) => m.id));
 
-			// Merge: start from incoming (sorted), then binary-insert any
-			// existing messages not in incoming (optimistic or live SSE).
-			// This matches the SolidJS reconcile({ key: "id" }) approach.
+			// Merge incoming messages with existing ones — never delete messages
+			// that exist in the sync store but are missing from the fetch (they may
+			// be from a newer turn that the server hasn't persisted yet).
 			const existing = s.messages[sessionID] ?? [];
-			const merged = [...incoming];
+			const merged: typeof existing = [];
+			const seen = new Set<string>();
+
+			// Start with all incoming messages
+			for (const m of incoming) {
+				merged.push(m);
+				seen.add(m.id);
+			}
+			// Add any existing messages not in incoming (optimistic or from live SSE).
+			// Optimistic messages go at the end to avoid clock-skew sorting issues;
+			// non-optimistic ones are inserted at their sorted position.
+			const deferredOptimistic: typeof existing = [];
 			for (const m of existing) {
-				if (!incomingIds.has(m.id)) {
-					const r = Binary.search(merged, m.id, (x) => x.id);
-					if (!r.found) merged.splice(r.index, 0, m);
+				if (!seen.has(m.id)) {
+					if (optimisticIds.has(m.id)) {
+						deferredOptimistic.push(m);
+					} else {
+						const r = Binary.search(merged, m.id, (x) => x.id);
+						merged.splice(r.index, 0, m);
+					}
 				}
+			}
+			// Append optimistic messages at the end
+			for (const m of deferredOptimistic) {
+				merged.push(m);
 			}
 
 			// Merge parts: for each message, reconcile by part ID.
@@ -420,48 +446,18 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 			case "message.updated": {
 				const info = (event.properties as { info: Message }).info;
 				if (!info?.sessionID) return;
-
-				// When a real user message arrives from the server, swap out the
-				// matching optimistic message in a SINGLE atomic set() call.
-				// This prevents the intermediate render where the message vanishes
-				// (optimistic removed) before the real one appears (upserted).
+				// When a real user message arrives from the server, remove any
+				// optimistic user messages for this session (they have client-generated
+				// IDs that differ from the server-generated ID).
 				if (info.role === "user" && !optimisticIds.has(info.id)) {
 					const msgs = get().messages[info.sessionID];
 					if (msgs) {
-						// Find the OLDEST optimistic user message to replace (not all).
-						// This handles rapid sends correctly: each server ack only
-						// removes the one optimistic message it replaces.
-						const optIdx = msgs.findIndex(
-							(m) => m.role === "user" && optimisticIds.has(m.id),
-						);
-						if (optIdx !== -1) {
-							const optId = msgs[optIdx].id;
-							optimisticIds.delete(optId);
-							// Atomic: remove optimistic + insert real in one set()
-							set((s) => {
-								const list = s.messages[info.sessionID] ?? [];
-								// Remove the optimistic message
-								const without = list.filter((m) => m.id !== optId);
-								// Insert the real message at sorted position
-								const r = Binary.search(without, info.id, (m) => m.id);
-								const next = [...without];
-								if (r.found) {
-									next[r.index] = info;
-								} else {
-									next.splice(r.index, 0, info);
-								}
-								// Clean up optimistic parts
-								const { [optId]: _, ...restParts } = s.parts;
-								return {
-									messages: { ...s.messages, [info.sessionID]: next },
-									parts: restParts,
-								};
-							});
-							return;
+						const toRemove = msgs.filter((m) => m.role === "user" && optimisticIds.has(m.id));
+						for (const m of toRemove) {
+							store.optimisticRemove(info.sessionID, m.id);
 						}
 					}
 				}
-				// No optimistic swap needed — plain upsert
 				store.upsertMessage(info.sessionID, info);
 				return;
 			}
@@ -479,9 +475,11 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				if (!part?.messageID || !part?.sessionID) return;
 
 				const existingMsgs = get().messages[part.sessionID];
-				const exists =
-					existingMsgs &&
-					Binary.search(existingMsgs, part.messageID, (m) => m.id).found;
+				const bsResult = existingMsgs && Binary.search(existingMsgs, part.messageID, (m) => m.id);
+				const exists = existingMsgs && (
+					(bsResult && bsResult.found && existingMsgs[bsResult.index]?.id === part.messageID) ||
+					existingMsgs.some((m) => m.id === part.messageID)
+				);
 				if (!exists) {
 					store.upsertMessage(part.sessionID, {
 						id: part.messageID,
