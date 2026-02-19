@@ -2764,13 +2764,14 @@ export function SessionChat({
 	}, [messages?.length]);
 
 	// ---- Auto-scroll (replaces inline scroll logic) ----
-	const { scrollRef, contentRef, showScrollButton, scrollToBottom, scrollToLastTurn, spacerHeight } =
+	const { scrollRef, contentRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd, spacerHeight } =
 		useAutoScroll({
 			working: isBusy,
 		});
 
-	// Scroll to the last turn when switching session tabs or on initial message load.
-	// Uses scrollToLastTurn() so the last user message appears at the top of the viewport.
+	// Scroll to the bottom when switching session tabs or on initial message load.
+	// Uses scrollToEnd() (instant, no smooth animation) so there's no visible
+	// jump. Staggered attempts cover async markdown/code-block rendering.
 	const initialScrollDoneRef = useRef<string | null>(null);
 	useEffect(() => {
 		// Reset on session change so we scroll on first render of new session
@@ -2785,16 +2786,22 @@ export function SessionChat({
 		if (messageCount === 0) return;
 		initialScrollDoneRef.current = sessionId;
 
-		// Staggered attempts: the scroll container mounts after this render,
-		// then message components (markdown, code blocks) render asynchronously.
-		const t1 = setTimeout(scrollToLastTurn, 50);
-		const t2 = setTimeout(scrollToLastTurn, 500);
+		// Staggered instant scrolls: the scroll container mounts after this
+		// render, then message components (markdown, code blocks) render
+		// asynchronously. Use scrollToEnd (instant) so there's no visible
+		// smooth animation on page load.
+		const t1 = setTimeout(scrollToEnd, 0);
+		const t2 = setTimeout(scrollToEnd, 100);
+		const t3 = setTimeout(scrollToEnd, 500);
+		const t4 = setTimeout(scrollToEnd, 1500);
 
 		return () => {
 			clearTimeout(t1);
 			clearTimeout(t2);
+			clearTimeout(t3);
+			clearTimeout(t4);
 		};
-	}, [messageCount, sessionId, scrollToLastTurn]);
+	}, [messageCount, sessionId, scrollToEnd]);
 
 	// ---- Pending permissions & questions ----
 	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
@@ -3415,7 +3422,7 @@ export function SessionChat({
 						    only brings the last message to the bottom of the screen.
 						    Height is dynamically measured from the scroll container so
 						    the newest message appears flush at the top. */}
-						<div className="shrink-0" style={{ minHeight: spacerHeight }} />
+						<div style={{ height: spacerHeight }} />
 						</div>
 					</div>
 

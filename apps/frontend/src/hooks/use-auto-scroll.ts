@@ -5,13 +5,19 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 /**
  * useAutoScroll — ChatGPT-style auto-scroll.
  *
- * The spacer is dynamically sized (viewport - lastTurnHeight - offset)
- * so the max scroll puts the last turn at the top — but no further.
- * scrollToLastTurn() uses direct DOM measurement for precise positioning;
- * scrollToBottom() goes to the absolute end (RAF loop / FAB button).
+ * Dynamic spacer: sized so that the browser's natural max-scroll
+ * (scrollHeight - clientHeight) lands exactly where the last turn's
+ * user bubble sits at the top with TURN_TOP_OFFSET padding.
  *
- * The RAF loop follows growing content when the user is "at the bottom".
- * If the user scrolls up, auto-scroll stops and a button appears.
+ * Formula: spacer = viewportH - lastTurnH - TURN_TOP_OFFSET  (min 0)
+ *
+ * This means:
+ *   - Short last turn → big spacer → lots of empty space below
+ *   - Tall last turn  → small/no spacer → content fills viewport
+ *   - No clamp needed — the natural scroll limit IS the right limit
+ *
+ * MutationObserver + ResizeObserver keep the spacer in sync as content
+ * changes (new messages, streaming text, steps collapsing).
  */
 
 interface UseAutoScrollOptions {
@@ -24,81 +30,96 @@ interface UseAutoScrollReturn {
   showScrollButton: boolean;
   scrollToBottom: () => void;
   scrollToLastTurn: () => void;
+  scrollToEnd: () => void;
   spacerHeight: number;
 }
 
-const BOTTOM_THRESHOLD = 50;
-// Padding above the user message bubble when scrolling to the last turn
+const BOTTOM_THRESHOLD = 80;
 const TURN_TOP_OFFSET = 24;
+
+// ── Hook ────────────────────────────────────────────────────────────
 
 export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [spacerHeight, setSpacerHeight] = useState(0);
+  // Start with a generous default so the first render has room to scroll.
+  const [spacerHeight, setSpacerHeight] = useState(() =>
+    typeof window !== 'undefined' ? window.innerHeight : 800,
+  );
 
   const userScrolledRef = useRef(false);
   const rafIdRef = useRef<number>(0);
   const lastScrollHeightRef = useRef(0);
+  const prevWorkingRef = useRef(working);
 
-  // ---- Dynamic spacer ----
-  // Sized so that the maximum scroll puts the last turn's user message
-  // at the top with TURN_TOP_OFFSET padding — but no further.
-  // Formula: spacer = viewportH - lastTurnH - TURN_TOP_OFFSET (min 0).
-  // Falls back to full viewport when there are no turns yet.
+  // ── Dynamic spacer ────────────────────────────────────────────────
+  // Recalculates whenever:
+  //   - The scroll container resizes (ResizeObserver)
+  //   - Content changes: new messages, streaming text (MutationObserver)
+  // RAF-throttled to avoid layout thrashing.
   useEffect(() => {
     const el = scrollRef.current;
     const content = contentRef.current;
     if (!el || !content) return;
 
-    let rafPending = 0;
+    let rafId = 0;
 
     const recalc = () => {
       const viewportH = el.clientHeight;
-      const turnEls = content.querySelectorAll<HTMLElement>('[data-turn-id]');
-      const lastTurn = turnEls[turnEls.length - 1];
+      const turns = content.querySelectorAll<HTMLElement>('[data-turn-id]');
+      const lastTurn = turns[turns.length - 1];
       if (!lastTurn) {
+        // No turns yet — full viewport spacer so optimistic message can scroll up.
         setSpacerHeight(viewportH);
         return;
       }
-      // Use offsetHeight instead of getBoundingClientRect to avoid
-      // issues with transforms/scroll position affecting the measurement.
       const lastTurnH = lastTurn.offsetHeight;
       setSpacerHeight(Math.max(0, viewportH - lastTurnH - TURN_TOP_OFFSET));
     };
 
-    const scheduleRecalc = () => {
-      if (rafPending) return;
-      rafPending = requestAnimationFrame(() => {
-        rafPending = 0;
+    const schedule = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
         recalc();
       });
     };
 
-    const ro = new ResizeObserver(scheduleRecalc);
+    const ro = new ResizeObserver(schedule);
     ro.observe(el);
 
-    // Watch for content changes (new messages, streaming)
-    const mo = new MutationObserver(scheduleRecalc);
+    const mo = new MutationObserver(schedule);
     mo.observe(content, { childList: true, subtree: true, characterData: true });
 
+    // Initial calc.
     recalc();
 
     return () => {
       ro.disconnect();
       mo.disconnect();
-      cancelAnimationFrame(rafPending);
+      cancelAnimationFrame(rafId);
     };
   }, []);
 
+  // ── "At bottom" — with the dynamic spacer, the absolute bottom IS
+  //    the last-turn-at-top position, so we just check scrollHeight. ──
   const isAtBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return true;
     return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
   }, []);
 
-  // ---- Public scrollToBottom ----
-  // With the dynamic spacer, scrolling to the absolute bottom === last turn at top.
+  // ── Instant: scroll to bottom (= last turn at top) ────────────────
+  const scrollToEnd = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    userScrolledRef.current = false;
+    setShowScrollButton(false);
+    el.scrollTop = el.scrollHeight;
+  }, []);
+
+  // ── Smooth: scroll to bottom (= last turn at top) ─────────────────
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -107,40 +128,34 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, []);
 
-  // ---- Scroll last turn's user message to the top of viewport ----
-  // Uses direct DOM measurement so it works even before the spacer has recalculated.
+  // ── Alias used by handleSend — smooth scroll to last turn ─────────
   const scrollToLastTurn = useCallback(() => {
-    const el = scrollRef.current;
-    const content = contentRef.current;
-    if (!el || !content) return;
-
-    const turnEls = content.querySelectorAll<HTMLElement>('[data-turn-id]');
-    const lastTurn = turnEls[turnEls.length - 1];
-    if (!lastTurn) {
-      scrollToBottom();
-      return;
-    }
-
-    const elRect = el.getBoundingClientRect();
-    const turnRect = lastTurn.getBoundingClientRect();
-    const target = Math.max(0, el.scrollTop + (turnRect.top - elRect.top) - TURN_TOP_OFFSET);
-
-    userScrolledRef.current = false;
-    setShowScrollButton(false);
-    el.scrollTo({ top: target, behavior: 'smooth' });
+    scrollToBottom();
   }, [scrollToBottom]);
 
-  // ---- RAF-based auto-scroll loop ----
+  // ── Re-anchor on working → idle ───────────────────────────────────
+  // The DOM changes dramatically (steps collapse, response moves).
+  // Re-position the last turn at the top so it doesn't disappear.
+  useEffect(() => {
+    const was = prevWorkingRef.current;
+    prevWorkingRef.current = working;
+    if (was && !working && !userScrolledRef.current) {
+      // Staggered instant scrolls to cover layout settling.
+      const t1 = setTimeout(scrollToEnd, 50);
+      const t2 = setTimeout(scrollToEnd, 200);
+      const t3 = setTimeout(scrollToEnd, 600);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    }
+  }, [working, scrollToEnd]);
+
+  // ── RAF auto-scroll during streaming ──────────────────────────────
   useEffect(() => {
     if (!working) {
+      // Not streaming — check if FAB should show.
       const timer = setTimeout(() => {
-        if (!isAtBottom()) {
-          setShowScrollButton(true);
-        } else {
-          setShowScrollButton(false);
-          userScrolledRef.current = false;
-        }
-      }, 350);
+        if (!isAtBottom()) setShowScrollButton(true);
+        else { setShowScrollButton(false); userScrolledRef.current = false; }
+      }, 400);
       return () => clearTimeout(timer);
     }
 
@@ -151,126 +166,82 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
       if (!active) return;
       const el = scrollRef.current;
       if (el) {
-        const newHeight = el.scrollHeight;
-        const heightGrew = newHeight - lastScrollHeightRef.current;
-
-        if (heightGrew > 0) {
-          const distFromBottom = newHeight - el.scrollTop - el.clientHeight;
-
-          if (distFromBottom <= heightGrew + BOTTOM_THRESHOLD) {
-            // User was at the bottom — follow the content
-            el.scrollTop = newHeight;
+        const newH = el.scrollHeight;
+        const grew = newH - lastScrollHeightRef.current;
+        if (grew > 0) {
+          const dist = newH - el.scrollTop - el.clientHeight;
+          if (dist <= grew + BOTTOM_THRESHOLD && !userScrolledRef.current) {
+            // Follow growing content — just go to the bottom.
+            // With the dynamic spacer this = last turn at top.
+            el.scrollTop = newH;
           } else if (!userScrolledRef.current) {
-            // User is far from the bottom — they scrolled up
             userScrolledRef.current = true;
             setShowScrollButton(true);
           }
         }
-
-        lastScrollHeightRef.current = newHeight;
+        lastScrollHeightRef.current = newH;
       }
       rafIdRef.current = requestAnimationFrame(tick);
     };
 
     rafIdRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      active = false;
-      cancelAnimationFrame(rafIdRef.current);
-    };
+    return () => { active = false; cancelAnimationFrame(rafIdRef.current); };
   }, [working, isAtBottom]);
 
-  // ---- Wheel: user-intent detector ----
+  // ── Wheel intent ──────────────────────────────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.('[data-scrollable]')) return;
-
+    const handle = (e: WheelEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
       if (e.deltaY < 0) {
-        if (!userScrolledRef.current) {
-          userScrolledRef.current = true;
-          setShowScrollButton(true);
-        }
+        if (!userScrolledRef.current) { userScrolledRef.current = true; setShowScrollButton(true); }
       } else if (e.deltaY > 0) {
         requestAnimationFrame(() => {
-          if (isAtBottom()) {
-            userScrolledRef.current = false;
-            setShowScrollButton(false);
-          }
+          if (isAtBottom()) { userScrolledRef.current = false; setShowScrollButton(false); }
         });
       }
     };
-
-    el.addEventListener('wheel', handleWheel, { passive: true });
-    return () => el.removeEventListener('wheel', handleWheel);
+    el.addEventListener('wheel', handle, { passive: true });
+    return () => el.removeEventListener('wheel', handle);
   }, [isAtBottom]);
 
-  // ---- Touch: detect swipe intent ----
+  // ── Touch intent ──────────────────────────────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-
-    let touchStartY = 0;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0]?.clientY ?? 0;
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.('[data-scrollable]')) return;
-
-      const touchY = e.touches[0]?.clientY ?? 0;
-      const delta = touchStartY - touchY;
-
-      if (delta < -10) {
-        if (!userScrolledRef.current) {
-          userScrolledRef.current = true;
-          setShowScrollButton(true);
-        }
-      } else if (delta > 10) {
+    let startY = 0;
+    const onStart = (e: TouchEvent) => { startY = e.touches[0]?.clientY ?? 0; };
+    const onMove = (e: TouchEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
+      const dy = startY - (e.touches[0]?.clientY ?? 0);
+      if (dy < -10 && !userScrolledRef.current) { userScrolledRef.current = true; setShowScrollButton(true); }
+      else if (dy > 10) {
         requestAnimationFrame(() => {
-          if (isAtBottom()) {
-            userScrolledRef.current = false;
-            setShowScrollButton(false);
-          }
+          if (isAtBottom()) { userScrolledRef.current = false; setShowScrollButton(false); }
         });
       }
     };
-
-    el.addEventListener('touchstart', handleTouchStart, { passive: true });
-    el.addEventListener('touchmove', handleTouchMove, { passive: true });
-    return () => {
-      el.removeEventListener('touchstart', handleTouchStart);
-      el.removeEventListener('touchmove', handleTouchMove);
-    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); };
   }, [isAtBottom]);
 
-  // ---- Keyboard / scrollbar-drag catch-all ----
+  // ── Keyboard / scrollbar drag catch-all ───────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-
-    let lastScrollTop = el.scrollTop;
-
-    const handleScroll = () => {
-      const currentScrollTop = el.scrollTop;
-      const scrolledUp = currentScrollTop < lastScrollTop;
-      lastScrollTop = currentScrollTop;
-
-      if (scrolledUp && !isAtBottom()) {
-        if (!userScrolledRef.current) {
-          userScrolledRef.current = true;
-          setShowScrollButton(true);
-        }
+    let last = el.scrollTop;
+    const handle = () => {
+      const cur = el.scrollTop;
+      if (cur < last && !isAtBottom() && !userScrolledRef.current) {
+        userScrolledRef.current = true;
+        setShowScrollButton(true);
       }
+      last = cur;
     };
-
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
+    el.addEventListener('scroll', handle, { passive: true });
+    return () => el.removeEventListener('scroll', handle);
   }, [isAtBottom]);
 
   return {
@@ -279,6 +250,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     showScrollButton,
     scrollToBottom,
     scrollToLastTurn,
+    scrollToEnd,
     spacerHeight,
   };
 }
