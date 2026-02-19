@@ -93,7 +93,12 @@ const server = Bun.serve({
     const url = new URL(req.url);
     let pathname = decodeURIComponent(url.pathname);
 
-    if (pathname === "/" || pathname === "/index.html") {
+    if (
+      pathname === "/" ||
+      pathname === "/index.html" ||
+      pathname === "/viewer" ||
+      pathname === "/viewer.html"
+    ) {
       const html = buildViewerHtml();
       return new Response(html, {
         headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" },
