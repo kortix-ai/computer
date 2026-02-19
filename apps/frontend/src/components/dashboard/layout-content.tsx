@@ -17,6 +17,7 @@ import { featureFlags } from "@/lib/feature-flags";
 import { cn } from "@/lib/utils";
 import { useSandboxConnectionStore } from "@/stores/sandbox-connection-store";
 import { useServerStore } from "@/stores/server-store";
+import { getSandboxToken, useSandboxAuthStore } from "@/stores/sandbox-auth-store";
 import { useTabStore } from "@/stores/tab-store";
 import { AnnouncementDialog } from "../announcements/announcement-dialog";
 import { NovuInboxProvider } from "../notifications/novu-inbox-provider";
@@ -43,6 +44,35 @@ function SandboxConnectionProvider() {
 	useSandboxConnection();
 	useConnectionToasts();
 	return null;
+}
+
+/**
+ * Syncs per-instance auth tokens to the global sandbox-auth-store when the
+ * active server changes. This ensures that switching between instances with
+ * different tokens works seamlessly — the token is loaded BEFORE any
+ * connection attempt, avoiding the 401→dialog dance.
+ */
+function ServerTokenSyncProvider() {
+  const activeServerId = useServerStore((s) => s.activeServerId);
+  const servers = useServerStore((s) => s.servers);
+
+  useEffect(() => {
+    const server = servers.find((s) => s.id === activeServerId);
+    if (!server) return;
+
+    const authStore = useSandboxAuthStore.getState();
+    if (server.authToken) {
+      // Load the per-instance token into the global store
+      authStore.setSandboxToken(server.authToken);
+    } else if (authStore.sandboxToken && !server.authToken) {
+      // Server has no token — clear the global store so we don't send
+      // the previous instance's token to a different server.
+      // BUT only clear if this is a genuine switch, not initial mount.
+      authStore.clearSandboxToken();
+    }
+  }, [activeServerId, servers]);
+
+  return null;
 }
 
 // Lazy load heavy components that aren't needed for initial render
@@ -123,6 +153,12 @@ const CommandPalette = lazy(() =>
 const ConnectingScreen = lazy(() =>
 	import("@/components/dashboard/connecting-screen").then((mod) => ({
 		default: mod.ConnectingScreen,
+	})),
+);
+
+const SandboxTokenDialog = lazy(() =>
+	import("@/components/auth/sandbox-token-dialog").then((mod) => ({
+		default: mod.SandboxTokenDialog,
 	})),
 );
 
@@ -356,7 +392,24 @@ export default function DashboardLayoutContent({
 		const checkOnboarding = async () => {
 			try {
 				const instanceUrl = useServerStore.getState().getActiveServerUrl();
-				const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
+				const headers: Record<string, string> = {};
+				const sandboxToken = getSandboxToken();
+				if (sandboxToken) headers['Authorization'] = `Bearer ${sandboxToken}`;
+				const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, { headers });
+
+				// If 401 with sandbox_token auth, don't redirect — let the dialog handle it
+				if (res.status === 401) {
+					try {
+						const body = await res.json();
+						if (body?.authType === 'sandbox_token') {
+							// The SandboxTokenDialog will handle this; just mark onboarding as checked
+							// so we stay on the dashboard and the dialog can appear.
+							setOnboardingChecked(true);
+							return;
+						}
+					} catch { /* non-JSON */ }
+				}
+
 				if (res.ok) {
 					const data = await res.json();
 					if (data.ONBOARDING_COMPLETE !== "true") {
@@ -442,9 +495,13 @@ export default function DashboardLayoutContent({
 				}
 			>
 				<SandboxInitProvider />
+				<ServerTokenSyncProvider />
 				<SandboxConnectionProvider />
 				<OpenCodeEventStreamProvider />
 				<WebNotificationProvider />
+				<Suspense fallback={null}>
+					<SandboxTokenDialog />
+				</Suspense>
 				<Suspense fallback={null}>
 					<ConnectingScreen />
 				</Suspense>

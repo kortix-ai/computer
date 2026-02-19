@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getSupabaseAccessToken, invalidateTokenCache } from "@/lib/auth-token";
+import { authenticatedFetch } from "@/lib/auth-token";
 import {
 	incrementSandboxFail,
 	markInitialCheckDone,
@@ -11,6 +11,7 @@ import {
 	useSandboxConnectionStore,
 } from "@/stores/sandbox-connection-store";
 import { useServerStore } from "@/stores/server-store";
+import { useSandboxAuthStore } from "@/stores/sandbox-auth-store";
 
 /**
  * Number of consecutive failures before marking as unreachable
@@ -91,46 +92,50 @@ export function useSandboxConnection() {
 			try {
 				const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT);
 
-				const headers: Record<string, string> = {};
-				const token = await getSupabaseAccessToken();
-				if (token) headers["Authorization"] = `Bearer ${token}`;
-
-				const res = await fetch(`${url}/session`, {
+				// Use the shared authenticatedFetch for auth injection + 401 handling.
+				// Sandbox auth detection (401 with authType=sandbox_token) is handled
+				// automatically — it sets needsAuth on the sandbox-auth-store.
+				const res = await authenticatedFetch(`${url}/session`, {
 					method: "GET",
 					signal: controller.signal,
-					headers,
 				});
 				clearTimeout(timer);
 
-				// On 401/403, the token likely expired during a connection drop.
-				// Invalidate the cached token and fetch fresh so the next health check
-				// (and all SDK requests) immediately use a valid token.
-				if (res.status === 401 || res.status === 403) {
-					try {
-						invalidateTokenCache();
-						await getSupabaseAccessToken();
-					} catch {
-						/* refresh failed — will retry on next poll */
-					}
-					// Treat auth failure as a connection failure so the retry loop
-					// kicks in with fast polling.
+				if (!alive) return;
+
+				// If authenticatedFetch detected sandbox auth, it already set needsAuth.
+				// Mark unreachable and schedule retry.
+				if (res.status === 401) {
+					setSandboxStatus('unreachable');
+					scheduleNext();
+					return;
+				}
+
+				if (res.status === 403) {
 					throw new Error(`Auth error: ${res.status}`);
 				}
 
-				if (!alive) return;
 				resetSandboxFail();
 				setSandboxStatus("connected");
 
+				// Connected successfully — clear any stale needsAuth flag.
+				// If the sandbox doesn't require auth (no 401), any previous
+				// needsAuth state is stale (e.g. from a recreated sandbox).
+				const authState = useSandboxAuthStore.getState();
+				if (authState.needsAuth) {
+					authState.setNeedsAuth(false);
+				}
+
 				// Fetch port mappings once on first successful connection.
-				// This populates mappedPorts so all service URLs use direct host ports
-				// instead of going through the proxy.
+				// Stored as metadata for informational purposes (e.g. showing
+				// available ports in the UI). All access routes through the
+				// backend proxy — mappedPorts is NOT used for direct localhost access.
 				if (!portsFetchedRef.current) {
 					portsFetchedRef.current = true;
 					try {
-						const portsRes = await fetch(`${url}/kortix/ports`, {
+						const portsRes = await authenticatedFetch(`${url}/kortix/ports`, {
 							signal: AbortSignal.timeout(3000),
-							headers,
-						});
+						}, { handleSandboxAuth: false, retryOnAuthError: false });
 						if (portsRes.ok) {
 							const data = await portsRes.json();
 							if (data.ports && Object.keys(data.ports).length > 0) {
@@ -150,10 +155,9 @@ export function useSandboxConnection() {
 				if (!versionFetchedRef.current) {
 					versionFetchedRef.current = true;
 					try {
-						const hRes = await fetch(`${url}/kortix/health`, {
+						const hRes = await authenticatedFetch(`${url}/kortix/health`, {
 							signal: AbortSignal.timeout(3000),
-							headers,
-						});
+						}, { handleSandboxAuth: false, retryOnAuthError: false });
 						if (hRes.ok) {
 							const hData = await hRes.json();
 							if (hData.version) {

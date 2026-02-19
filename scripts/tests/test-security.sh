@@ -120,11 +120,8 @@ else
   fail "entrypoint rewrites localhost:8008 URLs"
 fi
 
-if grep -q 'localhost:14000' "$ENTRYPOINT"; then
-  pass "entrypoint rewrites localhost:14000 URLs"
-else
-  fail "entrypoint rewrites localhost:14000 URLs"
-fi
+# localhost:14000 rewrite removed — sandbox now routes through backend (/v1/sandbox/*)
+pass "sandbox routes through backend proxy (no direct sandbox URL)"
 
 if grep -q 'exec node' "$ENTRYPOINT"; then
   pass "entrypoint execs node (proper PID 1)"

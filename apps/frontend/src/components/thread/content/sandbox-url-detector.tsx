@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { UnifiedMarkdown } from '@/components/markdown';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { openTabAndNavigate } from '@/stores/tab-store';
-import { useServerStore } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import {
   detectLocalhostUrls,
   proxyLocalhostUrl,
@@ -426,14 +426,13 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
   const activeServer = useServerStore((s) => {
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
   });
-  const serverUrl = activeServer?.url || 'http://localhost:4096';
-  const mappedPorts = activeServer?.mappedPorts;
+  const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
 
   const detected = useMemo(() => detectLocalhostUrls(safeContent), [safeContent]);
 
   const proxyUrls = useMemo(
-    () => detected.map((d) => proxyLocalhostUrl(d.originalUrl, serverUrl, mappedPorts) ?? d.originalUrl),
-    [detected, serverUrl, mappedPorts],
+    () => detected.map((d) => proxyLocalhostUrl(d.originalUrl, serverUrl) ?? d.originalUrl),
+    [detected, serverUrl],
   );
 
   if (detected.length === 0) {

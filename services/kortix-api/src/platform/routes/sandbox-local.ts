@@ -15,6 +15,7 @@
 import { Hono } from 'hono';
 import { supabaseAuth as authMiddleware } from '../../middleware/auth';
 import { LocalDockerProvider, type SandboxInfo } from '../providers/local-docker';
+import { sandboxAuthStore } from '../sandbox-auth-store';
 import type { AuthVariables } from '../../types';
 
 const provider = new LocalDockerProvider();
@@ -27,7 +28,7 @@ const provider = new LocalDockerProvider();
 function serialize(info: SandboxInfo) {
   return {
     sandbox_id: info.name, // always 'kortix-sandbox'
-    external_id: info.containerId,
+    external_id: info.name,  // Container name (e.g. 'kortix-sandbox') — used for Docker DNS & URL routing
     name: info.name,
     provider: 'local_docker' as const,
     base_url: info.baseUrl,
@@ -93,6 +94,8 @@ export function createLocalSandboxRouter(): Hono<{ Variables: AuthVariables }> {
     try {
       const existed = !!(await provider.find());
       const info = await provider.ensure();
+      // Invalidate cached auth token — container may have changed
+      sandboxAuthStore.invalidate();
 
       console.log(
         `[SANDBOX-LOCAL] ${existed ? 'Ensured' : 'Created'} sandbox (${info.status})`,
@@ -108,6 +111,36 @@ export function createLocalSandboxRouter(): Hono<{ Variables: AuthVariables }> {
       );
     } catch (err) {
       console.error('[SANDBOX-LOCAL] ensure error:', err);
+      return c.json({ success: false, error: String(err) }, 500);
+    }
+  });
+
+  // ─── POST /generate-token ───────────────────────────────────────────────
+  // Generate a sandbox access key. Recreates the container with the token
+  // baked in (workspace volume preserved). Returns the key — shown once.
+  // If a token already exists, this regenerates it (new key, old one invalid).
+
+  router.post('/generate-token', async (c) => {
+    try {
+      // Generate a new access key
+      const { randomAlphanumeric } = await import('../../shared/crypto');
+      const accessKey = `sak_${randomAlphanumeric(32)}`;
+
+      // Store in sandboxAuthStore (memory + disk). Instant — no container restart.
+      // The proxy middleware reads from this store on every request.
+      sandboxAuthStore.setAccessKey(accessKey);
+
+      // Return sandbox info if available (for frontend to update)
+      const info = await provider.find();
+
+      console.log('[SANDBOX-LOCAL] Token generated and stored');
+      return c.json({
+        success: true,
+        data: info ? serialize(info) : null,
+        accessKey,
+      });
+    } catch (err) {
+      console.error('[SANDBOX-LOCAL] generate-token error:', err);
       return c.json({ success: false, error: String(err) }, 500);
     }
   });
@@ -144,6 +177,7 @@ export function createLocalSandboxRouter(): Hono<{ Variables: AuthVariables }> {
   router.delete('/', async (c) => {
     try {
       await provider.remove();
+      sandboxAuthStore.clear(); // Remove persisted token when sandbox is deleted
       console.log('[SANDBOX-LOCAL] Removed sandbox');
       return c.json({ success: true });
     } catch (err) {

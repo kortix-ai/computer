@@ -17,6 +17,7 @@
 import { Hono } from 'hono';
 import { supabaseAuth as authMiddleware } from '../../middleware/auth';
 import { LocalDockerProvider, type SandboxInfo } from '../providers/local-docker';
+import { sandboxAuthStore } from '../sandbox-auth-store';
 import {
   getAvailableProviders,
   getDefaultProviderName,
@@ -35,7 +36,7 @@ const provider = new LocalDockerProvider();
 function serialize(info: SandboxInfo) {
   return {
     sandbox_id: info.name, // always 'kortix-sandbox'
-    external_id: info.containerId,
+    external_id: info.name,  // Container name (e.g. 'kortix-sandbox') — used for Docker DNS & URL routing
     name: info.name,
     provider: 'local_docker' as const,
     base_url: info.baseUrl,
@@ -75,6 +76,8 @@ export function createLocalAccountRouter(): Hono<{ Variables: AuthVariables }> {
     try {
       const existed = !!(await provider.find());
       const info = await provider.ensure();
+      // Invalidate cached auth token — container may have been recreated
+      sandboxAuthStore.invalidate();
 
       console.log(
         `[PLATFORM-LOCAL] ${existed ? 'Found existing' : 'Created'} sandbox (${info.status})`,

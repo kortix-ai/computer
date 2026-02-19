@@ -11,7 +11,7 @@ import { MermaidRenderer } from '@/components/ui/mermaid-renderer';
 import { isMermaidCode } from '@/lib/mermaid-utils';
 import { autoLinkUrls } from '@kortix/shared';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
-import { useServerStore } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
 
 // Helper to check if a URL is internal (same origin)
@@ -295,12 +295,11 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   const activeServer = useServerStore((s) =>
     s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
   );
-  const serverUrl = activeServer?.url || 'http://localhost:4096';
-  const mappedPorts = activeServer?.mappedPorts;
+  const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
 
   /** Rewrite a localhost:PORT URL through the sandbox proxy, or pass through. */
   const proxy = (url: string | undefined) =>
-    proxyLocalhostUrl(url, serverUrl, mappedPorts);
+    proxyLocalhostUrl(url, serverUrl);
 
   const safeContent = typeof content === 'string' ? content : (content ? String(content) : '');
   

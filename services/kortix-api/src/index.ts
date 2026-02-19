@@ -15,12 +15,14 @@ import { cronApp, startScheduler, stopScheduler, getSchedulerStatus } from './cr
 import { channelsApp, startChannelService, stopChannelService, getChannelServiceStatus } from './channels';
 import { daytonaProxyApp } from './daytona-proxy';
 import { deploymentsApp } from './deployments';
+import { getSandboxBaseUrl } from './daytona-proxy/routes/local-preview';
 import { setupApp } from './setup';
 import { providersApp } from './providers/routes';
 import { secretsApp } from './secrets/routes';
+import { timingSafeStringEqual } from './shared/crypto';
+import { sandboxAuthStore } from './platform/sandbox-auth-store';
 import { integrationsApp } from './integrations';
 import { queueApp, startDrainer, stopDrainer } from './queue';
-import { integrationsApp } from './integrations';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -152,12 +154,13 @@ if (config.isLocal()) {
 // Message queue — persists queued messages to filesystem and drains them server-side.
 app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queue/messages/:id, /v1/queue/all, /v1/queue/status
 
-// Daytona Proxy is cloud-only (requires Daytona API). In local mode the catch-all
-// /:sandboxId/:port/* pattern would intercept every unmatched request and throw
-// "Invalid port" errors for unmatched paths.
-if (!config.isLocal()) {
-  app.route('/v1/preview', daytonaProxyApp); // /v1/preview/:sandboxId/:port/* (MUST BE LAST — wildcard catch-all)
-}
+// Preview Proxy — unified route for both cloud (Daytona) and local mode.
+// Pattern: /v1/preview/{sandboxId}/{port}/* for ALL modes.
+// Cloud:  sandboxId = Daytona external ID → proxied via Daytona SDK
+// Local:  sandboxId = container name (e.g. 'kortix-sandbox') → Docker DNS resolution
+// Auth middleware is selected by config.isLocal() (see daytona-proxy/index.ts).
+// MUST be after all explicit routes (wildcard catch-all).
+app.route('/v1/preview', daytonaProxyApp);
 
 // === Error Handling ===
 
@@ -224,7 +227,7 @@ console.log(`
 ║    /v1/integrations (OAuth integrations)                    ║
 ║    /v1/setup      (local setup & env management)           ║
 ║    /v1/queue      (persistent message queue)               ║
-║    /v1/preview    (sandbox preview proxy)                  ║
+║    /v1/preview    (sandbox proxy — local + cloud)           ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
 ║  Supabase:   ${config.SUPABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
@@ -250,7 +253,190 @@ function shutdown(signal: string) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+// ─── WebSocket proxy for sandbox PTY ─────────────────────────────────────────
+// The Bun server needs to handle WebSocket upgrades at the top level.
+// We intercept WS upgrade requests for /v1/sandbox/pty/* and proxy them
+// to the sandbox's Kortix Master (which further proxies to OpenCode).
+
+const WS_CONNECT_TIMEOUT_MS = 10_000;
+const WS_BUFFER_MAX_BYTES = 1024 * 1024; // 1MB
+const WS_IDLE_TIMEOUT_MS = 5 * 60_000;   // 5min
+
+interface WsProxyData {
+  targetUrl: string;
+  upstream: WebSocket | null;
+  buffered: (string | Buffer | ArrayBuffer)[];
+  bufferBytes: number;
+  connectTimer: ReturnType<typeof setTimeout> | null;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+  closed: boolean;
+}
+
+function clearWsTimers(data: WsProxyData) {
+  if (data.connectTimer) { clearTimeout(data.connectTimer); data.connectTimer = null; }
+  if (data.idleTimer) { clearTimeout(data.idleTimer); data.idleTimer = null; }
+}
+
+function resetIdleTimer(ws: { data: WsProxyData; close: (code?: number, reason?: string) => void }) {
+  if (ws.data.idleTimer) clearTimeout(ws.data.idleTimer);
+  ws.data.idleTimer = setTimeout(() => {
+    console.warn(`[preview-proxy] WS idle timeout`);
+    try { ws.close(1000, 'idle timeout'); } catch {}
+  }, WS_IDLE_TIMEOUT_MS);
+}
+
+let activeWsConnections = 0;
+
 export default {
   port: config.PORT,
-  fetch: app.fetch,
+
+  async fetch(req: Request, server: any): Promise<Response | undefined> {
+    // ── WebSocket upgrade for /v1/preview/{sandboxId}/{port}/* ────────
+    // In local mode, ALL /v1/preview/* WebSocket connections go to local sandbox.
+    // Parses sandbox ID dynamically from the URL for Docker DNS resolution.
+    // Pattern: /v1/preview/{sandboxId}/{port}/{path} → ws://{sandboxId}:8000/{path}
+    //   (port 8000 = direct, other ports = through Kortix Master's /proxy/{port}/)
+    if (req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+      const url = new URL(req.url);
+      const previewPrefix = '/v1/preview/';
+      const isLocalPreview = config.isLocal() && url.pathname.startsWith(previewPrefix);
+
+      if (isLocalPreview) {
+        // Validate sandbox auth token if configured (WS can't set headers — use ?token=)
+        const hasAuth = await sandboxAuthStore.hasAuth();
+        if (hasAuth) {
+          const wsToken = url.searchParams.get('token');
+          const accessKey = await sandboxAuthStore.getAccessKey();
+          if (!wsToken || !accessKey || !timingSafeStringEqual(wsToken, accessKey)) {
+            return new Response(JSON.stringify({ error: 'Unauthorized', authType: 'sandbox_token' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        // Parse: /v1/preview/{sandboxId}/{port}/{rest}
+        const afterPreview = url.pathname.slice(previewPrefix.length); // e.g. "kortix-sandbox/8000/ws"
+        const segments = afterPreview.split('/');
+        const sandboxId = segments[0];   // e.g. "kortix-sandbox"
+        const portStr = segments[1] || '';
+        const remainingPath = segments.length > 2 ? '/' + segments.slice(2).join('/') : '/';
+        const port = parseInt(portStr, 10);
+
+        if (sandboxId && !isNaN(port) && port >= 1 && port <= 65535) {
+          const sandboxBaseUrl = getSandboxBaseUrl(sandboxId);
+          const wsBase = sandboxBaseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+
+          // Port 8000 = direct to Kortix Master, others = through port proxy
+          const targetPath = port === 8000
+            ? remainingPath
+            : `/proxy/${port}${remainingPath}`;
+
+          // Build upstream query string: strip user's token, inject service key
+          const upstreamParams = new URLSearchParams(url.searchParams);
+          upstreamParams.delete('token'); // remove user's sandbox token
+          const serviceKey = await sandboxAuthStore.getServiceKey();
+          if (serviceKey) {
+            upstreamParams.set('token', serviceKey);
+          }
+          const upstreamSearch = upstreamParams.toString() ? `?${upstreamParams.toString()}` : '';
+          const targetUrl = `${wsBase}${targetPath}${upstreamSearch}`;
+
+          const success = server.upgrade(req, {
+            data: {
+              targetUrl,
+              upstream: null,
+              buffered: [],
+              bufferBytes: 0,
+              connectTimer: null,
+              idleTimer: null,
+              closed: false,
+            } satisfies WsProxyData,
+          });
+          if (success) return undefined; // Bun took over
+        }
+      }
+    }
+
+    // ── HTTP / SSE — delegate to Hono ──────────────────────────────────
+    return app.fetch(req, server);
+  },
+
+  websocket: {
+    open(ws: { data: WsProxyData; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
+      activeWsConnections++;
+      resetIdleTimer(ws);
+
+      ws.data.connectTimer = setTimeout(() => {
+        if (ws.data.upstream?.readyState === WebSocket.CONNECTING) {
+          console.warn(`[preview-proxy] WS upstream connect timeout`);
+          try { ws.data.upstream.close(); } catch {}
+          try { ws.close(1011, 'upstream connect timeout'); } catch {}
+        }
+      }, WS_CONNECT_TIMEOUT_MS);
+
+      try {
+        const upstream = new WebSocket(ws.data.targetUrl);
+        ws.data.upstream = upstream;
+
+        upstream.addEventListener('open', () => {
+          if (ws.data.connectTimer) { clearTimeout(ws.data.connectTimer); ws.data.connectTimer = null; }
+          for (const msg of ws.data.buffered) {
+            upstream.send(msg);
+          }
+          ws.data.buffered = [];
+          ws.data.bufferBytes = 0;
+        });
+
+        upstream.addEventListener('message', (e: MessageEvent) => {
+          resetIdleTimer(ws);
+          try { ws.send(e.data); } catch {
+            try { upstream.close(); } catch {}
+          }
+        });
+
+        upstream.addEventListener('close', () => {
+          if (!ws.data.closed) {
+            try { ws.close(); } catch {}
+          }
+        });
+
+        upstream.addEventListener('error', () => {
+          if (!ws.data.closed) {
+            try { ws.close(1011, 'upstream error'); } catch {}
+          }
+        });
+      } catch (err) {
+        console.error(`[preview-proxy] WS connect failed:`, err);
+        try { ws.close(1011, 'upstream connection failed'); } catch {}
+      }
+    },
+
+    message(ws: { data: WsProxyData; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
+      resetIdleTimer(ws);
+      const upstream = ws.data.upstream;
+      if (upstream && upstream.readyState === WebSocket.OPEN) {
+        upstream.send(message);
+      } else if (upstream && upstream.readyState === WebSocket.CONNECTING) {
+        const size = typeof message === 'string' ? message.length : (message as Buffer).byteLength;
+        if (ws.data.bufferBytes + size > WS_BUFFER_MAX_BYTES) {
+          console.warn(`[preview-proxy] WS buffer overflow, closing`);
+          try { ws.close(1011, 'buffer overflow'); } catch {}
+          return;
+        }
+        ws.data.buffered.push(message);
+        ws.data.bufferBytes += size;
+      }
+    },
+
+    close(ws: { data: WsProxyData }) {
+      activeWsConnections--;
+      ws.data.closed = true;
+      clearWsTimers(ws.data);
+      try { ws.data.upstream?.close(); } catch {}
+      ws.data.upstream = null;
+      ws.data.buffered = [];
+      ws.data.bufferBytes = 0;
+    },
+  },
 };

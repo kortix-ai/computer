@@ -8,6 +8,7 @@
 
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
+import { getSandboxToken } from '@/stores/sandbox-auth-store';
 import type { GitCommit, FileHistoryResult, FileCommitDiff } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -54,7 +55,10 @@ async function runGitCommand(command: string): Promise<string> {
   // Connect via WebSocket to read output
   const baseUrl = getActiveOpenCodeUrl();
   const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-  const connectUrl = `${wsUrl}/pty/${ptyId}/connect`;
+  // Append sandbox token as query param (WebSocket can't set custom headers)
+  const sandboxToken = getSandboxToken();
+  const tokenParam = sandboxToken ? `?token=${encodeURIComponent(sandboxToken)}` : '';
+  const connectUrl = `${wsUrl}/pty/${ptyId}/connect${tokenParam}`;
 
   const output = await new Promise<string>((resolve, reject) => {
     let chunks: string[] = [];
