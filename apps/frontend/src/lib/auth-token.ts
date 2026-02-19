@@ -1,12 +1,15 @@
 /**
- * Shared helper to get the current Supabase access token (JWT).
+ * Shared auth token helpers.
  *
- * Used by:
- *  - opencode-sdk.ts   (SDK fetch wrapper for instance API calls)
- *  - use-file-events.ts (SSE connections to instance /event endpoint)
- *  - server-selector.tsx (health checks for remote instances)
+ * Provides two token sources:
+ * 1. Supabase JWT — for cloud mode (authenticated via Supabase login)
+ * 2. Sandbox token — for local/VPS mode (user enters SANDBOX_AUTH_TOKEN)
  *
- * Returns `null` when no session is available (user not logged in).
+ * `getAuthToken()` is the unified getter: tries Supabase first, then sandbox.
+ * Use it anywhere you need to authenticate against the sandbox proxy.
+ *
+ * `getSupabaseAccessToken()` is kept for callers that specifically need the
+ * Supabase JWT (e.g. platform API calls that go through Supabase auth, not sandbox auth).
  *
  * **Deduplication**: Multiple callers (SSE, health check, session fetch, etc.)
  * all call getSupabaseAccessToken() on page load simultaneously. Without
@@ -20,6 +23,8 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import { getSandboxToken, useSandboxAuthStore } from "@/stores/sandbox-auth-store";
+import { isLocalMode } from "@/lib/config";
 
 /** Max retries for token acquisition (getSession + refreshSession fallback) */
 const TOKEN_MAX_RETRIES = 2;
@@ -101,4 +106,112 @@ async function fetchToken(): Promise<string | null> {
 	}
 
 	return null;
+}
+
+/**
+ * Unified auth token getter.
+ *
+ * - Local mode: returns sandbox token immediately (synchronous, no network call).
+ *   Supabase is not available in local mode — skipping it avoids multi-second
+ *   delays from failed getSession()/refreshSession() calls that block every
+ *   health check and SDK request.
+ * - Cloud mode: returns Supabase JWT, falling back to sandbox token.
+ */
+export async function getAuthToken(): Promise<string | null> {
+  // Local mode: sandbox token only — Supabase is not available.
+  // This is synchronous and instant (reads from zustand store).
+  if (isLocalMode()) {
+    return getSandboxToken();
+  }
+
+  // Cloud mode: Supabase JWT
+  const supabaseToken = await getSupabaseAccessToken();
+  if (supabaseToken) return supabaseToken;
+
+  // Fallback: sandbox token (for cloud users with VPS sandboxes)
+  return getSandboxToken();
+}
+
+// ── Shared auth-injecting fetch ──
+
+/**
+ * Build a Headers object from request input + init, injecting the auth token.
+ */
+function buildAuthHeaders(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  token?: string | null,
+): Headers {
+  const headers = new Headers(
+    input instanceof Request ? input.headers : undefined,
+  );
+  if (init?.headers) {
+    new Headers(init.headers).forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return headers;
+}
+
+/**
+ * Shared authenticated fetch — injects auth tokens and handles 401 responses.
+ *
+ * Centralizes the pattern duplicated across opencode-sdk, use-sandbox-connection,
+ * and server-selector. All three auth injection points now go through this.
+ *
+ * Behavior:
+ *   1. Gets the current auth token (Supabase JWT or sandbox token)
+ *   2. Injects it as Bearer token on the request
+ *   3. On 401 with `authType: 'sandbox_token'`: sets `needsAuth` on sandbox-auth-store
+ *   4. On other 401: invalidates the token cache, gets fresh, retries once
+ *
+ * Options:
+ *   - `handleSandboxAuth`: if false, skips sandbox_token detection (default: true)
+ *   - `retryOnAuthError`: if false, skips stale-token retry (default: true)
+ */
+export async function authenticatedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: {
+    handleSandboxAuth?: boolean;
+    retryOnAuthError?: boolean;
+  },
+): Promise<Response> {
+  const { handleSandboxAuth = true, retryOnAuthError = true } = options ?? {};
+
+  const token = await getAuthToken();
+  const headers = buildAuthHeaders(input, init, token);
+  const mergedInit = { ...init, headers };
+
+  const response = await fetch(input, mergedInit);
+
+  if (response.status === 401) {
+    // Check for sandbox auth requirement
+    if (handleSandboxAuth) {
+      try {
+        const body = await response.clone().json();
+        if (body?.authType === 'sandbox_token') {
+          useSandboxAuthStore.getState().setNeedsAuth(true);
+          return response;
+        }
+      } catch {
+        // Response may not be JSON — fall through to retry logic
+      }
+    }
+
+    // Non-sandbox 401: the cached token is stale. Retry once with fresh token.
+    if (retryOnAuthError && token) {
+      invalidateTokenCache();
+      const newToken = await getAuthToken();
+      if (newToken && newToken !== token) {
+        const retryHeaders = buildAuthHeaders(input, init, newToken);
+        return fetch(input, { ...init, headers: retryHeaders });
+      }
+    }
+  }
+
+  return response;
 }

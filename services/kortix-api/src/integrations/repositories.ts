@@ -8,6 +8,7 @@ export async function insertIntegration(data: {
   appName?: string;
   providerName: string;
   providerAccountId: string;
+  label?: string;
   scopes?: string[];
   metadata?: Record<string, unknown>;
 }) {
@@ -19,14 +20,15 @@ export async function insertIntegration(data: {
       appName: data.appName ?? null,
       providerName: data.providerName,
       providerAccountId: data.providerAccountId,
+      label: data.label ?? null,
       scopes: data.scopes ?? [],
       metadata: data.metadata ?? {},
     })
     .onConflictDoUpdate({
-      target: [integrations.accountId, integrations.app, integrations.providerName],
+      target: [integrations.accountId, integrations.providerAccountId],
       set: {
-        providerAccountId: data.providerAccountId,
         appName: data.appName ?? null,
+        label: data.label ?? undefined,
         scopes: data.scopes ?? [],
         status: 'active',
         updatedAt: new Date(),
@@ -69,6 +71,36 @@ export async function updateIntegrationLastUsed(integrationId: string) {
     .where(eq(integrations.integrationId, integrationId));
 }
 
+export async function updateIntegrationLabel(integrationId: string, label: string) {
+  const [row] = await db
+    .update(integrations)
+    .set({ label, updatedAt: new Date() })
+    .where(eq(integrations.integrationId, integrationId))
+    .returning();
+  return row ?? null;
+}
+
+export async function getSandboxAppConflict(sandboxId: string, integrationId: string, app: string) {
+  const [row] = await db
+    .select({
+      integrationId: integrations.integrationId,
+      label: integrations.label,
+      appName: integrations.appName,
+    })
+    .from(sandboxIntegrations)
+    .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
+    .where(
+      and(
+        eq(sandboxIntegrations.sandboxId, sandboxId),
+        eq(integrations.app, app),
+      ),
+    )
+    .limit(1);
+
+  if (!row || row.integrationId === integrationId) return null;
+  return row;
+}
+
 export async function linkSandboxIntegration(sandboxId: string, integrationId: string) {
   const [row] = await db
     .insert(sandboxIntegrations)
@@ -89,35 +121,42 @@ export async function unlinkSandboxIntegration(sandboxId: string, integrationId:
     );
 }
 
-export async function listSandboxIntegrations(_sandboxId: string, accountId?: string) {
-  if (!accountId) return [];
+export async function listSandboxIntegrations(sandboxId: string, _accountId?: string) {
   const rows = await db
-    .select()
-    .from(integrations)
-    .where(and(eq(integrations.accountId, accountId), eq(integrations.status, 'active')));
-  return rows.map(r => ({
-    id: null,
-    sandboxId: _sandboxId,
-    integrationId: r.integrationId,
-    grantedAt: null,
-    integration: {
-      integrationId: r.integrationId,
-      app: r.app,
-      appName: r.appName,
-      status: r.status,
-      providerName: r.providerName,
-    },
-  }));
-}
-
-export async function hasSandboxIntegration(_sandboxId: string, app: string, accountId?: string): Promise<boolean> {
-  if (!accountId) return false;
-  const [row] = await db
-    .select({ id: integrations.integrationId })
-    .from(integrations)
+    .select({
+      id: sandboxIntegrations.id,
+      sandboxId: sandboxIntegrations.sandboxId,
+      integrationId: sandboxIntegrations.integrationId,
+      grantedAt: sandboxIntegrations.grantedAt,
+      integration: {
+        integrationId: integrations.integrationId,
+        app: integrations.app,
+        appName: integrations.appName,
+        label: integrations.label,
+        status: integrations.status,
+        providerName: integrations.providerName,
+        providerAccountId: integrations.providerAccountId,
+      },
+    })
+    .from(sandboxIntegrations)
+    .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
     .where(
       and(
-        eq(integrations.accountId, accountId),
+        eq(sandboxIntegrations.sandboxId, sandboxId),
+        eq(integrations.status, 'active'),
+      ),
+    );
+  return rows;
+}
+
+export async function hasSandboxIntegration(sandboxId: string, app: string, _accountId?: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: sandboxIntegrations.id })
+    .from(sandboxIntegrations)
+    .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
+    .where(
+      and(
+        eq(sandboxIntegrations.sandboxId, sandboxId),
         eq(integrations.app, app),
         eq(integrations.status, 'active'),
       ),
@@ -126,20 +165,70 @@ export async function hasSandboxIntegration(_sandboxId: string, app: string, acc
   return !!row;
 }
 
-export async function getIntegrationForSandbox(_sandboxId: string, app: string, accountId?: string) {
-  if (!accountId) return null;
+export async function getIntegrationForSandbox(sandboxId: string, app: string, _accountId?: string) {
   const [row] = await db
-    .select()
-    .from(integrations)
+    .select({
+      integrationId: integrations.integrationId,
+      accountId: integrations.accountId,
+      app: integrations.app,
+      appName: integrations.appName,
+      label: integrations.label,
+      providerName: integrations.providerName,
+      providerAccountId: integrations.providerAccountId,
+      status: integrations.status,
+      scopes: integrations.scopes,
+      metadata: integrations.metadata,
+      connectedAt: integrations.connectedAt,
+      lastUsedAt: integrations.lastUsedAt,
+      createdAt: integrations.createdAt,
+      updatedAt: integrations.updatedAt,
+    })
+    .from(sandboxIntegrations)
+    .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
     .where(
       and(
-        eq(integrations.accountId, accountId),
+        eq(sandboxIntegrations.sandboxId, sandboxId),
         eq(integrations.app, app),
         eq(integrations.status, 'active'),
       ),
     )
     .limit(1);
   return row ?? null;
+}
+
+export async function getLinkedSandboxes(integrationId: string) {
+  const rows = await db
+    .select({
+      sandboxId: sandboxes.sandboxId,
+      name: sandboxes.name,
+      status: sandboxes.status,
+      grantedAt: sandboxIntegrations.grantedAt,
+    })
+    .from(sandboxIntegrations)
+    .innerJoin(sandboxes, eq(sandboxIntegrations.sandboxId, sandboxes.sandboxId))
+    .where(eq(sandboxIntegrations.integrationId, integrationId));
+  return rows;
+}
+
+export async function getAppSandboxLinks(accountId: string, app: string) {
+  const rows = await db
+    .select({
+      sandboxId: sandboxIntegrations.sandboxId,
+      sandboxName: sandboxes.name,
+      integrationId: integrations.integrationId,
+      label: integrations.label,
+    })
+    .from(sandboxIntegrations)
+    .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
+    .innerJoin(sandboxes, eq(sandboxIntegrations.sandboxId, sandboxes.sandboxId))
+    .where(
+      and(
+        eq(integrations.accountId, accountId),
+        eq(integrations.app, app),
+        eq(integrations.status, 'active'),
+      ),
+    );
+  return rows;
 }
 
 export async function verifySandboxOwnership(sandboxId: string, accountId: string): Promise<boolean> {

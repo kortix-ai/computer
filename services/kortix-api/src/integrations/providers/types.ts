@@ -83,10 +83,10 @@ export interface AuthProvider {
   createConnectToken(accountId: string, app?: string): Promise<ConnectTokenResult>;
   listAccounts(accountId: string): Promise<ConnectedAccount[]>;
   getAccount(accountId: string, accountProviderId: string): Promise<ConnectedAccount | null>;
-  getAuthToken(accountId: string, app: string): Promise<AuthToken>;
+  getAuthToken(accountId: string, app: string, providerAccountId?: string): Promise<AuthToken>;
   deleteAccount(accountId: string, accountProviderId: string): Promise<void>;
   listApps(query?: string, limit?: number, cursor?: string): Promise<AppListResult>;
-  proxyRequest(accountId: string, app: string, request: ProxyRequest): Promise<ProxyResponse>;
+  proxyRequest(accountId: string, app: string, request: ProxyRequest, providerAccountId?: string): Promise<ProxyResponse>;
   listActions(app: string, query?: string, limit?: number): Promise<ActionListResult>;
-  runAction(accountId: string, actionKey: string, props: Record<string, unknown>, app: string): Promise<ActionRunResult>;
+  runAction(accountId: string, actionKey: string, props: Record<string, unknown>, app: string, providerAccountId?: string): Promise<ActionRunResult>;
 }

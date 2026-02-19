@@ -62,7 +62,6 @@ cd apps/frontend
 
 NEXT_PUBLIC_ENV_MODE=local \
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1 \
-NEXT_PUBLIC_OPENCODE_URL=http://localhost:14000 \
 NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.placeholder \
 NEXT_OUTPUT=standalone \
@@ -412,13 +411,13 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 
 **Fix:** Don't build inside Docker. Build on host, package into runner-only image (current approach).
 
-### `NEXT_PUBLIC_OPENCODE_URL` wrong port
+### Sandbox connection issues
 
-**Symptom:** Frontend can't connect to OpenCode (port 4096 instead of 14000).
+**Symptom:** Frontend can't connect to the sandbox.
 
-**Root cause:** `NEXT_PUBLIC_*` vars are baked at build time. If not passed during build, `server-store.ts` falls back to wrong port.
+**Root cause:** All sandbox requests now route through the backend (`/v1/sandbox/*`). Ensure `NEXT_PUBLIC_BACKEND_URL` is correctly set at build time.
 
-**Fix:** Always pass `NEXT_PUBLIC_OPENCODE_URL=http://localhost:14000` during the host build step.
+**Fix:** Ensure `NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1` is passed during the host build step.
 
 ### `/onboarding` crashes with `useSidebar must be used within a SidebarProvider`
 

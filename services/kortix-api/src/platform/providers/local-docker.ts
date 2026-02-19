@@ -46,12 +46,7 @@ const PORT_MAP: Record<string, string> = {
 
 const BASE_URL = `http://localhost:${PORT_MAP['8000']}`;
 
-/**
- * Internal Docker-network URL for the sandbox.
- * Used by resolveEndpoint() when the API runs inside Docker alongside the sandbox.
- * Falls back to BASE_URL (localhost) when running on the host (pnpm dev).
- */
-const INTERNAL_URL = `http://${CONTAINER_NAME}:8000`;
+
 
 /** ExposedPorts for Docker container config. */
 const EXPOSED_PORTS: Record<string, {}> = Object.fromEntries(
@@ -198,7 +193,7 @@ export class LocalDockerProvider implements SandboxProvider {
     this._lastCreateOpts = opts;
     const info = await this.ensure();
     return {
-      externalId: info.containerId,
+      externalId: info.name,  // Container name (e.g. 'kortix-sandbox') — used for Docker DNS & URL routing
       baseUrl: info.baseUrl,
       metadata: {
         containerName: info.name,
@@ -211,11 +206,12 @@ export class LocalDockerProvider implements SandboxProvider {
 
   // ── Cron / Endpoint resolution ───────────────────────────────────────
 
-  async resolveEndpoint(_externalId: string): Promise<ResolvedEndpoint> {
-    // When running inside Docker (DOCKER_HOST set), use the internal network URL
-    // so the API container can reach the sandbox via Docker DNS.
-    // When running on the host (pnpm dev), use localhost with mapped ports.
-    const url = config.DOCKER_HOST ? INTERNAL_URL : BASE_URL;
+  async resolveEndpoint(externalId: string): Promise<ResolvedEndpoint> {
+    // Inside Docker: resolve via Docker DNS using the container name (externalId).
+    // On host (pnpm dev): fall back to localhost with mapped ports.
+    const url = config.DOCKER_HOST
+      ? `http://${externalId}:8000`
+      : BASE_URL;
     return {
       url,
       headers: { 'Content-Type': 'application/json' },
@@ -239,7 +235,11 @@ export class LocalDockerProvider implements SandboxProvider {
 
   private _lastCreateOpts?: CreateSandboxOpts;
 
-  private async createContainer(): Promise<void> {
+  /**
+   * @param opts.sandboxAuthToken - If provided, bake this as SANDBOX_AUTH_TOKEN into the container.
+   *   Used by the generate-token endpoint. If omitted, no auth token is set (open access).
+   */
+  private async createContainer(opts?: { sandboxAuthToken?: string }): Promise<void> {
     const authToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN || generateSandboxToken();
     const sandboxEnvVars = readSandboxEnv();
 
@@ -259,6 +259,10 @@ export class LocalDockerProvider implements SandboxProvider {
       `SANDBOX_ID=${CONTAINER_NAME}`,
       'PROJECT_ID=local',
       'ENV_MODE=local',
+      // Only set SANDBOX_AUTH_TOKEN if user explicitly generated one
+      ...(opts?.sandboxAuthToken ? [`SANDBOX_AUTH_TOKEN=${opts.sandboxAuthToken}`] : []),
+      // Pass through INTERNAL_SERVICE_KEY from config if set (for sandbox-side auth)
+      ...(config.INTERNAL_SERVICE_KEY ? [`INTERNAL_SERVICE_KEY=${config.INTERNAL_SERVICE_KEY}`] : []),
       ...sandboxEnvVars,
     ];
 
@@ -290,6 +294,77 @@ export class LocalDockerProvider implements SandboxProvider {
     console.log(
       `[LOCAL-DOCKER] Sandbox created and started on ports ${PORT_BASE}-${PORT_BASE + 6}`,
     );
+
+  }
+
+  /**
+   * Recreate the container with a SANDBOX_AUTH_TOKEN baked in.
+   * Used by the generate-token endpoint. Removes old container, creates new one.
+   * Workspace volume is preserved.
+   *
+   * Waits for the container's HTTP server to be ready before returning,
+   * so the frontend can immediately use the new token.
+   */
+  async recreateWithToken(sandboxAuthToken: string): Promise<SandboxInfo> {
+    // Remove existing container if any
+    try {
+      await this.remove();
+    } catch {
+      // May not exist
+    }
+    await this.createContainer({ sandboxAuthToken });
+
+    // Wait for the container's HTTP server to actually be ready.
+    // The container starts but internal services (kortix-master) take time to boot.
+    const maxWait = 60_000; // 60 seconds max
+    const pollInterval = 1_000; // 1 second
+    const start = Date.now();
+
+    while (Date.now() - start < maxWait) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(`http://${CONTAINER_NAME}:8000/session`, {
+          signal: controller.signal,
+          headers: {
+            'Authorization': `Bearer ${sandboxAuthToken}`,
+          },
+        });
+        clearTimeout(timeout);
+        if (res.ok || res.status === 200) {
+          console.log(`[LOCAL-DOCKER] Container ready after ${Date.now() - start}ms`);
+          break;
+        }
+      } catch {
+        // Not ready yet — keep polling
+      }
+      await new Promise((r) => setTimeout(r, pollInterval));
+    }
+
+    return this.getSandboxInfo();
+  }
+
+  /**
+   * Read environment variables from the running container via Docker inspect.
+   * Returns a map of VAR_NAME → value. Used by SandboxAuthTokenStore to
+   * discover the auto-generated tokens without storing them locally.
+   */
+  async getContainerEnv(): Promise<Record<string, string>> {
+    try {
+      const container = this.docker.getContainer(CONTAINER_NAME);
+      const info = await container.inspect();
+      const envList = info.Config.Env || [];
+      const result: Record<string, string> = {};
+      for (const entry of envList) {
+        const eqIdx = entry.indexOf('=');
+        if (eqIdx > 0) {
+          result[entry.slice(0, eqIdx)] = entry.slice(eqIdx + 1);
+        }
+      }
+      return result;
+    } catch {
+      return {};
+    }
   }
 
   private toSandboxInfo(info: Docker.ContainerInspectInfo): SandboxInfo {
@@ -321,3 +396,5 @@ export interface SandboxInfo {
   mappedPorts: Record<string, string>;
   createdAt: string;
 }
+
+

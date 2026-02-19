@@ -26,7 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useOpenCodeCommands } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
 import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -45,7 +45,7 @@ async function uploadToPath(filePath: string, content: string): Promise<void> {
   form.append(filePath, blob, fileName);
 
   const headers: Record<string, string> = {};
-  const token = await getSupabaseAccessToken();
+  const token = await getAuthToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${baseUrl}/file/upload`, {

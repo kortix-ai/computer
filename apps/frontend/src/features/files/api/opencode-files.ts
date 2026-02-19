@@ -10,7 +10,7 @@
 
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
 import type {
   FileContent,
   FileNode,
@@ -155,7 +155,7 @@ async function uploadToPath(
   form.append(filePath, content, fileName);
 
   const headers: Record<string, string> = {};
-  const token = await getSupabaseAccessToken();
+  const token = await getAuthToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }

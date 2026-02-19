@@ -14,7 +14,7 @@
  * In local:      http://localhost:8008/v1/platform/*  (base URL includes /v1)
  */
 
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getSupabaseAccessToken, getAuthToken } from '@/lib/auth-token';
 import type { ServerEntry } from '@/stores/server-store';
 
 // ─── Sandbox Port Constants ──────────────────────────────────────────────────
@@ -34,33 +34,20 @@ export const SANDBOX_PORTS = {
 } as const;
 
 /**
- * Get a direct URL to a sandbox service via the preview proxy.
+ * Get a URL to access a specific container port on a sandbox.
+ * ALL modes route through the backend's unified preview proxy:
+ *   {BACKEND_URL}/preview/{sandboxId}/{containerPort}
  *
- * - Local Docker: resolves via `mappedPorts` → `http://localhost:{hostPort}`
- * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
- * - Manual/unknown: returns null (caller should fall back to proxy)
+ * Provider-agnostic — sandboxId is the external_id (container name for local,
+ * Daytona sandbox ID for cloud).
  */
 export function getDirectPortUrl(
   server: ServerEntry,
   containerPort: string,
 ): string | null {
-  // Cloud: route through the preview proxy (guard against undefined sandboxId)
-  if (server.provider === 'daytona' && server.sandboxId && server.sandboxId !== 'undefined') {
+  if (server.sandboxId && server.sandboxId !== 'undefined') {
     return `${PLATFORM_URL}/preview/${server.sandboxId}/${containerPort}`;
   }
-
-  // Local Docker: look up the random host port from mappedPorts
-  if (server.provider === 'local_docker' && server.mappedPorts) {
-    const hostPort = server.mappedPorts[containerPort];
-    if (!hostPort) return null;
-    try {
-      const base = new URL(server.url);
-      return `${base.protocol}//${base.hostname}:${hostPort}`;
-    } catch {
-      return `http://localhost:${hostPort}`;
-    }
-  }
-
   return null;
 }
 
@@ -111,6 +98,8 @@ interface PlatformResponse<T> {
   data?: T;
   error?: string;
   created?: boolean;
+  /** One-time sandbox access key (sak_...) — only present when a new sandbox is created. */
+  accessKey?: string;
 }
 
 // ─── Fetch helper ────────────────────────────────────────────────────────────
@@ -151,20 +140,16 @@ async function platformFetch<T>(
 
 /**
  * Build the OpenCode server URL for a sandbox.
- * - Local Docker: uses the base_url directly (http://localhost:{port})
- * - Daytona (cloud): {BACKEND_URL}/preview/{externalId}/8000
+ * Provider-agnostic: {BACKEND_URL}/preview/{externalId}/8000
+ *
+ * The external_id is the sandbox identifier used for routing:
+ *   - Local Docker: container name (e.g. 'kortix-sandbox') — resolves via Docker DNS
+ *   - Daytona (cloud): Daytona sandbox ID
  *
  * Guards against missing external_id to prevent broken URLs.
  */
 export function getSandboxUrl(sandbox: SandboxInfo): string {
-  // Local Docker always uses base_url (direct localhost port mapping)
-  if (sandbox.provider === 'local_docker') {
-    return sandbox.base_url;
-  }
-
-  // Daytona requires a valid external_id for URL construction
   if (!sandbox.external_id) {
-    // Fallback: if base_url is set, use it directly
     if (sandbox.base_url) return sandbox.base_url;
     throw new Error(
       `Cannot build sandbox URL: missing external_id for ${sandbox.provider} sandbox "${sandbox.sandbox_id}"`,
@@ -176,35 +161,15 @@ export function getSandboxUrl(sandbox: SandboxInfo): string {
 
 /**
  * Build a URL to access a specific container port on a sandbox.
- *
- * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
- * - Local Docker: reads `metadata.mappedPorts[containerPort]` →
- *   `http://localhost:{hostPort}`. Returns null if no mapping exists.
- * - Falls back to null if the port can't be resolved.
+ * Provider-agnostic: {BACKEND_URL}/preview/{externalId}/{containerPort}
  */
 export function getSandboxPortUrl(
   sandbox: SandboxInfo,
   containerPort: string,
 ): string | null {
-  if ((sandbox.provider === 'daytona' || (!sandbox.provider && sandbox.external_id)) && sandbox.external_id) {
+  if (sandbox.external_id) {
     return `${PLATFORM_URL}/preview/${sandbox.external_id}/${containerPort}`;
   }
-
-  if (sandbox.provider === 'local_docker') {
-    const mappedPorts = sandbox.metadata?.mappedPorts as
-      | Record<string, string>
-      | undefined;
-    const hostPort = mappedPorts?.[containerPort];
-    if (!hostPort) return null;
-    // base_url is http://localhost:{somePort} — extract the hostname
-    try {
-      const base = new URL(sandbox.base_url);
-      return `${base.protocol}//${base.hostname}:${hostPort}`;
-    } catch {
-      return `http://localhost:${hostPort}`;
-    }
-  }
-
   return null;
 }
 
@@ -385,18 +350,28 @@ export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
   return res.json();
 }
 
+// ─── Sandbox Token Regeneration ─────────────────────────────────────────────
+
 /**
- * Get the full changelog history from the platform.
- * Returns all changelog entries (newest first).
+ * Generate (or regenerate) the sandbox access key.
+ * Recreates the container with the token baked in (workspace volume preserved).
+ * Returns the new access key — shown to user once.
  */
-export async function getFullChangelog(): Promise<ChangelogEntry[]> {
-  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/version/changelog`, {
-    headers: { 'Accept': 'application/json' },
+export async function regenerateSandboxToken(): Promise<{
+  sandbox: SandboxInfo;
+  accessKey: string;
+}> {
+  const result = await platformFetch<SandboxInfo>('/platform/sandbox/generate-token', {
+    method: 'POST',
   });
-  if (!res.ok) throw new Error(`Changelog fetch failed: ${res.status}`);
-  const data = await res.json();
-  return data.changelog ?? [];
+
+  if (!result.success || !result.data || !result.accessKey) {
+    throw new Error(result.error || 'Failed to generate token');
+  }
+
+  return { sandbox: result.data, accessKey: result.accessKey };
 }
+
 
 /**
  * Trigger an update on a running sandbox.
@@ -407,7 +382,7 @@ export async function triggerSandboxUpdate(
   version: string,
 ): Promise<SandboxUpdateResult> {
   const url = getSandboxUrl(sandbox);
-  const token = await getSupabaseAccessToken();
+  const token = await getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

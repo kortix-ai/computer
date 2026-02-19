@@ -120,7 +120,7 @@ export function createCloudSandboxRouter(
   });
 
   // ─── POST / ────────────────────────────────────────────────────────────
-  // Ensure sandbox exists and is active. Idempotent.
+  // Create a new sandbox. Users can have multiple active sandboxes.
 
   router.post('/', async (c) => {
     const userId = c.get('userId');
@@ -129,37 +129,26 @@ export function createCloudSandboxRouter(
       const body = await c.req.json().catch(() => ({}));
       const requestedProvider = (body?.provider as ProviderName) || undefined;
       const providerName = requestedProvider || getDefaultProviderName();
+      const customName = body?.name as string | undefined;
 
       const accountId = await resolveAccountId(userId);
 
-      // Already have an active sandbox?
-      const [existing] = await db
+      // Count existing sandboxes for naming
+      const existingCount = await db
         .select()
         .from(sandboxes)
-        .where(
-          and(
-            eq(sandboxes.accountId, accountId),
-            eq(sandboxes.status, 'active'),
-          ),
-        )
-        .limit(1);
+        .where(eq(sandboxes.accountId, accountId))
+        .then((rows) => rows.length);
 
-      if (existing) {
-        return c.json({
-          success: true,
-          data: serializeSandbox(existing),
-          created: false,
-        });
-      }
+      const sandboxName = customName || `sandbox-${accountId.slice(0, 8)}${existingCount > 0 ? `-${existingCount + 1}` : ''}`;
 
-      // Provision a new one
       const provider = getProvider(providerName);
       const authToken = generateSandboxToken();
 
       const result = await provider.create({
         accountId,
         userId,
-        name: `sandbox-${accountId.slice(0, 8)}`,
+        name: sandboxName,
         envVars: {
           KORTIX_TOKEN: authToken,
         },
@@ -169,7 +158,7 @@ export function createCloudSandboxRouter(
         .insert(sandboxes)
         .values({
           accountId,
-          name: `sandbox-${accountId.slice(0, 8)}`,
+          name: sandboxName,
           provider: providerName,
           externalId: result.externalId,
           status: 'active',
@@ -190,8 +179,8 @@ export function createCloudSandboxRouter(
         201,
       );
     } catch (err) {
-      console.error('[SANDBOX-CLOUD] ensure error:', err);
-      return c.json({ success: false, error: 'Failed to ensure sandbox' }, 500);
+      console.error('[SANDBOX-CLOUD] create error:', err);
+      return c.json({ success: false, error: 'Failed to create sandbox' }, 500);
     }
   });
 

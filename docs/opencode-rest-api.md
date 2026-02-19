@@ -7,7 +7,7 @@ Complete reference for the OpenCode server REST API. Useful for debugging sessio
 - **Default port**: `4096` (configurable, our sandbox uses `3111`)
 - **Framework**: Hono (TypeScript) on Bun
 - **Auth**: Optional HTTP Basic when `OPENCODE_SERVER_PASSWORD` is set
-- **Frontend env var**: `NEXT_PUBLIC_OPENCODE_URL` (defaults to `http://localhost:4096`)
+- **Frontend access**: Routed through the backend at `{NEXT_PUBLIC_BACKEND_URL}/sandbox/*`
 
 All project-scoped endpoints accept an optional `?directory=<path>` query param (or `x-opencode-directory` header).
 
