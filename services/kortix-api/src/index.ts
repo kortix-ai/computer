@@ -20,6 +20,7 @@ import { providersApp } from './providers/routes';
 import { secretsApp } from './secrets/routes';
 import { integrationsApp } from './integrations';
 import { queueApp, startDrainer, stopDrainer } from './queue';
+import { integrationsApp } from './integrations';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 

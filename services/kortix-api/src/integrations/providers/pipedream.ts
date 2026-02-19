@@ -278,6 +278,11 @@ export class PipedreamProvider implements AuthProvider {
     if (query) params.set('q', query);
     params.set('limit', String(limit));
     if (cursor) params.set('after', cursor);
+    // Sort by popularity (featured_weight) descending so popular apps appear first
+    if (!query) {
+      params.set('sort_key', 'featured_weight');
+      params.set('sort_direction', 'desc');
+    }
 
     const data = await this.apiRequest<{
       page_info: {
@@ -292,6 +297,7 @@ export class PipedreamProvider implements AuthProvider {
         img_src?: string;
         auth_type?: string;
         categories: string[];
+        featured_weight?: number;
       }>;
     }>('GET', `/v1/connect/${this.projectId}/apps?${params.toString()}`);
 
@@ -302,6 +308,7 @@ export class PipedreamProvider implements AuthProvider {
       imgSrc: a.img_src,
       authType: a.auth_type,
       categories: a.categories || [],
+      featuredWeight: a.featured_weight,
     }));
 
     const pageInfo = data.page_info || {};
@@ -387,10 +394,6 @@ export class PipedreamProvider implements AuthProvider {
     }
 
     try {
-      // Pipedream Connect API requires:
-      // - `id` (the action key)
-      // - `configured_props` with the app auth as {app_slug: {authProvisionId: account_id}}
-      // - `external_user_id`
       const configured_props: Record<string, unknown> = {
         [app]: { authProvisionId: account.id },
         ...props,
