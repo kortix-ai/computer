@@ -27,6 +27,7 @@ export {
   kortixApiKeys,
   integrations,
   sandboxIntegrations,
+  serverEntries,
   // Enums (integrations)
   integrationStatusEnum,
   // Relations
@@ -84,4 +85,6 @@ export type {
   NewIntegration,
   SandboxIntegration,
   NewSandboxIntegration,
+  ServerEntry,
+  NewServerEntry,
 } from './types';

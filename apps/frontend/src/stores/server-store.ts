@@ -126,9 +126,83 @@ interface ServerStore {
  */
 const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '');
 const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/preview/kortix-sandbox/8000`;
+const SERVERS_API = `${BACKEND_URL}/servers`;
 
 function generateId(): string {
   return `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ── API sync helpers (fire-and-forget) ──────────────────────────────────────
+
+/** Strip authToken before sending to API — tokens stay in localStorage only. */
+function toApiPayload(s: ServerEntry) {
+  return {
+    id: s.id,
+    label: s.label,
+    url: s.url,
+    isDefault: s.isDefault,
+    provider: s.provider,
+    sandboxId: s.sandboxId,
+    mappedPorts: s.mappedPorts,
+  };
+}
+
+function syncServerToApi(server: ServerEntry) {
+  fetch(`${SERVERS_API}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(toApiPayload(server)),
+  }).catch(() => {}); // fire-and-forget
+}
+
+function deleteServerFromApi(id: string) {
+  fetch(`${SERVERS_API}/${id}`, { method: 'DELETE' }).catch(() => {});
+}
+
+/** Bulk sync all servers to API (used on initial hydration). */
+function syncAllToApi(servers: ServerEntry[]) {
+  fetch(`${SERVERS_API}/sync`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ servers: servers.map(toApiPayload) }),
+  }).catch(() => {});
+}
+
+/** Load servers from API, merging authTokens from localStorage entries. */
+async function loadFromApi(localServers: ServerEntry[]): Promise<ServerEntry[] | null> {
+  try {
+    const res = await fetch(SERVERS_API);
+    if (!res.ok) return null;
+    const rows: Array<{
+      id: string;
+      label: string;
+      url: string;
+      isDefault: boolean;
+      provider: 'daytona' | 'local_docker' | null;
+      sandboxId: string | null;
+      mappedPorts: Record<string, string> | null;
+    }> = await res.json();
+    if (!rows.length) return null;
+
+    // Build a lookup for local authTokens
+    const tokenMap = new Map<string, string>();
+    for (const s of localServers) {
+      if (s.authToken) tokenMap.set(s.id, s.authToken);
+    }
+
+    return rows.map((r) => ({
+      id: r.id,
+      label: r.label,
+      url: r.url,
+      isDefault: r.isDefault,
+      provider: r.provider ?? undefined,
+      sandboxId: r.sandboxId ?? undefined,
+      mappedPorts: r.mappedPorts ?? undefined,
+      authToken: tokenMap.get(r.id),
+    }));
+  } catch {
+    return null;
+  }
 }
 
 const DEFAULT_SERVER_ID = 'default';
@@ -162,6 +236,7 @@ export const useServerStore = create<ServerStore>()(
         set((state) => ({
           servers: [...state.servers, newServer],
         }));
+        syncServerToApi(newServer);
         return newServer;
       },
 
@@ -182,6 +257,11 @@ export const useServerStore = create<ServerStore>()(
           // use updateServerSilent for sandbox URL/port changes.
           ...(isActive && updates.url ? { serverVersion: state.serverVersion + 1 } : {}),
         }));
+        // Sync non-token updates to API
+        if (updates.label || updates.url) {
+          const updated = get().servers.find((s) => s.id === id);
+          if (updated) syncServerToApi(updated);
+        }
       },
 
       updateServerSilent: (id, updates) => {
@@ -220,6 +300,9 @@ export const useServerStore = create<ServerStore>()(
               ? { urlVersion: state.urlVersion + 1 }
               : {}),
         }));
+        // Sync to API
+        const updated = get().servers.find((s) => s.id === id);
+        if (updated) syncServerToApi(updated);
       },
 
       removeServer: (id: string) => {
@@ -235,6 +318,7 @@ export const useServerStore = create<ServerStore>()(
           // If we removed the active server, bump version
           ...(wasActive ? { serverVersion: state.serverVersion + 1 } : {}),
         });
+        deleteServerFromApi(id);
       },
 
       setActiveServer: (id: string, options?: { auto?: boolean }) => {
@@ -313,19 +397,18 @@ export const useServerStore = create<ServerStore>()(
             sandboxId: sandbox.sandboxId,
           });
         } else {
+          const newEntry: ServerEntry = {
+            id: targetId,
+            label: sandbox.label,
+            url: sandbox.url.replace(/\/+$/, ''),
+            provider: sandbox.provider,
+            sandboxId: sandbox.sandboxId,
+            mappedPorts: sandbox.mappedPorts,
+          };
           set((state) => ({
-            servers: [
-              ...state.servers,
-              {
-                id: targetId,
-                label: sandbox.label,
-                url: sandbox.url.replace(/\/+$/, ''),
-                provider: sandbox.provider,
-                sandboxId: sandbox.sandboxId,
-                mappedPorts: sandbox.mappedPorts,
-              },
-            ],
+            servers: [...state.servers, newEntry],
           }));
+          syncServerToApi(newEntry);
         }
 
         // Auto-switch to the sandbox if the user hasn't manually picked a server
@@ -386,6 +469,23 @@ export const useServerStore = create<ServerStore>()(
         if (!state.servers.some((s) => s.id === state.activeServerId)) {
           state.activeServerId = DEFAULT_SERVER_ID;
         }
+
+        // Async: load from API and merge, preserving local authTokens.
+        // On first ever boot, push localStorage entries to API.
+        const localServers = [...state.servers];
+        loadFromApi(localServers).then((apiServers) => {
+          if (apiServers && apiServers.length > 0) {
+            // API has data — use it as source of truth (with local tokens merged in)
+            const hasDefault = apiServers.some((s) => s.id === DEFAULT_SERVER_ID);
+            if (!hasDefault) {
+              apiServers.unshift(createDefaultServer());
+            }
+            useServerStore.setState({ servers: apiServers });
+          } else {
+            // API is empty — seed it with current localStorage entries
+            syncAllToApi(localServers);
+          }
+        });
       },
     },
   ),
