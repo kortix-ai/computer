@@ -2449,20 +2449,38 @@ export function SessionChat({
 	const isServerBusy =
 		sessionStatus?.type === "busy" || sessionStatus?.type === "retry";
 
+	// Check if the latest assistant message is still incomplete (server hasn't
+	// set time.completed). This is a reliable secondary signal that the AI is
+	// still producing content, even if the session status briefly reports idle
+	// (e.g. during SSE reconnection, stale watchdog poll, or between agentic
+	// steps). Only considers the very last assistant message.
+	const hasIncompleteAssistant = useMemo(() => {
+		if (!messages || messages.length === 0) return false;
+		for (let i = messages.length - 1; i >= 0; i--) {
+			if (messages[i].info.role === "assistant") {
+				return !(messages[i].info as any).time?.completed;
+			}
+		}
+		return false;
+	}, [messages]);
+
+	// Effective busy: server says busy OR the assistant message is incomplete.
+	const effectiveBusy = isServerBusy || hasIncompleteAssistant;
+
 	// Debounced busy state: goes true immediately, but stays true for 2s
-	// after the server says idle. This prevents flickering between agentic
+	// after BOTH signals say idle. This prevents flickering between agentic
 	// steps where the status briefly goes idle then back to busy.
-	const [isBusy, setIsBusy] = useState(isServerBusy);
+	const [isBusy, setIsBusy] = useState(effectiveBusy);
 	const busyTimerRef = useRef<ReturnType<typeof setTimeout>>();
 	useEffect(() => {
-		if (isServerBusy) {
+		if (effectiveBusy) {
 			clearTimeout(busyTimerRef.current);
 			setIsBusy(true);
 		} else {
 			busyTimerRef.current = setTimeout(() => setIsBusy(false), 2000);
 		}
 		return () => clearTimeout(busyTimerRef.current);
-	}, [isServerBusy]);
+	}, [effectiveBusy]);
 
 	// ---- Message Queue ----
 	// Hydrate the queue from the backend on first mount (survives page reloads).
