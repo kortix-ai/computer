@@ -17,6 +17,14 @@ import { useRef, useEffect, useCallback, useState } from 'react';
  * MutationObserver recalculates the spacer on every content change.
  * This is now safe because scrollHeight doesn't change (turn growth
  * and spacer shrinkage cancel out), so there's nothing to fight.
+ *
+ * User scroll intent:
+ * Once the user scrolls UP, auto-scroll is disabled and the "scroll to
+ * bottom" FAB appears. Auto-scroll resumes ONLY when:
+ *   - The user clicks the FAB (scrollToBottom)
+ *   - The user sends a new message (scrollToBottom)
+ *   - The user scrolls all the way back to the absolute bottom of the
+ *     scrollable area (classic scrollHeight check, NOT measureTarget)
  */
 
 interface UseAutoScrollOptions {
@@ -44,6 +52,11 @@ function measureTarget(scrollEl: HTMLDivElement, contentEl: HTMLDivElement): num
   const sr = scrollEl.getBoundingClientRect();
   const tr = last.getBoundingClientRect();
   return Math.max(0, scrollEl.scrollTop + (tr.top - sr.top) - TURN_TOP_OFFSET);
+}
+
+/** Classic "near the absolute bottom of scrollable content" check. */
+function isNearScrollEnd(el: HTMLDivElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
 }
 
 export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollReturn {
@@ -102,7 +115,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(rafId); };
   }, [recalcSpacer, working]);
 
-  // ── isAtBottom (DOM-measured) ─────────────────────────────────────
+  // ── isAtBottom (DOM-measured, uses measureTarget) ─────────────────
   const isAtBottom = useCallback(() => {
     const el = scrollRef.current;
     const content = contentRef.current;
@@ -165,7 +178,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
       recalcSpacer();
       const timer = setTimeout(() => {
         if (!isAtBottom()) setShowScrollButton(true);
-        else { setShowScrollButton(false); userScrolledRef.current = false; }
+        else setShowScrollButton(false);
       }, 400);
       return () => clearTimeout(timer);
     }
@@ -192,22 +205,34 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
   }, [working, isAtBottom, recalcSpacer]);
 
   // ── Wheel intent ──────────────────────────────────────────────────
+  // Depends on `working` so listeners are (re-)attached when the scroll
+  // area mounts (it's conditionally rendered; refs may be null on mount).
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const handle = (e: WheelEvent) => {
       if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
       if (e.deltaY < 0) {
-        if (!userScrolledRef.current) { userScrolledRef.current = true; setShowScrollButton(true); }
+        // Scrolling up → disable auto-scroll, show FAB
+        if (!userScrolledRef.current) {
+          userScrolledRef.current = true;
+          setShowScrollButton(true);
+        }
       } else if (e.deltaY > 0) {
+        // Scrolling down → resume auto-scroll only if the user reached
+        // the absolute bottom of the scrollable area (classic check).
+        // This avoids false positives from measureTarget.
         requestAnimationFrame(() => {
-          if (isAtBottom()) { userScrolledRef.current = false; setShowScrollButton(false); }
+          if (isNearScrollEnd(el)) {
+            userScrolledRef.current = false;
+            setShowScrollButton(false);
+          }
         });
       }
     };
     el.addEventListener('wheel', handle, { passive: true });
     return () => el.removeEventListener('wheel', handle);
-  }, [isAtBottom]);
+  }, [working]);
 
   // ── Touch intent ──────────────────────────────────────────────────
   useEffect(() => {
@@ -218,17 +243,24 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     const onMove = (e: TouchEvent) => {
       if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
       const dy = startY - (e.touches[0]?.clientY ?? 0);
-      if (dy < -10 && !userScrolledRef.current) { userScrolledRef.current = true; setShowScrollButton(true); }
-      else if (dy > 10) {
+      if (dy < -10 && !userScrolledRef.current) {
+        // Swiping up → disable auto-scroll
+        userScrolledRef.current = true;
+        setShowScrollButton(true);
+      } else if (dy > 10) {
+        // Swiping down → resume only at absolute bottom
         requestAnimationFrame(() => {
-          if (isAtBottom()) { userScrolledRef.current = false; setShowScrollButton(false); }
+          if (isNearScrollEnd(el)) {
+            userScrolledRef.current = false;
+            setShowScrollButton(false);
+          }
         });
       }
     };
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: true });
     return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); };
-  }, [isAtBottom]);
+  }, [working]);
 
   // ── Keyboard / scrollbar drag catch-all ───────────────────────────
   useEffect(() => {
@@ -237,7 +269,8 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     let last = el.scrollTop;
     const handle = () => {
       const cur = el.scrollTop;
-      if (cur < last && !isAtBottom() && !userScrolledRef.current) {
+      // Detect upward scroll (keyboard, scrollbar drag, programmatic)
+      if (cur < last - 2 && !userScrolledRef.current) {
         userScrolledRef.current = true;
         setShowScrollButton(true);
       }
@@ -245,7 +278,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     };
     el.addEventListener('scroll', handle, { passive: true });
     return () => el.removeEventListener('scroll', handle);
-  }, [isAtBottom]);
+  }, [working]);
 
   return { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd };
 }
