@@ -1122,7 +1122,7 @@ export function TabBar() {
         </div>
 
         {/* Action buttons group — solid bg so tabs don't scroll behind */}
-        <div className="flex-shrink-0 flex items-center gap-px pr-1 relative z-20 bg-sidebar pl-2">
+        <div className="flex-shrink-0 flex items-center gap-px pr-1 relative z-20 bg-sidebar pl-2 h-full">
           {/* Fade edge — hidden when scrolled fully right */}
           <div ref={scrollFadeRef} className="absolute right-full top-0 bottom-0 w-3 bg-gradient-to-r from-transparent to-sidebar pointer-events-none transition-opacity duration-150" />
           {/* New tab button */}
