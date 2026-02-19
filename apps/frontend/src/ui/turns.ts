@@ -328,17 +328,16 @@ export function isToolPartHidden(
 // ============================================================================
 
 /**
- * Collect answered question parts that should be shown outside of the collapsed
- * steps list. Matches SolidJS session-turn.tsx:341-362
+ * Collect answered question parts that should be shown outside of the
+ * steps list. Questions are always rendered standalone (never inside steps),
+ * so answered questions are shown regardless of stepsExpanded state.
  */
 export function getAnsweredQuestionParts(
   turn: Turn,
-  stepsExpanded: boolean,
+  _stepsExpanded: boolean,
   hasActiveQuestion: boolean,
 ): PartWithMessage[] {
-  // Already visible in steps
-  if (stepsExpanded) return [];
-  // Active question takes precedence
+  // Active question takes precedence — don't also show old answered ones
   if (hasActiveQuestion) return [];
 
   const result: PartWithMessage[] = [];
