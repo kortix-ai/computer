@@ -46,37 +46,20 @@ import { listSandboxes, type SandboxInfo } from '@/lib/platform-client';
 
 const AppLogo = ({
   app,
-  size = 'md',
 }: {
   app: { imgSrc?: string; name: string };
-  size?: 'sm' | 'md' | 'lg';
 }) => {
-  const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-10 h-10',
-    lg: 'w-12 h-12',
-  };
-  const iconSizes = {
-    sm: 'h-4 w-4',
-    md: 'h-5 w-5',
-    lg: 'h-6 w-6',
-  };
-
-  if (app.imgSrc) {
-    return (
-      <img
-        src={app.imgSrc}
-        alt={app.name}
-        className={`${sizeClasses[size]} rounded-xl object-contain`}
-      />
-    );
-  }
-
   return (
-    <div
-      className={`${sizeClasses[size]} rounded-xl bg-muted/60 border border-border/50 flex items-center justify-center`}
-    >
-      <Plug className={`${iconSizes[size]} text-muted-foreground`} />
+    <div className="w-9 h-9 rounded-[10px] bg-muted/50 border border-border/40 flex items-center justify-center shrink-0 overflow-hidden">
+      {app.imgSrc ? (
+        <img
+          src={app.imgSrc}
+          alt={app.name}
+          className="w-5 h-5 object-contain"
+        />
+      ) : (
+        <Plug className="h-4 w-4 text-muted-foreground" />
+      )}
     </div>
   );
 };
@@ -100,30 +83,26 @@ const AppCard = ({
 
   return (
     <SpotlightCard className="bg-card border border-border/50">
-      <div className="p-4 flex flex-col h-full">
-        <div className="flex items-start gap-3 mb-3">
-          <AppLogo app={{ imgSrc: app.imgSrc, name: app.name }} size="lg" />
+      <div className="p-3.5 flex flex-col h-full">
+        <div className="flex items-center gap-2.5 mb-2.5">
+          <AppLogo app={{ imgSrc: app.imgSrc, name: app.name }} />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm text-foreground truncate">
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-medium text-[13px] text-foreground truncate">
                 {app.name}
               </h3>
               {isConnected && (
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
               )}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              {app.categories.slice(0, 2).map((cat) => (
-                <Badge
-                  key={cat}
-                  variant="secondary"
-                  className="text-[10px] px-1.5 py-0 font-normal"
-                >
+              {app.categories.slice(0, 1).map((cat) => (
+                <span key={cat} className="text-[10px] text-muted-foreground">
                   {cat}
-                </Badge>
+                </span>
               ))}
               {app.authType && (
-                <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
+                <span className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">
                   {app.authType}
                 </span>
               )}
@@ -131,28 +110,25 @@ const AppCard = ({
           </div>
         </div>
 
-        {app.description && (
-          <p className="text-xs text-muted-foreground leading-relaxed mb-4 line-clamp-2 flex-1">
-            {app.description}
+        <div className="h-[30px] mb-3">
+          <p className="text-[11px] text-muted-foreground/80 leading-[15px] line-clamp-2">
+            {app.description || '\u00A0'}
           </p>
-        )}
-        {!app.description && <div className="flex-1" />}
+        </div>
 
         <div className="flex justify-end">
           {isConnected ? (
             <Button
               variant="ghost"
-              size="sm"
               className="text-muted-foreground hover:text-foreground h-7 px-2.5 text-xs"
               onClick={onManage}
             >
-              <Link2 className="h-3 w-3 mr-1" />
+              <Link2 className="h-3 w-3" />
               Manage
             </Button>
           ) : (
             <Button
-              variant="outline"
-              size="sm"
+              variant="default"
               className="h-7 px-3 text-xs"
               onClick={onConnect}
               disabled={isConnecting}
@@ -160,7 +136,7 @@ const AppCard = ({
               {isConnecting ? (
                 <Loader2 className="h-3 w-3 animate-spin mr-1" />
               ) : (
-                <Plug className="h-3 w-3 mr-1" />
+                <Plug className="h-3 w-3" />
               )}
               Connect
             </Button>
@@ -188,56 +164,60 @@ const ConnectionCard = ({
 }) => {
   return (
     <SpotlightCard className="bg-card border border-border/50">
-      <div className="p-4 flex items-center gap-3">
-        <AppLogo
-          app={{
-            imgSrc,
-            name: connection.appName || connection.app,
-          }}
-          size="md"
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="font-medium text-sm text-foreground truncate">
-              {connection.appName || connection.app}
-            </h3>
-            <Badge
-              variant={connection.status === 'active' ? 'highlight' : 'secondary'}
-              className="text-[10px]"
-            >
-              {connection.status}
-            </Badge>
+      <div className="p-3.5 flex flex-col h-full">
+        <div className="flex items-center gap-2.5 mb-2.5">
+          <AppLogo
+            app={{
+              imgSrc,
+              name: connection.appName || connection.app,
+            }}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-medium text-[13px] text-foreground truncate">
+                {connection.appName || connection.app}
+              </h3>
+              <Badge
+                variant={connection.status === 'active' ? 'highlight' : 'secondary'}
+                className="text-[10px] px-1.5 py-0"
+              >
+                {connection.status}
+              </Badge>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Connected {new Date(connection.connectedAt).toLocaleDateString()}
+              {connection.lastUsedAt && (
+                <> &middot; Used {new Date(connection.lastUsedAt).toLocaleDateString()}</>
+              )}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground truncate">
-            Connected {new Date(connection.connectedAt).toLocaleDateString()}
-            {connection.lastUsedAt && (
-              <> &middot; Last used {new Date(connection.lastUsedAt).toLocaleDateString()}</>
-            )}
-          </p>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+
+        <div className="flex-1" />
+
+        <div className="flex items-center justify-end gap-1">
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground h-7 px-2.5 text-xs"
             onClick={onLinkSandbox}
-            title="Link to sandbox"
           >
-            <Link2 className="h-4 w-4" />
+            <Link2 className="h-3 w-3 mr-1" />
+            Link
           </Button>
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive h-7 px-2.5 text-xs"
             onClick={onDisconnect}
             disabled={isDisconnecting}
-            title="Disconnect"
           >
             {isDisconnecting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
             ) : (
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3 mr-1" />
             )}
+            Remove
           </Button>
         </div>
       </div>
@@ -396,17 +376,19 @@ const EmptyState = () => (
 const LoadingGrid = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
     {Array.from({ length: 8 }).map((_, i) => (
-      <div key={i} className="rounded-2xl border bg-card p-4">
-        <div className="flex items-start gap-3 mb-3">
-          <Skeleton className="h-12 w-12 rounded-xl" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-16" />
+      <div key={i} className="rounded-2xl border bg-card p-3.5">
+        <div className="flex items-center gap-2.5 mb-2.5">
+          <Skeleton className="h-9 w-9 rounded-[10px]" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-2.5 w-16" />
           </div>
         </div>
-        <Skeleton className="h-3 w-full mb-1" />
-        <Skeleton className="h-3 w-3/4 mb-4" />
-        <Skeleton className="h-8 w-full rounded-md" />
+        <Skeleton className="h-2.5 w-full mb-1" />
+        <Skeleton className="h-2.5 w-3/4 mb-3" />
+        <div className="flex justify-end">
+          <Skeleton className="h-7 w-20 rounded-md" />
+        </div>
       </div>
     ))}
   </div>
@@ -419,6 +401,7 @@ export function IntegrationsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [authFilter, setAuthFilter] = useState<'all' | 'oauth' | 'keys'>('oauth');
   const [connectingApp, setConnectingApp] = useState<string | null>(null);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [linkDialogConnection, setLinkDialogConnection] =
@@ -453,6 +436,12 @@ export function IntegrationsPage() {
     () => defaultAppsData?.pages.flatMap((p) => p.apps) ?? [],
     [defaultAppsData],
   );
+
+  // Filter apps by auth type
+  const filteredApps = useMemo(() => {
+    if (authFilter === 'all') return apps;
+    return apps.filter((a) => a.authType === authFilter);
+  }, [apps, authFilter]);
 
   const connectionsByApp = useMemo(() => {
     const map = new Map<string, IntegrationConnection>();
@@ -596,7 +585,7 @@ export function IntegrationsPage() {
             <h2 className="text-sm font-medium text-muted-foreground mb-3">
               Connected ({connections.length})
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {connections.map((connection) => (
                 <ConnectionCard
                   key={connection.integrationId}
@@ -613,7 +602,7 @@ export function IntegrationsPage() {
           </div>
         )}
 
-        {/* Search */}
+        {/* Search + Filter */}
         <div className="flex items-center gap-2 sm:gap-4 pb-4 pt-2">
           <div className="flex-1 max-w-md">
             <div className="relative">
@@ -628,6 +617,21 @@ export function IntegrationsPage() {
                 <Search className="h-4 w-4" />
               </div>
             </div>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/30 p-0.5">
+            {(['oauth', 'keys', 'all'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setAuthFilter(filter)}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  authFilter === filter
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {filter === 'oauth' ? 'OAuth' : filter === 'keys' ? 'API Key' : 'All'}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -648,14 +652,14 @@ export function IntegrationsPage() {
             <LoadingGrid />
           ) : apps.length === 0 && connections.length === 0 ? (
             <EmptyState />
-          ) : apps.length === 0 ? (
+          ) : filteredApps.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
-              No apps found{searchQuery ? ` for "${searchQuery}"` : ''}.
+              No apps found{searchQuery ? ` for "${searchQuery}"` : ''}{authFilter !== 'all' ? ` with ${authFilter === 'oauth' ? 'OAuth' : 'API key'} auth` : ''}.
             </p>
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {apps.map((app) => (
+                {filteredApps.map((app) => (
                   <AppCard
                     key={app.slug}
                     app={app}

@@ -27,6 +27,7 @@ export interface AppInfo {
   imgSrc?: string;
   authType?: string;
   categories: string[];
+  featuredWeight?: number;
 }
 
 export interface AppListResult {
