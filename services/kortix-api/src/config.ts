@@ -82,6 +82,21 @@ export const config = {
    */
   SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
 
+  /**
+   * Optional bearer token to protect sandbox proxy access in local/VPS mode.
+   * If set, all requests through /v1/preview/{sandboxId}/* must present this token
+   * via Authorization header or ?token= query param.
+   * If unset, sandbox proxy is open (backward compatible).
+   */
+  SANDBOX_AUTH_TOKEN: process.env.SANDBOX_AUTH_TOKEN || '',
+
+  /**
+   * Internal service key for kortix-api → sandbox communication.
+   * Injected into proxied requests so the sandbox can validate the caller.
+   * In VPS mode this is auto-generated; in local mode defaults to empty (no auth).
+   */
+  INTERNAL_SERVICE_KEY: process.env.INTERNAL_SERVICE_KEY || '',
+
   // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
   SCHEDULER_ENABLED: process.env.SCHEDULER_ENABLED !== 'false',
   /** If set, enables pg_cron mode: external ticks via POST /v1/cron/tick with this secret */
@@ -130,6 +145,11 @@ export const config = {
     if (this.SANDBOX_PROVIDER === 'local_docker') return true;
     if (this.SANDBOX_PROVIDER === 'daytona') return false;
     return true;
+  },
+
+  /** True when a sandbox auth token is configured (local/VPS protection enabled). */
+  hasSandboxAuth(): boolean {
+    return !!this.SANDBOX_AUTH_TOKEN;
   },
 };
 

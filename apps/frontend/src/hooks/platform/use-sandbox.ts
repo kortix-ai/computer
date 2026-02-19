@@ -22,24 +22,21 @@ import {
   type SandboxInfo,
   type SandboxProviderName,
 } from '@/lib/platform-client';
-import { useServerStore } from '@/stores/server-store';
+import { useServerStore, CLOUD_SANDBOX_SERVER_ID } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
 import { useAuth } from '@/components/AuthProvider';
+import { isLocalMode } from '@/lib/config';
 import { useEffect } from 'react';
-
-const SANDBOX_SERVER_ID = 'cloud-sandbox';
 
 /**
  * Register (or update) the sandbox as a server entry in the server store
  * and set it as the active server if no other server is active.
  *
- * Uses updateServerSilent for URL/port updates so that only the connection
- * health monitor re-verifies — the SSE event stream is NOT disrupted and
- * cached queries are NOT nuked.
+ * Delegates to the centralized `registerOrUpdateSandbox()` action on
+ * server-store — no duplicated logic here. Tab-swapping is handled
+ * here since it's a UI concern (not a store concern).
  */
 function registerSandboxServer(sandbox: SandboxInfo) {
-  const store = useServerStore.getState();
-
   let url: string;
   try {
     url = getSandboxUrl(sandbox);
@@ -48,42 +45,23 @@ function registerSandboxServer(sandbox: SandboxInfo) {
     return;
   }
 
-  const mappedPorts = extractMappedPorts(sandbox);
-  const label = sandbox.name || (sandbox.provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
-  const existing = store.servers.find((s) => s.id === SANDBOX_SERVER_ID);
+  const previousActiveId = useServerStore.getState().activeServerId;
 
-  if (existing) {
-    // Silently update URL / mappedPorts / provider / sandboxId — no serverVersion bump.
-    // This avoids nuking the SSE stream and query caches on port changes.
-    store.updateServerSilent(SANDBOX_SERVER_ID, {
+  const serverId = useServerStore.getState().registerOrUpdateSandbox(
+    {
       url,
-      label: sandbox.name || existing.label,
-      mappedPorts,
+      label: sandbox.name || (sandbox.provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox'),
       provider: sandbox.provider,
       sandboxId: sandbox.external_id,
-    });
-  } else {
-    // Add new server entry for the sandbox
-    // We manually set the state to inject our known ID
-    useServerStore.setState((state) => ({
-      servers: [
-        ...state.servers,
-        {
-          id: SANDBOX_SERVER_ID,
-          label,
-          url,
-          provider: sandbox.provider,
-          sandboxId: sandbox.external_id,
-          mappedPorts,
-        },
-      ],
-    }));
-  }
+      mappedPorts: extractMappedPorts(sandbox),
+    },
+    { isLocal: isLocalMode(), autoSwitch: true },
+  );
 
-  // Auto-switch to sandbox only if the user hasn't manually picked a server
-  if (!store.userSelected && store.activeServerId === 'default') {
-    useTabStore.getState().swapForServer(SANDBOX_SERVER_ID, store.activeServerId);
-    store.setActiveServer(SANDBOX_SERVER_ID, { auto: true });
+  // If the active server changed (autoSwitch kicked in), swap tabs
+  const newActiveId = useServerStore.getState().activeServerId;
+  if (newActiveId !== previousActiveId) {
+    useTabStore.getState().swapForServer(serverId, previousActiveId);
   }
 }
 
@@ -134,5 +112,6 @@ export function useProviders() {
   });
 }
 
-export { SANDBOX_SERVER_ID };
+/** @deprecated Use CLOUD_SANDBOX_SERVER_ID from '@/stores/server-store' directly */
+export const SANDBOX_SERVER_ID = CLOUD_SANDBOX_SERVER_ID;
 export type { SandboxProviderName };

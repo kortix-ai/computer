@@ -1,9 +1,9 @@
-import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
+import { createHash, createHmac, timingSafeEqual, randomBytes } from 'crypto';
 import { config } from '../config';
 
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-function randomAlphanumeric(length: number): string {
+export function randomAlphanumeric(length: number): string {
   const bytes = randomBytes(length);
   let result = '';
   for (let i = 0; i < length; i++) {
@@ -54,4 +54,16 @@ export function verifySecretKey(secretKey: string, storedHash: string): boolean 
 
 export function isApiKeySecretConfigured(): boolean {
   return !!config.API_KEY_SECRET;
+}
+
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ *
+ * Hashes both inputs with SHA-256 first so the comparison is always
+ * on fixed-length 32-byte digests — no string length leakage.
+ */
+export function timingSafeStringEqual(a: string, b: string): boolean {
+  const hashA = createHash('sha256').update(a).digest();
+  const hashB = createHash('sha256').update(b).digest();
+  return timingSafeEqual(hashA, hashB);
 }

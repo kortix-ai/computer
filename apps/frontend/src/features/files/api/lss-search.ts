@@ -6,7 +6,7 @@
  */
 
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
 import type { LssHit, LssSearchResult } from '../types';
 
 /**
@@ -39,7 +39,7 @@ export async function searchLss(
   const headers: Record<string, string> = {
     Accept: 'application/json',
   };
-  const token = await getSupabaseAccessToken();
+  const token = await getAuthToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }

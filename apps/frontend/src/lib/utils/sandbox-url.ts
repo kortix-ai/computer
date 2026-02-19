@@ -2,10 +2,11 @@
  * Sandbox URL detection and rewriting utilities.
  *
  * Detects localhost URLs in agent output (e.g. "Website is live at http://localhost:8080")
- * and rewrites them to be accessible through the proxy layer:
+ * and rewrites them to be accessible through the proxy layer.
  *
- * Cloud mode:  http://localhost:8080 → {BACKEND_URL}/preview/{sandboxId}/8000/proxy/8080/
- * Local mode:  http://localhost:8080 → {serverUrl}/proxy/8080/
+ * All modes route through the backend's unified preview proxy:
+ *   {BACKEND_URL}/preview/{sandboxId}/8000/proxy/{port}/
+ * The sandboxId is the container name (local) or Daytona ID (cloud).
  */
 
 import { SANDBOX_PORTS } from '@/lib/platform-client';
@@ -168,55 +169,26 @@ export function hasLocalhostUrls(text: string): boolean {
   return detectLocalhostUrls(text).length > 0;
 }
 
-function resolveProxyBase(
-  serverUrl: string,
-  mappedPorts?: Record<string, string>,
-): string {
-  const base = serverUrl.replace(/\/+$/, '');
-
-  // Cloud/daytona URLs are already routed through preview base paths.
-  if (base.includes('/preview/')) return base;
-
-  try {
-    const parsed = new URL(base);
-    const mappedMasterPort = mappedPorts?.[SANDBOX_PORTS.KORTIX_MASTER];
-
-    if (mappedMasterPort) {
-      parsed.port = mappedMasterPort;
-      return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '');
-    }
-
-    // Direct OpenCode API URL -> switch to Kortix Master port.
-    if (parsed.port === '4096') {
-      parsed.port = SANDBOX_PORTS.KORTIX_MASTER;
-      return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '');
-    }
-
-    // VPS/reverse-proxy path prefixes should be preserved as-is.
-    return base;
-  } catch {
-    return base;
-  }
-}
-
 /**
  * Rewrite a localhost URL to go through the sandbox proxy.
  *
+ * The serverUrl always routes through the backend's unified preview proxy:
+ *   {BACKEND_URL}/preview/{sandboxId}/8000
+ * Exposes Kortix Master's /proxy/{port}/ endpoint for dynamic port proxying.
+ *
  * @param port - The port number to proxy
  * @param path - The path to append (e.g. "/api/docs")
- * @param serverUrl - The active OpenCode server URL (e.g. "{BACKEND_URL}/preview/abc123/8000" or "http://localhost:4096")
- * @param mappedPorts - Optional container-port → host-port map from Docker (for local_docker multi-sandbox)
+ * @param serverUrl - The active server URL (always routed through backend)
  * @returns The proxied URL
  */
 export function rewriteLocalhostUrl(
   port: number,
   path: string,
   serverUrl: string,
-  mappedPorts?: Record<string, string>,
 ): string {
   const safePath = normalizePath(path);
-  const proxyBase = resolveProxyBase(serverUrl, mappedPorts);
-  return `${proxyBase}/proxy/${port}${safePath}`;
+  const base = serverUrl.replace(/\/+$/, '');
+  return `${base}/proxy/${port}${safePath}`;
 }
 
 /**
@@ -226,9 +198,8 @@ export function rewriteLocalhostUrl(
 export function getProxyBaseUrl(
   port: number,
   serverUrl: string,
-  mappedPorts?: Record<string, string>,
 ): string {
-  return rewriteLocalhostUrl(port, '/', serverUrl, mappedPorts);
+  return rewriteLocalhostUrl(port, '/', serverUrl);
 }
 
 /**
@@ -270,7 +241,7 @@ export function isProxiableLocalhostUrl(url: string): boolean {
 export function proxyLocalhostUrl(
   url: string | undefined,
   serverUrl: string,
-  mappedPorts?: Record<string, string>,
+  _mappedPorts?: Record<string, string>,
 ): string | undefined {
   if (!url) return url;
 
@@ -280,7 +251,7 @@ export function proxyLocalhostUrl(
   // Don't rewrite URLs pointing at the app itself or already-proxied URLs
   if (!isProxiableLocalhostUrl(parsed.originalUrl)) return parsed.originalUrl;
 
-  return rewriteLocalhostUrl(parsed.port, parsed.path, serverUrl, mappedPorts);
+  return rewriteLocalhostUrl(parsed.port, parsed.path, serverUrl);
 }
 
 /**

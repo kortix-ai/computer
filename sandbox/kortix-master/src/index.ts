@@ -51,6 +51,34 @@ const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
   : undefined
 app.use('*', cors(corsOrigins ? { origin: corsOrigins } : undefined))
 
+// ─── Global auth (when INTERNAL_SERVICE_KEY is set) ──────────────────────────
+// Protects ALL routes (except health) with bearer token or ?token= query param.
+// If INTERNAL_SERVICE_KEY is empty (default local mode), auth is skipped entirely.
+if (config.INTERNAL_SERVICE_KEY) {
+  app.use('*', async (c, next) => {
+    // Skip health endpoint — Docker health probes need unauthenticated access
+    const pathname = new URL(c.req.url).pathname
+    if (pathname === '/kortix/health') return next()
+
+    const authHeader = c.req.header('Authorization')
+    let token: string | null = null
+
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.slice(7)
+    }
+
+    if (!token) {
+      token = c.req.query('token') || null
+    }
+
+    if (!token || token !== config.INTERNAL_SERVICE_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    return next()
+  })
+}
+
 // ─── OpenCode readiness tracking ─────────────────────────────────────────────
 let openCodeReady = false
 let openCodeLastCheck = 0
@@ -184,6 +212,21 @@ export default {
     // ── WebSocket upgrade for /proxy/:port/* ────────────────────────────
     if (req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
       const url = new URL(req.url)
+
+      // Validate INTERNAL_SERVICE_KEY for WS upgrades (header or ?token= query param)
+      if (config.INTERNAL_SERVICE_KEY) {
+        const authHeader = req.headers.get('Authorization')
+        let wsToken: string | null = null
+        if (authHeader?.startsWith('Bearer ')) wsToken = authHeader.slice(7)
+        if (!wsToken) wsToken = url.searchParams.get('token')
+        if (!wsToken || wsToken !== config.INTERNAL_SERVICE_KEY) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+      }
+
       const parsed = parseProxyPath(url.pathname)
 
       if (parsed && !WS_BLOCKED_PORTS.has(parsed.port)) {

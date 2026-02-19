@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
 
 /**
  * Appends the current Supabase JWT as a `?token=` query parameter
@@ -35,7 +35,7 @@ export function useAuthenticatedPreviewUrl(previewUrl: string): string {
     let cancelled = false;
 
     async function injectToken() {
-      const token = await getSupabaseAccessToken();
+      const token = await getAuthToken();
       if (cancelled) return;
 
       if (token) {

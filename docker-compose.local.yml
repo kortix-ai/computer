@@ -5,7 +5,7 @@
 # ║    1. postgres   — PostgreSQL + pg_cron + pg_net  (localhost:54322)         ║
 # ║    2. frontend   — Next.js dashboard              (http://localhost:3000)   ║
 # ║    3. kortix-api — Backend API (Bun/Hono)         (http://localhost:8008)   ║
-# ║    4. sandbox    — AI agent environment            (http://localhost:14000) ║
+# ║    4. sandbox    — AI agent environment (proxied via kortix-api)            ║
 # ║                                                                            ║
 # ║  Usage:                                                                    ║
 # ║    docker compose -f docker-compose.local.yml up                           ║
@@ -61,7 +61,6 @@ services:
         # NEXT_PUBLIC_* must be build args (baked into JS bundle at build time)
         NEXT_PUBLIC_ENV_MODE: local
         NEXT_PUBLIC_BACKEND_URL: http://localhost:8008/v1
-        NEXT_PUBLIC_OPENCODE_URL: http://localhost:14000
     ports:
       - "3000:3000"
     environment:
@@ -69,7 +68,6 @@ services:
       # them visible in `docker inspect` and available to server-side code)
       - NEXT_PUBLIC_ENV_MODE=local
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1
-      - NEXT_PUBLIC_OPENCODE_URL=http://localhost:14000
     env_file:
       - path: apps/frontend/.env
         required: false
@@ -99,6 +97,11 @@ services:
       # OrbStack on macOS: set DOCKER_SOCKET to ~/.orbstack/run/docker.sock
       # The API tells sandboxes to call back via the Docker network
       - KORTIX_URL=http://kortix-api:8008/v1/router
+      # Network to place the sandbox container on (must match this compose project's network)
+      - SANDBOX_NETWORK=computer_default
+      # Optional: sandbox auth token (set in .env to protect sandbox access)
+      - SANDBOX_AUTH_TOKEN=${SANDBOX_AUTH_TOKEN:-}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:-}
       # ─── Database (connects to the postgres service) ───────────────────
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
       # ─── pg_cron scheduler ─────────────────────────────────────────────
@@ -143,6 +146,8 @@ services:
       - SANDBOX_ID=kortix-sandbox
       - PROJECT_ID=local
       - ENV_MODE=local
+      # Optional: internal service key (set in .env to protect sandbox routes)
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:-}
       - SANDBOX_PORT_MAP={"8000":"14000","3111":"14001","6080":"14002","6081":"14003","3210":"14004","9223":"14005","9224":"14006"}
     env_file:
       - path: sandbox/.env
@@ -150,14 +155,18 @@ services:
     volumes:
       - sandbox-workspace:/workspace
       - sandbox-secrets:/app/secrets
+    # All sandbox access goes through the backend proxy (kortix-api → sandbox:8000).
+    # Only Kortix Master (14000) is exposed for direct debugging; all other services
+    # are reached via /v1/sandbox/proxy/{port}/ through the backend.
     ports:
-      - "14000:8000"   # Kortix Master (proxy entry point)
-      - "14001:3111"   # OpenCode Web UI
-      - "14002:6080"   # Desktop (noVNC)
-      - "14003:6081"   # Desktop (HTTPS)
-      - "14004:3210"   # Presentation Viewer
-      - "14005:9223"   # Agent Browser Stream (WS)
-      - "14006:9224"   # Agent Browser Viewer
+      - "14000:8000"   # Kortix Master (direct debug access only)
+    expose:
+      - "3111"   # OpenCode Web UI
+      - "6080"   # Desktop (noVNC)
+      - "6081"   # Desktop (HTTPS)
+      - "3210"   # Presentation Viewer
+      - "9223"   # Agent Browser Stream (WS)
+      - "9224"   # Agent Browser Viewer
     shm_size: "2gb"
     restart: unless-stopped
     healthcheck:
