@@ -2,15 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useTheme } from 'next-themes';
-
 import {
   Plus,
   LayoutDashboard,
-  Sun,
-  Moon,
-  Monitor,
-  Palette,
   PanelLeftClose,
   PanelLeftIcon,
   FileText,
@@ -69,9 +63,7 @@ import type { FindMatch } from '@/features/files';
 import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
-import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
-import { THEMES, getThemeById } from '@/lib/themes';
 import { CompactDialog } from '@/components/session/compact-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
 import { InitProjectDialog } from '@/components/session/init-project-dialog';
@@ -241,7 +233,6 @@ export function CommandPalette() {
   const [initOpen, setInitOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const createSession = useCreateOpenCodeSession();
   const executeCommand = useExecuteOpenCodeCommand();
@@ -451,8 +442,6 @@ export function CommandPalette() {
   const showTextSection = hasQuery && textQueryLongEnough;
   const showTextSkeletons = showTextSection && isTextPending && !hasTextResults;
 
-  const showQuickActions = !hasQuery;
-
   // Overall pending state
   const isAnyPending = isLssPending || isFilePending || isTextPending;
   // "Hard" pending = an actual network fetch is in flight (not just debounce timer)
@@ -554,24 +543,6 @@ export function CommandPalette() {
     [handleSelectFile],
   );
 
-  const handleToggleTheme = useCallback(() => {
-    const next =
-      theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
-    setTheme(next);
-    close();
-  }, [theme, setTheme, close]);
-
-  const setThemeId = useUserPreferencesStore((s) => s.setThemeId);
-  const currentThemeId = useUserPreferencesStore((s) => s.preferences.themeId);
-
-  const handleSwitchTheme = useCallback(
-    (themeId: string) => {
-      setThemeId(themeId);
-      close();
-    },
-    [setThemeId, close],
-  );
-
   const handleToggleSidebar = useCallback(() => {
     toggleSidebar();
     close();
@@ -633,15 +604,6 @@ export function CommandPalette() {
   // const handleSelectWorktreeDir = useCallback(...);
   // const handleRemoveWorktree = useCallback(...);
   // const handleResetWorktree = useCallback(...);
-
-  const themeLabel = useMemo(() => {
-    if (theme === 'light') return 'Switch to Dark';
-    if (theme === 'dark') return 'Switch to System';
-    return 'Switch to Light';
-  }, [theme]);
-
-  const ThemeIcon =
-    theme === 'light' ? Moon : theme === 'dark' ? Monitor : Sun;
 
   // Group headings
   const lssHeading = (
@@ -881,10 +843,8 @@ export function CommandPalette() {
             </CommandGroup>
           )}
 
-          {/* Quick actions (when no query) */}
-          {showQuickActions && (
-            <>
-              <CommandGroup heading="Actions">
+          {/* Actions — always rendered so cmdk filtering can find them */}
+          <CommandGroup heading="Actions">
                 <CommandItem onSelect={handleNewSession} disabled={isCreating}>
                   {isCreating ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1049,29 +1009,6 @@ export function CommandPalette() {
 
               <CommandSeparator />
 
-              <CommandGroup heading="Appearance">
-                <CommandItem onSelect={() => handleToggleTheme()}>
-                  <ThemeIcon className="mr-2 h-4 w-4" />
-                  <span>{themeLabel}</span>
-                </CommandItem>
-                {THEMES.map((t) => (
-                  <CommandItem
-                    key={t.id}
-                    onSelect={() => handleSwitchTheme(t.id)}
-                    keywords={['theme', t.name.toLowerCase()]}
-                  >
-                    <span
-                      className="mr-2 h-3 w-3 rounded-full shrink-0 inline-block"
-                      style={{ backgroundColor: t.accentColor }}
-                    />
-                    <span className="flex-1">{t.name}</span>
-                    {t.id === currentThemeId && (
-                      <span className="ml-auto text-xs text-muted-foreground">Active</span>
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-
               <CommandGroup heading="View">
                 <CommandItem onSelect={() => handleToggleSidebar()}>
                   {sidebarOpen ? (
@@ -1103,8 +1040,6 @@ export function CommandPalette() {
                   </CommandItem>
                 ))}
               </CommandGroup>
-            </>
-          )}
         </CommandList>
       </CommandDialog>
 
