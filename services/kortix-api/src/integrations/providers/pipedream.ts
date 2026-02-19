@@ -177,12 +177,18 @@ export class PipedreamProvider implements AuthProvider {
     }
   }
 
-  async getAuthToken(accountId: string, app: string): Promise<AuthToken> {
-    const accounts = await this.listAccounts(accountId);
-    const account = accounts.find((a) => a.app === app);
+  async getAuthToken(accountId: string, app: string, providerAccountId?: string): Promise<AuthToken> {
+    let pdAccountId: string;
 
-    if (!account) {
-      throw new Error(`No connected account found for app "${app}"`);
+    if (providerAccountId) {
+      pdAccountId = providerAccountId;
+    } else {
+      const accounts = await this.listAccounts(accountId);
+      const account = accounts.find((a) => a.app === app);
+      if (!account) {
+        throw new Error(`No connected account found for app "${app}"`);
+      }
+      pdAccountId = account.id;
     }
 
     const data = await this.apiRequest<{
@@ -194,7 +200,7 @@ export class PipedreamProvider implements AuthProvider {
         oauth_uid?: string;
         [key: string]: unknown;
       };
-    }>('GET', `/v1/connect/${this.projectId}/accounts/${account.id}?include_credentials=1`);
+    }>('GET', `/v1/connect/${this.projectId}/accounts/${pdAccountId}?include_credentials=1`);
 
     const creds = data.credentials;
     if (!creds?.oauth_access_token) {
@@ -212,12 +218,18 @@ export class PipedreamProvider implements AuthProvider {
     await this.apiRequest<void>('DELETE', `/v1/connect/${this.projectId}/accounts/${accountProviderId}`);
   }
 
-  async proxyRequest(accountId: string, app: string, request: ProxyRequest): Promise<ProxyResponse> {
-    const accounts = await this.listAccounts(accountId);
-    const account = accounts.find((a) => a.app === app);
+  async proxyRequest(accountId: string, app: string, request: ProxyRequest, providerAccountId?: string): Promise<ProxyResponse> {
+    let pdAccountId: string;
 
-    if (!account) {
-      throw new Error(`No connected account found for app "${app}"`);
+    if (providerAccountId) {
+      pdAccountId = providerAccountId;
+    } else {
+      const accounts = await this.listAccounts(accountId);
+      const account = accounts.find((a) => a.app === app);
+      if (!account) {
+        throw new Error(`No connected account found for app "${app}"`);
+      }
+      pdAccountId = account.id;
     }
 
     const encodedUrl = Buffer.from(request.url)
@@ -227,7 +239,7 @@ export class PipedreamProvider implements AuthProvider {
       .replace(/=+$/, '');
 
     const token = await this.getApiToken();
-    const proxyUrl = `${this.baseUrl}/v1/connect/${this.projectId}/proxy/${encodedUrl}?external_user_id=${encodeURIComponent(accountId)}&account_id=${account.id}`;
+    const proxyUrl = `${this.baseUrl}/v1/connect/${this.projectId}/proxy/${encodedUrl}?external_user_id=${encodeURIComponent(accountId)}&account_id=${pdAccountId}`;
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -382,20 +394,27 @@ export class PipedreamProvider implements AuthProvider {
     actionKey: string,
     props: Record<string, unknown>,
     app: string,
+    providerAccountId?: string,
   ): Promise<ActionRunResult> {
-    const accounts = await this.listAccounts(accountId);
-    const account = accounts.find((a) => a.app === app);
+    let pdAccountId: string;
 
-    if (!account) {
-      return {
-        success: false,
-        error: `No connected account found for app "${app}". The user needs to connect it first.`,
-      };
+    if (providerAccountId) {
+      pdAccountId = providerAccountId;
+    } else {
+      const accounts = await this.listAccounts(accountId);
+      const account = accounts.find((a) => a.app === app);
+      if (!account) {
+        return {
+          success: false,
+          error: `No connected account found for app "${app}". The user needs to connect it first.`,
+        };
+      }
+      pdAccountId = account.id;
     }
 
     try {
       const configured_props: Record<string, unknown> = {
-        [app]: { authProvisionId: account.id },
+        [app]: { authProvisionId: pdAccountId },
         ...props,
       };
 

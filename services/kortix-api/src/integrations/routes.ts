@@ -12,6 +12,10 @@ import {
   unlinkSandboxIntegration,
   getIntegrationForSandbox,
   updateIntegrationLastUsed,
+  updateIntegrationLabel,
+  getLinkedSandboxes,
+  getAppSandboxLinks,
+  getSandboxAppConflict,
   verifySandboxOwnership,
   listSandboxIntegrations,
 } from './repositories';
@@ -38,6 +42,7 @@ const proxyRequestSchema = z.object({
   url: z.string().url(),
   headers: z.record(z.string()).optional(),
   body: z.unknown().optional(),
+  integration_id: z.string().uuid().optional(),
 });
 
 const linkSchema = z.object({
@@ -104,6 +109,8 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
       app: z.string().min(1),
       app_name: z.string().optional(),
       provider_account_id: z.string().min(1),
+      label: z.string().max(255).optional(),
+      sandbox_id: z.string().uuid().optional(),
     });
     const parsed = saveSchema.safeParse(body);
     if (!parsed.success) {
@@ -112,16 +119,28 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
     try {
       const provider = createAuthProvider();
-      await insertIntegration({
+      const row = await insertIntegration({
         accountId,
         app: parsed.data.app,
         appName: parsed.data.app_name,
         providerName: provider.name,
         providerAccountId: parsed.data.provider_account_id,
+        label: parsed.data.label,
       });
 
+      if (parsed.data.sandbox_id && row) {
+        const sandboxOwned = await verifySandboxOwnership(parsed.data.sandbox_id, accountId);
+        if (sandboxOwned) {
+          const conflict = await getSandboxAppConflict(parsed.data.sandbox_id, row.integrationId, row.app);
+          if (!conflict) {
+            await linkSandboxIntegration(parsed.data.sandbox_id, row.integrationId);
+            console.log(`[INTEGRATIONS] Auto-linked: ${parsed.data.app} → sandbox ${parsed.data.sandbox_id}`);
+          }
+        }
+      }
+
       console.log(`[INTEGRATIONS] Saved: ${parsed.data.app} for account ${accountId}`);
-      return c.json({ success: true });
+      return c.json({ success: true, integration: row });
     } catch (err) {
       console.error('[INTEGRATIONS] Error saving connection:', err);
       return c.json({ error: 'Failed to save connection' }, 500);
@@ -154,6 +173,48 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
     }
 
     return c.json(row);
+  });
+
+  app.patch('/connections/:integrationId/label', async (c) => {
+    const userId = c.get('userId') as string;
+    const accountId = userId;
+    const { integrationId } = c.req.param();
+
+    const body = await c.req.json();
+    const labelSchema = z.object({
+      label: z.string().min(1).max(255),
+    });
+    const parsed = labelSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new HTTPException(400, { message: 'label is required (1-255 chars)' });
+    }
+
+    const row = await getIntegrationById(integrationId);
+    if (!row || row.accountId !== accountId) {
+      throw new HTTPException(404, { message: 'Integration not found' });
+    }
+
+    const updated = await updateIntegrationLabel(integrationId, parsed.data.label);
+    return c.json({ success: true, integration: updated });
+  });
+
+  app.get('/connections/:integrationId/sandboxes', async (c) => {
+    const userId = c.get('userId') as string;
+    const accountId = userId;
+    const { integrationId } = c.req.param();
+
+    const row = await getIntegrationById(integrationId);
+    if (!row || row.accountId !== accountId) {
+      throw new HTTPException(404, { message: 'Integration not found' });
+    }
+
+    const linkedSandboxes = await getLinkedSandboxes(integrationId);
+    const appLinks = await getAppSandboxLinks(accountId, row.app);
+
+    return c.json({
+      sandboxes: linkedSandboxes,
+      appSandboxLinks: appLinks,
+    });
   });
 
   app.delete('/connections/:integrationId', async (c) => {
@@ -198,7 +259,13 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
       throw new HTTPException(403, { message: 'Sandbox not found or not owned by account' });
     }
 
-    
+    const conflict = await getSandboxAppConflict(parsed.data.sandbox_id, integrationId, integration.app);
+    if (conflict) {
+      throw new HTTPException(409, {
+        message: `This sandbox already has a different ${integration.appName || integration.app} profile linked ("${conflict.label || 'Unnamed'}"). Unlink it first.`,
+      });
+    }
+
     await linkSandboxIntegration(parsed.data.sandbox_id, integrationId);
     return c.json({ success: true }, 201);
   });
@@ -227,7 +294,14 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
       throw new HTTPException(400, { message: 'Invalid proxy request: app, url are required' });
     }
 
-    const { app: appSlug, method, url, headers, body: reqBody } = parsed.data;
+    const { app: appSlug, method, url, headers, body: reqBody, integration_id } = parsed.data;
+    let providerAccountId: string | undefined;
+    if (integration_id) {
+      const integration = await getIntegrationById(integration_id);
+      if (integration && integration.accountId === accountId) {
+        providerAccountId = integration.providerAccountId;
+      }
+    }
 
     try {
       const provider = createAuthProvider();
@@ -236,7 +310,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
         url,
         headers,
         body: reqBody,
-      });
+      }, providerAccountId);
 
       console.log(`[INTEGRATIONS] User proxy: app=${appSlug} ${method} ${url} → ${result.status}`);
       c.header('Cache-Control', 'no-store');
@@ -309,7 +383,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
 
     try {
       const provider = createAuthProvider();
-      const token = await provider.getAuthToken(accountId, appSlug);
+      const token = await provider.getAuthToken(accountId, appSlug, linked.providerAccountId);
 
       console.log(`[INTEGRATIONS] Token fetched: app=${appSlug} sandbox=${sandboxId} account=${accountId}`);
       await updateIntegrationLastUsed(linked.integrationId as string);
@@ -356,7 +430,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
         url,
         headers,
         body: reqBody,
-      });
+      }, linked.providerAccountId);
 
       console.log(`[INTEGRATIONS] Proxy: app=${appSlug} ${method} ${url} → ${result.status} sandbox=${sandboxId}`);
       await updateIntegrationLastUsed(linked.integrationId as string);
@@ -385,6 +459,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
       integrations: linked.map((l) => ({
         app: l.integration.app,
         appName: l.integration.appName,
+        label: l.integration.label,
         status: l.integration.status,
       })),
     });
@@ -435,7 +510,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
       const provider = createAuthProvider();
       const result = await provider.createConnectToken(accountId, appSlug);
 
-      const dashboardUrl = `${config.FRONTEND_URL}/integrations?connect=${encodeURIComponent(appSlug)}`;
+      const dashboardUrl = `${config.FRONTEND_URL}/integrations?connect=${encodeURIComponent(appSlug)}&sandbox_id=${encodeURIComponent(sandboxId)}`;
       console.log(`[INTEGRATIONS] Connect token created: app=${appSlug} sandbox=${sandboxId} account=${accountId}`);
       return c.json({
         connectUrl: dashboardUrl,
@@ -493,7 +568,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
 
     try {
       const provider = createAuthProvider();
-      const result = await provider.runAction(accountId, action_key, props, appSlug);
+      const result = await provider.runAction(accountId, action_key, props, appSlug, linked.providerAccountId);
 
       console.log(`[INTEGRATIONS] Action run: ${action_key} app=${appSlug} sandbox=${sandboxId} success=${result.success}`);
       await updateIntegrationLastUsed(linked.integrationId as string);

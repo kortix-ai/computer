@@ -44,6 +44,7 @@ import { useSummarizeOpenCodeSession, findOpenCodeFiles, useOpenCodeSessions, us
 import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
+import { getClient } from '@/lib/opencode-sdk';
 
 export type { ProviderListResponse };
 
@@ -379,7 +380,12 @@ function VariantSelector({
 // Token Progress Circle
 // ============================================================================
 
+// Compaction fires at AUTO_COMPACT_THRESHOLD (90%). (Technique used by Openclaw)
+// Memory flush fires earlier at: contextWindow - RESERVE_TOKENS_FLOOR - SOFT_THRESHOLD_TOKENS.
+// With defaults below → flush ≈ 88% for 200k ctx. Increase RESERVE to flush earlier, decrease to flush later.
 const AUTO_COMPACT_THRESHOLD = 0.9;
+const RESERVE_TOKENS_FLOOR = 20_000;
+const SOFT_THRESHOLD_TOKENS = 4_000;
 
 interface TokenProgressProps {
   messages: MessageWithParts[] | undefined;
@@ -413,11 +419,30 @@ function getContextLimit(models: FlatModel[] | undefined, selectedModel: { provi
 function TokenProgress({ messages, sessionId, models, selectedModel, onContextClick }: TokenProgressProps) {
   const summarize = useSummarizeOpenCodeSession();
   const autoCompactTriggered = useRef(false);
+  const flushTriggered = useRef(false);
   const [isCompacting, setIsCompacting] = useState(false);
 
   const contextTokens = useMemo(() => getLastAssistantTokenTotal(messages), [messages]);
   const contextLimit = useMemo(() => getContextLimit(models, selectedModel), [models, selectedModel]);
   const ratio = contextTokens > 0 ? Math.min(contextTokens / contextLimit, 1) : 0;
+  const flushThreshold = contextLimit - RESERVE_TOKENS_FLOOR - SOFT_THRESHOLD_TOKENS;
+
+  // Reset flush guard when tokens drop below the soft threshold
+  useEffect(() => {
+    if (contextTokens < flushThreshold) flushTriggered.current = false;
+  }, [contextTokens, flushThreshold]);
+
+  // Pre-compaction memory flush: fire-and-forget agent turn to persist durable memories
+  useEffect(() => {
+    if (contextTokens >= flushThreshold && !flushTriggered.current && !isCompacting && sessionId) {
+      flushTriggered.current = true;
+      getClient().session.promptAsync({
+        sessionID: sessionId,
+        system: 'Session nearing compaction. Store durable memories now.',
+        parts: [{ type: 'text', text: 'Write any lasting notes to memory/YYYY-MM-DD.md; reply with NO_REPLY if nothing to store.' }],
+      }).catch((err) => console.error('[flush] pre-compaction memory flush failed:', err));
+    }
+  }, [contextTokens, flushThreshold, isCompacting, sessionId]);
 
   useEffect(() => {
     if (ratio < AUTO_COMPACT_THRESHOLD) autoCompactTriggered.current = false;

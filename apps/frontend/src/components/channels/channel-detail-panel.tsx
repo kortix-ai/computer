@@ -35,6 +35,7 @@ import {
   ArrowDown,
   Link,
   Unlink,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   useUpdateChannel,
@@ -195,75 +196,76 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg gap-0 p-0 overflow-hidden">
-        {/* Header */}
-        <DialogHeader className="p-4 pb-3">
-          <DialogTitle className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-muted shrink-0">
-              <Icon className="h-4.5 w-4.5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="truncate">{channel.name}</span>
-                <Badge variant={channel.enabled ? 'highlight' : 'secondary'} className="text-xs shrink-0">
-                  {channel.enabled ? 'Active' : 'Disabled'}
-                </Badge>
+        <div className="bg-muted/30 border-b px-6 pt-6 pb-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-muted border border-border/50 shrink-0">
+                <Icon className="h-5 w-5" />
+                {channel.enabled && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                  </span>
+                )}
               </div>
-              <span className="text-xs font-normal text-muted-foreground">
-                {getChannelLabel(channel.channelType)}
-              </span>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Tabs */}
-        <div className="flex gap-1 px-4 pb-3">
-          <button
-            onClick={() => setTab('settings')}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-              tab === 'settings'
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            Settings
-          </button>
-          <button
-            onClick={() => setTab('messages')}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-              tab === 'messages'
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            Messages
-          </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate">{channel.name}</span>
+                  <Badge variant={channel.enabled ? 'highlight' : 'secondary'} className="text-xs shrink-0">
+                    {channel.enabled ? 'Active' : 'Disabled'}
+                  </Badge>
+                </div>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {getChannelLabel(channel.channelType)}
+                </span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-1 mt-4 rounded-2xl bg-muted/50 p-1 w-fit">
+            <button
+              onClick={() => setTab('settings')}
+              className={cn(
+                "px-4 py-1.5 text-sm font-medium rounded-xl transition-colors",
+                tab === 'settings'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Settings
+            </button>
+            <button
+              onClick={() => setTab('messages')}
+              className={cn(
+                "px-4 py-1.5 text-sm font-medium rounded-xl transition-colors",
+                tab === 'messages'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Messages
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="max-h-[60vh] overflow-y-auto px-4 pb-4">
+        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
           {tab === 'settings' ? (
             <div className="space-y-4">
-              {/* Name */}
               <div className="space-y-1.5">
                 <Label htmlFor="edit-name" className="text-xs">Name</Label>
                 <Input
                   id="edit-name"
                   value={name}
                   onChange={(e) => { setName(e.target.value); markDirty(); }}
-                  className="h-8"
+                  className="h-9 rounded-xl focus:ring-2 focus:ring-primary/50"
                 />
               </div>
-
-              {/* Session Strategy */}
               <div className="space-y-1.5">
                 <Label className="text-xs">Session Strategy</Label>
                 <Select
                   value={sessionStrategy}
                   onValueChange={(v) => { setSessionStrategy(v as SessionStrategy); markDirty(); }}
                 >
-                  <SelectTrigger className="h-8">
+                  <SelectTrigger className="h-9 rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -273,21 +275,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* System Prompt */}
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-prompt" className="text-xs">System Prompt</Label>
-                <Textarea
-                  id="edit-prompt"
-                  value={systemPrompt}
-                  onChange={(e) => { setSystemPrompt(e.target.value); markDirty(); }}
-                  placeholder="You are a helpful assistant..."
-                  rows={2}
-                />
-              </div>
-
-              {/* Instance Link */}
-              <div className="rounded-lg border p-3 space-y-2">
+              <div className="rounded-xl border p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Linked Instance</Label>
                   {channel.sandboxId ? (
@@ -296,7 +284,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                       size="sm"
                       onClick={handleUnlink}
                       disabled={unlinkMutation.isPending}
-                      className="h-6 text-xs text-muted-foreground px-2"
+                      className="h-7 text-xs text-muted-foreground px-2"
                     >
                       <Unlink className="h-3 w-3 mr-1" />
                       Unlink
@@ -312,7 +300,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                       variant="outline"
                       size="sm"
                       onClick={handleShowLinkPicker}
-                      className="h-7 text-xs"
+                      className="h-7 text-xs rounded-lg"
                     >
                       Change
                     </Button>
@@ -325,16 +313,15 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                       size="sm"
                       onClick={handleShowLinkPicker}
                       disabled={linkMutation.isPending}
-                      className="h-7 text-xs"
+                      className="h-7 text-xs rounded-lg"
                     >
                       <Link className="h-3 w-3 mr-1" />
                       Link
                     </Button>
                   </div>
                 )}
-
                 {showInstancePicker && (
-                  <div className="border rounded-md mt-2 max-h-48 overflow-y-auto">
+                  <div className="border rounded-xl mt-2 max-h-48 overflow-y-auto">
                     {instances.length === 0 ? (
                       <div className="p-3 text-sm text-muted-foreground text-center">
                         No instances found
@@ -346,7 +333,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                           onClick={() => handleLink(inst.sandbox_id)}
                           disabled={linkMutation.isPending}
                           className={cn(
-                            "w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted transition-colors text-left",
+                            "w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted transition-colors text-left first:rounded-t-xl last:rounded-b-xl",
                             inst.sandbox_id === channel.sandboxId && "bg-muted"
                           )}
                         >
@@ -358,9 +345,49 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                   </div>
                 )}
               </div>
+              <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-4">
+                <div className="flex items-start gap-3 mb-3">
+                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-medium text-destructive">Danger Zone</h4>
+                    <p className="text-xs text-destructive mt-0.5">
+                      Disable or permanently delete this channel. Deleting cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-7">
+                  {/* <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleToggle}
+                    disabled={toggleMutation.isPending}
+                    className="h-8 text-xs gap-1.5 rounded-lg"
+                  >
+                    {channel.enabled ? (
+                      <>
+                        <PowerOff className="h-3.5 w-3.5" />
+                        Disable
+                      </>
+                    ) : (
+                      <>
+                        <Power className="h-3.5 w-3.5" />
+                        Enable
+                      </>
+                    )}
+                  </Button> */}
+                  <Button
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    size="sm"
+                    className="text-xs gap-1.5 rounded-lg text-white bg-destructive hover:bg-destructive/60"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : (
-            /* Messages Tab */
             <div className="space-y-2">
               {messages.length === 0 ? (
                 <div className="text-center py-8">
@@ -375,7 +402,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
                   <div
                     key={msg.channelMessageId}
                     className={cn(
-                      "rounded-lg p-2.5 text-sm",
+                      "rounded-xl p-2.5 text-sm",
                       msg.direction === 'inbound'
                         ? "bg-muted/50 mr-8"
                         : "bg-primary/10 ml-8"
@@ -405,49 +432,26 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center gap-2 px-4 py-3 border-t bg-muted/30">
+        <div className="flex items-center gap-2 px-6 py-4 border-t bg-muted/30">
           {isDirty && (
             <Button
               size="sm"
               onClick={handleSave}
               disabled={updateMutation.isPending}
-              className="h-8 text-xs gap-1.5"
+              className="h-9 text-xs gap-1.5 rounded-xl"
             >
               <Save className="h-3.5 w-3.5" />
-              {updateMutation.isPending ? 'Saving...' : 'Save'}
+              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleToggle}
-            disabled={toggleMutation.isPending}
-            className="h-8 text-xs gap-1.5"
-          >
-            {channel.enabled ? (
-              <>
-                <PowerOff className="h-3.5 w-3.5" />
-                Disable
-              </>
-            ) : (
-              <>
-                <Power className="h-3.5 w-3.5" />
-                Enable
-              </>
-            )}
-          </Button>
           <div className="flex-1" />
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            className="h-8 text-xs gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => onOpenChange(false)}
+            className="h-9 text-xs rounded-xl"
           >
-            <Trash2 className="h-3.5 w-3.5" />
-            {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            Close
           </Button>
         </div>
       </DialogContent>
