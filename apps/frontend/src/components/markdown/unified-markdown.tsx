@@ -104,40 +104,105 @@ function normalizeLanguage(lang: string): string {
 }
 
 // Syntax-highlighted code using Shiki
+//
+// Module-level cache so highlighted HTML survives component remounts
+// (streamdown unmounts/remounts code components on every token).
+// Also acts as a coalescing mechanism: only one Shiki call per unique
+// (code, lang, theme) triple is ever in-flight.
+const shikiCache = new Map<string, string>();      // key → html
+const shikiPending = new Map<string, Promise<string | null>>(); // key → in-flight promise
+const SHIKI_CACHE_MAX = 64;
+
+function shikiKey(code: string, lang: string, theme: string) {
+  // Use a fast hash: first 100 + last 100 chars + length.
+  // Full code only matters for very small snippets.
+  const sig = code.length <= 200
+    ? code
+    : code.slice(0, 100) + code.slice(-100) + code.length;
+  return `${lang}:${theme}:${sig}`;
+}
+
+function evictOldest() {
+  if (shikiCache.size > SHIKI_CACHE_MAX) {
+    const first = shikiCache.keys().next().value;
+    if (first !== undefined) shikiCache.delete(first);
+  }
+}
+
+function highlightAsync(code: string, language: string, theme: string): Promise<string | null> {
+  const key = shikiKey(code, language, theme);
+  const cached = shikiCache.get(key);
+  if (cached !== undefined) return Promise.resolve(cached);
+
+  const pending = shikiPending.get(key);
+  if (pending) return pending;
+
+  const normalizedLang = normalizeLanguage(language);
+  const truncated = code.length > SHIKI_MAX_LENGTH
+    ? code.slice(0, SHIKI_MAX_LENGTH) + '\n// ... (truncated for highlighting)'
+    : code;
+
+  const p = codeToHtml(truncated, {
+    lang: normalizedLang,
+    theme,
+    transformers: [{
+      pre(node) {
+        if (node.properties.style) {
+          node.properties.style = (node.properties.style as string)
+            .replace(/background-color:[^;]+;?/g, '');
+        }
+      },
+    }],
+  })
+    .then((html) => {
+      evictOldest();
+      shikiCache.set(key, html);
+      shikiPending.delete(key);
+      return html;
+    })
+    .catch((err) => {
+      console.warn(`[HighlightedCode] Shiki failed for lang="${normalizedLang}":`, err?.message || err);
+      shikiPending.delete(key);
+      return null;
+    });
+
+  shikiPending.set(key, p);
+  return p;
+}
+
+// Find the best cached HTML for the current code by checking if any
+// cache entry is a prefix match (the code was shorter earlier during streaming).
+function findBestCachedHtml(code: string, language: string, theme: string): string | null {
+  // Exact match first
+  const exact = shikiCache.get(shikiKey(code, language, theme));
+  if (exact) return exact;
+  return null;
+}
+
 export function HighlightedCode({ code, language, children }: { code: string; language: string; children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
-  const [html, setHtml] = useState<string | null>(null);
   const theme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
 
+  // Check cache synchronously — if we have a hit, render immediately (no flash)
+  const cachedHtml = findBestCachedHtml(code, language, theme);
+  const [html, setHtml] = useState<string | null>(cachedHtml);
+  const versionRef = useRef(0);
+
   useEffect(() => {
-    let cancelled = false;
+    // If already cached, just set it
+    const cached = shikiCache.get(shikiKey(code, language, theme));
+    if (cached) {
+      setHtml(cached);
+      return;
+    }
 
-    const normalizedLang = normalizeLanguage(language);
-    // Truncate very large code to keep Shiki responsive
-    const truncated = code.length > SHIKI_MAX_LENGTH
-      ? code.slice(0, SHIKI_MAX_LENGTH) + '\n// ... (truncated for highlighting)'
-      : code;
-
-    codeToHtml(truncated, {
-      lang: normalizedLang,
-      theme,
-      transformers: [{
-        pre(node) {
-          if (node.properties.style) {
-            node.properties.style = (node.properties.style as string)
-              .replace(/background-color:[^;]+;?/g, '');
-          }
-        },
-      }],
-    })
-      .then((result) => { if (!cancelled) setHtml(result); })
-      .catch((err) => {
-        // If the specific language grammar isn't available, try 'text' as fallback
-        if (!cancelled) {
-          console.warn(`[HighlightedCode] Shiki failed for lang="${normalizedLang}":`, err?.message || err);
-        }
-      });
-    return () => { cancelled = true; };
+    const version = ++versionRef.current;
+    highlightAsync(code, language, theme).then((result) => {
+      // Only update if this is still the latest request
+      if (version === versionRef.current && result) {
+        setHtml(result);
+      }
+    });
   }, [code, language, theme]);
 
   if (html) {
@@ -157,7 +222,7 @@ export function HighlightedCode({ code, language, children }: { code: string; la
 }
 
 // Code block component with copy functionality
-function CodeBlock({ children }: { children: React.ReactNode }) {
+function CodeBlock({ children, isStreaming }: { children: React.ReactNode; isStreaming?: boolean }) {
   const preRef = useRef<HTMLPreElement>(null);
   const [codeText, setCodeText] = useState('');
 
@@ -186,7 +251,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
       >
         {children}
       </pre>
-      {codeText && <CopyButton code={codeText} />}
+      {codeText && !isStreaming && <CopyButton code={codeText} />}
     </div>
   );
 }
@@ -460,12 +525,16 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
                 return <MermaidRenderer chart={code} className="my-5" />;
               }
 
-              // Syntax-highlighted block code
-              if (language) {
+              // Syntax-highlighted block code.
+              // During streaming, streamdown remounts code components on every
+              // token which causes HighlightedCode to flash (state resets).
+              // So we only highlight in static mode — during streaming we show
+              // plain monospace text which is stable and flicker-free.
+              if (language && !isStreaming) {
                 return <HighlightedCode code={code} language={language}>{children}</HighlightedCode>;
               }
 
-              // Block code without language - plain mono font
+              // Block code without language (or streaming) - plain mono font
               return (
                 <code className="text-[13px] font-mono leading-relaxed text-inherit whitespace-pre">
                   {children}
@@ -476,7 +545,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
             // Inline code - subtle pill style, clickable if it looks like a file path
             return <ClickableInlineCode>{children}</ClickableInlineCode>;
           },
-          pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
+          pre: ({ children }) => <CodeBlock isStreaming={isStreaming}>{children}</CodeBlock>,
 
           // ═══════════════════════════════════════════════════════════════
           // BLOCKQUOTES - Clean side border

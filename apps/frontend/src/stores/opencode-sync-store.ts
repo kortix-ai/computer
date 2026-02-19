@@ -446,15 +446,41 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 			case "message.updated": {
 				const info = (event.properties as { info: Message }).info;
 				if (!info?.sessionID) return;
-				// When a real user message arrives from the server, remove any
-				// optimistic user messages for this session (they have client-generated
-				// IDs that differ from the server-generated ID).
+				// When a real user message arrives from the server, swap out the
+				// optimistic message(s) in a SINGLE atomic set() call.
+				// This prevents the intermediate render where the user bubble
+				// vanishes (optimistic removed) before the real one appears.
 				if (info.role === "user" && !optimisticIds.has(info.id)) {
 					const msgs = get().messages[info.sessionID];
 					if (msgs) {
-						const toRemove = msgs.filter((m) => m.role === "user" && optimisticIds.has(m.id));
-						for (const m of toRemove) {
-							store.optimisticRemove(info.sessionID, m.id);
+						const optIds = msgs
+							.filter((m) => m.role === "user" && optimisticIds.has(m.id))
+							.map((m) => m.id);
+						if (optIds.length > 0) {
+							// Clean up optimistic tracking
+							for (const id of optIds) optimisticIds.delete(id);
+							// Atomic: remove optimistic + insert real in one set()
+							set((s) => {
+								const list = s.messages[info.sessionID] ?? [];
+								// Remove all optimistic user messages
+								const without = list.filter((m) => !optIds.includes(m.id));
+								// Insert the real message at sorted position
+								const r = Binary.search(without, info.id, (m) => m.id);
+								const next = [...without];
+								if (r.found) {
+									next[r.index] = info;
+								} else {
+									next.splice(r.index, 0, info);
+								}
+								// Clean up optimistic parts
+								const newParts = { ...s.parts };
+								for (const id of optIds) delete newParts[id];
+								return {
+									messages: { ...s.messages, [info.sessionID]: next },
+									parts: newParts,
+								};
+							});
+							return;
 						}
 					}
 				}

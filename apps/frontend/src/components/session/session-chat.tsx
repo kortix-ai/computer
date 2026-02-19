@@ -2108,6 +2108,15 @@ function SessionTurn({
 			{!working && response && (
 				<>
 					<div className="flex items-center gap-0.5 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
+						{/* Duration & cost — always visible when no steps trigger shows them */}
+						{!hasSteps && duration && (
+							<span className="text-[11px] text-muted-foreground/50 mr-1">
+								{duration}
+								{costInfo && (
+									<> · {formatCost(costInfo.cost)} · {formatTokens(costInfo.tokens.input + costInfo.tokens.output)}t</>
+								)}
+							</span>
+						)}
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<button
@@ -2380,10 +2389,6 @@ export function SessionChat({
 					...(sendOpts?.model && { model: sendOpts.model }),
 					...(sendOpts?.variant && { variant: sendOpts.variant }),
 				} as any)
-				.then(() => {
-					// Safety-net: remove optimistic message after server ack
-					removeOptimisticUserMessage(messageID);
-				})
 				.catch(() => {
 					removeOptimisticUserMessage(messageID);
 					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
@@ -3098,13 +3103,6 @@ export function SessionChat({
 					...(sendOpts?.model && { model: sendOpts.model }),
 					...(sendOpts?.variant && { variant: sendOpts.variant }),
 				} as any)
-				.then(() => {
-					// Server acknowledged the prompt. The SSE event reducer handles
-					// the atomic swap (optimistic → real), but if the SSE event
-					// already arrived before this resolves, the optimistic message
-					// may already be gone. This is a safety-net cleanup.
-					removeOptimisticUserMessage(messageID);
-				})
 				.catch(() => {
 					// On failure, set status to idle and remove optimistic message
 					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
@@ -3267,7 +3265,7 @@ export function SessionChat({
 				<div className="relative flex-1 min-h-0">
 					<div
 						ref={scrollRef}
-						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full [scroll-behavior:auto]"
+						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-8 bg-background h-full [scroll-behavior:auto]"
 					>
 						<div
 							ref={contentRef}
