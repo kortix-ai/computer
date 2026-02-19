@@ -15,7 +15,8 @@ permission:
   web-search: allow
   scrape-webpage: allow
   skill: allow
-  question: allow
+  
+  : allow
 ---
 
 # Kortix-Main

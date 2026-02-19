@@ -105,31 +105,8 @@ export function SidebarRight() {
   );
 
   const handleOpenDesktop = useCallback(() => {
-    const containerPort = SANDBOX_PORTS.DESKTOP;
-    const directUrl = activeServer
-      ? getDirectPortUrl(activeServer, containerPort)
-      : null;
-
-    let url: string;
-    if (directUrl) {
-      // Direct port access — noVNC works natively
-      url = directUrl;
-    } else {
-      // Proxy access — tell noVNC to route its WebSocket through the proxy path
-      const proxyBase = getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, mappedPorts);
-      url = `${proxyBase.replace(/\/$/, '')}/vnc_lite.html?path=proxy/${containerPort}/websockify&autoconnect=true&resize=scale`;
-    }
-
-    const tabId = `preview:${containerPort}`;
-    const tabHref = `/preview/${containerPort}`;
-    openTabAndNavigate({
-      id: tabId,
-      title: 'Desktop',
-      type: 'preview',
-      href: tabHref,
-      metadata: { url, port: parseInt(containerPort, 10), originalUrl: `http://localhost:${containerPort}/` },
-    });
-  }, [activeServer, serverUrl, mappedPorts]);
+    openSandboxServiceTab(SANDBOX_PORTS.DESKTOP, 'Desktop');
+  }, [openSandboxServiceTab]);
 
   const handleOpenAgentBrowser = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');

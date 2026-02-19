@@ -2,7 +2,7 @@
 # Presentation Viewer — watches for and serves slide decks on port 3210
 
 PRES_ROOT="/workspace/presentations"
-VIEWER="/opt/opencode/skills/KORTIX-presentation-viewer/serve.ts"
+VIEWER="/opt/opencode/skills/presentation-viewer/serve.ts"
 PORT=3210
 
 wait_for_presentation() {

@@ -19,7 +19,7 @@ import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import {
   detectLocalhostUrls,
-  rewriteLocalhostUrl,
+  proxyLocalhostUrl,
   toInternalUrl,
   type DetectedLocalhostUrl,
 } from '@/lib/utils/sandbox-url';
@@ -218,7 +218,7 @@ function SandboxPreviewCard({
   proxyUrl: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const [showInlinePreview, setShowInlinePreview] = useState(false);
+  const [showInlinePreview, setShowInlinePreview] = useState(true);
   const reachability = usePortReachability(proxyUrl);
 
   const isReachable = reachability === 'reachable';
@@ -432,7 +432,7 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
   const detected = useMemo(() => detectLocalhostUrls(safeContent), [safeContent]);
 
   const proxyUrls = useMemo(
-    () => detected.map((d) => rewriteLocalhostUrl(d.port, d.path, serverUrl, mappedPorts)),
+    () => detected.map((d) => proxyLocalhostUrl(d.originalUrl, serverUrl, mappedPorts) ?? d.originalUrl),
     [detected, serverUrl, mappedPorts],
   );
 

@@ -10,19 +10,144 @@ const BLOCKED_PORTS = new Set([
 
 const FETCH_TIMEOUT_MS = 30_000
 
+// ---------------------------------------------------------------------------
+// Service Worker approach
+//
+// Instead of trying to rewrite every absolute path in HTML/JS/CSS responses
+// (which is impossible to do reliably — ES module imports, dynamic imports,
+// fetch() calls, WebSocket URLs, CSS url(), etc.), we inject a Service Worker
+// into the initial HTML response.
+//
+// The Service Worker intercepts ALL requests from the page and rewrites
+// absolute paths (e.g. /src/main.tsx) to go through the proxy prefix
+// (e.g. /proxy/5173/src/main.tsx). This catches everything: static imports,
+// dynamic imports, fetch(), img src, css url(), etc.
+//
+// Flow:
+// 1. Browser requests /proxy/5173/
+// 2. Proxy fetches from localhost:5173/, gets HTML
+// 3. Proxy injects a <script> that registers a Service Worker
+// 4. The SW intercepts all subsequent requests and rewrites paths
+// 5. All rewrites go through /proxy/5173/... which the proxy handles normally
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate the Service Worker JavaScript for a given proxy prefix.
+ * This SW intercepts all fetch requests from the page and rewrites
+ * absolute paths to go through the proxy.
+ */
+function generateServiceWorkerJs(prefix: string): string {
+  return `// Kortix Proxy Service Worker — rewrites all requests through ${prefix}
+const PREFIX = '${prefix}';
+
+self.addEventListener('install', (e) => { self.skipWaiting(); });
+self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
+
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url);
+
+  // Only intercept same-origin requests
+  if (url.origin !== self.location.origin) return;
+
+  // Already has the proxy prefix — pass through
+  if (url.pathname.startsWith(PREFIX + '/') || url.pathname === PREFIX) return;
+
+  // Skip kortix internal paths
+  if (url.pathname.startsWith('/kortix/') || url.pathname.startsWith('/env/') || url.pathname.startsWith('/lss/')) return;
+
+  // Skip other proxy paths (different port)
+  if (url.pathname.match(/^\\/proxy\\/\\d+/)) return;
+
+  // Rewrite: /src/main.tsx → /proxy/5173/src/main.tsx
+  const newUrl = new URL(PREFIX + url.pathname + url.search, url.origin);
+  e.respondWith(fetch(new Request(newUrl.href, e.request)));
+});
+`
+}
+
+/**
+ * Generate the inline bootstrap script that registers the Service Worker.
+ * The SW is loaded from a special URL: /proxy/{port}/__kortix_sw__.js
+ *
+ * Only reloads ONCE after first SW activation. Uses sessionStorage to
+ * prevent reload loops. If the SW is already controlling the page,
+ * does nothing.
+ */
+function generateBootstrapScript(prefix: string): string {
+  return `<script>
+(function() {
+  if (!('serviceWorker' in navigator)) return;
+
+  // If a SW is already controlling this page, we're good — do nothing.
+  if (navigator.serviceWorker.controller) return;
+
+  var swUrl = '${prefix}/__kortix_sw__.js';
+  var scope = '${prefix}/';
+  var reloadKey = '__kortix_sw_reload_' + scope;
+
+  // Prevent infinite reload: only reload once per session per scope.
+  if (sessionStorage.getItem(reloadKey)) return;
+
+  navigator.serviceWorker.register(swUrl, { scope: scope })
+    .then(function(reg) {
+      // SW is already active and controlling — no reload needed.
+      if (reg.active && navigator.serviceWorker.controller) return;
+
+      var sw = reg.installing || reg.waiting || reg.active;
+      if (!sw) return;
+
+      if (sw.state === 'activated') {
+        // Activated but not yet controlling (first install).
+        // Reload so it takes control.
+        sessionStorage.setItem(reloadKey, '1');
+        window.location.reload();
+        return;
+      }
+
+      sw.addEventListener('statechange', function() {
+        if (sw.state === 'activated') {
+          sessionStorage.setItem(reloadKey, '1');
+          window.location.reload();
+        }
+      });
+    });
+})();
+</script>`
+}
+
+/**
+ * Inject the SW bootstrap into an HTML response.
+ */
+function injectBootstrap(html: string, prefix: string): string {
+  const script = generateBootstrapScript(prefix)
+
+  // Inject right after <head> (or <head ...attributes>)
+  const headMatch = html.match(/<head(\s[^>]*)?>/)
+  if (headMatch) {
+    const pos = headMatch.index! + headMatch[0].length
+    return html.slice(0, pos) + script + html.slice(pos)
+  }
+
+  // No <head>? Inject at the very top
+  return script + html
+}
+
+
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+
 /**
  * Dynamic port proxy: /proxy/:port/*
  *
  * Proxies HTTP requests to any localhost port inside the sandbox container.
- * This enables the frontend to access any service the agent starts
- * (e.g. dev servers on port 3000, 8080, 5173, etc.) without needing
- * those ports individually exposed in docker-compose.
+ * For HTML responses, injects a Service Worker bootstrap that rewrites
+ * all subsequent requests through the proxy prefix.
  */
 proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
   const portStr = c.req.param('port')
   const port = parseInt(portStr, 10)
 
-  // Validate port
   if (isNaN(port) || port < 1 || port > 65535) {
     return c.json({ error: 'Invalid port number', port: portStr }, 400)
   }
@@ -31,24 +156,36 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
     return c.json({ error: 'Port is blocked', port }, 403)
   }
 
-  // Extract the path after /proxy/:port/
   const url = new URL(c.req.url)
   const prefix = `/proxy/${portStr}`
   const remainingPath = url.pathname.slice(prefix.length) || '/'
+
+  // ── Serve the Service Worker script ──────────────────────────────────
+  if (remainingPath === '/__kortix_sw__.js') {
+    return new Response(generateServiceWorkerJs(prefix), {
+      status: 200,
+      headers: {
+        'content-type': 'application/javascript',
+        'cache-control': 'no-cache',
+        'service-worker-allowed': prefix + '/',
+      },
+    })
+  }
+
   const targetUrl = `http://localhost:${port}${remainingPath}${url.search}`
 
-  // Build headers, stripping Host (it would be wrong for the upstream)
+  // Build headers
   const headers = new Headers()
   for (const [key, value] of c.req.raw.headers.entries()) {
     const lower = key.toLowerCase()
     if (lower === 'host' || lower === 'authorization') continue
+    // Strip service-worker header so upstream doesn't see it
+    if (lower === 'service-worker') continue
     headers.set(key, value)
   }
-
-  // Set correct Host for the upstream service
   headers.set('Host', `localhost:${port}`)
 
-  // Detect SSE requests
+  // Detect SSE
   const acceptsSSE = (c.req.header('accept') || '').includes('text/event-stream')
 
   try {
@@ -64,22 +201,19 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
       signal: acceptsSSE ? undefined : AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
 
-    // Rewrite Location headers so redirects go through the proxy too
+    // Rewrite Location headers for redirects
     const responseHeaders = new Headers(response.headers)
     const location = responseHeaders.get('location')
     if (location) {
       try {
         const locUrl = new URL(location, `http://localhost:${port}`)
-        // Only rewrite if the redirect target is the same localhost port
         if (locUrl.hostname === 'localhost' && parseInt(locUrl.port || '80') === port) {
           responseHeaders.set('location', `${prefix}${locUrl.pathname}${locUrl.search}`)
         }
-      } catch {
-        // Leave location as-is if we can't parse it
-      }
+      } catch { /* leave as-is */ }
     }
 
-    // Check if this is a streaming response — pass body as stream
+    // Streaming responses — pass through as stream
     const contentType = responseHeaders.get('content-type') || ''
     if (contentType.includes('text/event-stream') || contentType.includes('application/octet-stream')) {
       return new Response(response.body, {
@@ -89,7 +223,22 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
       })
     }
 
-    // Buffer the response body to avoid Bun ReadableStream proxy issues
+    // HTML responses — inject the Service Worker bootstrap
+    if (contentType.includes('text/html')) {
+      const html = await response.text()
+      const rewritten = injectBootstrap(html, prefix)
+
+      responseHeaders.set('content-length', String(Buffer.byteLength(rewritten, 'utf-8')))
+      responseHeaders.delete('transfer-encoding')
+
+      return new Response(rewritten, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      })
+    }
+
+    // Everything else — buffer and forward
     const body = await response.arrayBuffer()
     return new Response(body, {
       status: response.status,
@@ -113,7 +262,7 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
   }
 })
 
-// Handle bare /proxy/:port (no trailing path) — redirect to /proxy/:port/
+// Bare /proxy/:port (no trailing slash) — redirect to /proxy/:port/
 proxyRouter.all('/:port{[0-9]+}', async (c) => {
   const portStr = c.req.param('port')
   const url = new URL(c.req.url)

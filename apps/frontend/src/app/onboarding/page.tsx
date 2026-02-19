@@ -11,6 +11,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { isLocalMode } from '@/lib/config';
 import { LightRays } from '@/components/ui/light-rays';
 import { useCreateOpenCodeSession, useExecuteOpenCodeCommand } from '@/hooks/opencode/use-opencode-sessions';
+import { getClient } from '@/lib/opencode-sdk';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { SecretsManager } from '@/components/secrets/secrets-manager';
@@ -214,7 +215,7 @@ export default function OnboardingPage() {
   }, [user, isLoading, router]);
 
   // ── Onboarding session lifecycle ──────────────────────────────
-  // Resume existing session or create new one + fire /onboarding command.
+  // Resume existing session (with validation) or create new one + fire /onboarding command.
   const MAX_RETRIES = 3;
 
   useEffect(() => {
@@ -231,16 +232,31 @@ export default function OnboardingPage() {
       try {
         // 1. Try to resume an existing onboarding session
         const res = await fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`).catch(() => null);
-        const existing = res?.ok ? (await res.json()).ONBOARDING_SESSION_ID : null;
+        const existingId = res?.ok ? (await res.json()).ONBOARDING_SESSION_ID : null;
 
-        if (existing && existing !== '') {
-          // Existing session found — just resume, don't re-send /onboarding command
-          setSessionId(existing);
-          creatingRef.current = false;
-          return;
+        if (existingId && existingId !== '') {
+          // Validate the session actually exists before using it.
+          // A stale/deleted session ID would cause "Session not found" in SessionChat.
+          try {
+            const client = getClient();
+            const result = await client.session.get({ sessionID: existingId });
+            if (result.data) {
+              // Session is valid — resume it
+              setSessionId(existingId);
+              creatingRef.current = false;
+              return;
+            }
+          } catch {
+            // Session doesn't exist anymore — clear the stale ID and fall through to create
+            fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ value: '' }),
+            }).catch(() => {});
+          }
         }
 
-        // 2. No existing session — create + persist + fire command in one flow
+        // 2. No valid session — create + persist + fire command in one flow
         const session = await createSessionRef.current.mutateAsync({ title: 'Kortix Onboarding' });
         persistOnboardingSessionId(session.id);
         await executeCommandRef.current.mutateAsync({ sessionId: session.id, command: 'onboarding' });
@@ -264,7 +280,6 @@ export default function OnboardingPage() {
     })();
 
     return () => clearTimeout(retryTimer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, sessionId, sessionError, retryTick]);
 
   // ── Poll sandbox instance for onboarding completion ───────────

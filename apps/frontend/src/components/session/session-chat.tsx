@@ -1,151 +1,159 @@
-'use client';
-
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+"use client";
 
 import {
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  ArrowDown,
-  ArrowUp,
-  Loader2,
-  Copy,
-  Check,
-  FileText,
-  Image as ImageIcon,
-  ArrowUpLeft,
-  GitFork,
-  Layers,
-  ListPlus,
-  Scissors,
-  Pencil,
-  Send,
-  Trash2,
-  Undo2,
-  X,
-  MessageSquare,
-  ExternalLink,
-  Terminal,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { KortixLoader } from '@/components/ui/kortix-loader';
-import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
-import { SandboxUrlDetector } from '@/components/thread/content/sandbox-url-detector';
+	ArrowDown,
+	ArrowUp,
+	ArrowUpLeft,
+	Check,
+	ChevronDown,
+	ChevronRight,
+	ChevronUp,
+	Copy,
+	ExternalLink,
+	FileText,
+	GitFork,
+	Image as ImageIcon,
+	Layers,
+	ListPlus,
+	Loader2,
+	MessageSquare,
+	Pencil,
+	Scissors,
+	Send,
+	Terminal,
+	Trash2,
+	Undo2,
+	X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { UnifiedMarkdown } from "@/components/markdown/unified-markdown";
+import { ImagePreview } from "@/components/session/image-preview";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+	ConfirmDialog,
+	RevertBanner,
+} from "@/components/session/message-actions";
+import { ConnectProviderDialog } from "@/components/session/model-selector";
+import { QuestionPrompt } from "@/components/session/question-prompt";
 import {
-  useOpenCodeSession,
-  useSendOpenCodeMessage,
-  useAbortOpenCodeSession,
-  useOpenCodeAgents,
-  useOpenCodeCommands,
-  useExecuteOpenCodeCommand,
-  useOpenCodeProviders,
-  useForkSession,
-  useRevertSession,
-  useUnrevertSession,
-  useUpdatePart,
-  useDeletePart,
-  replyToPermission,
-  replyToQuestion,
-  rejectQuestion,
-  findOpenCodeFiles,
-  ascendingId,
-} from '@/hooks/opencode/use-opencode-sessions';
-import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
-import { useSyncStore } from '@/stores/opencode-sync-store';
-import { getClient } from '@/lib/opencode-sdk';
-import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
-import { useKortixComputerStore } from '@/stores/kortix-computer-store';
-import { useMessageQueueStore, type QueuedMessage } from '@/stores/message-queue-store';
-import { useAutoScroll } from '@/hooks/use-auto-scroll';
-import { useThrottledValue } from '@/hooks/use-throttled-value';
-import { SessionSiteHeader } from '@/components/session/session-site-header';
-
+	type AttachedFile,
+	SessionChatInput,
+	type TrackedMention,
+} from "@/components/session/session-chat-input";
+import { SessionContextModal } from "@/components/session/session-context-modal";
+import { TurnErrorDisplay } from "@/components/session/session-error-banner";
+import { SessionSiteHeader } from "@/components/session/session-site-header";
+import { SessionWelcome } from "@/components/session/session-welcome";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-
-
+	OcPatchPartView,
+	OcSnapshotPartView,
+} from "@/components/session/snapshot-part-views";
+import { ToolPartRenderer } from "@/components/session/tool-renderers";
+import { SandboxUrlDetector } from "@/components/thread/content/sandbox-url-detector";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { KortixLoader } from "@/components/ui/kortix-loader";
+import { Textarea } from "@/components/ui/textarea";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { uploadFile } from "@/features/files/api/opencode-files";
+import { useOpenCodeConfig } from "@/hooks/opencode/use-opencode-config";
+import { useOpenCodeLocal } from "@/hooks/opencode/use-opencode-local";
+import type { ProviderListResponse } from "@/hooks/opencode/use-opencode-sessions";
+import {
+	ascendingId,
+	findOpenCodeFiles,
+	rejectQuestion,
+	replyToPermission,
+	replyToQuestion,
+	useAbortOpenCodeSession,
+	useDeletePart,
+	useExecuteOpenCodeCommand,
+	useForkSession,
+	useOpenCodeAgents,
+	useOpenCodeCommands,
+	useOpenCodeProviders,
+	useOpenCodeSession,
+	useRevertSession,
+	useSendOpenCodeMessage,
+	useUnrevertSession,
+	useUpdatePart,
+} from "@/hooks/opencode/use-opencode-sessions";
+import { useSessionSync } from "@/hooks/opencode/use-session-sync";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import { useThrottledValue } from "@/hooks/use-throttled-value";
+import { getClient } from "@/lib/opencode-sdk";
+// billingApi / invalidateAccountState / useQueryClient removed — billing is handled server-side by the router
+import { playSound } from "@/lib/sounds";
+import { cn } from "@/lib/utils";
+import { useKortixComputerStore } from "@/stores/kortix-computer-store";
+import {
+	type QueuedMessage,
+	useMessageQueueStore,
+} from "@/stores/message-queue-store";
+import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
+import { useOpenCodeSessionStatusStore } from "@/stores/opencode-session-status-store";
+import { useSyncStore } from "@/stores/opencode-sync-store";
+import { useServerStore } from "@/stores/server-store";
+import { openTabAndNavigate } from "@/stores/tab-store";
 // Shared UI primitives (framework-agnostic, reusable on mobile)
 import {
-  type MessageWithParts,
-  type Turn,
-  type Command,
-  type Part,
-  type TextPart,
-  type ToolPart,
-  type FilePart,
-  type AgentPart,
-  type SnapshotPart,
-  type PatchPart,
-  type PermissionRequest,
-  type QuestionRequest,
-  type RetryInfo,
-  type TurnCostInfo,
-  type PartWithMessage,
-  isTextPart,
-  isToolPart,
-  isReasoningPart,
-  isFilePart,
-  isAgentPart,
-  isCompactionPart,
-  isSnapshotPart,
-  isPatchPart,
-  isAttachment,
-  splitUserParts,
-  groupMessagesIntoTurns,
-  collectTurnParts,
-  findLastTextPart,
-  isShellMode,
-  getShellModePart,
-  isLastUserMessage,
-  getWorkingState,
-  getHiddenToolParts,
-  isToolPartHidden,
-  getAnsweredQuestionParts,
-  getTurnStatus,
-  getTurnCost,
-  getTurnError,
-  getRetryInfo,
-  getPermissionForTool,
-  formatDuration,
-  formatCost,
-  formatTokens,
-  shouldShowToolPart,
-  hasDiffs,
-} from '@/ui';
-
-import { SessionChatInput, type AttachedFile, type TrackedMention } from '@/components/session/session-chat-input';
-import { uploadFile } from '@/features/files/api/opencode-files';
-import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
-import { useSessionSync } from '@/hooks/opencode/use-session-sync';
-import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
-import { SessionWelcome } from '@/components/session/session-welcome';
-import { ToolPartRenderer } from '@/components/session/tool-renderers';
-import { QuestionPrompt } from '@/components/session/question-prompt';
-import { ImagePreview } from '@/components/session/image-preview';
-import { RevertBanner, ConfirmDialog } from '@/components/session/message-actions';
-import { TurnErrorDisplay } from '@/components/session/session-error-banner';
-import { OcSnapshotPartView, OcPatchPartView } from '@/components/session/snapshot-part-views';
-import { SessionContextModal } from '@/components/session/session-context-modal';
-import { ConnectProviderDialog } from '@/components/session/model-selector';
-import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
-import { openTabAndNavigate } from '@/stores/tab-store';
-import { useServerStore } from '@/stores/server-store';
-
-// billingApi / invalidateAccountState / useQueryClient removed — billing is handled server-side by the router
-import { playSound } from '@/lib/sounds';
+	type AgentPart,
+	type Command,
+	collectTurnParts,
+	type FilePart,
+	findLastTextPart,
+	formatCost,
+	formatDuration,
+	formatTokens,
+	getHiddenToolParts,
+	getPermissionForTool,
+	getQuestionForTool,
+	getRetryInfo,
+	getShellModePart,
+	getTurnCost,
+	getTurnError,
+	getTurnStatus,
+	getWorkingState,
+	groupMessagesIntoTurns,
+	hasDiffs,
+	isAgentPart,
+	isAttachment,
+	isCompactionPart,
+	isFilePart,
+	isLastUserMessage,
+	isPatchPart,
+	isReasoningPart,
+	isShellMode,
+	isSnapshotPart,
+	isTextPart,
+	isToolPart,
+	isToolPartHidden,
+	type MessageWithParts,
+	type Part,
+	type PartWithMessage,
+	type PatchPart,
+	type PermissionRequest,
+	type QuestionRequest,
+	type RetryInfo,
+	type SnapshotPart,
+	shouldShowToolPart,
+	splitUserParts,
+	type TextPart,
+	type ToolPart,
+	type Turn,
+	type TurnCostInfo,
+	turnHasSteps,
+} from "@/ui";
 
 // ============================================================================
 // Sub-Session / Fork Breadcrumb
@@ -158,183 +166,176 @@ import { playSound } from '@/lib/sounds';
 // ============================================================================
 
 function ForkContextDivider({ parentID }: { parentID: string }) {
-  const { data: parentSession } = useOpenCodeSession(parentID);
-  const parentTitle = parentSession?.title || 'Parent session';
+	const { data: parentSession } = useOpenCodeSession(parentID);
+	const parentTitle = parentSession?.title || "Parent session";
 
-  return (
-    <div className="flex items-center gap-3 py-2 mb-2">
-      <div className="flex-1 h-px bg-border/50" />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            onClick={() =>
-              parentSession &&
-              openTabAndNavigate({
-                id: parentSession.id,
-                title: parentSession.title || 'Parent session',
-                type: 'session',
-                href: `/sessions/${parentSession.id}`,
-                serverId: useServerStore.getState().activeServerId,
-              })
-            }
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
-          >
-            <GitFork className="size-3 text-muted-foreground/60" />
-            <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
-              Forked from
-            </span>
-            <span className="text-[10px] font-medium text-muted-foreground max-w-[150px] truncate">
-              {parentTitle}
-            </span>
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="text-xs">
-          Go to parent session: {parentTitle}
-        </TooltipContent>
-      </Tooltip>
-      <div className="flex-1 h-px bg-border/50" />
-    </div>
-  );
-}
-
-// ============================================================================
-// Answered question card — collapsible summary of completed Q&A
-// ============================================================================
-
-function AnsweredQuestionCard({ part }: { part: ToolPart }) {
-  const [expanded, setExpanded] = useState(false);
-  const input = (part.state as any)?.input ?? {};
-  const metadata = (part.state as any)?.metadata ?? {};
-  const questions: Array<{ question: string; options?: { label: string }[] }> =
-    Array.isArray(input.questions) ? input.questions : [];
-  const answers: string[][] = Array.isArray(metadata.answers) ? metadata.answers : [];
-  if (questions.length === 0 || answers.length === 0) return null;
-
-  const answeredCount = answers.filter((a) => a.length > 0).length;
-
-  return (
-    <div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer hover:bg-muted/30 transition-colors"
-      >
-        <MessageSquare className="size-3.5 text-muted-foreground shrink-0" />
-        <span className="text-xs font-medium text-foreground">Questions</span>
-        <span className="text-[11px] text-muted-foreground">{answeredCount} answered</span>
-        <ChevronDown className={cn('size-3 text-muted-foreground ml-auto transition-transform', expanded && 'rotate-180')} />
-      </button>
-      {expanded && (
-        <div className="border-t border-border/30 divide-y divide-border/30">
-          {questions.map((q, i) => {
-            const answer = answers[i] || [];
-            const answerText = answer.join(', ') || 'No answer';
-            return (
-              <div key={i} className="px-3.5 py-2.5">
-                <div className="text-xs text-muted-foreground">{q.question}</div>
-                <div className="text-xs font-medium text-foreground mt-0.5">{answerText}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+	return (
+		<div className="flex items-center gap-3 py-2 mb-2">
+			<div className="flex-1 h-px bg-border/50" />
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						onClick={() =>
+							parentSession &&
+							openTabAndNavigate({
+								id: parentSession.id,
+								title: parentSession.title || "Parent session",
+								type: "session",
+								href: `/sessions/${parentSession.id}`,
+								serverId: useServerStore.getState().activeServerId,
+							})
+						}
+						className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
+					>
+						<GitFork className="size-3 text-muted-foreground/60" />
+						<span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+							Forked from
+						</span>
+						<span className="text-[10px] font-medium text-muted-foreground max-w-[150px] truncate">
+							{parentTitle}
+						</span>
+					</button>
+				</TooltipTrigger>
+				<TooltipContent side="bottom" className="text-xs">
+					Go to parent session: {parentTitle}
+				</TooltipContent>
+			</Tooltip>
+			<div className="flex-1 h-px bg-border/50" />
+		</div>
+	);
 }
 
 // ============================================================================
 // Highlight @mentions in plain text (for optimistic & user messages)
 // ============================================================================
 
-function HighlightMentions({ text, agentNames, onFileClick }: { text: string; agentNames?: string[]; onFileClick?: (path: string) => void }) {
-  // Strip session ref XML before processing mentions
-  const { cleanText, sessions } = useMemo(() => parseSessionReferences(text), [text]);
+function HighlightMentions({
+	text,
+	agentNames,
+	onFileClick,
+}: {
+	text: string;
+	agentNames?: string[];
+	onFileClick?: (path: string) => void;
+}) {
+	// Strip session ref XML before processing mentions
+	const { cleanText, sessions } = useMemo(
+		() => parseSessionReferences(text),
+		[text],
+	);
 
-  const segments = useMemo(() => {
-    if (!cleanText) return [{ text: cleanText, type: undefined as 'file' | 'agent' | 'session' | undefined }];
+	const segments = useMemo(() => {
+		if (!cleanText)
+			return [
+				{
+					text: cleanText,
+					type: undefined as "file" | "agent" | "session" | undefined,
+				},
+			];
 
-    // Detect session @mentions first (titles can contain spaces)
-    type MentionType = 'file' | 'agent' | 'session';
-    const sessionDetected: { start: number; end: number; type: MentionType }[] = [];
-    for (const s of sessions) {
-      const needle = `@${s.title}`;
-      const idx = cleanText.indexOf(needle);
-      if (idx !== -1) {
-        sessionDetected.push({ start: idx, end: idx + needle.length, type: 'session' });
-      }
-    }
+		// Detect session @mentions first (titles can contain spaces)
+		type MentionType = "file" | "agent" | "session";
+		const sessionDetected: { start: number; end: number; type: MentionType }[] =
+			[];
+		for (const s of sessions) {
+			const needle = `@${s.title}`;
+			const idx = cleanText.indexOf(needle);
+			if (idx !== -1) {
+				sessionDetected.push({
+					start: idx,
+					end: idx + needle.length,
+					type: "session",
+				});
+			}
+		}
 
-    const agentSet = new Set(agentNames || []);
-    const mentionRegex = /@(\S+)/g;
-    const detected: { start: number; end: number; type: MentionType }[] = [...sessionDetected];
-    let match: RegExpExecArray | null;
-    while ((match = mentionRegex.exec(cleanText)) !== null) {
-      const mStart = match.index;
-      // Skip if overlaps with a session mention
-      if (sessionDetected.some((s) => mStart >= s.start && mStart < s.end)) continue;
-      const name = match[1];
-      detected.push({ start: mStart, end: match.index + match[0].length, type: agentSet.has(name) ? 'agent' : 'file' });
-    }
-    if (detected.length === 0) return [{ text, type: undefined }];
+		const agentSet = new Set(agentNames || []);
+		const mentionRegex = /@(\S+)/g;
+		const detected: { start: number; end: number; type: MentionType }[] = [
+			...sessionDetected,
+		];
+		let match: RegExpExecArray | null;
+		while ((match = mentionRegex.exec(cleanText)) !== null) {
+			const mStart = match.index;
+			// Skip if overlaps with a session mention
+			if (sessionDetected.some((s) => mStart >= s.start && mStart < s.end))
+				continue;
+			const name = match[1];
+			detected.push({
+				start: mStart,
+				end: match.index + match[0].length,
+				type: agentSet.has(name) ? "agent" : "file",
+			});
+		}
+		if (detected.length === 0) return [{ text, type: undefined }];
 
-    detected.sort((a, b) => a.start - b.start || b.end - a.end);
-    const result: { text: string; type?: MentionType }[] = [];
-    let lastIndex = 0;
-    for (const ref of detected) {
-      if (ref.start < lastIndex) continue;
-      if (ref.start > lastIndex) result.push({ text: cleanText.slice(lastIndex, ref.start) });
-      result.push({ text: cleanText.slice(ref.start, ref.end), type: ref.type });
-      lastIndex = ref.end;
-    }
-    if (lastIndex < cleanText.length) result.push({ text: cleanText.slice(lastIndex) });
-    return result;
-  }, [cleanText, agentNames, sessions]);
+		detected.sort((a, b) => a.start - b.start || b.end - a.end);
+		const result: { text: string; type?: MentionType }[] = [];
+		let lastIndex = 0;
+		for (const ref of detected) {
+			if (ref.start < lastIndex) continue;
+			if (ref.start > lastIndex)
+				result.push({ text: cleanText.slice(lastIndex, ref.start) });
+			result.push({
+				text: cleanText.slice(ref.start, ref.end),
+				type: ref.type,
+			});
+			lastIndex = ref.end;
+		}
+		if (lastIndex < cleanText.length)
+			result.push({ text: cleanText.slice(lastIndex) });
+		return result;
+	}, [cleanText, agentNames, sessions]);
 
-  return (
-    <>
-      {segments.map((seg, i) =>
-        seg.type === 'file' && onFileClick ? (
-          <span
-            key={i}
-            className="text-blue-500 font-medium cursor-pointer hover:underline"
-            onClick={(e) => { e.stopPropagation(); onFileClick(seg.text.replace(/^@/, '')); }}
-          >
-            {seg.text}
-          </span>
-        ) : seg.type === 'session' ? (
-          <span
-            key={i}
-            className="text-emerald-500 font-medium cursor-pointer hover:underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              const title = seg.text.replace(/^@/, '');
-              const ref = sessions.find((s) => s.title === title);
-              if (ref) {
-                openTabAndNavigate({
-                  id: ref.id,
-                  title: ref.title || 'Session',
-                  type: 'session',
-                  href: `/sessions/${ref.id}`,
-                  serverId: useServerStore.getState().activeServerId,
-                });
-              }
-            }}
-          >
-            {seg.text}
-          </span>
-        ) : (
-          <span
-            key={i}
-            className={cn(
-              seg.type === 'file' && 'text-blue-500 font-medium',
-              seg.type === 'agent' && 'text-purple-500 font-medium',
-            )}
-          >
-            {seg.text}
-          </span>
-        ),
-      )}
-    </>
-  );
+	return (
+		<>
+			{segments.map((seg, i) =>
+				seg.type === "file" && onFileClick ? (
+					<span
+						key={i}
+						className="text-blue-500 font-medium cursor-pointer hover:underline"
+						onClick={(e) => {
+							e.stopPropagation();
+							onFileClick(seg.text.replace(/^@/, ""));
+						}}
+					>
+						{seg.text}
+					</span>
+				) : seg.type === "session" ? (
+					<span
+						key={i}
+						className="text-emerald-500 font-medium cursor-pointer hover:underline"
+						onClick={(e) => {
+							e.stopPropagation();
+							const title = seg.text.replace(/^@/, "");
+							const ref = sessions.find((s) => s.title === title);
+							if (ref) {
+								openTabAndNavigate({
+									id: ref.id,
+									title: ref.title || "Session",
+									type: "session",
+									href: `/sessions/${ref.id}`,
+									serverId: useServerStore.getState().activeServerId,
+								});
+							}
+						}}
+					>
+						{seg.text}
+					</span>
+				) : (
+					<span
+						key={i}
+						className={cn(
+							seg.type === "file" && "text-blue-500 font-medium",
+							seg.type === "agent" && "text-purple-500 font-medium",
+						)}
+					>
+						{seg.text}
+					</span>
+				),
+			)}
+		</>
+	);
 }
 
 // ============================================================================
@@ -342,20 +343,26 @@ function HighlightMentions({ text, agentNames, onFileClick }: { text: string; ag
 // ============================================================================
 
 interface ParsedFileRef {
-  path: string;
-  mime: string;
-  filename: string;
+	path: string;
+	mime: string;
+	filename: string;
 }
 
-const FILE_TAG_REGEX = /<file\s+path="([^"]*?)"\s+mime="([^"]*?)"\s+filename="([^"]*?)">\s*[\s\S]*?<\/file>/g;
+const FILE_TAG_REGEX =
+	/<file\s+path="([^"]*?)"\s+mime="([^"]*?)"\s+filename="([^"]*?)">\s*[\s\S]*?<\/file>/g;
 
-function parseFileReferences(text: string): { cleanText: string; files: ParsedFileRef[] } {
-  const files: ParsedFileRef[] = [];
-  const cleanText = text.replace(FILE_TAG_REGEX, (_, path, mime, filename) => {
-    files.push({ path, mime, filename });
-    return '';
-  }).trim();
-  return { cleanText, files };
+function parseFileReferences(text: string): {
+	cleanText: string;
+	files: ParsedFileRef[];
+} {
+	const files: ParsedFileRef[] = [];
+	const cleanText = text
+		.replace(FILE_TAG_REGEX, (_, path, mime, filename) => {
+			files.push({ path, mime, filename });
+			return "";
+		})
+		.trim();
+	return { cleanText, files };
 }
 
 // ============================================================================
@@ -363,19 +370,30 @@ function parseFileReferences(text: string): { cleanText: string; files: ParsedFi
 // ============================================================================
 
 interface ParsedSessionRef {
-  id: string;
-  title: string;
+	id: string;
+	title: string;
 }
 
-function parseSessionReferences(text: string): { cleanText: string; sessions: ParsedSessionRef[] } {
-  const sessions: ParsedSessionRef[] = [];
-  let cleaned = text.replace(/<session_ref\s+id="([^"]*?)"\s+title="([^"]*?)"\s*\/>/g, (_, id, title) => {
-    sessions.push({ id, title });
-    return '';
-  });
-  // Strip the instruction header text
-  cleaned = cleaned.replace(/\n*Referenced sessions \(use the session_context tool to fetch details when needed\):\n?/g, '').trim();
-  return { cleanText: cleaned, sessions };
+function parseSessionReferences(text: string): {
+	cleanText: string;
+	sessions: ParsedSessionRef[];
+} {
+	const sessions: ParsedSessionRef[] = [];
+	let cleaned = text.replace(
+		/<session_ref\s+id="([^"]*?)"\s+title="([^"]*?)"\s*\/>/g,
+		(_, id, title) => {
+			sessions.push({ id, title });
+			return "";
+		},
+	);
+	// Strip the instruction header text
+	cleaned = cleaned
+		.replace(
+			/\n*Referenced sessions \(use the session_context tool to fetch details when needed\):\n?/g,
+			"",
+		)
+		.trim();
+	return { cleanText: cleaned, sessions };
 }
 
 // ============================================================================
@@ -383,156 +401,176 @@ function parseSessionReferences(text: string): { cleanText: string; sessions: Pa
 // ============================================================================
 
 interface DCPPrunedItem {
-  tool: string;
-  description: string;
+	tool: string;
+	description: string;
 }
 
 interface DCPNotification {
-  type: 'prune' | 'compress';
-  tokensSaved: number;
-  batchSaved: number;
-  prunedCount: number;
-  extractedTokens: number;
-  reason?: string;
-  items: DCPPrunedItem[];
-  distilled?: string;
-  // compress-specific
-  messagesCount?: number;
-  toolsCount?: number;
-  topic?: string;
-  summary?: string;
+	type: "prune" | "compress";
+	tokensSaved: number;
+	batchSaved: number;
+	prunedCount: number;
+	extractedTokens: number;
+	reason?: string;
+	items: DCPPrunedItem[];
+	distilled?: string;
+	// compress-specific
+	messagesCount?: number;
+	toolsCount?: number;
+	topic?: string;
+	summary?: string;
 }
 
-const DCP_TAG_REGEX = /<dcp-notification\s+([^>]*)>([\s\S]*?)<\/dcp-notification>/g;
-const DCP_ITEM_REGEX = /<dcp-item\s+tool="([^"]*?)"\s+description="([^"]*?)"\s*\/>/g;
+const DCP_TAG_REGEX =
+	/<dcp-notification\s+([^>]*)>([\s\S]*?)<\/dcp-notification>/g;
+const DCP_ITEM_REGEX =
+	/<dcp-item\s+tool="([^"]*?)"\s+description="([^"]*?)"\s*\/>/g;
 const DCP_DISTILLED_REGEX = /<dcp-distilled>([\s\S]*?)<\/dcp-distilled>/;
 const DCP_SUMMARY_REGEX = /<dcp-summary>([\s\S]*?)<\/dcp-summary>/;
 
 function unescapeXml(str: string): string {
-  return str
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
+	return str
+		.replace(/&quot;/g, '"')
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/&amp;/g, "&");
 }
 
 function parseAttr(attrs: string, name: string): string | undefined {
-  const re = new RegExp(`${name}="([^"]*?)"`);
-  const m = attrs.match(re);
-  return m ? unescapeXml(m[1]) : undefined;
+	const re = new RegExp(`${name}="([^"]*?)"`);
+	const m = attrs.match(re);
+	return m ? unescapeXml(m[1]) : undefined;
 }
 
 // Legacy DCP format: "▣ DCP | ~12.5K tokens saved total" (pre-XML version)
 const DCP_LEGACY_REGEX = /^▣ DCP \| ~([\d.]+K?) tokens saved total/;
-const DCP_LEGACY_PRUNING_REGEX = /▣ Pruning \(~([\d.]+K?) tokens(?:, distilled ([\d.]+K?) tokens)?\)(?:\s*—\s*(.+))?/;
+const DCP_LEGACY_PRUNING_REGEX =
+	/▣ Pruning \(~([\d.]+K?) tokens(?:, distilled ([\d.]+K?) tokens)?\)(?:\s*—\s*(.+))?/;
 const DCP_LEGACY_ITEM_REGEX = /→\s+(\S+?):\s+(.+)/g;
 
 function parseLegacyDCPNotification(text: string): DCPNotification | null {
-  const headerMatch = text.match(DCP_LEGACY_REGEX);
-  if (!headerMatch) return null;
+	const headerMatch = text.match(DCP_LEGACY_REGEX);
+	if (!headerMatch) return null;
 
-  const tokenStr = headerMatch[1];
-  const tokensSaved = tokenStr.endsWith('K')
-    ? Math.round(parseFloat(tokenStr.slice(0, -1)) * 1000)
-    : parseInt(tokenStr, 10);
+	const tokenStr = headerMatch[1];
+	const tokensSaved = tokenStr.endsWith("K")
+		? Math.round(parseFloat(tokenStr.slice(0, -1)) * 1000)
+		: parseInt(tokenStr, 10);
 
-  const pruningMatch = text.match(DCP_LEGACY_PRUNING_REGEX);
-  let batchSaved = 0;
-  let extractedTokens = 0;
-  let reason: string | undefined;
-  if (pruningMatch) {
-    const batchStr = pruningMatch[1];
-    batchSaved = batchStr.endsWith('K')
-      ? Math.round(parseFloat(batchStr.slice(0, -1)) * 1000)
-      : parseInt(batchStr, 10);
-    if (pruningMatch[2]) {
-      const extStr = pruningMatch[2];
-      extractedTokens = extStr.endsWith('K')
-        ? Math.round(parseFloat(extStr.slice(0, -1)) * 1000)
-        : parseInt(extStr, 10);
-    }
-    reason = pruningMatch[3]?.trim();
-  }
+	const pruningMatch = text.match(DCP_LEGACY_PRUNING_REGEX);
+	let batchSaved = 0;
+	let extractedTokens = 0;
+	let reason: string | undefined;
+	if (pruningMatch) {
+		const batchStr = pruningMatch[1];
+		batchSaved = batchStr.endsWith("K")
+			? Math.round(parseFloat(batchStr.slice(0, -1)) * 1000)
+			: parseInt(batchStr, 10);
+		if (pruningMatch[2]) {
+			const extStr = pruningMatch[2];
+			extractedTokens = extStr.endsWith("K")
+				? Math.round(parseFloat(extStr.slice(0, -1)) * 1000)
+				: parseInt(extStr, 10);
+		}
+		reason = pruningMatch[3]?.trim();
+	}
 
-  const items: DCPPrunedItem[] = [];
-  let itemMatch;
-  DCP_LEGACY_ITEM_REGEX.lastIndex = 0;
-  while ((itemMatch = DCP_LEGACY_ITEM_REGEX.exec(text)) !== null) {
-    items.push({ tool: itemMatch[1], description: itemMatch[2].trim() });
-  }
+	const items: DCPPrunedItem[] = [];
+	let itemMatch;
+	DCP_LEGACY_ITEM_REGEX.lastIndex = 0;
+	while ((itemMatch = DCP_LEGACY_ITEM_REGEX.exec(text)) !== null) {
+		items.push({ tool: itemMatch[1], description: itemMatch[2].trim() });
+	}
 
-  // Check for compress format
-  const isCompress = text.includes('▣ Compressing');
+	// Check for compress format
+	const isCompress = text.includes("▣ Compressing");
 
-  return {
-    type: isCompress ? 'compress' : 'prune',
-    tokensSaved,
-    batchSaved,
-    prunedCount: items.length,
-    extractedTokens,
-    reason,
-    items,
-  };
+	return {
+		type: isCompress ? "compress" : "prune",
+		tokensSaved,
+		batchSaved,
+		prunedCount: items.length,
+		extractedTokens,
+		reason,
+		items,
+	};
 }
 
-function parseDCPNotifications(text: string): { cleanText: string; notifications: DCPNotification[] } {
-  const notifications: DCPNotification[] = [];
+function parseDCPNotifications(text: string): {
+	cleanText: string;
+	notifications: DCPNotification[];
+} {
+	const notifications: DCPNotification[] = [];
 
-  // First try XML format
-  const cleanText = text.replace(DCP_TAG_REGEX, (_, attrs: string, body: string) => {
-    const type = (parseAttr(attrs, 'type') || 'prune') as 'prune' | 'compress';
-    const tokensSaved = parseInt(parseAttr(attrs, 'tokens-saved') || '0', 10);
-    const batchSaved = parseInt(parseAttr(attrs, 'batch-saved') || '0', 10);
-    const prunedCount = parseInt(parseAttr(attrs, 'pruned-count') || '0', 10);
-    const extractedTokens = parseInt(parseAttr(attrs, 'extracted-tokens') || '0', 10);
-    const reason = parseAttr(attrs, 'reason');
+	// First try XML format
+	const cleanText = text
+		.replace(DCP_TAG_REGEX, (_, attrs: string, body: string) => {
+			const type = (parseAttr(attrs, "type") || "prune") as
+				| "prune"
+				| "compress";
+			const tokensSaved = parseInt(parseAttr(attrs, "tokens-saved") || "0", 10);
+			const batchSaved = parseInt(parseAttr(attrs, "batch-saved") || "0", 10);
+			const prunedCount = parseInt(parseAttr(attrs, "pruned-count") || "0", 10);
+			const extractedTokens = parseInt(
+				parseAttr(attrs, "extracted-tokens") || "0",
+				10,
+			);
+			const reason = parseAttr(attrs, "reason");
 
-    // Parse items
-    const items: DCPPrunedItem[] = [];
-    let itemMatch;
-    DCP_ITEM_REGEX.lastIndex = 0;
-    while ((itemMatch = DCP_ITEM_REGEX.exec(body)) !== null) {
-      items.push({ tool: unescapeXml(itemMatch[1]), description: unescapeXml(itemMatch[2]) });
-    }
+			// Parse items
+			const items: DCPPrunedItem[] = [];
+			let itemMatch;
+			DCP_ITEM_REGEX.lastIndex = 0;
+			while ((itemMatch = DCP_ITEM_REGEX.exec(body)) !== null) {
+				items.push({
+					tool: unescapeXml(itemMatch[1]),
+					description: unescapeXml(itemMatch[2]),
+				});
+			}
 
-    // Parse distilled
-    const distilledMatch = body.match(DCP_DISTILLED_REGEX);
-    const distilled = distilledMatch ? unescapeXml(distilledMatch[1]) : undefined;
+			// Parse distilled
+			const distilledMatch = body.match(DCP_DISTILLED_REGEX);
+			const distilled = distilledMatch
+				? unescapeXml(distilledMatch[1])
+				: undefined;
 
-    // Compress-specific
-    const messagesCount = parseInt(parseAttr(attrs, 'messages-count') || '0', 10) || undefined;
-    const toolsCount = parseInt(parseAttr(attrs, 'tools-count') || '0', 10) || undefined;
-    const topic = parseAttr(attrs, 'topic');
-    const summaryMatch = body.match(DCP_SUMMARY_REGEX);
-    const summary = summaryMatch ? unescapeXml(summaryMatch[1]) : undefined;
+			// Compress-specific
+			const messagesCount =
+				parseInt(parseAttr(attrs, "messages-count") || "0", 10) || undefined;
+			const toolsCount =
+				parseInt(parseAttr(attrs, "tools-count") || "0", 10) || undefined;
+			const topic = parseAttr(attrs, "topic");
+			const summaryMatch = body.match(DCP_SUMMARY_REGEX);
+			const summary = summaryMatch ? unescapeXml(summaryMatch[1]) : undefined;
 
-    notifications.push({
-      type,
-      tokensSaved,
-      batchSaved,
-      prunedCount,
-      extractedTokens,
-      reason,
-      items,
-      distilled,
-      messagesCount,
-      toolsCount,
-      topic,
-      summary,
-    });
-    return '';
-  }).trim();
+			notifications.push({
+				type,
+				tokensSaved,
+				batchSaved,
+				prunedCount,
+				extractedTokens,
+				reason,
+				items,
+				distilled,
+				messagesCount,
+				toolsCount,
+				topic,
+				summary,
+			});
+			return "";
+		})
+		.trim();
 
-  // If no XML notifications found, try legacy format
-  if (notifications.length === 0 && cleanText) {
-    const legacy = parseLegacyDCPNotification(cleanText);
-    if (legacy) {
-      notifications.push(legacy);
-      return { cleanText: '', notifications };
-    }
-  }
+	// If no XML notifications found, try legacy format
+	if (notifications.length === 0 && cleanText) {
+		const legacy = parseLegacyDCPNotification(cleanText);
+		if (legacy) {
+			notifications.push(legacy);
+			return { cleanText: "", notifications };
+		}
+	}
 
-  return { cleanText, notifications };
+	return { cleanText, notifications };
 }
 
 // ============================================================================
@@ -540,129 +578,142 @@ function parseDCPNotifications(text: string): { cleanText: string; notifications
 // ============================================================================
 
 const DCP_REASON_LABELS: Record<string, string> = {
-  completion: 'Task Complete',
-  noise: 'Noise Removal',
-  extraction: 'Extraction',
+	completion: "Task Complete",
+	noise: "Noise Removal",
+	extraction: "Extraction",
 };
 
 function formatDCPTokens(tokens: number): string {
-  if (tokens >= 1000) {
-    const k = (tokens / 1000).toFixed(1).replace('.0', '');
-    return `${k}K`;
-  }
-  return tokens.toString();
+	if (tokens >= 1000) {
+		const k = (tokens / 1000).toFixed(1).replace(".0", "");
+		return `${k}K`;
+	}
+	return tokens.toString();
 }
 
-function DCPNotificationCard({ notification }: { notification: DCPNotification }) {
-  const [expanded, setExpanded] = useState(false);
-  const isPrune = notification.type === 'prune';
-  const hasItems = notification.items.length > 0;
-  const hasDetails = hasItems || notification.distilled || notification.summary;
+function DCPNotificationCard({
+	notification,
+}: {
+	notification: DCPNotification;
+}) {
+	const [expanded, setExpanded] = useState(false);
+	const isPrune = notification.type === "prune";
+	const hasItems = notification.items.length > 0;
+	const hasDetails = hasItems || notification.distilled || notification.summary;
 
-  return (
-    <div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => hasDetails && setExpanded(!expanded)}
-        className={cn(
-          'flex items-center gap-2 w-full px-3 py-2 border-b border-border/40 bg-muted/30',
-          hasDetails && 'cursor-pointer hover:bg-muted/50 transition-colors',
-        )}
-      >
-        <Scissors className="size-3.5 text-muted-foreground/70 flex-shrink-0" />
-        <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
-          {isPrune ? 'Context Pruned' : 'Context Compressed'}
-        </span>
+	return (
+		<div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
+			{/* Header */}
+			<button
+				onClick={() => hasDetails && setExpanded(!expanded)}
+				className={cn(
+					"flex items-center gap-2 w-full px-3 py-2 border-b border-border/40 bg-muted/30",
+					hasDetails && "cursor-pointer hover:bg-muted/50 transition-colors",
+				)}
+			>
+				<Scissors className="size-3.5 text-muted-foreground/70 flex-shrink-0" />
+				<span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+					{isPrune ? "Context Pruned" : "Context Compressed"}
+				</span>
 
-        {/* Stats pills */}
-        <div className="flex items-center gap-1.5 ml-auto">
-          {notification.reason && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/70">
-              {DCP_REASON_LABELS[notification.reason] || notification.reason}
-            </span>
-          )}
-          {isPrune && notification.prunedCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-medium">
-              {notification.prunedCount} pruned
-            </span>
-          )}
-          {!isPrune && notification.messagesCount && notification.messagesCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium">
-              {notification.messagesCount} msgs
-            </span>
-          )}
-          {notification.batchSaved > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-500 font-medium">
-              -{formatDCPTokens(notification.batchSaved)} tokens
-            </span>
-          )}
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
-            {formatDCPTokens(notification.tokensSaved)} saved
-          </span>
-          {hasDetails && (
-            <ChevronDown className={cn(
-              'size-3 text-muted-foreground/50 transition-transform',
-              expanded && 'rotate-180'
-            )} />
-          )}
-        </div>
-      </button>
+				{/* Stats pills */}
+				<div className="flex items-center gap-1.5 ml-auto">
+					{notification.reason && (
+						<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground/70">
+							{DCP_REASON_LABELS[notification.reason] || notification.reason}
+						</span>
+					)}
+					{isPrune && notification.prunedCount > 0 && (
+						<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-medium">
+							{notification.prunedCount} pruned
+						</span>
+					)}
+					{!isPrune &&
+						notification.messagesCount &&
+						notification.messagesCount > 0 && (
+							<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium">
+								{notification.messagesCount} msgs
+							</span>
+						)}
+					{notification.batchSaved > 0 && (
+						<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-500 font-medium">
+							-{formatDCPTokens(notification.batchSaved)} tokens
+						</span>
+					)}
+					<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+						{formatDCPTokens(notification.tokensSaved)} saved
+					</span>
+					{hasDetails && (
+						<ChevronDown
+							className={cn(
+								"size-3 text-muted-foreground/50 transition-transform",
+								expanded && "rotate-180",
+							)}
+						/>
+					)}
+				</div>
+			</button>
 
-      {/* Expandable details */}
-      {expanded && hasDetails && (
-        <div className="px-3 py-2 space-y-2">
-          {/* Pruned items list */}
-          {hasItems && (
-            <div className="space-y-0.5">
-              {notification.items.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
-                  <span className="text-muted-foreground/40">&rarr;</span>
-                  <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground/70">
-                    {item.tool}
-                  </span>
-                  {item.description && (
-                    <span className="truncate max-w-[300px]">{item.description}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+			{/* Expandable details */}
+			{expanded && hasDetails && (
+				<div className="px-3 py-2 space-y-2">
+					{/* Pruned items list */}
+					{hasItems && (
+						<div className="space-y-0.5">
+							{notification.items.map((item, i) => (
+								<div
+									key={i}
+									className="flex items-center gap-2 text-[11px] text-muted-foreground/80"
+								>
+									<span className="text-muted-foreground/40">&rarr;</span>
+									<span className="font-mono text-[10px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground/70">
+										{item.tool}
+									</span>
+									{item.description && (
+										<span className="truncate max-w-[300px]">
+											{item.description}
+										</span>
+									)}
+								</div>
+							))}
+						</div>
+					)}
 
-          {/* Compress topic */}
-          {notification.topic && (
-            <div className="text-[11px] text-muted-foreground/80">
-              <span className="text-muted-foreground/50">Topic:</span>{' '}
-              <span>{notification.topic}</span>
-            </div>
-          )}
+					{/* Compress topic */}
+					{notification.topic && (
+						<div className="text-[11px] text-muted-foreground/80">
+							<span className="text-muted-foreground/50">Topic:</span>{" "}
+							<span>{notification.topic}</span>
+						</div>
+					)}
 
-          {/* Distilled content */}
-          {notification.distilled && (
-            <div className="mt-1.5 border-t border-border/30 pt-1.5">
-              <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">
-                Distilled
-              </div>
-              <div className="text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
-                {notification.distilled}
-              </div>
-            </div>
-          )}
+					{/* Distilled content */}
+					{notification.distilled && (
+						<div className="mt-1.5 border-t border-border/30 pt-1.5">
+							<div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">
+								Distilled
+							</div>
+							<div className="text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+								{notification.distilled}
+							</div>
+						</div>
+					)}
 
-          {/* Compress summary */}
-          {notification.summary && (
-            <div className="mt-1.5 border-t border-border/30 pt-1.5">
-              <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">
-                Summary
-              </div>
-              <div className="text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
-                {notification.summary}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+					{/* Compress summary */}
+					{notification.summary && (
+						<div className="mt-1.5 border-t border-border/30 pt-1.5">
+							<div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">
+								Summary
+							</div>
+							<div className="text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+								{notification.summary}
+							</div>
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
 }
 
 // ============================================================================
@@ -670,78 +721,78 @@ function DCPNotificationCard({ notification }: { notification: DCPNotification }
 // ============================================================================
 
 function EditPartDialog({
-  open,
-  onOpenChange,
-  initialText,
-  onSave,
-  loading,
+	open,
+	onOpenChange,
+	initialText,
+	onSave,
+	loading,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initialText: string;
-  onSave: (text: string) => void;
-  loading?: boolean;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	initialText: string;
+	onSave: (text: string) => void;
+	loading?: boolean;
 }) {
-  const [text, setText] = useState(initialText);
+	const [text, setText] = useState(initialText);
 
-  // Reset text when dialog opens with new content
-  useEffect(() => {
-    if (open) setText(initialText);
-  }, [open, initialText]);
+	// Reset text when dialog opens with new content
+	useEffect(() => {
+		if (open) setText(initialText);
+	}, [open, initialText]);
 
-  const handleSave = () => {
-    const trimmed = text.trim();
-    if (trimmed && trimmed !== initialText) {
-      onSave(trimmed);
-    } else {
-      onOpenChange(false);
-    }
-  };
+	const handleSave = () => {
+		const trimmed = text.trim();
+		if (trimmed && trimmed !== initialText) {
+			onSave(trimmed);
+		} else {
+			onOpenChange(false);
+		}
+	};
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Edit message</DialogTitle>
-          <DialogDescription>
-            Modify the text content of this message part.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-2">
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="min-h-[120px] text-sm"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                handleSave();
-              }
-            }}
-          />
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={loading || !text.trim() || text.trim() === initialText}
-          >
-            {loading ? (
-              <Loader2 className="size-3.5 animate-spin mr-1.5" />
-            ) : null}
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Edit message</DialogTitle>
+					<DialogDescription>
+						Modify the text content of this message part.
+					</DialogDescription>
+				</DialogHeader>
+				<div className="py-2">
+					<Textarea
+						value={text}
+						onChange={(e) => setText(e.target.value)}
+						className="min-h-[120px] text-sm"
+						autoFocus
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+								e.preventDefault();
+								handleSave();
+							}
+						}}
+					/>
+				</div>
+				<DialogFooter>
+					<Button
+						variant="outline"
+						onClick={() => onOpenChange(false)}
+						disabled={loading}
+					>
+						Cancel
+					</Button>
+					<Button
+						onClick={handleSave}
+						disabled={loading || !text.trim() || text.trim() === initialText}
+					>
+						{loading ? (
+							<Loader2 className="size-3.5 animate-spin mr-1.5" />
+						) : null}
+						Save
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
 }
 
 // ============================================================================
@@ -749,132 +800,131 @@ function EditPartDialog({
 // ============================================================================
 
 function PartActions({
-  part,
-  messageId,
-  sessionId,
-  isBusy,
-  className,
+	part,
+	messageId,
+	sessionId,
+	isBusy,
+	className,
 }: {
-  part: Part;
-  messageId: string;
-  sessionId: string;
-  isBusy: boolean;
-  className?: string;
+	part: Part;
+	messageId: string;
+	sessionId: string;
+	isBusy: boolean;
+	className?: string;
 }) {
-  const [editOpen, setEditOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const updatePart = useUpdatePart();
-  const deletePart = useDeletePart();
+	const [editOpen, setEditOpen] = useState(false);
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const updatePart = useUpdatePart();
+	const deletePart = useDeletePart();
 
-  // Only text parts are editable
-  const isEditable = isTextPart(part) && !!(part as TextPart).text?.trim();
-  const partText = isEditable ? (part as TextPart).text : '';
+	// Only text parts are editable
+	const isEditable = isTextPart(part) && !!(part as TextPart).text?.trim();
+	const partText = isEditable ? (part as TextPart).text : "";
 
-  const handleUpdate = useCallback(
-    (newText: string) => {
-      updatePart.mutate(
-        {
-          sessionId,
-          messageId,
-          partId: part.id,
-          part: { ...part, text: newText, metadata: { ...((part as any).metadata || {}), edited: true } } as any,
-        },
-        {
-          onSuccess: () => setEditOpen(false),
-        },
-      );
-    },
-    [sessionId, messageId, part, updatePart],
-  );
+	const handleUpdate = useCallback(
+		(newText: string) => {
+			updatePart.mutate(
+				{
+					sessionId,
+					messageId,
+					partId: part.id,
+					part: {
+						...part,
+						text: newText,
+						metadata: { ...((part as any).metadata || {}), edited: true },
+					} as any,
+				},
+				{
+					onSuccess: () => setEditOpen(false),
+				},
+			);
+		},
+		[sessionId, messageId, part, updatePart],
+	);
 
-  const handleDelete = useCallback(() => {
-    deletePart.mutate(
-      {
-        sessionId,
-        messageId,
-        partId: part.id,
-      },
-      {
-        onSuccess: () => setDeleteDialogOpen(false),
-      },
-    );
-  }, [sessionId, messageId, part.id, deletePart]);
+	const handleDelete = useCallback(() => {
+		deletePart.mutate(
+			{
+				sessionId,
+				messageId,
+				partId: part.id,
+			},
+			{
+				onSuccess: () => setDeleteDialogOpen(false),
+			},
+		);
+	}, [sessionId, messageId, part.id, deletePart]);
 
-  return (
-    <>
-      <div
-        className={cn(
-          'flex items-center gap-0.5',
-          className,
-        )}
-      >
-        {/* Edit button — only for text parts */}
-        {isEditable && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setEditOpen(true)}
-                disabled={isBusy}
-                className={cn(
-                  'p-1.5 rounded-md transition-colors cursor-pointer',
-                  'text-muted-foreground/50 hover:text-foreground hover:bg-muted/60',
-                  'disabled:opacity-30 disabled:cursor-not-allowed',
-                )}
-              >
-                <Pencil className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              Edit
-            </TooltipContent>
-          </Tooltip>
-        )}
+	return (
+		<>
+			<div className={cn("flex items-center gap-0.5", className)}>
+				{/* Edit button — only for text parts */}
+				{isEditable && (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<button
+								onClick={() => setEditOpen(true)}
+								disabled={isBusy}
+								className={cn(
+									"p-1.5 rounded-md transition-colors cursor-pointer",
+									"text-muted-foreground/50 hover:text-foreground hover:bg-muted/60",
+									"disabled:opacity-30 disabled:cursor-not-allowed",
+								)}
+							>
+								<Pencil className="size-3.5" />
+							</button>
+						</TooltipTrigger>
+						<TooltipContent side="top" className="text-xs">
+							Edit
+						</TooltipContent>
+					</Tooltip>
+				)}
 
-        {/* Delete button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => setDeleteDialogOpen(true)}
-              disabled={isBusy}
-              className={cn(
-                'p-1.5 rounded-md transition-colors cursor-pointer',
-                'text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10',
-                'disabled:opacity-30 disabled:cursor-not-allowed',
-              )}
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            Delete
-          </TooltipContent>
-        </Tooltip>
-      </div>
+				{/* Delete button */}
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<button
+							onClick={() => setDeleteDialogOpen(true)}
+							disabled={isBusy}
+							className={cn(
+								"p-1.5 rounded-md transition-colors cursor-pointer",
+								"text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10",
+								"disabled:opacity-30 disabled:cursor-not-allowed",
+							)}
+						>
+							<Trash2 className="size-3.5" />
+						</button>
+					</TooltipTrigger>
+					<TooltipContent side="top" className="text-xs">
+						Delete
+					</TooltipContent>
+				</Tooltip>
+			</div>
 
-      {/* Edit dialog */}
-      {isEditable && (
-        <EditPartDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          initialText={partText}
-          onSave={handleUpdate}
-          loading={updatePart.isPending}
-        />
-      )}
+			{/* Edit dialog */}
+			{isEditable && (
+				<EditPartDialog
+					open={editOpen}
+					onOpenChange={setEditOpen}
+					initialText={partText}
+					onSave={handleUpdate}
+					loading={updatePart.isPending}
+				/>
+			)}
 
-      {/* Delete confirmation */}
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        title="Delete message part"
-        description="This will permanently remove this part from the message. This action cannot be undone."
-        action={handleDelete}
-        actionLabel="Delete"
-        variant="destructive"
-        loading={deletePart.isPending}
-      />
-    </>
-  );
+			{/* Delete confirmation */}
+			<ConfirmDialog
+				open={deleteDialogOpen}
+				onOpenChange={setDeleteDialogOpen}
+				title="Delete message part"
+				description="This will permanently remove this part from the message. This action cannot be undone."
+				action={handleDelete}
+				actionLabel="Delete"
+				variant="destructive"
+				loading={deletePart.isPending}
+			/>
+		</>
+	);
 }
 
 // ============================================================================
@@ -888,362 +938,452 @@ function PartActions({
  * and checking if the message text starts with that prefix.
  */
 function detectCommandFromText(
-  rawText: string,
-  commands?: Command[],
+	rawText: string,
+	commands?: Command[],
 ): { name: string; args?: string } | undefined {
-  if (!commands || !rawText || rawText.length < 50) return undefined;
+	if (!commands || !rawText || rawText.length < 50) return undefined;
 
-  for (const cmd of commands) {
-    if (!cmd.template) continue;
-    const tpl = cmd.template;
+	for (const cmd of commands) {
+		if (!cmd.template) continue;
+		const tpl = cmd.template;
 
-    // Find the first placeholder position ($1, $2, ..., $ARGUMENTS)
-    const placeholderMatch = tpl.match(/\$(\d+|\bARGUMENTS\b)/);
-    // Use the text before the first placeholder as the prefix to match
-    const prefix = placeholderMatch
-      ? tpl.slice(0, placeholderMatch.index).trimEnd()
-      : tpl.trimEnd();
+		// Find the first placeholder position ($1, $2, ..., $ARGUMENTS)
+		const placeholderMatch = tpl.match(/\$(\d+|\bARGUMENTS\b)/);
+		// Use the text before the first placeholder as the prefix to match
+		const prefix = placeholderMatch
+			? tpl.slice(0, placeholderMatch.index).trimEnd()
+			: tpl.trimEnd();
 
-    // Require a meaningful prefix (at least 20 chars) to avoid false positives
-    if (prefix.length < 20) continue;
+		// Require a meaningful prefix (at least 20 chars) to avoid false positives
+		if (prefix.length < 20) continue;
 
-    if (rawText.startsWith(prefix)) {
-      // Extract the user's arguments: text after the template prefix (approximate)
-      // For templates ending with the placeholder, the args are what comes after the prefix
-      let args: string | undefined;
-      if (placeholderMatch) {
-        const afterPrefix = rawText.slice(prefix.length).trim();
-        // The args are at the end; try to extract the last meaningful section
-        const lastNewlineBlock = afterPrefix.split('\n\n').pop()?.trim();
-        if (lastNewlineBlock && lastNewlineBlock.length < 200) {
-          args = lastNewlineBlock;
-        }
-      }
-      return { name: cmd.name, args };
-    }
-  }
-  return undefined;
+		if (rawText.startsWith(prefix)) {
+			// Extract the user's arguments: text after the template prefix (approximate)
+			// For templates ending with the placeholder, the args are what comes after the prefix
+			let args: string | undefined;
+			if (placeholderMatch) {
+				const afterPrefix = rawText.slice(prefix.length).trim();
+				// The args are at the end; try to extract the last meaningful section
+				const lastNewlineBlock = afterPrefix.split("\n\n").pop()?.trim();
+				if (lastNewlineBlock && lastNewlineBlock.length < 200) {
+					args = lastNewlineBlock;
+				}
+			}
+			return { name: cmd.name, args };
+		}
+	}
+	return undefined;
 }
 
-function UserMessageRow({ message, agentNames, commandInfo, commands }: { message: MessageWithParts; agentNames?: string[]; commandInfo?: { name: string; args?: string }; commands?: Command[] }) {
-  const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
-  const { attachments, stickyParts } = useMemo(
-    () => splitUserParts(message.parts),
-    [message.parts],
-  );
+function UserMessageRow({
+	message,
+	agentNames,
+	commandInfo,
+	commands,
+}: {
+	message: MessageWithParts;
+	agentNames?: string[];
+	commandInfo?: { name: string; args?: string };
+	commands?: Command[];
+}) {
+	const openFileInComputer = useKortixComputerStore(
+		(s) => s.openFileInComputer,
+	);
+	const { attachments, stickyParts } = useMemo(
+		() => splitUserParts(message.parts),
+		[message.parts],
+	);
 
-  // Extract text from sticky parts, parse out <file> and <session_ref> XML references
-  // Filter out both synthetic AND ignored parts from user-visible text
-  const textParts = stickyParts.filter(isTextPart).filter((p) => (p as TextPart).text?.trim() && !(p as TextPart).synthetic && !(p as any).ignored);
-  const rawText = textParts.map((p) => (p as TextPart).text).join('\n');
-  const { cleanText: textAfterFiles, files: uploadedFiles } = useMemo(() => parseFileReferences(rawText), [rawText]);
-  const { cleanText: text, sessions: sessionRefs } = useMemo(() => parseSessionReferences(textAfterFiles), [textAfterFiles]);
+	// Extract text from sticky parts, parse out <file> and <session_ref> XML references
+	// Filter out both synthetic AND ignored parts from user-visible text
+	const textParts = stickyParts
+		.filter(isTextPart)
+		.filter(
+			(p) =>
+				(p as TextPart).text?.trim() &&
+				!(p as TextPart).synthetic &&
+				!(p as any).ignored,
+		);
+	const rawText = textParts.map((p) => (p as TextPart).text).join("\n");
+	const { cleanText: textAfterFiles, files: uploadedFiles } = useMemo(
+		() => parseFileReferences(rawText),
+		[rawText],
+	);
+	const { cleanText: text, sessions: sessionRefs } = useMemo(
+		() => parseSessionReferences(textAfterFiles),
+		[textAfterFiles],
+	);
 
-  // Resolve effective command info: use runtime-tracked info or fall back to template matching
-  const effectiveCommandInfo = useMemo(
-    () => commandInfo ?? detectCommandFromText(rawText, commands),
-    [commandInfo, rawText, commands],
-  );
+	// Resolve effective command info: use runtime-tracked info or fall back to template matching
+	const effectiveCommandInfo = useMemo(
+		() => commandInfo ?? detectCommandFromText(rawText, commands),
+		[commandInfo, rawText, commands],
+	);
 
-  // Extract DCP notifications from ignored text parts (DCP plugin sends ignored user messages)
-  const ignoredTextParts = stickyParts.filter(isTextPart).filter((p) => (p as any).ignored && (p as TextPart).text?.trim());
-  const ignoredRawText = ignoredTextParts.map((p) => (p as TextPart).text).join('\n');
-  const dcpNotifications = useMemo(() => {
-    if (!ignoredRawText) return [];
-    return parseDCPNotifications(ignoredRawText).notifications;
-  }, [ignoredRawText]);
+	// Extract DCP notifications from ignored text parts (DCP plugin sends ignored user messages)
+	const ignoredTextParts = stickyParts
+		.filter(isTextPart)
+		.filter((p) => (p as any).ignored && (p as TextPart).text?.trim());
+	const ignoredRawText = ignoredTextParts
+		.map((p) => (p as TextPart).text)
+		.join("\n");
+	const dcpNotifications = useMemo(() => {
+		if (!ignoredRawText) return [];
+		return parseDCPNotifications(ignoredRawText).notifications;
+	}, [ignoredRawText]);
 
-  // Check if any text part was edited
-  const isEdited = textParts.some((p) => (p as any).metadata?.edited);
+	// Check if any text part was edited
+	const isEdited = textParts.some((p) => (p as any).metadata?.edited);
 
-  // Inline file references
-  const inlineFiles = stickyParts.filter(isFilePart) as FilePart[];
-  const filesWithSource = inlineFiles.filter(
-    (f) => f.source?.text?.start !== undefined && f.source?.text?.end !== undefined,
-  );
+	// Inline file references
+	const inlineFiles = stickyParts.filter(isFilePart) as FilePart[];
+	const filesWithSource = inlineFiles.filter(
+		(f) =>
+			f.source?.text?.start !== undefined && f.source?.text?.end !== undefined,
+	);
 
-  // Agent mentions
-  const agentParts = stickyParts.filter(isAgentPart) as AgentPart[];
+	// Agent mentions
+	const agentParts = stickyParts.filter(isAgentPart) as AgentPart[];
 
-  const [expanded, setExpanded] = useState(false);
-  const [canExpand, setCanExpand] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const textRef = useRef<HTMLDivElement>(null);
+	const [expanded, setExpanded] = useState(false);
+	const [canExpand, setCanExpand] = useState(false);
+	const [copied, setCopied] = useState(false);
+	const textRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const el = textRef.current;
-    if (!el || expanded) return;
-    setCanExpand(el.scrollHeight > el.clientHeight + 2);
-  }, [text, expanded]);
+	useEffect(() => {
+		const el = textRef.current;
+		if (!el || expanded) return;
+		setCanExpand(el.scrollHeight > el.clientHeight + 2);
+	}, [text, expanded]);
 
-  const handleCopy = async () => {
-    if (!text) return;
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+	const handleCopy = async () => {
+		if (!text) return;
+		await navigator.clipboard.writeText(text);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	};
 
-  // Build highlighted text segments
-  const segments = useMemo(() => {
-    if (!text) return [];
-    type SegType = 'file' | 'agent' | 'session';
+	// Build highlighted text segments
+	const segments = useMemo(() => {
+		if (!text) return [];
+		type SegType = "file" | "agent" | "session";
 
-    // Detect session @mentions first (titles can contain spaces, so indexOf is used)
-    const sessionDetected: { start: number; end: number; type: SegType }[] = [];
-    for (const s of sessionRefs) {
-      const needle = `@${s.title}`;
-      const idx = text.indexOf(needle);
-      if (idx !== -1) {
-        sessionDetected.push({ start: idx, end: idx + needle.length, type: 'session' });
-      }
-    }
+		// Detect session @mentions first (titles can contain spaces, so indexOf is used)
+		const sessionDetected: { start: number; end: number; type: SegType }[] = [];
+		for (const s of sessionRefs) {
+			const needle = `@${s.title}`;
+			const idx = text.indexOf(needle);
+			if (idx !== -1) {
+				sessionDetected.push({
+					start: idx,
+					end: idx + needle.length,
+					type: "session",
+				});
+			}
+		}
 
-    // Collect server-provided source refs (file/agent), filtering out any that
-    // overlap with a session mention (the server sees @Title as a file mention
-    // for the first word only — the session range is more accurate).
-    const serverRefs = [
-      ...filesWithSource.map((f) => ({
-        start: f.source!.text!.start,
-        end: f.source!.text!.end,
-        type: 'file' as SegType,
-      })),
-      ...agentParts
-        .filter((a) => a.source?.start !== undefined && a.source?.end !== undefined)
-        .map((a) => ({
-          start: a.source!.start,
-          end: a.source!.end,
-          type: 'agent' as SegType,
-        })),
-    ].filter((r) => !sessionDetected.some((s) => r.start >= s.start && r.start < s.end));
+		// Collect server-provided source refs (file/agent), filtering out any that
+		// overlap with a session mention (the server sees @Title as a file mention
+		// for the first word only — the session range is more accurate).
+		const serverRefs = [
+			...filesWithSource.map((f) => ({
+				start: f.source!.text!.start,
+				end: f.source!.text!.end,
+				type: "file" as SegType,
+			})),
+			...agentParts
+				.filter(
+					(a) => a.source?.start !== undefined && a.source?.end !== undefined,
+				)
+				.map((a) => ({
+					start: a.source!.start,
+					end: a.source!.end,
+					type: "agent" as SegType,
+				})),
+		].filter(
+			(r) =>
+				!sessionDetected.some((s) => r.start >= s.start && r.start < s.end),
+		);
 
-    // Merge session + server refs
-    const allRefs = [...sessionDetected, ...serverRefs];
+		// Merge session + server refs
+		const allRefs = [...sessionDetected, ...serverRefs];
 
-    if (allRefs.length > 0) {
-      allRefs.sort((a, b) => a.start - b.start || b.end - a.end);
-      const result: { text: string; type?: SegType }[] = [];
-      let lastIndex = 0;
-      for (const ref of allRefs) {
-        if (ref.start < lastIndex) continue;
-        if (ref.start > lastIndex) result.push({ text: text.slice(lastIndex, ref.start) });
-        result.push({ text: text.slice(ref.start, ref.end), type: ref.type });
-        lastIndex = ref.end;
-      }
-      if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
-      return result;
-    }
+		if (allRefs.length > 0) {
+			allRefs.sort((a, b) => a.start - b.start || b.end - a.end);
+			const result: { text: string; type?: SegType }[] = [];
+			let lastIndex = 0;
+			for (const ref of allRefs) {
+				if (ref.start < lastIndex) continue;
+				if (ref.start > lastIndex)
+					result.push({ text: text.slice(lastIndex, ref.start) });
+				result.push({ text: text.slice(ref.start, ref.end), type: ref.type });
+				lastIndex = ref.end;
+			}
+			if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
+			return result;
+		}
 
-    // Fallback: detect @mentions from text using regex
-    const agentSet = new Set(agentNames || []);
-    const mentionRegex = /@(\S+)/g;
-    const detected: { start: number; end: number; type: SegType }[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = mentionRegex.exec(text)) !== null) {
-      const mStart = match.index;
-      detected.push({ start: mStart, end: match.index + match[0].length, type: agentSet.has(match[1]) ? 'agent' : 'file' });
-    }
+		// Fallback: detect @mentions from text using regex
+		const agentSet = new Set(agentNames || []);
+		const mentionRegex = /@(\S+)/g;
+		const detected: { start: number; end: number; type: SegType }[] = [];
+		let match: RegExpExecArray | null;
+		while ((match = mentionRegex.exec(text)) !== null) {
+			const mStart = match.index;
+			detected.push({
+				start: mStart,
+				end: match.index + match[0].length,
+				type: agentSet.has(match[1]) ? "agent" : "file",
+			});
+		}
 
-    if (detected.length === 0) return [{ text, type: undefined }];
+		if (detected.length === 0) return [{ text, type: undefined }];
 
-    detected.sort((a, b) => a.start - b.start || b.end - a.end);
-    const result: { text: string; type?: SegType }[] = [];
-    let lastIndex = 0;
-    for (const ref of detected) {
-      if (ref.start < lastIndex) continue;
-      if (ref.start > lastIndex) result.push({ text: text.slice(lastIndex, ref.start) });
-      result.push({ text: text.slice(ref.start, ref.end), type: ref.type });
-      lastIndex = ref.end;
-    }
-    if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
-    return result;
-  }, [text, filesWithSource, agentParts, agentNames, sessionRefs]);
+		detected.sort((a, b) => a.start - b.start || b.end - a.end);
+		const result: { text: string; type?: SegType }[] = [];
+		let lastIndex = 0;
+		for (const ref of detected) {
+			if (ref.start < lastIndex) continue;
+			if (ref.start > lastIndex)
+				result.push({ text: text.slice(lastIndex, ref.start) });
+			result.push({ text: text.slice(ref.start, ref.end), type: ref.type });
+			lastIndex = ref.end;
+		}
+		if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
+		return result;
+	}, [text, filesWithSource, agentParts, agentNames, sessionRefs]);
 
-  // If the message is purely DCP notifications (no real user content), render only the cards
-  const hasUserContent = !!(text || uploadedFiles.length > 0 || sessionRefs.length > 0 || attachments.length > 0);
+	// If the message is purely DCP notifications (no real user content), render only the cards
+	const hasUserContent = !!(
+		text ||
+		uploadedFiles.length > 0 ||
+		sessionRefs.length > 0 ||
+		attachments.length > 0
+	);
 
-  if (!hasUserContent && dcpNotifications.length > 0) {
-    return (
-      <div className="flex flex-col gap-1.5 w-full">
-        {dcpNotifications.map((n, i) => (
-          <DCPNotificationCard key={i} notification={n} />
-        ))}
-      </div>
-    );
-  }
+	if (!hasUserContent && dcpNotifications.length > 0) {
+		return (
+			<div className="flex flex-col gap-1.5 w-full">
+				{dcpNotifications.map((n, i) => (
+					<DCPNotificationCard key={i} notification={n} />
+				))}
+			</div>
+		);
+	}
 
-  // Command messages: render as a right-aligned card instead of the raw template text
-  if (effectiveCommandInfo) {
-    return (
-      <div className="flex flex-col items-end gap-1">
-        <div className="inline-flex flex-col gap-1.5 px-4 py-2.5 rounded-2xl border border-border/60 bg-muted/40">
-          <div className="flex items-center gap-2">
-            <Terminal className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="font-mono text-sm text-foreground">/{effectiveCommandInfo.name}</span>
-          </div>
-          {effectiveCommandInfo.args && (
-            <div className="text-xs text-muted-foreground pl-5.5 break-words max-w-[400px]" style={{ paddingLeft: '1.375rem' }}>
-              {effectiveCommandInfo.args}
-            </div>
-          )}
-        </div>
-        {/* DCP notifications from ignored parts */}
-        {dcpNotifications.length > 0 && (
-          <div className="flex flex-col gap-1.5 w-full mt-1">
-            {dcpNotifications.map((n, i) => (
-              <DCPNotificationCard key={i} notification={n} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+	// Command messages: render as a right-aligned card instead of the raw template text
+	if (effectiveCommandInfo) {
+		return (
+			<div className="flex flex-col items-end gap-1">
+				<div className="inline-flex flex-col gap-1.5 px-4 py-2.5 rounded-2xl border border-border/60 bg-muted/40">
+					<div className="flex items-center gap-2">
+						<Terminal className="size-3.5 text-muted-foreground shrink-0" />
+						<span className="font-mono text-sm text-foreground">
+							/{effectiveCommandInfo.name}
+						</span>
+					</div>
+					{effectiveCommandInfo.args && (
+						<div
+							className="text-xs text-muted-foreground pl-5.5 break-words max-w-[400px]"
+							style={{ paddingLeft: "1.375rem" }}
+						>
+							{effectiveCommandInfo.args}
+						</div>
+					)}
+				</div>
+				{/* DCP notifications from ignored parts */}
+				{dcpNotifications.length > 0 && (
+					<div className="flex flex-col gap-1.5 w-full mt-1">
+						{dcpNotifications.map((n, i) => (
+							<DCPNotificationCard key={i} notification={n} />
+						))}
+					</div>
+				)}
+			</div>
+		);
+	}
 
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <div
-        className={cn(
-          'flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden',
-          canExpand && 'cursor-pointer hover:bg-card/80 transition-colors',
-        )}
-        onClick={() => canExpand && setExpanded(!expanded)}
-      >
-        {/* Attachment thumbnails (images/PDFs) */}
-        {attachments.length > 0 && (
-          <div className="flex gap-2 p-3 pb-0 flex-wrap">
-            {attachments.map((file) => (
-              <div key={file.id} className="rounded-lg overflow-hidden border border-border/50">
-                {file.mime?.startsWith('image/') && file.url ? (
-                  <ImagePreview src={file.url} alt={file.filename ?? 'Attachment'}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={file.url}
-                      alt={file.filename ?? 'Attachment'}
-                      className="max-h-32 max-w-48 object-cover"
-                    />
-                  </ImagePreview>
-                ) : file.mime === 'application/pdf' ? (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
-                    <FileText className="size-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{file.filename || 'PDF'}</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
-                    <ImageIcon className="size-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{file.filename || 'File'}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+	return (
+		<div className="flex flex-col items-end gap-1">
+			<div
+				className={cn(
+					"flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden",
+					canExpand && "cursor-pointer hover:bg-card/80 transition-colors",
+				)}
+				onClick={() => canExpand && setExpanded(!expanded)}
+			>
+				{/* Attachment thumbnails (images/PDFs) */}
+				{attachments.length > 0 && (
+					<div className="flex gap-2 p-3 pb-0 flex-wrap">
+						{attachments.map((file) => (
+							<div
+								key={file.id}
+								className="rounded-lg overflow-hidden border border-border/50"
+							>
+								{file.mime?.startsWith("image/") && file.url ? (
+									<ImagePreview
+										src={file.url}
+										alt={file.filename ?? "Attachment"}
+									>
+										{/* eslint-disable-next-line @next/next/no-img-element */}
+										<img
+											src={file.url}
+											alt={file.filename ?? "Attachment"}
+											className="max-h-32 max-w-48 object-cover"
+										/>
+									</ImagePreview>
+								) : file.mime === "application/pdf" ? (
+									<div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
+										<FileText className="size-4 text-muted-foreground" />
+										<span className="text-xs text-muted-foreground">
+											{file.filename || "PDF"}
+										</span>
+									</div>
+								) : (
+									<div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
+										<ImageIcon className="size-4 text-muted-foreground" />
+										<span className="text-xs text-muted-foreground">
+											{file.filename || "File"}
+										</span>
+									</div>
+								)}
+							</div>
+						))}
+					</div>
+				)}
 
-        {/* Uploaded file references (from <file> XML tags) */}
-        {uploadedFiles.length > 0 && (
-          <div className="flex gap-2 p-3 pb-0 flex-wrap">
-            {uploadedFiles.map((f, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
-                <FileText className="size-4 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
-              </div>
-            ))}
-          </div>
-        )}
+				{/* Uploaded file references (from <file> XML tags) */}
+				{uploadedFiles.length > 0 && (
+					<div className="flex gap-2 p-3 pb-0 flex-wrap">
+						{uploadedFiles.map((f, i) => (
+							<div
+								key={i}
+								className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30"
+							>
+								<FileText className="size-4 text-muted-foreground shrink-0" />
+								<span className="text-xs text-muted-foreground truncate max-w-[200px]">
+									{f.filename}
+								</span>
+							</div>
+						))}
+					</div>
+				)}
 
-        {/* Text content */}
-        {text && (
-          <div className="relative group px-4 py-3">
-            <div
-              ref={textRef}
-              className={cn(
-                'text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0',
-                !expanded && 'max-h-[200px] overflow-hidden',
-              )}
-            >
-              {segments.length > 0 ? (
-                segments.map((seg, i) =>
-                  seg.type === 'file' ? (
-                    <span
-                      key={i}
-                      className="text-blue-500 font-medium cursor-pointer hover:underline"
-                      onClick={(e) => { e.stopPropagation(); openFileInComputer(seg.text.replace(/^@/, '')); }}
-                    >
-                      {seg.text}
-                    </span>
-                  ) : seg.type === 'session' ? (
-                    <span
-                      key={i}
-                      className="text-emerald-500 font-medium cursor-pointer hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const title = seg.text.replace(/^@/, '');
-                        const ref = sessionRefs.find((s) => s.title === title);
-                        if (ref) {
-                          openTabAndNavigate({
-                            id: ref.id,
-                            title: ref.title || 'Session',
-                            type: 'session',
-                            href: `/sessions/${ref.id}`,
-                            serverId: useServerStore.getState().activeServerId,
-                          });
-                        }
-                      }}
-                    >
-                      {seg.text}
-                    </span>
-                  ) : (
-                    <span
-                      key={i}
-                      className={cn(
-                        seg.type === 'agent' && 'text-purple-500 font-medium',
-                      )}
-                    >
-                      {seg.text}
-                    </span>
-                  ),
-                )
-              ) : (
-                <span>{text}</span>
-              )}
-            </div>
+				{/* Text content */}
+				{text && (
+					<div className="relative group px-4 py-3">
+						<div
+							ref={textRef}
+							className={cn(
+								"text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0",
+								!expanded && "max-h-[200px] overflow-hidden",
+							)}
+						>
+							{segments.length > 0 ? (
+								segments.map((seg, i) =>
+									seg.type === "file" ? (
+										<span
+											key={i}
+											className="text-blue-500 font-medium cursor-pointer hover:underline"
+											onClick={(e) => {
+												e.stopPropagation();
+												openFileInComputer(seg.text.replace(/^@/, ""));
+											}}
+										>
+											{seg.text}
+										</span>
+									) : seg.type === "session" ? (
+										<span
+											key={i}
+											className="text-emerald-500 font-medium cursor-pointer hover:underline"
+											onClick={(e) => {
+												e.stopPropagation();
+												const title = seg.text.replace(/^@/, "");
+												const ref = sessionRefs.find((s) => s.title === title);
+												if (ref) {
+													openTabAndNavigate({
+														id: ref.id,
+														title: ref.title || "Session",
+														type: "session",
+														href: `/sessions/${ref.id}`,
+														serverId: useServerStore.getState().activeServerId,
+													});
+												}
+											}}
+										>
+											{seg.text}
+										</span>
+									) : (
+										<span
+											key={i}
+											className={cn(
+												seg.type === "agent" && "text-purple-500 font-medium",
+											)}
+										>
+											{seg.text}
+										</span>
+									),
+								)
+							) : (
+								<span>{text}</span>
+							)}
+						</div>
 
-            {/* Gradient fade overlay for collapsed long messages */}
-            {canExpand && !expanded && (
-              <div className="absolute inset-x-0 bottom-3 h-10 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-            )}
+						{/* Gradient fade overlay for collapsed long messages */}
+						{canExpand && !expanded && (
+							<div className="absolute inset-x-0 bottom-3 h-10 bg-gradient-to-t from-card to-transparent pointer-events-none" />
+						)}
 
-            {/* Expand/collapse indicator */}
-            {canExpand && (
-              <div className="absolute bottom-3 right-4 p-1 rounded-md bg-card/80 backdrop-blur-sm text-muted-foreground z-10">
-                <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
-              </div>
-            )}
+						{/* Expand/collapse indicator */}
+						{canExpand && (
+							<div className="absolute bottom-3 right-4 p-1 rounded-md bg-card/80 backdrop-blur-sm text-muted-foreground z-10">
+								<ChevronDown
+									className={cn(
+										"size-3.5 transition-transform",
+										expanded && "rotate-180",
+									)}
+								/>
+							</div>
+						)}
+					</div>
+				)}
+			</div>
+			{isEdited && (
+				<span className="text-[10px] text-muted-foreground/50 pr-1">
+					edited
+				</span>
+			)}
 
-          </div>
-        )}
-      </div>
-      {isEdited && (
-        <span className="text-[10px] text-muted-foreground/50 pr-1">edited</span>
-      )}
-
-      {/* DCP notifications from ignored parts (rendered below user bubble if mixed) */}
-      {dcpNotifications.length > 0 && (
-        <div className="flex flex-col gap-1.5 w-full mt-1">
-          {dcpNotifications.map((n, i) => (
-            <DCPNotificationCard key={i} notification={n} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+			{/* DCP notifications from ignored parts (rendered below user bubble if mixed) */}
+			{dcpNotifications.length > 0 && (
+				<div className="flex flex-col gap-1.5 w-full mt-1">
+					{dcpNotifications.map((n, i) => (
+						<DCPNotificationCard key={i} notification={n} />
+					))}
+				</div>
+			)}
+		</div>
+	);
 }
 
 // ============================================================================
 // Throttled Markdown — limits re-renders during streaming (~30fps)
 // ============================================================================
 
-function ThrottledMarkdown({ content, isStreaming }: { content: string; isStreaming: boolean }) {
-  const throttled = useThrottledValue(content, 33);
-  return <UnifiedMarkdown content={isStreaming ? throttled : content} isStreaming={isStreaming} />;
+function ThrottledMarkdown({
+	content,
+	isStreaming,
+}: {
+	content: string;
+	isStreaming: boolean;
+}) {
+	const throttled = useThrottledValue(content, 33);
+	return (
+		<UnifiedMarkdown
+			content={isStreaming ? throttled : content}
+			isStreaming={isStreaming}
+		/>
+	);
 }
 
 // ============================================================================
@@ -1251,709 +1391,675 @@ function ThrottledMarkdown({ content, isStreaming }: { content: string; isStream
 // ============================================================================
 
 interface SessionTurnProps {
-  turn: Turn;
-  allMessages: MessageWithParts[];
-  sessionId: string;
-  sessionStatus: import('@/ui').SessionStatus | undefined;
-  permissions: PermissionRequest[];
-  questions: QuestionRequest[];
-  stepsExpanded: boolean;
-  onToggleSteps: () => void;
-  onPermissionReply: (requestId: string, reply: 'once' | 'always' | 'reject') => Promise<void>;
-  onQuestionReply: (requestId: string, answers: string[][]) => Promise<void>;
-  onQuestionReject: (requestId: string) => Promise<void>;
-  agentNames?: string[];
-  /** Whether this is the first turn in the session */
-  isFirstTurn: boolean;
-  /** Whether the session is busy */
-  isBusy: boolean;
-  /** Whether the session is in a reverted state */
-  isReverted: boolean;
-  /** Whether this turn contains a compaction */
-  isCompaction?: boolean;
-  /** Fork the session at a specific message */
-  onFork: (messageId: string) => Promise<void>;
-  /** Revert the session to before a specific message */
-  onRevert: (messageId: string) => Promise<void>;
-  /** Providers data for the Connect Provider dialog */
-  providers?: ProviderListResponse;
-  /** Map of user message IDs to command info for rendering command pills */
-  commandMessages?: Map<string, { name: string; args?: string }>;
-  /** Available commands for template prefix matching (page refresh detection) */
-  commands?: Command[];
+	turn: Turn;
+	allMessages: MessageWithParts[];
+	sessionId: string;
+	sessionStatus: import("@/ui").SessionStatus | undefined;
+	permissions: PermissionRequest[];
+	questions: QuestionRequest[];
+	stepsExpanded: boolean;
+	onToggleSteps: () => void;
+	agentNames?: string[];
+	/** Whether this is the first turn in the session */
+	isFirstTurn: boolean;
+	/** Whether the session is busy */
+	isBusy: boolean;
+	/** Whether the session is in a reverted state */
+	isReverted: boolean;
+	/** Whether this turn contains a compaction */
+	isCompaction?: boolean;
+	/** Fork the session at a specific message */
+	onFork: (messageId: string) => Promise<void>;
+	/** Revert the session to before a specific message */
+	onRevert: (messageId: string) => Promise<void>;
+	/** Providers data for the Connect Provider dialog */
+	providers?: ProviderListResponse;
+	/** Map of user message IDs to command info for rendering command pills */
+	commandMessages?: Map<string, { name: string; args?: string }>;
+	/** Available commands for template prefix matching (page refresh detection) */
+	commands?: Command[];
+	/** Permission reply handler */
+	onPermissionReply: (
+		requestId: string,
+		reply: "once" | "always" | "reject",
+	) => Promise<void>;
+	/** Question reply handler */
+	onQuestionReply: (requestId: string, answers: string[][]) => Promise<void>;
+	/** Question reject handler */
+	onQuestionReject: (requestId: string) => Promise<void>;
 }
 
 function SessionTurn({
-  turn,
-  allMessages,
-  sessionId,
-  sessionStatus,
-  permissions,
-  questions,
-  stepsExpanded,
-  onToggleSteps,
-  onPermissionReply,
-  onQuestionReply,
-  onQuestionReject,
-  agentNames,
-  isFirstTurn,
-  isBusy,
-  isReverted,
-  isCompaction,
-  onFork,
-  onRevert,
-  providers,
-  commandMessages,
-  commands,
+	turn,
+	allMessages,
+	sessionId,
+	sessionStatus,
+	permissions,
+	questions,
+	stepsExpanded,
+	onToggleSteps,
+	agentNames,
+	isFirstTurn,
+	isBusy,
+	isReverted,
+	isCompaction,
+	onFork,
+	onRevert,
+	providers,
+	commandMessages,
+	commands,
+	onPermissionReply,
+	onQuestionReply,
+	onQuestionReject,
 }: SessionTurnProps) {
-  const [copied, setCopied] = useState(false);
-  const [userCopied, setUserCopied] = useState(false);
-  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [connectProviderOpen, setConnectProviderOpen] = useState(false);
-  const [revertLoading, setRevertLoading] = useState(false);
+	const [copied, setCopied] = useState(false);
+	const [userCopied, setUserCopied] = useState(false);
+	const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+	const [connectProviderOpen, setConnectProviderOpen] = useState(false);
+	const [revertLoading, setRevertLoading] = useState(false);
 
-  // Handler for action buttons on turn errors (e.g. "Check settings" opens provider dialog)
-  const handleTurnErrorAction = useCallback(() => {
-    setConnectProviderOpen(true);
-  }, []);
+	// Derived state from shared helpers
+	const allParts = useMemo(() => collectTurnParts(turn), [turn]);
+	const hasSteps = useMemo(() => turnHasSteps(allParts), [allParts]);
+	const isLast = useMemo(
+		() => isLastUserMessage(turn.userMessage.info.id, allMessages),
+		[turn.userMessage.info.id, allMessages],
+	);
+	// A turn is "working" when:
+	// 1. The session status says busy/retry (via getWorkingState), OR
+	// 2. This is the last turn AND the parent component says isBusy (e.g. we
+	//    just sent a message but sessionStatus hasn't updated to busy yet).
+	//    This covers the race between sending and the server acknowledging.
+	const working = useMemo(
+		() => getWorkingState(sessionStatus, isLast) || (isLast && isBusy),
+		[sessionStatus, isLast, isBusy],
+	);
+	const lastTextPart = useMemo(() => findLastTextPart(allParts), [allParts]);
+	const responseRaw = lastTextPart?.text ?? "";
+	const response = working ? responseRaw : responseRaw.trim();
+	// Match SolidJS: hideResponsePart filters the last text part from steps content
+	const responsePartId = lastTextPart?.id;
+	const hideResponsePart = !working && !!responsePartId;
+	// Retry info (only on last turn)
+	const retryInfo = useMemo(
+		() => (isLast ? getRetryInfo(sessionStatus) : undefined),
+		[sessionStatus, isLast],
+	);
 
-  // Derived state from shared helpers
-  const allParts = useMemo(() => collectTurnParts(turn), [turn]);
-  const isLast = useMemo(
-    () => isLastUserMessage(turn.userMessage.info.id, allMessages),
-    [turn.userMessage.info.id, allMessages],
-  );
-  // A turn is "working" when:
-  // 1. The session status says busy/retry (via getWorkingState), OR
-  // 2. This is the last turn AND the parent component says isBusy (e.g. we
-  //    just sent a message but sessionStatus hasn't updated to busy yet).
-  //    This covers the race between sending and the server acknowledging.
-  const working = useMemo(
-    () => getWorkingState(sessionStatus, isLast) || (isLast && isBusy),
-    [sessionStatus, isLast, isBusy],
-  );
-  // Check if there are visible steps that actually render inside the
-  // collapsible steps section. Tool parts that are rendered elsewhere
-  // (todowrite, task, question) don't count as "steps".
-  const hasSteps = useMemo(() => {
-    return allParts.some(({ part }) => {
-      if (part.type === 'compaction' || part.type === 'snapshot' || part.type === 'patch') return true;
-      if (isToolPart(part)) {
-        if (part.tool === 'todowrite' || part.tool === 'task' || part.tool === 'question') return false;
-        return shouldShowToolPart(part);
-      }
-      return false;
-    });
-  }, [allParts]);
-  const lastTodoWritePart = useMemo(() => {
-    for (let i = allParts.length - 1; i >= 0; i--) {
-      const p = allParts[i].part;
-      if (isToolPart(p) && p.tool === 'todowrite') return p as ToolPart;
-    }
-    return undefined;
-  }, [allParts]);
-  const lastTextPart = useMemo(() => findLastTextPart(allParts), [allParts]);
-  const responsePartId = lastTextPart?.id;
-  const responseRaw = lastTextPart?.text ?? '';
-  const response = working ? responseRaw : responseRaw.trim();
-  const hideResponse = useMemo(
-    () => !!responsePartId,
-    [responsePartId],
-  );
+	// Cost info (only when not working)
+	const costInfo = useMemo(
+		() => (!working ? getTurnCost(allParts) : undefined),
+		[allParts, working],
+	);
 
-  // Retry info (only on last turn)
-  const retryInfo = useMemo(() => (isLast ? getRetryInfo(sessionStatus) : undefined), [sessionStatus, isLast]);
+	// Turn error — derived directly from message data (same approach as SolidJS reference)
+	const turnError = useMemo(() => getTurnError(turn), [turn]);
 
-  // Cost info (only when not working)
-  const costInfo = useMemo(() => (!working ? getTurnCost(allParts) : undefined), [allParts, working]);
+	// Shell mode detection
+	const shellModePart = useMemo(() => getShellModePart(turn), [turn]);
 
-  // Turn error — derived directly from message data (same approach as SolidJS reference)
-  const turnError = useMemo(() => getTurnError(turn), [turn]);
+	// Permission matching for this session (used for tool-level permission overlays)
+	const nextPermission = useMemo(
+		() => permissions.filter((p) => p.sessionID === sessionId)[0],
+		[permissions, sessionId],
+	);
 
-  // Shell mode detection
-  const shellModePart = useMemo(() => getShellModePart(turn), [turn]);
+	// Question matching for this turn (used to pass to ToolPartRenderer for forceOpen/locked state)
+	const nextQuestion = useMemo(() => {
+		const sessionQuestions = questions.filter((q) => q.sessionID === sessionId);
+		if (sessionQuestions.length === 0) return undefined;
+		const turnMessageIds = new Set(
+			turn.assistantMessages.map((m) => m.info.id),
+		);
+		const matched = sessionQuestions.find(
+			(q) => q.tool && turnMessageIds.has(q.tool.messageID),
+		);
+		if (matched) return matched;
+		if (isLast) return sessionQuestions[0];
+		return undefined;
+	}, [questions, sessionId, turn.assistantMessages, isLast]);
 
-  // Permission/question matching for this session
-  const nextPermission = useMemo(() => permissions.filter((p) => p.sessionID === sessionId)[0], [permissions, sessionId]);
-  // Only assign a question to this turn if:
-  // 1. It has a tool ref whose messageID belongs to one of this turn's assistant messages, OR
-  // 2. It has no tool ref and this is the last turn, OR
-  // 3. It has a tool ref that doesn't match any turn's messages and this is the last turn (fallback)
-  const nextQuestion = useMemo(() => {
-    const sessionQuestions = questions.filter((q) => q.sessionID === sessionId);
-    if (sessionQuestions.length === 0) return undefined;
-    const turnMessageIds = new Set(turn.assistantMessages.map((m) => m.info.id));
-    // First: find a question whose tool ref matches this turn
-    const matched = sessionQuestions.find((q) => q.tool && turnMessageIds.has(q.tool.messageID));
-    if (matched) return matched;
-    // For the last turn: also accept questions without a tool ref, or with a tool ref
-    // that doesn't match any specific turn (fallback to prevent questions from being invisible)
-    if (isLast) {
-      return sessionQuestions[0];
-    }
-    return undefined;
-  }, [questions, sessionId, turn.assistantMessages, isLast]);
+	// Hidden tool parts (when permission/question is active)
+	const hidden = useMemo(
+		() => getHiddenToolParts(nextPermission, nextQuestion),
+		[nextPermission, nextQuestion],
+	);
 
-  // Hidden tool parts (when permission/question is active)
-  const hidden = useMemo(() => getHiddenToolParts(nextPermission, nextQuestion), [nextPermission, nextQuestion]);
+	// Answered question parts — shown when steps are collapsed (matches SolidJS)
+	const answeredQuestionParts = useMemo(() => {
+		if (stepsExpanded) return [];
+		if (questions.filter((q) => q.sessionID === sessionId).length > 0)
+			return [];
+		const result: { part: ToolPart; messageId: string }[] = [];
+		for (const msg of turn.assistantMessages) {
+			for (const part of msg.parts) {
+				if (part.type !== "tool") continue;
+				const tool = part as ToolPart;
+				if (tool.tool !== "question") continue;
+				const answers = (tool.state as any)?.metadata?.answers;
+				if (answers && answers.length > 0) {
+					result.push({ part: tool, messageId: msg.info.id });
+				}
+			}
+		}
+		return result;
+	}, [stepsExpanded, questions, sessionId, turn.assistantMessages]);
 
-  // Answered question parts (shown outside collapsed steps)
-  const answeredQuestionParts = useMemo(() => getAnsweredQuestionParts(turn, stepsExpanded, !!nextQuestion), [turn, stepsExpanded, nextQuestion]);
+	// Last assistant message ID — used for "fork from response" action
+	const lastAssistantMessageId = useMemo(() => {
+		const msgs = turn.assistantMessages;
+		return msgs.length > 0 ? msgs[msgs.length - 1].info.id : undefined;
+	}, [turn.assistantMessages]);
 
-  // Task/subsession parts (always visible outside collapsed steps)
-  const taskToolParts = useMemo(() => {
-    return allParts.filter(({ part }) => isToolPart(part) && (part as ToolPart).tool === 'task');
-  }, [allParts]);
+	// User message text — for copy action
+	const userMessageText = useMemo(() => {
+		const textParts = turn.userMessage.parts.filter(isTextPart) as TextPart[];
+		return textParts
+			.map((p) => p.text)
+			.join("\n")
+			.trim();
+	}, [turn.userMessage.parts]);
 
-  // Last assistant message ID — used for "fork from response" action
-  const lastAssistantMessageId = useMemo(() => {
-    const msgs = turn.assistantMessages;
-    return msgs.length > 0 ? msgs[msgs.length - 1].info.id : undefined;
-  }, [turn.assistantMessages]);
+	const handleCopyUser = async () => {
+		if (!userMessageText) return;
+		await navigator.clipboard.writeText(userMessageText);
+		setUserCopied(true);
+		setTimeout(() => setUserCopied(false), 2000);
+	};
 
-  // User message text — for copy action
-  const userMessageText = useMemo(() => {
-    const textParts = turn.userMessage.parts.filter(isTextPart) as TextPart[];
-    return textParts.map((p) => p.text).join('\n').trim();
-  }, [turn.userMessage.parts]);
+	// ---- Status throttling (2.5s) ----
+	const lastStatusChangeRef = useRef(Date.now());
+	const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	const childMessages = undefined as MessageWithParts[] | undefined; // placeholder for child session delegation
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const rawStatus = useMemo(
+		() => getTurnStatus(allParts, childMessages),
+		[allParts],
+	);
+	const [throttledStatus, setThrottledStatus] = useState("");
 
-  const handleCopyUser = async () => {
-    if (!userMessageText) return;
-    await navigator.clipboard.writeText(userMessageText);
-    setUserCopied(true);
-    setTimeout(() => setUserCopied(false), 2000);
-  };
+	useEffect(() => {
+		const newStatus = rawStatus;
+		if (newStatus === throttledStatus || !newStatus) return;
+		const elapsed = Date.now() - lastStatusChangeRef.current;
+		if (elapsed >= 2500) {
+			setThrottledStatus(newStatus);
+			lastStatusChangeRef.current = Date.now();
+		} else {
+			clearTimeout(statusTimeoutRef.current);
+			statusTimeoutRef.current = setTimeout(() => {
+				setThrottledStatus(getTurnStatus(allParts, childMessages));
+				lastStatusChangeRef.current = Date.now();
+			}, 2500 - elapsed);
+		}
+		return () => clearTimeout(statusTimeoutRef.current);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [allParts, rawStatus, throttledStatus]);
 
-  // ---- Status throttling (2.5s) ----
-  const lastStatusChangeRef = useRef(Date.now());
-  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const childMessages = undefined as MessageWithParts[] | undefined; // placeholder for child session delegation
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const rawStatus = useMemo(() => getTurnStatus(allParts, childMessages), [allParts]);
-  const [throttledStatus, setThrottledStatus] = useState('');
+	// ---- Retry countdown ----
+	const [retrySecondsLeft, setRetrySecondsLeft] = useState(0);
+	useEffect(() => {
+		if (!retryInfo) {
+			setRetrySecondsLeft(0);
+			return;
+		}
+		const update = () =>
+			setRetrySecondsLeft(
+				Math.max(0, Math.round((retryInfo.next - Date.now()) / 1000)),
+			);
+		update();
+		const timer = setInterval(update, 1000);
+		return () => clearInterval(timer);
+	}, [retryInfo]);
 
-  useEffect(() => {
-    const newStatus = rawStatus;
-    if (newStatus === throttledStatus || !newStatus) return;
-    const elapsed = Date.now() - lastStatusChangeRef.current;
-    if (elapsed >= 2500) {
-      setThrottledStatus(newStatus);
-      lastStatusChangeRef.current = Date.now();
-    } else {
-      clearTimeout(statusTimeoutRef.current);
-      statusTimeoutRef.current = setTimeout(() => {
-        setThrottledStatus(getTurnStatus(allParts, childMessages));
-        lastStatusChangeRef.current = Date.now();
-      }, 2500 - elapsed);
-    }
-    return () => clearTimeout(statusTimeoutRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allParts, rawStatus, throttledStatus]);
+	// ---- Duration ticking ----
+	const [duration, setDuration] = useState("");
+	useEffect(() => {
+		const startTime = (turn.userMessage.info as any)?.time?.created;
+		if (!startTime) return;
 
-  // ---- Retry countdown ----
-  const [retrySecondsLeft, setRetrySecondsLeft] = useState(0);
-  useEffect(() => {
-    if (!retryInfo) { setRetrySecondsLeft(0); return; }
-    const update = () => setRetrySecondsLeft(Math.max(0, Math.round((retryInfo.next - Date.now()) / 1000)));
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [retryInfo]);
+		if (!working) {
+			const lastMsg = turn.assistantMessages[turn.assistantMessages.length - 1];
+			const endTime =
+				(lastMsg?.info as any)?.time?.completed ||
+				(lastMsg?.info as any)?.time?.created ||
+				startTime;
+			setDuration(formatDuration(endTime - startTime));
+			return;
+		}
+		const update = () => setDuration(formatDuration(Date.now() - startTime));
+		update();
+		const timer = setInterval(update, 1000);
+		return () => clearInterval(timer);
+	}, [working, turn]);
 
-  // ---- Duration ticking ----
-  const [duration, setDuration] = useState('');
-  useEffect(() => {
-    const startTime = (turn.userMessage.info as any)?.time?.created;
-    if (!startTime) return;
+	// ---- Copy response ----
+	const handleCopy = async () => {
+		if (!response) return;
+		await navigator.clipboard.writeText(response);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	};
 
-    if (!working) {
-      const lastMsg = turn.assistantMessages[turn.assistantMessages.length - 1];
-      const endTime = (lastMsg?.info as any)?.time?.completed || (lastMsg?.info as any)?.time?.created || startTime;
-      setDuration(formatDuration(endTime - startTime));
-      return;
-    }
-    const update = () => setDuration(formatDuration(Date.now() - startTime));
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [working, turn]);
+	// ============================================================================
+	// Shell mode — short-circuit rendering
+	// ============================================================================
 
-  // ---- Copy response ----
-  const handleCopy = async () => {
-    if (!response) return;
-    await navigator.clipboard.writeText(response);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+	if (shellModePart) {
+		return (
+			<div className="space-y-1">
+				<ToolPartRenderer
+					part={shellModePart}
+					sessionId={sessionId}
+					permission={nextPermission?.tool ? nextPermission : undefined}
+					question={nextQuestion?.tool ? nextQuestion : undefined}
+					onPermissionReply={onPermissionReply}
+					onQuestionReply={onQuestionReply}
+					onQuestionReject={onQuestionReject}
+					defaultOpen
+				/>
+				{turnError && (
+					<TurnErrorDisplay errorText={turnError} className="mt-2" />
+				)}
+				<ConnectProviderDialog
+					open={connectProviderOpen}
+					onOpenChange={setConnectProviderOpen}
+					providers={providers}
+				/>
+		</div>
+	);
+}
 
-  // Attachment images from user message
-  const { attachments } = useMemo(
-    () => splitUserParts(turn.userMessage.parts),
-    [turn.userMessage.parts],
-  );
+	// ============================================================================
+	// Compaction mode — render as a distinct card, no user bubble / logo / steps
+	// ============================================================================
 
-  // ============================================================================
-  // Shell mode — short-circuit rendering
-  // ============================================================================
+	if (isCompaction && !working && response) {
+		return (
+			<div className="group/turn">
+				<div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
+					<div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-muted/40">
+						<Layers className="size-3.5 text-muted-foreground/70" />
+						<span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+							Compaction
+						</span>
+					</div>
+					<div className="px-4 py-3 text-sm text-muted-foreground/90 [&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_strong]:text-foreground/90">
+						<SandboxUrlDetector content={response} isStreaming={false} />
+					</div>
+				</div>
+			</div>
+		);
+	}
 
-  if (shellModePart) {
-    return (
-      <div className="space-y-1">
-         <ToolPartRenderer
-          part={shellModePart}
-          sessionId={sessionId}
-          permission={nextPermission?.tool ? nextPermission : undefined}
-          question={nextQuestion?.tool ? nextQuestion : undefined}
-          onPermissionReply={onPermissionReply}
-          onQuestionReply={onQuestionReply}
-          onQuestionReject={onQuestionReject}
-          defaultOpen
-        />
-        {turnError && (
-          <TurnErrorDisplay errorText={turnError} className="mt-2" />
-        )}
-        <ConnectProviderDialog
-          open={connectProviderOpen}
-          onOpenChange={setConnectProviderOpen}
-          providers={providers}
-        />
-      </div>
-    );
-  }
+	// ============================================================================
+	// Normal mode rendering — 1:1 port of SolidJS session-turn.tsx
+	//
+	// Structure:
+	//   1. User message + actions
+	//   2. Kortix logo
+	//   3. Steps trigger (spinner/chevron + status + duration) — if working || hasSteps
+	//   4. Collapsible steps (if expanded): all parts EXCEPT response part + reasoning when done
+	//   5. Answered question parts (if collapsed + has answered questions)
+	//   6. Response section (ONLY when NOT working) — the extracted last text part
+	//   7. Error (when steps collapsed)
+	//   8. Question prompt
+	//   9. Action bar (copy, fork, revert)
+	//
+	// The response (last text part) is NEVER rendered twice:
+	//   - While working: it renders INSIDE steps as a regular text part (hideResponsePart=false)
+	//   - When done: it's HIDDEN from steps (hideResponsePart=true) and shown below as Response
+	// ============================================================================
 
-  // ============================================================================
-  // Compaction mode — render as a distinct card, no user bubble / logo / steps
-  // ============================================================================
+	return (
+		<div className="space-y-3 group/turn">
+			{/* ── User message ── */}
+			<div>
+				<UserMessageRow
+					message={turn.userMessage}
+					agentNames={agentNames}
+					commandInfo={commandMessages?.get(turn.userMessage.info.id)}
+					commands={commands}
+				/>
+				{userMessageText && (
+					<div className="flex justify-end mt-1 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<button
+									onClick={handleCopyUser}
+									className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+								>
+									{userCopied ? (
+										<Check className="size-3.5" />
+									) : (
+										<Copy className="size-3.5" />
+									)}
+								</button>
+							</TooltipTrigger>
+							<TooltipContent>{userCopied ? "Copied!" : "Copy"}</TooltipContent>
+						</Tooltip>
+						{(() => {
+							const userTextPart = turn.userMessage.parts.find(
+								(p) =>
+									isTextPart(p) &&
+									(p as TextPart).text?.trim() &&
+									!(p as TextPart).synthetic,
+							);
+							if (!userTextPart) return null;
+							return (
+								<PartActions
+									part={userTextPart}
+									messageId={turn.userMessage.info.id}
+									sessionId={sessionId}
+									isBusy={isBusy}
+								/>
+							);
+						})()}
+					</div>
+				)}
+			</div>
 
-  if (isCompaction && !working && response) {
-    return (
-      <div className="group/turn">
-        <div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-muted/40">
-            <Layers className="size-3.5 text-muted-foreground/70" />
-            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
-              Compaction
-            </span>
-          </div>
-          <div className="px-4 py-3 text-sm text-muted-foreground/90 [&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_strong]:text-foreground/90">
-            <SandboxUrlDetector content={response} isStreaming={false} />
-          </div>
-        </div>
-      </div>
-    );
-  }
+			{/* ── Kortix logo ── */}
+			{turn.assistantMessages.length > 0 && (
+				<div className="flex items-center gap-2 mt-3">
+					{/* eslint-disable-next-line @next/next/no-img-element */}
+					<img
+						src="/kortix-logomark-white.svg"
+						alt="Kortix"
+						className={cn("dark:invert-0 invert flex-shrink-0")}
+						style={{ height: "14px", width: "auto" }}
+					/>
+				</div>
+			)}
 
-  // ============================================================================
-  // Normal mode rendering
-  // ============================================================================
+			{/* ── Steps trigger ── */}
+			{(working || hasSteps) && (
+				<button
+					onClick={onToggleSteps}
+					aria-expanded={stepsExpanded}
+					className={cn(
+						"flex items-center gap-2 text-xs transition-colors py-1 cursor-pointer",
+						working
+							? "text-muted-foreground"
+							: "text-muted-foreground hover:text-foreground",
+					)}
+				>
+					{working ? (
+						<span className="relative flex size-3">
+							<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/30" />
+							<span className="relative inline-flex rounded-full size-3 bg-muted-foreground/50" />
+						</span>
+					) : (
+						<ChevronRight
+							className={cn(
+								"size-3 transition-transform flex-shrink-0",
+								stepsExpanded && "rotate-90",
+							)}
+						/>
+					)}
+					<span>
+						{retryInfo
+							? retryInfo.message.length > 60
+								? retryInfo.message.slice(0, 60) + "..."
+								: retryInfo.message
+							: working
+								? throttledStatus || "Working..."
+								: stepsExpanded
+									? "Hide steps"
+									: "Show steps"}
+					</span>
+					{retryInfo && (
+						<>
+							<span className="text-muted-foreground/50">·</span>
+							<span className="text-amber-500">
+								Retrying{retrySecondsLeft > 0 ? ` in ${retrySecondsLeft}s` : ""}
+							</span>
+							<span className="text-muted-foreground/50">
+								(#{retryInfo.attempt})
+							</span>
+						</>
+					)}
+					<span className="text-muted-foreground/50">·</span>
+					<span className="text-muted-foreground/70">{duration}</span>
+					{costInfo && !working && (
+						<>
+							<span className="text-muted-foreground/50">·</span>
+							<span className="text-muted-foreground/70">
+								{formatCost(costInfo.cost)}
+							</span>
+							<span className="text-muted-foreground/50">·</span>
+							<span className="text-muted-foreground/70">
+								{formatTokens(costInfo.tokens.input + costInfo.tokens.output)}t
+							</span>
+						</>
+					)}
+				</button>
+			)}
 
-  return (
-    <div className="space-y-3 group/turn">
-      <div>
-        {/* User message */}
-        <UserMessageRow
-          message={turn.userMessage}
-          agentNames={agentNames}
-          commandInfo={commandMessages?.get(turn.userMessage.info.id)}
-          commands={commands}
-        />
-        {/* User message actions — copy, edit, delete */}
-        {userMessageText && (
-          <div className="flex justify-end mt-1 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleCopyUser}
-                  className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                >
-                  {userCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{userCopied ? 'Copied!' : 'Copy'}</TooltipContent>
-            </Tooltip>
-            {/* Edit/Delete for user text parts */}
-            {(() => {
-              const userTextPart = turn.userMessage.parts.find(
-                (p) => isTextPart(p) && (p as TextPart).text?.trim() && !(p as TextPart).synthetic,
-              );
-              if (!userTextPart) return null;
-              return (
-                <PartActions
-                  part={userTextPart}
-                  messageId={turn.userMessage.info.id}
-                  sessionId={sessionId}
-                  isBusy={isBusy}
-                />
-              );
-            })()}
-          </div>
-        )}
-      </div>
+			{/* ── Collapsible steps content ──
+          Shown when expanded. Renders ALL parts from all assistant messages,
+          EXCEPT: the response part (last text) is hidden when not working
+          (it renders separately below as the Response section).
+          Reasoning is hidden when not working (matches SolidJS hideReasoning). */}
+			{stepsExpanded && turn.assistantMessages.length > 0 && (
+				<div className="space-y-2">
+					{allParts.map(({ part, message }) => {
+						// Hide the response part when done — it renders as the Response section below
+						if (
+							hideResponsePart &&
+							isTextPart(part) &&
+							part.id === responsePartId
+						)
+							return null;
 
-      {/* Kortix logo header */}
-      {(working || hasSteps) && (
-         <div className="flex items-center gap-2 mt-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/kortix-logomark-white.svg"
-            alt="Kortix"
-            className={cn('dark:invert-0 invert flex-shrink-0')}
-            style={{ height: '14px', width: 'auto' }}
-          />
-        </div>
-      )}
+						// Text parts (intermediate + streaming response while working)
+						if (isTextPart(part)) {
+							if (!part.text?.trim()) return null;
+							return (
+								<div key={part.id} className="text-sm">
+									<ThrottledMarkdown
+										content={part.text}
+										isStreaming={working}
+									/>
+								</div>
+							);
+						}
 
-      {/* Steps trigger button */}
-      {(working || hasSteps) && (
-        <button
-          onClick={onToggleSteps}
-          aria-expanded={stepsExpanded}
-          className={cn(
-            'flex items-center gap-2 text-xs transition-colors py-1.5 cursor-pointer',
-            working
-              ? 'text-muted-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {working ? (
-            <span className="flex items-center gap-1.5">
-              <span className="relative flex size-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/30" />
-                <span className="relative inline-flex rounded-full size-3 bg-muted-foreground/50" />
-              </span>
-            </span>
-          ) : (
-            <ChevronRight
-              className={cn(
-                'size-3 transition-transform flex-shrink-0',
-                stepsExpanded && 'rotate-90',
-              )}
-            />
-          )}
+						// Reasoning — only while working
+						if (isReasoningPart(part)) {
+							if (!working) return null;
+							if (!part.text?.trim()) return null;
+							return (
+								<div
+									key={part.id}
+									className="text-sm text-muted-foreground italic"
+								>
+									<ThrottledMarkdown content={part.text} isStreaming={true} />
+								</div>
+							);
+						}
 
-          {/* Status text / retry info / show-hide label */}
-          <span>
-            {retryInfo
-              ? retryInfo.message.length > 60
-                ? retryInfo.message.slice(0, 60) + '...'
-                : retryInfo.message
-              : working
-                ? (throttledStatus || 'Working...')
-                : stepsExpanded
-                  ? 'Hide steps'
-                  : 'Show steps'}
-          </span>
+						// Compaction indicator
+						if (isCompactionPart(part)) {
+							return (
+								<div key={part.id} className="flex items-center gap-2 py-2.5">
+									<div className="flex-1 h-px bg-border" />
+									<div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/80 border border-border/60">
+										<Layers className="size-3 text-muted-foreground" />
+										<span className="text-[10px] font-semibold text-muted-foreground tracking-wide">
+											Compaction
+										</span>
+									</div>
+									<div className="flex-1 h-px bg-border" />
+								</div>
+							);
+						}
 
-          {/* Retry countdown + attempt */}
-          {retryInfo && (
-            <>
-              <span className="text-muted-foreground/50">·</span>
-              <span className="text-amber-500">
-                Retrying{retrySecondsLeft > 0 ? ` in ${retrySecondsLeft}s` : ''}
-              </span>
-              <span className="text-muted-foreground/50">(#{retryInfo.attempt})</span>
-            </>
-          )}
+						// Tool parts
+						if (isToolPart(part)) {
+							if (!shouldShowToolPart(part)) return null;
+							if (part.tool === "todowrite") return null;
+							const perm = getPermissionForTool(permissions, part.callID);
+							const question = getQuestionForTool(questions, part.callID);
+							if (!question && isToolPartHidden(part, message.info.id, hidden))
+								return null;
+							return (
+								<div key={part.id}>
+									<ToolPartRenderer
+										part={part}
+										sessionId={sessionId}
+										permission={perm}
+										question={question}
+										onPermissionReply={onPermissionReply}
+										onQuestionReply={onQuestionReply}
+										onQuestionReject={onQuestionReject}
+									/>
+								</div>
+							);
+						}
 
-          {/* Duration */}
-          <span className="text-muted-foreground/50">·</span>
-          <span className="text-muted-foreground/70">{duration}</span>
+						// Snapshot parts
+						if (isSnapshotPart(part)) {
+							return (
+								<div key={part.id}>
+									<OcSnapshotPartView part={part} />
+								</div>
+							);
+						}
 
-          {/* Cost & tokens (when done) */}
-          {costInfo && !working && (
-            <>
-              <span className="text-muted-foreground/50">·</span>
-              <span className="text-muted-foreground/70">{formatCost(costInfo.cost)}</span>
-              <span className="text-muted-foreground/50">·</span>
-              <span className="text-muted-foreground/70">
-                {formatTokens(costInfo.tokens.input + costInfo.tokens.output)}t
-              </span>
-            </>
-          )}
-        </button>
-      )}
+						// Patch parts
+						if (isPatchPart(part)) {
+							return (
+								<div key={part.id}>
+									<OcPatchPartView part={part} sessionId={sessionId} />
+								</div>
+							);
+						}
 
-      {/* Expanded steps content — indented with left border (matching OpenCode SolidJS) */}
-      {(working || hasSteps) && stepsExpanded && turn.assistantMessages.length > 0 && (
-        <div className="ml-3 pl-3 border-l border-border/60 space-y-3">
-          {allParts.map(({ part, message }) => {
-            // Skip the response text part (shown separately below)
-            if (hideResponse && part.id === responsePartId) return null;
+						return null;
+					})}
 
-            // Reasoning — hidden when turn is done
-            if (isReasoningPart(part)) {
-              if (!working) return null;
-              if (!part.text?.trim()) return null;
-              return (
-                <div key={part.id} className="text-sm text-muted-foreground italic">
-                  <ThrottledMarkdown content={part.text} isStreaming={true} />
-                </div>
-              );
-            }
+					{/* Error inside steps */}
+					{turnError && <TurnErrorDisplay errorText={turnError} />}
+				</div>
+			)}
 
-            // Text parts — render as markdown with sandbox URL detection
-            if (isTextPart(part) && part.text?.trim()) {
-              const isStreamingText = working && part.id === lastTextPart?.id;
-              return (
-                <div key={part.id} className="text-sm">
-                  {isStreamingText ? (
-                    <ThrottledMarkdown content={part.text} isStreaming={true} />
-                  ) : (
-                    <SandboxUrlDetector content={part.text} isStreaming={false} />
-                  )}
-                </div>
-              );
-            }
+			{/* ── Answered question parts (when steps collapsed) ── */}
+			{!stepsExpanded && answeredQuestionParts.length > 0 && (
+				<div className="space-y-2">
+					{answeredQuestionParts.map(({ part }) => (
+						<ToolPartRenderer key={part.id} part={part} sessionId={sessionId} />
+					))}
+				</div>
+			)}
 
-            // Compaction indicator
-            if (isCompactionPart(part)) {
-              return (
-                <div key={part.id} className="flex items-center gap-2 py-2.5 -mx-1">
-                  <div className="flex-1 h-px bg-border" />
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/80 border border-border/60">
-                    <Layers className="size-3 text-muted-foreground" />
-                    <span className="text-[10px] font-semibold text-muted-foreground tracking-wide">
-                      Compaction
-                    </span>
-                  </div>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-              );
-            }
+			{/* ── Screen reader ── */}
+			<div className="sr-only" aria-live="polite">
+				{!working && response ? response : ""}
+			</div>
 
-            // Tool parts
-            if (isToolPart(part)) {
-              if (!shouldShowToolPart(part)) return null;
-              // Skip all todowrite parts — rendered as a single stable component below
-              if (part.tool === 'todowrite') return null;
-              // Skip task parts — rendered always-visible outside collapsed steps
-              if (part.tool === 'task') return null;
+			{/* ── Response section (ONLY when NOT working) ──
+          This is the extracted last text part, shown as the final response.
+          While working, text streams inside the steps block above. */}
+			{!working && response && (
+				<div className="mt-3 text-sm">
+					<SandboxUrlDetector content={response} isStreaming={false} />
+				</div>
+			)}
 
-              const perm = getPermissionForTool(permissions, part.callID);
+			{/* ── Error (when steps collapsed) ── */}
+			{turnError && !stepsExpanded && (
+				<TurnErrorDisplay errorText={turnError} />
+			)}
 
-              // Hide tool parts that have active permission
-              if (isToolPartHidden(part, message.info.id, hidden)) return null;
+			{/* ── Question prompt (fallback for non-tool-associated questions) ──
+          Tool-associated questions now render inside ToolPartRenderer (matching
+          SolidJS reference message-part.tsx line 664). This standalone prompt
+          only shows for questions that aren't tied to a specific tool call. */}
+			{nextQuestion && !nextQuestion.tool && (
+				<QuestionPrompt
+					request={nextQuestion}
+					onReply={onQuestionReply}
+					onReject={onQuestionReject}
+				/>
+			)}
 
-              // Questions are NEVER rendered inside steps — always shown
-              // standalone at the bottom of the turn (after the response).
-              return (
-                <div key={part.id}>
-                  <ToolPartRenderer
-                    part={part}
-                    sessionId={sessionId}
-                    permission={perm}
-                    onPermissionReply={onPermissionReply}
-                  />
-                </div>
-              );
-            }
+			{/* ── Action bar (copy, fork, revert) ── */}
+			{!working && response && (
+				<>
+					<div className="flex items-center gap-0.5 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<button
+									onClick={handleCopy}
+									className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+								>
+									{copied ? (
+										<Check className="size-3.5" />
+									) : (
+										<Copy className="size-3.5" />
+									)}
+								</button>
+							</TooltipTrigger>
+							<TooltipContent>{copied ? "Copied!" : "Copy"}</TooltipContent>
+						</Tooltip>
+						{!isBusy && !isReverted && lastAssistantMessageId && (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										onClick={() => onFork(lastAssistantMessageId)}
+										className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+									>
+										<GitFork className="size-3.5" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent>Fork from here</TooltipContent>
+							</Tooltip>
+						)}
+						{!isFirstTurn && !isBusy && !isReverted && (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										onClick={() => setRevertDialogOpen(true)}
+										className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+									>
+										<Undo2 className="size-3.5" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent>Revert to before this</TooltipContent>
+							</Tooltip>
+						)}
+					</div>
+					<ConfirmDialog
+						open={revertDialogOpen}
+						onOpenChange={setRevertDialogOpen}
+						title="Revert to this point"
+						description="This will undo all messages and file changes after this point. You can restore them later by clicking the undo button in the revert banner."
+						action={async () => {
+							setRevertLoading(true);
+							try {
+								await onRevert(turn.userMessage.info.id);
+							} finally {
+								setRevertLoading(false);
+								setRevertDialogOpen(false);
+							}
+						}}
+						actionLabel="Revert"
+						variant="destructive"
+						loading={revertLoading}
+					/>
+				</>
+			)}
 
-            // Snapshot parts — collapsible metadata
-            if (isSnapshotPart(part)) {
-              return (
-                <div key={part.id}>
-                  <OcSnapshotPartView part={part} />
-                </div>
-              );
-            }
-
-            // Patch parts — collapsible with file list
-            if (isPatchPart(part)) {
-              return (
-                <div key={part.id}>
-                  <OcPatchPartView part={part} sessionId={sessionId} />
-                </div>
-              );
-            }
-
-            return null;
-          })}
-
-          {/* TodoWrite is now rendered in the chat input area — skip here */}
-
-          {/* Error at bottom of steps */}
-          {turnError && (
-            <TurnErrorDisplay errorText={turnError} />
-          )}
-        </div>
-      )}
-
-      {/* Always-visible: Subsession/task cards */}
-      {taskToolParts.length > 0 && (
-        <div className="space-y-2">
-          {taskToolParts.map(({ part, message }) => {
-            const toolPart = part as ToolPart;
-            if (!shouldShowToolPart(toolPart)) return null;
-            const perm = getPermissionForTool(permissions, toolPart.callID);
-            if (isToolPartHidden(toolPart, message.info.id, hidden)) return null;
-            return (
-              <ToolPartRenderer
-                key={part.id}
-                part={toolPart}
-                sessionId={sessionId}
-                permission={perm}
-                onPermissionReply={onPermissionReply}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Kortix logo — shown when there are no steps (otherwise logo is already above the steps trigger) */}
-      {!hasSteps && (response || answeredQuestionParts.length > 0) && (
-        <div className="flex items-center gap-2 mt-3 mb-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/kortix-logomark-white.svg"
-            alt="Kortix"
-            className="dark:invert-0 invert flex-shrink-0"
-            style={{ height: '14px', width: 'auto' }}
-          />
-        </div>
-      )}
-
-      {/* Answered question parts — collapsible, shown before the response text */}
-      {answeredQuestionParts.length > 0 && (
-        <div className="space-y-2 mb-3">
-          {answeredQuestionParts.map(({ part }) => (
-            <AnsweredQuestionCard key={part.id} part={part as ToolPart} />
-          ))}
-        </div>
-      )}
-
-      {/* Response section (streams in real time while the turn is working) */}
-      {response && (
-        <div>
-          <div className="text-sm">
-            {working ? (
-              <ThrottledMarkdown content={response} isStreaming={true} />
-            ) : (
-              <SandboxUrlDetector content={response} isStreaming={false} />
-            )}
-          </div>
-          {!working && (
-            <div className="sr-only" aria-live="polite">
-              {response}
-            </div>
-          )}
-        </div>
-      )}
-
-
-      {/* Error — always visible. Shown here (outside steps) when steps are collapsed OR when there are no steps at all */}
-      {turnError && (!stepsExpanded || (!working && !hasSteps)) && (
-        <TurnErrorDisplay errorText={turnError} />
-      )}
-
-      {/* Standalone permission (no tool ref) */}
-      {nextPermission && !nextPermission.tool && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/5">
-          <span className="text-xs text-foreground flex-1">
-            Permission required: <span className="font-medium">{nextPermission.permission}</span>
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => onPermissionReply(nextPermission.id, 'reject')}
-              className="px-2 py-1 text-[11px] rounded-md text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-            >
-              Deny
-            </button>
-            <button
-              onClick={() => onPermissionReply(nextPermission.id, 'always')}
-              className="px-2 py-1 text-[11px] rounded-md text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
-            >
-              Allow always
-            </button>
-            <button
-              onClick={() => onPermissionReply(nextPermission.id, 'once')}
-              className="px-2 py-1 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              Allow once
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Question prompt — always rendered at the bottom of the turn, after the response */}
-      {nextQuestion && (
-        <QuestionPrompt
-          request={nextQuestion}
-          onReply={onQuestionReply}
-          onReject={onQuestionReject}
-        />
-      )}
-
-      {/* Unified action bar — copy, edit, delete, fork, revert under the response */}
-      {!working && response && (
-        <>
-          <div className="flex items-center gap-0.5 opacity-0 group-hover/turn:opacity-100 transition-opacity duration-150">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleCopy}
-                  className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                >
-                  {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{copied ? 'Copied!' : 'Copy'}</TooltipContent>
-            </Tooltip>
-            {!isBusy && !isReverted && lastAssistantMessageId && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => onFork(lastAssistantMessageId)}
-                    className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                  >
-                    <GitFork className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Fork from here</TooltipContent>
-              </Tooltip>
-            )}
-            {!isFirstTurn && !isBusy && !isReverted && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setRevertDialogOpen(true)}
-                    className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                  >
-                    <Undo2 className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Revert to before this</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-          <ConfirmDialog
-            open={revertDialogOpen}
-            onOpenChange={setRevertDialogOpen}
-            title="Revert to this point"
-            description="This will undo all messages and file changes after this point. You can restore them later by clicking the undo button in the revert banner."
-            action={async () => {
-              setRevertLoading(true);
-              try {
-                await onRevert(turn.userMessage.info.id);
-              } finally {
-                setRevertLoading(false);
-                setRevertDialogOpen(false);
-              }
-            }}
-            actionLabel="Revert"
-            variant="destructive"
-            loading={revertLoading}
-          />
-        </>
-      )}
-
-      {/* Connect Provider Dialog — opened from turn error action buttons */}
-      <ConnectProviderDialog
-        open={connectProviderOpen}
-        onOpenChange={setConnectProviderOpen}
-        providers={providers}
-      />
-    </div>
-  );
+			<ConnectProviderDialog
+				open={connectProviderOpen}
+				onOpenChange={setConnectProviderOpen}
+				providers={providers}
+			/>
+		</div>
+	);
 }
 
 // ============================================================================
@@ -1961,1204 +2067,1398 @@ function SessionTurn({
 // ============================================================================
 
 interface SessionChatProps {
-  sessionId: string;
-  /** Optional element rendered at the leading (left) edge of the session header */
-  headerLeadingAction?: React.ReactNode;
-  /** Hide the session site header entirely */
-  hideHeader?: boolean;
+	sessionId: string;
+	/** Optional element rendered at the leading (left) edge of the session header */
+	headerLeadingAction?: React.ReactNode;
+	/** Hide the session site header entirely */
+	hideHeader?: boolean;
+	/** Read-only mode — hides the chat input bar (used for sub-session modal viewer) */
+	readOnly?: boolean;
 }
 
-export function SessionChat({ sessionId, headerLeadingAction, hideHeader }: SessionChatProps) {
-  // ---- Context modal ----
-  const [contextModalOpen, setContextModalOpen] = useState(false);
-
-  // ---- KortixComputer side panel ----
-  const { isSidePanelOpen, setIsSidePanelOpen, openFileInComputer } = useKortixComputerStore();
-  const handleTogglePanel = useCallback(() => {
-    setIsSidePanelOpen(!isSidePanelOpen);
-  }, [isSidePanelOpen, setIsSidePanelOpen]);
-
-  // ---- Hooks ----
-  const { data: session, isLoading: sessionLoading } = useOpenCodeSession(sessionId);
-  // useSessionSync is the SINGLE source of truth for messages (matches OpenCode SolidJS).
-  // It fetches on first access, then SSE events keep it up to date.
-  // No React Query fallback — prevents stale refetches from overwriting live data.
-  const { messages: syncMessages, isLoading: syncMessagesLoading } = useSessionSync(sessionId);
-  const messages = syncMessages.length > 0 ? syncMessages : undefined;
-  const messagesLoading = syncMessagesLoading;
-  const { data: agents } = useOpenCodeAgents();
-  const { data: commands } = useOpenCodeCommands();
-  const { data: providers } = useOpenCodeProviders();
-  const { data: config } = useOpenCodeConfig();
-  const sendMessage = useSendOpenCodeMessage();
-  const abortSession = useAbortOpenCodeSession();
-  const executeCommand = useExecuteOpenCodeCommand();
-  const forkSession = useForkSession();
-  const revertSession = useRevertSession();
-  const unrevertSession = useUnrevertSession();
-
-  // ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
-  const local = useOpenCodeLocal({ agents, providers, config });
-
-  const pendingPromptHandled = useRef(false);
-
-  // ---- Polling fallback & optimistic send ----
-  const [pollingActive, setPollingActive] = useState(false);
-  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
-  const [pendingUserMessageId, setPendingUserMessageId] = useState<string | null>(null);
-  const [pendingCommand, setPendingCommand] = useState<{ name: string; description?: string } | null>(null);
-  // Map of user message IDs → command info, so UserMessageRow can render
-  // a compact command pill instead of the raw expanded template text.
-  const commandMessagesRef = useRef<Map<string, { name: string; args?: string }>>(new Map());
-  // Stash the pending command info so we can associate it with the user message
-  // even if the busy signal arrives before the message list updates.
-  const pendingCommandStashRef = useRef<{ name: string; args?: string } | null>(null);
-  // Track whether we're retrying a failed send (keeps loader visible)
-  const [isRetrying, setIsRetrying] = useState(false);
-  // Track whether a pending prompt send is in flight (dashboard→session flow).
-  // Keeps isBusy true until the server acknowledges with a busy status.
-  const [pendingSendInFlight, setPendingSendInFlight] = useState(false);
-  const [pendingSendMessageId, setPendingSendMessageId] = useState<string | null>(null);
-  // Grace period: don't stop polling immediately on idle after a recent send
-  const lastSendTimeRef = useRef<number>(0);
-  // ---- Optimistic prompt (from dashboard/project page) ----
-  // Uses session-specific sessionStorage keys so pushState navigation works
-  // (no dependency on ?new=true URL param which requires router.push).
-  const [optimisticPrompt, setOptimisticPrompt] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
-    }
-    return null;
-  });
-
-  const addOptimisticUserMessage = useCallback((messageId: string, text: string, partIds?: string[]) => {
-    const parts = text.trim()
-      ? [
-          {
-            id: partIds?.[0] ?? ascendingId('prt'),
-            sessionID: sessionId,
-            messageID: messageId,
-            type: 'text',
-            text,
-          } as any,
-        ]
-      : [];
-    const info = {
-      id: messageId,
-      sessionID: sessionId,
-      role: 'user',
-      time: { created: Date.now() },
-    } as any;
-
-    useSyncStore.getState().optimisticAdd(sessionId, info, parts as any);
-  }, [sessionId]);
-
-  const removeOptimisticUserMessage = useCallback((messageId: string) => {
-    useSyncStore.getState().optimisticRemove(sessionId, messageId);
-  }, [sessionId]);
-
-  // Hydrate options from sessionStorage and send the pending prompt for new sessions.
-  // The dashboard/project page stores the prompt in sessionStorage and navigates here.
-  // We send the message from here (not the dashboard) so that SSE listeners and polling
-  // are already active when the response starts streaming back.
-  // Retries up to 3 times on failure (e.g. "Unable to connect" errors).
-  useEffect(() => {
-    if (pendingPromptHandled.current) return;
-    const pendingPrompt = sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
-    if (pendingPrompt) {
-      pendingPromptHandled.current = true;
-      setPollingActive(true);
-      setPendingSendInFlight(true);
-      sessionStorage.removeItem(`opencode_pending_prompt:${sessionId}`);
-      sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
-
-      // Restore agent/model/variant selections from the dashboard
-      const options: Record<string, unknown> = {};
-      try {
-        const raw = sessionStorage.getItem(`opencode_pending_options:${sessionId}`);
-        if (raw) {
-          const pendingOptions = JSON.parse(raw);
-          sessionStorage.removeItem(`opencode_pending_options:${sessionId}`);
-          if (pendingOptions?.agent) { options.agent = pendingOptions.agent; local.agent.set(pendingOptions.agent as string); }
-          if (pendingOptions?.model) { options.model = pendingOptions.model; local.model.set(pendingOptions.model as { providerID: string; modelID: string }); }
-          if (pendingOptions?.variant) { options.variant = pendingOptions.variant; local.model.variant.set(pendingOptions.variant as string); }
-        }
-      } catch {
-        // ignore
-      }
-
-      // Send the message with retry. The useSendOpenCodeMessage hook already
-      // retries 3 times internally for transient errors. We add one additional
-      // outer retry (2 attempts total at this level) to cover cases where the
-      // SDK client itself fails to initialize or the server takes longer to start.
-      const sendOpts = Object.keys(options).length > 0 ? options as any : undefined;
-      const messageID = ascendingId('msg');
-      const textPartId = ascendingId('prt');
-      setPendingSendMessageId(messageID);
-      addOptimisticUserMessage(messageID, pendingPrompt, [textPartId]);
-      lastSendTimeRef.current = Date.now();
-
-      // Fire-and-forget via promptAsync. Don't send messageID — let the
-      // server generate it with its own clock to avoid clock-skew issues.
-      const client = getClient();
-      void client.session.promptAsync({
-        sessionID: sessionId,
-        parts: [{ type: 'text', text: pendingPrompt }],
-        ...(sendOpts?.agent && { agent: sendOpts.agent }),
-        ...(sendOpts?.model && { model: sendOpts.model }),
-        ...(sendOpts?.variant && { variant: sendOpts.variant }),
-      } as any).catch(() => {
-        removeOptimisticUserMessage(messageID);
-        useSyncStore.getState().setStatus(sessionId, { type: 'idle' });
-        setIsRetrying(false);
-        setPendingSendInFlight(false);
-        setPendingSendMessageId(null);
-        setOptimisticPrompt(null);
-        setPollingActive(false);
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, addOptimisticUserMessage, removeOptimisticUserMessage]);
-
-  // Clear optimistic prompt once real messages arrive
-  useEffect(() => {
-    if (optimisticPrompt && messages && messages.length > 0) {
-      setOptimisticPrompt(null);
-    }
-  }, [optimisticPrompt, messages]);
-
-  const agentNames = useMemo(
-    () => local.agent.list.map((a) => a.name),
-    [local.agent.list],
-  );
-
-  // ---- Check if any messages have tool calls ----
-  const hasToolCalls = useMemo(() => {
-    if (!messages) return false;
-    return messages.some((msg) =>
-      msg.parts?.some((p) => p.type === 'tool'),
-    );
-  }, [messages]);
-
-  // ---- Restore model/agent from last user message (matching SolidJS session.tsx:550-560) ----
-  const lastUserMessage = useMemo(
-    () => messages ? [...messages].reverse().find((m) => m.info.role === 'user') : undefined,
-    [messages],
-  );
-  const lastUserMsgIdRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (!lastUserMessage) return;
-    if (lastUserMsgIdRef.current === lastUserMessage.info.id) return;
-    lastUserMsgIdRef.current = lastUserMessage.info.id;
-    const msg = lastUserMessage.info as any;
-    if (msg.agent) local.agent.set(msg.agent);
-    if (msg.model) local.model.set(msg.model); // no { recent: true } — matches SolidJS
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastUserMessage?.info.id]);
-
-  // ---- Session status ----
-  // Use sync store as primary (matches OpenCode), fall back to status store
-  const syncStatus = useSyncStore((s) => s.sessionStatus[sessionId]);
-  const legacyStatus = useOpenCodeSessionStatusStore(
-    (s) => s.statuses[sessionId],
-  );
-  const sessionStatus = syncStatus ?? legacyStatus;
-  const isServerBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
-  // Match OpenCode: isBusy is driven ONLY by the session status (single source of truth).
-  // pendingUserMessage/pendingSendInFlight are no longer part of isBusy — they caused
-  // the input to queue messages instead of sending them, breaking 2nd+ turns.
-  const isBusy = isServerBusy;
-
-  // ---- Message Queue ----
-  // Hydrate the queue from the backend on first mount (survives page reloads).
-  const queueHydrated = useMessageQueueStore((s) => s.hydrated);
-  useEffect(() => {
-    if (!queueHydrated) {
-      useMessageQueueStore.getState().hydrateFromBackend();
-    }
-  }, [queueHydrated]);
-
-  // Select the full array (stable ref) and derive the filtered list via useMemo
-  // to avoid the "getSnapshot should be cached" infinite-loop error that occurs
-  // when .filter() creates a new array reference on every selector call.
-  const allQueuedMessages = useMessageQueueStore((s) => s.messages);
-  const queuedMessages = useMemo(
-    () => allQueuedMessages.filter((m) => m.sessionId === sessionId),
-    [allQueuedMessages, sessionId],
-  );
-  const queueDequeue = useMessageQueueStore((s) => s.dequeue);
-  const queueRemove = useMessageQueueStore((s) => s.remove);
-  const queueMoveUp = useMessageQueueStore((s) => s.moveUp);
-  const queueMoveDown = useMessageQueueStore((s) => s.moveDown);
-  const queueClearSession = useMessageQueueStore((s) => s.clearSession);
-  const [queueExpanded, setQueueExpanded] = useState(true);
-
-  // Track previous *server* busy state to detect idle transitions.
-  // We use `isServerBusy` (the actual server status) instead of the derived
-  // `isBusy` because `isBusy` includes optimistic client state
-  // (`pendingUserMessage`) which can flicker false before the server has
-  // reported busy via SSE — causing the drain to fire twice.
-  const prevServerBusyRef = useRef(isServerBusy);
-  // Guard against double-drain: tracks whether a drain is already scheduled
-  const drainScheduledRef = useRef(false);
-
-  // Sync queue from backend when session goes idle. The backend drainer may
-  // have already processed messages while the tab was closed/backgrounded.
-  // This re-fetches the persisted queue so the frontend stays in sync.
-  useEffect(() => {
-    const wasBusy = prevServerBusyRef.current;
-    prevServerBusyRef.current = isServerBusy;
-
-    if (wasBusy && !isServerBusy) {
-      // Re-sync from backend first, then drain from local store
-      void (async () => {
-        // Refresh queue from backend (the drainer may have consumed messages)
-        try {
-          const { fetchSessionQueue } = await import('@/lib/api/queue');
-          const backendMsgs = await fetchSessionQueue(sessionId);
-          const state = useMessageQueueStore.getState();
-          // Replace session's messages with backend truth, preserving local file refs
-          const otherMsgs = state.messages.filter((m) => m.sessionId !== sessionId);
-          const merged = backendMsgs.map((bm) => {
-            // Preserve local file attachments if the message still exists locally
-            const local = state.messages.find((m) => m.id === bm.id);
-            return {
-              id: bm.id,
-              sessionId: bm.sessionId,
-              text: bm.text,
-              timestamp: bm.timestamp,
-              files: local?.files,
-            } as QueuedMessage;
-          });
-          useMessageQueueStore.setState({ messages: [...otherMsgs, ...merged] });
-        } catch {
-          // Backend unreachable — use local state as fallback
-        }
-
-        // Now drain: check if there are still queued messages to send
-        const sessionQueue = useMessageQueueStore.getState().messages.filter(
-          (m) => m.sessionId === sessionId,
-        );
-        if (sessionQueue.length > 0) {
-          drainScheduledRef.current = true;
-          setTimeout(() => {
-            drainScheduledRef.current = false;
-            const next = queueDequeue(sessionId);
-            if (next) {
-              handleSend(next.text, next.files);
-            }
-          }, 500);
-        }
-      })();
-
-      return () => { drainScheduledRef.current = false; };
-    }
-  }, [isServerBusy, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fallback drain: when isBusy becomes false and there are queued messages,
-  // drain the queue. This covers cases where the SSE missed the busy event
-  // entirely (e.g. status went undefined → idle, so isServerBusy was never
-  // true and the primary drain above never fires).
-  useEffect(() => {
-    if (isBusy || drainScheduledRef.current) return;
-    const sessionQueue = useMessageQueueStore.getState().messages.filter(
-      (m) => m.sessionId === sessionId,
-    );
-    if (sessionQueue.length === 0) return;
-     drainScheduledRef.current = true;
-    const timer = setTimeout(() => {
-      drainScheduledRef.current = false;
-      const next = queueDequeue(sessionId);
-      if (next) {
-        handleSend(next.text, next.files);
-      }
-    }, 500);
-    return () => { clearTimeout(timer); drainScheduledRef.current = false; };
-  }, [isBusy, queuedMessages.length, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // "Send now" handler: abort current session + send the queued message
-  const handleQueueSendNow = useCallback(
-    (messageId: string) => {
-      const msg = useMessageQueueStore.getState().messages.find((m) => m.id === messageId);
-      if (!msg) return;
-      queueRemove(messageId);
-      // Abort the current session first
-      abortSession.mutate(sessionId);
-      // Send after a brief delay to let abort take effect
-      setTimeout(() => {
-        handleSend(msg.text, msg.files);
-      }, 150);
-    },
-    [sessionId, abortSession, queueRemove], // handleSend added via eslint-disable below
-  ); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Stop polling when session goes idle (via SSE or polling fallback).
-  // Grace period: if we sent a message recently (within 5s), don't stop polling
-  // on the first idle status — the server may not have started processing yet.
-  useEffect(() => {
-    if (pollingActive && sessionStatus?.type === 'idle') {
-      const timeSinceSend = Date.now() - lastSendTimeRef.current;
-      if (timeSinceSend < 5000) {
-        // Still within grace period — check again shortly
-        const remaining = 5000 - timeSinceSend;
-        const timer = setTimeout(() => {
-          // Re-check: if still idle after grace period, stop polling
-          const currentStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-          if (currentStatus?.type === 'idle') {
-            setPollingActive(false);
-          }
-        }, remaining);
-        return () => clearTimeout(timer);
-      }
-      setPollingActive(false);
-    }
-  }, [pollingActive, sessionStatus?.type, sessionId]);
-
-  // Clear pendingSendInFlight once the server acknowledges it's working,
-  // or when new messages arrive from the server.
-  // This bridges the gap between the optimistic prompt clearing and the
-  // server status updating — keeps isBusy true so the turn shows a loader.
-  useEffect(() => {
-    if (!pendingSendInFlight) return;
-    if (isServerBusy) {
-      setPendingSendInFlight(false);
-      setPendingSendMessageId(null);
-      return;
-    }
-    // If we got an assistant reply for the pending user message, the server
-    // already accepted and processed this send even if status events were missed.
-    const hasAssistantReply = pendingSendMessageId
-      ? !!messages?.some(
-          (m) =>
-            m.info.role === 'assistant' &&
-            (m.info as any).parentID === pendingSendMessageId,
-        )
-      : false;
-    if (hasAssistantReply) {
-      setPendingSendInFlight(false);
-      setPendingSendMessageId(null);
-    }
-  }, [pendingSendInFlight, isServerBusy, messages, pendingSendMessageId]);
-
-  // Safety timeout: clear pendingSendInFlight after 30s even if the server
-  // never acknowledged. Prevents the UI from being stuck forever in "busy"
-  // when the send succeeded (HTTP 204) but the server never started processing.
-  useEffect(() => {
-    if (!pendingSendInFlight) return;
-    const timer = setTimeout(() => {
-      setPendingSendInFlight(false);
-      setPendingSendMessageId(null);
-    }, 30_000);
-    return () => clearTimeout(timer);
-  }, [pendingSendInFlight]);
-
-  // Stale session watchdog: when the session has been busy for a while, do a
-  // direct status check. If the server reports idle (or doesn't include the
-  // session at all — meaning it's idle), force the status to idle — recovering
-  // from a silently dropped SSE stream or missed event.
-  // First check after 5s, then every 15s.
-  useEffect(() => {
-    if (!isServerBusy) return;
-
-    const check = async () => {
-      try {
-        const client = getClient();
-        const result = await client.session.status();
-        if (result.data) {
-          const statuses = result.data as Record<string, any>;
-          const serverStatus = statuses[sessionId];
-          const resolvedStatus = serverStatus ?? { type: 'idle' as const };
-          // Update BOTH stores — sync store is the primary source of truth,
-          // but legacy store is also used as fallback.
-          useSyncStore.getState().setStatus(sessionId, resolvedStatus);
-          useOpenCodeSessionStatusStore.getState().setStatus(sessionId, resolvedStatus);
-        }
-      } catch {
-        // ignore — next interval will retry
-      }
-    };
-
-    // First check after 5s, then every 15s
-    const initialTimer = setTimeout(() => {
-      check();
-    }, 5_000);
-    const interval = setInterval(check, 15_000);
-    return () => { clearTimeout(initialTimer); clearInterval(interval); };
-  }, [isServerBusy, sessionId]);
-
-  // Message-based idle detection: if the last assistant message has
-  // time.completed set, the server marked the message as completed but we never got the
-  // idle event — force the session to idle after a short grace period
-  // to avoid racing with a status event that's still in flight.
-  useEffect(() => {
-    if (!isServerBusy || !messages || messages.length === 0) return;
-    // Find the last assistant message
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.info.role === 'assistant') {
-        const assistantInfo = msg.info as any;
-        if (assistantInfo.time?.completed) {
-          const timer = setTimeout(() => {
-            const syncStoreStatus = useSyncStore.getState().sessionStatus[sessionId];
-            const legacyStoreStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-            const currentType = syncStoreStatus?.type ?? legacyStoreStatus?.type;
-            if (currentType === 'busy' || currentType === 'retry') {
-              const idle = { type: 'idle' as const };
-              useSyncStore.getState().setStatus(sessionId, idle);
-              useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
-            }
-          }, 2_000);
-          return () => clearTimeout(timer);
-        }
-        break; // only check the last assistant message
-      }
-    }
-  }, [isServerBusy, messages, sessionId]);
-
-  // Clear pending user message when we can confirm the message is in cache
-  // (by ID), or when new messages arrive (fallback for command sends).
-  // When a command was pending, associate the newest user message with the
-  // command info so UserMessageRow can render a nice pill instead of raw template text.
-  const prevMsgLenRef = useRef(messages?.length || 0);
-  useEffect(() => {
-    if (!pendingUserMessage) return;
-    const hasPendingMessage = pendingUserMessageId
-      ? !!messages?.some((m) => m.info.id === pendingUserMessageId)
-      : false;
-    if (hasPendingMessage) {
-      setPendingUserMessage(null);
-      setPendingUserMessageId(null);
-      setPendingCommand(null);
-      return;
-    }
-    const len = messages?.length || 0;
-    if (len > prevMsgLenRef.current) {
-      setPendingUserMessage(null);
-      setPendingUserMessageId(null);
-      setPendingCommand(null);
-    }
-  }, [messages, messages?.length, pendingUserMessage, pendingUserMessageId]);
-
-  // Associate stashed command info with the newest user message when messages arrive.
-  // Runs separately so it captures the mapping even if busy fires before messages update.
-  useEffect(() => {
-    const stash = pendingCommandStashRef.current;
-    if (!stash || !messages) return;
-    const len = messages.length;
-    if (len <= prevMsgLenRef.current) return;
-    // Find the last user message — the one just created by the command
-    for (let i = len - 1; i >= 0; i--) {
-      if (messages[i].info.role === 'user') {
-        commandMessagesRef.current.set(messages[i].info.id, stash);
-        pendingCommandStashRef.current = null;
-        break;
-      }
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    prevMsgLenRef.current = messages?.length || 0;
-  }, [messages?.length]);
-
-  // ---- Auto-scroll (replaces inline scroll logic) ----
-  const { scrollRef, contentRef, showScrollButton, scrollToBottom } = useAutoScroll({
-    working: isBusy,
-  });
-
-  // Scroll to bottom when switching session tabs or on initial message load.
-  // Uses scrollToBottom() from the hook so the programmatic-scroll guard works
-  // correctly and doesn't interfere with user-intent detection.
-  const initialScrollDoneRef = useRef<string | null>(null);
-  useEffect(() => {
-    // Reset on session change so we scroll on first render of new session
-    if (initialScrollDoneRef.current !== sessionId) {
-      initialScrollDoneRef.current = null;
-    }
-  }, [sessionId]);
-
-  const messageCount = messages?.length ?? 0;
-  useEffect(() => {
-    if (initialScrollDoneRef.current === sessionId) return;
-    if (messageCount === 0) return;
-    initialScrollDoneRef.current = sessionId;
-
-    // Staggered attempts: the scroll container mounts after this render,
-    // then message components (markdown, code blocks) render asynchronously.
-    // All go through scrollToBottom() which marks them as programmatic.
-    scrollToBottom();
-    const t1 = setTimeout(scrollToBottom, 150);
-    const t2 = setTimeout(scrollToBottom, 500);
-
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [messageCount, sessionId, scrollToBottom]);
-
-  // ---- Pending permissions & questions ----
-  const allPermissions = useOpenCodePendingStore((s) => s.permissions);
-  const allQuestions = useOpenCodePendingStore((s) => s.questions);
-  const pendingPermissions = useMemo(
-    () => Object.values(allPermissions).filter((p) => p.sessionID === sessionId),
-    [allPermissions, sessionId],
-  );
-  const pendingQuestions = useMemo(
-    () => Object.values(allQuestions).filter((q) => q.sessionID === sessionId),
-    [allQuestions, sessionId],
-  );
-
-  // ---- Permission/question reply handlers ----
-  const removePermission = useOpenCodePendingStore((s) => s.removePermission);
-  const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
-
-  const handlePermissionReply = useCallback(
-    async (requestId: string, reply: 'once' | 'always' | 'reject') => {
-      try {
-        await replyToPermission(requestId, reply);
-        removePermission(requestId);
-      } catch {
-        // ignore
-      }
-    },
-    [removePermission],
-  );
-
-  const handleQuestionReply = useCallback(
-    async (requestId: string, answers: string[][]) => {
-      try {
-        await replyToQuestion(requestId, answers);
-        removeQuestion(requestId);
-      } catch {
-        // ignore
-      }
-    },
-    [removeQuestion],
-  );
-
-  const handleQuestionReject = useCallback(
-    async (requestId: string) => {
-      try {
-        await rejectQuestion(requestId);
-        removeQuestion(requestId);
-      } catch {
-        // ignore
-      }
-    },
-    [removeQuestion],
-  );
-
-  // ---- Group messages into turns ----
-  const turns = useMemo(
-    () => (messages ? groupMessagesIntoTurns(messages) : []),
-    [messages],
-  );
-
-  // ============================================================================
-  // Expanded state management (keyed by user message ID)
-  // ============================================================================
-
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-
-  // Auto-expand last turn when session is busy (use isBusy to avoid race with SSE sessionStatus)
-  useEffect(() => {
-    if (!messages || messages.length === 0) return;
-    const lastUserId = [...messages].reverse().find((m) => m.info.role === 'user')?.info.id;
-    if (lastUserId && (sessionStatus?.type !== 'idle' || isBusy)) {
-      setExpanded((prev) => ({ ...prev, [lastUserId]: true }));
-    }
-  }, [messages, sessionStatus, isBusy]);
-
-  // Reset on session change
-  useEffect(() => {
-    setExpanded({});
-    setPollingActive(false);
-    setPendingUserMessage(null);
-    setPendingUserMessageId(null);
-    setPendingCommand(null);
-    setPendingSendInFlight(false);
-    setPendingSendMessageId(null);
-    setIsRetrying(false);
-    lastSendTimeRef.current = 0;
-  }, [sessionId]);
-
-  const toggleExpanded = useCallback((id: string) => {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  }, []);
-
-  // ============================================================================
-  // Billing: DISABLED — billing is handled server-side by the router
-  // (POST /v1/router/chat/completions deducts credits per LLM call).
-  // This frontend useEffect was causing double-billing once opencode.jsonc
-  // got cost config and step-finish.cost became non-zero.
-  // ============================================================================
-
-  // ============================================================================
-  // Fork / Revert / Unrevert handlers
-  // ============================================================================
-
-  const isReverted = !!session?.revert;
-
-  const handleFork = useCallback(
-    async (messageId: string) => {
-      // The server's fork copies all messages BEFORE the given messageID
-      // (exclusive: msg.id >= messageID → break). Since the user clicks
-      // "Fork from here" on an assistant response and expects that response
-      // to be included, we pass the ID of the first message AFTER the
-      // assistant message as the cut-off. If the assistant message is the
-      // last one in the session, we omit messageID entirely to copy everything.
-      let forkAtMessageId: string | undefined;
-      if (messages) {
-        const idx = messages.findIndex((m) => m.info.id === messageId);
-        if (idx >= 0 && idx < messages.length - 1) {
-          forkAtMessageId = messages[idx + 1].info.id;
-        }
-        // else: last message — omit messageID to copy all
-      }
-
-      const forkedSession = await forkSession.mutateAsync({
-        sessionId,
-        messageId: forkAtMessageId,
-      });
-
-      // Open the forked session in a new tab and navigate
-      const title = forkedSession.title || 'Forked session';
-      openTabAndNavigate({
-        id: forkedSession.id,
-        title,
-        type: 'session',
-        href: `/sessions/${forkedSession.id}`,
-        parentSessionId: sessionId,
-        serverId: useServerStore.getState().activeServerId,
-      });
-      // Store fork origin in localStorage (survives refresh) so the forked
-      // session can show the "Forked from" indicator.
-      localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
-    },
-    [sessionId, forkSession, messages],
-  );
-
-  const handleRevert = useCallback(
-    async (messageId: string) => {
-      await revertSession.mutateAsync({
-        sessionId,
-        messageId,
-      });
-    },
-    [sessionId, revertSession],
-  );
-
-  const handleUnrevert = useCallback(async () => {
-    await unrevertSession.mutateAsync(sessionId);
-  }, [sessionId, unrevertSession]);
-
-
-
-
-  // ============================================================================
-  // Send / Stop / Command handlers
-  // ============================================================================
-
-  const handleSend = useCallback(
-    async (text: string, files?: AttachedFile[], mentions?: TrackedMention[]) => {
-      // Play send sound
-      playSound('send');
-      const messageID = ascendingId('msg');
-
-      // Generate part IDs upfront so the optimistic message and the server
-      // request use the SAME IDs. When the server echoes parts via
-      // message.part.updated, the sync store's upsertPart will UPDATE
-      // (not duplicate) the optimistic parts. This matches OpenCode's
-      // SolidJS approach where part IDs are sent with the prompt request.
-      const textPartId = ascendingId('prt');
-
-      // Build optimistic text that includes session ref XML so that
-      // HighlightMentions / UserMessageRow can detect multi-word session
-      // mentions (e.g. "@Intro message") before the server echoes back.
-      const sessionMentionsForOptimistic = mentions?.filter((m) => m.kind === 'session' && m.value);
-      let optimisticText = text;
-      if (sessionMentionsForOptimistic && sessionMentionsForOptimistic.length > 0) {
-        const refs = sessionMentionsForOptimistic
-          .map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
-          .join('\n');
-        optimisticText = `${text}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
-      }
-
-      // Optimistic: show message immediately in sync store + set busy
-      // Matches OpenCode: sync.set("session_status", session.id, { type: "busy" })
-      addOptimisticUserMessage(messageID, optimisticText, [textPartId]);
-      useSyncStore.getState().setStatus(sessionId, { type: 'busy' });
-
-      // Scroll to bottom after the optimistic message renders
-      requestAnimationFrame(() => scrollToBottom());
-
-      const options: Record<string, unknown> = {};
-      if (local.agent.current) options.agent = local.agent.current.name;
-      if (local.model.currentKey) options.model = local.model.currentKey;
-      if (local.model.variant.current) options.variant = local.model.variant.current;
-
-      // Build parts: text first, then upload attached files to /workspace/uploads/
-      // and send as XML text references (agent reads from disk on demand, not loaded into context)
-      const parts: Array<
-        | { id: string; type: 'text'; text: string }
-        | { id: string; type: 'file'; mime: string; url: string; filename?: string }
-      > = [{ id: textPartId, type: 'text', text }];
-
-      if (files && files.length > 0) {
-        const uploadResults = await Promise.all(
-          files.map(async (af) => {
-            const timestamp = Date.now();
-            const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const uniqueName = `${timestamp}-${safeName}`;
-            const uploadBlob = new File([af.file], uniqueName, { type: af.file.type });
-            const results = await uploadFile(uploadBlob, '/workspace/uploads');
-            if (!results || results.length === 0) {
-              throw new Error(`Failed to upload file: ${af.file.name}`);
-            }
-            return {
-              path: results[0].path,
-              mime: af.file.type || 'application/octet-stream',
-              filename: af.file.name,
-            };
-          }),
-        );
-        for (const f of uploadResults) {
-          parts.push({
-            id: ascendingId('prt'),
-            type: 'text',
-            text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
-          });
-        }
-      }
-
-      // Append session reference hints for @session mentions
-      const sessionMentions = mentions?.filter((m) => m.kind === 'session' && m.value);
-      if (sessionMentions && sessionMentions.length > 0) {
-        const refs = sessionMentions
-          .map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
-          .join('\n');
-        parts.push({
-          id: ascendingId('prt'),
-          type: 'text',
-          text: `\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`,
-        });
-      }
-
-      // Fire-and-forget via session.prompt (matching OpenCode app's approach).
-      // SSE events drive all incremental UI updates via sync store.
-      // prompt() blocks until the full response is ready, but since we don't
-      // await the result, it effectively runs in the background. This is exactly
-      // how OpenCode's web app sends messages.
-      // Don't send part IDs or messageID — let the server generate them with
-      // its own clock. Client-generated IDs can sort before server IDs due to
-      // clock skew (browser vs Docker container), causing the server's loop to
-      // exit immediately thinking the prompt was already answered.
-      const mappedParts = parts.map((p: any) => {
-        if (p.type === 'file') return { type: 'file' as const, mime: p.mime, url: p.url, filename: p.filename };
-        return { type: 'text' as const, text: p.text };
-      });
-      const sendOpts = Object.keys(options).length > 0 ? options : undefined;
-      const client = getClient();
-      void client.session.promptAsync({
-        sessionID: sessionId,
-        parts: mappedParts,
-        ...(sendOpts?.agent && { agent: sendOpts.agent }),
-        ...(sendOpts?.model && { model: sendOpts.model }),
-        ...(sendOpts?.variant && { variant: sendOpts.variant }),
-      } as any).catch(() => {
-        // On failure, set status to idle and remove optimistic message
-        useSyncStore.getState().setStatus(sessionId, { type: 'idle' });
-        removeOptimisticUserMessage(messageID);
-      });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessionId, sendMessage, local.agent.current, local.model.currentKey, local.model.variant.current, addOptimisticUserMessage, removeOptimisticUserMessage, scrollToBottom],
-  );
-
-  const handleStop = useCallback(() => {
-    abortSession.mutate(sessionId);
-  }, [sessionId, abortSession]);
-
-  const handleCommand = useCallback(
-    (cmd: Command, args?: string) => {
-      playSound('send');
-      const label = args ? `/${cmd.name} ${args}` : `/${cmd.name}`;
-      setPendingCommand({ name: cmd.name, description: args || cmd.description });
-      pendingCommandStashRef.current = { name: cmd.name, args: args || cmd.description };
-      setPendingUserMessage(label);
-      setPendingUserMessageId(null);
-      setPollingActive(true);
-      lastSendTimeRef.current = Date.now();
-      executeCommand.mutate(
-        { sessionId, command: cmd.name, args },
-        {
-          onError: () => {
-            setPendingCommand(null);
-            setPendingUserMessage(null);
-            setPendingUserMessageId(null);
-            setPollingActive(false);
-          },
-        },
-      );
-      requestAnimationFrame(() => scrollToBottom());
-    },
-    [sessionId, executeCommand, scrollToBottom],
-  );
-
-  const handleFileSearch = useCallback(async (query: string): Promise<string[]> => {
-    try {
-      return await findOpenCodeFiles(query);
-    } catch {
-      return [];
-    }
-  }, []);
-
-  // Detect if this session was forked and resolve its parent.
-  // Must be above early returns to preserve hook order.
-  // localStorage is the source of truth (set by handleFork). The server may
-  // or may not populate parentID on the forked session.
-  const forkParentId = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(`fork_origin_${sessionId}`);
-  }, [sessionId]);
-  const isSubSession = !!session?.parentID || !!forkParentId;
-  const isFork = !!forkParentId;
-  // The effective parent ID: prefer server parentID, fall back to localStorage
-  const effectiveParentId = session?.parentID || forkParentId;
-
-  // Parent session data — used for SubSessionBar and threadContext on chat input
-  const { data: parentSessionData } = useOpenCodeSession(effectiveParentId || '');
-  const threadContext = useMemo(() => {
-    if (!effectiveParentId || !parentSessionData) return undefined;
-    return {
-      variant: isFork ? 'fork' as const : 'thread' as const,
-      parentTitle: parentSessionData.title || 'Parent session',
-      onBackToParent: () => {
-        openTabAndNavigate({
-          id: parentSessionData.id,
-          title: parentSessionData.title || 'Parent session',
-          type: 'session',
-          href: `/sessions/${parentSessionData.id}`,
-          serverId: useServerStore.getState().activeServerId,
-        });
-      },
-    };
-  }, [effectiveParentId, parentSessionData, isFork]);
-
-  // ============================================================================
-  // Loading / Not-found states
-  // ============================================================================
-  //
-  // IMPORTANT: Do NOT use early returns here. Returning a different component
-  // tree unmounts the textarea, losing user input, focus, and all local state.
-  // Instead, render the full layout with a loading overlay on top. The main
-  // component tree (including SessionChatInput) stays mounted.
-
-  const isSessionReady = !!(session || optimisticPrompt);
-  const isDataLoading = (sessionLoading || messagesLoading) && !optimisticPrompt;
-  const isNotFound = !session && !sessionLoading && !optimisticPrompt;
-
-  const hasMessages = messages && messages.length > 0;
-  const showOptimistic = !!optimisticPrompt && !hasMessages;
-
-  return (
-    <div className="relative flex flex-col h-full bg-background">
-      {/* Loading overlay — covers content but does NOT unmount children */}
-      {isDataLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
-          <KortixLoader size="small" />
-        </div>
-      )}
-
-      {/* Not-found overlay */}
-      {isNotFound && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background text-sm text-muted-foreground">
-          Session not found
-        </div>
-      )}
-      {/* Session header — shown for all sessions including sub-sessions */}
-      {!hideHeader && (
-        <SessionSiteHeader
-          sessionId={sessionId}
-          sessionTitle={session?.title || 'Untitled'}
-          onToggleSidePanel={handleTogglePanel}
-          isSidePanelOpen={isSidePanelOpen}
-          canOpenSidePanel={hasToolCalls}
-          leadingAction={headerLeadingAction}
-        />
-      )}
-
-      {/* Revert banner — shown when session is in reverted state */}
-      {isReverted && session?.revert?.messageID && (
-        <RevertBanner
-          sessionId={sessionId}
-          revertMessageId={session.revert.messageID}
-          loading={unrevertSession.isPending}
-          onUnrevert={handleUnrevert}
-        />
-      )}
-
-      {/* Context modal — triple-click the session title area to open */}
-      <SessionContextModal
-        open={contextModalOpen}
-        onOpenChange={setContextModalOpen}
-        messages={messages}
-        session={session}
-        providers={providers}
-      />
-
-      {(hasMessages || showOptimistic) ? (
-        <div className="relative flex-1 min-h-0">
-          <div
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-6 bg-background h-full [scroll-behavior:auto]"
-          >
-            <div
-              ref={contentRef}
-              role="log"
-              className="mx-auto max-w-3xl min-w-0 w-full px-3 sm:px-6"
-            >
-              <div className="flex flex-col gap-12 min-w-0">
-                {/* Fork context divider — shown at the top of forked sessions */}
-                {isFork && effectiveParentId && (
-                  <ForkContextDivider parentID={effectiveParentId} />
-                )}
-
-                {/* Optimistic user message */}
-                {showOptimistic && (
-                  <>
-                    <div className="flex justify-end">
-                      <div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
-                        {(() => {
-                          const { cleanText, files } = parseFileReferences(optimisticPrompt || '');
-                          return (
-                            <>
-                              {files.length > 0 && (
-                                <div className="flex gap-2 p-3 pb-0 flex-wrap">
-                                  {files.map((f, i) => (
-                                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30">
-                                      <FileText className="size-4 text-muted-foreground shrink-0" />
-                                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">{f.filename}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {cleanText && (
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
-                                  <HighlightMentions text={cleanText} agentNames={agentNames} onFileClick={openFileInComputer} />
-                                </p>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/kortix-logomark-white.svg"
-                        alt="Kortix"
-                        className="dark:invert-0 invert flex-shrink-0"
-                        style={{ height: '14px', width: 'auto' }}
-                      />
-                      {isRetrying && (
-                        <span className="text-xs text-amber-500">
-                          Retrying connection...
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {/* Turn-based message rendering */}
-                {turns.map((turn, turnIndex) => {
-                  // Check if this turn is a compaction summary
-                  // The server sets `summary: true` on assistant messages that are compaction summaries
-                  const hasCompaction = turn.assistantMessages.some(
-                    (msg) => (msg.info as any).summary === true
-                  ) || turn.assistantMessages.some(
-                    (msg) => msg.parts.some((p) => p.type === 'compaction')
-                  );
-
-                  return (
-                    <div key={turn.userMessage.info.id}>
-                      {/* Compaction divider — shown before the first turn after compaction */}
-                      {hasCompaction && (
-                        <div className="flex items-center gap-3 py-4 my-3">
-                          <div className="flex-1 h-px bg-border" />
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/80 border border-border/60">
-                            <Layers className="size-3.5 text-muted-foreground" />
-                            <span className="text-[11px] font-semibold text-muted-foreground tracking-wide">
-                              Compaction
-                            </span>
-                          </div>
-                          <div className="flex-1 h-px bg-border" />
-                        </div>
-                      )}
-                      <SessionTurn
-                        turn={turn}
-                        allMessages={messages!}
-                        sessionId={sessionId}
-                        sessionStatus={sessionStatus}
-                        permissions={pendingPermissions}
-                        questions={pendingQuestions}
-                        stepsExpanded={!!expanded[turn.userMessage.info.id]}
-                        onToggleSteps={() => toggleExpanded(turn.userMessage.info.id)}
-                        onPermissionReply={handlePermissionReply}
-                        onQuestionReply={handleQuestionReply}
-                        onQuestionReject={handleQuestionReject}
-                        agentNames={agentNames}
-                        isFirstTurn={turnIndex === 0}
-                        isBusy={isBusy}
-                        isReverted={isReverted}
-                        isCompaction={hasCompaction}
-                        onFork={handleFork}
-                        onRevert={handleRevert}
-                        providers={providers}
-                        commandMessages={commandMessagesRef.current}
-                        commands={commands}
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* Busy indicator when no turns yet but session is busy */}
-                {!showOptimistic && isBusy && turns.length === 0 && (
-                  <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/kortix-logomark-white.svg"
-                      alt="Kortix"
-                      className="dark:invert-0 invert flex-shrink-0"
-                      style={{ height: '14px', width: 'auto' }}
-                    />
-                  </div>
-                )}
-
-
-              </div>
-            </div>
-          </div>
-
-          {/* Scroll to bottom FAB */}
-          <div
-            className={cn(
-              'absolute bottom-4 left-1/2 -translate-x-1/2 transition-all',
-              showScrollButton
-                ? 'opacity-100 translate-y-0'
-                : 'opacity-0 translate-y-2 pointer-events-none',
-            )}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
-              onClick={scrollToBottom}
-            >
-              <ArrowDown className="size-3 mr-1" />
-              Scroll to bottom
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <SessionWelcome />
-      )}
-
-      {/* Queue UI moved into the chat input card via inputSlot */}
-
-      {/* Input */}
-      <SessionChatInput
-        onSend={handleSend}
-        isBusy={isBusy}
-        onStop={handleStop}
-        agents={local.agent.list}
-        selectedAgent={local.agent.current?.name ?? null}
-        onAgentChange={(name) => local.agent.set(name ?? undefined)}
-        commands={commands || []}
-        onCommand={handleCommand}
-        models={local.model.list}
-        selectedModel={local.model.currentKey ?? null}
-        onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}
-        variants={local.model.variant.list}
-        selectedVariant={local.model.variant.current ?? null}
-        onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
-        messages={messages}
-        sessionId={sessionId}
-        onFileSearch={handleFileSearch}
-        providers={providers}
-        threadContext={threadContext}
-        onContextClick={() => setContextModalOpen(true)}
-        inputSlot={queuedMessages.length > 0 ? (
-          <div className="rounded-xl bg-muted/50 overflow-hidden">
-            {/* Compact header row */}
-            <button
-              type="button"
-              onClick={() => setQueueExpanded((v) => !v)}
-              className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
-            >
-              <ListPlus className="size-3.5 text-muted-foreground flex-shrink-0" />
-              <span className="text-xs text-muted-foreground flex-1 text-left truncate">
-                {queuedMessages.length} message{queuedMessages.length !== 1 ? 's' : ''} queued
-                {queuedMessages.length > 0 && (
-                  <span className="text-foreground/80 font-medium"> · {queuedMessages[0].text.slice(0, 50)}{queuedMessages[0].text.length > 50 ? '…' : ''}</span>
-                )}
-              </span>
-              <div className="flex items-center gap-1 shrink-0">
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => { e.stopPropagation(); queueClearSession(sessionId); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); queueClearSession(sessionId); } }}
-                  className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <X className="size-3" />
-                </span>
-                <ChevronUp className={cn('size-3 text-muted-foreground/40 transition-transform', !queueExpanded && 'rotate-180')} />
-              </div>
-            </button>
-
-            {/* Expanded list */}
-            {queueExpanded && queuedMessages.length > 1 && (
-              <div className="border-t border-border/30 max-h-[160px] overflow-y-auto scrollbar-hide">
-                <div className="flex flex-col px-1.5 py-1">
-                  {queuedMessages.map((qm, idx) => (
-                    <div
-                      key={qm.id}
-                      className="group/q flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted/60 transition-colors"
-                    >
-                      <span className="text-[10px] tabular-nums text-muted-foreground/40 shrink-0 w-3 text-center">
-                        {idx + 1}
-                      </span>
-                      <p className="flex-1 text-xs text-muted-foreground truncate min-w-0">
-                        {qm.text}
-                      </p>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover/q:opacity-100 transition-opacity shrink-0">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button type="button" onClick={() => handleQueueSendNow(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
-                              <Send className="size-2.5" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top"><p className="text-xs">Send now</p></TooltipContent>
-                        </Tooltip>
-                        {idx > 0 && (
-                          <button type="button" onClick={() => queueMoveUp(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
-                            <ArrowUp className="size-2.5" />
-                          </button>
-                        )}
-                        {idx < queuedMessages.length - 1 && (
-                          <button type="button" onClick={() => queueMoveDown(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer">
-                            <ArrowDown className="size-2.5" />
-                          </button>
-                        )}
-                        <button type="button" onClick={() => queueRemove(qm.id)} className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer">
-                          <X className="size-2.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : undefined}
-      />
-    </div>
-  );
+export function SessionChat({
+	sessionId,
+	headerLeadingAction,
+	hideHeader,
+	readOnly,
+}: SessionChatProps) {
+	// ---- Context modal ----
+	const [contextModalOpen, setContextModalOpen] = useState(false);
+
+	// ---- KortixComputer side panel ----
+	const { isSidePanelOpen, setIsSidePanelOpen, openFileInComputer } =
+		useKortixComputerStore();
+	const handleTogglePanel = useCallback(() => {
+		setIsSidePanelOpen(!isSidePanelOpen);
+	}, [isSidePanelOpen, setIsSidePanelOpen]);
+
+	// ---- Hooks ----
+	const { data: session, isLoading: sessionLoading } =
+		useOpenCodeSession(sessionId);
+	// useSessionSync is the SINGLE source of truth for messages (matches OpenCode SolidJS).
+	// It fetches on first access, then SSE events keep it up to date.
+	// No React Query fallback — prevents stale refetches from overwriting live data.
+	const { messages: syncMessages, isLoading: syncMessagesLoading } =
+		useSessionSync(sessionId);
+	const messages = syncMessages.length > 0 ? syncMessages : undefined;
+	const messagesLoading = syncMessagesLoading;
+	const { data: agents } = useOpenCodeAgents();
+	const { data: commands } = useOpenCodeCommands();
+	const { data: providers } = useOpenCodeProviders();
+	const { data: config } = useOpenCodeConfig();
+	const sendMessage = useSendOpenCodeMessage();
+	const abortSession = useAbortOpenCodeSession();
+	const executeCommand = useExecuteOpenCodeCommand();
+	const forkSession = useForkSession();
+	const revertSession = useRevertSession();
+	const unrevertSession = useUnrevertSession();
+
+	// ---- Unified model/agent/variant state (1:1 port of SolidJS local.tsx) ----
+	const local = useOpenCodeLocal({ agents, providers, config });
+
+	const pendingPromptHandled = useRef(false);
+
+	// ---- Polling fallback & optimistic send ----
+	const [pollingActive, setPollingActive] = useState(false);
+	const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(
+		null,
+	);
+	const [pendingUserMessageId, setPendingUserMessageId] = useState<
+		string | null
+	>(null);
+	const [pendingCommand, setPendingCommand] = useState<{
+		name: string;
+		description?: string;
+	} | null>(null);
+	// Map of user message IDs → command info, so UserMessageRow can render
+	// a compact command pill instead of the raw expanded template text.
+	const commandMessagesRef = useRef<
+		Map<string, { name: string; args?: string }>
+	>(new Map());
+	// Stash the pending command info so we can associate it with the user message
+	// even if the busy signal arrives before the message list updates.
+	const pendingCommandStashRef = useRef<{ name: string; args?: string } | null>(
+		null,
+	);
+	// Track whether we're retrying a failed send (keeps loader visible)
+	const [isRetrying, setIsRetrying] = useState(false);
+	// Track whether a pending prompt send is in flight (dashboard→session flow).
+	// Keeps isBusy true until the server acknowledges with a busy status.
+	const [pendingSendInFlight, setPendingSendInFlight] = useState(false);
+	const [pendingSendMessageId, setPendingSendMessageId] = useState<
+		string | null
+	>(null);
+	// Grace period: don't stop polling immediately on idle after a recent send
+	const lastSendTimeRef = useRef<number>(0);
+	// ---- Optimistic prompt (from dashboard/project page) ----
+	// Uses session-specific sessionStorage keys so pushState navigation works
+	// (no dependency on ?new=true URL param which requires router.push).
+	const [optimisticPrompt, setOptimisticPrompt] = useState<string | null>(
+		() => {
+			if (typeof window !== "undefined") {
+				return sessionStorage.getItem(`opencode_pending_prompt:${sessionId}`);
+			}
+			return null;
+		},
+	);
+
+	const addOptimisticUserMessage = useCallback(
+		(messageId: string, text: string, partIds?: string[]) => {
+			const parts = text.trim()
+				? [
+						{
+							id: partIds?.[0] ?? ascendingId("prt"),
+							sessionID: sessionId,
+							messageID: messageId,
+							type: "text",
+							text,
+						} as any,
+					]
+				: [];
+			const info = {
+				id: messageId,
+				sessionID: sessionId,
+				role: "user",
+				time: { created: Date.now() },
+			} as any;
+
+			useSyncStore.getState().optimisticAdd(sessionId, info, parts as any);
+		},
+		[sessionId],
+	);
+
+	const removeOptimisticUserMessage = useCallback(
+		(messageId: string) => {
+			useSyncStore.getState().optimisticRemove(sessionId, messageId);
+		},
+		[sessionId],
+	);
+
+	// Hydrate options from sessionStorage and send the pending prompt for new sessions.
+	// The dashboard/project page stores the prompt in sessionStorage and navigates here.
+	// We send the message from here (not the dashboard) so that SSE listeners and polling
+	// are already active when the response starts streaming back.
+	// Retries up to 3 times on failure (e.g. "Unable to connect" errors).
+	useEffect(() => {
+		if (pendingPromptHandled.current) return;
+		const pendingPrompt = sessionStorage.getItem(
+			`opencode_pending_prompt:${sessionId}`,
+		);
+		if (pendingPrompt) {
+			pendingPromptHandled.current = true;
+			setPollingActive(true);
+			setPendingSendInFlight(true);
+			sessionStorage.removeItem(`opencode_pending_prompt:${sessionId}`);
+			sessionStorage.removeItem(`opencode_pending_send_failed:${sessionId}`);
+
+			// Restore agent/model/variant selections from the dashboard
+			const options: Record<string, unknown> = {};
+			try {
+				const raw = sessionStorage.getItem(
+					`opencode_pending_options:${sessionId}`,
+				);
+				if (raw) {
+					const pendingOptions = JSON.parse(raw);
+					sessionStorage.removeItem(`opencode_pending_options:${sessionId}`);
+					if (pendingOptions?.agent) {
+						options.agent = pendingOptions.agent;
+						local.agent.set(pendingOptions.agent as string);
+					}
+					if (pendingOptions?.model) {
+						options.model = pendingOptions.model;
+						local.model.set(
+							pendingOptions.model as { providerID: string; modelID: string },
+						);
+					}
+					if (pendingOptions?.variant) {
+						options.variant = pendingOptions.variant;
+						local.model.variant.set(pendingOptions.variant as string);
+					}
+				}
+			} catch {
+				// ignore
+			}
+
+			// Send the message with retry. The useSendOpenCodeMessage hook already
+			// retries 3 times internally for transient errors. We add one additional
+			// outer retry (2 attempts total at this level) to cover cases where the
+			// SDK client itself fails to initialize or the server takes longer to start.
+			const sendOpts =
+				Object.keys(options).length > 0 ? (options as any) : undefined;
+			const messageID = ascendingId("msg");
+			const textPartId = ascendingId("prt");
+			setPendingSendMessageId(messageID);
+			addOptimisticUserMessage(messageID, pendingPrompt, [textPartId]);
+			lastSendTimeRef.current = Date.now();
+
+			// Fire-and-forget via promptAsync. Don't send messageID — let the
+			// server generate it with its own clock to avoid clock-skew issues.
+			const client = getClient();
+			void client.session
+				.promptAsync({
+					sessionID: sessionId,
+					parts: [{ type: "text", text: pendingPrompt }],
+					...(sendOpts?.agent && { agent: sendOpts.agent }),
+					...(sendOpts?.model && { model: sendOpts.model }),
+					...(sendOpts?.variant && { variant: sendOpts.variant }),
+				} as any)
+				.then(() => {
+					// Safety-net: remove optimistic message after server ack
+					removeOptimisticUserMessage(messageID);
+				})
+				.catch(() => {
+					removeOptimisticUserMessage(messageID);
+					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+					setIsRetrying(false);
+					setPendingSendInFlight(false);
+					setPendingSendMessageId(null);
+					setOptimisticPrompt(null);
+					setPollingActive(false);
+				});
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [sessionId, addOptimisticUserMessage, removeOptimisticUserMessage]);
+
+	// Clear optimistic prompt once real messages arrive
+	useEffect(() => {
+		if (optimisticPrompt && messages && messages.length > 0) {
+			setOptimisticPrompt(null);
+		}
+	}, [optimisticPrompt, messages]);
+
+	const agentNames = useMemo(
+		() => local.agent.list.map((a) => a.name),
+		[local.agent.list],
+	);
+
+	// ---- Check if any messages have tool calls ----
+	const hasToolCalls = useMemo(() => {
+		if (!messages) return false;
+		return messages.some((msg) => msg.parts?.some((p) => p.type === "tool"));
+	}, [messages]);
+
+	// ---- Restore model/agent from last user message (matching SolidJS session.tsx:550-560) ----
+	const lastUserMessage = useMemo(
+		() =>
+			messages
+				? [...messages].reverse().find((m) => m.info.role === "user")
+				: undefined,
+		[messages],
+	);
+	const lastUserMsgIdRef = useRef<string | undefined>(undefined);
+	useEffect(() => {
+		if (!lastUserMessage) return;
+		if (lastUserMsgIdRef.current === lastUserMessage.info.id) return;
+		lastUserMsgIdRef.current = lastUserMessage.info.id;
+		const msg = lastUserMessage.info as any;
+		if (msg.agent) local.agent.set(msg.agent);
+		if (msg.model) local.model.set(msg.model); // no { recent: true } — matches SolidJS
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lastUserMessage?.info.id]);
+
+	// ---- Session status ----
+	// Use sync store as primary (matches OpenCode), fall back to status store
+	const syncStatus = useSyncStore((s) => s.sessionStatus[sessionId]);
+	const legacyStatus = useOpenCodeSessionStatusStore(
+		(s) => s.statuses[sessionId],
+	);
+	const sessionStatus = syncStatus ?? legacyStatus;
+	const isServerBusy =
+		sessionStatus?.type === "busy" || sessionStatus?.type === "retry";
+	// Match OpenCode: isBusy is driven ONLY by the session status (single source of truth).
+	// pendingUserMessage/pendingSendInFlight are no longer part of isBusy — they caused
+	// the drain to fire twice.
+	const isBusy = isServerBusy;
+
+	// ---- Message Queue ----
+	// Hydrate the queue from the backend on first mount (survives page reloads).
+	const queueHydrated = useMessageQueueStore((s) => s.hydrated);
+	useEffect(() => {
+		if (!queueHydrated) {
+			useMessageQueueStore.getState().hydrateFromBackend();
+		}
+	}, [queueHydrated]);
+
+	// Select the full array (stable ref) and derive the filtered list via useMemo
+	// to avoid the "getSnapshot should be cached" infinite-loop error that occurs
+	// when .filter() creates a new array reference on every selector call.
+	const allQueuedMessages = useMessageQueueStore((s) => s.messages);
+	const queuedMessages = useMemo(
+		() => allQueuedMessages.filter((m) => m.sessionId === sessionId),
+		[allQueuedMessages, sessionId],
+	);
+	const queueDequeue = useMessageQueueStore((s) => s.dequeue);
+	const queueRemove = useMessageQueueStore((s) => s.remove);
+	const queueMoveUp = useMessageQueueStore((s) => s.moveUp);
+	const queueMoveDown = useMessageQueueStore((s) => s.moveDown);
+	const queueClearSession = useMessageQueueStore((s) => s.clearSession);
+	const [queueExpanded, setQueueExpanded] = useState(true);
+
+	// Track previous *server* busy state to detect idle transitions.
+	const prevServerBusyRef = useRef(isServerBusy);
+	// Guard against double-drain: tracks whether a drain is already in progress
+	const drainScheduledRef = useRef(false);
+	// Track IDs that were dequeued locally but may not be persisted yet.
+	// Prevents the backend re-sync from re-adding messages we already consumed.
+	const dequeuedIdsRef = useRef(new Set<string>());
+
+	// Drain helper: dequeue the next message and send it.
+	// Shared by primary + fallback drains to avoid duplication.
+	const drainNext = useCallback(() => {
+		if (drainScheduledRef.current) return;
+		const sessionQueue = useMessageQueueStore
+			.getState()
+			.messages.filter((m) => m.sessionId === sessionId);
+		if (sessionQueue.length === 0) return;
+		drainScheduledRef.current = true;
+		setTimeout(() => {
+			drainScheduledRef.current = false;
+			const next = queueDequeue(sessionId);
+			if (next) {
+				dequeuedIdsRef.current.add(next.id);
+				handleSend(next.text, next.files);
+			}
+		}, 500);
+	}, [sessionId, queueDequeue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+	// Sync queue from backend when session goes idle. The backend drainer may
+	// have already processed messages while the tab was closed/backgrounded.
+	// This re-fetches the persisted queue so the frontend stays in sync.
+	useEffect(() => {
+		const wasBusy = prevServerBusyRef.current;
+		prevServerBusyRef.current = isServerBusy;
+
+		if (wasBusy && !isServerBusy) {
+			void (async () => {
+				// Refresh queue from backend (the drainer may have consumed messages)
+				try {
+					const { fetchSessionQueue } = await import("@/lib/api/queue");
+					const backendMsgs = await fetchSessionQueue(sessionId);
+					const state = useMessageQueueStore.getState();
+					const otherMsgs = state.messages.filter(
+						(m) => m.sessionId !== sessionId,
+					);
+					// Filter out messages we already dequeued locally (race protection)
+					const merged = backendMsgs
+						.filter((bm) => !dequeuedIdsRef.current.has(bm.id))
+						.map((bm) => {
+							const local = state.messages.find((m) => m.id === bm.id);
+							return {
+								id: bm.id,
+								sessionId: bm.sessionId,
+								text: bm.text,
+								timestamp: bm.timestamp,
+								files: local?.files,
+							} as QueuedMessage;
+						});
+					useMessageQueueStore.setState({
+						messages: [...otherMsgs, ...merged],
+					});
+					// Clear dequeued IDs that are no longer on the backend (confirmed removed)
+					const backendIds = new Set(backendMsgs.map((bm) => bm.id));
+					for (const id of dequeuedIdsRef.current) {
+						if (!backendIds.has(id)) dequeuedIdsRef.current.delete(id);
+					}
+				} catch {
+					// Backend unreachable — use local state as fallback
+				}
+
+				// Now drain the next message if any remain
+				drainNext();
+			})();
+		}
+	}, [isServerBusy, sessionId, drainNext]);
+
+	// Fallback drain: when isBusy becomes false and there are queued messages,
+	// drain the queue. This covers cases where the SSE missed the busy event
+	// entirely (e.g. status went undefined → idle, so isServerBusy was never
+	// true and the primary drain above never fires).
+	useEffect(() => {
+		if (isBusy || drainScheduledRef.current) return;
+		const sessionQueue = useMessageQueueStore
+			.getState()
+			.messages.filter((m) => m.sessionId === sessionId);
+		if (sessionQueue.length === 0) return;
+		drainNext();
+	}, [isBusy, queuedMessages.length, sessionId, drainNext]);
+
+	// "Send now" handler: abort current session + send the queued message
+	const handleQueueSendNow = useCallback(
+		(messageId: string) => {
+			const msg = useMessageQueueStore
+				.getState()
+				.messages.find((m) => m.id === messageId);
+			if (!msg) return;
+			queueRemove(messageId);
+			// Abort the current session first
+			abortSession.mutate(sessionId);
+			// Send after a brief delay to let abort take effect
+			setTimeout(() => {
+				handleSend(msg.text, msg.files);
+			}, 150);
+		},
+		[sessionId, abortSession, queueRemove], // handleSend added via eslint-disable below
+	); // eslint-disable-line react-hooks/exhaustive-deps
+
+	// Stop polling when session goes idle (via SSE or polling fallback).
+	// Grace period: if we sent a message recently (within 5s), don't stop polling
+	// on the first idle status — the server may not have started processing yet.
+	useEffect(() => {
+		if (pollingActive && sessionStatus?.type === "idle") {
+			const timeSinceSend = Date.now() - lastSendTimeRef.current;
+			if (timeSinceSend < 5000) {
+				// Still within grace period — check again shortly
+				const remaining = 5000 - timeSinceSend;
+				const timer = setTimeout(() => {
+					// Re-check: if still idle after grace period, stop polling
+					const currentStatus =
+						useOpenCodeSessionStatusStore.getState().statuses[sessionId];
+					if (currentStatus?.type === "idle") {
+						setPollingActive(false);
+					}
+				}, remaining);
+				return () => clearTimeout(timer);
+			}
+			setPollingActive(false);
+		}
+	}, [pollingActive, sessionStatus?.type, sessionId]);
+
+	// Clear pendingSendInFlight once the server acknowledges it's working,
+	// or when new messages arrive (fallback for command sends).
+	// This bridges the gap between the optimistic prompt clearing and the
+	// server status updating — keeps isBusy true so the turn shows a loader.
+	useEffect(() => {
+		if (!pendingSendInFlight) return;
+		if (isServerBusy) {
+			setPendingSendInFlight(false);
+			setPendingSendMessageId(null);
+			return;
+		}
+		// If we got an assistant reply for the pending user message, the server
+		// already accepted and processed this send even if status events were missed.
+		const hasAssistantReply = pendingSendMessageId
+			? !!messages?.some(
+					(m) =>
+						m.info.role === "assistant" &&
+						(m.info as any).parentID === pendingSendMessageId,
+				)
+			: false;
+		if (hasAssistantReply) {
+			setPendingSendInFlight(false);
+			setPendingSendMessageId(null);
+		}
+	}, [pendingSendInFlight, isServerBusy, messages, pendingSendMessageId]);
+
+	// Safety timeout: clear pendingSendInFlight after 30s even if the server
+	// never acknowledged. Prevents the UI from being stuck forever in "busy"
+	// when the send succeeded (HTTP 204) but the server never started processing.
+	useEffect(() => {
+		if (!pendingSendInFlight) return;
+		const timer = setTimeout(() => {
+			setPendingSendInFlight(false);
+			setPendingSendMessageId(null);
+		}, 30_000);
+		return () => clearTimeout(timer);
+	}, [pendingSendInFlight]);
+
+	// Stale session watchdog: when the session has been busy for a while, do a
+	// direct status check. If the server reports idle (or doesn't include the
+	// session at all — meaning it's idle), force the session to idle — recovering
+	// from a silently dropped SSE stream or missed event.
+	// First check after 5s, then every 15s.
+	useEffect(() => {
+		if (!isServerBusy) return;
+
+		const check = async () => {
+			try {
+				const client = getClient();
+				const result = await client.session.status();
+				if (result.data) {
+					const statuses = result.data as Record<string, any>;
+					const serverStatus = statuses[sessionId];
+					if (serverStatus) {
+						useOpenCodeSessionStatusStore
+							.getState()
+							.setStatus(sessionId, serverStatus);
+					} else {
+						// Server didn't include this session — it's idle
+						useOpenCodeSessionStatusStore
+							.getState()
+							.setStatus(sessionId, { type: "idle" });
+					}
+				}
+			} catch {
+				// ignore — next interval will retry
+			}
+		};
+
+		// First check after 5s, then every 15s
+		const initialTimer = setTimeout(() => {
+			check();
+		}, 5_000);
+		const interval = setInterval(check, 15_000);
+		return () => {
+			clearTimeout(initialTimer);
+			clearInterval(interval);
+		};
+	}, [isServerBusy, sessionId]);
+
+	// Message-based idle detection: if the last assistant message has
+	// time.completed set, the server marked the message as completed but we never got the
+	// idle event — force the session to idle after a short grace period
+	// to avoid racing with a status event that's still in flight.
+	useEffect(() => {
+		if (!isServerBusy || !messages || messages.length === 0) return;
+		// Find the last assistant message
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const msg = messages[i];
+			if (msg.info.role === "assistant") {
+				const assistantInfo = msg.info as any;
+				if (assistantInfo.time?.completed) {
+					const timer = setTimeout(() => {
+						const currentStatus =
+							useOpenCodeSessionStatusStore.getState().statuses[sessionId];
+						if (
+							currentStatus?.type === "busy" ||
+							currentStatus?.type === "retry"
+						) {
+							useOpenCodeSessionStatusStore
+								.getState()
+								.setStatus(sessionId, { type: "idle" });
+						}
+					}, 2_000);
+					return () => clearTimeout(timer);
+				}
+				break; // only check the last assistant message
+			}
+		}
+	}, [isServerBusy, messages, sessionId]);
+
+	// Clear pending user message when we can confirm the message is in cache
+	// (by ID), or when new messages arrive (fallback for command sends).
+	// When a command was pending, associate the newest user message with the
+	// command info so UserMessageRow can render a nice pill instead of raw template text.
+	const prevMsgLenRef = useRef(messages?.length || 0);
+	useEffect(() => {
+		if (!pendingUserMessage) return;
+		const hasPendingMessage = pendingUserMessageId
+			? !!messages?.some((m) => m.info.id === pendingUserMessageId)
+			: false;
+		if (hasPendingMessage) {
+			setPendingUserMessage(null);
+			setPendingUserMessageId(null);
+			setPendingCommand(null);
+			return;
+		}
+		const len = messages?.length || 0;
+		if (len > prevMsgLenRef.current) {
+			setPendingUserMessage(null);
+			setPendingUserMessageId(null);
+			setPendingCommand(null);
+		}
+	}, [messages, messages?.length, pendingUserMessage, pendingUserMessageId]);
+
+	// Associate stashed command info with the newest user message when messages arrive.
+	// Runs separately so it captures the mapping even if busy fires before messages update.
+	useEffect(() => {
+		const stash = pendingCommandStashRef.current;
+		if (!stash || !messages) return;
+		const len = messages.length;
+		if (len <= prevMsgLenRef.current) return;
+		// Find the last user message — the one just created by the command
+		for (let i = len - 1; i >= 0; i--) {
+			if (messages[i].info.role === "user") {
+				commandMessagesRef.current.set(messages[i].info.id, stash);
+				pendingCommandStashRef.current = null;
+				break;
+			}
+		}
+	}, [messages]);
+
+	useEffect(() => {
+		prevMsgLenRef.current = messages?.length || 0;
+	}, [messages?.length]);
+
+	// ---- Auto-scroll (replaces inline scroll logic) ----
+	const { scrollRef, contentRef, showScrollButton, scrollToBottom } =
+		useAutoScroll({
+			working: isBusy,
+		});
+
+	// Scroll to bottom when switching session tabs or on initial message load.
+	// Uses scrollToBottom() from the hook so the programmatic-scroll guard works
+	// correctly and doesn't interfere with user-intent detection.
+	const initialScrollDoneRef = useRef<string | null>(null);
+	useEffect(() => {
+		// Reset on session change so we scroll on first render of new session
+		if (initialScrollDoneRef.current !== sessionId) {
+			initialScrollDoneRef.current = null;
+		}
+	}, [sessionId]);
+
+	const messageCount = messages?.length ?? 0;
+	useEffect(() => {
+		if (initialScrollDoneRef.current === sessionId) return;
+		if (messageCount === 0) return;
+		initialScrollDoneRef.current = sessionId;
+
+		// Staggered attempts: the scroll container mounts after this render,
+		// then message components (markdown, code blocks) render asynchronously.
+		// All go through scrollToBottom() which marks them as programmatic.
+		scrollToBottom();
+		const t1 = setTimeout(scrollToBottom, 150);
+		const t2 = setTimeout(scrollToBottom, 500);
+
+		return () => {
+			clearTimeout(t1);
+			clearTimeout(t2);
+		};
+	}, [messageCount, sessionId, scrollToBottom]);
+
+	// ---- Pending permissions & questions ----
+	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
+	const allQuestions = useOpenCodePendingStore((s) => s.questions);
+	const pendingPermissions = useMemo(
+		() =>
+			Object.values(allPermissions).filter((p) => p.sessionID === sessionId),
+		[allPermissions, sessionId],
+	);
+	const pendingQuestions = useMemo(
+		() => Object.values(allQuestions).filter((q) => q.sessionID === sessionId),
+		[allQuestions, sessionId],
+	);
+
+	// ---- Permission/question reply handlers ----
+	const removePermission = useOpenCodePendingStore((s) => s.removePermission);
+	const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
+
+	const handlePermissionReply = useCallback(
+		async (requestId: string, reply: "once" | "always" | "reject") => {
+			try {
+				await replyToPermission(requestId, reply);
+				removePermission(requestId);
+			} catch {
+				// ignore
+			}
+		},
+		[removePermission],
+	);
+
+	const handleQuestionReply = useCallback(
+		async (requestId: string, answers: string[][]) => {
+			try {
+				await replyToQuestion(requestId, answers);
+				removeQuestion(requestId);
+			} catch {
+				// ignore
+			}
+		},
+		[removeQuestion],
+	);
+
+	const handleQuestionReject = useCallback(
+		async (requestId: string) => {
+			try {
+				await rejectQuestion(requestId);
+				removeQuestion(requestId);
+			} catch {
+				// ignore
+			}
+		},
+		[removeQuestion],
+	);
+
+	// ---- Group messages into turns ----
+	const turns = useMemo(
+		() => (messages ? groupMessagesIntoTurns(messages) : []),
+		[messages],
+	);
+
+	// ============================================================================
+	// Expanded state management (keyed by user message ID)
+	// ============================================================================
+
+	const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+	// Track turns the user explicitly collapsed — never auto-reopen these
+	const userCollapsedRef = useRef<Set<string>>(new Set());
+
+	// Auto-expand last turn when session is busy — but only if the user
+	// hasn't manually collapsed it. Without this guard, every new tool call
+	// or part update re-opens the steps the user just closed.
+	useEffect(() => {
+		if (!messages || messages.length === 0) return;
+		const lastUserId = [...messages]
+			.reverse()
+			.find((m) => m.info.role === "user")?.info.id;
+		if (lastUserId && (sessionStatus?.type !== "idle" || isBusy)) {
+			if (!userCollapsedRef.current.has(lastUserId)) {
+				setExpanded((prev) => ({ ...prev, [lastUserId]: true }));
+			}
+		}
+	}, [messages, sessionStatus, isBusy]);
+
+	const toggleExpanded = useCallback((id: string) => {
+		setExpanded((prev) => {
+			const next = !prev[id];
+			if (!next) {
+				userCollapsedRef.current.add(id);
+			} else {
+				userCollapsedRef.current.delete(id);
+			}
+			return { ...prev, [id]: next };
+		});
+	}, []);
+
+	// Reset on session change
+	useEffect(() => {
+		setExpanded({});
+		userCollapsedRef.current.clear();
+		setPollingActive(false);
+		setPendingUserMessage(null);
+		setPendingUserMessageId(null);
+		setPendingCommand(null);
+		setPendingSendInFlight(false);
+		setPendingSendMessageId(null);
+		setIsRetrying(false);
+		lastSendTimeRef.current = 0;
+	}, [sessionId]);
+
+	// ============================================================================
+	// Billing: DISABLED — billing is handled server-side by the router
+	// (POST /v1/router/chat/completions deducts credits per LLM call).
+	// This frontend useEffect was causing double-billing once opencode.jsonc
+	// got cost config and step-finish.cost became non-zero.
+	// ============================================================================
+
+	// ============================================================================
+	// Fork / Revert / Unrevert handlers
+	// ============================================================================
+
+	const isReverted = !!session?.revert;
+
+	const handleFork = useCallback(
+		async (messageId: string) => {
+			// The server's fork copies all messages BEFORE the given messageID
+			// (exclusive: msg.id >= messageID → break). Since the user clicks
+			// "Fork from here" on an assistant response and expects that response
+			// to be included, we pass the ID of the first message AFTER the
+			// assistant message as the cut-off. If the assistant message is the
+			// last one in the session, we omit messageID entirely to copy everything.
+			let forkAtMessageId: string | undefined;
+			if (messages) {
+				const idx = messages.findIndex((m) => m.info.id === messageId);
+				if (idx >= 0 && idx < messages.length - 1) {
+					forkAtMessageId = messages[idx + 1].info.id;
+				}
+				// else: last message — omit messageID to copy all
+			}
+
+			const forkedSession = await forkSession.mutateAsync({
+				sessionId,
+				messageId: forkAtMessageId,
+			});
+
+			// Open the forked session in a new tab and navigate
+			const title = forkedSession.title || "Forked session";
+			openTabAndNavigate({
+				id: forkedSession.id,
+				title,
+				type: "session",
+				href: `/sessions/${forkedSession.id}`,
+				parentSessionId: sessionId,
+				serverId: useServerStore.getState().activeServerId,
+			});
+			// Store fork origin in localStorage (survives refresh) so the forked
+			// session can show the "Forked from" indicator.
+			localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
+		},
+		[sessionId, forkSession, messages],
+	);
+
+	const handleRevert = useCallback(
+		async (messageId: string) => {
+			await revertSession.mutateAsync({
+				sessionId,
+				messageId,
+			});
+		},
+		[sessionId, revertSession],
+	);
+
+	const handleUnrevert = useCallback(async () => {
+		await unrevertSession.mutateAsync(sessionId);
+	}, [sessionId, unrevertSession]);
+
+	// ============================================================================
+	// Send / Stop / Command handlers
+	// ============================================================================
+
+	const handleSend = useCallback(
+		async (
+			text: string,
+			files?: AttachedFile[],
+			mentions?: TrackedMention[],
+		) => {
+			// Play send sound
+			playSound("send");
+			const messageID = ascendingId("msg");
+
+			// Generate part IDs upfront so the optimistic message and the server
+			// request use the SAME IDs. When the server echoes parts via
+			// message.part.updated, the sync store's upsertPart will UPDATE
+			// (not duplicate) the optimistic parts. This matches OpenCode's
+			// SolidJS approach where part IDs are sent with the prompt request.
+			const textPartId = ascendingId("prt");
+
+			// Build optimistic text that includes session ref XML so that
+			// HighlightMentions / UserMessageRow can detect multi-word session
+			// mentions (e.g. "@Intro message") before the server echoes back.
+			const sessionMentionsForOptimistic = mentions?.filter(
+				(m) => m.kind === "session" && m.value,
+			);
+			let optimisticText = text;
+			if (
+				sessionMentionsForOptimistic &&
+				sessionMentionsForOptimistic.length > 0
+			) {
+				const refs = sessionMentionsForOptimistic
+					.map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
+					.join("\n");
+				optimisticText = `${text}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
+			}
+
+			// Optimistic: show message immediately in sync store + set busy
+			// Matches OpenCode: sync.set("session_status", session.id, { type: "busy" })
+			addOptimisticUserMessage(messageID, optimisticText, [textPartId]);
+			useSyncStore.getState().setStatus(sessionId, { type: "busy" });
+
+			// Scroll to bottom after the optimistic message renders
+			requestAnimationFrame(() => scrollToBottom());
+
+			const options: Record<string, unknown> = {};
+			if (local.agent.current) options.agent = local.agent.current.name;
+			if (local.model.currentKey) options.model = local.model.currentKey;
+			if (local.model.variant.current)
+				options.variant = local.model.variant.current;
+
+			// Build parts: text first, then upload attached files to /workspace/uploads/
+			// and send as XML text references (agent reads from disk on demand, not loaded into context)
+			const parts: Array<
+				| { id: string; type: "text"; text: string }
+				| {
+						id: string;
+						type: "file";
+						mime: string;
+						url: string;
+						filename?: string;
+				  }
+			> = [{ id: textPartId, type: "text", text }];
+
+			if (files && files.length > 0) {
+				const uploadResults = await Promise.all(
+					files.map(async (af) => {
+						const timestamp = Date.now();
+						const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+						const uniqueName = `${timestamp}-${safeName}`;
+						const uploadBlob = new File([af.file], uniqueName, {
+							type: af.file.type,
+						});
+						const results = await uploadFile(uploadBlob, "/workspace/uploads");
+						if (!results || results.length === 0) {
+							throw new Error(`Failed to upload file: ${af.file.name}`);
+						}
+						return {
+							path: results[0].path,
+							mime: af.file.type || "application/octet-stream",
+							filename: af.file.name,
+						};
+					}),
+				);
+				for (const f of uploadResults) {
+					parts.push({
+						id: ascendingId("prt"),
+						type: "text",
+						text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
+					});
+				}
+			}
+
+			// Append session reference hints for @session mentions
+			const sessionMentions = mentions?.filter(
+				(m) => m.kind === "session" && m.value,
+			);
+			if (sessionMentions && sessionMentions.length > 0) {
+				const refs = sessionMentions
+					.map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
+					.join("\n");
+				parts.push({
+					id: ascendingId("prt"),
+					type: "text",
+					text: `\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`,
+				});
+			}
+
+			// Fire-and-forget via session.prompt (matching OpenCode app's approach).
+			// SSE events drive all incremental UI updates via sync store.
+			// prompt() blocks until the full response is ready, but since we don't
+			// await the result, it effectively runs in the background. This is exactly
+			// how OpenCode's web app sends messages.
+			// Don't send part IDs or messageID — let the server generate them with
+			// its own clock. Client-generated IDs can sort before server IDs due to
+			// clock skew (browser vs Docker container), causing the server's loop to
+			// exit immediately thinking the prompt was already answered.
+			const mappedParts = parts.map((p: any) => {
+				if (p.type === "file")
+					return {
+						type: "file" as const,
+						mime: p.mime,
+						url: p.url,
+						filename: p.filename,
+					};
+				return { type: "text" as const, text: p.text };
+			});
+			const sendOpts = Object.keys(options).length > 0 ? options : undefined;
+			const client = getClient();
+			void client.session
+				.promptAsync({
+					sessionID: sessionId,
+					parts: mappedParts,
+					...(sendOpts?.agent && { agent: sendOpts.agent }),
+					...(sendOpts?.model && { model: sendOpts.model }),
+					...(sendOpts?.variant && { variant: sendOpts.variant }),
+				} as any)
+				.then(() => {
+					// Server acknowledged the prompt. The SSE event reducer handles
+					// the atomic swap (optimistic → real), but if the SSE event
+					// already arrived before this resolves, the optimistic message
+					// may already be gone. This is a safety-net cleanup.
+					removeOptimisticUserMessage(messageID);
+				})
+				.catch(() => {
+					// On failure, set status to idle and remove optimistic message
+					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+					removeOptimisticUserMessage(messageID);
+				});
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[
+			sessionId,
+			sendMessage,
+			local.agent.current,
+			local.model.currentKey,
+			local.model.variant.current,
+			addOptimisticUserMessage,
+			removeOptimisticUserMessage,
+			scrollToBottom,
+		],
+	);
+
+	const handleStop = useCallback(() => {
+		abortSession.mutate(sessionId);
+	}, [sessionId, abortSession]);
+
+	const handleCommand = useCallback(
+		(cmd: Command, args?: string) => {
+			playSound("send");
+			const label = args ? `/${cmd.name} ${args}` : `/${cmd.name}`;
+			setPendingCommand({
+				name: cmd.name,
+				description: args || cmd.description,
+			});
+			pendingCommandStashRef.current = {
+				name: cmd.name,
+				args: args || cmd.description,
+			};
+			setPendingUserMessage(label);
+			setPendingUserMessageId(null);
+			setPollingActive(true);
+			lastSendTimeRef.current = Date.now();
+			executeCommand.mutate(
+				{ sessionId, command: cmd.name, args },
+				{
+					onError: () => {
+						setPendingCommand(null);
+						setPendingUserMessage(null);
+						setPendingUserMessageId(null);
+						setPollingActive(false);
+					},
+				},
+			);
+			requestAnimationFrame(() => scrollToBottom());
+		},
+		[sessionId, executeCommand, scrollToBottom],
+	);
+
+	const handleFileSearch = useCallback(
+		async (query: string): Promise<string[]> => {
+			try {
+				return await findOpenCodeFiles(query);
+			} catch {
+				return [];
+			}
+		},
+		[],
+	);
+
+	// Detect if this session was forked and resolve its parent.
+	// Must be above early returns to preserve hook order.
+	// localStorage is the source of truth (set by handleFork). The server may
+	// or may not populate parentID on the forked session.
+	const forkParentId = useMemo(() => {
+		if (typeof window === "undefined") return null;
+		return localStorage.getItem(`fork_origin_${sessionId}`);
+	}, [sessionId]);
+	const isSubSession = !!session?.parentID || !!forkParentId;
+	const isFork = !!forkParentId;
+	// The effective parent ID: prefer server parentID, fall back to localStorage
+	const effectiveParentId = session?.parentID || forkParentId;
+
+	// Parent session data — used for SubSessionBar and threadContext on chat input
+	const { data: parentSessionData } = useOpenCodeSession(
+		effectiveParentId || "",
+	);
+	const threadContext = useMemo(() => {
+		if (!effectiveParentId || !parentSessionData) return undefined;
+		return {
+			variant: isFork ? ("fork" as const) : ("thread" as const),
+			parentTitle: parentSessionData.title || "Parent session",
+			onBackToParent: () => {
+				openTabAndNavigate({
+					id: parentSessionData.id,
+					title: parentSessionData.title || "Parent session",
+					type: "session",
+					href: `/sessions/${parentSessionData.id}`,
+					serverId: useServerStore.getState().activeServerId,
+				});
+			},
+		};
+	}, [effectiveParentId, parentSessionData, isFork]);
+
+	// ============================================================================
+	// Loading / Not-found states
+	// ============================================================================
+	//
+	// IMPORTANT: Do NOT use early returns here. Returning a different component
+	// tree unmounts the textarea, losing user input, focus, and all local state.
+	// Instead, the loading/not-found states are rendered inline in the content
+	// area while the header and input remain mounted.
+
+	const isDataLoading =
+		(sessionLoading || messagesLoading) && !optimisticPrompt;
+	const isNotFound = !session && !sessionLoading && !optimisticPrompt;
+
+	const hasMessages = messages && messages.length > 0;
+	const showOptimistic = !!optimisticPrompt && !hasMessages;
+
+	return (
+		<div className="relative flex flex-col h-full bg-background">
+			{/* Session header — always mounted */}
+			{!hideHeader && (
+				<SessionSiteHeader
+					sessionId={sessionId}
+					sessionTitle={session?.title || "Untitled"}
+					onToggleSidePanel={handleTogglePanel}
+					isSidePanelOpen={isSidePanelOpen}
+					canOpenSidePanel={hasToolCalls}
+					leadingAction={headerLeadingAction}
+				/>
+			)}
+
+			{/* Revert banner — shown when session is in reverted state */}
+			{isReverted && session?.revert?.messageID && (
+				<RevertBanner
+					sessionId={sessionId}
+					revertMessageId={session.revert.messageID}
+					loading={unrevertSession.isPending}
+					onUnrevert={handleUnrevert}
+				/>
+			)}
+
+			{/* Context modal — triple-click the session title area to open */}
+			<SessionContextModal
+				open={contextModalOpen}
+				onOpenChange={setContextModalOpen}
+				messages={messages}
+				session={session}
+				providers={providers}
+			/>
+
+			{/* Content area — loading, not-found, or actual messages */}
+			{isDataLoading ? (
+				<div className="flex-1 flex items-center justify-center min-h-0">
+					<KortixLoader size="small" />
+				</div>
+			) : isNotFound ? (
+				<div className="flex-1 flex items-center justify-center min-h-0 text-sm text-muted-foreground">
+					Session not found
+				</div>
+			) : hasMessages || showOptimistic ? (
+				<div className="relative flex-1 min-h-0">
+					<div
+						ref={scrollRef}
+						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-32 bg-background h-full [scroll-behavior:auto]"
+					>
+						<div
+							ref={contentRef}
+							role="log"
+							className="mx-auto max-w-3xl min-w-0 w-full px-3 sm:px-6"
+						>
+							<div className="flex flex-col gap-12 min-w-0">
+								{/* Fork context divider — shown at the top of forked sessions */}
+								{isFork && effectiveParentId && (
+									<ForkContextDivider parentID={effectiveParentId} />
+								)}
+
+								{/* Optimistic user message */}
+								{showOptimistic && (
+									<>
+										<div className="flex justify-end">
+											<div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
+												{(() => {
+													const { cleanText, files } = parseFileReferences(
+														optimisticPrompt || "",
+													);
+													return (
+														<>
+															{files.length > 0 && (
+																<div className="flex gap-2 p-3 pb-0 flex-wrap">
+																	{files.map((f, i) => (
+																		<div
+																			key={i}
+																			className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30"
+																		>
+																			<FileText className="size-4 text-muted-foreground shrink-0" />
+																			<span className="text-xs text-muted-foreground truncate max-w-[200px]">
+																				{f.filename}
+																			</span>
+																		</div>
+																	))}
+																</div>
+															)}
+															{cleanText && (
+																<p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
+																	<HighlightMentions
+																		text={cleanText}
+																		agentNames={agentNames}
+																		onFileClick={openFileInComputer}
+																	/>
+																</p>
+															)}
+														</>
+													);
+												})()}
+											</div>
+										</div>
+										<div className="flex items-center gap-3">
+											{/* eslint-disable-next-line @next/next/no-img-element */}
+											<img
+												src="/kortix-logomark-white.svg"
+												alt="Kortix"
+												className="dark:invert-0 invert flex-shrink-0"
+												style={{ height: "14px", width: "auto" }}
+											/>
+											{isRetrying && (
+												<span className="text-xs text-amber-500">
+													Retrying connection...
+												</span>
+											)}
+										</div>
+									</>
+								)}
+
+								{/* Turn-based message rendering */}
+								{turns.map((turn, turnIndex) => {
+									// Check if this turn is a compaction summary
+									// The server sets `summary: true` on assistant messages that are compaction summaries
+									const hasCompaction =
+										turn.assistantMessages.some(
+											(msg) => (msg.info as any).summary === true,
+										) ||
+										turn.assistantMessages.some((msg) =>
+											msg.parts.some((p) => p.type === "compaction"),
+										);
+
+									return (
+										<div key={turn.userMessage.info.id}>
+											{/* Compaction divider — shown before the first turn after compaction */}
+											{hasCompaction && (
+												<div className="flex items-center gap-3 py-4 my-3">
+													<div className="flex-1 h-px bg-border" />
+													<div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/80 border border-border/60">
+														<Layers className="size-3.5 text-muted-foreground" />
+														<span className="text-[11px] font-semibold text-muted-foreground tracking-wide">
+															Compaction
+														</span>
+													</div>
+													<div className="flex-1 h-px bg-border" />
+												</div>
+											)}
+											<SessionTurn
+												turn={turn}
+												allMessages={messages!}
+												sessionId={sessionId}
+												sessionStatus={sessionStatus}
+												permissions={pendingPermissions}
+												questions={pendingQuestions}
+												stepsExpanded={!!expanded[turn.userMessage.info.id]}
+												onToggleSteps={() =>
+													toggleExpanded(turn.userMessage.info.id)
+												}
+												agentNames={agentNames}
+												isFirstTurn={turnIndex === 0}
+												isBusy={isBusy}
+												isReverted={isReverted}
+												isCompaction={hasCompaction}
+												onFork={handleFork}
+												onRevert={handleRevert}
+												providers={providers}
+												commandMessages={commandMessagesRef.current}
+												commands={commands}
+												onPermissionReply={handlePermissionReply}
+												onQuestionReply={handleQuestionReply}
+												onQuestionReject={handleQuestionReject}
+											/>
+										</div>
+									);
+								})}
+
+								{/* Busy indicator when no turns yet but session is busy */}
+								{!showOptimistic && isBusy && turns.length === 0 && (
+									<div className="flex items-center gap-3">
+										{/* eslint-disable-next-line @next/next/no-img-element */}
+										<img
+											src="/kortix-logomark-white.svg"
+											alt="Kortix"
+											className="dark:invert-0 invert flex-shrink-0"
+											style={{ height: "14px", width: "auto" }}
+										/>
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+
+					{/* Scroll to bottom FAB */}
+					<div
+						className={cn(
+							"absolute bottom-4 left-1/2 -translate-x-1/2 transition-all",
+							showScrollButton
+								? "opacity-100 translate-y-0"
+								: "opacity-0 translate-y-2 pointer-events-none",
+						)}
+					>
+						<Button
+							variant="outline"
+							size="sm"
+							className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
+							onClick={scrollToBottom}
+						>
+							<ArrowDown className="size-3 mr-1" />
+							Scroll to bottom
+						</Button>
+					</div>
+				</div>
+			) : (
+				<SessionWelcome />
+			)}
+
+			{/* Input — hidden in read-only mode (sub-session modal) */}
+			{!readOnly && (
+				<SessionChatInput
+				onSend={handleSend}
+				isBusy={isBusy}
+				onStop={handleStop}
+				agents={local.agent.list}
+				selectedAgent={local.agent.current?.name ?? null}
+				onAgentChange={(name) => local.agent.set(name ?? undefined)}
+				commands={commands || []}
+				onCommand={handleCommand}
+				models={local.model.list}
+				selectedModel={local.model.currentKey ?? null}
+				onModelChange={(m) => local.model.set(m ?? undefined, { recent: true })}
+				variants={local.model.variant.list}
+				selectedVariant={local.model.variant.current ?? null}
+				onVariantChange={(v) => local.model.variant.set(v ?? undefined)}
+				messages={messages}
+				sessionId={sessionId}
+				onFileSearch={handleFileSearch}
+				providers={providers}
+				threadContext={threadContext}
+				onContextClick={() => setContextModalOpen(true)}
+				inputSlot={
+					queuedMessages.length > 0 ? (
+						<div className="rounded-xl bg-muted/50 overflow-hidden">
+							{/* Compact header row */}
+							<button
+								type="button"
+								onClick={() => setQueueExpanded((v) => !v)}
+								className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
+							>
+								<ListPlus className="size-3.5 text-muted-foreground flex-shrink-0" />
+								<span className="text-xs text-muted-foreground flex-1 text-left truncate">
+									{queuedMessages.length} message
+									{queuedMessages.length !== 1 ? "s" : ""} queued
+									{queuedMessages.length > 0 && (
+										<span className="text-foreground/80 font-medium">
+											{" "}
+											· {queuedMessages[0].text.slice(0, 50)}
+											{queuedMessages[0].text.length > 50 ? "…" : ""}
+										</span>
+									)}
+								</span>
+								<div className="flex items-center gap-1 shrink-0">
+									<span
+										role="button"
+										tabIndex={0}
+										onClick={(e) => {
+											e.stopPropagation();
+											queueClearSession(sessionId);
+										}}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.stopPropagation();
+												queueClearSession(sessionId);
+											}
+										}}
+										className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+									>
+										<X className="size-3" />
+									</span>
+									<ChevronUp
+										className={cn(
+											"size-3 text-muted-foreground/40 transition-transform",
+											!queueExpanded && "rotate-180",
+										)}
+									/>
+								</div>
+							</button>
+
+							{/* Expanded list */}
+							{queueExpanded && queuedMessages.length > 1 && (
+								<div className="border-t border-border/30 max-h-[160px] overflow-y-auto scrollbar-hide">
+									<div className="flex flex-col px-1.5 py-1">
+										{queuedMessages.map((qm, idx) => (
+											<div
+												key={qm.id}
+												className="group/q flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted/60 transition-colors"
+											>
+												<span className="text-[10px] tabular-nums text-muted-foreground/40 shrink-0 w-3 text-center">
+													{idx + 1}
+												</span>
+												<p className="flex-1 text-xs text-muted-foreground truncate min-w-0">
+													{qm.text}
+												</p>
+												<div className="flex items-center gap-0.5 opacity-0 group-hover/q:opacity-100 transition-opacity shrink-0">
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<button
+																type="button"
+																onClick={() => handleQueueSendNow(qm.id)}
+																className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+															>
+																<Send className="size-2.5" />
+															</button>
+														</TooltipTrigger>
+														<TooltipContent side="top">
+															<p className="text-xs">Send now</p>
+														</TooltipContent>
+													</Tooltip>
+													{idx > 0 && (
+														<button
+															type="button"
+															onClick={() => queueMoveUp(qm.id)}
+															className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+														>
+															<ArrowUp className="size-2.5" />
+														</button>
+													)}
+													{idx < queuedMessages.length - 1 && (
+														<button
+															type="button"
+															onClick={() => queueMoveDown(qm.id)}
+															className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+														>
+															<ArrowDown className="size-2.5" />
+														</button>
+													)}
+													<button
+														type="button"
+														onClick={() => queueRemove(qm.id)}
+														className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+													>
+														<X className="size-2.5" />
+													</button>
+												</div>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+						</div>
+					) : undefined
+				}
+			/>
+			)}
+		</div>
+	);
 }

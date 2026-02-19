@@ -9,9 +9,12 @@
  * is injected into every request via a custom fetch wrapper so the proxy can authenticate.
  */
 
-import { createOpencodeClient, type OpencodeClient } from '@kortix/opencode-sdk/v2/client';
-import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import {
+	createOpencodeClient,
+	type OpencodeClient,
+} from "@kortix/opencode-sdk/v2/client";
+import { getSupabaseAccessToken, invalidateTokenCache } from "@/lib/auth-token";
+import { getActiveOpenCodeUrl } from "@/stores/server-store";
 
 let cachedClient: OpencodeClient | null = null;
 let cachedUrl: string | null = null;
@@ -19,17 +22,23 @@ let cachedUrl: string | null = null;
 /**
  * Build a Headers object with the given token injected as Authorization.
  */
-function buildHeaders(input: RequestInfo | URL, init?: RequestInit, token?: string | null): Headers {
-  const headers = new Headers(input instanceof Request ? input.headers : undefined);
-  if (init?.headers) {
-    new Headers(init.headers).forEach((value, key) => {
-      headers.set(key, value);
-    });
-  }
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-  return headers;
+function buildHeaders(
+	input: RequestInfo | URL,
+	init?: RequestInit,
+	token?: string | null,
+): Headers {
+	const headers = new Headers(
+		input instanceof Request ? input.headers : undefined,
+	);
+	if (init?.headers) {
+		new Headers(init.headers).forEach((value, key) => {
+			headers.set(key, value);
+		});
+	}
+	if (token && !headers.has("Authorization")) {
+		headers.set("Authorization", `Bearer ${token}`);
+	}
+	return headers;
 }
 
 /**
@@ -42,33 +51,30 @@ function buildHeaders(input: RequestInfo | URL, init?: RequestInit, token?: stri
  * while the sandbox was still processing.
  */
 function createAuthFetch(): typeof fetch {
-  return async (input: RequestInfo | URL, init?: RequestInit) => {
-    const token = await getSupabaseAccessToken();
-    const headers = buildHeaders(input, init, token);
-    const mergedInit = { ...init, headers };
+	return async (input: RequestInfo | URL, init?: RequestInit) => {
+		const token = await getSupabaseAccessToken();
+		const headers = buildHeaders(input, init, token);
+		const mergedInit = { ...init, headers };
 
-    // Disable Bun timeout on Request objects
-    if (input instanceof Request) {
-      (input as any).timeout = false;
-    }
+		// Disable Bun timeout on Request objects
+		if (input instanceof Request) {
+			(input as any).timeout = false;
+		}
 
-    const response = await fetch(input, mergedInit);
+		const response = await fetch(input, mergedInit);
 
-    // On 401, the token may have expired during a connection drop.
-    // Force a session refresh and retry the request once.
-    if (response.status === 401 && token) {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.refreshSession();
-      const newToken = session?.access_token;
-      if (newToken && newToken !== token) {
-        const retryHeaders = buildHeaders(input, init, newToken);
-        return fetch(input, { ...init, headers: retryHeaders });
-      }
-    }
+		// On 401, the cached token is stale. Invalidate and retry once.
+		if (response.status === 401 && token) {
+			invalidateTokenCache();
+			const newToken = await getSupabaseAccessToken();
+			if (newToken && newToken !== token) {
+				const retryHeaders = buildHeaders(input, init, newToken);
+				return fetch(input, { ...init, headers: retryHeaders });
+			}
+		}
 
-    return response;
-  };
+		return response;
+	};
 }
 
 /**
@@ -76,21 +82,21 @@ function createAuthFetch(): typeof fetch {
  * Safe to call from non-React contexts (API modules, etc.).
  */
 export function getClient(): OpencodeClient {
-  const url = getActiveOpenCodeUrl();
-  if (cachedClient && cachedUrl === url) return cachedClient;
+	const url = getActiveOpenCodeUrl();
+	if (cachedClient && cachedUrl === url) return cachedClient;
 
-  cachedClient = createOpencodeClient({
-    baseUrl: url,
-    fetch: createAuthFetch(),
-  });
-  cachedUrl = url;
-  return cachedClient;
+	cachedClient = createOpencodeClient({
+		baseUrl: url,
+		fetch: createAuthFetch(),
+	});
+	cachedUrl = url;
+	return cachedClient;
 }
 
 /**
  * Force-recreate the client (e.g. after a server switch).
  */
 export function resetClient(): void {
-  cachedClient = null;
-  cachedUrl = null;
+	cachedClient = null;
+	cachedUrl = null;
 }

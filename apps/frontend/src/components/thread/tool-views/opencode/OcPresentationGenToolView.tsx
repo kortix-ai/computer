@@ -19,6 +19,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
+import { useServerStore } from '@/stores/server-store';
+import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
 
 // ============================================================================
 // Parsing
@@ -107,6 +109,18 @@ export function OcPresentationGenToolView({
   const actionLabel = ACTION_LABELS[action] || action || 'Presentation';
   const ActionIcon = getActionIcon(action);
 
+  // Proxy-rewrite viewer URL so localhost:3210 → proxy/3210
+  const activeServer = useServerStore((s) =>
+    s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
+  );
+  const serverUrl = activeServer?.url || 'http://localhost:4096';
+  const mappedPorts = activeServer?.mappedPorts;
+
+  const viewerUrl = useMemo(() => {
+    if (!parsed?.viewer_url) return undefined;
+    return proxyLocalhostUrl(parsed.viewer_url, serverUrl, mappedPorts);
+  }, [parsed?.viewer_url, serverUrl, mappedPorts]);
+
   // Subtitle
   const subtitle = useMemo(() => {
     if (action === 'create_slide' && slideTitle) {
@@ -136,9 +150,9 @@ export function OcPresentationGenToolView({
             title={actionLabel}
             subtitle={subtitle}
           />
-          {parsed?.viewer_url && (
+          {viewerUrl && (
             <a
-              href={parsed.viewer_url}
+              href={viewerUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 ml-2"
@@ -195,9 +209,9 @@ export function OcPresentationGenToolView({
             {/* Success: Preview */}
             {parsed?.success && action === 'preview' && (
               <div className="space-y-3">
-                {parsed.viewer_url && (
+                {viewerUrl && (
                   <a
-                    href={parsed.viewer_url}
+                    href={viewerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50 hover:bg-muted transition-colors"
@@ -208,7 +222,7 @@ export function OcPresentationGenToolView({
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground">Open Presentation Viewer</p>
                       <p className="text-xs text-muted-foreground font-mono truncate">
-                        {parsed.viewer_url}
+                        localhost:3210
                       </p>
                     </div>
                     <ExternalLink className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />

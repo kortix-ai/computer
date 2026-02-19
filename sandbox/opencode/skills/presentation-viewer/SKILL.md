@@ -30,15 +30,15 @@ An HTTP server on `localhost` eliminates all of this. Iframes load cleanly, imag
 If the service is not running for some reason (e.g. no presentations exist yet), it will auto-start once the first presentation's `metadata.json` appears. The agent can also restart it manually:
 
 ```bash
-bun run /opt/KORTIX-presentation-viewer/serve.ts /workspace/presentations/<name>
+bun run /opt/opencode/skills/presentation-viewer/serve.ts /workspace/presentations/<name>
 ```
 
 ### Container details
 
 | Item | Value |
 |------|-------|
-| Service location | `/etc/services.d/KORTIX-presentation-viewer/run` |
-| Viewer files | `/opt/KORTIX-presentation-viewer/` |
+| Service location | `/etc/s6-overlay/s6-rc.d/svc-presentation-viewer/run` |
+| Viewer files | `/opt/opencode/skills/presentation-viewer/` |
 | Port | `3210` (mapped to host) |
 | Presentations dir | `/workspace/presentations/` |
 | Managed by | s6-overlay (auto-restart on crash) |
@@ -46,7 +46,7 @@ bun run /opt/KORTIX-presentation-viewer/serve.ts /workspace/presentations/<name>
 ## Local development (outside container)
 
 ```bash
-bun run .opencode/skills/KORTIX-presentation-viewer/serve.ts presentations/my-deck
+bun run .opencode/skills/presentation-viewer/serve.ts presentations/my-deck
 ```
 
 Or via the `presentation-gen` tool:

@@ -129,9 +129,19 @@ export const useTabStore = create<TabState>()(
       openTab: (tabInput) => {
         const { tabs, tabOrder } = get();
 
-        // If tab already exists, just activate it
+        // If tab already exists, update its metadata (URL may have changed) and activate it
         if (tabs[tabInput.id]) {
-          set({ activeTabId: tabInput.id });
+          const existing = tabs[tabInput.id];
+          const merged: Tab = {
+            ...existing,
+            ...tabInput,
+            openedAt: existing.openedAt,
+            metadata: { ...existing.metadata, ...tabInput.metadata },
+          };
+          set({
+            tabs: { ...tabs, [tabInput.id]: merged },
+            activeTabId: tabInput.id,
+          });
           return;
         }
 

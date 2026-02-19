@@ -34,7 +34,7 @@ const SKILLS_DIR = resolve(
   dirname(new URL(import.meta.url).pathname),
   "..",
   "skills",
-  "KORTIX-presentation-viewer",
+  "presentation-viewer",
 );
 
 interface SlideMetadata {

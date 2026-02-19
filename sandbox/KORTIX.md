@@ -217,7 +217,7 @@ Each skill contains:
 - `references/` — Documentation loaded as needed
 - `assets/` — Templates and files used in output
 
-Current skills: `KORTIX-memory`, `KORTIX-semantic-search`, `KORTIX-deep-research`, `KORTIX-browser`, `KORTIX-docx`, `KORTIX-email`, `KORTIX-pdf`, `KORTIX-presentations`, `KORTIX-presentation-viewer`, `KORTIX-remotion`, `KORTIX-skill-creator`, `KORTIX-xlsx`.
+Current skills: `KORTIX-memory`, `KORTIX-semantic-search`, `KORTIX-deep-research`, `KORTIX-browser`, `docx`, `email`, `pdf`, `presentations`, `presentation-viewer`, `remotion`, `KORTIX-skill-creator`, `xlsx`.
 
 ### Commands as Workflows
 
