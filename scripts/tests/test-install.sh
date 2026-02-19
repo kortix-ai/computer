@@ -128,7 +128,7 @@ else
   fail "uses Caddy for reverse proxy (VPS)"
 fi
 
-if grep -q 'basicauth' "$SCRIPT"; then
+if grep -q 'basic_auth' "$SCRIPT"; then
   pass "supports basic auth (VPS)"
 else
   fail "supports basic auth (VPS)"
