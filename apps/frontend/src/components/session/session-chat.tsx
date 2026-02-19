@@ -2035,27 +2035,6 @@ function SessionTurn({
 				</div>
 			)}
 
-			{/* Always-visible: Subsession/task cards */}
-			{taskToolParts.length > 0 && (
-				<div className="space-y-2">
-					{taskToolParts.map(({ part, message }) => {
-						const toolPart = part as ToolPart;
-						if (!shouldShowToolPart(toolPart)) return null;
-						const perm = getPermissionForTool(permissions, toolPart.callID);
-						if (isToolPartHidden(toolPart, message.info.id, hidden)) return null;
-						return (
-							<ToolPartRenderer
-								key={part.id}
-								part={toolPart}
-								sessionId={sessionId}
-								permission={perm}
-								onPermissionReply={onPermissionReply}
-							/>
-						);
-					})}
-				</div>
-			)}
-
 			{/* Kortix logo — shown when there are no steps and not working (otherwise logo is already above the steps trigger) */}
 			{!hasSteps && !working && (response || answeredQuestionParts.length > 0) && (
 				<div className="flex items-center gap-2 mt-3 mb-3">
@@ -2087,6 +2066,27 @@ function SessionTurn({
 					{answeredQuestionParts.map(({ part }) => (
 						<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
 					))}
+				</div>
+			)}
+
+			{/* Always-visible: Subsession/task cards — rendered after the response text */}
+			{taskToolParts.length > 0 && (
+				<div className="space-y-2">
+					{taskToolParts.map(({ part, message }) => {
+						const toolPart = part as ToolPart;
+						if (!shouldShowToolPart(toolPart)) return null;
+						const perm = getPermissionForTool(permissions, toolPart.callID);
+						if (isToolPartHidden(toolPart, message.info.id, hidden)) return null;
+						return (
+							<ToolPartRenderer
+								key={part.id}
+								part={toolPart}
+								sessionId={sessionId}
+								permission={perm}
+								onPermissionReply={onPermissionReply}
+							/>
+						);
+					})}
 				</div>
 			)}
 
@@ -3169,6 +3169,9 @@ export function SessionChat({
 		(cmd: Command, args?: string) => {
 			playSound("send");
 			const label = args ? `/${cmd.name} ${args}` : `/${cmd.name}`;
+			const messageID = ascendingId("msg");
+			const textPartId = ascendingId("prt");
+
 			setPendingCommand({
 				name: cmd.name,
 				description: args || cmd.description,
@@ -3181,6 +3184,12 @@ export function SessionChat({
 			setPendingUserMessageId(null);
 			setPollingActive(true);
 			lastSendTimeRef.current = Date.now();
+
+			// Optimistic: show command message immediately + set busy
+			// (mirrors handleSend behavior)
+			addOptimisticUserMessage(messageID, label, [textPartId]);
+			useSyncStore.getState().setStatus(sessionId, { type: "busy" });
+
 			executeCommand.mutate(
 				{ sessionId, command: cmd.name, args },
 				{
@@ -3189,12 +3198,14 @@ export function SessionChat({
 						setPendingUserMessage(null);
 						setPendingUserMessageId(null);
 						setPollingActive(false);
+						useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+						removeOptimisticUserMessage(messageID);
 					},
 				},
 			);
 			setTimeout(() => scrollToBottom(), 50);
 		},
-		[sessionId, executeCommand, scrollToBottom],
+		[sessionId, executeCommand, scrollToBottom, addOptimisticUserMessage, removeOptimisticUserMessage],
 	);
 
 	const handleFileSearch = useCallback(
