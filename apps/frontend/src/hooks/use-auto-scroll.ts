@@ -3,21 +3,20 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 
 /**
- * useAutoScroll — ChatGPT-style auto-scroll.
+ * useAutoScroll — ChatGPT-style scroll.
  *
- * Dynamic spacer: sized so that the browser's natural max-scroll
- * (scrollHeight - clientHeight) lands exactly where the last turn's
- * user bubble sits at the top with TURN_TOP_OFFSET padding.
+ * Spacer = max(0, viewportH - lastTurnH - TURN_TOP_OFFSET).
+ * Updated via DIRECT DOM manipulation (spacerRef.style.height), not
+ * React state. This avoids re-renders that fight with the RAF loop.
  *
- * Formula: spacer = viewportH - lastTurnH - TURN_TOP_OFFSET  (min 0)
+ * Key physics: as the last turn grows by X, the spacer shrinks by X.
+ * scrollHeight stays CONSTANT. No scrolling is needed while the
+ * response fits in the viewport — content fills in where the spacer was.
+ * Once the spacer hits 0, scrollHeight grows and the RAF loop follows.
  *
- * This means:
- *   - Short last turn → big spacer → lots of empty space below
- *   - Tall last turn  → small/no spacer → content fills viewport
- *   - No clamp needed — the natural scroll limit IS the right limit
- *
- * MutationObserver + ResizeObserver keep the spacer in sync as content
- * changes (new messages, streaming text, steps collapsing).
+ * MutationObserver recalculates the spacer on every content change.
+ * This is now safe because scrollHeight doesn't change (turn growth
+ * and spacer shrinkage cancel out), so there's nothing to fight.
  */
 
 interface UseAutoScrollOptions {
@@ -27,63 +26,69 @@ interface UseAutoScrollOptions {
 interface UseAutoScrollReturn {
   scrollRef: React.RefObject<HTMLDivElement>;
   contentRef: React.RefObject<HTMLDivElement>;
+  spacerElRef: React.RefObject<HTMLDivElement>;
   showScrollButton: boolean;
   scrollToBottom: () => void;
   scrollToLastTurn: () => void;
   scrollToEnd: () => void;
-  spacerHeight: number;
 }
 
 const BOTTOM_THRESHOLD = 80;
 const TURN_TOP_OFFSET = 24;
 
-// ── Hook ────────────────────────────────────────────────────────────
+/** scrollTop that puts the last [data-turn-id] at TURN_TOP_OFFSET from viewport top. */
+function measureTarget(scrollEl: HTMLDivElement, contentEl: HTMLDivElement): number | null {
+  const turns = contentEl.querySelectorAll<HTMLElement>('[data-turn-id]');
+  const last = turns[turns.length - 1];
+  if (!last) return null;
+  const sr = scrollEl.getBoundingClientRect();
+  const tr = last.getBoundingClientRect();
+  return Math.max(0, scrollEl.scrollTop + (tr.top - sr.top) - TURN_TOP_OFFSET);
+}
 
 export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const spacerElRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  // Start with a generous default so the first render has room to scroll.
-  const [spacerHeight, setSpacerHeight] = useState(() =>
-    typeof window !== 'undefined' ? window.innerHeight : 800,
-  );
 
   const userScrolledRef = useRef(false);
   const rafIdRef = useRef<number>(0);
-  const lastScrollHeightRef = useRef(0);
   const prevWorkingRef = useRef(working);
+  // Current spacer value for the RAF loop's contentH calculation.
+  const spacerValRef = useRef(0);
 
-  // ── Dynamic spacer ────────────────────────────────────────────────
-  // Recalculates whenever:
-  //   - The scroll container resizes (ResizeObserver)
-  //   - Content changes: new messages, streaming text (MutationObserver)
-  // RAF-throttled to avoid layout thrashing.
+  // ── Spacer recalc (direct DOM, no React state) ────────────────────
+  const recalcSpacer = useCallback(() => {
+    const el = scrollRef.current;
+    const content = contentRef.current;
+    const spacer = spacerElRef.current;
+    if (!el || !content || !spacer) return;
+
+    const vh = el.clientHeight;
+    const turns = content.querySelectorAll<HTMLElement>('[data-turn-id]');
+    const last = turns[turns.length - 1];
+    const h = last
+      ? Math.max(0, vh - last.offsetHeight - TURN_TOP_OFFSET)
+      : vh;
+
+    spacerValRef.current = h;
+    spacer.style.height = h + 'px';
+  }, []);
+
+  // ── Observers: resize + content mutations ─────────────────────────
+  // Re-run when `working` changes so that observers are created once the
+  // scroll area actually mounts (it's conditionally rendered — refs may
+  // be null on the initial mount during loading/welcome screen).
   useEffect(() => {
     const el = scrollRef.current;
     const content = contentRef.current;
     if (!el || !content) return;
 
     let rafId = 0;
-
-    const recalc = () => {
-      const viewportH = el.clientHeight;
-      const turns = content.querySelectorAll<HTMLElement>('[data-turn-id]');
-      const lastTurn = turns[turns.length - 1];
-      if (!lastTurn) {
-        // No turns yet — full viewport spacer so optimistic message can scroll up.
-        setSpacerHeight(viewportH);
-        return;
-      }
-      const lastTurnH = lastTurn.offsetHeight;
-      setSpacerHeight(Math.max(0, viewportH - lastTurnH - TURN_TOP_OFFSET));
-    };
-
     const schedule = () => {
       if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        recalc();
-      });
+      rafId = requestAnimationFrame(() => { rafId = 0; recalcSpacer(); });
     };
 
     const ro = new ResizeObserver(schedule);
@@ -92,66 +97,72 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     const mo = new MutationObserver(schedule);
     mo.observe(content, { childList: true, subtree: true, characterData: true });
 
-    // Initial calc.
-    recalc();
+    recalcSpacer();
 
-    return () => {
-      ro.disconnect();
-      mo.disconnect();
-      cancelAnimationFrame(rafId);
-    };
-  }, []);
+    return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(rafId); };
+  }, [recalcSpacer, working]);
 
-  // ── "At bottom" — with the dynamic spacer, the absolute bottom IS
-  //    the last-turn-at-top position, so we just check scrollHeight. ──
+  // ── isAtBottom (DOM-measured) ─────────────────────────────────────
   const isAtBottom = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return true;
-    return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
+    const content = contentRef.current;
+    if (!el || !content) return true;
+    const target = measureTarget(el, content);
+    if (target === null) return true;
+    return el.scrollTop >= target - BOTTOM_THRESHOLD;
   }, []);
 
-  // ── Instant: scroll to bottom (= last turn at top) ────────────────
+  // ── Instant scroll: last turn at top ──────────────────────────────
   const scrollToEnd = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    const content = contentRef.current;
+    if (!el || !content) return;
+    // Ensure spacer is sized before measuring — covers the case where
+    // observers haven't been set up yet (e.g. idle session first load).
+    recalcSpacer();
     userScrolledRef.current = false;
     setShowScrollButton(false);
-    el.scrollTop = el.scrollHeight;
-  }, []);
+    const target = measureTarget(el, content);
+    if (target !== null) el.scrollTop = target;
+  }, [recalcSpacer]);
 
-  // ── Smooth: scroll to bottom (= last turn at top) ─────────────────
+  // ── Smooth scroll: last turn at top ───────────────────────────────
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    const content = contentRef.current;
+    if (!el || !content) return;
+    // Ensure spacer is sized before measuring.
+    recalcSpacer();
     userScrolledRef.current = false;
     setShowScrollButton(false);
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, []);
+    const target = measureTarget(el, content);
+    if (target !== null) el.scrollTo({ top: target, behavior: 'smooth' });
+  }, [recalcSpacer]);
 
-  // ── Alias used by handleSend — smooth scroll to last turn ─────────
-  const scrollToLastTurn = useCallback(() => {
-    scrollToBottom();
-  }, [scrollToBottom]);
+  const scrollToLastTurn = useCallback(() => scrollToBottom(), [scrollToBottom]);
 
-  // ── Re-anchor on working → idle ───────────────────────────────────
-  // The DOM changes dramatically (steps collapse, response moves).
-  // Re-position the last turn at the top so it doesn't disappear.
+  // ── On working → idle: re-anchor after DOM settles ────────────────
   useEffect(() => {
     const was = prevWorkingRef.current;
     prevWorkingRef.current = working;
     if (was && !working && !userScrolledRef.current) {
-      // Staggered instant scrolls to cover layout settling.
-      const t1 = setTimeout(scrollToEnd, 50);
-      const t2 = setTimeout(scrollToEnd, 200);
-      const t3 = setTimeout(scrollToEnd, 600);
-      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+      // Spacer is already correct (MO keeps it updated).
+      // Just re-anchor in case steps collapsed / response moved.
+      const t1 = setTimeout(scrollToEnd, 100);
+      const t2 = setTimeout(scrollToEnd, 500);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
     }
   }, [working, scrollToEnd]);
 
   // ── RAF auto-scroll during streaming ──────────────────────────────
+  // Phase 1 (spacer > 0): scrollHeight is constant, no scrolling needed.
+  //   The spacer shrinks as the turn grows — content fills in naturally.
+  // Phase 2 (spacer = 0): scrollHeight grows. Follow the growth.
   useEffect(() => {
     if (!working) {
-      // Not streaming — check if FAB should show.
+      // Not streaming — calculate spacer once (covers idle session loads
+      // where the observer setup may have been deferred).
+      recalcSpacer();
       const timer = setTimeout(() => {
         if (!isAtBottom()) setShowScrollButton(true);
         else { setShowScrollButton(false); userScrolledRef.current = false; }
@@ -160,33 +171,25 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     }
 
     let active = true;
-    lastScrollHeightRef.current = scrollRef.current?.scrollHeight ?? 0;
 
     const tick = () => {
       if (!active) return;
       const el = scrollRef.current;
-      if (el) {
-        const newH = el.scrollHeight;
-        const grew = newH - lastScrollHeightRef.current;
-        if (grew > 0) {
-          const dist = newH - el.scrollTop - el.clientHeight;
-          if (dist <= grew + BOTTOM_THRESHOLD && !userScrolledRef.current) {
-            // Follow growing content — just go to the bottom.
-            // With the dynamic spacer this = last turn at top.
-            el.scrollTop = newH;
-          } else if (!userScrolledRef.current) {
-            userScrolledRef.current = true;
-            setShowScrollButton(true);
-          }
+      if (el && !userScrolledRef.current) {
+        // Only scroll when the spacer has hit 0 and content overflows.
+        const contentH = el.scrollHeight - spacerValRef.current;
+        const viewportBottom = el.scrollTop + el.clientHeight;
+        const overflow = contentH - viewportBottom;
+        if (overflow > 0) {
+          el.scrollTop += overflow;
         }
-        lastScrollHeightRef.current = newH;
       }
       rafIdRef.current = requestAnimationFrame(tick);
     };
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { active = false; cancelAnimationFrame(rafIdRef.current); };
-  }, [working, isAtBottom]);
+  }, [working, isAtBottom, recalcSpacer]);
 
   // ── Wheel intent ──────────────────────────────────────────────────
   useEffect(() => {
@@ -244,13 +247,5 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     return () => el.removeEventListener('scroll', handle);
   }, [isAtBottom]);
 
-  return {
-    scrollRef,
-    contentRef,
-    showScrollButton,
-    scrollToBottom,
-    scrollToLastTurn,
-    scrollToEnd,
-    spacerHeight,
-  };
+  return { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd };
 }

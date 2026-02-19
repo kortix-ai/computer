@@ -104,7 +104,7 @@ import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
 import { useOpenCodeSessionStatusStore } from "@/stores/opencode-session-status-store";
 import { useSyncStore } from "@/stores/opencode-sync-store";
 import { useServerStore } from "@/stores/server-store";
-import { openTabAndNavigate } from "@/stores/tab-store";
+import { openTabAndNavigate, useTabStore } from "@/stores/tab-store";
 // Shared UI primitives (framework-agnostic, reusable on mobile)
 import {
 	type AgentPart,
@@ -2449,8 +2449,20 @@ export function SessionChat({
 	const isServerBusy =
 		sessionStatus?.type === "busy" || sessionStatus?.type === "retry";
 
-	// Match OpenCode: isBusy is driven ONLY by the session status (single source of truth).
-	const isBusy = isServerBusy;
+	// Debounced busy state: goes true immediately, but stays true for 2s
+	// after the server says idle. This prevents flickering between agentic
+	// steps where the status briefly goes idle then back to busy.
+	const [isBusy, setIsBusy] = useState(isServerBusy);
+	const busyTimerRef = useRef<ReturnType<typeof setTimeout>>();
+	useEffect(() => {
+		if (isServerBusy) {
+			clearTimeout(busyTimerRef.current);
+			setIsBusy(true);
+		} else {
+			busyTimerRef.current = setTimeout(() => setIsBusy(false), 2000);
+		}
+		return () => clearTimeout(busyTimerRef.current);
+	}, [isServerBusy]);
 
 	// ---- Message Queue ----
 	// Hydrate the queue from the backend on first mount (survives page reloads).
@@ -2764,44 +2776,41 @@ export function SessionChat({
 	}, [messages?.length]);
 
 	// ---- Auto-scroll (replaces inline scroll logic) ----
-	const { scrollRef, contentRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd, spacerHeight } =
+	const { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd } =
 		useAutoScroll({
 			working: isBusy,
 		});
 
-	// Scroll to the bottom when switching session tabs or on initial message load.
-	// Uses scrollToEnd() (instant, no smooth animation) so there's no visible
-	// jump. Staggered attempts cover async markdown/code-block rendering.
+	// Scroll to the last turn on initial load / session change.
+	// Uses scrollToEnd (instant) so there's no visible smooth animation.
+	// Staggered attempts cover async markdown/code-block rendering.
 	const initialScrollDoneRef = useRef<string | null>(null);
-	useEffect(() => {
-		// Reset on session change so we scroll on first render of new session
-		if (initialScrollDoneRef.current !== sessionId) {
-			initialScrollDoneRef.current = null;
-		}
-	}, [sessionId]);
-
 	const messageCount = messages?.length ?? 0;
 	useEffect(() => {
 		if (initialScrollDoneRef.current === sessionId) return;
 		if (messageCount === 0) return;
 		initialScrollDoneRef.current = sessionId;
 
-		// Staggered instant scrolls: the scroll container mounts after this
-		// render, then message components (markdown, code blocks) render
-		// asynchronously. Use scrollToEnd (instant) so there's no visible
-		// smooth animation on page load.
 		const t1 = setTimeout(scrollToEnd, 0);
 		const t2 = setTimeout(scrollToEnd, 100);
 		const t3 = setTimeout(scrollToEnd, 500);
 		const t4 = setTimeout(scrollToEnd, 1500);
 
-		return () => {
-			clearTimeout(t1);
-			clearTimeout(t2);
-			clearTimeout(t3);
-			clearTimeout(t4);
-		};
+		return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
 	}, [messageCount, sessionId, scrollToEnd]);
+
+	// Scroll to the last turn when switching back to this tab.
+	const activeTabId = useTabStore((s) => s.activeTabId);
+	const isActiveTab = activeTabId === sessionId;
+	const wasActiveRef = useRef(isActiveTab);
+	useEffect(() => {
+		const was = wasActiveRef.current;
+		wasActiveRef.current = isActiveTab;
+		if (!was && isActiveTab && messageCount > 0) {
+			const t = setTimeout(scrollToBottom, 100);
+			return () => clearTimeout(t);
+		}
+	}, [isActiveTab, messageCount, scrollToBottom]);
 
 	// ---- Pending permissions & questions ----
 	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
@@ -3020,9 +3029,9 @@ export function SessionChat({
 			addOptimisticUserMessage(messageID, optimisticText, [textPartId]);
 			useSyncStore.getState().setStatus(sessionId, { type: "busy" });
 
-			// Scroll so the new user message appears at the top of the viewport.
-			// Single setTimeout gives React time to commit the DOM update.
-			setTimeout(() => scrollToLastTurn(), 50);
+		// Scroll so the new user message appears at the top of the viewport.
+		// MutationObserver recalcs spacer automatically when the new turn renders.
+		setTimeout(() => scrollToBottom(), 50);
 
 			const options: Record<string, unknown> = {};
 			if (local.agent.current) options.agent = local.agent.current.name;
@@ -3131,7 +3140,7 @@ export function SessionChat({
 			local.model.variant.current,
 			addOptimisticUserMessage,
 			removeOptimisticUserMessage,
-			scrollToLastTurn,
+			scrollToBottom,
 		],
 	);
 
@@ -3166,9 +3175,9 @@ export function SessionChat({
 					},
 				},
 			);
-			setTimeout(() => scrollToLastTurn(), 50);
+			setTimeout(() => scrollToBottom(), 50);
 		},
-		[sessionId, executeCommand, scrollToLastTurn],
+		[sessionId, executeCommand, scrollToBottom],
 	);
 
 	const handleFileSearch = useCallback(
@@ -3422,7 +3431,7 @@ export function SessionChat({
 						    only brings the last message to the bottom of the screen.
 						    Height is dynamically measured from the scroll container so
 						    the newest message appears flush at the top. */}
-						<div style={{ height: spacerHeight }} />
+						<div ref={spacerElRef} />
 						</div>
 					</div>
 
