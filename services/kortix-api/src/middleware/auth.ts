@@ -4,6 +4,7 @@ import { validateSecretKey } from '../repositories/api-keys';
 import { validateSandboxToken } from '../repositories/sandboxes';
 import { getSupabase } from '../shared/supabase';
 import { config } from '../config';
+import { timingSafeStringEqual } from '../shared/crypto';
 
 /**
  * API key auth (sk_/sbt_ for search, LLM routes).
@@ -146,6 +147,47 @@ export async function dualAuth(c: Context, next: Next) {
  * Supabase JWT from header OR query param (for daytona-proxy SSE).
  * EventSource/SSE can't set headers, so we also check ?token=<token>.
  */
+/**
+ * Sandbox token auth (for local/VPS sandbox proxy protection).
+ *
+ * If SANDBOX_AUTH_TOKEN is configured, validates the token from:
+ *   1. Authorization: Bearer <token> header
+ *   2. ?token=<token> query parameter (for SSE/EventSource which can't set headers)
+ *
+ * If SANDBOX_AUTH_TOKEN is NOT set, passes through (no auth — backward compatible).
+ *
+ * Returns 401 with { authType: 'sandbox_token' } so the frontend can distinguish
+ * this from Supabase auth failures and show the correct dialog.
+ */
+export async function sandboxTokenAuth(c: Context, next: Next) {
+  if (!config.hasSandboxAuth()) {
+    await next();
+    return;
+  }
+
+  // Extract token from header or query param
+  const authHeader = c.req.header('Authorization');
+  let token: string | undefined;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  }
+
+  if (!token) {
+    token = c.req.query('token') || undefined;
+  }
+
+  if (!token) {
+    return c.json({ error: 'Unauthorized', authType: 'sandbox_token' }, 401);
+  }
+
+  if (!timingSafeStringEqual(token, config.SANDBOX_AUTH_TOKEN)) {
+    return c.json({ error: 'Invalid token', authType: 'sandbox_token' }, 401);
+  }
+
+  await next();
+}
+
 export async function supabaseAuthWithQueryParam(c: Context, next: Next) {
   // Local mode: skip auth, inject mock user
   if (config.isLocal()) {

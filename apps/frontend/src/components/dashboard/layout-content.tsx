@@ -21,6 +21,7 @@ import { useConnectionToasts } from '@/components/dashboard/connecting-screen';
 import { TabBar } from '@/components/tabs/tab-bar';
 import { useTabStore } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
+import { getSandboxToken } from '@/stores/sandbox-auth-store';
 import { cn } from '@/lib/utils';
 
 function OpenCodeEventStreamProvider() {
@@ -98,6 +99,10 @@ const CommandPalette = lazy(() =>
 
 const ConnectingScreen = lazy(() =>
   import('@/components/dashboard/connecting-screen').then(mod => ({ default: mod.ConnectingScreen }))
+);
+
+const SandboxTokenDialog = lazy(() =>
+  import('@/components/auth/sandbox-token-dialog').then(mod => ({ default: mod.SandboxTokenDialog }))
 );
 
 const SessionLayout = lazy(() =>
@@ -304,7 +309,24 @@ export default function DashboardLayoutContent({
     const checkOnboarding = async () => {
       try {
         const instanceUrl = useServerStore.getState().getActiveServerUrl();
-        const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
+        const headers: Record<string, string> = {};
+        const sandboxToken = getSandboxToken();
+        if (sandboxToken) headers['Authorization'] = `Bearer ${sandboxToken}`;
+        const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, { headers });
+
+        // If 401 with sandbox_token auth, don't redirect — let the dialog handle it
+        if (res.status === 401) {
+          try {
+            const body = await res.json();
+            if (body?.authType === 'sandbox_token') {
+              // The SandboxTokenDialog will handle this; just mark onboarding as checked
+              // so we stay on the dashboard and the dialog can appear.
+              setOnboardingChecked(true);
+              return;
+            }
+          } catch { /* non-JSON */ }
+        }
+
         if (res.ok) {
           const data = await res.json();
           if (data.ONBOARDING_COMPLETE !== 'true') {
@@ -380,6 +402,9 @@ export default function DashboardLayoutContent({
       <SandboxConnectionProvider />
       <OpenCodeEventStreamProvider />
       <WebNotificationProvider />
+      <Suspense fallback={null}>
+        <SandboxTokenDialog />
+      </Suspense>
       <Suspense fallback={null}>
         <ConnectingScreen />
       </Suspense>

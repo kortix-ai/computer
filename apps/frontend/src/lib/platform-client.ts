@@ -14,7 +14,7 @@
  * In local:      http://localhost:8008/v1/platform/*  (base URL includes /v1)
  */
 
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getSupabaseAccessToken, getAuthToken } from '@/lib/auth-token';
 import type { ServerEntry } from '@/stores/server-store';
 
 // ─── Sandbox Port Constants ──────────────────────────────────────────────────
@@ -34,31 +34,26 @@ export const SANDBOX_PORTS = {
 } as const;
 
 /**
- * Get a direct URL to a sandbox service via the preview proxy.
+ * Get a URL to access a specific container port on a sandbox.
+ * ALL modes route through the backend's unified preview proxy.
  *
- * - Local Docker: resolves via `mappedPorts` → `http://localhost:{hostPort}`
  * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
- * - Manual/unknown: returns null (caller should fall back to proxy)
+ * - Local Docker:    `{BACKEND_URL}/preview/local/{containerPort}`
+ * - Manual/unknown: returns null (caller should fall back to generic proxy)
  */
 export function getDirectPortUrl(
   server: ServerEntry,
   containerPort: string,
 ): string | null {
-  // Cloud: route through the preview proxy (guard against undefined sandboxId)
+  // Cloud: route through the preview proxy
   if (server.provider === 'daytona' && server.sandboxId && server.sandboxId !== 'undefined') {
     return `${PLATFORM_URL}/preview/${server.sandboxId}/${containerPort}`;
   }
 
-  // Local Docker: look up the random host port from mappedPorts
-  if (server.provider === 'local_docker' && server.mappedPorts) {
-    const hostPort = server.mappedPorts[containerPort];
-    if (!hostPort) return null;
-    try {
-      const base = new URL(server.url);
-      return `${base.protocol}//${base.hostname}:${hostPort}`;
-    } catch {
-      return `http://localhost:${hostPort}`;
-    }
+  // Local Docker: route through the unified preview proxy.
+  // Backend handles port 8000 directly and other ports via Kortix Master's /proxy/{port}/.
+  if (server.provider === 'local_docker') {
+    return `${PLATFORM_URL}/preview/local/${containerPort}`;
   }
 
   return null;
@@ -157,9 +152,12 @@ async function platformFetch<T>(
  * Guards against missing external_id to prevent broken URLs.
  */
 export function getSandboxUrl(sandbox: SandboxInfo): string {
-  // Local Docker always uses base_url (direct localhost port mapping)
+  // Local Docker: route through the backend's unified preview proxy.
+  // The platform API returns the raw Docker URL (e.g. http://localhost:14000)
+  // but the frontend should never connect directly — all requests go through
+  // the backend at {BACKEND_URL}/preview/local/8000 which proxies to the sandbox.
   if (sandbox.provider === 'local_docker') {
-    return sandbox.base_url;
+    return `${PLATFORM_URL}/preview/local/${SANDBOX_PORTS.KORTIX_MASTER}`;
   }
 
   // Daytona requires a valid external_id for URL construction
@@ -178,8 +176,7 @@ export function getSandboxUrl(sandbox: SandboxInfo): string {
  * Build a URL to access a specific container port on a sandbox.
  *
  * - Daytona (cloud): `{BACKEND_URL}/preview/{externalId}/{containerPort}`
- * - Local Docker: reads `metadata.mappedPorts[containerPort]` →
- *   `http://localhost:{hostPort}`. Returns null if no mapping exists.
+ * - Local Docker:    `{BACKEND_URL}/preview/local/{containerPort}`
  * - Falls back to null if the port can't be resolved.
  */
 export function getSandboxPortUrl(
@@ -190,19 +187,9 @@ export function getSandboxPortUrl(
     return `${PLATFORM_URL}/preview/${sandbox.external_id}/${containerPort}`;
   }
 
+  // Local Docker: route through the unified preview proxy
   if (sandbox.provider === 'local_docker') {
-    const mappedPorts = sandbox.metadata?.mappedPorts as
-      | Record<string, string>
-      | undefined;
-    const hostPort = mappedPorts?.[containerPort];
-    if (!hostPort) return null;
-    // base_url is http://localhost:{somePort} — extract the hostname
-    try {
-      const base = new URL(sandbox.base_url);
-      return `${base.protocol}//${base.hostname}:${hostPort}`;
-    } catch {
-      return `http://localhost:${hostPort}`;
-    }
+    return `${PLATFORM_URL}/preview/local/${containerPort}`;
   }
 
   return null;
@@ -407,7 +394,7 @@ export async function triggerSandboxUpdate(
   version: string,
 ): Promise<SandboxUpdateResult> {
   const url = getSandboxUrl(sandbox);
-  const token = await getSupabaseAccessToken();
+  const token = await getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServerStore } from '@/stores/server-store';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
 import { fileListKeys } from './use-file-list';
 import { fileContentKeys } from './use-file-content';
 import { gitStatusKeys } from './use-git-status';
@@ -38,8 +38,8 @@ export function useFileEventInvalidation() {
       try {
         const baseEventUrl = `${getActiveOpenCodeUrl()}/event`;
 
-        // Attach JWT as query param (EventSource doesn't support custom headers)
-        const token = await getSupabaseAccessToken();
+        // Attach auth token as query param (EventSource doesn't support custom headers)
+        const token = await getAuthToken();
         const eventUrl = token
           ? `${baseEventUrl}${baseEventUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
           : baseEventUrl;

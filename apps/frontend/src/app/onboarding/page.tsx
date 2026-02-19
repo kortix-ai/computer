@@ -32,7 +32,7 @@ const BIOS_LINES: { text: string; bold?: boolean }[] = [
   { text: 'Starting KORTIX OS...' },
 ];
 
-/** Get the sandbox instance URL (e.g. http://localhost:14000) */
+/** Get the sandbox instance URL (routed through backend at /v1/preview/local/8000) */
 function getInstanceUrl() {
   return useServerStore.getState().getActiveServerUrl();
 }

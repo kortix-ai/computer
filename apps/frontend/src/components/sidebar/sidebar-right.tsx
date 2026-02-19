@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/sidebar-right-provider';
 import { SidebarFileBrowser } from '@/components/sidebar/sidebar-explorer';
 import { useFilesStore } from '@/features/files/store/files-store';
-import { useServerStore } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
@@ -51,8 +51,7 @@ export function SidebarRight() {
   const activeServer = useServerStore((s) => {
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
   });
-  const serverUrl = activeServer?.url || 'http://localhost:4096';
-  const mappedPorts = activeServer?.mappedPorts;
+  const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
 
   // Create new PTY terminal → opens as a tab
   const createPty = useCreatePty();
@@ -73,18 +72,15 @@ export function SidebarRight() {
   }, [createPty]);
 
   /**
-   * Open a well-known sandbox service as a preview tab using a DIRECT URL.
-   * Resolves the random Docker host port (or Daytona path) from the active server's mappedPorts.
-   * Falls back to the proxy if no direct URL can be resolved.
+   * Open a well-known sandbox service as a preview tab.
+   * All modes route through the backend proxy — no direct localhost access.
    */
   const openSandboxServiceTab = useCallback(
     (containerPort: string, title: string) => {
-      // Try direct URL first (bypasses proxy, works for WebSocket services like noVNC)
-      const directUrl = activeServer
-        ? getDirectPortUrl(activeServer, containerPort)
-        : null;
-      // Fall back to proxy-based URL if direct resolution fails
-      const url = directUrl || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, mappedPorts);
+      // Prefer provider-aware URL (cloud: /preview/{id}/{port}, local: /preview/local/{port})
+      const url = activeServer
+        ? (getDirectPortUrl(activeServer, containerPort) || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl))
+        : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl);
 
       const tabId = `preview:${containerPort}`;
       const tabHref = `/preview/${containerPort}`;
@@ -101,24 +97,16 @@ export function SidebarRight() {
         },
       });
     },
-    [activeServer, serverUrl, mappedPorts],
+    [activeServer, serverUrl],
   );
 
   const handleOpenDesktop = useCallback(() => {
     const containerPort = SANDBOX_PORTS.DESKTOP;
-    const directUrl = activeServer
-      ? getDirectPortUrl(activeServer, containerPort)
-      : null;
-
-    let url: string;
-    if (directUrl) {
-      // Direct port access — noVNC works natively
-      url = directUrl;
-    } else {
-      // Proxy access — tell noVNC to route its WebSocket through the proxy path
-      const proxyBase = getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, mappedPorts);
-      url = `${proxyBase.replace(/\/$/, '')}/vnc_lite.html?path=proxy/${containerPort}/websockify&autoconnect=true&resize=scale`;
-    }
+    // Route through the proxy — Kortix Master proxies to KasmVNC port.
+    // KasmVNC serves its own UI at the root and handles WebSocket internally.
+    const url = activeServer
+      ? (getDirectPortUrl(activeServer, containerPort) || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl))
+      : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl);
 
     const tabId = `preview:${containerPort}`;
     const tabHref = `/preview/${containerPort}`;
@@ -129,7 +117,7 @@ export function SidebarRight() {
       href: tabHref,
       metadata: { url, port: parseInt(containerPort, 10), originalUrl: `http://localhost:${containerPort}/` },
     });
-  }, [activeServer, serverUrl, mappedPorts]);
+  }, [activeServer, serverUrl]);
 
   const handleOpenAgentBrowser = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');

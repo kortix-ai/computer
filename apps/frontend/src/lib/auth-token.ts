@@ -1,15 +1,19 @@
 /**
- * Shared helper to get the current Supabase access token (JWT).
+ * Shared auth token helpers.
  *
- * Used by:
- *  - opencode-sdk.ts   (SDK fetch wrapper for instance API calls)
- *  - use-file-events.ts (SSE connections to instance /event endpoint)
- *  - server-selector.tsx (health checks for remote instances)
+ * Provides two token sources:
+ * 1. Supabase JWT — for cloud mode (authenticated via Supabase login)
+ * 2. Sandbox token — for local/VPS mode (user enters SANDBOX_AUTH_TOKEN)
  *
- * Returns `null` when no session is available (user not logged in).
+ * `getAuthToken()` is the unified getter: tries Supabase first, then sandbox.
+ * Use it anywhere you need to authenticate against the sandbox proxy.
+ *
+ * `getSupabaseAccessToken()` is kept for callers that specifically need the
+ * Supabase JWT (e.g. platform API calls that go through Supabase auth, not sandbox auth).
  */
 
 import { createClient } from '@/lib/supabase/client';
+import { getSandboxToken } from '@/stores/sandbox-auth-store';
 
 /**
  * Get the current Supabase access token.
@@ -23,4 +27,19 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Unified auth token getter — tries Supabase JWT first, falls back to sandbox token.
+ *
+ * Use this for any request going through the /v1/preview proxy. The proxy
+ * accepts either Supabase JWT (cloud) or sandbox token (local/VPS).
+ */
+export async function getAuthToken(): Promise<string | null> {
+  // Cloud mode: Supabase JWT
+  const supabaseToken = await getSupabaseAccessToken();
+  if (supabaseToken) return supabaseToken;
+
+  // Local/VPS mode: sandbox token (synchronous — stored in zustand)
+  return getSandboxToken();
 }

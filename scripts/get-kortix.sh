@@ -43,6 +43,7 @@ ADMIN_USER="admin"
 ADMIN_PASSWORD=""
 KORTIX_TOKEN=""
 INTERNAL_SERVICE_KEY=""
+SANDBOX_AUTH_TOKEN=""
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 open_browser() {
@@ -247,9 +248,13 @@ generate_secrets() {
   success "Encryption key generated"
 
   if [ "$DEPLOY_MODE" = "vps" ]; then
-    # Generate internal service key
+    # Generate internal service key (sandbox ↔ API service-to-service auth)
     INTERNAL_SERVICE_KEY=$(generate_token)
     success "Internal service token generated"
+
+    # Generate sandbox auth token (user → API proxy auth)
+    SANDBOX_AUTH_TOKEN=$(generate_token)
+    success "Sandbox auth token generated"
 
     if [ "$ENABLE_AUTH" = "yes" ]; then
       ADMIN_PASSWORD=$(generate_password)
@@ -287,21 +292,9 @@ ${DOMAIN} {
 ${tls_config}
 ${auth_block}
 
-  # API routes — proxy to kortix-api
+  # API routes — proxy to kortix-api (includes /v1/sandbox/* for sandbox proxy)
   handle /v1/* {
     reverse_proxy kortix-api:8008
-  }
-
-  # Sandbox — proxy to sandbox master
-  handle /server/* {
-    uri strip_prefix /server
-    reverse_proxy sandbox:8000
-  }
-
-  # WebSocket support for sandbox
-  handle /server/ws/* {
-    uri strip_prefix /server
-    reverse_proxy sandbox:8000
   }
 
   # Default — serve frontend
@@ -360,7 +353,6 @@ services:
     environment:
       - NEXT_PUBLIC_ENV_MODE=local
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1
-      - NEXT_PUBLIC_OPENCODE_URL=http://localhost:14000
     depends_on:
       kortix-api:
         condition: service_started
@@ -376,6 +368,7 @@ services:
       - SANDBOX_PROVIDER=local_docker
       - DOCKER_HOST=unix:///var/run/docker.sock
       - KORTIX_URL=http://kortix-api:8008/v1/router
+      - SANDBOX_INTERNAL_URL=http://sandbox:8000
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
       - CRON_API_URL=http://kortix-api:8008
       - CRON_TICK_SECRET=\${CRON_TICK_SECRET}
@@ -417,14 +410,17 @@ services:
     volumes:
       - sandbox-workspace:/workspace
       - sandbox-secrets:/app/secrets
+    # All sandbox access goes through the backend proxy (kortix-api → sandbox:8000).
+    # Only Kortix Master is exposed to the host for direct debugging.
     ports:
       - "14000:8000"
-      - "14001:3111"
-      - "14002:6080"
-      - "14003:6081"
-      - "14004:3210"
-      - "14005:9223"
-      - "14006:9224"
+    expose:
+      - "3111"
+      - "6080"
+      - "6081"
+      - "3210"
+      - "9223"
+      - "9224"
     shm_size: "2gb"
     restart: unless-stopped
     healthcheck:
@@ -512,7 +508,9 @@ services:
       - SANDBOX_PROVIDER=local_docker
       - DOCKER_HOST=unix:///var/run/docker.sock
       - KORTIX_URL=http://kortix-api:8008/v1/router
+      - SANDBOX_INTERNAL_URL=http://sandbox:8000
       - INTERNAL_SERVICE_KEY=\${INTERNAL_SERVICE_KEY}
+      - SANDBOX_AUTH_TOKEN=\${SANDBOX_AUTH_TOKEN}
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
       - CRON_API_URL=http://kortix-api:8008
       - CRON_TICK_SECRET=\${CRON_TICK_SECRET}
@@ -555,6 +553,12 @@ services:
       - .env
     expose:
       - "8000"
+      - "3111"
+      - "6080"
+      - "6081"
+      - "3210"
+      - "9223"
+      - "9224"
     volumes:
       - sandbox-workspace:/workspace
       - sandbox-secrets:/app/secrets
@@ -586,6 +590,7 @@ write_env() {
 # DO NOT share this file. Regenerate with: kortix reconfigure
 KORTIX_TOKEN=${KORTIX_TOKEN}
 INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+SANDBOX_AUTH_TOKEN=${SANDBOX_AUTH_TOKEN}
 CRON_TICK_SECRET=${CRON_SECRET}
 ENVEOF
 
@@ -665,7 +670,6 @@ case "${1:-help}" in
       echo "  ${G}Kortix is running!${N}"
       echo "  Dashboard:  ${B}http://localhost:3000${N}"
       echo "  API:        ${B}http://localhost:8008${N}"
-      echo "  Sandbox:    ${B}http://localhost:14000${N}"
     fi
     echo ""
     ;;
@@ -909,6 +913,14 @@ pull_and_start() {
     if [ "$ENABLE_AUTH" = "yes" ]; then
       echo "  ${CYAN}Username:${NC}  ${BOLD}${ADMIN_USER}${NC}"
       echo "  ${CYAN}Password:${NC}  ${BOLD}${ADMIN_PASSWORD}${NC}"
+    fi
+
+    if [ -n "$SANDBOX_AUTH_TOKEN" ]; then
+      echo "  ${CYAN}Sandbox Token:${NC} ${BOLD}${SANDBOX_AUTH_TOKEN}${NC}"
+      echo ""
+      echo "  ${YELLOW}Save these credentials — they won't be shown again.${NC}"
+      echo "  ${DIM}(Also saved to ${INSTALL_DIR}/.credentials and .env)${NC}"
+    elif [ "$ENABLE_AUTH" = "yes" ]; then
       echo ""
       echo "  ${YELLOW}Save these credentials — they won't be shown again.${NC}"
       echo "  ${DIM}(Also saved to ${INSTALL_DIR}/.credentials)${NC}"
@@ -939,7 +951,6 @@ pull_and_start() {
     echo ""
     echo "  ${CYAN}Dashboard:${NC}   ${BOLD}http://localhost:3000${NC}"
     echo "  ${CYAN}API:${NC}         ${BOLD}http://localhost:8008${NC}"
-    echo "  ${CYAN}Sandbox:${NC}     ${BOLD}http://localhost:14000${NC}"
     echo ""
 
     info "Opening setup in browser..."

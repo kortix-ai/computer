@@ -20,7 +20,7 @@ import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
 import { ensureSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
 import { useProviders } from '@/hooks/platform/use-sandbox';
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
@@ -52,7 +52,7 @@ function useConnectionStatus(url: string, enabled: boolean) {
       const timeout = setTimeout(() => controller.abort(), 3000);
 
       const headers: Record<string, string> = {};
-      const token = await getSupabaseAccessToken();
+      const token = await getAuthToken();
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
@@ -713,14 +713,14 @@ export function InstanceManagerDialog({
                 </label>
                 <input
                   ref={urlInputRef}
-                  placeholder="http://localhost:4096"
+                   placeholder="http://localhost:8008/v1/preview/local/8000"
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
                   className="w-full h-9 px-3 text-sm font-mono rounded-lg bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                   required
                 />
                 <p className="text-[10px] text-muted-foreground/50">
-                  The full URL of the Kortix server, e.g. http://192.168.1.50:4096
+                  The full URL of the Kortix server, e.g. http://192.168.1.50:8008/v1/preview/local/8000
                 </p>
               </div>
 

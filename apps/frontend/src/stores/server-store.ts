@@ -51,8 +51,14 @@ interface ServerStore {
   clearStatuses: () => void;
 }
 
-const DEFAULT_OPENCODE_URL =
-  process.env.NEXT_PUBLIC_OPENCODE_URL || 'http://localhost:14000';
+/**
+ * The default sandbox URL routes through the backend's unified preview proxy.
+ * NEXT_PUBLIC_BACKEND_URL includes /v1, so the endpoint is /v1/preview/local/8000/*.
+ * Same URL pattern as cloud mode (/v1/preview/{sandboxId}/{port}/*) — the frontend
+ * is completely agnostic about whether it's local or cloud.
+ */
+const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '');
+const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/preview/local/8000`;
 
 function generateId(): string {
   return `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -62,8 +68,8 @@ const DEFAULT_SERVER_ID = 'default';
 
 const createDefaultServer = (): ServerEntry => ({
   id: DEFAULT_SERVER_ID,
-  label: DEFAULT_OPENCODE_URL.replace(/^https?:\/\//, ''),
-  url: DEFAULT_OPENCODE_URL,
+  label: 'Local Sandbox',
+  url: DEFAULT_SANDBOX_URL,
   isDefault: true,
 });
 
@@ -175,7 +181,7 @@ export const useServerStore = create<ServerStore>()(
       getActiveServerUrl: () => {
         const state = get();
         const active = state.servers.find((s) => s.id === state.activeServerId);
-        return active?.url || DEFAULT_OPENCODE_URL;
+        return active?.url || DEFAULT_SANDBOX_URL;
       },
 
       clearStatuses: () => {
@@ -183,7 +189,7 @@ export const useServerStore = create<ServerStore>()(
       },
     }),
     {
-      name: 'opencode-servers-v1',
+      name: 'opencode-servers-v3', // v3: unified under /preview/local/{port} instead of /sandbox
       partialize: (state) => ({
         servers: state.servers,
         activeServerId: state.activeServerId,
@@ -195,9 +201,11 @@ export const useServerStore = create<ServerStore>()(
         if (!hasDefault) {
           state.servers = [createDefaultServer(), ...state.servers];
         } else {
+          // Always reset the default server's URL to the current backend-proxied URL.
+          // This handles migration from old direct-connect URLs (localhost:14000).
           state.servers = state.servers.map((s) =>
             s.id === DEFAULT_SERVER_ID
-              ? { ...s, url: DEFAULT_OPENCODE_URL, label: DEFAULT_OPENCODE_URL.replace(/^https?:\/\//, '') }
+              ? { ...s, url: DEFAULT_SANDBOX_URL, label: 'Local Sandbox' }
               : s,
           );
         }
@@ -207,7 +215,7 @@ export const useServerStore = create<ServerStore>()(
 );
 
 /**
- * Get the current active OpenCode server URL.
+ * Get the current active sandbox URL (routed through the backend).
  * Use this in non-React contexts (API modules, etc.).
  */
 export function getActiveOpenCodeUrl(): string {

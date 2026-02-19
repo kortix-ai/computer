@@ -10,7 +10,8 @@ import {
   markInitialCheckDone,
   setSandboxVersion,
 } from '@/stores/sandbox-connection-store';
-import { getSupabaseAccessToken } from '@/lib/auth-token';
+import { getAuthToken } from '@/lib/auth-token';
+import { useSandboxAuthStore } from '@/stores/sandbox-auth-store';
 
 /**
  * Number of consecutive failures before marking as unreachable
@@ -92,10 +93,10 @@ export function useSandboxConnection() {
         const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT);
 
         const headers: Record<string, string> = {};
-        const token = await getSupabaseAccessToken();
+        const token = await getAuthToken();
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        await fetch(`${url}/session`, {
+        const res = await fetch(`${url}/session`, {
           method: 'GET',
           signal: controller.signal,
           headers,
@@ -103,12 +104,27 @@ export function useSandboxConnection() {
         clearTimeout(timer);
 
         if (!alive) return;
+
+        // Detect sandbox auth requirement (401 with authType=sandbox_token)
+        if (res.status === 401) {
+          try {
+            const body = await res.json();
+            if (body?.authType === 'sandbox_token') {
+              useSandboxAuthStore.getState().setNeedsAuth(true);
+              setSandboxStatus('unreachable');
+              scheduleNext();
+              return;
+            }
+          } catch { /* non-JSON response */ }
+        }
+
         resetSandboxFail();
         setSandboxStatus('connected');
 
         // Fetch port mappings once on first successful connection.
-        // This populates mappedPorts so all service URLs use direct host ports
-        // instead of going through the proxy.
+        // Stored as metadata for informational purposes (e.g. showing
+        // available ports in the UI). All access routes through the
+        // backend proxy — mappedPorts is NOT used for direct localhost access.
         if (!portsFetchedRef.current) {
           portsFetchedRef.current = true;
           try {
@@ -126,7 +142,7 @@ export function useSandboxConnection() {
                 });
               }
             }
-          } catch { /* non-critical — proxy fallback still works */ }
+          } catch { /* non-critical */ }
         }
 
         // Fetch sandbox version from /kortix/health once on connect
