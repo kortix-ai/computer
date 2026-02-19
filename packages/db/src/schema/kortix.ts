@@ -362,6 +362,7 @@ export const integrations = kortixSchema.table(
     appName: varchar('app_name', { length: 255 }),
     providerName: varchar('provider_name', { length: 50 }).notNull(),
     providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
+    label: varchar('label', { length: 255 }),
     status: integrationStatusEnum('status').default('active').notNull(),
     scopes: jsonb('scopes').default([]).$type<string[]>(),
     metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
@@ -374,7 +375,7 @@ export const integrations = kortixSchema.table(
     index('idx_integrations_account').on(table.accountId),
     index('idx_integrations_app').on(table.app),
     index('idx_integrations_provider_account').on(table.providerAccountId),
-    uniqueIndex('idx_integrations_account_app').on(table.accountId, table.app, table.providerName),
+    uniqueIndex('idx_integrations_account_provider_account').on(table.accountId, table.providerAccountId),
   ],
 );
 

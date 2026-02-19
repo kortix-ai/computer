@@ -8,6 +8,7 @@ export interface IntegrationConnection {
   accountId: string;
   app: string;
   appName: string | null;
+  label: string | null;
   providerName: string;
   providerAccountId: string;
   status: 'active' | 'revoked' | 'expired' | 'error';
@@ -32,6 +33,25 @@ export interface ConnectTokenResult {
   token: string;
   expiresAt: string;
   connectUrl?: string;
+}
+
+export interface LinkedSandbox {
+  sandboxId: string;
+  name: string;
+  status: string;
+  grantedAt: string;
+}
+
+export interface AppSandboxLink {
+  sandboxId: string;
+  sandboxName: string;
+  integrationId: string;
+  label: string | null;
+}
+
+export interface IntegrationSandboxesResult {
+  sandboxes: LinkedSandbox[];
+  appSandboxLinks: AppSandboxLink[];
 }
 
 interface AppPageInfo {
@@ -125,11 +145,39 @@ const saveConnection = async (data: {
   app: string;
   app_name?: string;
   provider_account_id: string;
+  label?: string;
+  sandbox_id?: string;
 }): Promise<void> => {
   const response = await backendApi.post('/integrations/connections/save', data);
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to save connection');
   }
+};
+
+const renameIntegration = async ({
+  integrationId,
+  label,
+}: {
+  integrationId: string;
+  label: string;
+}): Promise<void> => {
+  const response = await backendApi.patch(
+    `/integrations/connections/${integrationId}/label`,
+    { label },
+  );
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to rename integration');
+  }
+};
+
+const fetchIntegrationSandboxes = async (integrationId: string): Promise<IntegrationSandboxesResult> => {
+  const response = await backendApi.get<IntegrationSandboxesResult>(
+    `/integrations/connections/${integrationId}/sandboxes`,
+  );
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to fetch linked sandboxes');
+  }
+  return response.data!;
 };
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
@@ -191,6 +239,7 @@ export const useLinkSandboxIntegration = () => {
     mutationFn: linkSandbox,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integration-connections'] });
+      queryClient.invalidateQueries({ queryKey: ['integration-sandboxes'] });
     },
   });
 };
@@ -202,6 +251,27 @@ export const useUnlinkSandboxIntegration = () => {
     mutationFn: unlinkSandbox,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integration-connections'] });
+      queryClient.invalidateQueries({ queryKey: ['integration-sandboxes'] });
     },
+  });
+};
+
+export const useRenameIntegration = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: renameIntegration,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['integration-connections'] });
+    },
+  });
+};
+
+export const useIntegrationSandboxes = (integrationId: string | null) => {
+  return useQuery({
+    queryKey: ['integration-sandboxes', integrationId],
+    queryFn: () => fetchIntegrationSandboxes(integrationId!),
+    enabled: !!integrationId,
+    staleTime: 30 * 1000,
   });
 };
