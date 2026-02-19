@@ -3,18 +3,15 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 
 /**
- * useAutoScroll — auto-scroll that reliably respects user intent.
+ * useAutoScroll — ChatGPT-style auto-scroll.
  *
- * Design:
- * - The RAF loop uses **direct DOM measurement** to decide whether to scroll,
- *   not a flag set by event handlers. This eliminates race conditions.
- * - On each frame: if new content arrived (scrollHeight grew) AND the user's
- *   distance from the bottom is roughly equal to the height growth (meaning
- *   they were already at the bottom before the content grew), we auto-scroll.
- *   If the user scrolled up, their distance from bottom is much larger than
- *   the height growth, so we leave them alone.
- * - Wheel/touch/scroll handlers still drive the "Scroll to bottom" button
- *   visibility via `userScrolledRef`.
+ * The spacer is dynamically sized (viewport - lastTurnHeight - offset)
+ * so the max scroll puts the last turn at the top — but no further.
+ * scrollToLastTurn() uses direct DOM measurement for precise positioning;
+ * scrollToBottom() goes to the absolute end (RAF loop / FAB button).
+ *
+ * The RAF loop follows growing content when the user is "at the bottom".
+ * If the user scrolls up, auto-scroll stops and a button appears.
  */
 
 interface UseAutoScrollOptions {
@@ -26,20 +23,73 @@ interface UseAutoScrollReturn {
   contentRef: React.RefObject<HTMLDivElement>;
   showScrollButton: boolean;
   scrollToBottom: () => void;
+  scrollToLastTurn: () => void;
+  spacerHeight: number;
 }
 
 const BOTTOM_THRESHOLD = 50;
+// Padding above the user message bubble when scrolling to the last turn
+const TURN_TOP_OFFSET = 24;
 
 export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [spacerHeight, setSpacerHeight] = useState(0);
 
-  // userScrolledRef is now only used for scroll-button visibility,
-  // NOT for the RAF auto-scroll decision.
   const userScrolledRef = useRef(false);
   const rafIdRef = useRef<number>(0);
   const lastScrollHeightRef = useRef(0);
+
+  // ---- Dynamic spacer ----
+  // Sized so that the maximum scroll puts the last turn's user message
+  // at the top with TURN_TOP_OFFSET padding — but no further.
+  // Formula: spacer = viewportH - lastTurnH - TURN_TOP_OFFSET (min 0).
+  // Falls back to full viewport when there are no turns yet.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = contentRef.current;
+    if (!el || !content) return;
+
+    let rafPending = 0;
+
+    const recalc = () => {
+      const viewportH = el.clientHeight;
+      const turnEls = content.querySelectorAll<HTMLElement>('[data-turn-id]');
+      const lastTurn = turnEls[turnEls.length - 1];
+      if (!lastTurn) {
+        setSpacerHeight(viewportH);
+        return;
+      }
+      // Use offsetHeight instead of getBoundingClientRect to avoid
+      // issues with transforms/scroll position affecting the measurement.
+      const lastTurnH = lastTurn.offsetHeight;
+      setSpacerHeight(Math.max(0, viewportH - lastTurnH - TURN_TOP_OFFSET));
+    };
+
+    const scheduleRecalc = () => {
+      if (rafPending) return;
+      rafPending = requestAnimationFrame(() => {
+        rafPending = 0;
+        recalc();
+      });
+    };
+
+    const ro = new ResizeObserver(scheduleRecalc);
+    ro.observe(el);
+
+    // Watch for content changes (new messages, streaming)
+    const mo = new MutationObserver(scheduleRecalc);
+    mo.observe(content, { childList: true, subtree: true, characterData: true });
+
+    recalc();
+
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+      cancelAnimationFrame(rafPending);
+    };
+  }, []);
 
   const isAtBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -47,7 +97,8 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
   }, []);
 
-  // ---- Public scrollToBottom (smooth, resets user intent) ----
+  // ---- Public scrollToBottom ----
+  // With the dynamic spacer, scrolling to the absolute bottom === last turn at top.
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -56,10 +107,32 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, []);
 
+  // ---- Scroll last turn's user message to the top of viewport ----
+  // Uses direct DOM measurement so it works even before the spacer has recalculated.
+  const scrollToLastTurn = useCallback(() => {
+    const el = scrollRef.current;
+    const content = contentRef.current;
+    if (!el || !content) return;
+
+    const turnEls = content.querySelectorAll<HTMLElement>('[data-turn-id]');
+    const lastTurn = turnEls[turnEls.length - 1];
+    if (!lastTurn) {
+      scrollToBottom();
+      return;
+    }
+
+    const elRect = el.getBoundingClientRect();
+    const turnRect = lastTurn.getBoundingClientRect();
+    const target = Math.max(0, el.scrollTop + (turnRect.top - elRect.top) - TURN_TOP_OFFSET);
+
+    userScrolledRef.current = false;
+    setShowScrollButton(false);
+    el.scrollTo({ top: target, behavior: 'smooth' });
+  }, [scrollToBottom]);
+
   // ---- RAF-based auto-scroll loop ----
   useEffect(() => {
     if (!working) {
-      // When work stops, check if we should show the scroll button
       const timer = setTimeout(() => {
         if (!isAtBottom()) {
           setShowScrollButton(true);
@@ -82,16 +155,13 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
         const heightGrew = newHeight - lastScrollHeightRef.current;
 
         if (heightGrew > 0) {
-          // Content changed — decide whether to follow it.
-          // If the user was at the bottom before the growth, their distance
-          // from the new bottom is approximately equal to the growth.
-          // If they scrolled up, their distance is much larger.
           const distFromBottom = newHeight - el.scrollTop - el.clientHeight;
 
           if (distFromBottom <= heightGrew + BOTTOM_THRESHOLD) {
+            // User was at the bottom — follow the content
             el.scrollTop = newHeight;
           } else if (!userScrolledRef.current) {
-            // User is far from the bottom — show the scroll button.
+            // User is far from the bottom — they scrolled up
             userScrolledRef.current = true;
             setShowScrollButton(true);
           }
@@ -110,7 +180,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     };
   }, [working, isAtBottom]);
 
-  // ---- Wheel: user-intent detector (for scroll button) ----
+  // ---- Wheel: user-intent detector ----
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -120,13 +190,11 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
       if (target?.closest?.('[data-scrollable]')) return;
 
       if (e.deltaY < 0) {
-        // Scrolling UP — show the button
         if (!userScrolledRef.current) {
           userScrolledRef.current = true;
           setShowScrollButton(true);
         }
       } else if (e.deltaY > 0) {
-        // Scrolling DOWN — hide the button when user reaches the bottom
         requestAnimationFrame(() => {
           if (isAtBottom()) {
             userScrolledRef.current = false;
@@ -140,7 +208,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     return () => el.removeEventListener('wheel', handleWheel);
   }, [isAtBottom]);
 
-  // ---- Touch: detect swipe intent (for scroll button) ----
+  // ---- Touch: detect swipe intent ----
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -159,13 +227,11 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
       const delta = touchStartY - touchY;
 
       if (delta < -10) {
-        // Swiping DOWN on screen → scrolling UP (seeing older content)
         if (!userScrolledRef.current) {
           userScrolledRef.current = true;
           setShowScrollButton(true);
         }
       } else if (delta > 10) {
-        // Swiping UP on screen → scrolling DOWN — re-engage only at bottom
         requestAnimationFrame(() => {
           if (isAtBottom()) {
             userScrolledRef.current = false;
@@ -183,7 +249,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     };
   }, [isAtBottom]);
 
-  // ---- Keyboard / scrollbar-drag catch-all (for scroll button) ----
+  // ---- Keyboard / scrollbar-drag catch-all ----
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -212,5 +278,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     contentRef,
     showScrollButton,
     scrollToBottom,
+    scrollToLastTurn,
+    spacerHeight,
   };
 }

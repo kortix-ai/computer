@@ -4461,6 +4461,33 @@ function memGetTypeInfo(
 	};
 }
 
+/** Try to parse output as a JSON error result (with error + message fields). */
+function parseMemGetErrorResult(
+	output: string,
+): { error: string; message: string; suggestion?: string } | null {
+	if (!output) return null;
+	const trimmed = output.trim();
+	if (!trimmed.startsWith("{")) return null;
+	try {
+		const parsed = JSON.parse(trimmed);
+		if (
+			parsed &&
+			typeof parsed === "object" &&
+			typeof parsed.error === "string" &&
+			typeof parsed.message === "string"
+		) {
+			return {
+				error: parsed.error,
+				message: parsed.message,
+				suggestion: typeof parsed.suggestion === "string" ? parsed.suggestion : undefined,
+			};
+		}
+	} catch {
+		/* not JSON */
+	}
+	return null;
+}
+
 /** Try to parse output as a JSON file-read result (with path + content fields). */
 function parseMemGetFileResult(
 	output: string,
@@ -4495,25 +4522,29 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const ids = input.ids ? String(input.ids) : "";
 	const path = input.path ? String(input.path) : "";
 
-	// Try file-read result first, then observations
-	const fileResult = useMemo(() => parseMemGetFileResult(output), [output]);
+	// Try error result first, then file-read result, then observations
+	const errorResult = useMemo(() => parseMemGetErrorResult(output), [output]);
+	const fileResult = useMemo(() => (errorResult ? null : parseMemGetFileResult(output)), [output, errorResult]);
 	const observations = useMemo(
-		() => (fileResult ? [] : parseMemGetOutput(output)),
-		[output, fileResult],
+		() => (errorResult || fileResult ? [] : parseMemGetOutput(output)),
+		[output, errorResult, fileResult],
 	);
 	const hasResults = observations.length > 0;
 	const hasFileResult = !!fileResult;
+	const hasError = !!errorResult;
 
 	const triggerSubtitle = path || ids || (fileResult ? fileResult.path : "");
 	const triggerBadge =
 		status === "completed"
-			? hasFileResult
-				? "loaded"
-				: hasResults
-					? `${observations.length} loaded`
-					: output
-						? "loaded"
-						: "empty"
+			? hasError
+				? "not found"
+				: hasFileResult
+					? "loaded"
+					: hasResults
+						? `${observations.length} loaded`
+						: output
+							? "loaded"
+							: "empty"
 			: undefined;
 
 	return (
@@ -4529,26 +4560,48 @@ function MemGetTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 							{triggerSubtitle}
 						</span>
 					)}
-					{triggerBadge && (
-						<span
-						 className={cn(
-								"text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0",
-								hasResults || hasFileResult
+				{triggerBadge && (
+					<span
+					 className={cn(
+							"text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0",
+							hasError
+								? "bg-amber-500/10 text-amber-400"
+								: hasResults || hasFileResult
 									? "bg-primary/10 text-primary"
 									: "bg-muted/60 text-muted-foreground",
-							)}
-						>
-							{triggerBadge}
-						</span>
-					)}
+						)}
+					>
+						{triggerBadge}
+					</span>
+				)}
+			</div>
+		}
+		defaultOpen={defaultOpen}
+		forceOpen={forceOpen}
+		locked={locked}
+	>
+		{/* Error result: render structured error display */}
+		{status === "completed" && hasError ? (
+			<div className="px-3 pb-2.5 pt-1">
+				<div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
+					<AlertTriangle className="size-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+					<div className="min-w-0 flex-1 space-y-1">
+						<div className="text-[11px] font-medium text-amber-300">
+							{errorResult!.error}
+						</div>
+						<div className="text-[11px] text-muted-foreground/70 leading-relaxed break-all">
+							{errorResult!.message}
+						</div>
+						{errorResult!.suggestion && (
+							<div className="text-[11px] text-muted-foreground/50 italic">
+								{errorResult!.suggestion}
+							</div>
+						)}
+					</div>
 				</div>
-			}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{/* File-read result: render markdown content */}
-			{status === "completed" && hasFileResult ? (
+			</div>
+		) : /* File-read result: render markdown content */
+		status === "completed" && hasFileResult ? (
 				<div data-scrollable className="max-h-[400px] overflow-auto">
 					<div className="px-3 pb-2.5">
 						{/* File path + line count */}

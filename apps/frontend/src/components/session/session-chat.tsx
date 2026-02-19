@@ -2448,9 +2448,8 @@ export function SessionChat({
 	const sessionStatus = syncStatus ?? legacyStatus;
 	const isServerBusy =
 		sessionStatus?.type === "busy" || sessionStatus?.type === "retry";
+
 	// Match OpenCode: isBusy is driven ONLY by the session status (single source of truth).
-	// pendingUserMessage/pendingSendInFlight are no longer part of isBusy — they caused
-	// the drain to fire twice.
 	const isBusy = isServerBusy;
 
 	// ---- Message Queue ----
@@ -2683,8 +2682,11 @@ export function SessionChat({
 
 	// Message-based idle detection: if the last assistant message has
 	// time.completed set, the server marked the message as completed but we never got the
-	// idle event — force the session to idle after a short grace period
-	// to avoid racing with a status event that's still in flight.
+	// idle event — force the session to idle after a grace period.
+	// We use a longer delay (5s) to avoid prematurely killing agentic flows
+	// where the server creates a new assistant message shortly after completing one.
+	// The timer also re-checks message count to ensure no new messages arrived.
+	const messageCountForIdle = messages?.length ?? 0;
 	useEffect(() => {
 		if (!isServerBusy || !messages || messages.length === 0) return;
 		// Find the last assistant message
@@ -2693,7 +2695,13 @@ export function SessionChat({
 			if (msg.info.role === "assistant") {
 				const assistantInfo = msg.info as any;
 				if (assistantInfo.time?.completed) {
+					const msgCountAtStart = messages.length;
 					const timer = setTimeout(() => {
+						// Only force idle if no new messages arrived during the grace period
+						const currentMsgs = useSyncStore.getState().getMessages(sessionId);
+						if (currentMsgs.length > msgCountAtStart) {
+							return; // New messages arrived — agent is still working
+						}
 						const syncStoreStatus = useSyncStore.getState().sessionStatus[sessionId];
 						const legacyStoreStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
 						const currentType = syncStoreStatus?.type ?? legacyStoreStatus?.type;
@@ -2702,13 +2710,13 @@ export function SessionChat({
 							useSyncStore.getState().setStatus(sessionId, idle);
 							useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
 						}
-					}, 2_000);
+					}, 5_000);
 					return () => clearTimeout(timer);
 				}
 				break; // only check the last assistant message
 			}
 		}
-	}, [isServerBusy, messages, sessionId]);
+	}, [isServerBusy, messages, sessionId, messageCountForIdle]);
 
 	// Clear pending user message when we can confirm the message is in cache
 	// (by ID), or when new messages arrive (fallback for command sends).
@@ -2756,14 +2764,13 @@ export function SessionChat({
 	}, [messages?.length]);
 
 	// ---- Auto-scroll (replaces inline scroll logic) ----
-	const { scrollRef, contentRef, showScrollButton, scrollToBottom } =
+	const { scrollRef, contentRef, showScrollButton, scrollToBottom, scrollToLastTurn, spacerHeight } =
 		useAutoScroll({
 			working: isBusy,
 		});
 
-	// Scroll to bottom when switching session tabs or on initial message load.
-	// Uses scrollToBottom() from the hook so the programmatic-scroll guard works
-	// correctly and doesn't interfere with user-intent detection.
+	// Scroll to the last turn when switching session tabs or on initial message load.
+	// Uses scrollToLastTurn() so the last user message appears at the top of the viewport.
 	const initialScrollDoneRef = useRef<string | null>(null);
 	useEffect(() => {
 		// Reset on session change so we scroll on first render of new session
@@ -2780,16 +2787,14 @@ export function SessionChat({
 
 		// Staggered attempts: the scroll container mounts after this render,
 		// then message components (markdown, code blocks) render asynchronously.
-		// All go through scrollToBottom() which marks them as programmatic.
-		scrollToBottom();
-		const t1 = setTimeout(scrollToBottom, 150);
-		const t2 = setTimeout(scrollToBottom, 500);
+		const t1 = setTimeout(scrollToLastTurn, 50);
+		const t2 = setTimeout(scrollToLastTurn, 500);
 
 		return () => {
 			clearTimeout(t1);
 			clearTimeout(t2);
 		};
-	}, [messageCount, sessionId, scrollToBottom]);
+	}, [messageCount, sessionId, scrollToLastTurn]);
 
 	// ---- Pending permissions & questions ----
 	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
@@ -3008,8 +3013,9 @@ export function SessionChat({
 			addOptimisticUserMessage(messageID, optimisticText, [textPartId]);
 			useSyncStore.getState().setStatus(sessionId, { type: "busy" });
 
-			// Scroll to bottom after the optimistic message renders
-			requestAnimationFrame(() => scrollToBottom());
+			// Scroll so the new user message appears at the top of the viewport.
+			// Single setTimeout gives React time to commit the DOM update.
+			setTimeout(() => scrollToLastTurn(), 50);
 
 			const options: Record<string, unknown> = {};
 			if (local.agent.current) options.agent = local.agent.current.name;
@@ -3118,7 +3124,7 @@ export function SessionChat({
 			local.model.variant.current,
 			addOptimisticUserMessage,
 			removeOptimisticUserMessage,
-			scrollToBottom,
+			scrollToLastTurn,
 		],
 	);
 
@@ -3153,9 +3159,9 @@ export function SessionChat({
 					},
 				},
 			);
-			requestAnimationFrame(() => scrollToBottom());
+			setTimeout(() => scrollToLastTurn(), 50);
 		},
-		[sessionId, executeCommand, scrollToBottom],
+		[sessionId, executeCommand, scrollToLastTurn],
 	);
 
 	const handleFileSearch = useCallback(
@@ -3265,12 +3271,12 @@ export function SessionChat({
 				<div className="relative flex-1 min-h-0">
 					<div
 						ref={scrollRef}
-						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 pb-8 bg-background h-full [scroll-behavior:auto]"
+						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 bg-background h-full [scroll-behavior:auto]"
 					>
 						<div
 							ref={contentRef}
 							role="log"
-							className="mx-auto max-w-3xl min-w-0 w-full px-3 sm:px-6"
+							className="mx-auto max-w-4xl min-w-0 w-full px-3 sm:px-6"
 						>
 							<div className="flex flex-col gap-12 min-w-0">
 								{/* Fork context divider — shown at the top of forked sessions */}
@@ -3278,10 +3284,10 @@ export function SessionChat({
 									<ForkContextDivider parentID={effectiveParentId} />
 								)}
 
-								{/* Optimistic user message */}
-								{showOptimistic && (
-									<>
-										<div className="flex justify-end">
+							{/* Optimistic user message */}
+							{showOptimistic && (
+								<div data-turn-id="optimistic">
+									<div className="flex justify-end">
 											<div className="flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden">
 												{(() => {
 													const { cleanText, files } = parseFileReferences(
@@ -3332,7 +3338,7 @@ export function SessionChat({
 												</span>
 											)}
 										</div>
-									</>
+								</div>
 								)}
 
 								{/* Turn-based message rendering */}
@@ -3347,9 +3353,9 @@ export function SessionChat({
 											msg.parts.some((p) => p.type === "compaction"),
 										);
 
-									return (
-										<div key={turn.userMessage.info.id}>
-											{/* Compaction divider — shown before the first turn after compaction */}
+								return (
+									<div key={turn.userMessage.info.id} data-turn-id={turn.userMessage.info.id}>
+										{/* Compaction divider — shown before the first turn after compaction */}
 											{hasCompaction && (
 												<div className="flex items-center gap-3 py-4 my-3">
 													<div className="flex-1 h-px bg-border" />
@@ -3404,6 +3410,12 @@ export function SessionChat({
 									</div>
 								)}
 							</div>
+						{/* Spacer — ensures the last message can scroll to the top of
+						    the viewport (ChatGPT-style). Without this, scrollToBottom
+						    only brings the last message to the bottom of the screen.
+						    Height is dynamically measured from the scroll container so
+						    the newest message appears flush at the top. */}
+						<div className="shrink-0" style={{ minHeight: spacerHeight }} />
 						</div>
 					</div>
 

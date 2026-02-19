@@ -6,6 +6,7 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   FileText,
   Wrench,
   Hash,
@@ -46,6 +47,38 @@ interface MemoryFileResult {
   total_lines: number;
   showing?: { start: number; end: number; count: number };
   content: string;
+}
+
+/** Structured error result from the memory-get tool. */
+interface MemoryErrorResult {
+  error: string;
+  message: string;
+  suggestion?: string;
+}
+
+/** Try to parse output as a JSON error result (with error + message fields). */
+function parseErrorResult(output: string): MemoryErrorResult | null {
+  if (!output) return null;
+  const trimmed = output.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.error === 'string' &&
+      typeof parsed.message === 'string'
+    ) {
+      return {
+        error: parsed.error,
+        message: parsed.message,
+        suggestion: typeof parsed.suggestion === 'string' ? parsed.suggestion : undefined,
+      };
+    }
+  } catch {
+    /* not JSON */
+  }
+  return null;
 }
 
 /** Try to parse output as a JSON file-read result (with path + content fields). */
@@ -204,20 +237,24 @@ export function OcMemGetToolView({
 
   const isError = toolResult?.success === false || !!toolResult?.error;
 
-  // Try to parse as file-read result first
+  // Try to parse as error result first
+  const errorResult = useMemo(() => parseErrorResult(output), [output]);
+
+  // Try to parse as file-read result (skip if error)
   const fileResult = useMemo(() => {
+    if (errorResult) return null;
     // If output is already a JSON object (not stringified)
     if (typeof rawOutput === 'object' && rawOutput !== null && 'path' in rawOutput && 'content' in rawOutput) {
       return rawOutput as MemoryFileResult;
     }
     return parseFileReadResult(output);
-  }, [rawOutput, output]);
+  }, [rawOutput, output, errorResult]);
 
-  // Then try to parse as observations (only if not a file result)
+  // Then try to parse as observations (only if not a file result or error)
   const observations = useMemo(() => {
-    if (fileResult) return [];
+    if (errorResult || fileResult) return [];
     return parseMemGetOutput(output);
-  }, [output, fileResult]);
+  }, [output, errorResult, fileResult]);
 
   // Determine subtitle from context
   const subtitle = path || ids || (fileResult ? fileResult.path : '');
@@ -308,6 +345,53 @@ export function OcMemGetToolView({
             <Badge variant="outline" className="h-6 py-0.5 bg-muted">
               <CheckCircle className="h-3 w-3 text-emerald-500" />
               Loaded
+            </Badge>
+          )}
+        </ToolViewFooter>
+      </Card>
+    );
+  }
+
+  // --- Error result (e.g. file not found) ---
+  if (errorResult) {
+    return (
+      <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
+        <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+          <div className="flex flex-row items-center justify-between">
+            <ToolViewIconTitle icon={Brain} title="Memory" subtitle={subtitle} />
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0 h-full flex-1 overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/5 border border-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="text-sm font-medium text-amber-300">
+                  {errorResult.error}
+                </div>
+                <div className="text-xs text-muted-foreground/70 leading-relaxed break-all">
+                  {errorResult.message}
+                </div>
+                {errorResult.suggestion && (
+                  <div className="text-xs text-muted-foreground/50 italic">
+                    {errorResult.suggestion}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+
+        <ToolViewFooter
+          assistantTimestamp={assistantTimestamp}
+          toolTimestamp={toolTimestamp}
+          isStreaming={isStreaming}
+        >
+          {!isStreaming && (
+            <Badge variant="outline" className="h-6 py-0.5 bg-muted text-muted-foreground">
+              <AlertTriangle className="h-3 w-3 text-amber-400" />
+              Not found
             </Badge>
           )}
         </ToolViewFooter>
