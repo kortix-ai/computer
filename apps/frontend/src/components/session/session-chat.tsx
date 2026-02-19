@@ -2701,33 +2701,50 @@ export function SessionChat({
 	const messageCountForIdle = messages?.length ?? 0;
 	useEffect(() => {
 		if (!isServerBusy || !messages || messages.length === 0) return;
+
+		// If the last message is a user message, the AI hasn't started
+		// responding yet. Don't force idle based on a PREVIOUS assistant
+		// message's completion — the model may still be thinking.
+		const lastMsg = messages[messages.length - 1];
+		if (lastMsg?.info.role === "user") return;
+
 		// Find the last assistant message
+		let lastAssistantIdx = -1;
 		for (let i = messages.length - 1; i >= 0; i--) {
-			const msg = messages[i];
-			if (msg.info.role === "assistant") {
-				const assistantInfo = msg.info as any;
-				if (assistantInfo.time?.completed) {
-					const msgCountAtStart = messages.length;
-					const timer = setTimeout(() => {
-						// Only force idle if no new messages arrived during the grace period
-						const currentMsgs = useSyncStore.getState().getMessages(sessionId);
-						if (currentMsgs.length > msgCountAtStart) {
-							return; // New messages arrived — agent is still working
-						}
-						const syncStoreStatus = useSyncStore.getState().sessionStatus[sessionId];
-						const legacyStoreStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-						const currentType = syncStoreStatus?.type ?? legacyStoreStatus?.type;
-						if (currentType === 'busy' || currentType === 'retry') {
-							const idle = { type: 'idle' as const };
-							useSyncStore.getState().setStatus(sessionId, idle);
-							useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
-						}
-					}, 5_000);
-					return () => clearTimeout(timer);
-				}
-				break; // only check the last assistant message
+			if (messages[i].info.role === "assistant") {
+				lastAssistantIdx = i;
+				break;
 			}
 		}
+		if (lastAssistantIdx === -1) return;
+
+		const assistantInfo = messages[lastAssistantIdx].info as any;
+		if (!assistantInfo.time?.completed) return;
+
+		// Check if there's a user message AFTER this completed assistant.
+		// If so, the AI is still processing the new user message — don't
+		// force idle based on the previous turn's completion.
+		for (let i = lastAssistantIdx + 1; i < messages.length; i++) {
+			if (messages[i].info.role === "user") return;
+		}
+
+		const msgCountAtStart = messages.length;
+		const timer = setTimeout(() => {
+			// Only force idle if no new messages arrived during the grace period
+			const currentMsgs = useSyncStore.getState().getMessages(sessionId);
+			if (currentMsgs.length > msgCountAtStart) {
+				return; // New messages arrived — agent is still working
+			}
+			const syncStoreStatus = useSyncStore.getState().sessionStatus[sessionId];
+			const legacyStoreStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
+			const currentType = syncStoreStatus?.type ?? legacyStoreStatus?.type;
+			if (currentType === 'busy' || currentType === 'retry') {
+				const idle = { type: 'idle' as const };
+				useSyncStore.getState().setStatus(sessionId, idle);
+				useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
+			}
+		}, 5_000);
+		return () => clearTimeout(timer);
 	}, [isServerBusy, messages, sessionId, messageCountForIdle]);
 
 	// Clear pending user message when we can confirm the message is in cache
