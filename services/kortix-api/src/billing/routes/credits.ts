@@ -72,7 +72,6 @@ creditsRouter.get('/tier-configurations', async (c) => {
     yearly_price: t.yearlyPrice,
     monthly_credits: t.monthlyCredits,
     can_purchase_credits: t.canPurchaseCredits,
-    limits: t.limits,
   }));
 
   return c.json({ tiers });

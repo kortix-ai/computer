@@ -35,6 +35,10 @@ export const config = {
   CONTEXT7_API_URL: process.env.CONTEXT7_API_URL || 'https://context7.com',
   CONTEXT7_API_KEY: process.env.CONTEXT7_API_KEY || '',
 
+  // ─── Freestyle (Deployments) ──────────────────────────────────────────────
+  FREESTYLE_API_URL: process.env.FREESTYLE_API_URL || 'https://api.freestyle.sh',
+  FREESTYLE_API_KEY: process.env.FREESTYLE_API_KEY || '',
+
   // ─── LLM Providers ────────────────────────────────────────────────────────
   OPENROUTER_API_URL: process.env.OPENROUTER_API_URL || 'https://openrouter.ai/api/v1',
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
@@ -209,6 +213,11 @@ export const TOOL_PRICING: Record<string, ToolPricing> = {
   },
   proxy_context7: {
     baseCost: 0.001,
+    perResultCost: 0,
+    markupMultiplier: 1.5,
+  },
+  proxy_freestyle_deploy: {
+    baseCost: 0.01,
     perResultCost: 0,
     markupMultiplier: 1.5,
   },

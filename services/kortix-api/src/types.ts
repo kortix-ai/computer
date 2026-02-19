@@ -98,12 +98,6 @@ export interface TierConfig {
   monthlyCredits: number;
   canPurchaseCredits: boolean;
   models: string[];
-  limits: {
-    concurrentRuns: number;
-    customWorkers: number;
-    scheduledTriggers: number;
-    appTriggers: number;
-  };
   dailyCreditConfig: DailyCreditConfig | null;
   hidden: boolean;
 }
@@ -195,7 +189,6 @@ export interface AccountStateResponse {
     can_purchase_credits: boolean;
   };
   models: ModelInfo[];
-  limits: AccountLimits;
   tier: {
     name: string;
     display_name: string;
@@ -228,24 +221,6 @@ export interface ModelInfo {
   capabilities: string[];
   priority: number;
   recommended: boolean;
-}
-
-export interface AccountLimits {
-  concurrent_runs: { running_count: number; limit: number; can_start: boolean; tier_name: string };
-  ai_worker_count: CountLimit;
-  custom_mcp_count: CountLimit;
-  trigger_count: {
-    scheduled: { current_count: number; limit: number; can_create: boolean };
-    app: { current_count: number; limit: number; can_create: boolean };
-    tier_name: string;
-  };
-}
-
-export interface CountLimit {
-  current_count: number;
-  limit: number;
-  can_create: boolean;
-  tier_name: string;
 }
 
 // ─── API Request/Response Types (Billing) ───────────────────────────────────

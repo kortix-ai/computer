@@ -21,12 +21,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 0,
     canPurchaseCredits: false,
     models: [],
-    limits: {
-      concurrentRuns: 0,
-      customWorkers: 0,
-      scheduledTriggers: 0,
-      appTriggers: 0,
-    },
     dailyCreditConfig: null,
     hidden: true,
   },
@@ -39,12 +33,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 0,
     canPurchaseCredits: false,
     models: ['haiku'],
-    limits: {
-      concurrentRuns: 2,
-      customWorkers: 0,
-      scheduledTriggers: 0,
-      appTriggers: 0,
-    },
     dailyCreditConfig: FREE_DAILY_CREDITS,
     hidden: false,
   },
@@ -57,12 +45,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 40,
     canPurchaseCredits: false,
     models: ['all'],
-    limits: {
-      concurrentRuns: 3,
-      customWorkers: 5,
-      scheduledTriggers: 5,
-      appTriggers: 25,
-    },
     dailyCreditConfig: null,
     hidden: false,
   },
@@ -75,12 +57,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 100,
     canPurchaseCredits: false,
     models: ['all'],
-    limits: {
-      concurrentRuns: 5,
-      customWorkers: 20,
-      scheduledTriggers: 10,
-      appTriggers: 50,
-    },
     dailyCreditConfig: null,
     hidden: false,
   },
@@ -93,12 +69,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 400,
     canPurchaseCredits: true,
     models: ['all'],
-    limits: {
-      concurrentRuns: 20,
-      customWorkers: 100,
-      scheduledTriggers: 50,
-      appTriggers: 200,
-    },
     dailyCreditConfig: null,
     hidden: false,
   },
@@ -111,12 +81,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 100,
     canPurchaseCredits: false,
     models: ['all'],
-    limits: {
-      concurrentRuns: 5,
-      customWorkers: 20,
-      scheduledTriggers: 10,
-      appTriggers: 50,
-    },
     dailyCreditConfig: null,
     hidden: true,
   },
@@ -129,12 +93,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 400,
     canPurchaseCredits: true,
     models: ['all'],
-    limits: {
-      concurrentRuns: 20,
-      customWorkers: 100,
-      scheduledTriggers: 50,
-      appTriggers: 200,
-    },
     dailyCreditConfig: null,
     hidden: true,
   },
@@ -147,12 +105,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 800,
     canPurchaseCredits: true,
     models: ['all'],
-    limits: {
-      concurrentRuns: 50,
-      customWorkers: 200,
-      scheduledTriggers: 100,
-      appTriggers: 500,
-    },
     dailyCreditConfig: null,
     hidden: true,
   },
@@ -165,12 +117,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 1000,
     canPurchaseCredits: true,
     models: ['all'],
-    limits: {
-      concurrentRuns: 50,
-      customWorkers: 200,
-      scheduledTriggers: 100,
-      appTriggers: 500,
-    },
     dailyCreditConfig: null,
     hidden: true,
   },
@@ -183,12 +129,6 @@ const TIERS: Record<string, TierConfig> = {
     monthlyCredits: 1200,
     canPurchaseCredits: true,
     models: ['all'],
-    limits: {
-      concurrentRuns: 50,
-      customWorkers: 200,
-      scheduledTriggers: 100,
-      appTriggers: 500,
-    },
     dailyCreditConfig: null,
     hidden: true,
   },
@@ -327,10 +267,6 @@ export function isModelAllowed(tierName: string, model: string): boolean {
   const tier = getTier(tierName);
   if (tier.models.includes('all')) return true;
   return tier.models.includes(model);
-}
-
-export function getTierLimits(tierName: string) {
-  return getTier(tierName).limits;
 }
 
 export function getDailyCreditConfig(tierName: string): DailyCreditConfig | null {

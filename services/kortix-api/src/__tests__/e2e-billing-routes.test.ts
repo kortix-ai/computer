@@ -248,7 +248,7 @@ describe('Billing: tier-configurations', () => {
     expect(freeTier.display_name).toBe('Basic');
     expect(freeTier.monthly_price).toBe(0);
     expect(freeTier.monthly_credits).toBe(0);
-    expect(freeTier.limits).toBeDefined();
+
   });
 });
 

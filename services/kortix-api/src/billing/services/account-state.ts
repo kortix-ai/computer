@@ -99,7 +99,6 @@ export async function buildMinimalAccountState(accountId: string): Promise<Accou
       can_purchase_credits: tier.canPurchaseCredits,
     },
     models: getModelsForTier(tierName),
-    limits: buildLimits(tierName, accountId),
     tier: {
       name: tier.name,
       display_name: tier.displayName,
@@ -148,16 +147,6 @@ export function buildLocalAccountState(): AccountStateResponse {
       can_purchase_credits: false,
     },
     models: getModelsForTier('ultra'),
-    limits: {
-      concurrent_runs: { running_count: 0, limit: 999, can_start: true, tier_name: 'ultra' },
-      ai_worker_count: { current_count: 0, limit: 999, can_create: true, tier_name: 'ultra' },
-      custom_mcp_count: { current_count: 0, limit: 999, can_create: true, tier_name: 'ultra' },
-      trigger_count: {
-        scheduled: { current_count: 0, limit: 999, can_create: true },
-        app: { current_count: 0, limit: 999, can_create: true },
-        tier_name: 'ultra',
-      },
-    },
     tier: {
       name: 'ultra',
       display_name: 'Local (Unlimited)',
@@ -214,18 +203,4 @@ function extractScheduledChange(
   return null;
 }
 
-function buildLimits(tierName: string, _accountId: string) {
-  const tier = getTier(tierName);
-  const l = tier.limits;
 
-  return {
-    concurrent_runs: { running_count: 0, limit: l.concurrentRuns, can_start: true, tier_name: tierName },
-    ai_worker_count: { current_count: 0, limit: l.customWorkers, can_create: true, tier_name: tierName },
-    custom_mcp_count: { current_count: 0, limit: 10, can_create: true, tier_name: tierName },
-    trigger_count: {
-      scheduled: { current_count: 0, limit: l.scheduledTriggers, can_create: l.scheduledTriggers > 0 },
-      app: { current_count: 0, limit: l.appTriggers, can_create: l.appTriggers > 0 },
-      tier_name: tierName,
-    },
-  };
-}

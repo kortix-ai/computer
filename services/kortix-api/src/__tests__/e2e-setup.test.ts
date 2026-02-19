@@ -250,7 +250,7 @@ describe('Billing no-DB guard', () => {
     expect(state.models).toBeDefined();
     expect(state.models.length).toBeGreaterThan(0);
 
-    expect(state.limits).toBeDefined();
+
     expect(state.tier).toBeDefined();
     expect(state.tier.name).toBe('ultra');
     expect(state.tier.display_name).toBe('Local (Unlimited)');

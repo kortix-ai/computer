@@ -18,7 +18,7 @@ import {
     CreditCard,
     X,
     Trash2,
-    TrendingDown,
+
     ExternalLink,
     Info,
     Plug,
@@ -88,7 +88,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHea
 import { getPlanName, getPlanIcon } from '../billing/plan-utils';
 import { TierBadge } from '../billing/tier-badge';
 import { siteConfig } from '@/lib/site-config';
-import { UsageLimitsCard } from '@/components/billing/usage-limits-card';
+
 import { formatCredits } from '@kortix/shared';
 import { LanguageSwitcher } from './language-switcher';
 import { useTranslations } from 'next-intl';
@@ -102,7 +102,7 @@ import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
 import { previewSound } from '@/lib/sounds';
-type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'usage' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
+type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
 
 interface Tab {
     id: TabId;
@@ -138,7 +138,7 @@ export function UserSettingsModal({
         { id: 'plan', label: 'Plan', icon: Zap },
         { id: 'billing', label: 'Billing', icon: CreditCard },
         { id: 'transactions', label: 'Transactions', icon: Receipt },
-        { id: 'usage', label: 'Usage', icon: TrendingDown },
+
         ...(!isLocal ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
         { id: 'integrations', label: 'Secrets Manager', icon: Plug },
         { id: 'api-keys', label: 'API Keys', icon: Key },
@@ -230,7 +230,6 @@ export function UserSettingsModal({
                                 {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
                                 {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
                                 {activeTab === 'transactions' && <TransactionsTab />}
-                                {activeTab === 'usage' && <UsageTab />}
                                 {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
                             </div>
                         </div>
@@ -286,7 +285,6 @@ export function UserSettingsModal({
                             {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
                             {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
                             {activeTab === 'transactions' && <TransactionsTab />}
-                            {activeTab === 'usage' && <UsageTab />}
                             {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
                         </div>
                     </div>
@@ -1672,14 +1670,6 @@ function CreditsHelpAlert() {
         </div>
       </AlertDescription>
     </Alert>
-  );
-}
-
-function UsageTab() {
-  return (
-      <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 min-w-0 max-w-full overflow-x-hidden">
-        <UsageLimitsCard />
-      </div>
   );
 }
 

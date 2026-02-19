@@ -21,6 +21,8 @@ export interface UserPreferences {
   keyboard: KeyboardShortcutPreferences;
   /** Selected Kortix theme ID (e.g. 'default', 'ember', 'aurora') */
   themeId: string;
+  /** Selected desktop wallpaper ID */
+  wallpaperId: string;
 }
 
 // ============================================================================
@@ -49,6 +51,9 @@ interface UserPreferencesState {
   /** Set the active Kortix theme by ID */
   setThemeId: (themeId: string) => void;
 
+  /** Set the active desktop wallpaper by ID */
+  setWallpaperId: (wallpaperId: string) => void;
+
   /** Reset all preferences to defaults */
   resetPreferences: () => void;
 
@@ -62,6 +67,7 @@ export const useUserPreferencesStore = create<UserPreferencesState>()(
       preferences: {
         keyboard: getDefaultKeyboardPreferences(),
         themeId: 'graphite',
+        wallpaperId: 'brandmark',
       },
 
       setKeyboardPreferences: (prefs) => {
@@ -84,11 +90,22 @@ export const useUserPreferencesStore = create<UserPreferencesState>()(
         });
       },
 
+      setWallpaperId: (wallpaperId) => {
+        const current = get().preferences;
+        set({
+          preferences: {
+            ...current,
+            wallpaperId,
+          },
+        });
+      },
+
       resetPreferences: () => {
         set({
           preferences: {
             keyboard: getDefaultKeyboardPreferences(),
             themeId: 'graphite',
+            wallpaperId: 'brandmark',
           },
         });
       },

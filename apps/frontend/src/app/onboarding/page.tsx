@@ -17,6 +17,7 @@ import { useServerStore } from '@/stores/server-store';
 import { SecretsManager } from '@/components/secrets/secrets-manager';
 import { SessionChat } from '@/components/session/session-chat';
 import { Button } from '@/components/ui/button';
+import { WallpaperBackground } from '@/components/ui/wallpaper-background';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -55,20 +56,6 @@ function persistOnboardingSessionId(sessionId: string) {
 }
 
 /* ─── Sub-components ─────────────────────────────────────────── */
-
-function BrandmarkWallpaper() {
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/kortix-brandmark-bg.svg"
-        alt=""
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[140vw] min-w-[700px] h-auto sm:w-[160vw] sm:min-w-[1000px] md:min-w-[1200px] lg:w-[162vw] lg:min-w-[1620px] object-contain select-none invert dark:invert-0"
-        draggable={false}
-      />
-    </div>
-  );
-}
 
 function LiveClock() {
   const [now, setNow] = useState(new Date());
@@ -476,7 +463,7 @@ export default function OnboardingPage() {
             exit={{ opacity: 0, transition: { duration: 0.3 } }}
             transition={{ duration: 0.7 }}
           >
-            <BrandmarkWallpaper />
+            <WallpaperBackground />
             <motion.div
               className="relative z-10 flex justify-center pt-[12vh] sm:pt-[14vh]"
               initial={{ opacity: 0, y: -12 }}
@@ -530,7 +517,7 @@ export default function OnboardingPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
-            <BrandmarkWallpaper />
+            <WallpaperBackground />
             <div className="relative z-10 w-full max-w-2xl mx-auto bg-background/95 backdrop-blur-xl rounded-xl border border-border/40 overflow-hidden flex flex-col max-h-[85vh]">
               <div className="flex items-center gap-3 px-5 py-4 border-b border-border/40">
                 <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={() => setPhase('login')}>
@@ -565,7 +552,7 @@ export default function OnboardingPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
-            <BrandmarkWallpaper />
+            <WallpaperBackground />
             <div className="relative z-10 w-full max-w-4xl mx-4 bg-background/95 backdrop-blur-xl rounded-xl border border-border/40 overflow-hidden flex flex-col h-[90vh]">
               <div className="flex-1 min-h-0 overflow-hidden">
                 {sessionId ? (

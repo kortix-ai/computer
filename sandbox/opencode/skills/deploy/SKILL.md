@@ -1,86 +1,102 @@
 ---
 name: deploy
-description: "Deploy any web app, API, or static site to Freestyle.sh with a live preview URL. Supports Next.js, Vite, static sites, Express/Hono APIs, raw code snippets, Git repos, local files, and tar URLs. Auto-detects frameworks, builds, and deploys with instant SSL on *.style.dev subdomains or custom domains. Triggers on: 'deploy this', 'deploy my app', 'make this live', 'publish this', 'host this', 'get me a preview URL', 'deploy to freestyle', 'ship this', 'deploy to production', '1-click deploy', 'preview URL', 'put this online', any request to deploy, host, or publish a web application, site, or API to the internet."
+description: "Deploy any web app, API, or static site via Kortix Deployments API. Supports Next.js, Vite, static sites, Express/Hono APIs, raw code snippets, Git repos, local files, and tar URLs. Auto-detects frameworks, builds, and deploys with instant SSL on *.style.dev subdomains. Triggers on: 'deploy this', 'deploy my app', 'make this live', 'publish this', 'host this', 'get me a preview URL', 'ship this', 'deploy to production', '1-click deploy', 'preview URL', 'put this online', any request to deploy, host, or publish a web application, site, or API to the internet."
 ---
 
-# Deploy to Freestyle.sh
+# Kortix Deployments
 
-One-command deploys to live preview URLs via [Freestyle Serverless Deployments](https://docs.freestyle.sh/v2/serverless/deployments). Write a small deploy script, run it, hand back the URL.
+Deploy apps to live URLs via the Kortix Deployments API (`POST /v1/deployments`). The API handles everything server-side — no SDK, no API keys, no deploy scripts needed.
 
-## About Freestyle Serverless Deployments
+## How It Works
 
-Freestyle is an API-first serverless platform built for **programmatic deployment at scale** (not dashboard-clicking like Vercel/Netlify). Deployments run **Node.js only** with automatic scaling, wildcard subdomains, and framework detection.
+The agent calls the Kortix API directly using `KORTIX_TOKEN`. Kortix forwards to Freestyle.sh behind the scenes, tracks deployments per-user, and returns a live `*.style.dev` URL.
 
-**Key capabilities:**
-- **Sub-second deploys** for non-build deployments (no containers, cached deps)
-- **4 source types**: Git repo, inline code, local files (`readFiles`), tar URL
+**No user-facing API keys. No SDK installs. No `.mjs` scripts. Just one API call.**
+
+## Capabilities
+
+- **4 source types**: Git repo, inline code, local files, tar URL
 - **Auto-detects** Next.js, Vite, Expo — TypeScript works out of the box
-- **Free `*.style.dev` subdomains** with instant SSL, custom domains with wildcard certs
-- **WebSocket support** — timeout is per last TCP packet, not HTTP request
-- **Cached modules** — never upload `node_modules`, just your lockfile
+- **Free `*.style.dev` subdomains** with instant SSL
+- **Sub-second deploys** for non-build deployments
+- **WebSocket support** (timeout is per last TCP packet)
+- **Cached modules** — include your lockfile, never upload `node_modules`
 
-**When NOT to use Deployments (use Freestyle VMs instead):**
-- Non-Node workloads (Python, Ruby, Go) — VMs are full Linux environments
-- One-shot code execution (no HTTP server needed) — use Serverless Runs
-- Low-level system access (SSH, systemd, filesystem persistence)
-- Browser automation (scraping, testing)
+## Limitations (Node.js only)
 
-## Hard-Won Deployment Lessons
-
-These are critical gotchas discovered through real e2e testing:
-
-1. **SDK version**: Use `freestyle-sandboxes@latest` (NOT `@beta`). The `@beta` tag (0.1.3) has a different API path (`freestyle.edge.deployments`) that doesn't match current docs. Latest uses `freestyle.serverless.deployments`.
-2. **`readFiles` import**: `import { readFiles } from "freestyle-sandboxes"` — it is exported from the main package. NOT from `freestyle-sandboxes/utils` (that subpath doesn't exist).
-3. **Runtime is Node.js, NOT Deno**: `Deno.serve()` and Hono's `app.fire()` do NOT work. Always use Express `app.listen(3000)` or Hono with `@hono/node-server` and `serve({ fetch: app.fetch, port: 3000 })`.
-4. **Static sites MUST have a Node.js server entrypoint**: Setting `entrypointPath` to an HTML file (e.g., `index.html`) will serve that page but CSS/JS/image sub-assets will NOT load. You MUST bundle an Express static file server.
-5. **Deploy scripts must be `.mjs`**: The SDK uses ESM exports. Write `.mjs` files and run with `node`, not `.ts` with `npx tsx`.
-6. **Cold starts**: First request may 503 for ~10-15 seconds after deploy completes. This is normal. Subsequent requests are instant.
-7. **Port 3000**: All servers must listen on port 3000. This is the port Freestyle routes to.
-8. **`nodeModules` field**: Only needed for `code` deploys. For `files`/`git` deploys, include your lockfile and Freestyle installs deps automatically.
-9. **`envVars` are runtime-only**: NOT available at build time. Use `build.envVars` for build-time env vars.
-10. **Never upload `node_modules`**: `readFiles` auto-excludes it. Freestyle installs from your lockfile.
+- No Python, Ruby, Go — only Node.js/TypeScript
+- No SSH, systemd, filesystem persistence
+- No browser automation
+- No Sharp (use `images.unoptimized` for Next.js)
+- Port 3000 — all servers must listen on port 3000
 
 ## Prerequisites
 
-1. **API Key**: `FREESTYLE_API_KEY` must be set. Check with `env | grep FREESTYLE_API_KEY`. If missing, set via secrets or ask the user for their key from [admin.freestyle.sh](https://admin.freestyle.sh).
-
-2. **SDK**: `freestyle-sandboxes` must be installed (already pre-installed in sandbox). If missing:
-   ```bash
-   npm i freestyle-sandboxes
-   ```
+The sandbox has `KORTIX_API_URL` and `KORTIX_TOKEN` set automatically. No additional setup needed.
 
 ## Workflow
 
 1. **Detect** project type (see Detection below)
-2. **Pick** the right starter template
-3. **Customize** — fill in project-specific values (repo URL, domain slug, env vars, etc.)
-4. **Write** the deploy script as `.mjs` file (e.g., `/tmp/deploy-freestyle.mjs`)
-5. **Run** it: `FREESTYLE_API_KEY=... node /tmp/deploy-freestyle.mjs`
-6. **Report** the live URL to the user and show it
-
-**CRITICAL**: Deploy scripts must be `.mjs` files (ESM). The SDK uses ES module exports. Run with `node`, NOT `npx tsx`.
+2. **Build** the request body (pick the right source type + config)
+3. **Call** `POST /v1/deployments` with `KORTIX_TOKEN`
+4. **Report** the live URL to the user
 
 ### Domain Naming
 
 Generate a descriptive `*.style.dev` subdomain:
-- Use project name or directory name as base
-- Append short random suffix to avoid collisions: `my-app-x7k2.style.dev`
-- Keep it lowercase, alphanumeric + hyphens only
+- Use project name as base, append short random suffix: `my-app-x7k2.style.dev`
+- Lowercase, alphanumeric + hyphens only
 - Generate with: `` `${slug}-${crypto.randomUUID().slice(0, 4)}.style.dev` ``
+
+## API Call Pattern
+
+```bash
+# Strip /router from KORTIX_API_URL to get base (same pattern as cron triggers)
+BASE_URL="${KORTIX_API_URL%/router}"
+
+curl -X POST "$BASE_URL/deployments" \
+  -H "Authorization: Bearer $KORTIX_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+Or in JavaScript/TypeScript:
+
+```typescript
+const baseUrl = process.env.KORTIX_API_URL!.replace(/\/router$/, '');
+
+const response = await fetch(`${baseUrl}/deployments`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${process.env.KORTIX_TOKEN}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    source_type: 'git',
+    source_ref: 'https://github.com/user/repo',
+    domains: ['my-app-x7k2.style.dev'],
+    build: true,
+  }),
+});
+
+const result = await response.json();
+// result.data.live_url → "https://my-app-x7k2.style.dev"
+// result.data.deployment_id → UUID
+```
 
 ## Project Detection
 
-Check these files to determine the framework. If ambiguous, ask the user.
+Check these files to determine the framework:
 
 | File present | Framework | Deploy strategy |
 |---|---|---|
-| `next.config.{js,mjs,ts}` | Next.js | Git + `build: true` or local files via readFiles |
-| `vite.config.{js,ts,mjs}` | Vite | Git + `build: true` or local files via readFiles |
-| Only `.html`/`.css`/`.js` files | Static | Express static server + readFiles |
-| `package.json` with `express`/`hono`/`fastify` dep | Node.js API | Git or local files, no build |
-| `.git` with GitHub remote | Any | Prefer git deploy with repo URL |
-| User provides a code snippet | Code snippet | Inline `code` + `nodeModules` |
-| User provides a URL to `.tar.gz` | Tar | `tarUrl` source |
+| `next.config.{js,mjs,ts}` | Next.js | `source_type: 'git'` + `build: true` |
+| `vite.config.{js,ts,mjs}` | Vite | `source_type: 'git'` + `build: true` |
+| Only `.html`/`.css`/`.js` | Static | `source_type: 'files'` + Express server + `static_only: true` |
+| `package.json` with Express/Hono | Node.js API | `source_type: 'git'` or `'files'`, no build |
+| `.git` with GitHub remote | Any | Prefer `source_type: 'git'` with repo URL |
+| User provides code snippet | Code | `source_type: 'code'` + `node_modules` |
+| User provides `.tar.gz` URL | Tar | `source_type: 'tar'` |
 
 ### Next.js Pre-Flight
 
@@ -91,348 +107,262 @@ images: { unoptimized: true }
 ```
 If missing, add them automatically and inform the user.
 
-## Starter Templates
+## Deploy Examples
 
-Each template is a complete, runnable `.mjs` deploy script. Copy the appropriate one, fill in the `CUSTOMIZE` values, write to `/tmp/deploy-freestyle.mjs`, and run with `FREESTYLE_API_KEY=... node /tmp/deploy-freestyle.mjs`.
+### 1. Git Repo (any framework)
 
-**Import pattern** (same for all templates):
-```javascript
-import { freestyle, readFiles } from "freestyle-sandboxes";  // readFiles only when deploying local files
+```json
+{
+  "source_type": "git",
+  "source_ref": "https://github.com/user/repo",
+  "domains": ["my-app-x7k2.style.dev"],
+  "build": true
+}
 ```
 
-> **NOTE**: `readFiles` is exported from `freestyle-sandboxes` directly. NOT from `freestyle-sandboxes/utils`.
-
----
-
-### 1. Git Repo Deploy (any framework)
-
-The most common path. Works for any project with a Git remote. Freestyle auto-detects Next.js, Vite, Expo.
-
-```javascript
-import { freestyle } from "freestyle-sandboxes";
-
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  repo: "https://github.com/USER/REPO",     // CUSTOMIZE: repo URL
-  // branch: "main",                         // CUSTOMIZE: optional
-  // rootPath: "./apps/web",                 // CUSTOMIZE: optional, for monorepos
-  domains: ["SLUG.style.dev"],               // CUSTOMIZE: unique subdomain
-  build: true,                               // set false if no build needed
-  // envVars: { KEY: "value" },              // CUSTOMIZE: optional runtime env vars
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+With branch and monorepo path:
+```json
+{
+  "source_type": "git",
+  "source_ref": "https://github.com/user/monorepo",
+  "branch": "main",
+  "root_path": "./apps/web",
+  "domains": ["my-app-x7k2.style.dev"],
+  "build": true
+}
 ```
 
----
+### 2. Next.js (from git)
 
-### 2. Next.js (from Git)
-
-```javascript
-import { freestyle } from "freestyle-sandboxes";
-
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  repo: "https://github.com/USER/REPO",     // CUSTOMIZE
-  domains: ["SLUG.style.dev"],               // CUSTOMIZE
-  build: true,                               // auto-detects Next.js
-  // envVars: { DATABASE_URL: "..." },       // CUSTOMIZE: optional runtime env vars
-  // build: {                                // use this form for build-time env vars
-  //   command: "npm run build",
-  //   envVars: { NEXT_PUBLIC_API_URL: "https://api.example.com" },
-  // },
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+```json
+{
+  "source_type": "git",
+  "source_ref": "https://github.com/user/nextjs-app",
+  "domains": ["nextjs-app-a1b2.style.dev"],
+  "build": true,
+  "framework": "nextjs",
+  "env_vars": {
+    "DATABASE_URL": "postgres://..."
+  }
+}
 ```
 
----
-
-### 3. Next.js (from local files)
-
-Build locally, copy standalone artifacts, upload with `readFiles`.
-
-```javascript
-import { freestyle, readFiles } from "freestyle-sandboxes";
-import { execSync } from "child_process";
-import { cpSync } from "fs";
-
-// Build
-execSync("npm run build", { stdio: "inherit", cwd: "PROJECT_DIR" }); // CUSTOMIZE
-
-// Prepare standalone artifacts
-cpSync("PROJECT_DIR/public", "PROJECT_DIR/.next/standalone/public", { recursive: true });
-cpSync("PROJECT_DIR/.next/static", "PROJECT_DIR/.next/standalone/.next/static", { recursive: true });
-cpSync("PROJECT_DIR/package-lock.json", "PROJECT_DIR/.next/standalone/package-lock.json"); // CUSTOMIZE: use your lockfile
-
-const files = await readFiles("PROJECT_DIR/.next/standalone"); // CUSTOMIZE
-
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  files,
-  entrypointPath: "server.js",
-  domains: ["SLUG.style.dev"],              // CUSTOMIZE
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+With build-time env vars:
+```json
+{
+  "source_type": "git",
+  "source_ref": "https://github.com/user/nextjs-app",
+  "domains": ["nextjs-app-a1b2.style.dev"],
+  "build": {
+    "command": "npm run build",
+    "envVars": {
+      "NEXT_PUBLIC_API_URL": "https://api.example.com"
+    }
+  }
+}
 ```
 
----
+### 3. Vite / React / Vue / Svelte (from git)
 
-### 4. Vite (from Git)
-
-```javascript
-import { freestyle } from "freestyle-sandboxes";
-
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  repo: "https://github.com/USER/REPO",     // CUSTOMIZE
-  domains: ["SLUG.style.dev"],               // CUSTOMIZE
-  build: true,                               // auto-detects Vite
-  // envVars: { VITE_API_URL: "..." },       // CUSTOMIZE: optional
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+```json
+{
+  "source_type": "git",
+  "source_ref": "https://github.com/user/vite-app",
+  "domains": ["vite-app-c3d4.style.dev"],
+  "build": true
+}
 ```
 
----
+### 4. Inline Code (Express API)
 
-### 5. Vite / Static SPA (from local files)
-
-Build locally, add an Express static server, deploy the dist. **This pattern works for any pre-built SPA (React, Vue, Svelte, etc.) or static site.**
-
-```javascript
-import { freestyle, readFiles } from "freestyle-sandboxes";
-import { execSync } from "child_process";
-import { writeFileSync } from "fs";
-
-// Build (skip if already built or pure static)
-execSync("npm run build", { stdio: "inherit", cwd: "PROJECT_DIR" }); // CUSTOMIZE
-
-const distDir = "PROJECT_DIR/dist"; // CUSTOMIZE: build output directory
-
-// Write Express static server into dist
-writeFileSync(`${distDir}/server.js`, `
-import express from 'express';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const app = express();
-
-app.use(express.static(__dirname));
-app.get('*', (req, res) => res.sendFile(join(__dirname, 'index.html')));
-
-app.listen(3000, () => console.log('Server running on port 3000'));
-`);
-
-writeFileSync(`${distDir}/package.json`, JSON.stringify({
-  name: "deploy", type: "module", dependencies: { express: "^4.18.2" }
-}));
-
-const files = await readFiles(distDir);
-
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  files,
-  entrypointPath: "server.js",
-  nodeModules: { express: "^4.18.2" },
-  domains: ["SLUG.style.dev"],               // CUSTOMIZE
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+```json
+{
+  "source_type": "code",
+  "code": "import express from 'express';\nconst app = express();\napp.get('/', (req, res) => res.json({ status: 'ok' }));\napp.listen(3000);",
+  "node_modules": { "express": "^4.18.2" },
+  "domains": ["api-e5f6.style.dev"]
+}
 ```
 
----
-
-### 6. Static Site (HTML/CSS/JS files)
-
-For plain HTML/CSS/JS with no build step. **Must include an Express server** — Freestyle needs a Node.js entrypoint.
-
-```javascript
-import { freestyle, readFiles } from "freestyle-sandboxes";
-import { writeFileSync } from "fs";
-
-const siteDir = "PROJECT_DIR"; // CUSTOMIZE: directory with HTML/CSS/JS
-
-// Write Express static server
-writeFileSync(`${siteDir}/server.js`, `
-import express from 'express';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const app = express();
-
-app.use(express.static(__dirname));
-app.get('*', (req, res) => res.sendFile(join(__dirname, 'index.html')));
-
-app.listen(3000, () => console.log('Static server on port 3000'));
-`);
-
-const files = await readFiles(siteDir);
-
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  files,
-  entrypointPath: "server.js",
-  nodeModules: { express: "^4.18.2" },
-  domains: ["SLUG.style.dev"],                          // CUSTOMIZE
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+Hono variant (must use `@hono/node-server`):
+```json
+{
+  "source_type": "code",
+  "code": "import { Hono } from 'hono';\nimport { serve } from '@hono/node-server';\nconst app = new Hono();\napp.get('/', (c) => c.json({ status: 'ok' }));\nserve({ fetch: app.fetch, port: 3000 });",
+  "node_modules": { "hono": "^4", "@hono/node-server": "^1" },
+  "domains": ["api-g7h8.style.dev"]
+}
 ```
 
----
+**WARNING**: Do NOT use `Deno.serve()` or `app.fire()`. Runtime is Node.js. Always use `app.listen(3000)` or `serve({ fetch: app.fetch, port: 3000 })`.
 
-### 7. Code Snippet Deploy (Express)
+### 5. Local Files (pre-built static/SPA)
 
-For quick API servers or demos. **Use Express with `app.listen(3000)`** — this is the proven pattern.
+Read files with Node.js `fs`, send as array:
 
-```javascript
-import { freestyle } from "freestyle-sandboxes";
+```typescript
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join, relative } from 'path';
 
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  code: `
-    import express from 'express';
-    const app = express();
+function readFilesRecursive(dir: string, base?: string): Array<{path: string, content: string, encoding: string}> {
+  const result: Array<{path: string, content: string, encoding: string}> = [];
+  base = base ?? dir;
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules') continue;
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      result.push(...readFilesRecursive(full, base));
+    } else {
+      result.push({
+        path: relative(base, full),
+        content: readFileSync(full).toString('base64'),
+        encoding: 'base64',
+      });
+    }
+  }
+  return result;
+}
 
-    app.get('/', (req, res) => {
-      res.json({ status: 'ok', time: new Date().toISOString() });
-    });
+const files = readFilesRecursive('./dist');
 
-    app.listen(3000, () => console.log('Running on port 3000'));
-  `,
-  nodeModules: {
-    express: "^4.18.2",                       // CUSTOMIZE: dependencies
-  },
-  domains: ["SLUG.style.dev"],                // CUSTOMIZE
-  // envVars: { KEY: "value" },               // CUSTOMIZE: optional
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+// Then POST to /v1/deployments:
+{
+  "source_type": "files",
+  "files": files,
+  "entrypoint": "server.js",
+  "domains": ["my-site-i9j0.style.dev"]
+}
 ```
 
-**Hono variant** (also works — must use `@hono/node-server`):
-```javascript
-code: `
-  import { Hono } from "hono";
-  import { serve } from "@hono/node-server";
-  const app = new Hono();
-  app.get("/", (c) => c.json({ status: "ok" }));
-  serve({ fetch: app.fetch, port: 3000 });
-`,
-nodeModules: { hono: "4.11.1", "@hono/node-server": "^1.13.8" },
+**Important**: For static sites, you MUST include a Node.js server entrypoint (Express/Hono). Or use `static_only: true` with `public_dir`.
+
+### 6. Static Site (no server needed)
+
+```json
+{
+  "source_type": "git",
+  "source_ref": "https://github.com/user/static-site",
+  "domains": ["site-k1l2.style.dev"],
+  "static_only": true,
+  "public_dir": "public",
+  "clean_urls": true
+}
 ```
 
-> **WARNING**: Do NOT use `app.fire()` or `Deno.serve()` — these do not work in the Freestyle runtime. Always use `app.listen(3000)` (Express) or `serve({ fetch: app.fetch, port: 3000 })` (Hono).
+### 7. Tar URL
 
----
-
-### 8. Tar URL Deploy
-
-For deploying from a remote archive (S3, GCS signed URL, etc).
-
-```javascript
-import { freestyle } from "freestyle-sandboxes";
-
-const { deployment, domains } = await freestyle.serverless.deployments.create({
-  tarUrl: "https://s3.example.com/signed-url/app.tar.gz", // CUSTOMIZE
-  domains: ["SLUG.style.dev"],                              // CUSTOMIZE
-  build: true,                                              // CUSTOMIZE: set false if pre-built
-  // entrypointPath: "server.js",                           // CUSTOMIZE: if needed
-  // envVars: { KEY: "value" },                             // CUSTOMIZE: optional
-});
-
-console.log("Live at:", domains.map(d => `https://${d}`).join(", "));
-console.log("Deployment ID:", deployment.deploymentId);
+```json
+{
+  "source_type": "tar",
+  "tar_url": "https://s3.example.com/signed-url/app.tar.gz",
+  "domains": ["app-m3n4.style.dev"],
+  "build": true
+}
 ```
 
-## Custom Domains
+## Other API Endpoints
 
-If the user wants to deploy to their own domain instead of `*.style.dev`:
+```bash
+BASE_URL="${KORTIX_API_URL%/router}"
 
-### 1. Verify domain ownership
+# List all deployments
+curl "$BASE_URL/deployments" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
 
-```javascript
-const { record, instructions } = await freestyle.domains.verifications.create({
-  domain: "example.com",
-});
-// Tell user: Add TXT record _freestyle_custom_hostname.example.com → record.value
+# Get deployment details
+curl "$BASE_URL/deployments/{deployment_id}" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
+
+# Get deployment logs
+curl "$BASE_URL/deployments/{deployment_id}/logs" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
+
+# Stop a deployment
+curl -X POST "$BASE_URL/deployments/{deployment_id}/stop" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
+
+# Redeploy (same config, new version)
+curl -X POST "$BASE_URL/deployments/{deployment_id}/redeploy" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
+
+# Delete deployment record
+curl -X DELETE "$BASE_URL/deployments/{deployment_id}" \
+  -H "Authorization: Bearer $KORTIX_TOKEN"
 ```
 
-### 2. Complete verification (after user adds DNS record)
+## Response Format
 
-```javascript
-await freestyle.domains.verifications.complete({ domain: "example.com" });
+### Create (POST /v1/deployments)
+
+```json
+{
+  "success": true,
+  "data": {
+    "deploymentId": "uuid",
+    "accountId": "uuid",
+    "freestyleId": "freestyle-deployment-id",
+    "status": "active",
+    "sourceType": "git",
+    "sourceRef": "https://github.com/user/repo",
+    "framework": "nextjs",
+    "domains": ["my-app-x7k2.style.dev"],
+    "liveUrl": "https://my-app-x7k2.style.dev",
+    "envVars": {},
+    "buildConfig": { "auto": true },
+    "entrypoint": null,
+    "error": null,
+    "version": 1,
+    "createdAt": "2026-02-19T...",
+    "updatedAt": "2026-02-19T..."
+  }
+}
 ```
 
-### 3. Configure DNS
+### List (GET /v1/deployments)
 
-Tell the user to add an A record pointing to `35.235.84.134`:
-- **APEX** (`example.com`): `A @ 35.235.84.134`
-- **Subdomain** (`app.example.com`): `A app 35.235.84.134`
-- **Wildcard** (`*.example.com`): `A * 35.235.84.134`
-
-### 4. Deploy
-
-```javascript
-domains: ["example.com"]  // use the verified domain in the deploy call
+```json
+{
+  "success": true,
+  "data": [ /* array of deployment objects */ ],
+  "total": 5,
+  "limit": 50,
+  "offset": 0
+}
 ```
 
-## API Reference (Quick)
+## Hard-Won Lessons
 
-Full details in `references/freestyle-api.md`. Key options for `freestyle.serverless.deployments.create()`:
-
-**Sources** (exactly one required):
-- `repo: "https://github.com/user/repo"` + optional `branch`, `rootPath`
-- `code: "..."` + `nodeModules: { pkg: "version" }`
-- `files` (from `readFiles(dir)`) + `entrypointPath: "server.js"`
-- `tarUrl: "https://..."` 
-
-**Options:**
-- `domains: ["slug.style.dev"]` — required, free `*.style.dev` or verified custom domain
-- `build: true` or `build: { command, outDir, envVars }` — triggers framework build
-- `entrypointPath: "server.js"` — main file (auto-detected for Next.js/Vite)
-- `envVars: { KEY: "value" }` — runtime env vars (NOT build-time)
-- `nodeModules: { express: "^4.18.2" }` — only for `code` deploys
-- `timeoutMs: 60000` — idle timeout before scale-down (per last TCP packet)
-- `networkPermissions: [{ action, domain, behavior }]` — outbound network ACL
-- `headers: [{ source, headers: [{ key, value }] }]` — custom response headers
-- `redirects: [{ source, destination, permanent }]` — URL redirects
-- `waitForRollout: true` — wait until fully serving traffic
-
-**Return value:**
-```javascript
-const { deployment, domains } = await freestyle.serverless.deployments.create({...});
-// deployment.deploymentId — unique ID
-// domains — string[] of live URLs
-```
+1. **Runtime is Node.js**: `Deno.serve()` and `app.fire()` do NOT work. Use `app.listen(3000)`.
+2. **Port 3000**: All servers must listen on port 3000.
+3. **Static sites need a server OR `static_only: true`**: Setting `entrypoint` to an HTML file won't serve sub-assets. Either bundle an Express server or use `static_only` mode.
+4. **`env_vars` are runtime-only**: NOT available at build time. Use `build.envVars` for build-time variables.
+5. **Include your lockfile**: For git/file deploys, include `package-lock.json` / `yarn.lock` / `pnpm-lock.yaml`. Never include `node_modules`.
+6. **`node_modules` field**: Only needed for `code` deploys.
+7. **Cold starts**: First request may take 10-15 seconds. Subsequent requests are instant.
+8. **Next.js requires `output: "standalone"`** and `images: { unoptimized: true }`.
 
 ## Post-Deploy
 
 After a successful deployment:
 
-1. **Show the live URL** prominently — `https://SLUG.style.dev`
-2. **Show deployment ID** — for reference and debugging
-3. **Open in browser** if the browser skill is available:
+1. **Show the live URL** prominently: `https://SLUG.style.dev`
+2. **Show the deployment ID** for reference
+3. **Open in browser** if available:
    ```bash
    agent-browser --session preview-deploy open https://SLUG.style.dev
    ```
-4. **Clean up** — remove `/tmp/deploy-freestyle.mjs`
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `FREESTYLE_API_KEY` not set | Set via secrets or `export FREESTYLE_API_KEY=...` |
-| `Cannot find package` | Run deploy script from project root where `freestyle-sandboxes` is installed, or use absolute path to node_modules |
-| Build fails for Next.js | Ensure `output: "standalone"` and `images: { unoptimized: true }` in next.config |
-| Module not found on Freestyle | Include lockfile in source. Freestyle installs deps from it. Never upload `node_modules`. |
-| 404 on SPA routes / static assets not loading | You MUST use an Express static server entrypoint. Setting `entrypointPath` to an HTML file does NOT work for sub-assets. |
-| `app.fire()` / `Deno.serve()` fails | Freestyle runs Node.js, not Deno. Use `app.listen(3000)` or `@hono/node-server` `serve()`. |
-| 503 on first request | Cold start — wait 10-15 seconds after deploy for the instance to warm up. |
-| Domain not working | Check DNS: `dig yourdomain.com` should show `35.235.84.134` |
-| Deploy takes too long | Use `await: false` to return immediately, then poll with `freestyle.serverless.deployments.get()` |
-| Subdomain taken | Pick a different `*.style.dev` slug — add more random chars |
+| Deploy returns `status: 'failed'` | Check `data.error` field for details from Freestyle |
+| Build fails for Next.js | Ensure `output: "standalone"` and `images: { unoptimized: true }` |
+| Module not found | Include lockfile in source. Never upload `node_modules`. |
+| 404 on SPA routes | Use Express server with SPA fallback, or set `static_only: true` + `clean_urls: true` |
+| 503 on first request | Cold start — wait 10-15 seconds |
+| Subdomain taken | Pick a different `*.style.dev` slug |
+
+## Full API Reference
+
+See `references/freestyle-api.md` for complete request/response schema documentation.

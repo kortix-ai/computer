@@ -10,6 +10,7 @@ import {
   CreditCard,
   Key,
   LogOut,
+  Monitor,
   Settings,
   SlidersHorizontal,
   Sparkles,
@@ -18,7 +19,7 @@ import {
   Plug,
   Zap,
   BarChart3,
-  TrendingDown,
+
   MessageSquare,
   Calendar,
   Heart,
@@ -53,8 +54,8 @@ import { openTabAndNavigate } from '@/stores/tab-store';
 import { useTheme } from 'next-themes';
 import { Palette } from 'lucide-react';
 import { isLocalMode } from '@/lib/config';
-import { useUserPreferencesStore } from '@/stores/user-preferences-store';
-import { getThemeById } from '@/lib/themes';
+
+
 import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
 import { UserSettingsModal } from '@/components/settings/user-settings-modal';
 import { PlanSelectionModal } from '@/components/billing/pricing';
@@ -81,7 +82,7 @@ interface UserMenuProps {
   };
 }
 
-type SettingsTab = 'general' | 'appearance' | 'billing' | 'usage';
+type SettingsTab = 'general' | 'appearance' | 'billing';
 
 interface MenuItemConfig {
   icon: React.ComponentType<{ className?: string }>;
@@ -105,8 +106,7 @@ export function UserMenu({ user }: UserMenuProps) {
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab>('general');
   const { isOpen: isReferralDialogOpen, openDialog: openReferralDialog, closeDialog: closeReferralDialog } = useReferralDialog();
   const { theme, setTheme } = useTheme();
-  const themeId = useUserPreferencesStore((s) => s.preferences.themeId);
-  const currentTheme = getThemeById(themeId);
+
 
   const isFreeTier = !isLocal && (
     accountState?.subscription?.tier_key === 'free' ||
@@ -144,7 +144,7 @@ export function UserMenu({ user }: UserMenuProps) {
         { icon: Zap, label: 'Plan', onClick: () => { trackCtaUpgrade(); setShowPlanModal(true); } },
         { icon: LifeBuoy, label: 'Support', href: '/support' },
         { icon: CreditCard, label: 'Billing', onClick: () => openSettings('billing') },
-        { icon: TrendingDown, label: 'Usage', onClick: () => openSettings('usage') },
+
         { icon: KeyRound, label: 'Secrets Manager', href: '/settings/credentials' },
         { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
         { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
@@ -259,27 +259,6 @@ export function UserMenu({ user }: UserMenuProps) {
               <DropdownMenuLabel className="text-muted-foreground text-xs px-2 py-1.5">General</DropdownMenuLabel>
               <DropdownMenuGroup>
                 {generalItems.map(renderMenuItem)}
-                <DropdownMenuItem
-                  onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                  className="gap-2 p-2"
-                >
-                  <div className="relative h-4 w-4">
-                    <Sun className="h-4 w-4 absolute rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="h-4 w-4 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  </div>
-                  <span>{t('theme')}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => openSettings('appearance')}
-                  className="gap-2 p-2"
-                >
-                  <Palette className="h-4 w-4" />
-                  <span className="flex-1">Themes</span>
-                  <span
-                    className="ml-auto h-3 w-3 rounded-full shrink-0"
-                    style={{ backgroundColor: currentTheme?.accentColor ?? '#4F8EF7' }}
-                  />
-                </DropdownMenuItem>
               </DropdownMenuGroup>
 
               {/* Admin */}
@@ -292,6 +271,45 @@ export function UserMenu({ user }: UserMenuProps) {
                   </DropdownMenuGroup>
                 </>
               )}
+
+              {/* Appearance + theme toggle */}
+              <DropdownMenuItem
+                onClick={() => openSettings('appearance')}
+                className="gap-2 p-2"
+              >
+                <Palette className="h-4 w-4" />
+                <span className="flex-1">Appearance</span>
+              </DropdownMenuItem>
+              <div className="px-2 py-1.5">
+                <div className="flex gap-0.5 p-0.5 bg-muted/50 rounded-md w-fit">
+                  {([
+                    { value: 'light', icon: Sun },
+                    { value: 'dark', icon: Moon },
+                    { value: 'system', icon: Monitor },
+                  ] as const).map((mode) => {
+                    const Icon = mode.icon;
+                    const isActive = theme === mode.value;
+                    return (
+                      <button
+                        key={mode.value}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTheme(mode.value);
+                        }}
+                        className={`p-1.5 rounded-sm transition-all duration-150 ${
+                          isActive
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Icon className="size-3.5" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {!isLocal && (
                 <>

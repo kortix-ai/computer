@@ -68,26 +68,6 @@ export interface AccountState {
     priority: number;
     recommended: boolean;
   }>;
-  limits: {
-    concurrent_runs: {
-      running_count: number;
-      limit: number;
-      can_start: boolean;
-      tier_name: string;
-    };
-    ai_worker_count: {
-      current_count: number;
-      limit: number;
-      can_create: boolean;
-      tier_name: string;
-    };
-    custom_mcp_count: {
-      current_count: number;
-      limit: number;
-      can_create: boolean;
-      tier_name: string;
-    };
-  };
   tier: {
     name: string;
     display_name: string;

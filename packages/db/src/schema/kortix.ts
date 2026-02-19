@@ -206,13 +206,12 @@ export const deployments = kortixSchema.table(
     // Source
     sourceType: deploymentSourceEnum('source_type').notNull(),
     sourceRef: text('source_ref'),
-    sourcePath: text('source_path'),
     framework: varchar('framework', { length: 50 }),
 
     // Config
     domains: jsonb('domains').default([]).$type<string[]>(),
     liveUrl: text('live_url'),
-    envVarKeys: jsonb('env_var_keys').default([]).$type<string[]>(),
+    envVars: jsonb('env_vars').default({}).$type<Record<string, string>>(),
     buildConfig: jsonb('build_config').$type<Record<string, unknown>>(),
     entrypoint: text('entrypoint'),
 
