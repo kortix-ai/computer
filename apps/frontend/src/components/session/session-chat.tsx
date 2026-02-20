@@ -1451,12 +1451,72 @@ function ThrottledMarkdown({
 	isStreaming: boolean;
 }) {
 	const throttled = useThrottledValue(content, 33);
-	const displayContent = isStreaming ? trimIncompleteTableRow(throttled) : content;
+	const containerRef = useRef<HTMLDivElement>(null);
+	const frozenRef = useRef(false);
+	const frozenContentRef = useRef("");
+	const isStreamingRef = useRef(isStreaming);
+	isStreamingRef.current = isStreaming;
+	const [, setRenderTick] = useState(0);
+
+	const displayContent = isStreaming
+		? trimIncompleteTableRow(throttled)
+		: content;
+	const displayContentRef = useRef(displayContent);
+	displayContentRef.current = displayContent;
+
+	// Preserve text selection during streaming by freezing content updates
+	// when the user has an active selection inside this container.
+	// Without this, the ~30fps DOM re-renders from Streamdown destroy the
+	// browser's Selection/Range, making it impossible to select text while streaming.
+	useEffect(() => {
+		function checkSelection() {
+			const selection = document.getSelection();
+			const wasFrozen = frozenRef.current;
+
+			// Selection cleared or collapsed → unfreeze so content catches up
+			if (!selection || selection.isCollapsed || !containerRef.current) {
+				if (wasFrozen) {
+					frozenRef.current = false;
+					setRenderTick((c) => c + 1);
+				}
+				return;
+			}
+
+			try {
+				const range = selection.getRangeAt(0);
+				const container = containerRef.current;
+				const isInside =
+					container.contains(range.startContainer) ||
+					container.contains(range.endContainer);
+
+				if (isInside && isStreamingRef.current && !wasFrozen) {
+					// User started selecting inside the streaming container → freeze content
+					frozenContentRef.current = displayContentRef.current;
+					frozenRef.current = true;
+					setRenderTick((c) => c + 1);
+				}
+				// Once frozen, stay frozen until selection is cleared (handled above).
+				// This preserves the selection even after streaming stops.
+			} catch {
+				if (wasFrozen) {
+					frozenRef.current = false;
+					setRenderTick((c) => c + 1);
+				}
+			}
+		}
+
+		document.addEventListener("selectionchange", checkSelection);
+		return () => document.removeEventListener("selectionchange", checkSelection);
+	}, []);
+
+	const finalContent = frozenRef.current
+		? frozenContentRef.current
+		: displayContent;
+
 	return (
-		<UnifiedMarkdown
-			content={displayContent}
-			isStreaming={isStreaming}
-		/>
+		<div ref={containerRef}>
+			<UnifiedMarkdown content={finalContent} isStreaming={isStreaming} />
+		</div>
 	);
 }
 
