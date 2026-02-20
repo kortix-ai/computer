@@ -27,7 +27,7 @@ import { authenticatedFetch } from '@/lib/auth-token';
 import { ensureSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, regenerateSandboxToken, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
 
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
-import { isLocalMode } from '@/lib/config';
+import { isLocalMode, isCloudMode } from '@/lib/config';
 import {
   Dialog,
   DialogContent,
@@ -501,9 +501,14 @@ export function InstanceManagerDialog({
   const urlInputRef = React.useRef<HTMLInputElement>(null);
 
   const filtered = React.useMemo(() => {
-    if (!search.trim()) return servers;
+    // In cloud mode, hide the hardcoded "Local Sandbox" default entry —
+    // it's only meaningful when running locally with Docker.
+    const base = isCloudMode()
+      ? servers.filter((s) => !(s.id === 'default' && s.provider === 'local_docker'))
+      : servers;
+    if (!search.trim()) return base;
     const q = search.toLowerCase();
-    return servers.filter((s) => s.label.toLowerCase().includes(q) || s.url.toLowerCase().includes(q));
+    return base.filter((s) => s.label.toLowerCase().includes(q) || s.url.toLowerCase().includes(q));
   }, [servers, search]);
 
   // Reset state when dialog opens
@@ -899,6 +904,14 @@ export function ServerSelector() {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
+  // In cloud mode, hide the hardcoded "Local Sandbox" default entry
+  const visibleServers = React.useMemo(() => {
+    if (isCloudMode()) {
+      return servers.filter((s) => !(s.id === 'default' && s.provider === 'local_docker'));
+    }
+    return servers;
+  }, [servers]);
+
   const handleSelect = (id: string) => {
     if (id === activeServerId) return;
     useTabStore.getState().swapForServer(id, activeServerId);
@@ -926,7 +939,7 @@ export function ServerSelector() {
 
         {/* Compact instance list */}
         <div className="flex flex-col gap-px px-1 max-h-[180px] overflow-y-auto">
-          {servers.map((server) => (
+          {visibleServers.map((server) => (
             <CompactInstanceRow
               key={server.id}
               server={server}
