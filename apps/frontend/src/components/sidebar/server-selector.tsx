@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/auth-token';
-import { ensureSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, regenerateSandboxToken, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
+import { createSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, regenerateSandboxToken, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
 
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { isLocalMode, isCloudMode } from '@/lib/config';
@@ -595,7 +595,7 @@ export function InstanceManagerDialog({
     setIsCreatingSandbox(true);
     setSandboxError(null);
     try {
-      const { sandbox } = await ensureSandbox(provider ? { provider } : undefined);
+      const { sandbox } = await createSandbox(provider ? { provider } : undefined);
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
 
       let url: string;

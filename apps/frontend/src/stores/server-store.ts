@@ -130,11 +130,26 @@ const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:80
 const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/preview/kortix-sandbox/8000`;
 const SERVERS_API = `${BACKEND_URL}/servers`;
 
+const DEFAULT_SERVER_ID = 'default';
+const CLOUD_SANDBOX_SERVER_ID = 'cloud-sandbox';
+
 function generateId(): string {
   return `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // ── API sync helpers (fire-and-forget) ──────────────────────────────────────
+// ONLY custom user-added instances are synced to the servers API.
+// Managed sandbox entries ('default', 'cloud-sandbox') come from the
+// sandboxes table via useSandbox() — they live in zustand/localStorage only.
+
+/** IDs of managed entries that should NOT be synced to the servers API. */
+const MANAGED_IDS = new Set([DEFAULT_SERVER_ID, CLOUD_SANDBOX_SERVER_ID]);
+
+/** True if this entry is a managed sandbox (not a custom user entry). */
+function isManagedEntry(s: ServerEntry | string): boolean {
+  const id = typeof s === 'string' ? s : s.id;
+  return MANAGED_IDS.has(id);
+}
 
 /** Strip authToken before sending to API — tokens stay in localStorage only. */
 function toApiPayload(s: ServerEntry) {
@@ -150,6 +165,7 @@ function toApiPayload(s: ServerEntry) {
 }
 
 function syncServerToApi(server: ServerEntry) {
+  if (isManagedEntry(server)) return; // managed entries are not persisted to API
   authenticatedFetch(`${SERVERS_API}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -158,16 +174,19 @@ function syncServerToApi(server: ServerEntry) {
 }
 
 function deleteServerFromApi(id: string) {
+  if (isManagedEntry(id)) return;
   authenticatedFetch(`${SERVERS_API}/${id}`, { method: 'DELETE' },
     { handleSandboxAuth: false, retryOnAuthError: false }).catch(() => {});
 }
 
 /** Bulk sync all servers to API (used on initial hydration). */
 function syncAllToApi(servers: ServerEntry[]) {
+  const custom = servers.filter((s) => !isManagedEntry(s));
+  if (custom.length === 0) return;
   authenticatedFetch(`${SERVERS_API}/sync`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ servers: servers.map(toApiPayload) }),
+    body: JSON.stringify({ servers: custom.map(toApiPayload) }),
   }, { handleSandboxAuth: false, retryOnAuthError: false }).catch(() => {});
 }
 
@@ -208,9 +227,6 @@ async function loadFromApi(localServers: ServerEntry[]): Promise<ServerEntry[] |
     return null;
   }
 }
-
-const DEFAULT_SERVER_ID = 'default';
-const CLOUD_SANDBOX_SERVER_ID = 'cloud-sandbox';
 
 const createDefaultServer = (): ServerEntry => ({
   id: DEFAULT_SERVER_ID,
@@ -484,19 +500,19 @@ export const useServerStore = create<ServerStore>()(
           }
         }
 
-        // Async: load from API and merge, preserving local authTokens.
-        // On first ever boot, push localStorage entries to API.
+        // Async: load custom entries from API and merge with managed entries.
+        // Managed entries (default, cloud-sandbox) stay in localStorage only.
+        // Custom entries (user-added URLs) are the API's source of truth.
         const localServers = [...state.servers];
-        loadFromApi(localServers).then((apiServers) => {
-          if (apiServers && apiServers.length > 0) {
-            // API has data — use it as source of truth (with local tokens merged in)
-            const hasDefault = apiServers.some((s) => s.id === DEFAULT_SERVER_ID);
-            if (!hasDefault) {
-              apiServers.unshift(createDefaultServer());
-            }
-            useServerStore.setState({ servers: apiServers });
+        loadFromApi(localServers).then((apiCustomEntries) => {
+          if (apiCustomEntries && apiCustomEntries.length > 0) {
+            // Merge: keep managed entries from localStorage + custom entries from API
+            const currentState = useServerStore.getState();
+            const managed = currentState.servers.filter((s) => isManagedEntry(s));
+            const merged = [...managed, ...apiCustomEntries];
+            useServerStore.setState({ servers: merged });
           } else {
-            // API is empty — seed it with current localStorage entries
+            // API is empty — seed it with any custom entries from localStorage
             syncAllToApi(localServers);
           }
         });
