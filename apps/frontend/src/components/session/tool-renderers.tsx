@@ -1162,7 +1162,12 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 				{/* Command */}
 				<div className="px-3 py-2.5 [&_code]:text-[12px] [&_code]:leading-relaxed [&_code]:whitespace-pre-wrap [&_code]:break-words [&_pre]:contents">
 					{isWaiting ? (
-						<span className="text-[12px] font-mono text-muted-foreground/50">$ ...</span>
+						<div className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2">
+							<div className="flex items-center gap-2 text-[11px] text-muted-foreground/70">
+								<Loader2 className="size-3 animate-spin" />
+								<span>Preparing command...</span>
+							</div>
+						</div>
 					) : (
 						<HighlightedCode code={`$ ${command}`} language="bash">
 							{`$ ${command}`}
