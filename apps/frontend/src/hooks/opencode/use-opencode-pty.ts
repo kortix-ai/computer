@@ -47,9 +47,9 @@ export function useOpenCodePtyList(options?: { enabled?: boolean; serverUrl?: st
       const result = await client.pty.list();
       return unwrap(result);
     },
-    staleTime: 5 * 1000,
-    gcTime: 5 * 60 * 1000, // Keep cached data for 5 minutes across switches
-    refetchOnWindowFocus: true,
+    staleTime: Infinity, // SSE pty.* events trigger refetch
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     enabled: options?.enabled ?? true,
   });
 }
@@ -70,7 +70,8 @@ export function useCreatePty() {
       return unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix() });
+      // SSE pty.created will also fire; this is instant feedback
+      queryClient.refetchQueries({ queryKey: ptyKeys.listPrefix(), type: 'active' });
     },
   });
 }
@@ -85,7 +86,8 @@ export function useRemovePty() {
       unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix() });
+      // SSE pty.deleted will also fire
+      queryClient.refetchQueries({ queryKey: ptyKeys.listPrefix(), type: 'active' });
     },
   });
 }

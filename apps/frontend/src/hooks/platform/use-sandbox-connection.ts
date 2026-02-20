@@ -92,13 +92,14 @@ export function useSandboxConnection() {
 			try {
 				const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT);
 
-				// Use the shared authenticatedFetch for auth injection + 401 handling.
-				// Sandbox auth detection (401 with authType=sandbox_token) is handled
-				// automatically — it sets needsAuth on the sandbox-auth-store.
-				const res = await authenticatedFetch(`${url}/session`, {
-					method: "GET",
-					signal: controller.signal,
-				});
+			// Use /global/health for health checks — lightweight endpoint that
+			// returns { healthy: true } instead of the full session list.
+			// Sandbox auth detection (401 with authType=sandbox_token) is handled
+			// automatically — it sets needsAuth on the sandbox-auth-store.
+			const res = await authenticatedFetch(`${url}/global/health`, {
+				method: "GET",
+				signal: controller.signal,
+			});
 				clearTimeout(timer);
 
 				if (!alive) return;

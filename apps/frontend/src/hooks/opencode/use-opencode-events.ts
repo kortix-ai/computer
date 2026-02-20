@@ -26,7 +26,7 @@ import { useOpenCodeSessionStatusStore } from "@/stores/opencode-session-status-
 import { useSyncStore } from "@/stores/opencode-sync-store";
 import { useServerStore } from "@/stores/server-store";
 import { ptyKeys } from "./use-opencode-pty";
-import { opencodeKeys } from "./use-opencode-sessions";
+import { opencodeKeys, type Session, type MessageWithParts } from "./use-opencode-sessions";
 
 /**
  * Connects to OpenCode's SSE event stream via the SDK and
@@ -121,6 +121,11 @@ export function useOpenCodeEventStream() {
 		const abortController = new AbortController();
 		abortRef.current = abortController;
 
+		// Track when the last SSE event arrived — used to gate reconnect hydration.
+		// Quick reconnects (<5s) don't need to re-fetch permissions/questions/status
+		// because no events were missed or only a few were (SSE will catch up).
+		let lastEventTime = Date.now();
+
 		// Event coalescing queue (like the SolidJS reference)
 		let queue: ({ type: string; event: OpenCodeEvent } | undefined)[] = [];
 		let flushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -154,6 +159,7 @@ export function useOpenCodeEventStream() {
 			queue = [];
 			coalesced.clear();
 			lastFlush = Date.now();
+			lastEventTime = Date.now();
 
 			for (const item of events) {
 				if (!item) continue;
@@ -179,18 +185,20 @@ export function useOpenCodeEventStream() {
 					} as any);
 					const { stream } = result;
 
-					// On reconnect, refresh non-message data (sessions list, config, etc).
-					// Do NOT refetch messages — sync store is the source of truth and
-					// stale refetch data can overwrite live streaming state.
-					// SSE events will bring the sync store up to date.
-					if (retryCount > 0) {
+				// On reconnect, only re-hydrate if the gap was significant (>5s).
+				// Quick reconnects (<5s) don't need full re-hydration because SSE
+				// events will catch up. This prevents unnecessary HTTP requests on
+				// the frequent ERR_INCOMPLETE_CHUNKED_ENCODING reconnects.
+				if (retryCount > 0) {
+					const reconnectGap = Date.now() - lastEventTime;
+					const needsFullHydration = reconnectGap > 5000;
+
+					if (needsFullHydration) {
+						// Long gap — may have missed events, re-hydrate everything
 						queryClient.refetchQueries({
 							queryKey: opcodeKeys.sessions(),
+							type: 'active',
 						});
-						// Re-hydrate pending permissions & questions on reconnect.
-						// If the SSE connection dropped, we may have missed question.asked
-						// or permission.asked events, leaving the session stuck in "busy"
-						// with no prompt visible. Fetching the current list fixes that.
 						client.permission
 							.list()
 							.then((res) => {
@@ -208,7 +216,9 @@ export function useOpenCodeEventStream() {
 							.then((res) => {
 								if (res.data) {
 									const statuses = res.data as Record<string, any>;
-									for (const [sessionID, status] of Object.entries(statuses)) {
+									for (const [sessionID, status] of Object.entries(
+										statuses,
+									)) {
 										applySyncEvent({
 											type: "session.status",
 											properties: { sessionID, status },
@@ -218,6 +228,7 @@ export function useOpenCodeEventStream() {
 							})
 							.catch(() => {});
 					}
+				}
 					retryCount = 0;
 
 					// Consume stream exactly like OpenCode global-sdk.tsx:
@@ -357,40 +368,103 @@ export function useOpenCodeEventStream() {
 				case "message.part.removed":
 					break;
 
-				// ---- Session lifecycle ----
-				case "session.created":
-				case "session.updated":
-				case "session.deleted": {
-					// For sessions, just invalidate — the list is small and needs sorting
-					queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
-					const sessionID = (event.properties as any)?.info?.id;
-					if (sessionID) {
-						queryClient.invalidateQueries({
-							queryKey: opencodeKeys.session(sessionID),
-						});
-					}
-					break;
+			// ---- Session lifecycle — surgical cache mutations (zero HTTP) ----
+			//
+			// IMPORTANT: Return the old array reference when nothing changed.
+			// Creating new arrays on every SSE event causes cascading re-renders
+			// in all session list consumers, which triggers a Radix UI compose-refs
+			// infinite loop (Maximum update depth exceeded).
+			case "session.created": {
+				const info = (event.properties as any)?.info as Session | undefined;
+				if (info) {
+					queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+						if (!old) return [info];
+						const exists = old.findIndex((s) => s.id === info.id);
+						if (exists >= 0) {
+							// Already exists — check if actually changed
+							if (old[exists].time.updated === info.time.updated) return old;
+							const next = [...old];
+							next[exists] = info;
+							return next.sort((a, b) => b.time.updated - a.time.updated);
+						}
+						return [info, ...old].sort((a, b) => b.time.updated - a.time.updated);
+					});
+					queryClient.setQueryData(opencodeKeys.session(info.id), info);
 				}
+				break;
+			}
 
-				case "session.compacted": {
-					const sessionID = (event.properties as any).sessionID;
-					if (sessionID) {
-						// Full refetch after compaction since messages changed significantly.
-						// Rehydrate the sync store (the single source of truth for messages).
-						getClient()
-							.session.messages({ sessionID })
-							.then((res) => {
-								if (res.data)
-									useSyncStore.getState().hydrate(sessionID, res.data as any);
-							})
-							.catch(() => {});
-						// Also invalidate session to clear time.compacting
-						queryClient.invalidateQueries({
-							queryKey: opencodeKeys.session(sessionID),
-						});
-					}
-					break;
+			case "session.updated": {
+				const info = (event.properties as any)?.info as Session | undefined;
+				if (info) {
+					// Only update individual session cache (cheap, targeted)
+					queryClient.setQueryData(opencodeKeys.session(info.id), info);
+					// Update session list only if the session actually changed
+					queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+						if (!old) return old;
+						const idx = old.findIndex((s) => s.id === info.id);
+						if (idx < 0) return old;
+						// Shallow check: skip if the updated timestamp is identical
+						if (old[idx].time.updated === info.time.updated) return old;
+						const next = [...old];
+						next[idx] = info;
+						return next.sort((a, b) => b.time.updated - a.time.updated);
+					});
 				}
+				break;
+			}
+
+			case "session.deleted": {
+				const info = (event.properties as any)?.info as Session | undefined;
+				if (info) {
+					queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+						if (!old) return old;
+						const found = old.some((s) => s.id === info.id);
+						if (!found) return old; // Already gone — preserve reference
+						return old.filter((s) => s.id !== info.id);
+					});
+					queryClient.removeQueries({ queryKey: opencodeKeys.session(info.id) });
+					queryClient.removeQueries({ queryKey: opencodeKeys.messages(info.id) });
+				}
+				break;
+			}
+
+			case "session.compacted": {
+				const sessionID = (event.properties as any).sessionID;
+				if (sessionID) {
+					// Full refetch after compaction since messages changed significantly.
+					// Rehydrate the sync store (the single source of truth for messages).
+					const client = getClient();
+					client.session
+						.messages({ sessionID })
+						.then((res) => {
+							if (res.data)
+								useSyncStore.getState().hydrate(sessionID, res.data as any);
+						})
+						.catch(() => {});
+					// Refetch the individual session to clear time.compacting
+					// (targeted refetch, not full session list invalidation)
+					client.session
+						.get({ sessionID })
+						.then((res) => {
+							if (res.data) {
+								const session = res.data as Session;
+								queryClient.setQueryData(opencodeKeys.session(sessionID), session);
+								// Also update in session list
+								queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+									if (!old) return old;
+									const idx = old.findIndex((s) => s.id === sessionID);
+									if (idx < 0) return old;
+									const next = [...old];
+									next[idx] = session;
+									return next;
+								});
+							}
+						})
+						.catch(() => {});
+				}
+				break;
+			}
 
 				// ---- Session status ----
 				case "session.status": {
@@ -549,14 +623,14 @@ export function useOpenCodeEventStream() {
 
 				// ---- Server disposed ----
 				case "server.instance.disposed": {
-					// Full refresh of all data
-					queryClient.invalidateQueries({ queryKey: opcodeKeys.all });
+					// Full refresh of all data — only refetch actively mounted queries
+					queryClient.invalidateQueries({ queryKey: opcodeKeys.all, type: 'active' });
 					break;
 				}
 
 				// ---- LSP updated ----
 				case "lsp.updated": {
-					queryClient.invalidateQueries({ queryKey: ["opencode", "lsp"] });
+					queryClient.invalidateQueries({ queryKey: ["opencode", "lsp"], type: 'active' });
 					// Push diagnostics data into the diagnostics store if the event
 					// contains file-keyed diagnostic arrays.
 					const lspProps = event.properties as Record<string, unknown>;
@@ -596,51 +670,53 @@ export function useOpenCodeEventStream() {
 					break;
 				}
 
-				// ---- MCP tools changed ----
-				case "mcp.tools.changed": {
-					// MCP server tools were added/removed/changed — refresh status + tool lists
-					queryClient.invalidateQueries({ queryKey: opencodeKeys.mcpStatus() });
-					queryClient.invalidateQueries({ queryKey: opencodeKeys.toolIds() });
-					break;
-				}
+			// ---- MCP tools changed ----
+			case "mcp.tools.changed": {
+				// MCP server tools were added/removed/changed — refresh status + tool lists.
+				// Only refetch if queries are actively mounted (type: 'active').
+				queryClient.refetchQueries({ queryKey: opencodeKeys.mcpStatus(), type: 'active' });
+				queryClient.refetchQueries({ queryKey: opencodeKeys.toolIds(), type: 'active' });
+				break;
+			}
 
 				// ---- PTY events ----
 				case "pty.created":
 				case "pty.updated":
 				case "pty.exited":
 				case "pty.deleted": {
-					queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix() });
+					queryClient.invalidateQueries({ queryKey: ptyKeys.listPrefix(), type: 'active' });
 					break;
 				}
 
 				// ---- Worktree events — disabled for now ----
 				case "worktree.ready": {
-					queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees() });
-					queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
+					queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees(), type: 'active' });
+					queryClient.invalidateQueries({ queryKey: opencodeKeys.projects(), type: 'active' });
 					break;
 				}
 
 				case "worktree.failed": {
-					queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees() });
+					queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees(), type: 'active' });
 					break;
 				}
 
-				// ---- Project updated ----
-				case "project.updated": {
-					queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
-					queryClient.invalidateQueries({
-						queryKey: opencodeKeys.currentProject(),
-					});
-					break;
-				}
+			// ---- Project updated ----
+			case "project.updated": {
+				// Targeted refetch — project data is small and changes rarely,
+				// but we need the full response. Use refetchQueries to only
+				// refetch if the query is currently mounted (no orphan requests).
+				queryClient.refetchQueries({ queryKey: opencodeKeys.projects(), type: 'active' });
+				queryClient.refetchQueries({ queryKey: opencodeKeys.currentProject(), type: 'active' });
+				break;
+			}
 
 				// ---- File edited (outside agent, e.g. user edits in editor) ----
 				case "file.edited": {
 					const fileProps = event.properties as { file?: string };
-					queryClient.invalidateQueries({ queryKey: fileListKeys.all });
-					queryClient.invalidateQueries({ queryKey: gitStatusKeys.all });
+					queryClient.invalidateQueries({ queryKey: fileListKeys.all, type: 'active' });
+					queryClient.invalidateQueries({ queryKey: gitStatusKeys.all, type: 'active' });
 					if (fileProps.file) {
-						queryClient.invalidateQueries({ queryKey: fileContentKeys.all });
+						queryClient.invalidateQueries({ queryKey: fileContentKeys.all, type: 'active' });
 					}
 					break;
 				}

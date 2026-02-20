@@ -379,9 +379,17 @@ export default function DashboardLayoutContent({
 			setOnboardingChecked(true);
 			return;
 		}
-		// Note: we intentionally do NOT skip the check based on wasConnected.
-		// wasConnected persists in sessionStorage and becomes stale if the user
-		// reinstalls (wipes ~/.kortix). Always verify with the sandbox.
+
+		// Fast path: if we've already confirmed onboarding is complete this browser
+		// session, skip the network call entirely. This eliminates ~50 requests to
+		// /env/ONBOARDING_COMPLETE per session. The cache is cleared on tab close
+		// (sessionStorage), so a reinstall (wipe ~/.kortix) + new tab works fine.
+		const cached = sessionStorage.getItem("onboarding_complete");
+		if (cached === "true") {
+			setOnboardingChecked(true);
+			return;
+		}
+
 		const checkOnboarding = async () => {
 			try {
 				const instanceUrl = useServerStore.getState().getActiveServerUrl();
@@ -409,6 +417,8 @@ export default function DashboardLayoutContent({
 						router.replace("/onboarding");
 						return;
 					}
+					// Cache the successful result for this browser session
+					sessionStorage.setItem("onboarding_complete", "true");
 				} else if (res.status >= 500) {
 					// Server error — treat as not onboarded
 					router.replace("/onboarding");

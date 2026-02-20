@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+// React hooks — useEffect/useRef removed (useSessionPolling deleted)
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
@@ -135,9 +135,9 @@ export function useOpenCodeSessions() {
       const sessions = unwrap(result);
       return sessions.sort((a: Session, b: Session) => b.time.updated - a.time.updated);
     },
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * Math.pow(2, attempt), 10000),
   });
@@ -152,6 +152,7 @@ export function useOpenCodeSession(sessionId: string) {
       return unwrap(result);
     },
     enabled: !!sessionId,
+    staleTime: Infinity,
   });
 }
 
@@ -168,8 +169,15 @@ export function useCreateOpenCodeSession() {
       });
       return unwrap(result);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+    onSuccess: (newSession) => {
+      // Surgically insert into cache — SSE session.created will also fire
+      // but this gives instant UI feedback.
+      const session = newSession as Session;
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return [session];
+        return [session, ...old].sort((a, b) => b.time.updated - a.time.updated);
+      });
+      queryClient.setQueryData(opencodeKeys.session(session.id), session);
     },
   });
 }
@@ -182,9 +190,16 @@ export function useDeleteOpenCodeSession() {
       const client = getClient();
       const result = await client.session.delete({ sessionID: sessionId });
       unwrap(result);
+      return sessionId;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+    onSuccess: (sessionId) => {
+      // Surgically remove from cache — SSE session.deleted will also fire
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return old;
+        return old.filter((s) => s.id !== sessionId);
+      });
+      queryClient.removeQueries({ queryKey: opencodeKeys.session(sessionId) });
+      queryClient.removeQueries({ queryKey: opencodeKeys.messages(sessionId) });
     },
   });
 }
@@ -209,8 +224,18 @@ export function useUpdateOpenCodeSession() {
       const result = await client.session.update({ sessionID: sessionId, ...body });
       return unwrap(result);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+    onSuccess: (updatedSession) => {
+      // Surgically update cache — SSE session.updated will also fire
+      const session = updatedSession as Session;
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return old;
+        const idx = old.findIndex((s) => s.id === session.id);
+        if (idx < 0) return old;
+        const next = [...old];
+        next[idx] = session;
+        return next.sort((a, b) => b.time.updated - a.time.updated);
+      });
+      queryClient.setQueryData(opencodeKeys.session(session.id), session);
     },
   });
 }
@@ -224,7 +249,7 @@ export function useOpenCodeSessionDiff(sessionId: string) {
       return unwrap(result);
     },
     enabled: !!sessionId,
-    staleTime: 5 * 1000,
+    staleTime: Infinity,
   });
 }
 
@@ -237,7 +262,7 @@ export function useOpenCodeSessionTodo(sessionId: string) {
       return unwrap(result);
     },
     enabled: !!sessionId,
-    staleTime: 5 * 1000,
+    staleTime: Infinity,
   });
 }
 
@@ -262,9 +287,11 @@ export function useOpenCodeMessages(sessionId: string) {
       return unwrap(result) as MessageWithParts[];
     },
     enabled: !!sessionId,
-    staleTime: isBusy ? Infinity : 5 * 1000,
+    // While busy: Infinity (SSE events are source of truth, prevent race conditions).
+    // While idle: 60s (infrequent safety net — SSE events handle live updates).
+    staleTime: isBusy ? Infinity : 60 * 1000,
     gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: !isBusy,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -359,7 +386,7 @@ export function useOpenCodeAgents() {
       const result = await client.app.agents();
       return unwrap(result);
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -374,7 +401,7 @@ export function useOpenCodeAgent(agentName: string) {
       return agents.find((a: Agent) => a.name === agentName);
     },
     enabled: !!agentName,
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
   });
 }
 
@@ -388,7 +415,8 @@ export function useUpdateOpenCodeAgent() {
       return unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.agents() });
+      // Only refetch if agents query is currently mounted
+      queryClient.refetchQueries({ queryKey: opencodeKeys.agents(), type: 'active' });
     },
   });
 }
@@ -405,7 +433,7 @@ export function useOpenCodeToolIds() {
       const result = await client.tool.ids();
       return unwrap(result);
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -419,7 +447,7 @@ export function useOpenCodeTools(providerID: string, modelID: string) {
       return unwrap(result) as ToolListItem[];
     },
     enabled: !!providerID && !!modelID,
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -436,7 +464,7 @@ export function useOpenCodeSkills() {
       const result = await client.app.skills();
       return unwrap(result) as Skill[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -453,7 +481,7 @@ export function useOpenCodeProjects() {
       const result = await client.project.list();
       return unwrap(result);
     },
-    staleTime: 60 * 1000,
+    staleTime: Infinity,
     gcTime: 5 * 60 * 1000,
   });
 }
@@ -466,7 +494,7 @@ export function useOpenCodeCurrentProject() {
       const result = await client.project.current();
       return unwrap(result);
     },
-    staleTime: 60 * 1000,
+    staleTime: Infinity,
     gcTime: 5 * 60 * 1000,
   });
 }
@@ -483,7 +511,7 @@ export function useOpenCodePathInfo() {
       const result = await client.path.get();
       return unwrap(result);
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -500,7 +528,7 @@ export function useOpenCodeCommands() {
       const result = await client.command.list();
       return unwrap(result);
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -609,9 +637,10 @@ export function useSummarizeOpenCodeSession() {
       unwrap(result);
       return params.sessionId;
     },
-    onSuccess: (sessionId) => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionId) });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionId) });
+    onSuccess: (_sessionId) => {
+      // SSE session.compacted event handles rehydration of messages and
+      // session data. No need to invalidate here — the event handler in
+      // use-opencode-events.ts fetches messages + session for that ID.
     },
   });
 }
@@ -643,8 +672,13 @@ export function useForkSession() {
       });
       return unwrap(result) as Session;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+    onSuccess: (newSession) => {
+      // Insert forked session into cache — SSE session.created will also fire
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return [newSession];
+        return [newSession, ...old].sort((a, b) => b.time.updated - a.time.updated);
+      });
+      queryClient.setQueryData(opencodeKeys.session(newSession.id), newSession);
     },
   });
 }
@@ -674,10 +708,19 @@ export function useRevertSession() {
       });
       return unwrap(result) as Session;
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(variables.sessionId) });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
+    onSuccess: (updatedSession, variables) => {
+      // Update session in cache with the reverted state
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return old;
+        const idx = old.findIndex((s) => s.id === updatedSession.id);
+        if (idx < 0) return old;
+        const next = [...old];
+        next[idx] = updatedSession;
+        return next.sort((a, b) => b.time.updated - a.time.updated);
+      });
+      queryClient.setQueryData(opencodeKeys.session(updatedSession.id), updatedSession);
+      // Messages changed significantly after revert — refetch just this session's messages
+      queryClient.refetchQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
     },
   });
 }
@@ -697,10 +740,19 @@ export function useUnrevertSession() {
       });
       return unwrap(result) as Session;
     },
-    onSuccess: (_data, sessionId) => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(sessionId) });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(sessionId) });
+    onSuccess: (updatedSession, sessionId) => {
+      // Update session in cache with the unreverted state
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return old;
+        const idx = old.findIndex((s) => s.id === updatedSession.id);
+        if (idx < 0) return old;
+        const next = [...old];
+        next[idx] = updatedSession;
+        return next.sort((a, b) => b.time.updated - a.time.updated);
+      });
+      queryClient.setQueryData(opencodeKeys.session(updatedSession.id), updatedSession);
+      // Messages changed after unrevert — refetch just this session's messages
+      queryClient.refetchQueries({ queryKey: opencodeKeys.messages(sessionId) });
     },
   });
 }
@@ -724,11 +776,12 @@ export function useInitSession() {
         const err = result.error as any;
         throw new Error(err?.data?.message || err?.message || 'Failed to initialize project');
       }
+      return sessionId;
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(variables.sessionId) });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+    onSuccess: (sessionId) => {
+      // SSE events handle session updates. Just refetch messages for this session
+      // since /init creates new messages.
+      queryClient.refetchQueries({ queryKey: opencodeKeys.messages(sessionId) });
     },
     // Suppress global error handler — caller handles errors via onError callback
     onError: () => {},
@@ -747,7 +800,7 @@ export function useOpenCodeProviders() {
       const result = await client.provider.list();
       return unwrap(result);
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -764,7 +817,7 @@ export function useOpenCodeMcpStatus() {
       const result = await client.mcp.status();
       return unwrap(result) as Record<string, McpStatus>;
     },
-    staleTime: 30 * 1000,
+    staleTime: Infinity,
     gcTime: 5 * 60 * 1000,
   });
 }
@@ -783,8 +836,16 @@ export function useShareSession() {
       return unwrap(result) as Session;
     },
     onSuccess: (updatedSession) => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(updatedSession.id) });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+      // Surgically update cache with share info
+      queryClient.setQueryData(opencodeKeys.session(updatedSession.id), updatedSession);
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return old;
+        const idx = old.findIndex((s) => s.id === updatedSession.id);
+        if (idx < 0) return old;
+        const next = [...old];
+        next[idx] = updatedSession;
+        return next;
+      });
     },
   });
 }
@@ -799,8 +860,16 @@ export function useUnshareSession() {
       return unwrap(result) as Session;
     },
     onSuccess: (updatedSession) => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.session(updatedSession.id) });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.sessions() });
+      // Surgically update cache with unshare info
+      queryClient.setQueryData(opencodeKeys.session(updatedSession.id), updatedSession);
+      queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
+        if (!old) return old;
+        const idx = old.findIndex((s) => s.id === updatedSession.id);
+        if (idx < 0) return old;
+        const next = [...old];
+        next[idx] = updatedSession;
+        return next;
+      });
     },
   });
 }
@@ -815,8 +884,6 @@ export function useUnshareSession() {
  * SSE `message.part.updated` events handle cache updates automatically.
  */
 export function useUpdatePart() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({
       sessionId,
@@ -838,11 +905,8 @@ export function useUpdatePart() {
       });
       return unwrap(result) as Part;
     },
-    onSuccess: (_data, variables) => {
-      // SSE handles incremental cache update via message.part.updated,
-      // but invalidate as fallback in case SSE is disconnected.
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
-    },
+    // SSE message.part.updated handles cache updates via sync store.
+    // No onSuccess needed — eliminates unnecessary message refetch.
   });
 }
 
@@ -852,8 +916,6 @@ export function useUpdatePart() {
  * SSE `message.part.removed` events handle cache updates automatically.
  */
 export function useDeletePart() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({
       sessionId,
@@ -872,11 +934,8 @@ export function useDeletePart() {
       });
       return unwrap(result);
     },
-    onSuccess: (_data, variables) => {
-      // SSE handles incremental cache update via message.part.removed,
-      // but invalidate as fallback in case SSE is disconnected.
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.messages(variables.sessionId) });
-    },
+    // SSE message.part.removed handles cache updates via sync store.
+    // No onSuccess needed — eliminates unnecessary message refetch.
   });
 }
 
@@ -985,82 +1044,6 @@ export async function rejectQuestion(requestId: string): Promise<void> {
   unwrap(result);
 }
 
-// ============================================================================
-// Session Busy Polling (fallback when SSE is unavailable)
-// ============================================================================
-
-/**
- * Polls session status + refreshes messages while the session is expected to
- * be busy. Acts as a safety net when SSE events aren't arriving.
- *
- * Activate by calling `start()` after a successful promptAsync.
- * Automatically stops when the session transitions to idle or after 5 minutes.
- */
-export function useSessionPolling(sessionId: string) {
-  const queryClient = useQueryClient();
-  const refs = useRef({
-    sessionId,
-    queryClient,
-    interval: null as ReturnType<typeof setInterval> | null,
-    timeout: null as ReturnType<typeof setTimeout> | null,
-    sawBusy: false,
-    startedAt: 0,
-  });
-  refs.current.sessionId = sessionId;
-  refs.current.queryClient = queryClient;
-
-  const fns = useRef<{ stop: () => void; poll: () => Promise<void>; start: () => void }>(null!);
-  if (!fns.current) {
-    const stop = () => {
-      if (refs.current.interval) { clearInterval(refs.current.interval); refs.current.interval = null; }
-      if (refs.current.timeout) { clearTimeout(refs.current.timeout); refs.current.timeout = null; }
-      refs.current.sawBusy = false;
-    };
-
-    const poll = async () => {
-      const sid = refs.current.sessionId;
-      if (!sid) return;
-      const client = getClient();
-
-      // Refresh status
-      const statusResult = await client.session.status().catch(() => null);
-      if (statusResult?.data) {
-        const statuses = statusResult.data as Record<string, any>;
-        const status = statuses[sid];
-        if (status) {
-          useOpenCodeSessionStatusStore.getState().setStatus(sid, status);
-
-          if (status.type === 'busy' || status.type === 'retry') {
-            refs.current.sawBusy = true;
-          }
-
-          // Only stop when: we've seen busy AND now idle, AND at least 5s have passed
-          // This prevents stopping before the server has even started processing
-          const elapsed = Date.now() - refs.current.startedAt;
-          if (status.type === 'idle' && refs.current.sawBusy && elapsed > 5000) {
-            stop();
-          }
-        }
-      }
-
-      // Force refetch messages — bypasses staleTime: Infinity
-      refs.current.queryClient.refetchQueries({ queryKey: opencodeKeys.messages(sid) });
-    };
-
-    const start = () => {
-      stop();
-      refs.current.startedAt = Date.now();
-      refs.current.sawBusy = false;
-      poll();
-      refs.current.interval = setInterval(poll, 2000);
-      refs.current.timeout = setTimeout(stop, 5 * 60 * 1000);
-    };
-
-    fns.current = { stop, poll, start };
-  }
-
-  // Cleanup on unmount
-  useEffect(() => () => fns.current.stop(), []);
-
-  return fns.current;
-}
+// useSessionPolling was removed — SSE reconnects within <3s making 2s HTTP
+// polling redundant. All session status + message updates are driven by SSE
+// events via the sync store. See SSE-FIRST-MIGRATION-PLAN.md Phase 1d.

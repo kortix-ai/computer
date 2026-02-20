@@ -95,8 +95,8 @@ export function useAddMcpServer() {
     onSuccess: (data) => {
       // Optimistically set the full status map returned by add()
       queryClient.setQueryData(opencodeKeys.mcpStatus(), data);
-      // Also invalidate tool IDs since new server may expose tools
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.toolIds() });
+      // Also refresh tool IDs since new server may expose tools
+      queryClient.refetchQueries({ queryKey: opencodeKeys.toolIds(), type: 'active' });
     },
   });
 }
@@ -133,8 +133,8 @@ export function useConnectMcpServer() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.mcpStatus() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.toolIds() });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.mcpStatus(), type: 'active' });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.toolIds(), type: 'active' });
     },
   });
 }
@@ -170,8 +170,8 @@ export function useDisconnectMcpServer() {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.mcpStatus() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.toolIds() });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.mcpStatus(), type: 'active' });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.toolIds(), type: 'active' });
     },
   });
 }
@@ -204,8 +204,8 @@ export function useMcpAuthCallback() {
       return unwrap(result) as McpStatus;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.mcpStatus() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.toolIds() });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.mcpStatus(), type: 'active' });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.toolIds(), type: 'active' });
     },
   });
 }
@@ -224,7 +224,7 @@ export function useMcpAuthRemove() {
       return unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.mcpStatus() });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.mcpStatus(), type: 'active' });
     },
   });
 }
