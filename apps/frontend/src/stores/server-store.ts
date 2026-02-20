@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useSandboxAuthStore } from '@/stores/sandbox-auth-store';
+import { isCloudMode } from '@/lib/config';
 
 /**
  * SDK client reset callback — set by opencode-sdk.ts to break the circular
@@ -468,6 +469,16 @@ export const useServerStore = create<ServerStore>()(
         // If active server was the removed duplicate, switch to default
         if (!state.servers.some((s) => s.id === state.activeServerId)) {
           state.activeServerId = DEFAULT_SERVER_ID;
+        }
+
+        // In cloud mode, if the active server is the local default, auto-switch
+        // to the cloud-sandbox entry if one exists. The local default is not
+        // useful in cloud mode and shouldn't be the active server.
+        if (isCloudMode() && state.activeServerId === DEFAULT_SERVER_ID) {
+          const cloudEntry = state.servers.find((s) => s.id === CLOUD_SANDBOX_SERVER_ID);
+          if (cloudEntry) {
+            state.activeServerId = CLOUD_SANDBOX_SERVER_ID;
+          }
         }
 
         // Async: load from API and merge, preserving local authTokens.
