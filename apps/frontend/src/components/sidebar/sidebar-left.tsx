@@ -377,13 +377,20 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
   const { updateAvailable, latestVersion, changelog } = useGlobalSandboxUpdate();
   const router = useRouter();
 
+  const navigateToChangelog = () => {
+    openTabAndNavigate(
+      { id: 'page:/changelog', title: 'Changelog', type: 'page', href: '/changelog' },
+      router,
+    );
+  };
+
   if (!updateAvailable) return null;
 
   if (collapsed) {
     return (
       <div className="flex justify-center">
         <button
-          onClick={() => router.push('/changelog')}
+          onClick={navigateToChangelog}
           className="relative p-2 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
           title={`Update v${latestVersion} available`}
         >
@@ -396,7 +403,7 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
 
   return (
     <button
-      onClick={() => router.push('/changelog')}
+      onClick={navigateToChangelog}
       className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors cursor-pointer"
     >
       <div className="relative">

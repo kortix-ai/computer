@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowDownToLine, X, Loader2, Sparkles, ChevronRight } from 'lucide-react';
 import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
+import { openTabAndNavigate } from '@/stores/tab-store';
 
 /**
  * UpdateBanner — shows a slim top bar when a sandbox update is available.
@@ -75,7 +76,7 @@ export function UpdateBanner() {
 
           {/* View changelog link */}
           <button
-            onClick={() => router.push('/changelog')}
+            onClick={() => openTabAndNavigate({ id: 'page:/changelog', title: 'Changelog', type: 'page', href: '/changelog' }, router)}
             className="flex items-center gap-0.5 text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
           >
             What&apos;s new
