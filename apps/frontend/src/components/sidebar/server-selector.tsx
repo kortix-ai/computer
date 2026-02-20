@@ -595,6 +595,7 @@ export function InstanceManagerDialog({
     setIsCreatingSandbox(true);
     setSandboxError(null);
     try {
+      // Always create a brand new sandbox — users can have many.
       const { sandbox } = await createSandbox(provider ? { provider } : undefined);
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
 
@@ -605,21 +606,18 @@ export function InstanceManagerDialog({
         throw new Error(`Failed to build sandbox URL: ${err}`);
       }
 
-      const store = useServerStore.getState();
-      const serverId = store.registerOrUpdateSandbox(
-        {
-          url,
-          label,
-          provider: sandbox.provider,
-          sandboxId: sandbox.external_id,
-          mappedPorts: extractMappedPorts(sandbox),
-        },
-        { isLocal: isLocalMode() },
-      );
+      // Add as a new entry in the instance list (unique ID per sandbox).
+      const newServer = addServer(label, url);
+      // Attach sandbox metadata so the UI knows provider/sandboxId.
+      useServerStore.getState().updateServerSilent(newServer.id, {
+        provider: sandbox.provider,
+        sandboxId: sandbox.external_id,
+        mappedPorts: extractMappedPorts(sandbox),
+      });
 
       queryClient.setQueryData(['platform', 'sandbox'], sandbox);
-      useTabStore.getState().swapForServer(serverId, activeServerId);
-      setActiveServer(serverId);
+      useTabStore.getState().swapForServer(newServer.id, activeServerId);
+      setActiveServer(newServer.id);
       router.push('/dashboard');
       onOpenChange(false);
     } catch (err: any) {
