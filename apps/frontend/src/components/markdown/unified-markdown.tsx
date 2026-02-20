@@ -113,6 +113,41 @@ const shikiCache = new Map<string, string>();      // key → html
 const shikiPending = new Map<string, Promise<string | null>>(); // key → in-flight promise
 const SHIKI_CACHE_MAX = 64;
 
+// Module-level: last highlighted result per language+theme.
+// Survives component remounts (which happen every ~33ms during streaming
+// because Streamdown unmounts/remounts code components on each token).
+// Without this, every mount starts with no highlight state and the
+// component-level debounce (100ms) is killed before it can fire (~33ms remount cycle).
+const lastHighlightedMap = new Map<string, { html: string; code: string }>();
+
+// Module-level throttle for Shiki calls during streaming.
+// Ensures we highlight at most once per 200ms per language+theme combination,
+// surviving component remounts. Without this, the component-level debounce
+// is always killed by the ~33ms remount cycle, preventing any highlighting.
+const hlThrottleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const hlThrottleLatest = new Map<string, { code: string; language: string; theme: string }>();
+
+function scheduleModuleHighlight(code: string, language: string, theme: string) {
+  const key = `${language}:${theme}`;
+  hlThrottleLatest.set(key, { code, language, theme });
+
+  // If timer already running, just update the latest code and wait
+  if (hlThrottleTimers.has(key)) return;
+
+  hlThrottleTimers.set(key, setTimeout(() => {
+    hlThrottleTimers.delete(key);
+    const latest = hlThrottleLatest.get(key);
+    if (!latest) return;
+    hlThrottleLatest.delete(key);
+
+    highlightAsync(latest.code, latest.language, latest.theme).then((html) => {
+      if (html) {
+        lastHighlightedMap.set(key, { html, code: latest.code });
+      }
+    });
+  }, 200));
+}
+
 function shikiKey(code: string, lang: string, theme: string) {
   // Use a fast hash: first 100 + last 100 chars + length.
   // Full code only matters for very small snippets.
@@ -176,46 +211,81 @@ function findBestCachedHtml(code: string, language: string, theme: string): stri
   // Exact match first
   const exact = shikiCache.get(shikiKey(code, language, theme));
   if (exact) return exact;
+  // Module-level prefix match from last highlighted result
+  const hlKey = `${language}:${theme}`;
+  const last = lastHighlightedMap.get(hlKey);
+  if (last && code.startsWith(last.code) && last.code.length > 0) return last.html;
   return null;
 }
 
 export function HighlightedCode({ code, language, children }: { code: string; language: string; children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
+  const hlKey = `${language}:${theme}`;
 
   // Track the latest highlighted HTML and the code it corresponds to.
   // During streaming, code changes rapidly — we keep the previous highlight
   // visible until a new one is ready (no flash to plain text).
+  //
+  // The initialiser checks both the Shiki cache AND the module-level
+  // lastHighlightedMap for prefix matches — this is critical because
+  // Streamdown remounts this component on every token during streaming,
+  // destroying component state each time.
   const [highlighted, setHighlighted] = useState<{ html: string; code: string } | null>(() => {
-    const cached = findBestCachedHtml(code, language, theme);
-    return cached ? { html: cached, code } : null;
+    // Exact cache hit
+    const cached = shikiCache.get(shikiKey(code, language, theme));
+    if (cached) return { html: cached, code };
+    // Module-level prefix match (from a previous Shiki call during streaming)
+    const last = lastHighlightedMap.get(hlKey);
+    if (last && code.startsWith(last.code) && last.code.length > 0) return last;
+    return null;
   });
   const versionRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    // Exact cache hit — show immediately
+    // Exact cache hit — show immediately and update module state
     const cached = shikiCache.get(shikiKey(code, language, theme));
     if (cached) {
-      setHighlighted({ html: cached, code });
+      const result = { html: cached, code };
+      setHighlighted(result);
+      lastHighlightedMap.set(hlKey, result);
       return;
+    }
+
+    // Check module-level state for a better prefix match than current
+    const last = lastHighlightedMap.get(hlKey);
+    if (last && code.startsWith(last.code) && last.code.length > 0) {
+      setHighlighted(prev => {
+        if (!prev || last.code.length > prev.code.length || !code.startsWith(prev.code)) return last;
+        return prev;
+      });
     }
 
     const version = ++versionRef.current;
 
-    // Debounce Shiki calls: during streaming, code changes every ~33ms.
-    // Wait 100ms of stability before calling Shiki to avoid wasted work.
+    // Schedule module-level throttled highlight (survives component remounts).
+    // During streaming, Streamdown remounts this component every ~33ms which
+    // kills any component-level timers. The module-level throttle fires every
+    // ~200ms regardless, populating shikiCache and lastHighlightedMap so the
+    // next mount picks up the result via the useState initialiser above.
+    scheduleModuleHighlight(code, language, theme);
+
+    // Also schedule a component-level debounced highlight for when the component
+    // is stable (after streaming ends, component is no longer remounted by Streamdown).
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       highlightAsync(code, language, theme).then((result) => {
         if (version === versionRef.current && result) {
-          setHighlighted({ html: result, code });
+          const r = { html: result, code };
+          lastHighlightedMap.set(hlKey, r);
+          setHighlighted(r);
         }
       });
     }, 100);
 
     return () => clearTimeout(debounceRef.current);
-  }, [code, language, theme]);
+  }, [code, language, theme, hlKey]);
 
   // If we have a highlight for the EXACT current code, show it
   if (highlighted && highlighted.code === code) {
