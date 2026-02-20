@@ -1,0 +1,17 @@
+# Dev override: mount local services/opencode source into the sandbox
+# and run the opencode server from source using Bun instead of the
+# globally-installed npm binary.
+#
+# Usage (standalone sandbox):
+#   cd sandbox
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  desktop:
+    volumes:
+      - ../services/opencode:/opt/opencode-src
+      - ./dev/serve-entry.ts:/opt/opencode-dev/serve-entry.ts:ro
+      - ./dev/web-entry.ts:/opt/opencode-dev/web-entry.ts:ro
+      - ./dev/svc-opencode-serve-run:/etc/s6-overlay/s6-rc.d/svc-opencode-serve/run:ro
+      - ./dev/svc-opencode-web-run:/etc/s6-overlay/s6-rc.d/svc-opencode-web/run:ro
+      - ./dev/opencode-dev-init.sh:/custom-cont-init.d/99-opencode-dev-init.sh:ro

@@ -249,6 +249,9 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
     return { dirs, fileItems };
   }, [files]);
 
+  const isRootPath = currentPath === '/' || currentPath === '.' || currentPath === '';
+  const normalizedCurrentPath = isRootPath ? '' : currentPath.replace(/\/$/, '');
+
   // Check if file name already exists
   const fileNameExists = useMemo(() => {
     if (!isCreatingFile || !newFileName.trim() || !files) return false;
@@ -322,10 +325,10 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
   );
 
   const handleNavigateUp = useCallback(() => {
-    if (currentPath === '/' || currentPath === '.' || currentPath === '') return;
+    if (isRootPath) return;
     const parent = currentPath.replace(/\/[^/]+\/?$/, '') || '/';
     navigateToPath(parent);
-  }, [currentPath, navigateToPath]);
+  }, [isRootPath, currentPath, navigateToPath]);
 
   const handleDownload = useCallback(async (node: FileNode) => {
     try {
@@ -378,7 +381,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
       try {
         await uploadMutation.mutateAsync({
           file,
-          targetPath: currentPath === '.' ? undefined : currentPath,
+          targetPath: isRootPath ? undefined : currentPath,
         });
         toast.success(`Uploaded ${file.name}`);
       } catch (err) {
@@ -387,7 +390,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
         event.target.value = '';
       }
     },
-    [uploadMutation, currentPath],
+    [uploadMutation, isRootPath, currentPath],
   );
 
   const handleCreateFolder = useCallback(async () => {
@@ -395,10 +398,9 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
       setIsCreatingFolder(false);
       return;
     }
-    const folderPath =
-      currentPath === '.' || currentPath === ''
-        ? newFolderName.trim()
-        : `${currentPath.replace(/\/$/, '')}/${newFolderName.trim()}`;
+    const folderPath = normalizedCurrentPath
+      ? `${normalizedCurrentPath}/${newFolderName.trim()}`
+      : newFolderName.trim();
     try {
       await mkdirMutation.mutateAsync({ dirPath: folderPath });
       toast.success(`Created folder: ${newFolderName.trim()}`);
@@ -408,17 +410,16 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
       setIsCreatingFolder(false);
       setNewFolderName('');
     }
-  }, [mkdirMutation, currentPath, newFolderName]);
+  }, [mkdirMutation, normalizedCurrentPath, newFolderName]);
 
   const handleCreateFile = useCallback(async () => {
     if (!newFileName.trim()) {
       setIsCreatingFile(false);
       return;
     }
-    const filePath =
-      currentPath === '.' || currentPath === ''
-        ? newFileName.trim()
-        : `${currentPath.replace(/\/$/, '')}/${newFileName.trim()}`;
+    const filePath = normalizedCurrentPath
+      ? `${normalizedCurrentPath}/${newFileName.trim()}`
+      : newFileName.trim();
     try {
       await createMutation.mutateAsync({ filePath });
       toast.success(`Created file: ${newFileName.trim()}`);
@@ -428,7 +429,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
       setIsCreatingFile(false);
       setNewFileName('');
     }
-  }, [createMutation, currentPath, newFileName]);
+  }, [createMutation, normalizedCurrentPath, newFileName]);
 
   // Copy/Cut handlers
   const handleCopy = useCallback(
@@ -469,7 +470,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
   const handlePaste = useCallback(async () => {
     if (!clipboard) return;
 
-    const destDir = currentPath === '.' || currentPath === '' ? '' : currentPath.replace(/\/$/, '');
+    const destDir = normalizedCurrentPath;
     let destName = clipboard.name;
 
     if (files) {
@@ -516,7 +517,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
     } catch (err) {
       toast.error(`Failed to paste: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  }, [clipboard, currentPath, files, copyMutation, renameMutation, mkdirMutation, clearClipboard]);
+  }, [clipboard, normalizedCurrentPath, files, copyMutation, renameMutation, mkdirMutation, clearClipboard]);
 
   // Server not reachable
   if (!health?.healthy) {
@@ -606,7 +607,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
             <ContextMenuTrigger asChild>
               <div className="p-1 min-h-full">
                 {/* Go up — also a drop target for moving items to parent */}
-                {currentPath !== '/' && currentPath !== '.' && currentPath !== '' && (
+                {!isRootPath && (
                   <SidebarParentDropTarget
                     currentPath={currentPath}
                     onClick={handleNavigateUp}

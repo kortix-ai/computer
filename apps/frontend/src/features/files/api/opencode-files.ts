@@ -114,7 +114,14 @@ export async function uploadFile(
   targetPath?: string,
 ): Promise<UploadResult[]> {
   const client = getClient();
-  const result = await client.file.upload({ file, path: targetPath });
+  const rawPath = (targetPath ?? '').trim();
+  const normalizedPath =
+    !rawPath || rawPath === '/' || rawPath === '.'
+      ? '/workspace'
+      : rawPath.startsWith('/')
+        ? rawPath
+        : `/${rawPath}`;
+  const result = await client.file.upload({ file, path: normalizedPath });
   return unwrap(result) as UploadResult[];
 }
 
@@ -181,9 +188,11 @@ async function uploadToPath(
  * so the server receives a named file entry it can place correctly.
  */
 export async function createFile(filePath: string): Promise<UploadResult[]> {
-  const parts = filePath.split('/');
+  const rawPath = filePath.trim();
+  const absolutePath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+  const parts = absolutePath.split('/');
   const fileName = parts.pop() || 'untitled';
-  const dirPath = parts.join('/') || undefined;
+  const dirPath = parts.join('/') || '/workspace';
   const file = new File([' '], fileName, { type: 'application/octet-stream' });
   return uploadFile(file, dirPath);
 }

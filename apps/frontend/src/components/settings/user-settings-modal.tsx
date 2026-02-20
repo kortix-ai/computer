@@ -1059,12 +1059,11 @@ function NotificationsTab() {
                                 permission === 'granted'
                                     ? 'Browser permission granted'
                                     : permission === 'denied'
-                                        ? 'Blocked by browser — allow in browser settings'
+                                        ? 'Blocked by browser — click to request permission'
                                         : 'Will request browser permission when enabled'
                             }
                             enabled={preferences.enabled}
                             onToggle={() => toggleEnabled()}
-                            disabled={permission === 'denied'}
                         />
                     </div>
 

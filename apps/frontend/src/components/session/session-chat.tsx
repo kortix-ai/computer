@@ -1562,7 +1562,26 @@ function SessionTurn({
 	);
 	const lastTextPart = useMemo(() => findLastTextPart(allParts), [allParts]);
 	const responseRaw = lastTextPart?.text ?? "";
-	const response = working ? responseRaw : responseRaw.trim();
+	// Fallback: when aborted, collect ALL non-empty text parts if the
+	// primary response is empty.  The last text part may have been lost
+	// (timing between text-start and first text-delta) but earlier parts
+	// might still have content.
+	const abortedTextFallback = useMemo(() => {
+		if (responseRaw) return ""; // primary response exists — no fallback needed
+		// Only activate for aborted/errored turns
+		const hasError = turn.assistantMessages.some(
+			(m) => (m.info as any).error,
+		);
+		if (!hasError) return "";
+		const texts: string[] = [];
+		for (const { part } of allParts) {
+			if (isTextPart(part) && part.text?.trim()) {
+				texts.push(part.text);
+			}
+		}
+		return texts.join("\n\n").trim();
+	}, [responseRaw, allParts, turn.assistantMessages]);
+	const response = working ? responseRaw : (responseRaw.trim() || abortedTextFallback);
 	// Match SolidJS: hideResponsePart filters the last text part from steps content
 	const responsePartId = lastTextPart?.id;
 	const hideResponsePart = !working && !!responsePartId;
@@ -2093,13 +2112,22 @@ function SessionTurn({
 						return null;
 					})}
 
-					{/* Error inside steps */}
-					{turnError && <TurnErrorDisplay errorText={turnError} />}
+					</div>
+			)}
+
+			{/* Streaming text fallback — when the turn is active but steps are collapsed
+			    (e.g. auto-expand race, stale SSE idle event between turns), the text
+			    would be invisible: it only renders inside the steps section (gated by
+			    stepsExpanded) during working, and the Response section only renders when
+			    !working. This fallback closes that gap so streaming text is always visible. */}
+			{working && !stepsExpanded && !inlineContentParts && responseRaw && (
+				<div className="text-sm">
+					<ThrottledMarkdown content={responseRaw} isStreaming={true} />
 				</div>
 			)}
 
 			{/* Kortix logo — shown when there are no steps and not working (otherwise logo is already above the steps trigger) */}
-			{!hasSteps && !working && (response || answeredQuestionParts.length > 0) && (
+			{!hasSteps && !working && (response || answeredQuestionParts.length > 0 || turnError) && (
 				<div className="flex items-center gap-2 mt-3 mb-3">
 					{/* eslint-disable-next-line @next/next/no-img-element */}
 					<img
@@ -2189,8 +2217,8 @@ function SessionTurn({
 				</div>
 			)}
 
-			{/* ── Error (when steps collapsed) ── */}
-			{turnError && !stepsExpanded && (
+			{/* ── Error (abort / failure banner) ── */}
+			{turnError && (
 				<TurnErrorDisplay errorText={turnError} />
 			)}
 
@@ -3167,7 +3195,10 @@ export function SessionChat({
 
 		// Scroll so the new user message appears at the top of the viewport.
 		// MutationObserver recalcs spacer automatically when the new turn renders.
-		setTimeout(() => scrollToBottom(), 50);
+		// Fire twice: early (before DOM update) to reset scroll state so the RAF
+		// auto-scroll loop is unblocked, and again after the turn likely rendered.
+		scrollToBottom();
+		setTimeout(() => scrollToBottom(), 100);
 
 			const options: Record<string, unknown> = {};
 			if (local.agent.current) options.agent = local.agent.current.name;
@@ -3281,6 +3312,8 @@ export function SessionChat({
 	);
 
 	const handleStop = useCallback(() => {
+		// Guard against rapid clicks — ignore if an abort is already in flight
+		if (abortSession.isPending) return;
 		abortSession.mutate(sessionId);
 	}, [sessionId, abortSession]);
 

@@ -70,6 +70,11 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
   const prevWorkingRef = useRef(working);
   // Current spacer value for the RAF loop's contentH calculation.
   const spacerValRef = useRef(0);
+  // Guard: true while a programmatic scroll (scrollToBottom/scrollToEnd) is
+  // in progress.  Prevents the catch-all scroll listener from interpreting
+  // intermediate smooth-scroll frames as "user scrolled up".
+  const programmaticScrollRef = useRef(false);
+  const programmaticScrollTimer = useRef<ReturnType<typeof setTimeout>>(0 as any);
 
   // ── Spacer recalc (direct DOM, no React state) ────────────────────
   const recalcSpacer = useCallback(() => {
@@ -135,8 +140,12 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     recalcSpacer();
     userScrolledRef.current = false;
     setShowScrollButton(false);
+    programmaticScrollRef.current = true;
+    clearTimeout(programmaticScrollTimer.current);
     const target = measureTarget(el, content);
     if (target !== null) el.scrollTop = target;
+    // Release the guard after a frame so the instant scroll settles.
+    programmaticScrollTimer.current = setTimeout(() => { programmaticScrollRef.current = false; }, 50);
   }, [recalcSpacer]);
 
   // ── Smooth scroll: last turn at top ───────────────────────────────
@@ -148,8 +157,12 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     recalcSpacer();
     userScrolledRef.current = false;
     setShowScrollButton(false);
+    programmaticScrollRef.current = true;
+    clearTimeout(programmaticScrollTimer.current);
     const target = measureTarget(el, content);
     if (target !== null) el.scrollTo({ top: target, behavior: 'smooth' });
+    // Release the guard after smooth scroll completes (~400ms is typical).
+    programmaticScrollTimer.current = setTimeout(() => { programmaticScrollRef.current = false; }, 500);
   }, [recalcSpacer]);
 
   const scrollToLastTurn = useCallback(() => scrollToBottom(), [scrollToBottom]);
@@ -269,8 +282,9 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     let last = el.scrollTop;
     const handle = () => {
       const cur = el.scrollTop;
-      // Detect upward scroll (keyboard, scrollbar drag, programmatic)
-      if (cur < last - 2 && !userScrolledRef.current) {
+      // Detect upward scroll (keyboard, scrollbar drag) — but ignore
+      // intermediate frames from programmatic smooth-scrolls.
+      if (cur < last - 2 && !userScrolledRef.current && !programmaticScrollRef.current) {
         userScrolledRef.current = true;
         setShowScrollButton(true);
       }

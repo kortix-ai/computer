@@ -369,6 +369,8 @@ export function useAbortOpenCodeSession() {
       const result = await client.session.abort({ sessionID: sessionId });
       unwrap(result);
     },
+    retry: 2,
+    retryDelay: 300,
   });
 }
 

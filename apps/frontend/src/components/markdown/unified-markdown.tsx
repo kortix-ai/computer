@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Streamdown } from 'streamdown';
 import { Check, Copy } from 'lucide-react';
@@ -113,6 +113,41 @@ const shikiCache = new Map<string, string>();      // key → html
 const shikiPending = new Map<string, Promise<string | null>>(); // key → in-flight promise
 const SHIKI_CACHE_MAX = 64;
 
+// Module-level: last highlighted result per language+theme.
+// Survives component remounts (which happen every ~33ms during streaming
+// because Streamdown unmounts/remounts code components on each token).
+// Without this, every mount starts with no highlight state and the
+// component-level debounce (100ms) is killed before it can fire (~33ms remount cycle).
+const lastHighlightedMap = new Map<string, { html: string; code: string }>();
+
+// Module-level throttle for Shiki calls during streaming.
+// Ensures we highlight at most once per 200ms per language+theme combination,
+// surviving component remounts. Without this, the component-level debounce
+// is always killed by the ~33ms remount cycle, preventing any highlighting.
+const hlThrottleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const hlThrottleLatest = new Map<string, { code: string; language: string; theme: string }>();
+
+function scheduleModuleHighlight(code: string, language: string, theme: string) {
+  const key = `${language}:${theme}`;
+  hlThrottleLatest.set(key, { code, language, theme });
+
+  // If timer already running, just update the latest code and wait
+  if (hlThrottleTimers.has(key)) return;
+
+  hlThrottleTimers.set(key, setTimeout(() => {
+    hlThrottleTimers.delete(key);
+    const latest = hlThrottleLatest.get(key);
+    if (!latest) return;
+    hlThrottleLatest.delete(key);
+
+    highlightAsync(latest.code, latest.language, latest.theme).then((html) => {
+      if (html) {
+        lastHighlightedMap.set(key, { html, code: latest.code });
+      }
+    });
+  }, 200));
+}
+
 function shikiKey(code: string, lang: string, theme: string) {
   // Use a fast hash: first 100 + last 100 chars + length.
   // Full code only matters for very small snippets.
@@ -176,46 +211,81 @@ function findBestCachedHtml(code: string, language: string, theme: string): stri
   // Exact match first
   const exact = shikiCache.get(shikiKey(code, language, theme));
   if (exact) return exact;
+  // Module-level prefix match from last highlighted result
+  const hlKey = `${language}:${theme}`;
+  const last = lastHighlightedMap.get(hlKey);
+  if (last && code.startsWith(last.code) && last.code.length > 0) return last.html;
   return null;
 }
 
 export function HighlightedCode({ code, language, children }: { code: string; language: string; children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
+  const hlKey = `${language}:${theme}`;
 
   // Track the latest highlighted HTML and the code it corresponds to.
   // During streaming, code changes rapidly — we keep the previous highlight
   // visible until a new one is ready (no flash to plain text).
+  //
+  // The initialiser checks both the Shiki cache AND the module-level
+  // lastHighlightedMap for prefix matches — this is critical because
+  // Streamdown remounts this component on every token during streaming,
+  // destroying component state each time.
   const [highlighted, setHighlighted] = useState<{ html: string; code: string } | null>(() => {
-    const cached = findBestCachedHtml(code, language, theme);
-    return cached ? { html: cached, code } : null;
+    // Exact cache hit
+    const cached = shikiCache.get(shikiKey(code, language, theme));
+    if (cached) return { html: cached, code };
+    // Module-level prefix match (from a previous Shiki call during streaming)
+    const last = lastHighlightedMap.get(hlKey);
+    if (last && code.startsWith(last.code) && last.code.length > 0) return last;
+    return null;
   });
   const versionRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    // Exact cache hit — show immediately
+    // Exact cache hit — show immediately and update module state
     const cached = shikiCache.get(shikiKey(code, language, theme));
     if (cached) {
-      setHighlighted({ html: cached, code });
+      const result = { html: cached, code };
+      setHighlighted(result);
+      lastHighlightedMap.set(hlKey, result);
       return;
+    }
+
+    // Check module-level state for a better prefix match than current
+    const last = lastHighlightedMap.get(hlKey);
+    if (last && code.startsWith(last.code) && last.code.length > 0) {
+      setHighlighted(prev => {
+        if (!prev || last.code.length > prev.code.length || !code.startsWith(prev.code)) return last;
+        return prev;
+      });
     }
 
     const version = ++versionRef.current;
 
-    // Debounce Shiki calls: during streaming, code changes every ~33ms.
-    // Wait 100ms of stability before calling Shiki to avoid wasted work.
+    // Schedule module-level throttled highlight (survives component remounts).
+    // During streaming, Streamdown remounts this component every ~33ms which
+    // kills any component-level timers. The module-level throttle fires every
+    // ~200ms regardless, populating shikiCache and lastHighlightedMap so the
+    // next mount picks up the result via the useState initialiser above.
+    scheduleModuleHighlight(code, language, theme);
+
+    // Also schedule a component-level debounced highlight for when the component
+    // is stable (after streaming ends, component is no longer remounted by Streamdown).
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       highlightAsync(code, language, theme).then((result) => {
         if (version === versionRef.current && result) {
-          setHighlighted({ html: result, code });
+          const r = { html: result, code };
+          lastHighlightedMap.set(hlKey, r);
+          setHighlighted(r);
         }
       });
     }, 100);
 
     return () => clearTimeout(debounceRef.current);
-  }, [code, language, theme]);
+  }, [code, language, theme, hlKey]);
 
   // If we have a highlight for the EXACT current code, show it
   if (highlighted && highlighted.code === code) {
@@ -389,8 +459,316 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
 
   /** Rewrite a localhost:PORT URL through the sandbox proxy, or pass through. */
-  const proxy = (url: string | undefined) =>
-    proxyLocalhostUrl(url, serverUrl);
+  const proxy = useCallback(
+    (url: string | undefined) => proxyLocalhostUrl(url, serverUrl),
+    [serverUrl],
+  );
+
+  // Memoize the Streamdown components object so that Block's React.memo
+  // comparator sees stable function references for unchanged blocks.
+  // Without this, every content change (every ~33ms during streaming) creates
+  // new inline arrow functions → Block comparator fails reference equality →
+  // ALL blocks re-render → browser Selection/Range destroyed → text unselected.
+  // With memoized components, only the LAST block (whose content actually changed)
+  // re-renders, while completed blocks keep their DOM intact, preserving selection.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const components = useMemo(() => ({
+    // ═══════════════════════════════════════════════════════════════
+    // HEADINGS - Clean hierarchy with proper weight distribution
+    // ═══════════════════════════════════════════════════════════════
+    h1: ({ children }: { children?: React.ReactNode }) => (
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground mt-8 mb-4 first:mt-0 pb-2 border-b border-border/40">
+        {children}
+      </h1>
+    ),
+    h2: ({ children }: { children?: React.ReactNode }) => (
+      <h2 className="text-xl font-semibold tracking-tight text-foreground mt-8 mb-3 first:mt-0">
+        {children}
+      </h2>
+    ),
+    h3: ({ children }: { children?: React.ReactNode }) => (
+      <h3 className="text-lg font-semibold text-foreground mt-6 mb-2 first:mt-0">
+        {children}
+      </h3>
+    ),
+    h4: ({ children }: { children?: React.ReactNode }) => (
+      <h4 className="text-base font-semibold text-foreground mt-5 mb-2 first:mt-0">
+        {children}
+      </h4>
+    ),
+    h5: ({ children }: { children?: React.ReactNode }) => (
+      <h5 className="text-sm font-semibold text-foreground mt-4 mb-1 first:mt-0">
+        {children}
+      </h5>
+    ),
+    h6: ({ children }: { children?: React.ReactNode }) => (
+      <h6 className="text-sm font-medium text-muted-foreground mt-4 mb-1 first:mt-0 uppercase tracking-wide">
+        {children}
+      </h6>
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // PARAGRAPHS - Optimal line height for readability
+    // ═══════════════════════════════════════════════════════════════
+    p: ({ children }: { children?: React.ReactNode }) => (
+      <p className="text-sm text-foreground leading-relaxed my-4 first:mt-0 last:mb-0 [&:has(img)]:my-0">
+        {children}
+      </p>
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // LISTS - Clean bullets with proper spacing
+    // ═══════════════════════════════════════════════════════════════
+    ul: ({ children }: { children?: React.ReactNode }) => (
+      <ul className="my-4 ml-6 list-disc marker:text-muted-foreground/60 space-y-2 first:mt-0 last:mb-0 text-sm">
+        {children}
+      </ul>
+    ),
+    ol: ({ children }: { children?: React.ReactNode }) => (
+      <ol className="my-4 ml-6 list-decimal marker:text-muted-foreground/60 marker:font-medium space-y-2 first:mt-0 last:mb-0 text-sm">
+        {children}
+      </ol>
+    ),
+    li: ({ children }: { children?: React.ReactNode }) => (
+      <li className="text-sm text-foreground leading-relaxed pl-1">
+        {children}
+      </li>
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // LINKS - Subtle, professional styling with Next.js routing
+    // ═══════════════════════════════════════════════════════════════
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      // Note: localhost:PORT click interception is handled globally by
+      // <LocalhostLinkInterceptor> — no per-link proxy logic needed here.
+      // We still set the proxied href so the browser status bar / hover
+      // tooltip shows the reachable URL.
+      const resolvedHref = proxy(href) ?? href;
+      const isInternal = isInternalUrl(resolvedHref);
+      const isHashLink = resolvedHref?.startsWith('#');
+      const linkClassName = cn(
+        "font-medium text-foreground",
+        "underline decoration-foreground/30 underline-offset-[3px] decoration-[1px]",
+        "hover:decoration-foreground/60 transition-colors duration-150"
+      );
+
+      if (isHashLink) {
+        return (
+          <a
+            href={resolvedHref}
+            onClick={(e) => handleHashClick(e, resolvedHref ?? '')}
+            className={linkClassName}
+          >
+            {children}
+          </a>
+        );
+      }
+
+      if (isInternal) {
+        return (
+          <Link
+            href={resolvedHref || '#'}
+            className={linkClassName}
+          >
+            {children}
+          </Link>
+        );
+      }
+
+      return (
+        <a
+          href={resolvedHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClassName}
+        >
+          {children}
+        </a>
+      );
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // CODE - Clean, readable code styling with copy button
+    // ═══════════════════════════════════════════════════════════════
+    code: ({ children, className: codeClassName }: { children?: React.ReactNode; className?: string }) => {
+      const match = /language-(\w+)/.exec(codeClassName || '');
+      const language = match ? match[1] : '';
+      const code = String(children).replace(/\n$/, '');
+
+      // Detect block code: has language class OR contains newlines (multi-line)
+      const hasLanguageClass = codeClassName?.includes('language-');
+      const isMultiLine = code.includes('\n');
+      const isBlock = hasLanguageClass || isMultiLine;
+
+      if (isBlock) {
+        // Mermaid diagrams
+        if (isMermaidCode(language, code)) {
+          return <MermaidRenderer chart={code} className="my-5" />;
+        }
+
+        // Syntax-highlighted block code
+        if (language) {
+          return <HighlightedCode code={code} language={language}>{children}</HighlightedCode>;
+        }
+
+        // Block code without language - plain mono font
+        return (
+          <code className="text-[13px] font-mono leading-relaxed text-inherit whitespace-pre">
+            {children}
+          </code>
+        );
+      }
+
+      // Inline code - subtle pill style, clickable if it looks like a file path
+      return <ClickableInlineCode>{children}</ClickableInlineCode>;
+    },
+    pre: ({ children }: { children?: React.ReactNode }) => <CodeBlock isStreaming={isStreaming}>{children}</CodeBlock>,
+
+    // ═══════════════════════════════════════════════════════════════
+    // BLOCKQUOTES - Clean side border
+    // ═══════════════════════════════════════════════════════════════
+    blockquote: ({ children }: { children?: React.ReactNode }) => (
+      <blockquote className={cn(
+        "my-5 pl-4 py-1 text-sm",
+        "border-l-2 border-border",
+        "text-muted-foreground",
+        "[&>p]:my-2"
+      )}>
+        {children}
+      </blockquote>
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // HORIZONTAL RULE - Subtle divider
+    // ═══════════════════════════════════════════════════════════════
+    hr: () => (
+      <hr className="my-8 border-0 h-px bg-border/60" />
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // TABLES - Clean, modern table design
+    // ═══════════════════════════════════════════════════════════════
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <div className="my-5 overflow-x-auto rounded-xl border border-border/60">
+        <table className="w-full text-sm">
+          {children}
+        </table>
+      </div>
+    ),
+    thead: ({ children }: { children?: React.ReactNode }) => (
+      <thead className="bg-muted/50 dark:bg-muted/30 border-b border-border/60">
+        {children}
+      </thead>
+    ),
+    tbody: ({ children }: { children?: React.ReactNode }) => (
+      <tbody className="divide-y divide-border/40">
+        {children}
+      </tbody>
+    ),
+    tr: ({ children }: { children?: React.ReactNode }) => (
+      <tr className="transition-colors hover:bg-muted/30">
+        {children}
+      </tr>
+    ),
+    th: ({ children }: { children?: React.ReactNode }) => (
+      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">
+        {children}
+      </th>
+    ),
+    td: ({ children }: { children?: React.ReactNode }) => (
+      <td className="px-4 py-3 text-foreground">
+        {children}
+      </td>
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // IMAGES - Polished with proper spacing and rounded corners
+    // ═══════════════════════════════════════════════════════════════
+    img: ({ src, alt }: { src?: string; alt?: string }) => {
+      // Don't render img with empty src to avoid browser warning
+      if (!src) return null;
+      // Proxy localhost:PORT image sources through the sandbox proxy
+      const resolvedSrc = proxy(src) ?? src;
+      return (
+        <span className="block my-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resolvedSrc}
+            alt={alt || ''}
+            className={cn(
+              "max-w-full h-auto rounded-xl",
+              "border border-border/40",
+              ""
+            )}
+            loading="lazy"
+          />
+          {alt && (
+            <span className="block mt-2 text-center text-sm text-muted-foreground">
+              {alt}
+            </span>
+          )}
+        </span>
+      );
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEXT FORMATTING - Proper emphasis styling
+    // ═══════════════════════════════════════════════════════════════
+    strong: ({ children }: { children?: React.ReactNode }) => (
+      <strong className="font-semibold text-foreground">
+        {children}
+      </strong>
+    ),
+    em: ({ children }: { children?: React.ReactNode }) => (
+      <em className="italic text-foreground/90">
+        {children}
+      </em>
+    ),
+    del: ({ children }: { children?: React.ReactNode }) => (
+      <del className="line-through text-muted-foreground decoration-muted-foreground/50">
+        {children}
+      </del>
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // TASK LISTS - Checkbox styling (GFM)
+    // ═══════════════════════════════════════════════════════════════
+    input: ({ checked, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
+      <input
+        type="checkbox"
+        checked={checked}
+        readOnly
+        className={cn(
+          "mr-2 h-4 w-4 rounded border-border",
+          "accent-secondary cursor-default",
+          "align-middle relative -top-[1px]"
+        )}
+        {...props}
+      />
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // RAW HTML SUPPORT (GFM allows raw HTML)
+    // ═══════════════════════════════════════════════════════════════
+    div: ({ children, style, className: divClassName, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+      <div
+        className={cn("text-sm text-foreground", divClassName)}
+        style={style as React.CSSProperties}
+        {...props}
+      >
+        {children}
+      </div>
+    ),
+    span: ({ children, style, className: spanClassName, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
+      <span
+        className={cn("text-foreground", spanClassName)}
+        style={style as React.CSSProperties}
+        {...props}
+      >
+        {children}
+      </span>
+    ),
+  }), [isStreaming, proxy]);
 
   const safeContent = typeof content === 'string' ? content : (content ? String(content) : '');
   
@@ -413,306 +791,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
       <Streamdown
         isAnimating={isStreaming}
         mode="static"
-        components={{
-          // ═══════════════════════════════════════════════════════════════
-          // HEADINGS - Clean hierarchy with proper weight distribution
-          // ═══════════════════════════════════════════════════════════════
-          h1: ({ children }) => (
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground mt-8 mb-4 first:mt-0 pb-2 border-b border-border/40">
-              {children}
-            </h1>
-          ),
-          h2: ({ children }) => (
-            <h2 className="text-xl font-semibold tracking-tight text-foreground mt-8 mb-3 first:mt-0">
-              {children}
-            </h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="text-lg font-semibold text-foreground mt-6 mb-2 first:mt-0">
-              {children}
-            </h3>
-          ),
-          h4: ({ children }) => (
-            <h4 className="text-base font-semibold text-foreground mt-5 mb-2 first:mt-0">
-              {children}
-            </h4>
-          ),
-          h5: ({ children }) => (
-            <h5 className="text-sm font-semibold text-foreground mt-4 mb-1 first:mt-0">
-              {children}
-            </h5>
-          ),
-          h6: ({ children }) => (
-            <h6 className="text-sm font-medium text-muted-foreground mt-4 mb-1 first:mt-0 uppercase tracking-wide">
-              {children}
-            </h6>
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // PARAGRAPHS - Optimal line height for readability
-          // ═══════════════════════════════════════════════════════════════
-          p: ({ children }) => (
-            <p className="text-sm text-foreground leading-relaxed my-4 first:mt-0 last:mb-0 [&:has(img)]:my-0">
-              {children}
-            </p>
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // LISTS - Clean bullets with proper spacing
-          // ═══════════════════════════════════════════════════════════════
-          ul: ({ children }) => (
-            <ul className="my-4 ml-6 list-disc marker:text-muted-foreground/60 space-y-2 first:mt-0 last:mb-0 text-sm">
-              {children}
-            </ul>
-          ),
-          ol: ({ children }) => (
-            <ol className="my-4 ml-6 list-decimal marker:text-muted-foreground/60 marker:font-medium space-y-2 first:mt-0 last:mb-0 text-sm">
-              {children}
-            </ol>
-          ),
-          li: ({ children }) => (
-            <li className="text-sm text-foreground leading-relaxed pl-1">
-              {children}
-            </li>
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // LINKS - Subtle, professional styling with Next.js routing
-          // ═══════════════════════════════════════════════════════════════
-          a: ({ href, children }) => {
-            // Note: localhost:PORT click interception is handled globally by
-            // <LocalhostLinkInterceptor> — no per-link proxy logic needed here.
-            // We still set the proxied href so the browser status bar / hover
-            // tooltip shows the reachable URL.
-            const resolvedHref = proxy(href) ?? href;
-            const isInternal = isInternalUrl(resolvedHref);
-            const isHashLink = resolvedHref?.startsWith('#');
-            const linkClassName = cn(
-              "font-medium text-foreground",
-              "underline decoration-foreground/30 underline-offset-[3px] decoration-[1px]",
-              "hover:decoration-foreground/60 transition-colors duration-150"
-            );
-
-            if (isHashLink) {
-              // Hash links use smooth scroll
-              return (
-                <a
-                  href={resolvedHref}
-                  onClick={(e) => handleHashClick(e, resolvedHref ?? '')}
-                  className={linkClassName}
-                >
-                  {children}
-                </a>
-              );
-            }
-
-            if (isInternal) {
-              // Internal links use Next.js Link for client-side navigation
-              return (
-                <Link
-                  href={resolvedHref || '#'}
-                  className={linkClassName}
-                >
-                  {children}
-                </Link>
-              );
-            }
-
-            // External links open in new tab
-            return (
-              <a
-                href={resolvedHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={linkClassName}
-              >
-                {children}
-              </a>
-            );
-          },
-
-          // ═══════════════════════════════════════════════════════════════
-          // CODE - Clean, readable code styling with copy button
-          // ═══════════════════════════════════════════════════════════════
-          code: ({ children, className: codeClassName }) => {
-            const match = /language-(\w+)/.exec(codeClassName || '');
-            const language = match ? match[1] : '';
-            const code = String(children).replace(/\n$/, '');
-            
-            // Detect block code: has language class OR contains newlines (multi-line)
-            const hasLanguageClass = codeClassName?.includes('language-');
-            const isMultiLine = code.includes('\n');
-            const isBlock = hasLanguageClass || isMultiLine;
-
-            if (isBlock) {
-              // Mermaid diagrams
-              if (isMermaidCode(language, code)) {
-                return <MermaidRenderer chart={code} className="my-5" />;
-              }
-
-              // Syntax-highlighted block code
-              if (language) {
-                return <HighlightedCode code={code} language={language}>{children}</HighlightedCode>;
-              }
-
-              // Block code without language - plain mono font
-              return (
-                <code className="text-[13px] font-mono leading-relaxed text-inherit whitespace-pre">
-                  {children}
-                </code>
-              );
-            }
-
-            // Inline code - subtle pill style, clickable if it looks like a file path
-            return <ClickableInlineCode>{children}</ClickableInlineCode>;
-          },
-          pre: ({ children }) => <CodeBlock isStreaming={isStreaming}>{children}</CodeBlock>,
-
-          // ═══════════════════════════════════════════════════════════════
-          // BLOCKQUOTES - Clean side border
-          // ═══════════════════════════════════════════════════════════════
-          blockquote: ({ children }) => (
-            <blockquote className={cn(
-              "my-5 pl-4 py-1 text-sm",
-              "border-l-2 border-border",
-              "text-muted-foreground",
-              "[&>p]:my-2"
-            )}>
-              {children}
-            </blockquote>
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // HORIZONTAL RULE - Subtle divider
-          // ═══════════════════════════════════════════════════════════════
-          hr: () => (
-            <hr className="my-8 border-0 h-px bg-border/60" />
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // TABLES - Clean, modern table design
-          // ═══════════════════════════════════════════════════════════════
-          table: ({ children }) => (
-            <div className="my-5 overflow-x-auto rounded-xl border border-border/60">
-              <table className="w-full text-sm">
-                {children}
-              </table>
-            </div>
-          ),
-          thead: ({ children }) => (
-            <thead className="bg-muted/50 dark:bg-muted/30 border-b border-border/60">
-              {children}
-            </thead>
-          ),
-          tbody: ({ children }) => (
-            <tbody className="divide-y divide-border/40">
-              {children}
-            </tbody>
-          ),
-          tr: ({ children }) => (
-            <tr className="transition-colors hover:bg-muted/30">
-              {children}
-            </tr>
-          ),
-          th: ({ children }) => (
-            <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">
-              {children}
-            </th>
-          ),
-          td: ({ children }) => (
-            <td className="px-4 py-3 text-foreground">
-              {children}
-            </td>
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // IMAGES - Polished with proper spacing and rounded corners
-          // ═══════════════════════════════════════════════════════════════
-          img: ({ src, alt }) => {
-            // Don't render img with empty src to avoid browser warning
-            if (!src) return null;
-            // Proxy localhost:PORT image sources through the sandbox proxy
-            const resolvedSrc = proxy(src) ?? src;
-            return (
-              <span className="block my-5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={resolvedSrc}
-                  alt={alt || ''}
-                  className={cn(
-                    "max-w-full h-auto rounded-xl",
-                    "border border-border/40",
-                    ""
-                  )}
-                  loading="lazy"
-                />
-                {alt && (
-                  <span className="block mt-2 text-center text-sm text-muted-foreground">
-                    {alt}
-                  </span>
-                )}
-              </span>
-            );
-          },
-
-          // ═══════════════════════════════════════════════════════════════
-          // TEXT FORMATTING - Proper emphasis styling
-          // ═══════════════════════════════════════════════════════════════
-          strong: ({ children }) => (
-            <strong className="font-semibold text-foreground">
-              {children}
-            </strong>
-          ),
-          em: ({ children }) => (
-            <em className="italic text-foreground/90">
-              {children}
-            </em>
-          ),
-          del: ({ children }) => (
-            <del className="line-through text-muted-foreground decoration-muted-foreground/50">
-              {children}
-            </del>
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // TASK LISTS - Checkbox styling (GFM)
-          // ═══════════════════════════════════════════════════════════════
-          input: ({ checked, ...props }) => (
-            <input
-              type="checkbox"
-              checked={checked}
-              readOnly
-              className={cn(
-                "mr-2 h-4 w-4 rounded border-border",
-                "accent-secondary cursor-default",
-                "align-middle relative -top-[1px]"
-              )}
-              {...props}
-            />
-          ),
-
-          // ═══════════════════════════════════════════════════════════════
-          // RAW HTML SUPPORT (GFM allows raw HTML)
-          // ═══════════════════════════════════════════════════════════════
-          div: ({ children, style, className: divClassName, ...props }) => (
-            <div 
-              className={cn("text-sm text-foreground", divClassName)}
-              style={style as React.CSSProperties}
-              {...props}
-            >
-              {children}
-            </div>
-          ),
-          span: ({ children, style, className: spanClassName, ...props }) => (
-            <span 
-              className={cn("text-foreground", spanClassName)}
-              style={style as React.CSSProperties}
-              {...props}
-            >
-              {children}
-            </span>
-          ),
-        }}
+        components={components}
       >
         {processedContent}
       </Streamdown>

@@ -1,0 +1,14 @@
+# Dev override for docker-compose.local.yml: run opencode from local source.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml -f docker-compose.dev.yml up
+
+services:
+  sandbox:
+    volumes:
+      - ./services/opencode:/opt/opencode-src
+      - ./sandbox/dev/serve-entry.ts:/opt/opencode-dev/serve-entry.ts:ro
+      - ./sandbox/dev/web-entry.ts:/opt/opencode-dev/web-entry.ts:ro
+      - ./sandbox/dev/svc-opencode-serve-run:/etc/s6-overlay/s6-rc.d/svc-opencode-serve/run:ro
+      - ./sandbox/dev/svc-opencode-web-run:/etc/s6-overlay/s6-rc.d/svc-opencode-web/run:ro
+      - ./sandbox/dev/opencode-dev-init.sh:/custom-cont-init.d/99-opencode-dev-init.sh:ro
