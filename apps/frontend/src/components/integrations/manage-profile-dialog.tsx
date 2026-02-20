@@ -348,7 +348,7 @@ export const ManageProfileDialog = ({
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             <>
-                              <Link2 className="h-3 w-3 mr-1" />
+                              <Link2 className="h-3 w-3" />
                               Link
                             </>
                           )}
@@ -370,22 +370,18 @@ export const ManageProfileDialog = ({
                   </p>
                   <Button
                     variant="destructive"
-                    size="sm"
-                    className="h-7 text-xs"
                     onClick={handleDelete}
                     disabled={disconnect.isPending}
                   >
                     {disconnect.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      <Trash2 className="h-3 w-3 mr-1" />
+                      <Trash2 className="h-3 w-3" />
                     )}
                     Confirm
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
                     onClick={() => setConfirmDelete(false)}
                   >
                     Cancel

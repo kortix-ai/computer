@@ -16,6 +16,8 @@ import { Hono } from 'hono';
 import { supabaseAuth as authMiddleware } from '../../middleware/auth';
 import { LocalDockerProvider, type SandboxInfo } from '../providers/local-docker';
 import { sandboxAuthStore } from '../sandbox-auth-store';
+import { LOCAL_SANDBOX_ID } from '../local-identity';
+import { hasDatabase } from '../../shared/db';
 import type { AuthVariables } from '../../types';
 
 const provider = new LocalDockerProvider();
@@ -27,7 +29,7 @@ const provider = new LocalDockerProvider();
  */
 function serialize(info: SandboxInfo) {
   return {
-    sandbox_id: info.name, // always 'kortix-sandbox'
+    sandbox_id: hasDatabase ? LOCAL_SANDBOX_ID : info.name,
     external_id: info.name,  // Container name (e.g. 'kortix-sandbox') — used for Docker DNS & URL routing
     name: info.name,
     provider: 'local_docker' as const,
