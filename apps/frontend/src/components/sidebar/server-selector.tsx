@@ -17,7 +17,7 @@ import {
   KeyRound,
   Copy,
 } from 'lucide-react';
-import { useServerStore, CLOUD_SANDBOX_SERVER_ID, type ServerEntry } from '@/stores/server-store';
+import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { useSandboxAuthStore } from '@/stores/sandbox-auth-store';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
@@ -595,7 +595,6 @@ export function InstanceManagerDialog({
     setIsCreatingSandbox(true);
     setSandboxError(null);
     try {
-      // Always create a brand new sandbox — users can have many.
       const { sandbox } = await createSandbox(provider ? { provider } : undefined);
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
 
@@ -606,18 +605,35 @@ export function InstanceManagerDialog({
         throw new Error(`Failed to build sandbox URL: ${err}`);
       }
 
-      // Add as a new entry in the instance list (unique ID per sandbox).
-      const newServer = addServer(label, url);
-      // Attach sandbox metadata so the UI knows provider/sandboxId.
-      useServerStore.getState().updateServerSilent(newServer.id, {
-        provider: sandbox.provider,
-        sandboxId: sandbox.external_id,
-        mappedPorts: extractMappedPorts(sandbox),
-      });
+      const store = useServerStore.getState();
+      let serverId: string;
+
+      if (isLocalMode()) {
+        // Local mode: single sandbox — update the default entry.
+        store.updateServerSilent('default', {
+          url,
+          label,
+          provider: sandbox.provider,
+          sandboxId: sandbox.external_id,
+          mappedPorts: extractMappedPorts(sandbox),
+        });
+        serverId = 'default';
+      } else {
+        // Cloud mode: each sandbox gets its own entry.
+        // Deduplicates by sandboxId — won't double-add on refresh.
+        const newServer = store.addSandboxServer({
+          label,
+          url,
+          provider: sandbox.provider,
+          sandboxId: sandbox.external_id,
+          mappedPorts: extractMappedPorts(sandbox),
+        });
+        serverId = newServer.id;
+      }
 
       queryClient.setQueryData(['platform', 'sandbox'], sandbox);
-      useTabStore.getState().swapForServer(newServer.id, activeServerId);
-      setActiveServer(newServer.id);
+      useTabStore.getState().swapForServer(serverId, activeServerId);
+      setActiveServer(serverId);
       router.push('/dashboard');
       onOpenChange(false);
     } catch (err: any) {
@@ -750,8 +766,8 @@ export function InstanceManagerDialog({
                     onGenerateToken={server.provider === 'local_docker' ? handleGenerateToken : undefined}
                     isDeleting={isRemovingSandbox}
                     isGeneratingToken={isRegenerating}
-                    sandboxUpdate={server.id === CLOUD_SANDBOX_SERVER_ID ? sandboxUpdate : undefined}
-                    onVersionDetected={server.id === CLOUD_SANDBOX_SERVER_ID ? setSandboxVersion : undefined}
+                    sandboxUpdate={server.provider === 'daytona' ? sandboxUpdate : undefined}
+                    onVersionDetected={server.provider === 'daytona' ? setSandboxVersion : undefined}
                   />
                 ))
               )}

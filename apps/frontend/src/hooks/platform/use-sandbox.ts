@@ -22,19 +22,18 @@ import {
   type SandboxInfo,
   type SandboxProviderName,
 } from '@/lib/platform-client';
-import { useServerStore, CLOUD_SANDBOX_SERVER_ID } from '@/stores/server-store';
+import { useServerStore } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
 import { useAuth } from '@/components/AuthProvider';
 import { isLocalMode } from '@/lib/config';
 import { useEffect } from 'react';
 
 /**
- * Register (or update) the sandbox as a server entry in the server store
- * and set it as the active server if no other server is active.
+ * Register the sandbox as a server entry in the server store on boot.
+ * Deduplicates by sandboxId — if an entry for this sandbox already exists
+ * in the store (e.g. from a previous session), it's reused.
  *
- * Delegates to the centralized `registerOrUpdateSandbox()` action on
- * server-store — no duplicated logic here. Tab-swapping is handled
- * here since it's a UI concern (not a store concern).
+ * Auto-switches to the sandbox if the user hasn't manually picked a server.
  */
 function registerSandboxServer(sandbox: SandboxInfo) {
   let url: string;
@@ -45,23 +44,34 @@ function registerSandboxServer(sandbox: SandboxInfo) {
     return;
   }
 
-  const previousActiveId = useServerStore.getState().activeServerId;
+  const store = useServerStore.getState();
+  const previousActiveId = store.activeServerId;
 
-  const serverId = useServerStore.getState().registerOrUpdateSandbox(
-    {
+  // In local mode, update the default entry metadata (single sandbox).
+  if (isLocalMode()) {
+    store.updateServerSilent('default', {
       url,
-      label: sandbox.name || (sandbox.provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox'),
+      label: sandbox.name || 'Local Sandbox',
       provider: sandbox.provider,
       sandboxId: sandbox.external_id,
       mappedPorts: extractMappedPorts(sandbox),
-    },
-    { isLocal: isLocalMode(), autoSwitch: true },
-  );
+    });
+    return;
+  }
 
-  // If the active server changed (autoSwitch kicked in), swap tabs
-  const newActiveId = useServerStore.getState().activeServerId;
-  if (newActiveId !== previousActiveId) {
-    useTabStore.getState().swapForServer(serverId, previousActiveId);
+  // Cloud mode: add (or deduplicate) by sandboxId.
+  const entry = store.addSandboxServer({
+    label: sandbox.name || 'Cloud Sandbox',
+    url,
+    provider: sandbox.provider,
+    sandboxId: sandbox.external_id,
+    mappedPorts: extractMappedPorts(sandbox),
+  });
+
+  // Auto-switch if the user hasn't manually selected anything
+  if (!store.userSelected && (!previousActiveId || previousActiveId === 'default')) {
+    store.setActiveServer(entry.id, { auto: true });
+    useTabStore.getState().swapForServer(entry.id, previousActiveId);
   }
 }
 
@@ -113,5 +123,5 @@ export function useProviders() {
 }
 
 /** @deprecated Use CLOUD_SANDBOX_SERVER_ID from '@/stores/server-store' directly */
-export const SANDBOX_SERVER_ID = CLOUD_SANDBOX_SERVER_ID;
+export const SANDBOX_SERVER_ID = 'cloud-sandbox';
 export type { SandboxProviderName };
