@@ -24,6 +24,7 @@ import { sandboxAuthStore } from './platform/sandbox-auth-store';
 import { integrationsApp } from './integrations';
 import { queueApp, startDrainer, stopDrainer } from './queue';
 import { serversApp } from './servers';
+import { bootstrapLocalIdentity } from './platform/local-identity';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -240,6 +241,7 @@ console.log(`
 ╚═══════════════════════════════════════════════════════════╝
 `);
 
+bootstrapLocalIdentity().catch((err) => console.error('[startup] Local identity bootstrap failed:', err));
 startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
 startChannelService();
 startDrainer();

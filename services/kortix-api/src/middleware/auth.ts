@@ -6,6 +6,8 @@ import { getSupabase } from '../shared/supabase';
 import { config } from '../config';
 import { timingSafeStringEqual } from '../shared/crypto';
 import { sandboxAuthStore } from '../platform/sandbox-auth-store';
+import { LOCAL_SANDBOX_ID } from '../platform/local-identity';
+import { hasDatabase } from '../shared/db';
 
 /**
  * API key auth (sk_/sbt_ for search, LLM routes).
@@ -30,7 +32,7 @@ export async function apiKeyAuth(c: Context, next: Next) {
     }
 
     c.set('accountId', '00000000-0000-0000-0000-000000000000');
-    c.set('sandboxId', 'local');
+    c.set('sandboxId', hasDatabase ? LOCAL_SANDBOX_ID : 'local');
     await next();
     return;
   }
