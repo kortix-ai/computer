@@ -8,7 +8,7 @@ import { AppProviders } from "@/components/layout/app-providers";
 import { TabBar } from "@/components/tabs/tab-bar";
 import { useAdminRole } from "@/hooks/admin";
 import { useSystemStatusQuery } from "@/hooks/edge-flags";
-import { useOpenCodeEventStream } from "@/hooks/opencode/use-opencode-events";
+import { OpenCodeEventStreamProvider } from "@/hooks/opencode/use-opencode-events";
 import { useSandbox } from "@/hooks/platform/use-sandbox";
 import { useSandboxConnection } from "@/hooks/platform/use-sandbox-connection";
 import { useWebNotifications } from "@/hooks/use-web-notifications";
@@ -21,11 +21,6 @@ import { getSandboxToken, useSandboxAuthStore } from "@/stores/sandbox-auth-stor
 import { useTabStore } from "@/stores/tab-store";
 import { AnnouncementDialog } from "../announcements/announcement-dialog";
 import { NovuInboxProvider } from "../notifications/novu-inbox-provider";
-
-function OpenCodeEventStreamProvider() {
-	useOpenCodeEventStream();
-	return null;
-}
 
 /** Monitors session status transitions and fires browser notifications. Renders nothing. */
 function WebNotificationProvider() {
@@ -384,11 +379,17 @@ export default function DashboardLayoutContent({
 			setOnboardingChecked(true);
 			return;
 		}
-		// Fast path: previously connected = already onboarded
-		if (useSandboxConnectionStore.getState().wasConnected) {
+
+		// Fast path: if we've already confirmed onboarding is complete this browser
+		// session, skip the network call entirely. This eliminates ~50 requests to
+		// /env/ONBOARDING_COMPLETE per session. The cache is cleared on tab close
+		// (sessionStorage), so a reinstall (wipe ~/.kortix) + new tab works fine.
+		const cached = sessionStorage.getItem("onboarding_complete");
+		if (cached === "true") {
 			setOnboardingChecked(true);
 			return;
 		}
+
 		const checkOnboarding = async () => {
 			try {
 				const instanceUrl = useServerStore.getState().getActiveServerUrl();
@@ -416,8 +417,10 @@ export default function DashboardLayoutContent({
 						router.replace("/onboarding");
 						return;
 					}
-				} else {
-					// Env key not found — not onboarded yet
+					// Cache the successful result for this browser session
+					sessionStorage.setItem("onboarding_complete", "true");
+				} else if (res.status >= 500) {
+					// Server error — treat as not onboarded
 					router.replace("/onboarding");
 					return;
 				}

@@ -26,7 +26,7 @@ export function useOpenCodeConfig() {
       const result = await client.config.get();
       return unwrap(result);
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
 }
@@ -63,8 +63,8 @@ export function useUpdateOpenCodeConfig() {
       }
     },
     onSettled: () => {
-      // Always refetch to get the authoritative server state
-      queryClient.invalidateQueries({ queryKey: configKeys.all });
+      // Refetch to get the authoritative server state — only if mounted
+      queryClient.refetchQueries({ queryKey: configKeys.all, type: 'active' });
     },
   });
 }

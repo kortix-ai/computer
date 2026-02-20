@@ -201,22 +201,22 @@ echo ""
 
 LOCAL_COMPOSE=$(sed -n '/write_compose_local()/,/^}/p' "$SCRIPT")
 
-if echo "$LOCAL_COMPOSE" | grep -q '"3000:3000"'; then
-  pass "local compose keeps port 3000 on 0.0.0.0"
+if echo "$LOCAL_COMPOSE" | grep -q '"13737:3000"'; then
+  pass "local compose maps frontend to port 13737"
 else
-  fail "local compose keeps port 3000 on 0.0.0.0"
+  fail "local compose maps frontend to port 13737"
 fi
 
-if echo "$LOCAL_COMPOSE" | grep -q '"8008:8008"'; then
-  pass "local compose keeps port 8008 on 0.0.0.0"
+if echo "$LOCAL_COMPOSE" | grep -q '"13738:8008"'; then
+  pass "local compose maps API to port 13738"
 else
-  fail "local compose keeps port 8008 on 0.0.0.0"
+  fail "local compose maps API to port 13738"
 fi
 
-if echo "$LOCAL_COMPOSE" | grep -q '"14000:8000"'; then
-  pass "local compose keeps port 14000 on 0.0.0.0"
+if echo "$LOCAL_COMPOSE" | grep -q '"13740:8000"'; then
+  pass "local compose maps sandbox to port 13740"
 else
-  fail "local compose keeps port 14000 on 0.0.0.0"
+  fail "local compose maps sandbox to port 13740"
 fi
 
 if ! echo "$LOCAL_COMPOSE" | grep -q 'caddy'; then

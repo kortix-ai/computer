@@ -25,6 +25,7 @@ import { integrationsApp } from './integrations';
 import { queueApp, startDrainer, stopDrainer } from './queue';
 import { serversApp } from './servers';
 import { bootstrapLocalIdentity } from './platform/local-identity';
+import { ensureSchema } from './ensure-schema';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -32,21 +33,37 @@ const app = new Hono();
 
 // === Global Middleware ===
 
+// CORS origins: cloud mode = production domains only, local mode = add localhost.
+// CORS_ALLOWED_ORIGINS env var can add extra origins in either mode (e.g. remapped Docker ports).
+const cloudOrigins = [
+  'https://www.kortix.com',
+  'https://kortix.com',
+  'https://dev.kortix.com',
+  'https://new-dev.kortix.com',
+  'https://staging.kortix.com',
+  'https://kortix.cloud',
+  'https://www.kortix.cloud',
+  'https://new.kortix.com',
+];
+const localOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+const extraOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+  : [];
+const corsOrigins = [
+  ...new Set([
+    ...cloudOrigins,
+    ...(config.isLocal() ? localOrigins : []),
+    ...extraOrigins,
+  ]),
+];
+
 app.use(
   '*',
   cors({
-    origin: [
-      'https://www.kortix.com',
-      'https://kortix.com',
-      'https://dev.kortix.com',
-      'https://new-dev.kortix.com',
-      'https://staging.kortix.com',
-      'https://kortix.cloud',
-      'https://www.kortix.cloud',
-      'https://new.kortix.com',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-    ],
+    origin: corsOrigins,
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -245,6 +262,20 @@ bootstrapLocalIdentity().catch((err) => console.error('[startup] Local identity 
 startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
 startChannelService();
 startDrainer();
+// Ensure DB schema exists before starting services that depend on it.
+// This is idempotent — safe to run on every startup.
+ensureSchema()
+  .then(() => {
+    startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
+    startChannelService();
+    startDrainer();
+  })
+  .catch((err) => {
+    console.error('[startup] ensureSchema failed, starting services anyway:', err);
+    startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
+    startChannelService();
+    startDrainer();
+  });
 
 // Graceful shutdown
 function shutdown(signal: string) {

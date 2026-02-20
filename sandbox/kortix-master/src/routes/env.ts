@@ -98,7 +98,8 @@ envRouter.get('/:key', async (c) => {
   try {
     const key = c.req.param('key')
     const value = await secretStore.get(key)
-    if (value === null) return c.json({ error: 'Not found' }, 404)
+    // Return 200 with null value when key doesn't exist — avoids 404 retry loops
+    // in the frontend (e.g. ONBOARDING_COMPLETE before first onboarding).
     return c.json({ [key]: value })
   } catch (error) {
     console.error('[ENV API] Error getting key:', error)

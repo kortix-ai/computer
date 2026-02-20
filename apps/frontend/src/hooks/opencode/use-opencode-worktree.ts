@@ -50,9 +50,9 @@ export function useWorktreeList() {
       return (result.data ?? []) as string[];
     },
     enabled: isGitProject,
-    staleTime: 30 * 1000,
+    staleTime: Infinity, // SSE worktree.ready/failed events trigger refetch
     gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     retry: false,
   });
 }
@@ -81,8 +81,8 @@ export function useCreateWorktree() {
       return unwrap(result) as Worktree;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.worktrees(), type: 'active' });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.projects(), type: 'active' });
     },
     // Suppress global error handler — callers handle errors via mutateAsync catch
     onError: () => {},
@@ -109,8 +109,8 @@ export function useRemoveWorktree() {
       return unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.worktrees(), type: 'active' });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.projects(), type: 'active' });
     },
     onError: () => {},
   });
@@ -136,8 +136,8 @@ export function useResetWorktree() {
       return unwrap(result);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.worktrees() });
-      queryClient.invalidateQueries({ queryKey: opencodeKeys.projects() });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.worktrees(), type: 'active' });
+      queryClient.refetchQueries({ queryKey: opencodeKeys.projects(), type: 'active' });
     },
     onError: () => {},
   });

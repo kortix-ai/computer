@@ -72,6 +72,8 @@ This produces `.next/standalone/` with `apps/frontend/server.js` and all traced 
 
 > **Important:** `NEXT_OUTPUT=standalone` triggers `output: 'standalone'` in `next.config.ts`. The `outputFileTracingRoot` is set to `../../` (monorepo root) so the standalone output uses `apps/frontend/server.js` NOT `computer/apps/frontend/server.js`.
 
+> **Why `localhost:8008`?** This is the baked-in default. The `docker-entrypoint.sh` rewrites it at container startup when `NEXT_PUBLIC_BACKEND_URL` differs (e.g. `http://localhost:13738/v1` for Docker port remapping, or `https://yourdomain.com/v1` for VPS mode). Always build with `8008` as the default.
+
 **Step 2: Docker package**
 
 ```bash
@@ -262,9 +264,9 @@ bash scripts/get-kortix.sh
 
 # Verify
 docker ps --format 'table {{.Names}}\t{{.Status}}'
-curl -s http://localhost:3000/dashboard  # Frontend
-curl -s http://localhost:8008/v1/providers  # Provider status (new API)
-curl -s http://localhost:8008/v1/setup/onboarding-status  # Onboarding
+curl -s http://localhost:13737/dashboard  # Frontend
+curl -s http://localhost:13738/v1/providers  # Provider status (new API)
+curl -s http://localhost:13738/v1/setup/onboarding-status  # Onboarding
 ```
 
 ### Quick restart with new images (no volume reset)
@@ -286,12 +288,12 @@ docker compose down frontend && docker compose up -d frontend
 
 ```bash
 # Connect a provider (new API)
-curl -s -X PUT http://localhost:8008/v1/providers/anthropic/connect \
+curl -s -X PUT http://localhost:13738/v1/providers/anthropic/connect \
   -H "Content-Type: application/json" \
   -d '{"keys":{"ANTHROPIC_API_KEY":"sk-ant-your-key"}}' | python3 -m json.tool
 
 # Verify via provider list
-curl -s http://localhost:8008/v1/providers | python3 -c "
+curl -s http://localhost:13738/v1/providers | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 for p in d['providers']:
@@ -300,7 +302,7 @@ for p in d['providers']:
 "
 
 # Legacy API still works too
-curl -s http://localhost:8008/v1/setup/env | python3 -c "
+curl -s http://localhost:13738/v1/setup/env | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 print('ANTHROPIC configured:', d['configured']['ANTHROPIC_API_KEY'])
@@ -354,7 +356,7 @@ The setup/onboarding flow is an **overlay on top of the dashboard**, not a separ
 
 ### Flow
 
-1. User installs via `get-kortix.sh` → browser opens `http://localhost:3000/setup`
+1. User installs via `get-kortix.sh` → browser opens `http://localhost:13737/setup`
 2. `/setup` redirects to `/dashboard`
 3. Dashboard layout checks onboarding status → shows `SetupOverlay`
 4. Welcome step: "Welcome to" + Kortix logo + confetti (auto-advances after 4s)
@@ -369,6 +371,28 @@ The setup/onboarding flow is an **overlay on top of the dashboard**, not a separ
 
 - Sidebar is closed by default when setup overlay is active (`defaultSidebarOpen={!showSetupOverlay}` passed to `AppProviders`)
 - The `/onboarding` page wraps content in `<SidebarProvider defaultOpen={false}>` since it uses `SessionChat` which contains `useSidebar()` calls
+
+---
+
+## CORS Configuration
+
+The API uses mode-aware CORS (see `services/kortix-api/src/index.ts`):
+
+| Mode | Allowed origins |
+|---|---|
+| **Cloud** (`ENV_MODE=cloud`) | Production domains only (`kortix.com`, `kortix.cloud`, etc.) — **no localhost** |
+| **Local** (`ENV_MODE=local`) | Production domains + `http://localhost:3000` + `http://127.0.0.1:3000` |
+| **Either mode** | Extra origins from `CORS_ALLOWED_ORIGINS` env var (comma-separated) |
+
+### Why `CORS_ALLOWED_ORIGINS` is needed for Docker
+
+In Docker, the frontend runs on port `13737` and the API on port `13738`. Since these are different origins (`localhost:13737` ≠ `localhost:13738`), the browser enforces CORS. The default `localhost:3000` allowlist doesn't cover the remapped port.
+
+The installer sets `CORS_ALLOWED_ORIGINS=http://localhost:13737,http://127.0.0.1:13737` on the `kortix-api` service in docker-compose.yml.
+
+### VPS mode
+
+VPS mode uses a Caddy reverse proxy where both frontend and API share the same origin (e.g. `https://yourdomain.com`), so CORS isn't an issue. No `CORS_ALLOWED_ORIGINS` needed.
 
 ---
 
@@ -417,7 +441,7 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 
 **Root cause:** All sandbox requests now route through the backend (`/v1/sandbox/*`). Ensure `NEXT_PUBLIC_BACKEND_URL` is correctly set at build time.
 
-**Fix:** Ensure `NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1` is passed during the host build step.
+**Fix:** Ensure `NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1` is passed during the host build step. This is the baked-in default; the entrypoint rewrites it at runtime when `NEXT_PUBLIC_BACKEND_URL` is set in docker-compose.
 
 ### `/onboarding` crashes with `useSidebar must be used within a SidebarProvider`
 
@@ -435,7 +459,7 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 - **3 named volumes:** `postgres-data`, `sandbox-workspace`, `sandbox-secrets` (persist across upgrades)
 - **1 network:** `kortix_default` (bridge, all services connected)
 - **Health checks:** postgres and sandbox have health checks; API depends on postgres being healthy; frontend depends on API being started
-- **Port mappings:** `54322` (postgres), `3000` (frontend), `8008` (API), `14000` (sandbox master, proxied to OpenCode)
+- **Port mappings:** `13739` (postgres), `13737` (frontend), `13738` (API), `13740` (sandbox master, proxied to OpenCode)
 - **Database:** PostgreSQL with `pg_cron` and `pg_net` extensions for scheduled trigger execution. `kortix-api` connects via `DATABASE_URL` and configures `pg_cron` on startup.
 
 ### CLI commands (via `~/.kortix/kortix`)

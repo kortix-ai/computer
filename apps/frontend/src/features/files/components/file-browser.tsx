@@ -265,6 +265,9 @@ export function FileBrowser() {
     return map;
   }, [files, diagByFile]);
 
+  const isRootPath = currentPath === '/' || currentPath === '.' || currentPath === '';
+  const normalizedCurrentPath = isRootPath ? '' : currentPath.replace(/\/$/, '');
+
   // Build file list for prev/next navigation in viewer
   const handleFileClick = useCallback(
     (node: FileNode) => {
@@ -281,10 +284,10 @@ export function FileBrowser() {
 
   // Navigate up one level
   const handleNavigateUp = useCallback(() => {
-    if (currentPath === '/' || currentPath === '.' || currentPath === '') return;
+    if (isRootPath) return;
     const parent = currentPath.replace(/\/[^/]+\/?$/, '') || '/';
     navigateToPath(parent);
-  }, [currentPath, navigateToPath]);
+  }, [isRootPath, currentPath, navigateToPath]);
 
   // Open file history
   const handleHistory = useCallback(
@@ -354,7 +357,7 @@ export function FileBrowser() {
       try {
         await uploadMutation.mutateAsync({
           file,
-          targetPath: currentPath === '.' ? undefined : currentPath,
+          targetPath: isRootPath ? undefined : currentPath,
         });
         toast.success(`Uploaded ${file.name}`);
       } catch (err) {
@@ -363,7 +366,7 @@ export function FileBrowser() {
         event.target.value = '';
       }
     },
-    [uploadMutation, currentPath],
+    [uploadMutation, isRootPath, currentPath],
   );
 
   // Create folder
@@ -373,10 +376,9 @@ export function FileBrowser() {
       return;
     }
 
-    const folderPath =
-      currentPath === '.' || currentPath === ''
-        ? newFolderName.trim()
-        : `${currentPath.replace(/\/$/, '')}/${newFolderName.trim()}`;
+    const folderPath = normalizedCurrentPath
+      ? `${normalizedCurrentPath}/${newFolderName.trim()}`
+      : newFolderName.trim();
 
     try {
       await mkdirMutation.mutateAsync({ dirPath: folderPath });
@@ -387,7 +389,7 @@ export function FileBrowser() {
       setIsCreatingFolder(false);
       setNewFolderName('');
     }
-  }, [mkdirMutation, currentPath, newFolderName]);
+  }, [mkdirMutation, normalizedCurrentPath, newFolderName]);
 
   // Create file
   const handleCreateFile = useCallback(async () => {
@@ -396,10 +398,9 @@ export function FileBrowser() {
       return;
     }
 
-    const filePath =
-      currentPath === '.' || currentPath === ''
-        ? newFileName.trim()
-        : `${currentPath.replace(/\/$/, '')}/${newFileName.trim()}`;
+    const filePath = normalizedCurrentPath
+      ? `${normalizedCurrentPath}/${newFileName.trim()}`
+      : newFileName.trim();
 
     try {
       await createMutation.mutateAsync({ filePath });
@@ -410,7 +411,7 @@ export function FileBrowser() {
       setIsCreatingFile(false);
       setNewFileName('');
     }
-  }, [createMutation, currentPath, newFileName]);
+  }, [createMutation, normalizedCurrentPath, newFileName]);
 
   // Copy/Cut handlers for items
   const handleCopy = useCallback(
@@ -451,7 +452,7 @@ export function FileBrowser() {
   const handlePaste = useCallback(async () => {
     if (!clipboard) return;
 
-    const destDir = currentPath === '.' || currentPath === '' ? '' : currentPath.replace(/\/$/, '');
+    const destDir = normalizedCurrentPath;
 
     // Generate a unique name if there's a conflict
     let destName = clipboard.name;
@@ -511,7 +512,7 @@ export function FileBrowser() {
     } catch (err) {
       toast.error(`Failed to paste: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  }, [clipboard, currentPath, files, copyMutation, renameMutation, mkdirMutation, clearClipboard]);
+  }, [clipboard, normalizedCurrentPath, files, copyMutation, renameMutation, mkdirMutation, clearClipboard]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -680,7 +681,7 @@ export function FileBrowser() {
             <ContextMenuTrigger asChild>
               <div className="p-1.5 min-h-full">
                 {/* Go up — also a drop target for moving items to parent */}
-                {currentPath !== '/' && currentPath !== '.' && currentPath !== '' && (
+                {!isRootPath && (
                   <ParentDropTarget
                     currentPath={currentPath}
                     onClick={handleNavigateUp}
