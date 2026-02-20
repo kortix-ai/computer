@@ -247,6 +247,33 @@ export async function getSandbox(): Promise<SandboxInfo | null> {
 }
 
 /**
+ * Create a brand new sandbox. Unlike ensureSandbox(), this always provisions
+ * a fresh one — it does NOT return an existing sandbox.
+ *
+ * Use this when the user explicitly clicks "Cloud" or "Local Docker" in the
+ * Instance Manager. For idempotent "make sure I have a sandbox" logic, use
+ * ensureSandbox() instead.
+ */
+export async function createSandbox(opts?: {
+  provider?: SandboxProviderName;
+  name?: string;
+}): Promise<{ sandbox: SandboxInfo }> {
+  const result = await platformFetch<SandboxInfo>('/platform/sandbox', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(opts?.provider ? { provider: opts.provider } : {}),
+      ...(opts?.name ? { name: opts.name } : {}),
+    }),
+  });
+
+  if (!result.success || !result.data) {
+    throw new Error(result.error || 'Failed to create sandbox');
+  }
+
+  return { sandbox: result.data };
+}
+
+/**
  * List all sandboxes for the user's account.
  */
 export async function listSandboxes(): Promise<SandboxInfo[]> {

@@ -1,8 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { accountUser } from '@kortix/db';
 import { createAuthProvider } from './providers';
 import { config } from '../config';
+import { db } from '../shared/db';
 import {
   insertIntegration,
   listIntegrationsByAccount,
@@ -20,6 +23,25 @@ import {
   listSandboxIntegrations,
 } from './repositories';
 import type { AppEnv } from '../types';
+
+/**
+ * Resolve the account ID for a user. In cloud mode, users belong to
+ * accounts via the accountUser table. Falls back to userId if no
+ * membership exists. Must match the resolution used by the sandbox
+ * router so that verifySandboxOwnership works correctly.
+ */
+async function resolveAccountId(userId: string): Promise<string> {
+  try {
+    const [membership] = await db
+      .select({ accountId: accountUser.accountId })
+      .from(accountUser)
+      .where(eq(accountUser.userId, userId))
+      .limit(1);
+    return membership?.accountId ?? userId;
+  } catch {
+    return userId;
+  }
+}
 
 type SandboxEnv = {
   Variables: {
@@ -82,7 +104,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.post('/connect-token', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
 
     const body = await c.req.json().catch(() => ({}));
     const parsed = connectTokenSchema.safeParse(body);
@@ -102,7 +124,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.post('/connections/save', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
 
     const body = await c.req.json();
     const saveSchema = z.object({
@@ -151,7 +173,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
     try {
       const userId = c.get('userId') as string;
       console.log('[INTEGRATIONS] GET /connections userId:', userId);
-      const accountId = userId;
+      const accountId = await resolveAccountId(userId);
       console.log('[INTEGRATIONS] GET /connections accountId:', accountId);
       const rows = await listIntegrationsByAccount(accountId);
       console.log('[INTEGRATIONS] GET /connections rows:', rows.length);
@@ -164,7 +186,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.get('/connections/:integrationId', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
     const { integrationId } = c.req.param();
 
     const row = await getIntegrationById(integrationId);
@@ -177,7 +199,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.patch('/connections/:integrationId/label', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
     const { integrationId } = c.req.param();
 
     const body = await c.req.json();
@@ -200,7 +222,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.get('/connections/:integrationId/sandboxes', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
     const { integrationId } = c.req.param();
 
     const row = await getIntegrationById(integrationId);
@@ -219,7 +241,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.delete('/connections/:integrationId', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
     const { integrationId } = c.req.param();
 
     const row = await getIntegrationById(integrationId);
@@ -240,7 +262,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.post('/connections/:integrationId/link', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
     const { integrationId } = c.req.param();
 
     const body = await c.req.json();
@@ -272,7 +294,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.delete('/connections/:integrationId/link/:sandboxId', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
     const { integrationId, sandboxId } = c.req.param();
 
     const integration = await getIntegrationById(integrationId);
@@ -286,7 +308,7 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
   app.post('/connections/proxy', async (c) => {
     const userId = c.get('userId') as string;
-    const accountId = userId;
+    const accountId = await resolveAccountId(userId);
 
     const body = await c.req.json();
     const parsed = proxyRequestSchema.safeParse(body);

@@ -403,7 +403,12 @@ export const sandboxIntegrations = kortixSchema.table(
 export const serverEntries = kortixSchema.table(
   'server_entries',
   {
-    id: varchar('id', { length: 128 }).primaryKey(),
+    /** Auto-generated row PK. */
+    entryId: uuid('entry_id').defaultRandom().primaryKey(),
+    /** Frontend-assigned entry ID (e.g. 'default', 'cloud-sandbox', 'srv_xxx'). Unique per account. */
+    id: varchar('id', { length: 128 }).notNull(),
+    /** Owner account — scopes entries per-user. Null in local mode (single user). */
+    accountId: uuid('account_id'),
     label: varchar('label', { length: 255 }).notNull(),
     url: text('url').notNull(),
     isDefault: boolean('is_default').default(false).notNull(),
@@ -415,6 +420,8 @@ export const serverEntries = kortixSchema.table(
   },
   (table) => [
     index('idx_server_entries_default').on(table.isDefault),
+    index('idx_server_entries_account').on(table.accountId),
+    uniqueIndex('idx_server_entries_account_id').on(table.accountId, table.id),
   ],
 );
 

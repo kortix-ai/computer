@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useSandboxAuthStore } from '@/stores/sandbox-auth-store';
 import { isCloudMode } from '@/lib/config';
+import { authenticatedFetch } from '@/lib/auth-token';
 
 /**
  * SDK client reset callback — set by opencode-sdk.ts to break the circular
@@ -63,6 +64,18 @@ interface ServerStore {
    */
   urlVersion: number;
   addServer: (label: string, url: string, authToken?: string) => ServerEntry;
+  /**
+   * Add a new managed sandbox as a server entry. Deduplicates by sandboxId —
+   * if a server with the same sandboxId already exists, returns it instead.
+   * All metadata (provider, sandboxId, mappedPorts) is set atomically.
+   */
+  addSandboxServer: (entry: {
+    label: string;
+    url: string;
+    provider: SandboxProvider;
+    sandboxId: string;
+    mappedPorts?: Record<string, string>;
+  }) => ServerEntry;
   updateServer: (id: string, updates: Partial<Pick<ServerEntry, 'label' | 'url' | 'authToken'>>) => void;
   /**
    * Silently update a server's URL, ports, provider, and/or sandboxId
@@ -129,11 +142,26 @@ const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:80
 const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/preview/kortix-sandbox/8000`;
 const SERVERS_API = `${BACKEND_URL}/servers`;
 
+const DEFAULT_SERVER_ID = 'default';
+const CLOUD_SANDBOX_SERVER_ID = 'cloud-sandbox';
+
 function generateId(): string {
   return `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // ── API sync helpers (fire-and-forget) ──────────────────────────────────────
+// ONLY custom user-added instances are synced to the servers API.
+// Managed sandbox entries ('default', 'cloud-sandbox') come from the
+// sandboxes table via useSandbox() — they live in zustand/localStorage only.
+
+/** IDs of managed entries that should NOT be synced to the servers API. */
+const MANAGED_IDS = new Set([DEFAULT_SERVER_ID, CLOUD_SANDBOX_SERVER_ID]);
+
+/** True if this entry is a managed sandbox (not a custom user entry). */
+function isManagedEntry(s: ServerEntry | string): boolean {
+  const id = typeof s === 'string' ? s : s.id;
+  return MANAGED_IDS.has(id);
+}
 
 /** Strip authToken before sending to API — tokens stay in localStorage only. */
 function toApiPayload(s: ServerEntry) {
@@ -149,30 +177,36 @@ function toApiPayload(s: ServerEntry) {
 }
 
 function syncServerToApi(server: ServerEntry) {
-  fetch(`${SERVERS_API}`, {
+  if (isManagedEntry(server)) return; // managed entries are not persisted to API
+  authenticatedFetch(`${SERVERS_API}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(toApiPayload(server)),
-  }).catch(() => {}); // fire-and-forget
+  }, { handleSandboxAuth: false, retryOnAuthError: false }).catch(() => {}); // fire-and-forget
 }
 
 function deleteServerFromApi(id: string) {
-  fetch(`${SERVERS_API}/${id}`, { method: 'DELETE' }).catch(() => {});
+  if (isManagedEntry(id)) return;
+  authenticatedFetch(`${SERVERS_API}/${id}`, { method: 'DELETE' },
+    { handleSandboxAuth: false, retryOnAuthError: false }).catch(() => {});
 }
 
 /** Bulk sync all servers to API (used on initial hydration). */
 function syncAllToApi(servers: ServerEntry[]) {
-  fetch(`${SERVERS_API}/sync`, {
+  const custom = servers.filter((s) => !isManagedEntry(s));
+  if (custom.length === 0) return;
+  authenticatedFetch(`${SERVERS_API}/sync`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ servers: servers.map(toApiPayload) }),
-  }).catch(() => {});
+    body: JSON.stringify({ servers: custom.map(toApiPayload) }),
+  }, { handleSandboxAuth: false, retryOnAuthError: false }).catch(() => {});
 }
 
 /** Load servers from API, merging authTokens from localStorage entries. */
 async function loadFromApi(localServers: ServerEntry[]): Promise<ServerEntry[] | null> {
   try {
-    const res = await fetch(SERVERS_API);
+    const res = await authenticatedFetch(SERVERS_API, undefined,
+      { handleSandboxAuth: false, retryOnAuthError: false });
     if (!res.ok) return null;
     const rows: Array<{
       id: string;
@@ -206,9 +240,6 @@ async function loadFromApi(localServers: ServerEntry[]): Promise<ServerEntry[] |
   }
 }
 
-const DEFAULT_SERVER_ID = 'default';
-const CLOUD_SANDBOX_SERVER_ID = 'cloud-sandbox';
-
 const createDefaultServer = (): ServerEntry => ({
   id: DEFAULT_SERVER_ID,
   label: 'Local Sandbox',
@@ -220,8 +251,10 @@ const createDefaultServer = (): ServerEntry => ({
 export const useServerStore = create<ServerStore>()(
   persist(
     (set, get) => ({
-      servers: [createDefaultServer()],
-      activeServerId: DEFAULT_SERVER_ID,
+      // Local mode starts with the default local sandbox entry.
+      // Cloud mode starts empty — sandboxes are loaded via useSandbox hook.
+      servers: isCloudMode() ? [] : [createDefaultServer()],
+      activeServerId: isCloudMode() ? '' : DEFAULT_SERVER_ID,
       userSelected: false,
       serverVersion: 0,
       urlVersion: 0,
@@ -238,6 +271,29 @@ export const useServerStore = create<ServerStore>()(
           servers: [...state.servers, newServer],
         }));
         syncServerToApi(newServer);
+        return newServer;
+      },
+
+      addSandboxServer: (entry) => {
+        const state = get();
+        // Deduplicate: if a server with this sandboxId already exists, return it.
+        const existing = state.servers.find((s) => s.sandboxId === entry.sandboxId);
+        if (existing) return existing;
+
+        const normalizedUrl = entry.url.replace(/\/+$/, '');
+        const newServer: ServerEntry = {
+          id: generateId(),
+          label: entry.label || normalizedUrl.replace(/^https?:\/\//, ''),
+          url: normalizedUrl,
+          provider: entry.provider,
+          sandboxId: entry.sandboxId,
+          mappedPorts: entry.mappedPorts,
+        };
+        set((state) => ({
+          servers: [...state.servers, newServer],
+        }));
+        // Sandbox entries are NOT synced to the servers API — they come from
+        // the sandboxes table. Only custom user-added entries are synced.
         return newServer;
       },
 
@@ -443,60 +499,65 @@ export const useServerStore = create<ServerStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        const hasDefault = state.servers.some((s) => s.id === DEFAULT_SERVER_ID);
-        if (!hasDefault) {
-          state.servers = [createDefaultServer(), ...state.servers];
-        } else {
-          // Always reset the default server's URL and provider to current values.
-          // This handles migration from old direct-connect URLs (localhost:14000)
-          // and ensures provider is set (needed for key generation button).
-          // Note: authToken is preserved if set — it was explicitly generated by the user.
-          state.servers = state.servers.map((s) =>
-            s.id === DEFAULT_SERVER_ID
-              ? { ...s, url: DEFAULT_SANDBOX_URL, label: 'Local Sandbox', provider: 'local_docker' }
-              : s,
+
+        if (isCloudMode()) {
+          // ── Cloud mode ────────────────────────────────────────────────
+          // Remove stale local-only entries (default, cloud-sandbox) from
+          // localStorage — they don't belong in cloud mode.
+          state.servers = state.servers.filter(
+            (s) => s.id !== DEFAULT_SERVER_ID && s.id !== CLOUD_SANDBOX_SERVER_ID,
           );
-        }
-        // Clean up stale 'cloud-sandbox' duplicates that point to the same URL
-        // as the default entry. Previously useSandbox created these in local mode.
-        state.servers = state.servers.filter((s) => {
-          if (s.id === 'cloud-sandbox') {
-            const def = state.servers.find((d) => d.id === DEFAULT_SERVER_ID);
-            if (def && s.url === def.url) return false; // duplicate — remove
-          }
-          return true;
-        });
-        // If active server was the removed duplicate, switch to default
-        if (!state.servers.some((s) => s.id === state.activeServerId)) {
-          state.activeServerId = DEFAULT_SERVER_ID;
-        }
 
-        // In cloud mode, if the active server is the local default, auto-switch
-        // to the cloud-sandbox entry if one exists. The local default is not
-        // useful in cloud mode and shouldn't be the active server.
-        if (isCloudMode() && state.activeServerId === DEFAULT_SERVER_ID) {
-          const cloudEntry = state.servers.find((s) => s.id === CLOUD_SANDBOX_SERVER_ID);
-          if (cloudEntry) {
-            state.activeServerId = CLOUD_SANDBOX_SERVER_ID;
+          // Active server will be set by useSandbox hook once it loads.
+          // If current activeServerId was a removed entry, clear it.
+          if (state.activeServerId && !state.servers.some((s) => s.id === state.activeServerId)) {
+            state.activeServerId = state.servers[0]?.id ?? '';
           }
-        }
 
-        // Async: load from API and merge, preserving local authTokens.
-        // On first ever boot, push localStorage entries to API.
-        const localServers = [...state.servers];
-        loadFromApi(localServers).then((apiServers) => {
-          if (apiServers && apiServers.length > 0) {
-            // API has data — use it as source of truth (with local tokens merged in)
-            const hasDefault = apiServers.some((s) => s.id === DEFAULT_SERVER_ID);
-            if (!hasDefault) {
-              apiServers.unshift(createDefaultServer());
+          // Load custom entries from API (user-added URLs).
+          // Sandbox entries come from useSandbox hook, not from here.
+          const localServers = [...state.servers];
+          loadFromApi(localServers).then((apiEntries) => {
+            if (apiEntries && apiEntries.length > 0) {
+              // Merge: keep sandbox entries from zustand + custom entries from API
+              const currentState = useServerStore.getState();
+              const sandboxEntries = currentState.servers.filter((s) => s.provider);
+              const apiIds = new Set(apiEntries.map((s) => s.id));
+              const kept = sandboxEntries.filter((s) => !apiIds.has(s.id));
+              useServerStore.setState({ servers: [...kept, ...apiEntries] });
+            } else {
+              syncAllToApi(localServers);
             }
-            useServerStore.setState({ servers: apiServers });
+          });
+        } else {
+          // ── Local mode ────────────────────────────────────────────────
+          // Ensure the default local sandbox entry exists.
+          const hasDefault = state.servers.some((s) => s.id === DEFAULT_SERVER_ID);
+          if (!hasDefault) {
+            state.servers = [createDefaultServer(), ...state.servers];
           } else {
-            // API is empty — seed it with current localStorage entries
-            syncAllToApi(localServers);
+            // Reset the default entry's URL and provider to current values.
+            // Preserves authToken if set by the user.
+            state.servers = state.servers.map((s) =>
+              s.id === DEFAULT_SERVER_ID
+                ? { ...s, url: DEFAULT_SANDBOX_URL, label: 'Local Sandbox', provider: 'local_docker' }
+                : s,
+            );
           }
-        });
+
+          // Clean up stale cloud-sandbox duplicates that share the default URL.
+          state.servers = state.servers.filter((s) => {
+            if (s.id === CLOUD_SANDBOX_SERVER_ID) {
+              const def = state.servers.find((d) => d.id === DEFAULT_SERVER_ID);
+              if (def && s.url === def.url) return false;
+            }
+            return true;
+          });
+
+          if (!state.servers.some((s) => s.id === state.activeServerId)) {
+            state.activeServerId = DEFAULT_SERVER_ID;
+          }
+        }
       },
     },
   ),

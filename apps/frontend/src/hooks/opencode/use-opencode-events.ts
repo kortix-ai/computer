@@ -707,3 +707,15 @@ export function useOpenCodeEventStream() {
 
 // Use the correct key reference
 const opcodeKeys = opencodeKeys;
+
+/**
+ * Headless provider component that connects the SSE event stream.
+ * Renders nothing — just call useOpenCodeEventStream().
+ *
+ * Mount this once on any page that needs live session updates
+ * (dashboard layout, onboarding page, etc.).
+ */
+export function OpenCodeEventStreamProvider() {
+	useOpenCodeEventStream();
+	return null;
+}

@@ -10,6 +10,7 @@
 -- ║    - 0001_decouple_channels_sandbox.sql (nullable sandbox_id)             ║
 -- ║    - 0001_pg_cron_scheduler.sql         (pg_cron + pg_net scheduler)       ║
 -- ║    - 0002_trigger_model_columns.sql     (model columns on triggers)        ║
+-- ║    - 0004_server_entries_per_account.sql (per-account server entries)      ║
 -- ╚══════════════════════════════════════════════════════════════════════════════╝
 
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -396,13 +397,16 @@ ALTER TABLE kortix.triggers ADD COLUMN IF NOT EXISTS model_id VARCHAR(255);
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Migration: 0003_server_entries.sql
+-- Migration: 0003_server_entries.sql + 0004_server_entries_per_account.sql
 -- Stores user-configured server/instance entries (URL, label, provider).
 -- Auth tokens are NOT stored — they stay in browser localStorage.
+-- Scoped per-account with entry_id as PK and unique (account_id, id).
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS "kortix"."server_entries" (
-  "id" varchar(128) PRIMARY KEY NOT NULL,
+  "entry_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "id" varchar(128) NOT NULL,
+  "account_id" uuid,
   "label" varchar(255) NOT NULL,
   "url" text NOT NULL,
   "is_default" boolean DEFAULT false NOT NULL,
@@ -414,6 +418,8 @@ CREATE TABLE IF NOT EXISTS "kortix"."server_entries" (
 );
 
 CREATE INDEX IF NOT EXISTS "idx_server_entries_default" ON "kortix"."server_entries" USING btree ("is_default");
+CREATE INDEX IF NOT EXISTS "idx_server_entries_account" ON "kortix"."server_entries" USING btree ("account_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_server_entries_account_id" ON "kortix"."server_entries" USING btree ("account_id", "id");
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════

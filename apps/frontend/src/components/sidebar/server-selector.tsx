@@ -17,14 +17,14 @@ import {
   KeyRound,
   Copy,
 } from 'lucide-react';
-import { useServerStore, CLOUD_SANDBOX_SERVER_ID, type ServerEntry } from '@/stores/server-store';
+import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { useSandboxAuthStore } from '@/stores/sandbox-auth-store';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/auth-token';
-import { ensureSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, regenerateSandboxToken, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
+import { createSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, regenerateSandboxToken, type SandboxProviderName, type ChangelogEntry } from '@/lib/platform-client';
 
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { isLocalMode, isCloudMode } from '@/lib/config';
@@ -595,7 +595,7 @@ export function InstanceManagerDialog({
     setIsCreatingSandbox(true);
     setSandboxError(null);
     try {
-      const { sandbox } = await ensureSandbox(provider ? { provider } : undefined);
+      const { sandbox } = await createSandbox(provider ? { provider } : undefined);
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
 
       let url: string;
@@ -606,18 +606,33 @@ export function InstanceManagerDialog({
       }
 
       const store = useServerStore.getState();
-      const serverId = store.registerOrUpdateSandbox(
-        {
+      let serverId: string;
+
+      if (isLocalMode()) {
+        // Local mode: single sandbox — update the default entry.
+        store.updateServerSilent('default', {
           url,
           label,
           provider: sandbox.provider,
           sandboxId: sandbox.external_id,
           mappedPorts: extractMappedPorts(sandbox),
-        },
-        { isLocal: isLocalMode() },
-      );
+        });
+        serverId = 'default';
+      } else {
+        // Cloud mode: each sandbox gets its own entry.
+        // Deduplicates by sandboxId — won't double-add on refresh.
+        const newServer = store.addSandboxServer({
+          label,
+          url,
+          provider: sandbox.provider,
+          sandboxId: sandbox.external_id,
+          mappedPorts: extractMappedPorts(sandbox),
+        });
+        serverId = newServer.id;
+      }
 
-      queryClient.setQueryData(['platform', 'sandbox'], sandbox);
+      // Invalidate sandbox query so useSandbox picks up the latest state.
+      queryClient.invalidateQueries({ queryKey: ['platform', 'sandbox'] });
       useTabStore.getState().swapForServer(serverId, activeServerId);
       setActiveServer(serverId);
       router.push('/dashboard');
@@ -752,8 +767,8 @@ export function InstanceManagerDialog({
                     onGenerateToken={server.provider === 'local_docker' ? handleGenerateToken : undefined}
                     isDeleting={isRemovingSandbox}
                     isGeneratingToken={isRegenerating}
-                    sandboxUpdate={server.id === CLOUD_SANDBOX_SERVER_ID ? sandboxUpdate : undefined}
-                    onVersionDetected={server.id === CLOUD_SANDBOX_SERVER_ID ? setSandboxVersion : undefined}
+                    sandboxUpdate={server.provider === 'daytona' ? sandboxUpdate : undefined}
+                    onVersionDetected={server.provider === 'daytona' ? setSandboxVersion : undefined}
                   />
                 ))
               )}
