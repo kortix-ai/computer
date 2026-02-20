@@ -171,10 +171,16 @@ export function useCreateOpenCodeSession() {
     },
     onSuccess: (newSession) => {
       // Surgically insert into cache — SSE session.created will also fire
-      // but this gives instant UI feedback.
+      // but this gives instant UI feedback. Dedup to avoid duplicate keys.
       const session = newSession as Session;
       queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
         if (!old) return [session];
+        const idx = old.findIndex((s) => s.id === session.id);
+        if (idx >= 0) {
+          const next = [...old];
+          next[idx] = session;
+          return next.sort((a, b) => b.time.updated - a.time.updated);
+        }
         return [session, ...old].sort((a, b) => b.time.updated - a.time.updated);
       });
       queryClient.setQueryData(opencodeKeys.session(session.id), session);
@@ -673,9 +679,16 @@ export function useForkSession() {
       return unwrap(result) as Session;
     },
     onSuccess: (newSession) => {
-      // Insert forked session into cache — SSE session.created will also fire
+      // Insert forked session into cache — SSE session.created will also fire.
+      // Dedup to avoid duplicate keys in the session list.
       queryClient.setQueryData<Session[]>(opencodeKeys.sessions(), (old) => {
         if (!old) return [newSession];
+        const idx = old.findIndex((s) => s.id === newSession.id);
+        if (idx >= 0) {
+          const next = [...old];
+          next[idx] = newSession;
+          return next.sort((a, b) => b.time.updated - a.time.updated);
+        }
         return [newSession, ...old].sort((a, b) => b.time.updated - a.time.updated);
       });
       queryClient.setQueryData(opencodeKeys.session(newSession.id), newSession);
