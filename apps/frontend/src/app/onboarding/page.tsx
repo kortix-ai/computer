@@ -15,7 +15,6 @@ import { getClient } from '@/lib/opencode-sdk';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { SecretsManager } from '@/components/secrets/secrets-manager';
-import { SessionChat } from '@/components/session/session-chat';
 import { Button } from '@/components/ui/button';
 import { WallpaperBackground } from '@/components/ui/wallpaper-background';
 
@@ -44,6 +43,16 @@ function getInstanceUrl() {
 type BootPhase = 'power' | 'bios' | 'logo' | 'login' | 'credentials' | 'onboarding';
 
 /* ─── Helpers ────────────────────────────────────────────────── */
+
+/** Mark onboarding as complete in the sandbox env store. */
+function markOnboardingComplete() {
+  const instanceUrl = getInstanceUrl();
+  return fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: 'true' }),
+  }).catch(() => {}); // best effort
+}
 
 /** Persist the onboarding session ID to the sandbox instance (fire-and-forget). */
 function persistOnboardingSessionId(sessionId: string) {
@@ -117,7 +126,6 @@ export default function OnboardingPage() {
   const router = useRouter();
   const createSession = useCreateOpenCodeSession();
   const executeCommand = useExecuteOpenCodeCommand();
-  const completedRef = useRef(false);
   const creatingRef = useRef(false);
   const retriesRef = useRef(0);
   const { resolvedTheme } = useTheme();
@@ -126,7 +134,6 @@ export default function OnboardingPage() {
   const [phase, setPhase] = useState<BootPhase>('power');
   const [visibleLines, setVisibleLines] = useState(0);
   const [progressFill, setProgressFill] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -149,13 +156,7 @@ export default function OnboardingPage() {
     const instanceUrl = getInstanceUrl();
 
     if (params.has('skip_onboarding')) {
-      fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: 'true' }),
-      })
-        .catch(() => {})
-        .finally(() => router.replace('/dashboard'));
+      markOnboardingComplete().finally(() => router.replace('/dashboard'));
       return;
     }
 
@@ -202,12 +203,14 @@ export default function OnboardingPage() {
   }, [user, isLoading, router]);
 
   // ── Onboarding session lifecycle ──────────────────────────────
-  // Resume existing session (with validation) or create new one + fire /onboarding command.
+  // When we reach the 'onboarding' phase:
+  // 1. Resume existing session or create new one + fire /onboarding command
+  // 2. Mark onboarding as complete
+  // 3. Redirect to /sessions/{id} in the dashboard (no embedded chat)
   const MAX_RETRIES = 3;
 
   useEffect(() => {
     if (phase !== 'onboarding') return;
-    if (sessionId) return;
     if (sessionError) return;
     if (creatingRef.current) return;
     creatingRef.current = true;
@@ -217,24 +220,22 @@ export default function OnboardingPage() {
 
     (async () => {
       try {
+        let finalSessionId: string | null = null;
+
         // 1. Try to resume an existing onboarding session
         const res = await fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`).catch(() => null);
         const existingId = res?.ok ? (await res.json()).ONBOARDING_SESSION_ID : null;
 
-        if (existingId && existingId !== '') {
-          // Validate the session actually exists before using it.
-          // A stale/deleted session ID would cause "Session not found" in SessionChat.
+        if (existingId && existingId !== '' && existingId !== null) {
+          // Validate the session actually exists before using it
           try {
             const client = getClient();
             const result = await client.session.get({ sessionID: existingId });
             if (result.data) {
-              // Session is valid — resume it
-              setSessionId(existingId);
-              creatingRef.current = false;
-              return;
+              finalSessionId = existingId;
             }
           } catch {
-            // Session doesn't exist anymore — clear the stale ID and fall through to create
+            // Session doesn't exist anymore — clear the stale ID
             fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -243,12 +244,25 @@ export default function OnboardingPage() {
           }
         }
 
-        // 2. No valid session — create + persist + fire command in one flow
-        const session = await createSessionRef.current.mutateAsync({ title: 'Kortix Onboarding' });
-        persistOnboardingSessionId(session.id);
-        await executeCommandRef.current.mutateAsync({ sessionId: session.id, command: 'onboarding' });
-        setSessionId(session.id);
-        retriesRef.current = 0;
+        // 2. No valid session — create + persist + fire command
+        if (!finalSessionId) {
+          const session = await createSessionRef.current.mutateAsync({ title: 'Kortix Onboarding' });
+          persistOnboardingSessionId(session.id);
+          await executeCommandRef.current.mutateAsync({ sessionId: session.id, command: 'onboarding' });
+          finalSessionId = session.id;
+        }
+
+        // 3. Mark onboarding complete & redirect to session in dashboard
+        await markOnboardingComplete();
+
+        openTabAndNavigate({
+          id: finalSessionId,
+          title: 'Kortix Onboarding',
+          type: 'session',
+          href: `/sessions/${finalSessionId}`,
+          serverId: useServerStore.getState().activeServerId,
+        });
+        router.replace('/dashboard');
       } catch {
         creatingRef.current = false;
         retriesRef.current += 1;
@@ -267,45 +281,7 @@ export default function OnboardingPage() {
     })();
 
     return () => clearTimeout(retryTimer);
-  }, [phase, sessionId, sessionError, retryTick]);
-
-  // ── Poll sandbox instance for onboarding completion ───────────
-  useEffect(() => {
-    if (phase !== 'onboarding') return;
-    if (completedRef.current) return;
-
-    const poll = setInterval(async () => {
-      try {
-        const instanceUrl = getInstanceUrl();
-        const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.ONBOARDING_COMPLETE === 'true') {
-            clearInterval(poll);
-            setTimeout(() => {
-              if (!completedRef.current) {
-                completedRef.current = true;
-                if (sessionId) {
-                  openTabAndNavigate({
-                    id: sessionId,
-                    title: 'Kortix Onboarding',
-                    type: 'session',
-                    href: `/sessions/${sessionId}`,
-                    serverId: useServerStore.getState().activeServerId,
-                  });
-                }
-                router.replace('/dashboard');
-              }
-            }, 1500);
-          }
-        }
-      } catch {
-        // ignore — sandbox may not be reachable yet
-      }
-    }, 5000);
-
-    return () => clearInterval(poll);
-  }, [phase, sessionId, router]);
+  }, [phase, sessionError, retryTick, router]);
 
   // ── Boot sequence audio ───────────────────────────────────────
   useEffect(() => {
@@ -542,7 +518,7 @@ export default function OnboardingPage() {
           </motion.div>
         )}
 
-        {/* ═══ ONBOARDING — embedded chat session ═══ */}
+        {/* ═══ ONBOARDING — creating session then redirecting ═══ */}
         {phase === 'onboarding' && (
           <motion.div
             key="onboarding"
@@ -553,29 +529,28 @@ export default function OnboardingPage() {
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
             <WallpaperBackground />
-            <div className="relative z-10 w-full max-w-4xl mx-4 bg-background/95 backdrop-blur-xl rounded-xl border border-border/40 overflow-hidden flex flex-col h-[90vh]">
-              <div className="flex-1 min-h-0 overflow-hidden">
-                {sessionId ? (
-                  <SessionChat sessionId={sessionId} hideHeader />
-                ) : sessionError ? (
-                  <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <p className="text-sm text-muted-foreground">Could not connect to the sandbox.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        retriesRef.current = 0;
-                        setSessionError(false);
-                        setRetryTick((t) => t + 1);
-                      }}
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                ) : (
+            <div className="relative z-10 flex flex-col items-center gap-4">
+              {sessionError ? (
+                <div className="flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-xl rounded-xl border border-border/40 p-8">
+                  <p className="text-sm text-muted-foreground">Could not connect to the sandbox.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      retriesRef.current = 0;
+                      setSessionError(false);
+                      setRetryTick((t) => t + 1);
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3">
                   <LoadingDots />
-                )}
-              </div>
+                  <p className="text-xs text-muted-foreground">Setting up your workspace…</p>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

@@ -341,7 +341,7 @@ services:
   postgres:
     image: ${POSTGRES_IMAGE}
     ports:
-      - "54322:5432"
+      - "13739:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -363,10 +363,10 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE}
     ports:
-      - "3000:3000"
+      - "13737:3000"
     environment:
       - NEXT_PUBLIC_ENV_MODE=local
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:13738/v1
     depends_on:
       kortix-api:
         condition: service_started
@@ -375,7 +375,7 @@ services:
   kortix-api:
     image: ${API_IMAGE}
     ports:
-      - "8008:8008"
+      - "13738:8008"
     environment:
       - ENV_MODE=local
       - PORT=8008
@@ -387,6 +387,7 @@ services:
       - CRON_API_URL=http://kortix-api:8008
       - CRON_TICK_SECRET=\${CRON_TICK_SECRET}
       - SCHEDULER_ENABLED=true
+      - CORS_ALLOWED_ORIGINS=http://localhost:13737,http://127.0.0.1:13737
     env_file:
       - .env
     volumes:
@@ -397,7 +398,7 @@ services:
     restart: unless-stopped
 
   sandbox:
-    image: ${SANDBOX_IMAGE}
+    image: kortix/computer:latest
     container_name: kortix-sandbox
     cap_add:
       - SYS_ADMIN
@@ -418,7 +419,7 @@ services:
       - SANDBOX_ID=kortix-sandbox
       - PROJECT_ID=local
       - ENV_MODE=local
-      - SANDBOX_PORT_MAP={"8000":"14000","3111":"14001","6080":"14002","6081":"14003","3210":"14004","9223":"14005","9224":"14006"}
+      - SANDBOX_PORT_MAP={"8000":"13740","3111":"13741","6080":"13742","6081":"13743","3210":"13744","9223":"13745","9224":"13746"}
     env_file:
       - .env
     volumes:
@@ -427,7 +428,7 @@ services:
     # All sandbox access goes through the backend proxy (kortix-api → sandbox:8000).
     # Only Kortix Master is exposed to the host for direct debugging.
     ports:
-      - "14000:8000"
+      - "13740:8000"
     expose:
       - "3111"
       - "6080"
@@ -563,7 +564,7 @@ services:
       - ENV_MODE=local
       - INTERNAL_SERVICE_KEY=\${INTERNAL_SERVICE_KEY}
       - CORS_ALLOWED_ORIGINS=${public_url}
-      - SANDBOX_PORT_MAP={"8000":"14000","3111":"14001","6080":"14002","6081":"14003","3210":"14004","9223":"14005","9224":"14006"}
+      - SANDBOX_PORT_MAP={"8000":"13740","3111":"13741","6080":"13742","6081":"13743","3210":"13744","9223":"13745","9224":"13746"}
     env_file:
       - .env
     expose:
@@ -666,7 +667,7 @@ _url() {
       echo "https://localhost"
     fi
   else
-    echo "http://localhost:3000"
+    echo "http://localhost:13737"
   fi
 }
 
@@ -683,8 +684,8 @@ case "${1:-help}" in
       fi
     else
       echo "  ${G}Kortix is running!${N}"
-      echo "  Dashboard:  ${B}http://localhost:3000${N}"
-      echo "  API:        ${B}http://localhost:8008${N}"
+      echo "  Dashboard:  ${B}http://localhost:13737${N}"
+      echo "  API:        ${B}http://localhost:13738${N}"
     fi
     echo ""
     ;;
@@ -954,7 +955,7 @@ pull_and_start() {
     info "Waiting for services to start..."
     local attempts=0
     while [ $attempts -lt 30 ]; do
-      if curl -sf http://localhost:3000 >/dev/null 2>&1; then
+      if curl -sf http://localhost:13737 >/dev/null 2>&1; then
         break
       fi
       sleep 2
@@ -964,12 +965,12 @@ pull_and_start() {
     echo ""
     echo "  ${BOLD}${GREEN}Kortix is running!${NC}"
     echo ""
-    echo "  ${CYAN}Dashboard:${NC}   ${BOLD}http://localhost:3000${NC}"
-    echo "  ${CYAN}API:${NC}         ${BOLD}http://localhost:8008${NC}"
+    echo "  ${CYAN}Dashboard:${NC}   ${BOLD}http://localhost:13737${NC}"
+    echo "  ${CYAN}API:${NC}         ${BOLD}http://localhost:13738${NC}"
     echo ""
 
     info "Opening setup in browser..."
-    open_browser "http://localhost:3000/setup"
+    open_browser "http://localhost:13737/setup"
     echo ""
     echo "  ${BOLD}Next step:${NC} Add your API keys in the browser."
     echo ""
@@ -1005,7 +1006,7 @@ main() {
         domain=$(head -1 "$INSTALL_DIR/Caddyfile" 2>/dev/null | sed 's/ {$//' || echo "localhost")
         echo "  Dashboard: ${BOLD}https://${domain}${NC}"
       else
-        echo "  Dashboard: ${BOLD}http://localhost:3000${NC}"
+        echo "  Dashboard: ${BOLD}http://localhost:13737${NC}"
       fi
       echo ""
       exit 0
