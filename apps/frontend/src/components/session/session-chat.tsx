@@ -3178,7 +3178,10 @@ export function SessionChat({
 
 		// Scroll so the new user message appears at the top of the viewport.
 		// MutationObserver recalcs spacer automatically when the new turn renders.
-		setTimeout(() => scrollToBottom(), 50);
+		// Fire twice: early (before DOM update) to reset scroll state so the RAF
+		// auto-scroll loop is unblocked, and again after the turn likely rendered.
+		scrollToBottom();
+		setTimeout(() => scrollToBottom(), 100);
 
 			const options: Record<string, unknown> = {};
 			if (local.agent.current) options.agent = local.agent.current.name;
