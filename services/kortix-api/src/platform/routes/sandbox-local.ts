@@ -118,13 +118,14 @@ export function createLocalSandboxRouter(): Hono<{ Variables: AuthVariables }> {
   });
 
   // ─── POST /generate-token ───────────────────────────────────────────────
-  // Generate a sandbox access key (sak_xxx). This key protects the proxy:
-  //   - Frontend must send it as Bearer token to access the sandbox through the proxy.
-  //   - The proxy validates it (sandboxAuthStore.hasAuth/getAccessKey).
-  //   - The proxy→sandbox connection uses Docker networking and doesn't need this key.
+  // Generate a sandbox access key (sak_xxx). This key is used everywhere:
+  //   1. Proxy auth (frontend → proxy) — via sandboxAuthStore
+  //   2. Sandbox auth (proxy/cron → sandbox) — via INTERNAL_SERVICE_KEY env var
+  //   3. Sandbox callbacks (sandbox → API) — via KORTIX_TOKEN env var
   //
-  // NO container restart needed! The proxy is the auth boundary.
-  // The key is stored in sandboxAuthStore (in-memory + disk) and returned to the user.
+  // Flow: return the key to the frontend INSTANTLY, then recreate the container
+  // in the background so it picks up the key as env vars. The frontend already
+  // has the key before the container goes down, so no lockout.
 
   router.post('/generate-token', async (c) => {
     try {
@@ -133,21 +134,25 @@ export function createLocalSandboxRouter(): Hono<{ Variables: AuthVariables }> {
       const accessKey = `sak_${randomAlphanumeric(32)}`;
 
       // Store the key — this instantly enables proxy auth.
-      // The proxy middleware checks sandboxAuthStore.hasAuth() on every request.
-      // From this moment, requests without the key will get 401.
-      // This is fine because:
-      //   1. This request itself doesn't go through the sandbox proxy
-      //   2. The response carries the key back to the frontend
-      //   3. The frontend stores it and sends it on subsequent requests
       sandboxAuthStore.setAccessKey(accessKey);
 
-      // Get current sandbox info (no restart needed)
+      // Get current sandbox info before we recreate
       const info = await provider.find();
       if (!info) {
         return c.json({ success: false, error: 'No sandbox found' }, 404);
       }
 
-      console.log('[SANDBOX-LOCAL] Token generated (no container restart)');
+      // Recreate the container in the background so it picks up the key as
+      // INTERNAL_SERVICE_KEY + KORTIX_TOKEN. The frontend already has the key
+      // (this response is sent first), so no lockout. The proxy handles auth
+      // during the brief restart window — requests get 502 but no 401 prompt.
+      provider.recreateWithToken(accessKey).then(() => {
+        console.log('[SANDBOX-LOCAL] Container recreated with auth key');
+      }).catch((err) => {
+        console.error('[SANDBOX-LOCAL] Background container recreation failed:', err);
+      });
+
+      console.log('[SANDBOX-LOCAL] Token generated, container recreating in background');
       return c.json({
         success: true,
         data: serialize(info),
