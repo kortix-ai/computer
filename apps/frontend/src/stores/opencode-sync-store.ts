@@ -125,6 +125,11 @@ interface SyncState {
 // Track optimistic message IDs so we can remove them when the server sends
 // the real user message (which has a different, server-generated ID).
 const optimisticIds = new Set<string>();
+// Track message IDs where optimistic parts were bridged to the real message.
+// When the first real part arrives for a bridged message, the bridged parts
+// are cleared so optimistic and real parts don't co-exist (which would
+// double-render the user's text).
+const bridgedPartIds = new Set<string>();
 
 // ============================================================================
 
@@ -191,7 +196,15 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 
 	upsertPart: (messageID, part) =>
 		set((s) => {
-			const list = s.parts[messageID] ?? [];
+			// If this message had bridged (optimistic) parts, clear them now
+			// that a real part has arrived — prevents double-rendering.
+			let list: Part[];
+			if (bridgedPartIds.has(messageID)) {
+				bridgedPartIds.delete(messageID);
+				list = [];
+			} else {
+				list = s.parts[messageID] ?? [];
+			}
 			const result = Binary.search(list, part.id, (p) => p.id);
 			const next = [...list];
 			if (result.found) {
@@ -415,6 +428,7 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 
 	reset: () => {
 		optimisticIds.clear();
+		bridgedPartIds.clear();
 		set({
 			messages: {},
 			parts: {},
@@ -472,9 +486,21 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 								} else {
 									next.splice(r.index, 0, info);
 								}
-								// Clean up optimistic parts
+								// Bridge optimistic parts to the real message ID so
+								// the user bubble never flickers empty while waiting
+								// for real parts to arrive via message.part.updated.
 								const newParts = { ...s.parts };
-								for (const id of optIds) delete newParts[id];
+								let bridge: Part[] | undefined;
+								for (const id of optIds) {
+									if (!bridge && newParts[id]?.length) {
+										bridge = newParts[id];
+									}
+									delete newParts[id];
+								}
+								if (bridge && !newParts[info.id]?.length) {
+									newParts[info.id] = bridge;
+									bridgedPartIds.add(info.id);
+								}
 								return {
 									messages: { ...s.messages, [info.sessionID]: next },
 									parts: newParts,

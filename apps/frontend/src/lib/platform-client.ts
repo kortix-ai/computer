@@ -350,6 +350,17 @@ export async function getLatestSandboxVersion(): Promise<SandboxVersionInfo> {
   return res.json();
 }
 
+/**
+ * Get the full changelog from the platform.
+ */
+export async function getFullChangelog(): Promise<ChangelogEntry[]> {
+  const res = await fetch(`${PLATFORM_URL}/platform/sandbox/changelog`, {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Changelog fetch failed: ${res.status}`);
+  return res.json();
+}
+
 // ─── Sandbox Token Regeneration ─────────────────────────────────────────────
 
 /**

@@ -1645,6 +1645,9 @@ function SessionTurn({
 	// user messages that should not render a user bubble.
 	const hasVisibleUserContent = useMemo(() => {
 		const parts = turn.userMessage.parts;
+		// Parts not loaded yet (bridging / transient state) — assume visible
+		// to prevent a flash where the bubble disappears momentarily.
+		if (parts.length === 0) return true;
 		// Has any non-synthetic, non-ignored text?
 		const hasVisibleText = parts.some(
 			(p) =>
