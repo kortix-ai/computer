@@ -207,8 +207,8 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
 // Answered question card — collapsible summary of completed Q&A
 // ============================================================================
 
-function AnsweredQuestionCard({ part }: { part: ToolPart }) {
-	const [expanded, setExpanded] = useState(false);
+function AnsweredQuestionCard({ part, defaultExpanded = false }: { part: ToolPart; defaultExpanded?: boolean }) {
+	const [expanded, setExpanded] = useState(defaultExpanded);
 	const input = (part.state as any)?.input ?? {};
 	const metadata = (part.state as any)?.metadata ?? {};
 	const questions: Array<{ question: string; options?: { label: string }[] }> =
@@ -1630,6 +1630,27 @@ function SessionTurn({
 		return result;
 	}, [stepsExpanded, questions, sessionId, turn.assistantMessages]);
 
+	// Inline content parts — interleaves text and answered question parts in natural order.
+	// When a turn contains answered questions, we need to render text and questions
+	// in their original order rather than extracting the last text as a separate "response".
+	const inlineContentParts = useMemo(() => {
+		if (answeredQuestionParts.length === 0 || working) return null;
+		const answeredQuestionIds = new Set(answeredQuestionParts.map(({ part }) => part.id));
+		const items: Array<{ type: 'text'; part: TextPart; id: string } | { type: 'question'; part: ToolPart; id: string }> = [];
+		for (const { part } of allParts) {
+			if (isTextPart(part) && part.text?.trim()) {
+				items.push({ type: 'text', part, id: part.id });
+			} else if (isToolPart(part) && part.tool === 'question' && answeredQuestionIds.has(part.id)) {
+				items.push({ type: 'question', part, id: part.id });
+			}
+		}
+		// Only use inline rendering if there are both text and question items
+		const hasText = items.some(i => i.type === 'text');
+		const hasQuestion = items.some(i => i.type === 'question');
+		if (!hasText || !hasQuestion) return null;
+		return items;
+	}, [allParts, answeredQuestionParts, working]);
+
 	const taskToolParts = useMemo(() => {
 		return allParts.filter(({ part }) => isToolPart(part) && (part as ToolPart).tool === 'task');
 	}, [allParts]);
@@ -1750,8 +1771,16 @@ function SessionTurn({
 
 	// ---- Copy response ----
 	const handleCopy = async () => {
-		if (!response) return;
-		await navigator.clipboard.writeText(response);
+		// When inline content is active, copy all text parts (not just the last one)
+		const textToCopy = inlineContentParts
+			? inlineContentParts
+				.filter((item) => item.type === 'text')
+				.map((item) => (item.part as TextPart).text?.trim())
+				.filter(Boolean)
+				.join('\n\n')
+			: response;
+		if (!textToCopy) return;
+		await navigator.clipboard.writeText(textToCopy);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
 	};
@@ -1968,6 +1997,10 @@ function SessionTurn({
 						)
 							return null;
 
+						// When inline content rendering is active (text + answered questions in order),
+						// hide ALL text parts from steps since they render in the inline section
+						if (inlineContentParts && isTextPart(part) && part.text?.trim()) return null;
+
 						// Text parts (intermediate + streaming response while working)
 						if (isTextPart(part)) {
 							if (!part.text?.trim()) return null;
@@ -2081,20 +2114,40 @@ function SessionTurn({
 				{!working && response ? response : ""}
 			</div>
 
-			{/* Response section (shown when NOT working — while working, text streams inside steps above) */}
-			{!working && response && (
-				<div className="text-sm">
-					<SandboxUrlDetector content={response} isStreaming={false} />
+			{/* Inline content: text and answered questions rendered in natural order */}
+			{inlineContentParts ? (
+				<div className="space-y-3">
+					{inlineContentParts.map((item) => {
+						if (item.type === 'text') {
+							return (
+								<div key={item.id} className="text-sm">
+									<SandboxUrlDetector content={item.part.text!.trim()} isStreaming={false} />
+								</div>
+							);
+						}
+						return (
+							<AnsweredQuestionCard key={item.id} part={item.part} defaultExpanded />
+						);
+					})}
 				</div>
-			)}
+			) : (
+				<>
+					{/* Response section (shown when NOT working — while working, text streams inside steps above) */}
+					{!working && response && (
+						<div className="text-sm">
+							<SandboxUrlDetector content={response} isStreaming={false} />
+						</div>
+					)}
 
-			{/* Answered question parts — collapsible, shown after the response text */}
-			{answeredQuestionParts.length > 0 && (
-				<div className="space-y-2 mt-3">
-					{answeredQuestionParts.map(({ part }) => (
-						<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
-					))}
-				</div>
+					{/* Answered question parts — collapsible, shown after the response text */}
+					{answeredQuestionParts.length > 0 && (
+						<div className="space-y-2 mt-3">
+							{answeredQuestionParts.map(({ part }) => (
+								<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
+							))}
+						</div>
+					)}
+				</>
 			)}
 
 			{/* Always-visible: Subsession/task cards — rendered after the response text */}
