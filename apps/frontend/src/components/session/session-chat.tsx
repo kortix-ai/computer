@@ -96,10 +96,7 @@ import { getClient } from "@/lib/opencode-sdk";
 import { playSound } from "@/lib/sounds";
 import { cn } from "@/lib/utils";
 import { useKortixComputerStore } from "@/stores/kortix-computer-store";
-import {
-	type QueuedMessage,
-	useMessageQueueStore,
-} from "@/stores/message-queue-store";
+import { useMessageQueueStore } from "@/stores/message-queue-store";
 import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
 import { useOpenCodeSessionStatusStore } from "@/stores/opencode-session-status-store";
 import { useSyncStore } from "@/stores/opencode-sync-store";
@@ -2565,6 +2562,21 @@ export function SessionChat({
 		}
 		return false;
 	}, [messages]);
+	const hasPendingUserReply = useMemo(() => {
+		if (!messages || messages.length === 0) return false;
+		let lastUserIdx = -1;
+		for (let i = messages.length - 1; i >= 0; i--) {
+			if (messages[i].info.role === "user") {
+				lastUserIdx = i;
+				break;
+			}
+		}
+		if (lastUserIdx === -1) return false;
+		for (let i = lastUserIdx + 1; i < messages.length; i++) {
+			if (messages[i].info.role === "assistant") return false;
+		}
+		return true;
+	}, [messages]);
 
 	// Effective busy: server says busy OR the assistant message is incomplete.
 	const effectiveBusy = isServerBusy || hasIncompleteAssistant;
@@ -2585,7 +2597,7 @@ export function SessionChat({
 	}, [effectiveBusy]);
 
 	// ---- Message Queue ----
-	// Hydrate the queue from the backend on first mount (survives page reloads).
+	// Hydrate queue state on first mount (local client storage).
 	const queueHydrated = useMessageQueueStore((s) => s.hydrated);
 	useEffect(() => {
 		if (!queueHydrated) {
@@ -2608,18 +2620,22 @@ export function SessionChat({
 	const queueClearSession = useMessageQueueStore((s) => s.clearSession);
 	const [queueExpanded, setQueueExpanded] = useState(true);
 
-	// Track previous *server* busy state to detect idle transitions.
-	const prevServerBusyRef = useRef(isServerBusy);
 	// Guard against double-drain: tracks whether a drain is already in progress
 	const drainScheduledRef = useRef(false);
-	// Track IDs that were dequeued locally but may not be persisted yet.
-	// Prevents the backend re-sync from re-adding messages we already consumed.
-	const dequeuedIdsRef = useRef(new Set<string>());
+	const queueInFlightRef = useRef<{ queueId: string; sentAt: number } | null>(null);
+	const hasActiveQuestionForQueue = useOpenCodePendingStore((s) =>
+		Object.values(s.questions).some((q) => q.sessionID === sessionId),
+	);
 
 	// Drain helper: dequeue the next message and send it.
 	// Shared by primary + fallback drains to avoid duplication.
-	const drainNext = useCallback(() => {
+	const drainNextWhenSettled = useCallback(() => {
 		if (drainScheduledRef.current) return;
+		if (queueInFlightRef.current) return;
+		if (isServerBusy || hasIncompleteAssistant) return;
+		if (hasPendingUserReply) return;
+		if (pendingSendInFlight) return;
+		if (hasActiveQuestionForQueue) return;
 		const sessionQueue = useMessageQueueStore
 			.getState()
 			.messages.filter((m) => m.sessionId === sessionId);
@@ -2627,61 +2643,66 @@ export function SessionChat({
 		drainScheduledRef.current = true;
 		setTimeout(() => {
 			drainScheduledRef.current = false;
-			const next = queueDequeue(sessionId);
-			if (next) {
-				dequeuedIdsRef.current.add(next.id);
-				handleSend(next.text, next.files);
-			}
-		}, 500);
-	}, [sessionId, queueDequeue]); // eslint-disable-line react-hooks/exhaustive-deps
-
-	// Sync queue from backend when session goes idle. The backend drainer may
-	// have already processed messages while the tab was closed/backgrounded.
-	// This re-fetches the persisted queue so the frontend stays in sync.
-	useEffect(() => {
-		const wasBusy = prevServerBusyRef.current;
-		prevServerBusyRef.current = isServerBusy;
-
-		if (wasBusy && !isServerBusy) {
-			void (async () => {
-				// Refresh queue from backend (the drainer may have consumed messages)
-				try {
-					const { fetchSessionQueue } = await import("@/lib/api/queue");
-					const backendMsgs = await fetchSessionQueue(sessionId);
-					const state = useMessageQueueStore.getState();
-					const otherMsgs = state.messages.filter(
-						(m) => m.sessionId !== sessionId,
-					);
-					// Filter out messages we already dequeued locally (race protection)
-					const merged = backendMsgs
-						.filter((bm) => !dequeuedIdsRef.current.has(bm.id))
-						.map((bm) => {
-							const local = state.messages.find((m) => m.id === bm.id);
-							return {
-								id: bm.id,
-								sessionId: bm.sessionId,
-								text: bm.text,
-								timestamp: bm.timestamp,
-								files: local?.files,
-							} as QueuedMessage;
-						});
-					useMessageQueueStore.setState({
-						messages: [...otherMsgs, ...merged],
-					});
-					// Clear dequeued IDs that are no longer on the backend (confirmed removed)
-					const backendIds = new Set(backendMsgs.map((bm) => bm.id));
-					for (const id of dequeuedIdsRef.current) {
-						if (!backendIds.has(id)) dequeuedIdsRef.current.delete(id);
+			if (
+				queueInFlightRef.current ||
+				isServerBusy ||
+				hasIncompleteAssistant ||
+				hasPendingUserReply ||
+				pendingSendInFlight ||
+				hasActiveQuestionForQueue
+			)
+				return;
+			queueInFlightRef.current = { queueId: "__scheduling__" };
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					const next = queueDequeue(sessionId);
+					if (next) {
+						queueInFlightRef.current = { queueId: next.id, sentAt: Date.now() };
+						void handleSend(next.text, next.files)
+							.catch(() => {
+								queueInFlightRef.current = null;
+							});
+					} else {
+						queueInFlightRef.current = null;
 					}
-				} catch {
-					// Backend unreachable — use local state as fallback
-				}
+				});
+			});
+		}, 350);
+	}, [
+		sessionId,
+		queueDequeue,
+		isServerBusy,
+		hasIncompleteAssistant,
+		hasPendingUserReply,
+		pendingSendInFlight,
+		hasActiveQuestionForQueue,
+	]); // eslint-disable-line react-hooks/exhaustive-deps
 
-				// Now drain the next message if any remain
-				drainNext();
-			})();
-		}
-	}, [isServerBusy, sessionId, drainNext]);
+	// Release queue lock only after the queued message lifecycle is fully settled.
+	useEffect(() => {
+		const inFlight = queueInFlightRef.current;
+		if (!inFlight) return;
+		if (
+			isServerBusy ||
+			hasIncompleteAssistant ||
+			hasPendingUserReply ||
+			pendingSendInFlight ||
+			hasActiveQuestionForQueue
+		)
+			return;
+		queueInFlightRef.current = null;
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => drainNextWhenSettled());
+		});
+	}, [
+		messages,
+		isServerBusy,
+		hasIncompleteAssistant,
+		hasPendingUserReply,
+		pendingSendInFlight,
+		hasActiveQuestionForQueue,
+		drainNextWhenSettled,
+	]);
 
 	// Fallback drain: when isBusy becomes false and there are queued messages,
 	// drain the queue. This covers cases where the SSE missed the busy event
@@ -2693,8 +2714,8 @@ export function SessionChat({
 			.getState()
 			.messages.filter((m) => m.sessionId === sessionId);
 		if (sessionQueue.length === 0) return;
-		drainNext();
-	}, [isBusy, queuedMessages.length, sessionId, drainNext]);
+		drainNextWhenSettled();
+	}, [isBusy, queuedMessages.length, sessionId, drainNextWhenSettled]);
 
 	// "Send now" handler: abort current session + send the queued message
 	const handleQueueSendNow = useCallback(
@@ -2703,8 +2724,7 @@ export function SessionChat({
 				.getState()
 				.messages.find((m) => m.id === messageId);
 			if (!msg) return;
-			// Track as dequeued so backend re-sync won't re-add it
-			dequeuedIdsRef.current.add(messageId);
+			queueInFlightRef.current = null;
 			queueRemove(messageId);
 			// Abort the current session first
 			abortSession.mutate(sessionId);
@@ -3238,6 +3258,8 @@ export function SessionChat({
 					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
 					removeOptimisticUserMessage(messageID);
 				});
+
+			return messageID;
 		},
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[
@@ -3579,7 +3601,9 @@ export function SessionChat({
 			{/* Input — hidden in read-only mode (sub-session modal) */}
 			{!readOnly && (
 				<SessionChatInput
-				onSend={handleSend}
+				onSend={async (text, files, mentions) => {
+					await handleSend(text, files, mentions);
+				}}
 				isBusy={isBusy}
 				onStop={handleStop}
 				agents={local.agent.list}
