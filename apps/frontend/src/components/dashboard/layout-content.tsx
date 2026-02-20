@@ -384,11 +384,9 @@ export default function DashboardLayoutContent({
 			setOnboardingChecked(true);
 			return;
 		}
-		// Fast path: previously connected = already onboarded
-		if (useSandboxConnectionStore.getState().wasConnected) {
-			setOnboardingChecked(true);
-			return;
-		}
+		// Note: we intentionally do NOT skip the check based on wasConnected.
+		// wasConnected persists in sessionStorage and becomes stale if the user
+		// reinstalls (wipes ~/.kortix). Always verify with the sandbox.
 		const checkOnboarding = async () => {
 			try {
 				const instanceUrl = useServerStore.getState().getActiveServerUrl();
@@ -416,8 +414,8 @@ export default function DashboardLayoutContent({
 						router.replace("/onboarding");
 						return;
 					}
-				} else {
-					// Env key not found — not onboarded yet
+				} else if (res.status >= 500) {
+					// Server error — treat as not onboarded
 					router.replace("/onboarding");
 					return;
 				}
