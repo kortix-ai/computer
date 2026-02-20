@@ -2098,6 +2098,17 @@ function SessionTurn({
 				</div>
 			)}
 
+			{/* Streaming text fallback — when the turn is active but steps are collapsed
+			    (e.g. auto-expand race, stale SSE idle event between turns), the text
+			    would be invisible: it only renders inside the steps section (gated by
+			    stepsExpanded) during working, and the Response section only renders when
+			    !working. This fallback closes that gap so streaming text is always visible. */}
+			{working && !stepsExpanded && !inlineContentParts && responseRaw && (
+				<div className="text-sm">
+					<ThrottledMarkdown content={responseRaw} isStreaming={true} />
+				</div>
+			)}
+
 			{/* Kortix logo — shown when there are no steps and not working (otherwise logo is already above the steps trigger) */}
 			{!hasSteps && !working && (response || answeredQuestionParts.length > 0) && (
 				<div className="flex items-center gap-2 mt-3 mb-3">
