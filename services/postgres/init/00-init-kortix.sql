@@ -396,6 +396,27 @@ ALTER TABLE kortix.triggers ADD COLUMN IF NOT EXISTS model_id VARCHAR(255);
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
+-- Migration: 0003_server_entries.sql
+-- Stores user-configured server/instance entries (URL, label, provider).
+-- Auth tokens are NOT stored — they stay in browser localStorage.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS "kortix"."server_entries" (
+  "id" varchar(128) PRIMARY KEY NOT NULL,
+  "label" varchar(255) NOT NULL,
+  "url" text NOT NULL,
+  "is_default" boolean DEFAULT false NOT NULL,
+  "provider" "kortix"."sandbox_provider",
+  "sandbox_id" text,
+  "mapped_ports" jsonb,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS "idx_server_entries_default" ON "kortix"."server_entries" USING btree ("is_default");
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
 -- Legacy billing tables (public schema)
 -- These exist in Supabase cloud. Locally we create them so queries don't crash.
 -- ═══════════════════════════════════════════════════════════════════════════════

@@ -274,31 +274,45 @@ write_caddyfile() {
     tls_config="  tls internal"
   fi
 
-  local auth_block=""
+  local auth_block_frontend=""
   if [ "$ENABLE_AUTH" = "yes" ]; then
     # Generate bcrypt hash for the password using caddy's built-in hasher
     # We'll use a Docker one-liner since caddy might not be installed yet
     local hashed_pw
     hashed_pw=$(docker run --rm "$CADDY_IMAGE" caddy hash-password --plaintext "$ADMIN_PASSWORD" 2>/dev/null)
 
-    auth_block="
-  basicauth * {
-    ${ADMIN_USER} ${hashed_pw}
-  }"
+    # Basic auth protects only the frontend (HTML pages).
+    # API routes (/v1/*) use their own Bearer token auth — basic_auth would
+    # strip the Authorization header before proxying, breaking sandbox proxy auth.
+    auth_block_frontend="
+    basic_auth {
+      ${ADMIN_USER} ${hashed_pw}
+    }"
+  fi
+
+  # When using an IP address, clients (browsers, curl) don't send SNI.
+  # Caddy needs default_sni to know which certificate to serve.
+  local global_block=""
+  if [ "$USE_IP_ONLY" = "yes" ]; then
+    global_block="{
+  default_sni ${DOMAIN}
+}
+
+"
   fi
 
   cat > "$INSTALL_DIR/Caddyfile" << CADDYEOF
-${DOMAIN} {
+${global_block}${DOMAIN} {
 ${tls_config}
-${auth_block}
 
   # API routes — proxy to kortix-api (includes /v1/sandbox/* for sandbox proxy)
+  # API has its own Bearer token auth; Caddy just proxies transparently.
   handle /v1/* {
     reverse_proxy kortix-api:8008
   }
 
-  # Default — serve frontend
-  handle {
+  # Default — serve frontend (protected by basic auth if enabled)
+  handle {${auth_block_frontend}
     reverse_proxy frontend:3000
   }
 }
@@ -492,6 +506,7 @@ services:
       - "3000"
     environment:
       - NEXT_PUBLIC_ENV_MODE=local
+      - NEXT_PUBLIC_BACKEND_URL=${public_url}/v1
       - KORTIX_PUBLIC_URL=${public_url}
     depends_on:
       kortix-api:
@@ -624,7 +639,7 @@ cd "$DIR"
 
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-VERSION="0.5.5"
+VERSION="0.5.6"
 
 _open() {
   if command -v open &>/dev/null; then open "$1" 2>/dev/null

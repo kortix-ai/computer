@@ -212,10 +212,19 @@ export class LocalDockerProvider implements SandboxProvider {
     const url = config.DOCKER_HOST
       ? `http://${externalId}:8000`
       : BASE_URL;
-    return {
-      url,
-      headers: { 'Content-Type': 'application/json' },
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
     };
+
+    // In VPS/self-hosted mode with INTERNAL_SERVICE_KEY, the sandbox (kortix-master)
+    // requires Bearer auth on all routes. The cron executor and queue drainer call
+    // the sandbox directly (not through the proxy), so they need the service key.
+    if (config.INTERNAL_SERVICE_KEY) {
+      headers['Authorization'] = `Bearer ${config.INTERNAL_SERVICE_KEY}`;
+    }
+
+    return { url, headers };
   }
 
   async ensureRunning(_externalId: string): Promise<void> {

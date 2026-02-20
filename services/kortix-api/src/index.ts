@@ -23,6 +23,7 @@ import { timingSafeStringEqual } from './shared/crypto';
 import { sandboxAuthStore } from './platform/sandbox-auth-store';
 import { integrationsApp } from './integrations';
 import { queueApp, startDrainer, stopDrainer } from './queue';
+import { serversApp } from './servers';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -151,6 +152,8 @@ if (config.isLocal()) {
   app.route('/v1/providers', providersApp);   // /v1/providers, /v1/providers/schema, /v1/providers/:id/connect, /v1/providers/:id/disconnect, /v1/providers/health
   app.route('/v1/secrets', secretsApp);       // /v1/secrets, /v1/secrets/:key (PUT/DELETE)
 }
+// Server entries — persists user-configured instances (URL, label, provider — NOT auth tokens).
+app.route('/v1/servers', serversApp);        // /v1/servers, /v1/servers/:id, /v1/servers/sync
 // Message queue — persists queued messages to filesystem and drains them server-side.
 app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queue/messages/:id, /v1/queue/all, /v1/queue/status
 

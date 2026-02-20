@@ -1,5 +1,71 @@
 [
   {
+    "version": "0.5.6",
+    "date": "2026-02-19",
+    "title": "Self-hosted VPS installer & sandbox auth hardening",
+    "description": "One-click VPS installer (get-kortix.sh) with Caddy TLS, basic auth, firewall. Sandbox proxy auth hardened with INTERNAL_SERVICE_KEY for cron executor. Integrations UI and chat message handling improvements.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "VPS install script (get-kortix.sh) — one-click deploy with Caddy, TLS, firewall, and basic auth"
+      },
+      {
+        "type": "feature",
+        "text": "Integrations UI and OAuth integration profiles"
+      },
+      {
+        "type": "improvement",
+        "text": "Sandbox proxy auth: INTERNAL_SERVICE_KEY injected for cron executor in VPS mode"
+      },
+      {
+        "type": "improvement",
+        "text": "Caddy default_sni fix for IP-only TLS (no SNI from browsers/curl)"
+      },
+      {
+        "type": "improvement",
+        "text": "Session chat message handling refactor — optimistic messages, SSE sync"
+      },
+      {
+        "type": "fix",
+        "text": "Preview proxy local-docker resolveEndpoint now authenticates against sandbox"
+      },
+      {
+        "type": "fix",
+        "text": "Browser preview and sandbox URL routing uses dynamic sandboxId"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/opencode-ai@0.5.6",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.5.6",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.5.6",
+        "target": "npm"
+      },
+      {
+        "name": "v0.5.6",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.5.6",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-api:0.5.6",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.5.6",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.5.5",
     "date": "2026-02-18",
     "title": "License: Elastic License 2.0 (ELv2)",

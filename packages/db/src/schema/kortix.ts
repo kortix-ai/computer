@@ -396,6 +396,28 @@ export const sandboxIntegrations = kortixSchema.table(
   ],
 );
 
+// ─── Server Entries ──────────────────────────────────────────────────────────
+// User-configured server/instance entries (persisted from the frontend).
+// Auth tokens are NOT stored — they remain in the browser's localStorage.
+
+export const serverEntries = kortixSchema.table(
+  'server_entries',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    label: varchar('label', { length: 255 }).notNull(),
+    url: text('url').notNull(),
+    isDefault: boolean('is_default').default(false).notNull(),
+    provider: sandboxProviderEnum('provider'),
+    sandboxId: text('sandbox_id'),
+    mappedPorts: jsonb('mapped_ports').$type<Record<string, string>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_server_entries_default').on(table.isDefault),
+  ],
+);
+
 export const sandboxesRelations = relations(sandboxes, ({ many }) => ({
   triggers: many(triggers),
   executions: many(executions),
