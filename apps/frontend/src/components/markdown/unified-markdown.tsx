@@ -183,37 +183,63 @@ export function HighlightedCode({ code, language, children }: { code: string; la
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
 
-  // Check cache synchronously — if we have a hit, render immediately (no flash)
-  const cachedHtml = findBestCachedHtml(code, language, theme);
-  const [html, setHtml] = useState<string | null>(cachedHtml);
+  // Track the latest highlighted HTML and the code it corresponds to.
+  // During streaming, code changes rapidly — we keep the previous highlight
+  // visible until a new one is ready (no flash to plain text).
+  const [highlighted, setHighlighted] = useState<{ html: string; code: string } | null>(() => {
+    const cached = findBestCachedHtml(code, language, theme);
+    return cached ? { html: cached, code } : null;
+  });
   const versionRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    // If already cached, just set it
+    // Exact cache hit — show immediately
     const cached = shikiCache.get(shikiKey(code, language, theme));
     if (cached) {
-      setHtml(cached);
+      setHighlighted({ html: cached, code });
       return;
     }
 
     const version = ++versionRef.current;
-    highlightAsync(code, language, theme).then((result) => {
-      // Only update if this is still the latest request
-      if (version === versionRef.current && result) {
-        setHtml(result);
-      }
-    });
+
+    // Debounce Shiki calls: during streaming, code changes every ~33ms.
+    // Wait 100ms of stability before calling Shiki to avoid wasted work.
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      highlightAsync(code, language, theme).then((result) => {
+        if (version === versionRef.current && result) {
+          setHighlighted({ html: result, code });
+        }
+      });
+    }, 100);
+
+    return () => clearTimeout(debounceRef.current);
   }, [code, language, theme]);
 
-  if (html) {
+  // If we have a highlight for the EXACT current code, show it
+  if (highlighted && highlighted.code === code) {
     return (
       <code
         className="text-[13px] font-mono leading-relaxed whitespace-pre [&_pre]:contents [&_code]:contents"
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: highlighted.html }}
       />
     );
   }
 
+  // If we have a highlight for a PREFIX of the current code (streaming — code grew),
+  // show the highlighted prefix + plain text tail
+  if (highlighted && code.startsWith(highlighted.code) && highlighted.code.length > 0) {
+    const tail = code.slice(highlighted.code.length);
+    return (
+      <code className="text-[13px] font-mono leading-relaxed whitespace-pre [&_pre]:contents [&_code]:contents">
+        <span dangerouslySetInnerHTML={{ __html: highlighted.html }} />
+        {tail && <span className="text-inherit">{tail}</span>}
+      </code>
+    );
+  }
+
+  // No matching highlight yet — show plain text
   return (
     <code className="text-[13px] font-mono leading-relaxed text-inherit whitespace-pre">
       {children}
@@ -386,7 +412,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
     >
       <Streamdown
         isAnimating={isStreaming}
-        mode={isStreaming ? 'streaming' : 'static'}
+        mode="static"
         components={{
           // ═══════════════════════════════════════════════════════════════
           // HEADINGS - Clean hierarchy with proper weight distribution
@@ -524,16 +550,12 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
                 return <MermaidRenderer chart={code} className="my-5" />;
               }
 
-              // Syntax-highlighted block code.
-              // During streaming, streamdown remounts code components on every
-              // token which causes HighlightedCode to flash (state resets).
-              // So we only highlight in static mode — during streaming we show
-              // plain monospace text which is stable and flicker-free.
-              if (language && !isStreaming) {
+              // Syntax-highlighted block code
+              if (language) {
                 return <HighlightedCode code={code} language={language}>{children}</HighlightedCode>;
               }
 
-              // Block code without language (or streaming) - plain mono font
+              // Block code without language - plain mono font
               return (
                 <code className="text-[13px] font-mono leading-relaxed text-inherit whitespace-pre">
                   {children}

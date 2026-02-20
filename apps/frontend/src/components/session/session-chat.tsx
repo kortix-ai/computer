@@ -1633,8 +1633,10 @@ function SessionTurn({
 	// Inline content parts — interleaves text and answered question parts in natural order.
 	// When a turn contains answered questions, we need to render text and questions
 	// in their original order rather than extracting the last text as a separate "response".
+	// This works both during streaming and after completion so that answered questions
+	// stay in the correct position while the AI continues responding.
 	const inlineContentParts = useMemo(() => {
-		if (answeredQuestionParts.length === 0 || working) return null;
+		if (answeredQuestionParts.length === 0) return null;
 		const answeredQuestionIds = new Set(answeredQuestionParts.map(({ part }) => part.id));
 		const items: Array<{ type: 'text'; part: TextPart; id: string } | { type: 'question'; part: ToolPart; id: string }> = [];
 		for (const { part } of allParts) {
@@ -1649,7 +1651,7 @@ function SessionTurn({
 		const hasQuestion = items.some(i => i.type === 'question');
 		if (!hasText || !hasQuestion) return null;
 		return items;
-	}, [allParts, answeredQuestionParts, working]);
+	}, [allParts, answeredQuestionParts]);
 
 	const taskToolParts = useMemo(() => {
 		return allParts.filter(({ part }) => isToolPart(part) && (part as ToolPart).tool === 'task');
@@ -2114,21 +2116,37 @@ function SessionTurn({
 				{!working && response ? response : ""}
 			</div>
 
-			{/* Inline content: text and answered questions rendered in natural order */}
+			{/* Inline content: text and answered questions rendered in natural order.
+			    Works both during streaming and after completion. */}
 			{inlineContentParts ? (
 				<div className="space-y-3">
-					{inlineContentParts.map((item) => {
-						if (item.type === 'text') {
-							return (
-								<div key={item.id} className="text-sm">
-									<SandboxUrlDetector content={item.part.text!.trim()} isStreaming={false} />
-								</div>
-							);
+					{(() => {
+						// Find the last text item index — it might still be streaming
+						let lastTextIdx = -1;
+						if (working) {
+							for (let i = inlineContentParts.length - 1; i >= 0; i--) {
+								if (inlineContentParts[i].type === 'text') { lastTextIdx = i; break; }
+							}
 						}
-						return (
-							<AnsweredQuestionCard key={item.id} part={item.part} defaultExpanded />
-						);
-					})}
+						return inlineContentParts.map((item, idx) => {
+							if (item.type === 'text') {
+								const isStreaming = idx === lastTextIdx;
+								const text = isStreaming ? item.part.text! : item.part.text!.trim();
+								return (
+									<div key={item.id} className="text-sm">
+										{isStreaming ? (
+											<ThrottledMarkdown content={text} isStreaming />
+										) : (
+											<SandboxUrlDetector content={text} isStreaming={false} />
+										)}
+									</div>
+								);
+							}
+							return (
+								<AnsweredQuestionCard key={item.id} part={item.part} defaultExpanded />
+							);
+						});
+					})()}
 				</div>
 			) : (
 				<>

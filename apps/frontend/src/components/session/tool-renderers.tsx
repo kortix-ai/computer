@@ -1148,10 +1148,12 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const hasOutput =
 		!!sessionMeta || !!sessionMessages || !!structuredSections || !!outputBlock;
 
+	const isWaiting = !command && (status === "pending" || status === "running");
+
 	return (
 		<BasicTool
 			icon={<Terminal className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Shell", subtitle: description }}
+			trigger={{ title: "Shell", subtitle: description || (isWaiting ? "Preparing command..." : undefined) }}
 			defaultOpen={defaultOpen}
 			forceOpen={forceOpen}
 			locked={locked}
@@ -1159,9 +1161,13 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 			<div data-scrollable className="max-h-96 overflow-auto">
 				{/* Command */}
 				<div className="px-3 py-2.5 [&_code]:text-[12px] [&_code]:leading-relaxed [&_code]:whitespace-pre-wrap [&_code]:break-words [&_pre]:contents">
-					<HighlightedCode code={`$ ${command}`} language="bash">
-						{`$ ${command}`}
-					</HighlightedCode>
+					{isWaiting ? (
+						<span className="text-[12px] font-mono text-muted-foreground/50">$ ...</span>
+					) : (
+						<HighlightedCode code={`$ ${command}`} language="bash">
+							{`$ ${command}`}
+						</HighlightedCode>
+					)}
 				</div>
 				{/* Output */}
 				{hasOutput && (
