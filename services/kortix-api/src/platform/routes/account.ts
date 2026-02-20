@@ -10,7 +10,7 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import { sandboxes, accountUser, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
 import { generateSandboxToken } from '../services/token';
@@ -109,8 +109,8 @@ export function createAccountRouter(
 
       const accountId = await resolveAccountId(userId);
 
-      // Check if user already has an active sandbox
-      const [existing] = await db
+      // 1. Check for an existing active sandbox — return it immediately
+      const [active] = await db
         .select()
         .from(sandboxes)
         .where(
@@ -121,15 +121,58 @@ export function createAccountRouter(
         )
         .limit(1);
 
-      if (existing) {
+      if (active) {
         return c.json({
           success: true,
-          data: serializeSandbox(existing),
+          data: serializeSandbox(active),
           created: false,
         });
       }
 
-      // No sandbox — provision one
+      // 2. Check for a stopped/archived sandbox — restart it instead of creating new
+      const [stale] = await db
+        .select()
+        .from(sandboxes)
+        .where(
+          and(
+            eq(sandboxes.accountId, accountId),
+            inArray(sandboxes.status, ['stopped', 'archived']),
+          ),
+        )
+        .orderBy(desc(sandboxes.updatedAt))
+        .limit(1);
+
+      if (stale && stale.externalId) {
+        try {
+          const staleProvider = getProvider(stale.provider);
+          await staleProvider.start(stale.externalId);
+
+          const [reactivated] = await db
+            .update(sandboxes)
+            .set({ status: 'active', updatedAt: new Date() })
+            .where(eq(sandboxes.sandboxId, stale.sandboxId))
+            .returning();
+
+          console.log(
+            `[PLATFORM] Reactivated sandbox ${stale.sandboxId} via ${stale.provider} ` +
+            `(external: ${stale.externalId}) for account ${accountId}`,
+          );
+
+          return c.json({
+            success: true,
+            data: serializeSandbox(reactivated),
+            created: false,
+          });
+        } catch (err) {
+          // Failed to restart — fall through to create a new one
+          console.warn(
+            `[PLATFORM] Failed to reactivate sandbox ${stale.sandboxId}, will create new:`,
+            err,
+          );
+        }
+      }
+
+      // 3. No sandbox at all — provision a new one
       const provider = getProvider(providerName);
       const authToken = generateSandboxToken();
 
