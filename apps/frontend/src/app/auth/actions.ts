@@ -343,7 +343,9 @@ export async function installOwner(prevState: any, formData: FormData) {
 
   // Wizard step: provision the sandbox for the owner.
   // This is the self-hosted "install" — the first user gets a sandbox automatically.
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+  // Server-side: prefer BACKEND_URL (internal Docker hostname) over
+  // NEXT_PUBLIC_BACKEND_URL (browser-facing localhost, unreachable from container)
+  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
   const accessToken = signInData.session?.access_token;
   if (accessToken) {
     try {

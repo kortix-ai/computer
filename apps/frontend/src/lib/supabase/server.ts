@@ -5,9 +5,17 @@ import { cookies } from 'next/headers'
 export async function createClient() {
   const cookieStore = await cookies()
 
+  // IMPORTANT: NEXT_PUBLIC_ vars are inlined at build time by Next.js, so in
+  // Docker containers they contain placeholder values from the build host.
+  // We MUST use non-NEXT_PUBLIC_ runtime env vars (SUPABASE_URL, SUPABASE_ANON_KEY)
+  // which are read at runtime from process.env, falling back to NEXT_PUBLIC_ only
+  // for dev mode where they match the actual Supabase instance.
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {

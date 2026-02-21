@@ -791,10 +791,10 @@ write_compose() {
       GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: \"false\"
       GOTRUE_MAILER_AUTOCONFIRM: \"true\"
       GOTRUE_SMTP_ADMIN_EMAIL: admin@localhost
-      GOTRUE_SMTP_HOST: \"\"
-      GOTRUE_SMTP_PORT: \"\"
-      GOTRUE_SMTP_USER: \"\"
-      GOTRUE_SMTP_PASS: \"\"
+      GOTRUE_SMTP_HOST: localhost
+      GOTRUE_SMTP_PORT: \"587\"
+      GOTRUE_SMTP_USER: unused
+      GOTRUE_SMTP_PASS: unused
       GOTRUE_SMTP_SENDER_NAME: Kortix
       GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
       GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
@@ -855,12 +855,22 @@ ${supabase_ports}
 
     # Frontend connects to Kong (the Supabase API gateway)
     # In local mode, expose Kong on port 13740 so frontend can reach it from browser
+    # NEXT_PUBLIC_ vars are baked at build time by Next.js, so Docker images
+    # contain placeholder values. We MUST also set non-NEXT_PUBLIC_ runtime
+    # env vars (SUPABASE_URL, SUPABASE_ANON_KEY, BACKEND_URL) for server-side
+    # code (middleware, server actions) to work correctly.
     if [ "$DEPLOY_MODE" = "local" ]; then
       frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=http://localhost:13740
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}"
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - SUPABASE_URL=http://localhost:13740
+      - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - BACKEND_URL=http://localhost:13738/v1"
     else
       frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=\${SUPABASE_PUBLIC_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}"
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - SUPABASE_URL=\${SUPABASE_PUBLIC_URL}
+      - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - BACKEND_URL=http://kortix-api:8008/v1"
     fi
 
     supabase_url_env="      - SUPABASE_URL=http://supabase-kong:8000"
@@ -870,7 +880,10 @@ ${supabase_ports}
     # External mode — no Supabase containers
     api_depends="    # External Supabase — no local dependencies"
     frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=\${SUPABASE_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}"
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - SUPABASE_URL=\${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
+      - BACKEND_URL=http://kortix-api:8008/v1"
     supabase_url_env="      - SUPABASE_URL=\${SUPABASE_URL}"
     supabase_db_env="      - DATABASE_URL=\${DATABASE_URL}"
   fi
@@ -884,6 +897,8 @@ ${caddy_service}
   frontend:
     image: ${FRONTEND_IMAGE}
 ${frontend_ports}
+    extra_hosts:
+      - "localhost:host-gateway"
     environment:
 ${frontend_supabase_env}
       - NEXT_PUBLIC_BACKEND_URL=\${API_PUBLIC_URL}/v1

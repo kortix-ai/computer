@@ -57,7 +57,9 @@ export function getDirectPortUrl(
  * Uses NEXT_PUBLIC_BACKEND_URL directly (includes /v1).
  */
 function getPlatformUrl(): string {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  // Server-side: prefer BACKEND_URL (internal Docker hostname) over
+  // NEXT_PUBLIC_BACKEND_URL (browser-facing localhost, unreachable from container)
+  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
   if (backendUrl) {
     return backendUrl;
   }
