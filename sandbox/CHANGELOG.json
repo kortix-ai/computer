@@ -1,5 +1,119 @@
 [
   {
+    "version": "0.6.0",
+    "date": "2026-02-21",
+    "title": "Supabase everywhere, auth unification & security hardening",
+    "description": "Massive architecture refactor. Eliminated all local/cloud mode splits — auth is always Supabase (JWT for humans, sbt_ tokens for sandboxes). WordPress-style self-hosted installer. Every API endpoint requires authentication. Removed sak_ lock/key system. New env var model (ALLOWED_SANDBOX_PROVIDERS, INTERNAL_KORTIX_ENV, NEXT_PUBLIC_BILLING_ENABLED). pg_cron scheduler rewritten for Supabase.",
+    "changes": [
+      {
+        "type": "breaking",
+        "text": "Removed SANDBOX_PROVIDER env var — replaced by ALLOWED_SANDBOX_PROVIDERS (comma-separated list)"
+      },
+      {
+        "type": "breaking",
+        "text": "Removed sak_ (sandbox access key) lock/key system entirely"
+      },
+      {
+        "type": "breaking",
+        "text": "Removed IS_LOCAL / IS_CLOUD / EnvMode / isLocalMode() from frontend — replaced by isBillingEnabled() / isSelfHosted()"
+      },
+      {
+        "type": "breaking",
+        "text": "ENV_MODE is now only 'local' or 'cloud' — staging/prod behavior controlled by INTERNAL_KORTIX_ENV"
+      },
+      {
+        "type": "feature",
+        "text": "WordPress-style self-hosted installer — create owner account, auto-provision sandbox"
+      },
+      {
+        "type": "feature",
+        "text": "INTERNAL_KORTIX_ENV (dev/staging/prod) controls Stripe price IDs, analytics, log levels"
+      },
+      {
+        "type": "feature",
+        "text": "KORTIX_ROUTER_INTERNAL_ENABLED and KORTIX_BILLING_INTERNAL_ENABLED feature flags"
+      },
+      {
+        "type": "feature",
+        "text": "Self-hosted auth page with email/password (no magic links/OAuth)"
+      },
+      {
+        "type": "security",
+        "text": "All API endpoints now require authentication (Supabase JWT or sbt_ token)"
+      },
+      {
+        "type": "security",
+        "text": "WebSocket proxy no longer allows unauthenticated passthrough"
+      },
+      {
+        "type": "security",
+        "text": "/v1/providers, /v1/secrets, /v1/queue secured with combinedAuth"
+      },
+      {
+        "type": "security",
+        "text": "/v1/setup/* secured with supabaseAuth (except /install-status which remains public)"
+      },
+      {
+        "type": "improvement",
+        "text": "pg_cron scheduler rewritten — uses host.docker.internal for container-to-host communication"
+      },
+      {
+        "type": "improvement",
+        "text": "Frontend billing/feature gating uses NEXT_PUBLIC_BILLING_ENABLED env var"
+      },
+      {
+        "type": "improvement",
+        "text": "Postgres service deleted — everything uses Supabase (local CLI or cloud project)"
+      },
+      {
+        "type": "fix",
+        "text": "Server Action redirect() race condition — returns {success, redirectTo} instead"
+      },
+      {
+        "type": "fix",
+        "text": "Stale auth cookie loop — auth page validates session, signs out if invalid"
+      },
+      {
+        "type": "fix",
+        "text": "Default model set to anthropic/claude-sonnet-4-20250514"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/opencode-ai@0.6.0",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.6.0",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.6.0",
+        "target": "npm"
+      },
+      {
+        "name": "v0.6.0",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.6.0",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.6.0",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.6.0",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.6.0",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.5.7",
     "date": "2026-02-20",
     "title": "Command palette, wallpapers, server entries persistence & chat UX",
