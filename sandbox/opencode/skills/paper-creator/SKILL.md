@@ -132,7 +132,7 @@ The empty paper must compile cleanly. This is your baseline. Every subsequent ch
 
 ### 2a. Search for papers
 
-Load the `paper-search` skill for OpenAlex API reference. Search strategy:
+Load the `openalex-paper-search` skill for OpenAlex API reference. Search strategy:
 
 ```bash
 # Seminal/highly-cited papers

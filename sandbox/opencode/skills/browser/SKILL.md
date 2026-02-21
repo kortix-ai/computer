@@ -7,6 +7,28 @@ description: "Browser automation skill using agent-browser CLI. Use when the age
 
 Full browser control via the `agent-browser` CLI. This gives you a real Chromium instance you can drive end-to-end — navigate, click, type, screenshot, extract data, wait for elements, handle tabs, cookies, network interception, and more.
 
+## What is agent-browser?
+
+Browser automation CLI designed for AI agents. Compact text output minimizes context usage. Fast Rust CLI with Node.js fallback.
+
+### Features
+
+- **Agent-first** — Compact text output uses fewer tokens than JSON, designed for AI context efficiency
+- **Ref-based** — Snapshot returns accessibility tree with refs for deterministic element selection
+- **Fast** — Native Rust CLI for instant command parsing
+- **Complete** — 50+ commands for navigation, forms, screenshots, network, storage
+- **Sessions** — Multiple isolated browser instances with separate auth
+- **Cross-platform** — macOS, Linux, Windows with native binaries
+
+### Architecture
+
+Client-daemon architecture for optimal performance:
+
+1. **Rust CLI** — Parses commands, communicates with daemon
+2. **Node.js Daemon** — Manages Playwright browser instance
+
+Daemon starts automatically and persists between commands.
+
 ## Environment
 
 The system Chromium is pre-configured. No setup needed.
@@ -59,12 +81,14 @@ agent-browser --session check-docs open https://docs.example.com
 
 **Why refs?** The `snapshot` command returns an accessibility tree where every interactive element has a ref like `@e1`, `@e2`. Using refs is deterministic and fast — no fragile CSS selectors needed.
 
-## Command Reference
+---
+
+## Commands — Complete Reference
 
 ### Navigation
 
 ```bash
-agent-browser open <url>              # Navigate to URL
+agent-browser open <url>              # Navigate (aliases: goto, navigate)
 agent-browser back                    # Go back
 agent-browser forward                 # Go forward
 agent-browser reload                  # Reload page
@@ -103,12 +127,59 @@ agent-browser snapshot -i -c -d 5    # Combine options
 | Flag | Description |
 |------|-------------|
 | `-i, --interactive` | Only interactive elements (buttons, links, inputs) |
-| `-C, --cursor` | Include cursor-interactive elements (cursor:pointer, onclick) |
+| `-C, --cursor` | Include cursor-interactive elements (cursor:pointer, onclick, tabindex) |
 | `-c, --compact` | Remove empty structural elements |
 | `-d, --depth <n>` | Limit tree depth |
 | `-s, --selector <sel>` | Scope to CSS selector |
 
 The `-C` flag is essential for modern web apps that use custom clickable divs/spans instead of semantic buttons/links.
+
+**Cursor-Interactive Elements:**
+
+Many modern web apps use custom clickable elements (divs, spans) instead of standard buttons or links. The `-C` flag detects these by looking for:
+
+- `cursor: pointer` CSS style
+- `onclick` attribute or handler
+- `tabindex` attribute (keyboard focusable)
+
+```bash
+agent-browser snapshot -i -C
+# Output includes:
+# @e1 [button] "Submit"
+# @e2 [link] "Learn more"
+# Cursor-interactive elements:
+# @e3 [clickable] "Menu Item" [cursor:pointer, onclick]
+# @e4 [clickable] "Card" [cursor:pointer]
+```
+
+**Output Format:**
+
+The default text output is compact and AI-friendly:
+
+```
+@e1 [heading] "Example Domain" [level=1]
+@e2 [button] "Submit"
+@e3 [input type="email"] placeholder="Email"
+@e4 [link] "Learn more"
+```
+
+**Ref Lifecycle:**
+
+Refs are invalidated when the page changes. Always re-snapshot after navigation or DOM updates:
+
+```bash
+agent-browser click @e4      # Navigates to new page
+agent-browser snapshot -i    # Get fresh refs
+agent-browser click @e1      # Use new refs
+```
+
+**Snapshot Best Practices:**
+
+1. Use `-i` to reduce output to actionable elements
+2. Re-snapshot after page changes to get updated refs
+3. Scope with `-s` for specific page sections
+4. Use `-d` to limit depth on complex pages
+5. Use `-C` for SPAs with non-semantic clickable elements
 
 ### Extract Information
 
@@ -148,6 +219,14 @@ agent-browser wait --text "Welcome"   # Wait for text to appear
 agent-browser wait --url "**/dash"    # Wait for URL pattern
 agent-browser wait --load networkidle # Wait for network idle
 agent-browser wait --fn "window.ready === true"  # Wait for JS condition
+agent-browser wait --download [path]  # Wait for download to complete
+```
+
+### Downloads
+
+```bash
+agent-browser download <sel> <path>   # Click element to trigger download
+agent-browser wait --download [path]  # Wait for any download to complete
 ```
 
 ### JavaScript Evaluation
@@ -158,7 +237,21 @@ agent-browser eval "<js>" -b          # Base64-encode the JS
 agent-browser eval --stdin            # Read JS from stdin
 ```
 
-### Semantic Locators (Alternative to Refs)
+### Find Elements (Semantic Locators)
+
+Semantic locators with actions (`click`, `fill`, `check`, `hover`, `text`):
+
+```bash
+agent-browser find role <role> <action> [value]
+agent-browser find text <text> <action>
+agent-browser find label <label> <action> [value]
+agent-browser find placeholder <ph> <action> [value]
+agent-browser find testid <id> <action> [value]
+agent-browser find first <sel> <action> [value]
+agent-browser find nth <n> <sel> <action> [value]
+```
+
+Examples:
 
 ```bash
 agent-browser find role button click --name "Submit"
@@ -168,6 +261,15 @@ agent-browser find placeholder "Search..." fill "query"
 agent-browser find testid "submit-btn" click
 agent-browser find first ".item" click
 agent-browser find nth 2 "a" text
+```
+
+### Mouse
+
+```bash
+agent-browser mouse move <x> <y>      # Move mouse
+agent-browser mouse down [button]     # Press button
+agent-browser mouse up [button]       # Release button
+agent-browser mouse wheel <dy> [dx]   # Scroll wheel
 ```
 
 ### Tabs & Frames
@@ -191,6 +293,7 @@ agent-browser storage local           # Get all localStorage
 agent-browser storage local <key>     # Get specific key
 agent-browser storage local set <k> <v> # Set value
 agent-browser storage local clear     # Clear all
+agent-browser storage session         # Same for sessionStorage
 ```
 
 ### Network Interception
@@ -226,6 +329,8 @@ agent-browser dialog dismiss          # Dismiss dialog
 ### Debug
 
 ```bash
+agent-browser trace start [path]      # Start trace
+agent-browser trace stop [path]       # Stop and save trace
 agent-browser console                 # View console messages
 agent-browser console --clear         # Clear console
 agent-browser errors                  # View page errors (uncaught exceptions)
@@ -233,7 +338,122 @@ agent-browser errors --clear          # Clear errors
 agent-browser highlight <sel>         # Highlight element visually
 ```
 
-### Sessions & Parallel Browsing
+### State Management
+
+```bash
+agent-browser state save <path>       # Save auth state to file
+agent-browser state load <path>       # Load auth state from file
+agent-browser state list              # List saved state files
+agent-browser state show <file>       # Show state summary
+agent-browser state rename <old> <new> # Rename state file
+agent-browser state clear [name]      # Clear states for session name
+agent-browser state clear --all       # Clear all saved states
+agent-browser state clean --older-than <days>  # Delete old states
+```
+
+### Local Files
+
+Open local files (PDFs, HTML) using `file://` URLs:
+
+```bash
+agent-browser --allow-file-access open file:///path/to/document.pdf
+agent-browser --allow-file-access open file:///path/to/page.html
+agent-browser screenshot output.png
+```
+
+The `--allow-file-access` flag enables JavaScript to access other local files. Chromium only.
+
+### Global Options
+
+```
+--session <name>         # Isolated browser session
+--profile <path>         # Persistent browser profile directory
+--headed                 # Show browser window (not headless)
+--cdp <port|url>         # Connect via Chrome DevTools Protocol
+--auto-connect           # Auto-discover and connect to running Chrome
+--executable-path <path> # Custom browser executable
+--args <args>            # Browser launch args (comma separated)
+--user-agent <ua>        # Custom User-Agent string
+--proxy <url>            # Proxy server URL
+--headers <json>         # HTTP headers scoped to URL's origin
+--ignore-https-errors    # Ignore HTTPS certificate errors
+--allow-file-access      # Allow file:// URLs to access local files (Chromium only)
+--json                   # JSON output (for scripts)
+--debug                  # Debug output
+```
+
+### JSON Output (Machine-Readable)
+
+```bash
+agent-browser snapshot --json         # JSON accessibility tree
+agent-browser get text @e1 --json     # JSON text content
+agent-browser is visible @e2 --json   # JSON boolean
+```
+
+Note: The default text output is more compact and preferred for AI agents.
+
+---
+
+## Selectors
+
+In order of preference:
+
+### Refs (Best)
+
+Refs provide deterministic element selection from snapshots. Best for AI agents.
+
+```bash
+# 1. Get snapshot with refs
+agent-browser snapshot
+# Output:
+# - heading "Example Domain" [ref=e1] [level=1]
+# - button "Submit" [ref=e2]
+# - textbox "Email" [ref=e3]
+# - link "Learn more" [ref=e4]
+
+# 2. Use refs to interact
+agent-browser click @e2                   # Click the button
+agent-browser fill @e3 "test@example.com" # Fill the textbox
+agent-browser get text @e1                # Get heading text
+agent-browser hover @e4                   # Hover the link
+```
+
+**Why refs?**
+
+- **Deterministic** — Ref points to exact element from snapshot
+- **Fast** — No DOM re-query needed
+- **AI-friendly** — LLMs can reliably parse and use refs
+
+### CSS Selectors
+
+```bash
+agent-browser click "#id"
+agent-browser click ".class"
+agent-browser click "div > button"
+agent-browser click "[data-testid='submit']"
+```
+
+### Text & XPath
+
+```bash
+agent-browser click "text=Submit"
+agent-browser click "xpath=//button[@type='submit']"
+```
+
+### Semantic Locators
+
+```bash
+agent-browser find role button click --name "Submit"
+agent-browser find label "Email" fill "test@test.com"
+agent-browser find placeholder "Search..." fill "query"
+agent-browser find testid "submit-btn" click
+```
+
+Always prefer refs from snapshot. Fall back to CSS/text only when refs are unavailable.
+
+---
+
+## Sessions & Parallel Browsing
 
 **Every `--session` name must be unique across concurrent runs.** This prevents Chromium profile lock conflicts.
 
@@ -273,7 +493,89 @@ agent-browser --session test-signup close
 - Multiple ephemeral sessions can run in parallel without issues
 - **Always close ephemeral sessions when done** — `agent-browser --session <name> close`. This frees memory and removes clutter from the viewer. Never leave sessions open after your task is complete.
 
-### Authentication & Login
+### Session Isolation
+
+Each session has its own:
+
+- Browser instance
+- Cookies and storage
+- Navigation history
+- Authentication state
+
+### Persistent Profiles
+
+By default, browser state is lost when the browser closes. Use `--profile` to persist state across restarts:
+
+```bash
+# Use a persistent profile directory
+agent-browser --profile ~/.myapp-profile open myapp.com
+
+# Login once, then reuse the authenticated session
+agent-browser --profile ~/.myapp-profile open myapp.com/dashboard
+
+# Or via environment variable
+AGENT_BROWSER_PROFILE=~/.myapp-profile agent-browser open myapp.com
+```
+
+The profile directory stores: cookies, localStorage, IndexedDB data, service workers, browser cache, login sessions.
+
+### Session Persistence
+
+Use `--session-name` to automatically save and restore cookies and localStorage across browser restarts:
+
+```bash
+# Auto-save/load state for "twitter" session
+agent-browser --session-name twitter open twitter.com
+
+# Login once, then state persists automatically
+agent-browser --session-name twitter click "#login"
+
+# Or via environment variable
+export AGENT_BROWSER_SESSION_NAME=twitter
+agent-browser open twitter.com
+```
+
+State files are stored in `~/.agent-browser/sessions/` and automatically loaded on daemon start.
+
+**Session name rules:** Must contain only alphanumeric characters, hyphens, and underscores. No path traversal, spaces, or slashes.
+
+### State Encryption
+
+Encrypt saved state files (cookies, localStorage) using AES-256-GCM:
+
+```bash
+# Generate a 256-bit key (64 hex characters)
+openssl rand -hex 32
+
+# Set the encryption key
+export AGENT_BROWSER_ENCRYPTION_KEY=<your-64-char-hex-key>
+
+# State files are now encrypted automatically
+agent-browser --session-name secure-session open example.com
+```
+
+### State Auto-Expiration
+
+```bash
+# Set expiration (default: 30 days)
+export AGENT_BROWSER_STATE_EXPIRE_DAYS=7
+
+# Manually clean old states
+agent-browser state clean --older-than 7
+```
+
+### Session Environment Variables
+
+| Variable | Description |
+|---|---|
+| `AGENT_BROWSER_SESSION` | Browser session ID (default: "default") |
+| `AGENT_BROWSER_SESSION_NAME` | Auto-save/load state persistence name |
+| `AGENT_BROWSER_ENCRYPTION_KEY` | 64-char hex key for AES-256-GCM encryption |
+| `AGENT_BROWSER_STATE_EXPIRE_DAYS` | Auto-delete states older than N days (default: 30) |
+
+---
+
+## Authentication & Login
 
 **Primary session `kortix` (persistent — preferred for authenticated work):**
 
@@ -309,125 +611,18 @@ Ephemeral sessions don't have the persistent profile, but you can copy auth stat
 agent-browser --session kortix state save /workspace/.browser-auth.json
 
 # Load it into an ephemeral session
-agent-browser --session worker-$(date +%s) state load /workspace/.browser-auth.json
-agent-browser --session worker-1234 open https://app.example.com/dashboard
+agent-browser --session worker-1 state load /workspace/.browser-auth.json
+agent-browser --session worker-1 open https://app.example.com/dashboard
 ```
 
-**API token auth (no login needed):**
+**Authenticated headers (API token auth, no login needed):**
 
 ```bash
-# Set auth headers scoped to origin (not leaked to other domains)
+# Headers scoped to origin (not leaked to other domains)
 agent-browser --session kortix open api.example.com --headers '{"Authorization": "Bearer <token>"}'
-
-# Works with ephemeral sessions too
-agent-browser --session api-task-$(date +%s) open api.example.com --headers '{"Authorization": "Bearer <token>"}'
 ```
 
-### JSON Output (Machine-Readable)
-
-```bash
-agent-browser snapshot --json         # JSON accessibility tree
-agent-browser get text @e1 --json     # JSON text content
-agent-browser is visible @e2 --json   # JSON boolean
-```
-
-## Selector Types
-
-In order of preference:
-
-1. **Refs** (best) — `@e1`, `@e2` from snapshot output. Deterministic, fast.
-2. **CSS selectors** — `"#id"`, `".class"`, `"div > button"`
-3. **Text selectors** — `"text=Submit"`
-4. **XPath** — `"xpath=//button[@type='submit']"`
-5. **Semantic locators** — `find role button click --name "Submit"`
-
-Always prefer refs from snapshot. Fall back to CSS/text only when refs are unavailable.
-
-## Common Patterns
-
-### Login Flow
-
-```bash
-agent-browser open https://app.example.com/login
-agent-browser snapshot -i
-# Output shows: textbox "Email" [ref=e1], textbox "Password" [ref=e2], button "Sign In" [ref=e3]
-agent-browser fill @e1 "user@example.com"
-agent-browser fill @e2 "password123"
-agent-browser click @e3
-agent-browser wait --load networkidle
-agent-browser snapshot -i
-```
-
-### Form Submission
-
-```bash
-agent-browser open https://example.com/form
-agent-browser snapshot -i
-agent-browser fill @e1 "John Doe"
-agent-browser fill @e2 "john@example.com"
-agent-browser select @e3 "premium"
-agent-browser check @e4
-agent-browser click @e5
-agent-browser wait --text "Thank you"
-agent-browser screenshot confirmation.png
-```
-
-### Data Extraction / Scraping
-
-```bash
-agent-browser open https://example.com/products
-agent-browser snapshot -c
-agent-browser eval "JSON.stringify([...document.querySelectorAll('.product')].map(p => ({name: p.querySelector('h2').textContent, price: p.querySelector('.price').textContent})))"
-```
-
-### E2E Testing
-
-```bash
-agent-browser open http://localhost:3000
-agent-browser snapshot -i
-agent-browser click @e1                    # Click nav link
-agent-browser wait --load networkidle
-agent-browser get url                      # Verify URL changed
-agent-browser get text @e2                 # Verify content
-agent-browser screenshot test-result.png
-agent-browser close
-```
-
-### Screenshot for Visual Verification
-
-```bash
-agent-browser open https://example.com
-agent-browser wait --load networkidle
-agent-browser screenshot page.png
-agent-browser screenshot --full full-page.png
-```
-
-### Working with SPAs (Single Page Apps)
-
-```bash
-agent-browser open https://spa-app.com
-agent-browser wait --load networkidle
-agent-browser snapshot -i -C              # -C catches onclick divs
-agent-browser click @e5
-agent-browser wait --fn "document.querySelector('.loaded') !== null"
-agent-browser snapshot -i -C
-```
-
-### Network Monitoring
-
-```bash
-agent-browser open https://example.com
-agent-browser network requests --filter api
-# See all API calls the page made
-```
-
-### Mobile Device Emulation
-
-```bash
-agent-browser set device "iPhone 14"
-agent-browser open https://example.com
-agent-browser screenshot mobile.png
-```
+---
 
 ## Browser Viewer & Live Streaming
 
@@ -453,11 +648,371 @@ http://localhost:9224?session=login-github    ← specific ephemeral session
 ```
 Always include the `?session=` parameter when telling the human to check the viewer, so they land on the correct tab immediately.
 
-**WebSocket protocol** (for programmatic access):
-- Default session stream: `ws://localhost:9223`
-- Named session streams: auto-assigned ports (check `/workspace/.agent-browser/<session>.stream`)
-- Frame format: `{"type": "frame", "data": "<base64-jpeg>", "metadata": {...}}`
-- Input format: `{"type": "input_mouse", "eventType": "mousePressed", "x": 100, "y": 200, ...}`
+### Streaming / WebSocket Protocol
+
+Enable streaming for programmatic access or live preview:
+
+```bash
+AGENT_BROWSER_STREAM_PORT=9223 agent-browser open example.com
+```
+
+The server streams viewport frames and accepts input events (mouse, keyboard, touch). Connect to `ws://localhost:9223` to receive frames and send input.
+
+**Named session streams:** auto-assigned ports (check `/workspace/.agent-browser/<session>.stream`)
+
+**Frame messages:**
+
+```json
+{
+  "type": "frame",
+  "data": "<base64-encoded-jpeg>",
+  "metadata": {
+    "deviceWidth": 1280,
+    "deviceHeight": 720,
+    "pageScaleFactor": 1,
+    "offsetTop": 0,
+    "scrollOffsetX": 0,
+    "scrollOffsetY": 0
+  }
+}
+```
+
+**Status messages:**
+
+```json
+{
+  "type": "status",
+  "connected": true,
+  "screencasting": true,
+  "viewportWidth": 1280,
+  "viewportHeight": 720
+}
+```
+
+**Input injection — mouse events:**
+
+```json
+{ "type": "input_mouse", "eventType": "mousePressed", "x": 100, "y": 200, "button": "left", "clickCount": 1 }
+{ "type": "input_mouse", "eventType": "mouseReleased", "x": 100, "y": 200, "button": "left" }
+{ "type": "input_mouse", "eventType": "mouseMoved", "x": 150, "y": 250 }
+{ "type": "input_mouse", "eventType": "mouseWheel", "x": 100, "y": 200, "deltaX": 0, "deltaY": 100 }
+```
+
+**Input injection — keyboard events:**
+
+```json
+{ "type": "input_keyboard", "eventType": "keyDown", "key": "Enter", "code": "Enter" }
+{ "type": "input_keyboard", "eventType": "keyUp", "key": "Enter", "code": "Enter" }
+{ "type": "input_keyboard", "eventType": "char", "text": "a" }
+{ "type": "input_keyboard", "eventType": "keyDown", "key": "c", "code": "KeyC", "modifiers": 2 }
+```
+
+Modifier flags: 1=Alt, 2=Ctrl, 4=Meta, 8=Shift.
+
+**Input injection — touch events:**
+
+```json
+{ "type": "input_touch", "eventType": "touchStart", "touchPoints": [{ "x": 100, "y": 200 }] }
+{ "type": "input_touch", "eventType": "touchMove", "touchPoints": [{ "x": 150, "y": 250 }] }
+{ "type": "input_touch", "eventType": "touchEnd", "touchPoints": [] }
+{ "type": "input_touch", "eventType": "touchStart", "touchPoints": [{ "x": 100, "y": 200, "id": 0 }, { "x": 200, "y": 200, "id": 1 }] }
+```
+
+**Streaming use cases:**
+- Pair browsing — Human watches and assists AI agent in real-time
+- Remote preview — View browser output in a separate UI
+- Recording — Capture frames for video generation
+- Mobile testing — Inject touch events for mobile emulation
+- Accessibility testing — Manual interaction during automated tests
+
+---
+
+## CDP Mode
+
+Connect to an existing browser via Chrome DevTools Protocol:
+
+```bash
+# Start Chrome with: google-chrome --remote-debugging-port=9222
+
+# Connect once, then run commands without --cdp
+agent-browser connect 9222
+agent-browser snapshot
+agent-browser tab
+agent-browser close
+
+# Or pass --cdp on each command
+agent-browser --cdp 9222 snapshot
+```
+
+### Remote WebSocket URLs
+
+Connect to remote browser services via WebSocket URL:
+
+```bash
+# Connect to remote browser service
+agent-browser --cdp "wss://browser-service.com/cdp?token=..." snapshot
+
+# Works with any CDP-compatible service
+agent-browser --cdp "ws://localhost:9222/devtools/browser/abc123" open example.com
+```
+
+The `--cdp` flag accepts either:
+- A port number (e.g., `9222`) for local connections via `http://localhost:{port}`
+- A full WebSocket URL (e.g., `wss://...` or `ws://...`) for remote browser services
+
+### Auto-Connect
+
+Use `--auto-connect` to automatically discover and connect to a running Chrome instance without specifying a port:
+
+```bash
+# Auto-discover running Chrome with remote debugging
+agent-browser --auto-connect open example.com
+agent-browser --auto-connect snapshot
+
+# Or via environment variable
+AGENT_BROWSER_AUTO_CONNECT=1 agent-browser snapshot
+```
+
+Auto-connect discovers Chrome by:
+1. Reading Chrome's `DevToolsActivePort` file from the default user data directory
+2. Falling back to probing common debugging ports (9222, 9229)
+
+### CDP Use Cases
+
+Control of: Electron apps, Chrome/Chromium with remote debugging, WebView2 applications, remote browser services (via WebSocket URL), any browser exposing a CDP endpoint.
+
+### Cloud Providers
+
+Use cloud browser infrastructure when local browsers aren't available:
+
+```bash
+# Browserbase
+export BROWSERBASE_API_KEY="your-api-key"
+export BROWSERBASE_PROJECT_ID="your-project-id"
+agent-browser -p browserbase open https://example.com
+
+# Browser Use
+export BROWSER_USE_API_KEY="your-api-key"
+agent-browser -p browseruse open https://example.com
+
+# Kernel
+export KERNEL_API_KEY="your-api-key"
+agent-browser -p kernel open https://example.com
+
+# Or via environment variable
+export AGENT_BROWSER_PROVIDER=browserbase
+agent-browser open https://example.com
+```
+
+---
+
+## iOS Simulator
+
+Control real Mobile Safari in the iOS Simulator for authentic mobile web testing. Uses Appium with XCUITest for native automation.
+
+### Requirements
+
+- macOS with Xcode installed
+- iOS Simulator runtimes (download via Xcode)
+- Appium with XCUITest driver
+
+### Setup
+
+```bash
+# Install Appium globally
+npm install -g appium
+
+# Install the XCUITest driver for iOS
+appium driver install xcuitest
+```
+
+### List Available Devices
+
+```bash
+agent-browser device list
+```
+
+### Basic Usage
+
+Use the `-p ios` flag to enable iOS mode. The workflow is identical to desktop:
+
+```bash
+# Launch Safari on iPhone 16 Pro
+agent-browser -p ios --device "iPhone 16 Pro" open https://example.com
+
+# Get snapshot with refs (same as desktop)
+agent-browser -p ios snapshot -i
+
+# Interact using refs
+agent-browser -p ios tap @e1
+agent-browser -p ios fill @e2 "text"
+
+# Take screenshot
+agent-browser -p ios screenshot mobile.png
+
+# Close session (shuts down simulator)
+agent-browser -p ios close
+```
+
+### Mobile-Specific Commands
+
+```bash
+# Swipe gestures
+agent-browser -p ios swipe up
+agent-browser -p ios swipe down
+agent-browser -p ios swipe left
+agent-browser -p ios swipe right
+
+# Swipe with distance (pixels)
+agent-browser -p ios swipe up 500
+
+# Tap (alias for click, semantically clearer for touch)
+agent-browser -p ios tap @e1
+```
+
+### iOS Environment Variables
+
+```bash
+export AGENT_BROWSER_PROVIDER=ios
+export AGENT_BROWSER_IOS_DEVICE="iPhone 16 Pro"
+```
+
+| Variable | Description |
+|---|---|
+| `AGENT_BROWSER_PROVIDER` | Set to `ios` to enable iOS mode |
+| `AGENT_BROWSER_IOS_DEVICE` | Device name (e.g., "iPhone 16 Pro") |
+| `AGENT_BROWSER_IOS_UDID` | Device UDID (alternative to device name) |
+
+### iOS vs Desktop Differences
+
+| Feature | Desktop | iOS |
+|---|---|---|
+| Browser | Chromium/Firefox/WebKit | Safari only |
+| Tabs | Supported | Single tab only |
+| PDF export | Supported | Not supported |
+| Screencast | Supported | Not supported |
+| Swipe gestures | Not native | Native support |
+
+### Real Device Support
+
+Appium can control Safari on real iOS devices connected via USB:
+
+```bash
+# Get device UDID
+xcrun xctrace list devices
+
+# Use with agent-browser
+agent-browser -p ios --device "<DEVICE_UDID>" open https://example.com
+```
+
+Requires signing WebDriverAgent with your Apple Developer certificate (one-time Xcode setup).
+
+### iOS Performance Notes
+
+- **First launch:** 30-60 seconds to boot the simulator and start Appium
+- **Subsequent commands:** Fast (simulator stays running)
+- **Close command:** Shuts down simulator and Appium server
+
+---
+
+## Common Patterns
+
+### Login Flow
+
+```bash
+agent-browser --session kortix open https://app.example.com/login
+agent-browser --session kortix snapshot -i
+# Output shows: textbox "Email" [ref=e1], textbox "Password" [ref=e2], button "Sign In" [ref=e3]
+agent-browser --session kortix fill @e1 "user@example.com"
+agent-browser --session kortix fill @e2 "password123"
+agent-browser --session kortix click @e3
+agent-browser --session kortix wait --load networkidle
+agent-browser --session kortix snapshot -i
+```
+
+### Form Submission
+
+```bash
+agent-browser --session kortix open https://example.com/form
+agent-browser --session kortix snapshot -i
+agent-browser --session kortix fill @e1 "John Doe"
+agent-browser --session kortix fill @e2 "john@example.com"
+agent-browser --session kortix select @e3 "premium"
+agent-browser --session kortix check @e4
+agent-browser --session kortix click @e5
+agent-browser --session kortix wait --text "Thank you"
+agent-browser --session kortix screenshot confirmation.png
+```
+
+### Data Extraction / Scraping
+
+```bash
+agent-browser --session scrape-products open https://example.com/products
+agent-browser --session scrape-products snapshot -c
+agent-browser --session scrape-products eval "JSON.stringify([...document.querySelectorAll('.product')].map(p => ({name: p.querySelector('h2').textContent, price: p.querySelector('.price').textContent})))"
+agent-browser --session scrape-products close
+```
+
+### E2E Testing
+
+```bash
+agent-browser --session test-app open http://localhost:3000
+agent-browser --session test-app snapshot -i
+agent-browser --session test-app click @e1                    # Click nav link
+agent-browser --session test-app wait --load networkidle
+agent-browser --session test-app get url                      # Verify URL changed
+agent-browser --session test-app get text @e2                 # Verify content
+agent-browser --session test-app screenshot test-result.png
+agent-browser --session test-app close
+```
+
+### Working with SPAs (Single Page Apps)
+
+```bash
+agent-browser --session kortix open https://spa-app.com
+agent-browser --session kortix wait --load networkidle
+agent-browser --session kortix snapshot -i -C              # -C catches onclick divs
+agent-browser --session kortix click @e5
+agent-browser --session kortix wait --fn "document.querySelector('.loaded') !== null"
+agent-browser --session kortix snapshot -i -C
+```
+
+### Network Monitoring
+
+```bash
+agent-browser --session kortix open https://example.com
+agent-browser --session kortix network requests --filter api
+# See all API calls the page made
+```
+
+### Mobile Device Emulation
+
+```bash
+agent-browser --session kortix set device "iPhone 14"
+agent-browser --session kortix open https://example.com
+agent-browser --session kortix screenshot mobile.png
+```
+
+### Structured Data via JS
+
+```bash
+agent-browser --session kortix eval "JSON.stringify([...document.querySelectorAll('tr')].map(r => [...r.querySelectorAll('td')].map(c => c.textContent.trim())))"
+```
+
+---
+
+## Error Handling
+
+When something goes wrong:
+
+1. **Element not found** — Re-snapshot. The page may have changed. Try `-C` flag. Try CSS selector fallback.
+2. **Click intercepted** — A modal or overlay is blocking. Snapshot to see what's in the way. Dismiss it, scroll, or wait.
+3. **Timeout** — Page is slow. Increase wait time. Check network: `agent-browser network requests`.
+4. **Navigation failed** — Check URL. Try with `--ignore-https-errors` for self-signed certs.
+5. **Captcha/bot detection** — Screenshot to show the user. Try setting a realistic user agent: `agent-browser --user-agent "Mozilla/5.0..."`.
+6. **Page crash** — `agent-browser close` and start fresh.
+
+---
 
 ## Tips
 
@@ -476,3 +1031,6 @@ Always include the `?session=` parameter when telling the human to check the vie
 13. **Never close the `kortix` session unless intentional** — It's the shared browser the human sees.
 14. **Link to the right session** — When telling the human to check the viewer, always use `http://localhost:9224?session=<name>` so they land on the correct tab.
 15. **Name sessions for the human** — The human sees session names as tabs. Use descriptive names like `login-stripe`, `debug-api`, `fill-form` — never random IDs or timestamps.
+16. **Use headed mode for debugging** — `agent-browser open example.com --headed` shows the browser window.
+17. **Use traces for complex debugging** — `agent-browser trace start` captures a Playwright trace you can replay.
+18. **Full page as markdown** — For content-heavy pages, `scrape-webpage` may be faster than browser extraction. Use the browser only when you need JS-rendered content, interaction before extraction, or screenshots.

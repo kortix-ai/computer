@@ -34,7 +34,7 @@ const SKILLS_DIR = resolve(
   dirname(new URL(import.meta.url).pathname),
   "..",
   "skills",
-  "presentation-viewer",
+  "presentations",
 );
 
 interface SlideMetadata {
@@ -426,7 +426,7 @@ function doPreview(base: string, presentationName: string): string {
   if (!existsSync(serverScript))
     return JSON.stringify({
       success: false,
-      error: "Viewer server script not found. Check .opencode/skills/presentation-viewer/serve.ts",
+      error: "Viewer server script not found. Check .opencode/skills/presentations/serve.ts",
     });
 
   try {
