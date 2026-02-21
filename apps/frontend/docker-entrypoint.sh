@@ -24,22 +24,22 @@ RUNTIME_BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL:-}"
 # ── Detect baked values from the bundle ────────────────────────────────────────
 # The Supabase client is created via createBrowserClient("URL","KEY").
 # We extract the baked URL and key from the compiled JS.
-REFERENCE_FILE=$(find "$BUNDLE_DIR/static/chunks" -name '*.js' -exec grep -l 'createBrowserClient' {} \; | head -1)
+REFERENCE_FILE=$(grep -rl 'createBrowserClient' "$BUNDLE_DIR/static/chunks/" 2>/dev/null | head -1)
 
 BAKED_SUPABASE_URL=""
 BAKED_ANON_KEY=""
 if [ -n "$REFERENCE_FILE" ]; then
-  # Extract: createBrowserClient)("URL","KEY"
-  BAKED_SUPABASE_URL=$(grep -oP 'createBrowserClient\)\("\K[^"]+' "$REFERENCE_FILE" | head -1)
-  BAKED_ANON_KEY=$(grep -oP 'createBrowserClient\)\("[^"]+","\K[^"]+' "$REFERENCE_FILE" | head -1)
+  # Extract: createBrowserClient)("URL","KEY")
+  # Use grep -oP to extract the URL and key from the JS source
+  BAKED_SUPABASE_URL=$(grep -oP 'createBrowserClient\)\("\K[^"]+' "$REFERENCE_FILE" 2>/dev/null | head -1)
+  BAKED_ANON_KEY=$(grep -oP 'createBrowserClient\)\("[^"]+","\K[^"]+' "$REFERENCE_FILE" 2>/dev/null | head -1)
 fi
 
-# Backend URL: detect from bundle (look for /v1 API pattern)
+# Backend URL: detect the most common http(s)://host/v1 pattern in the bundle
 BAKED_BACKEND=""
 BAKED_HOST=""
 if [ -n "$RUNTIME_BACKEND_URL" ]; then
-  # Look for the common pattern: fetch("http://something/v1/...")
-  BAKED_BACKEND=$(grep -ohP 'https?://[^/"\s]+/v1(?=["/])' "$BUNDLE_DIR/static/chunks/"*.js 2>/dev/null | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
+  BAKED_BACKEND=$(grep -rohP 'https?://[^/"\x27\s]+/v1(?=["/])' "$BUNDLE_DIR/static/chunks/" 2>/dev/null | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
   if [ -n "$BAKED_BACKEND" ]; then
     BAKED_HOST=$(echo "$BAKED_BACKEND" | sed 's|/v1$||')
   fi
@@ -71,29 +71,29 @@ if [ "$needs_rewrite" = "true" ]; then
     RUNTIME_HOST=$(echo "${RUNTIME_BACKEND_URL%/}" | sed 's|/v1$||')
   fi
 
-  find "$BUNDLE_DIR" -name '*.js' -o -name '*.html' | while read -r file; do
-    SED_ARGS=""
+  # Build a sed script file to avoid shell escaping issues with URLs
+  SED_SCRIPT=$(mktemp)
 
-    # Backend URL
-    if [ -n "$BAKED_BACKEND" ] && [ -n "$RUNTIME_BACKEND_URL" ] && [ "$RUNTIME_BACKEND_URL" != "$BAKED_BACKEND" ]; then
-      SED_ARGS="$SED_ARGS -e s|${BAKED_BACKEND}|${RUNTIME_BACKEND_URL%/}|g"
-      SED_ARGS="$SED_ARGS -e s|${BAKED_HOST}|${RUNTIME_HOST}|g"
-    fi
+  if [ -n "$BAKED_BACKEND" ] && [ -n "$RUNTIME_BACKEND_URL" ] && [ "$RUNTIME_BACKEND_URL" != "$BAKED_BACKEND" ]; then
+    printf 's|%s|%s|g\n' "$BAKED_BACKEND" "${RUNTIME_BACKEND_URL%/}" >> "$SED_SCRIPT"
+    printf 's|%s|%s|g\n' "$BAKED_HOST" "$RUNTIME_HOST" >> "$SED_SCRIPT"
+  fi
 
-    # Supabase URL
-    if [ -n "$BAKED_SUPABASE_URL" ] && [ -n "$RUNTIME_SUPABASE_URL" ] && [ "$RUNTIME_SUPABASE_URL" != "$BAKED_SUPABASE_URL" ]; then
-      SED_ARGS="$SED_ARGS -e s|${BAKED_SUPABASE_URL}|${RUNTIME_SUPABASE_URL}|g"
-    fi
+  if [ -n "$BAKED_SUPABASE_URL" ] && [ -n "$RUNTIME_SUPABASE_URL" ] && [ "$RUNTIME_SUPABASE_URL" != "$BAKED_SUPABASE_URL" ]; then
+    printf 's|%s|%s|g\n' "$BAKED_SUPABASE_URL" "$RUNTIME_SUPABASE_URL" >> "$SED_SCRIPT"
+  fi
 
-    # Supabase anon key
-    if [ -n "$BAKED_ANON_KEY" ] && [ -n "$RUNTIME_ANON_KEY" ] && [ "$RUNTIME_ANON_KEY" != "$BAKED_ANON_KEY" ]; then
-      SED_ARGS="$SED_ARGS -e s|${BAKED_ANON_KEY}|${RUNTIME_ANON_KEY}|g"
-    fi
+  if [ -n "$BAKED_ANON_KEY" ] && [ -n "$RUNTIME_ANON_KEY" ] && [ "$RUNTIME_ANON_KEY" != "$BAKED_ANON_KEY" ]; then
+    printf 's|%s|%s|g\n' "$BAKED_ANON_KEY" "$RUNTIME_ANON_KEY" >> "$SED_SCRIPT"
+  fi
 
-    if [ -n "$SED_ARGS" ]; then
-      eval sed -i $SED_ARGS "\"$file\""
-    fi
-  done
+  if [ -s "$SED_SCRIPT" ]; then
+    find "$BUNDLE_DIR" -name '*.js' -o -name '*.html' | while read -r file; do
+      sed -i -f "$SED_SCRIPT" "$file"
+    done
+  fi
+
+  rm -f "$SED_SCRIPT"
 
   echo "[entrypoint] Rewrite complete"
 else
