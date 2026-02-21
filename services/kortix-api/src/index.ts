@@ -310,20 +310,19 @@ console.log(`
 ╚═══════════════════════════════════════════════════════════╝
 `);
 
-bootstrapLocalIdentity().catch((err) => console.error('[startup] Local identity bootstrap failed:', err));
-startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
-startChannelService();
-startDrainer();
 // Ensure DB schema exists before starting services that depend on it.
 // This is idempotent — safe to run on every startup.
 ensureSchema()
-  .then(() => {
+  .then(async () => {
+    // Bootstrap local identity AFTER schema push so the sandboxes table exists
+    await bootstrapLocalIdentity().catch((err) => console.error('[startup] Local identity bootstrap failed:', err));
     startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
     startChannelService();
     startDrainer();
   })
-  .catch((err) => {
+  .catch(async (err) => {
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
+    await bootstrapLocalIdentity().catch((e) => console.error('[startup] Local identity bootstrap failed:', e));
     startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
     startChannelService();
     startDrainer();

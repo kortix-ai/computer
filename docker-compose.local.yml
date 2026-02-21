@@ -38,7 +38,6 @@ services:
       - POSTGRES_DB=postgres
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./services/postgres/init:/docker-entrypoint-initdb.d:ro
     command: >
       postgres
       -c shared_preload_libraries=pg_cron,pg_net
@@ -104,6 +103,11 @@ services:
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:-}
       # ─── Database (connects to the postgres service) ───────────────────
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      # ─── Integrations (Pipedream Connect — optional) ─────────────────
+      - PIPEDREAM_CLIENT_ID=${PIPEDREAM_CLIENT_ID:-}
+      - PIPEDREAM_CLIENT_SECRET=${PIPEDREAM_CLIENT_SECRET:-}
+      - PIPEDREAM_PROJECT_ID=${PIPEDREAM_PROJECT_ID:-}
+      - PIPEDREAM_ENVIRONMENT=${PIPEDREAM_ENVIRONMENT:-development}
       # ─── pg_cron scheduler ─────────────────────────────────────────────
       - CRON_API_URL=http://kortix-api:8008
       - CRON_TICK_SECRET=local-dev-cron-secret

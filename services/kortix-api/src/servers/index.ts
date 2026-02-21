@@ -13,11 +13,12 @@
 
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
-import { serverEntries, accountUser } from '@kortix/db';
+import { serverEntries } from '@kortix/db';
 import type { AppEnv } from '../types';
 import { db } from '../shared/db';
 import { config } from '../config';
 import { supabaseAuth } from '../middleware/auth';
+import { resolveAccountId } from '../shared/resolve-account';
 
 export const serversApp = new Hono<AppEnv>();
 
@@ -25,20 +26,6 @@ export const serversApp = new Hono<AppEnv>();
 // In cloud mode: require Supabase JWT. In local mode: inject static userId.
 
 serversApp.use('/*', supabaseAuth);
-
-// ─── Resolve userId → accountId ─────────────────────────────────────────────
-
-async function resolveAccountId(userId: string): Promise<string> {
-  if (config.isLocal()) return userId; // local mode: userId IS the accountId
-
-  const [membership] = await db
-    .select({ accountId: accountUser.accountId })
-    .from(accountUser)
-    .where(eq(accountUser.userId, userId))
-    .limit(1);
-
-  return membership?.accountId ?? userId;
-}
 
 // ─── Static routes MUST come before parameterized /:id routes ───────────────
 

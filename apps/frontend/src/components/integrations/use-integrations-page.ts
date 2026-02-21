@@ -78,6 +78,10 @@ export function useIntegrationsPage(): any {
     return map;
   }, [defaultApps, apps]);
 
+  // Stable ref for connectionsByApp to avoid re-creating handleConnect on every refetch
+  const connectionsByAppRef = useRef(connectionsByApp);
+  connectionsByAppRef.current = connectionsByApp;
+
   const handleConnect = useCallback(
     async (app: IntegrationApp) => {
       setConnectingApp(app.slug);
@@ -98,7 +102,7 @@ export function useIntegrationsPage(): any {
             id: string;
           }) => {
             try {
-              const existing = connectionsByApp.get(app.slug) || [];
+              const existing = connectionsByAppRef.current.get(app.slug) || [];
               let label: string | undefined;
               if (existing.length > 0) {
                 label = `${app.name} Account ${existing.length + 1}`;
@@ -124,16 +128,22 @@ export function useIntegrationsPage(): any {
         autoConnectSandboxId.current = null;
       }
     },
-    [createToken, saveConnection, user, connectionsByApp],
+    // connectionsByApp removed — we use a ref instead to avoid dependency churn
+    [createToken, saveConnection, user],
   );
 
+  // Auto-connect from URL params (e.g. ?connect=gmail&sandbox_id=xxx)
+  // Reads params once, clears URL immediately, fires connect.
   useEffect(() => {
     const connectApp = searchParams.get('connect');
     if (!connectApp || autoConnectTriggered.current || !user || appsLoading) return;
     autoConnectTriggered.current = true;
 
     autoConnectSandboxId.current = searchParams.get('sandbox_id');
-    router.replace('/integrations', { scroll: false });
+
+    // Clear query params from URL immediately to stop Next.js prefetch spam.
+    // Use window.history directly to avoid React re-render cycles from router.replace.
+    window.history.replaceState(window.history.state, '', '/integrations');
 
     const app = apps.find((a) => a.slug === connectApp);
     if (app) {
@@ -145,7 +155,8 @@ export function useIntegrationsPage(): any {
         categories: [],
       } as IntegrationApp);
     }
-  }, [searchParams, user, apps, appsLoading, handleConnect, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user, appsLoading]);
 
   const handleManage = useCallback(
     (connection: IntegrationConnection) => {

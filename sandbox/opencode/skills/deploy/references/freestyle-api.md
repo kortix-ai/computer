@@ -7,7 +7,7 @@ All deployment operations go through the Kortix API. Freestyle is used as the de
 ```bash
 # Strip /router from KORTIX_API_URL
 BASE_URL="${KORTIX_API_URL%/router}"
-# e.g. https://api.kortix.ai/v1  or  http://kortix-api:8008/v1
+# e.g. http://localhost:8008/v1  or  http://kortix-api:8008/v1
 ```
 
 ## Authentication

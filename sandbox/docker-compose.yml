@@ -6,6 +6,20 @@
 #
 # Default host port range: 14000-14006
 # If you already have something running on that range, edit the mappings below.
+#
+# ── Networking ──────────────────────────────────────────────────────────────
+#
+# Two dev scenarios:
+#
+#   1. API running on host (pnpm run dev)  →  default, no extra config needed
+#      Sandbox reaches API via host.docker.internal:8008
+#
+#   2. API running in Docker (kortix stack) →  set KORTIX_NETWORK to join
+#      the API's Docker network so sandbox can use Docker DNS (kortix-api:8008)
+#
+#      KORTIX_NETWORK=kortix_default docker compose up
+#
+# ────────────────────────────────────────────────────────────────────────────
 
 services:
   desktop:
@@ -18,6 +32,9 @@ services:
       - SYS_ADMIN
     security_opt:
       - seccomp=unconfined
+    extra_hosts:
+      # Ensures host.docker.internal works on Linux too (macOS/Windows have it built-in)
+      - "host.docker.internal:host-gateway"
     environment:
       - PUID=1000
       - PGID=1000
@@ -29,8 +46,8 @@ services:
       - DISPLAY=:1
       - LSS_DIR=/workspace/.lss
       - KORTIX_WORKSPACE=/workspace
-      # Kortix Master
-      - KORTIX_API_URL=${KORTIX_API_URL:-https://api.kortix.ai/v1/router}
+      # Default: API on host (pnpm run dev). Override for Docker-to-Docker.
+      - KORTIX_API_URL=${KORTIX_API_URL:-http://host.docker.internal:8008/v1/router}
       - KORTIX_TOKEN=${KORTIX_TOKEN:-}
       - SANDBOX_ID=${SANDBOX_ID:-local}
       - PROJECT_ID=${PROJECT_ID:-local}

@@ -11,7 +11,7 @@
 
 import { Hono } from 'hono';
 import { eq, and, desc, inArray } from 'drizzle-orm';
-import { sandboxes, accountUser, type Database } from '@kortix/db';
+import { sandboxes, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
 import { generateSandboxToken } from '../services/token';
 import { supabaseAuth as authMiddleware } from '../../middleware/auth';
@@ -23,6 +23,7 @@ import {
   type SandboxProvider,
 } from '../providers';
 import type { AuthVariables } from '../../types';
+import { resolveAccountId as defaultResolveAccountId } from '../../shared/resolve-account';
 
 // ─── Dependency Injection ────────────────────────────────────────────────────
 
@@ -33,16 +34,6 @@ export interface AccountRouterDeps {
   getAvailableProviders: () => ProviderName[];
   resolveAccountId: (userId: string) => Promise<string>;
   useAuth: boolean;
-}
-
-async function defaultResolveAccountId(userId: string): Promise<string> {
-  const [membership] = await defaultDb
-    .select({ accountId: accountUser.accountId })
-    .from(accountUser)
-    .where(eq(accountUser.userId, userId))
-    .limit(1);
-
-  return membership?.accountId ?? userId;
 }
 
 const defaultDeps: AccountRouterDeps = {

@@ -1,25 +1,23 @@
 /**
- * Ensures the database schema is up-to-date using Drizzle migrations.
+ * Ensures the database schema is up-to-date using `drizzle-kit push`.
  *
- * In local mode (Docker installer), runs pending drizzle migrations on
- * every API startup. This handles the case where the postgres volume
- * already has data but is missing newer schema changes.
+ * This is the Prisma-style "declarative" approach: the schema definitions
+ * in packages/db/src/schema/ are the single source of truth.
+ * On every local-mode startup, we diff the live DB against the schema
+ * and apply any changes — no migration files needed.
  *
- * In cloud mode, migrations are managed externally (CI/CD, Supabase
- * dashboard) so this is a no-op.
+ * drizzle.config.ts has schemaFilter: ['kortix', 'public'] so it pushes
+ * both the kortix schema tables AND the public schema billing tables.
  *
- * Single source of truth: packages/db/src/schema/kortix.ts + drizzle migrations.
+ * In cloud mode, migrations are managed externally so this is a no-op.
  */
 
 import { join } from 'node:path';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import postgres from 'postgres';
 import { config } from './config';
 
 export async function ensureSchema(): Promise<void> {
   if (!config.DATABASE_URL) {
-    console.log('[migrate] No DATABASE_URL configured — skipping');
+    console.log('[schema] No DATABASE_URL configured — skipping');
     return;
   }
 
@@ -28,23 +26,43 @@ export async function ensureSchema(): Promise<void> {
     return;
   }
 
-  const migrationsFolder = join(import.meta.dir, '../../../packages/db/drizzle');
+  console.log('[schema] Pushing schema to database...');
 
-  const client = postgres(config.DATABASE_URL, {
-    max: 1,
-    idle_timeout: 5,
-    connect_timeout: 10,
-    onnotice: () => {},
-  });
+  const dbPkgRoot = join(import.meta.dir, '../../../packages/db');
+  const configPath = join(dbPkgRoot, 'drizzle.config.ts');
 
-  const db = drizzle(client);
+  // Use bun to run drizzle-kit from the root node_modules (packages/db has
+  // no local node_modules in the production image). The --config flag points
+  // at the config in packages/db which references schema files relative to itself.
+  const proc = Bun.spawn(
+    ['bun', 'drizzle-kit', 'push', '--force', '--config', configPath],
+    {
+      cwd: dbPkgRoot,
+      env: {
+        ...process.env,
+        DATABASE_URL: config.DATABASE_URL,
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
 
-  try {
-    await migrate(db, { migrationsFolder });
-    console.log('[migrate] Drizzle migrations applied');
-  } catch (err: any) {
-    console.error('[migrate] Migration failed:', err.message || err);
-  } finally {
-    await client.end();
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0) {
+    console.error('[schema] Push failed (exit', exitCode + ')');
+    if (stdout.trim()) console.error('[schema] stdout:', stdout.trim());
+    if (stderr.trim()) console.error('[schema] stderr:', stderr.trim());
+  } else {
+    console.log('[schema] Schema pushed successfully');
+    if (stdout.trim()) {
+      // Log just the summary lines, not verbose output
+      const summary = stdout.trim().split('\n').filter(l => l.includes('changes applied') || l.includes('CREATE') || l.includes('ALTER') || l.includes('No changes'));
+      if (summary.length) console.log('[schema]', summary.join(' | '));
+    }
   }
 }

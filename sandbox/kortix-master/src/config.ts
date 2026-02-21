@@ -22,7 +22,7 @@ export const config = {
   OPENCODE_PORT: parseInt(process.env.OPENCODE_PORT || '4096'),
 
   // Kortix backend
-  KORTIX_API_URL: process.env.KORTIX_API_URL || 'https://api.kortix.ai/v1/router',
+  KORTIX_API_URL: process.env.KORTIX_API_URL || 'http://localhost:8008/v1/router',
   KORTIX_TOKEN: process.env.KORTIX_TOKEN || '',
 
   // Secret storage

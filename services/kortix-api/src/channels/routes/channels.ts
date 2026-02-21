@@ -2,11 +2,12 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../../shared/db';
-import { channelConfigs, channelMessages, sandboxes, accountUser } from '@kortix/db';
+import { channelConfigs, channelMessages, sandboxes } from '@kortix/db';
 import { NotFoundError, ValidationError } from '../../errors';
 import type { AppEnv } from '../../types';
 import type { ChannelEngineImpl } from '../core/engine';
 import { encryptCredentials, decryptCredentials } from '../lib/credentials';
+import { resolveAccountId } from '../../shared/resolve-account';
 
 const CHANNEL_TYPES = [
   'telegram',
@@ -45,15 +46,6 @@ const updateChannelSchema = z.object({
   agent_name: z.string().nullable().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
-
-async function resolveAccountId(userId: string): Promise<string> {
-  const [membership] = await db
-    .select({ accountId: accountUser.accountId })
-    .from(accountUser)
-    .where(eq(accountUser.userId, userId))
-    .limit(1);
-  return membership?.accountId ?? userId;
-}
 
 export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
   const app = new Hono<AppEnv>();

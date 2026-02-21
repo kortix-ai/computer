@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { accountUser } from '@kortix/db';
 import { createAuthProvider } from './providers';
 import { config } from '../config';
 import { db } from '../shared/db';
@@ -23,25 +22,7 @@ import {
   listSandboxIntegrations,
 } from './repositories';
 import type { AppEnv } from '../types';
-
-/**
- * Resolve the account ID for a user. In cloud mode, users belong to
- * accounts via the accountUser table. Falls back to userId if no
- * membership exists. Must match the resolution used by the sandbox
- * router so that verifySandboxOwnership works correctly.
- */
-async function resolveAccountId(userId: string): Promise<string> {
-  try {
-    const [membership] = await db
-      .select({ accountId: accountUser.accountId })
-      .from(accountUser)
-      .where(eq(accountUser.userId, userId))
-      .limit(1);
-    return membership?.accountId ?? userId;
-  } catch {
-    return userId;
-  }
-}
+import { resolveAccountId } from '../shared/resolve-account';
 
 type SandboxEnv = {
   Variables: {

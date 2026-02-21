@@ -96,7 +96,9 @@ cd /path/to/computer
 docker build --build-arg SERVICE=kortix-api -f services/Dockerfile -t kortix/kortix-api:latest .
 ```
 
-Straightforward Bun image. No special considerations. Can be built **in parallel** with the frontend host build and sandbox build.
+Straightforward Bun image. `drizzle-kit` is a direct dependency of `kortix-api` (needed for `drizzle-kit push` at runtime). The Dockerfile uses `pnpm install --prod=false` to include it. Can be built **in parallel** with the frontend host build and sandbox build.
+
+> **Important:** The installer-generated compose runs the API with `user: "0:0"` (root) because it needs Docker socket access to manage the sandbox container. The Dockerfile sets `USER bun` but the socket is `root:root rw-rw----`.
 
 ### PostgreSQL (pg_cron + pg_net)
 
@@ -106,6 +108,8 @@ docker build -t kortix/postgres:latest .
 ```
 
 Custom PG16 image (~460MB). Stage 1 compiles `pg_net` from source; stage 2 installs `pg_cron` via apt and copies the compiled pg_net. Both extensions are loaded via `shared_preload_libraries`. Can be built **in parallel** with all other images.
+
+> **Note:** The postgres image does NOT contain any schema init scripts. All schema creation is handled by the API's `drizzle-kit push` on startup.
 
 ### Sandbox
 
@@ -396,6 +400,123 @@ VPS mode uses a Caddy reverse proxy where both frontend and API share the same o
 
 ---
 
+## Docker Networking — How the Sandbox Reaches the API
+
+The sandbox needs to call the Kortix API (`KORTIX_API_URL`). How it reaches the API depends on where the API is running.
+
+### Two dev scenarios
+
+| Scenario | API running | Sandbox `KORTIX_API_URL` | Command |
+|---|---|---|---|
+| **Host dev** (most common) | `pnpm run dev` on Mac | `http://host.docker.internal:8008/v1/router` | `cd sandbox && docker compose up` |
+| **All Docker** | Docker container | `http://kortix-api:8008/v1/router` | `cd sandbox && docker compose -f docker-compose.yml -f docker-compose.docker.yml up` |
+
+### Host dev (default — no extra config)
+
+You run `pnpm run dev` for `kortix-api` on your Mac. The sandbox container reaches it via `host.docker.internal` — a special Docker DNS name that resolves to the host machine. This is the **default** in `sandbox/docker-compose.yml`.
+
+```bash
+cd sandbox
+docker compose up        # Just works — KORTIX_API_URL defaults to host.docker.internal:8008
+```
+
+### All Docker (API + sandbox both in Docker)
+
+When `kortix-api` runs in Docker too (e.g. via `~/.kortix/docker-compose.yml`), containers need to be on the **same Docker network** for DNS resolution. Use the `docker-compose.docker.yml` override:
+
+```bash
+cd sandbox
+docker compose -f docker-compose.yml -f docker-compose.docker.yml up
+```
+
+This override:
+1. Joins the sandbox to the `kortix_default` network (where the API lives)
+2. Sets `KORTIX_API_URL=http://kortix-api:8008/v1/router` (Docker DNS)
+
+If the API's compose project has a different name, override the network:
+
+```bash
+KORTIX_NETWORK=computer_default docker compose -f docker-compose.yml -f docker-compose.docker.yml up
+```
+
+### All-in-one compose (`docker-compose.local.yml`)
+
+All 4 services in one compose project — they share a network automatically. No extra config needed.
+
+### Installed mode (`get-kortix.sh`)
+
+Same as all-in-one — single compose project, single network (`kortix_default`).
+
+### Programmatic sandbox creation
+
+When `local-docker.ts` creates a sandbox container via the Docker API, it sets `NetworkMode: config.SANDBOX_NETWORK` to put the container on the API's network.
+
+### Quick fix for a running sandbox on the wrong network
+
+```bash
+docker network connect kortix_default kortix-sandbox
+docker exec kortix-sandbox curl -sf http://kortix-api:8008/v1/health
+```
+
+### Key env vars
+
+| Var | Used by | Purpose |
+|---|---|---|
+| `KORTIX_API_URL` | sandbox container | URL the sandbox uses to call the API. Default: `http://host.docker.internal:8008/v1/router` (host dev) |
+| `KORTIX_NETWORK` | `docker-compose.docker.yml` | External Docker network to join (default: `kortix_default`) |
+| `SANDBOX_NETWORK` | `kortix-api` (`local-docker.ts`) | Network for programmatically-created sandbox containers |
+| `KORTIX_URL` | `kortix-api` | URL the API gives to sandboxes for callbacks |
+
+---
+
+## Database Schema Management
+
+Schema is managed declaratively using `drizzle-kit push` — no migration files.
+
+### How it works
+
+1. **Single source of truth:** `packages/db/src/schema/kortix.ts` (kortix schema) and `packages/db/src/schema/public.ts` (public schema billing tables)
+2. **On every startup:** `services/kortix-api/src/ensure-schema.ts` shells out to `bun drizzle-kit push --force`
+3. **drizzle-kit diffs** the live database against the schema definitions and applies changes (CREATE TABLE, ALTER TABLE, etc.)
+4. **Idempotent:** Safe to run on every startup. No-ops if schema is already up to date.
+
+### What gets pushed
+
+| Schema | Tables | Config |
+|---|---|---|
+| `kortix` | sandboxes, integrations, sandbox_integrations, triggers, executions, deployments, server_entries, api_keys, channel_configs, channel_sessions, channel_messages, channel_identity_map | `schemaFilter: ['kortix']` |
+| `public` | credit_accounts, credit_ledger, credit_usage, credit_purchases, account_deletion_requests, api_keys | `schemaFilter: ['public']`, `tablesFilter` whitelist |
+
+### Key files
+
+- `packages/db/src/schema/kortix.ts` — Kortix schema table definitions
+- `packages/db/src/schema/public.ts` — Public schema billing/auth table definitions
+- `packages/db/drizzle.config.ts` — Drizzle Kit config (schema paths, filters, DB URL)
+- `services/kortix-api/src/ensure-schema.ts` — Startup script that runs `drizzle-kit push`
+
+### Startup sequence
+
+```
+1. ensureSchema()        — drizzle-kit push creates/updates all tables
+2. bootstrapLocalIdentity() — inserts local sandbox row into kortix.sandboxes
+3. startScheduler()      — configures pg_cron
+4. startChannelService() — starts Slack/Telegram adapters
+5. startDrainer()        — starts message queue drainer
+```
+
+All services start AFTER schema push completes. If schema push fails, services still start (graceful degradation).
+
+### Why not migration files?
+
+Previous migration-based approach had 3 redundant systems that went out of sync:
+1. `packages/db/drizzle/` SQL migration files
+2. `services/postgres/init/00-init-kortix.sql` baked into postgres
+3. `ensure-schema.ts` running `migrate()` at startup
+
+Migration 0004 referenced a table never created by prior migrations, causing the entire transaction to roll back — leaving the database with zero tables. The declarative `drizzle-kit push` approach eliminates this class of bugs entirely.
+
+---
+
 ## Common Issues & Fixes
 
 ### Frontend Docker build uses cached (wrong) standalone output
@@ -403,6 +524,47 @@ VPS mode uses a Caddy reverse proxy where both frontend and API share the same o
 **Symptom:** Container crashes with `Cannot find module '/app/apps/frontend/server.js'` or `Cannot find module 'next'`
 
 **Fix:** Always use `docker build --no-cache` for the frontend image.
+
+### API can't access Docker socket (FailedToOpenSocket)
+
+**Symptom:** `[SANDBOX-LOCAL] list error: FailedToOpenSocket` — sandbox list returns 500, "Failed to load sandboxes" in frontend integration dialog.
+
+**Root cause:** The Dockerfile sets `USER bun` but the Docker socket is owned by `root:root` with permissions `rw-rw----`. The `bun` user can't read it.
+
+**Fix:** The compose file must include `user: "0:0"` on the `kortix-api` service. Both the installer (`get-kortix.sh`) and `docker-compose.local.yml` already have this. If you're writing a custom compose, add it:
+
+```yaml
+kortix-api:
+  image: kortix/kortix-api:latest
+  user: "0:0"  # Required for Docker socket access
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+```
+
+### Sandbox not found or not owned by account
+
+**Symptom:** 403 error when linking an integration to a sandbox.
+
+**Root cause:** The `kortix.sandboxes` table has no row for the local sandbox. This happens if `bootstrapLocalIdentity()` failed during startup.
+
+**Fix:** Check API logs for `[LOCAL-IDENTITY]` messages. If bootstrap failed:
+```bash
+# Restart the API — bootstrap runs on every startup
+docker compose -f ~/.kortix/docker-compose.yml --project-name kortix restart kortix-api
+# Verify the row exists
+docker exec kortix-postgres-1 psql -U postgres -c "SELECT sandbox_id, status FROM kortix.sandboxes;"
+```
+
+### drizzle-kit not found in container
+
+**Symptom:** `[schema] Schema push failed` with `Cannot find package 'drizzle-kit'`.
+
+**Root cause:** `drizzle-kit` must be a direct dependency of `services/kortix-api` (not just `packages/db`) for pnpm's `--filter` to hoist it.
+
+**Fix:** Ensure `drizzle-kit` is in `services/kortix-api/package.json` dependencies AND the lockfile is up to date:
+```bash
+pnpm install --filter ./services/kortix-api...
+```
 
 ### Sandbox `kortix-master` crashes with EACCES
 
@@ -435,7 +597,19 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 
 **Fix:** Don't build inside Docker. Build on host, package into runner-only image (current approach).
 
-### Sandbox connection issues
+### Sandbox can't reach the API (KORTIX_API_URL fails)
+
+**Symptom:** Sandbox logs show connection refused or DNS resolution failure for the API.
+
+**Root cause:** Depends on your setup:
+
+| Error | Cause | Fix |
+|---|---|---|
+| `Could not resolve host: kortix-api` | Sandbox not on API's Docker network | Use `docker-compose.docker.yml` override or connect manually: `docker network connect kortix_default kortix-sandbox` |
+| `Connection refused` to `host.docker.internal` | API not running on host | Start `pnpm run dev` for kortix-api |
+| `Connection refused` to `kortix-api` | API not in Docker, but using Docker URL | Switch to default (host dev) mode — don't use `docker-compose.docker.yml` |
+
+### Sandbox connection issues (frontend)
 
 **Symptom:** Frontend can't connect to the sandbox.
 
@@ -483,10 +657,15 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 - `scripts/tests/test-install.sh` — Installer structure tests
 - `scripts/tests/test-cli.sh` — Embedded CLI tests
 
-### PostgreSQL (Local Database)
-- `services/postgres/Dockerfile` — Custom PG16 image with pg_cron 1.6 + pg_net 0.20.2
-- `services/postgres/init/00-init-kortix.sql` — Init SQL: creates `kortix` schema, all tables, indexes, pg_cron/pg_net extensions, `scheduler_tick()` function, global tick cron job
-- `sandbox/push.sh` — Builds + pushes `kortix/postgres` image to Docker Hub
+### Database Schema
+- `packages/db/src/schema/kortix.ts` — Kortix schema table definitions (single source of truth)
+- `packages/db/src/schema/public.ts` — Public schema billing/auth table definitions
+- `packages/db/drizzle.config.ts` — Drizzle Kit config (schema paths, filters)
+- `services/kortix-api/src/ensure-schema.ts` — Startup schema push (`drizzle-kit push --force`)
+- `services/kortix-api/src/platform/local-identity.ts` — Bootstrap local sandbox DB record
+
+### PostgreSQL
+- `services/postgres/Dockerfile` — Custom PG16 image with pg_cron 1.6 + pg_net 0.20.2 (no init SQL — schema managed by API)
 
 ### Frontend — Setup & Onboarding
 - `apps/frontend/src/components/dashboard/setup-overlay.tsx` — Setup overlay (welcome + providers)
@@ -506,9 +685,13 @@ The installer writes `~/.kortix/docker-compose.yml` with:
 - `services/kortix-api/src/providers/registry.ts` — Shared provider registry (single source of truth)
 - `services/kortix-api/src/providers/routes.ts` — Unified provider API (`/v1/providers/*`)
 - `services/kortix-api/src/setup/index.ts` — Legacy setup routes (backward compat, onboarding)
+- `services/kortix-api/src/integrations/routes.ts` — OAuth integration routes (`/v1/integrations/*`)
 
 ### Sandbox
 - `sandbox/kortix-master/src/routes/env.ts` — Env routes (GET, POST, DELETE)
 - `sandbox/kortix-master/src/services/secret-store.ts` — Encrypted storage
 - `sandbox/config/97-secrets-to-s6-env.sh` — Init script (permissions + sync)
 - `sandbox/kortix-master/src/scripts/sync-s6-env.ts` — Sync secrets to s6 env
+
+### E2E Testing
+- `test/e2e.md` — Full 46-step install-to-verify test plan

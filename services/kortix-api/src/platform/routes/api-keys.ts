@@ -12,11 +12,12 @@
 
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
-import { sandboxes, accountUser, kortixApiKeys, type Database } from '@kortix/db';
+import { sandboxes, kortixApiKeys, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
 import { supabaseAuth } from '../../middleware/auth';
 import { hashSecretKey, generateApiKeyPair, isApiKeySecretConfigured } from '../../shared/crypto';
 import type { AuthVariables } from '../../types';
+import { resolveAccountId as defaultResolveAccountId } from '../../shared/resolve-account';
 
 // ─── Dependency Injection ────────────────────────────────────────────────────
 
@@ -24,16 +25,6 @@ export interface ApiKeysRouterDeps {
   db: Database;
   resolveAccountId: (userId: string) => Promise<string>;
   useAuth: boolean;
-}
-
-async function defaultResolveAccountId(userId: string): Promise<string> {
-  const [membership] = await defaultDb
-    .select({ accountId: accountUser.accountId })
-    .from(accountUser)
-    .where(eq(accountUser.userId, userId))
-    .limit(1);
-
-  return membership?.accountId ?? userId;
 }
 
 const defaultDeps: ApiKeysRouterDeps = {

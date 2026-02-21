@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import { creditAccounts } from '@kortix/db';
 import { db } from '../shared/db';
+import { config } from '../config';
 
 export interface CreditBalance {
   balance: number;
@@ -59,11 +60,17 @@ export async function getCreditBalance(accountId: string): Promise<CreditBalance
 
 /**
  * Check if account has sufficient credits.
+ * In local mode, credits are unlimited — always returns true.
  */
 export async function checkCredits(
   accountId: string,
   minimumRequired: number = 0.01
 ): Promise<CreditCheckResult> {
+  // Local mode: unlimited credits (no billing)
+  if (config.isLocal()) {
+    return { hasCredits: true, balance: 999999, message: 'OK (local mode — unlimited)' };
+  }
+
   const balance = await getCreditBalance(accountId);
 
   if (!balance) {
@@ -92,12 +99,18 @@ export async function checkCredits(
 /**
  * Deduct credits atomically using database function.
  * Uses existing atomic_use_credits PostgreSQL function.
+ * In local mode, always succeeds (no billing).
  */
 export async function deductCredits(
   accountId: string,
   amount: number,
   description: string,
 ): Promise<CreditDeductResult> {
+  // Local mode: no billing — always succeed
+  if (config.isLocal()) {
+    return { success: true, amountDeducted: 0, newBalance: 999999 };
+  }
+
   try {
     const result = await db.execute(sql`SELECT atomic_use_credits(
       ${accountId}::uuid,

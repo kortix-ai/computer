@@ -23,8 +23,9 @@ COPY packages/ ./packages/
 
 # Install pnpm and deps for this service + workspace packages it depends on.
 # --shamefully-hoist flattens node_modules (no symlinks) so COPY works on all Docker versions.
+# Include devDeps so drizzle-kit is available for schema push at runtime.
 RUN corepack enable pnpm && \
-    pnpm install --filter ./services/${SERVICE}... --shamefully-hoist
+    pnpm install --filter ./services/${SERVICE}... --shamefully-hoist --prod=false
 
 # ---- Runner Stage ----
 FROM base AS runner
@@ -51,6 +52,7 @@ COPY --from=deps /app/packages/shared/src ./packages/shared/src
 COPY --from=deps /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=deps /app/packages/shared/tsconfig.json ./packages/shared/tsconfig.json
 COPY --from=deps /app/packages/db/src ./packages/db/src
+COPY --from=deps /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
 COPY --from=deps /app/packages/db/package.json ./packages/db/package.json
 COPY --from=deps /app/packages/db/tsconfig.json ./packages/db/tsconfig.json
 

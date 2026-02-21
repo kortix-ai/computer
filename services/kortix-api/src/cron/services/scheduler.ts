@@ -1,21 +1,29 @@
-import { sql } from 'drizzle-orm';
+import { sql, eq, and, lte } from 'drizzle-orm';
 import { db } from '../../shared/db';
 import { hasDatabase } from '../../shared/db';
+import { triggers, sandboxes } from '@kortix/db';
 import { config } from '../../config';
+import { processTrigger } from './executor';
 
 /**
- * pg_cron scheduler — each trigger gets its own pg_cron job.
+ * Scheduler with two modes:
  *
- * When a trigger is created/updated: cron.schedule() a job that calls
- *   POST /v1/cron/trigger/:id/execute via pg_net.
+ * 1. **pg_cron mode** (cloud) — each trigger gets its own pg_cron job that
+ *    calls POST /v1/cron/tick/trigger/:id/execute via pg_net.
+ *    Requires pg_cron + pg_net extensions in PostgreSQL.
  *
- * When a trigger is deleted/paused: cron.unschedule() the job.
+ * 2. **In-process mode** (local / self-hosted) — a setInterval runs every 60s,
+ *    queries due triggers, and executes them in-process. No Postgres extensions
+ *    needed. This is the automatic fallback when pg_cron is unavailable.
  *
- * pg_cron handles all timing. No polling. No in-memory state.
  * pg_cron uses 5-field cron (min hour day month weekday).
  * Our triggers use 6-field (sec min hour day month weekday) —
  * we strip the seconds field since pg_cron doesn't support it.
  */
+
+/** In-process tick interval handle */
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+let schedulerMode: 'pg_cron' | 'in_process' | 'disabled' = 'disabled';
 
 /** Escape a string for safe use inside a SQL single-quoted literal */
 function escSql(value: string): string {
@@ -52,14 +60,56 @@ function jobName(triggerId: string): string {
   return `trigger_${triggerId}`;
 }
 
+// ─── In-process tick (local / self-hosted) ──────────────────────────────────
+
+/**
+ * Process all due triggers in-process.
+ * This is the same logic as POST /v1/cron/tick but called directly.
+ */
+async function inProcessTick(): Promise<void> {
+  try {
+    const dueTriggers = await db
+      .select()
+      .from(triggers)
+      .where(
+        and(
+          eq(triggers.isActive, true),
+          lte(triggers.nextRunAt, new Date()),
+        ),
+      );
+
+    if (dueTriggers.length === 0) return;
+
+    console.log(`[scheduler] In-process tick: processing ${dueTriggers.length} due trigger(s)`);
+
+    await Promise.allSettled(
+      dueTriggers.map(async (trigger) => {
+        try {
+          await processTrigger(trigger);
+        } catch (err) {
+          console.error(`[scheduler] Error processing trigger ${trigger.triggerId}:`, err);
+        }
+      }),
+    );
+  } catch (err) {
+    console.error('[scheduler] In-process tick error:', err);
+  }
+}
+
+// ─── pg_cron operations (cloud) ─────────────────────────────────────────────
+
 /**
  * Schedule a pg_cron job for a trigger.
  * Creates or replaces the job using cron.schedule().
+ * In local/in-process mode, this is a no-op (triggers are picked up by the interval).
  */
 export async function schedulePgCronJob(
   triggerId: string,
   cronExpr: string,
 ): Promise<void> {
+  // In-process mode: triggers are picked up by the interval tick, no pg_cron needed.
+  if (schedulerMode !== 'pg_cron') return;
+
   if (!config.CRON_API_URL || !config.CRON_TICK_SECRET) {
     console.warn(`[scheduler] Cannot schedule pg_cron job — CRON_API_URL or CRON_TICK_SECRET not set`);
     return;
@@ -99,8 +149,12 @@ export async function schedulePgCronJob(
 
 /**
  * Unschedule (remove) a pg_cron job for a trigger.
+ * In local/in-process mode, this is a no-op.
  */
 export async function unschedulePgCronJob(triggerId: string): Promise<void> {
+  // In-process mode: no pg_cron jobs to unschedule.
+  if (schedulerMode !== 'pg_cron') return;
+
   assertUuid(triggerId);
   const name = jobName(triggerId);
 
@@ -111,7 +165,6 @@ export async function unschedulePgCronJob(triggerId: string): Promise<void> {
     console.log(`[scheduler] pg_cron job unscheduled: ${name}`);
   } catch (err: any) {
     // Job might not exist — that's fine.
-    // Drizzle wraps Postgres errors: check err.message, err.cause.message, and err.cause.routine
     const msg = err?.message ?? '';
     const causeMsg = err?.cause?.message ?? '';
     const routine = err?.cause?.routine ?? '';
@@ -120,7 +173,7 @@ export async function unschedulePgCronJob(triggerId: string): Promise<void> {
       msg.includes('could not find') ||
       causeMsg.includes('does not exist') ||
       causeMsg.includes('could not find') ||
-      routine === 'cron_unschedule_named' // pg_cron's internal "job not found" error
+      routine === 'cron_unschedule_named'
     ) {
       console.log(`[scheduler] No existing pg_cron job to unschedule: ${name}`);
       return;
@@ -129,28 +182,49 @@ export async function unschedulePgCronJob(triggerId: string): Promise<void> {
   }
 }
 
+// ─── Lifecycle ──────────────────────────────────────────────────────────────
+
 /**
- * Start scheduler — for pg_cron mode this just logs.
- * pg_cron jobs are managed via CRUD routes, not on startup.
+ * Start the scheduler.
+ *
+ * - Local mode → in-process 60s interval (no pg_cron needed).
+ * - Cloud mode with CRON_API_URL → pg_cron (configure_scheduler in DB).
+ * - No database → disabled.
  */
 export async function startScheduler(): Promise<void> {
   if (!config.SCHEDULER_ENABLED) {
     console.log('[scheduler] Scheduler is disabled via SCHEDULER_ENABLED=false');
+    schedulerMode = 'disabled';
     return;
   }
 
   if (!hasDatabase) {
     console.log('[scheduler] Scheduler disabled — no DATABASE_URL configured');
+    schedulerMode = 'disabled';
     return;
   }
 
+  // ── Local / self-hosted: in-process interval ──────────────────────────
+  if (config.isLocal()) {
+    schedulerMode = 'in_process';
+    console.log('[scheduler] In-process mode — checking due triggers every 60s');
+
+    // Run first tick after 10s (give schema push time to finish)
+    setTimeout(() => {
+      inProcessTick();
+      tickInterval = setInterval(inProcessTick, 60_000);
+    }, 10_000);
+
+    return;
+  }
+
+  // ── Cloud: pg_cron mode ───────────────────────────────────────────────
   if (config.CRON_API_URL && config.CRON_TICK_SECRET) {
+    schedulerMode = 'pg_cron';
     console.log(`[scheduler] pg_cron mode — jobs managed per-trigger via cron.schedule()`);
     console.log(`[scheduler] API URL: ${config.CRON_API_URL}`);
 
     // Configure the global scheduler tick in PostgreSQL.
-    // This sets the API URL and secret that kortix.scheduler_tick() uses
-    // to fire the global tick every minute via pg_cron + pg_net.
     try {
       await db.execute(
         sql.raw(
@@ -159,26 +233,30 @@ export async function startScheduler(): Promise<void> {
       );
       console.log(`[scheduler] Configured pg_cron scheduler in database`);
     } catch (err: any) {
-      // Not fatal — configure_scheduler() may not exist if the
-      // pg_cron migration (0001_pg_cron_scheduler.sql) hasn't been applied.
       const msg = err?.message ?? err?.cause?.message ?? '';
       console.warn(`[scheduler] Could not configure pg_cron in database: ${msg}`);
     }
   } else {
-    console.log('[scheduler] CRON_API_URL or CRON_TICK_SECRET not set — pg_cron scheduling disabled');
+    schedulerMode = 'disabled';
+    console.log('[scheduler] CRON_API_URL or CRON_TICK_SECRET not set — scheduling disabled');
     console.log('[scheduler] Triggers can still be executed manually via POST /v1/cron/trigger/:id/execute');
   }
 }
 
 export function stopScheduler(): void {
-  // Nothing to stop — pg_cron runs in postgres
+  if (tickInterval) {
+    clearInterval(tickInterval);
+    tickInterval = null;
+    console.log('[scheduler] In-process tick interval stopped');
+  }
+  schedulerMode = 'disabled';
   console.log('[scheduler] Scheduler stopped');
 }
 
 export function getSchedulerStatus() {
   return {
-    running: !!(config.CRON_API_URL && config.CRON_TICK_SECRET),
-    mode: config.CRON_API_URL && config.CRON_TICK_SECRET ? 'pg_cron' : 'disabled',
+    running: schedulerMode !== 'disabled',
+    mode: schedulerMode,
     enabled: config.SCHEDULER_ENABLED,
     cronApiUrl: config.CRON_API_URL || null,
   };

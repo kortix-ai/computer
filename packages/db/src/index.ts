@@ -54,6 +54,11 @@ export type {
 export {
   apiKeys,
   creditAccounts,
+  creditLedger,
+  creditUsage,
+  accountDeletionRequests,
+  creditPurchases,
+  billingCustomers,
   accountUser,
 } from './schema/public';
 
