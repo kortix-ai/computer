@@ -28,9 +28,9 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-FRONTEND_IMAGE="kortix/kortix-frontend:0.6.0"
-API_IMAGE="kortix/kortix-api:0.6.0"
-SANDBOX_IMAGE="kortix/sandbox:0.6.0"
+FRONTEND_IMAGE="kortix/kortix-frontend:0.6.1"
+API_IMAGE="kortix/kortix-api:0.6.1"
+SANDBOX_IMAGE="kortix/sandbox:0.6.1"
 SUPABASE_POSTGRES_IMAGE="supabase/postgres:15.8.1.085"
 SUPABASE_GOTRUE_IMAGE="supabase/gotrue:v2.186.0"
 SUPABASE_KONG_IMAGE="kong:2.8.1"
@@ -488,6 +488,13 @@ ${tls_config}
     reverse_proxy kortix-api:8008
   }
 
+  handle /auth/v1/* {
+    reverse_proxy supabase-kong:8000
+  }
+  handle /rest/v1/* {
+    reverse_proxy supabase-kong:8000
+  }
+
   handle {${auth_block}
     reverse_proxy frontend:3000
   }
@@ -853,24 +860,33 @@ ${supabase_ports}
       supabase-auth:
         condition: service_healthy"
 
-    # Frontend connects to Kong (the Supabase API gateway)
-    # In local mode, expose Kong on port 13740 so frontend can reach it from browser
-    # NEXT_PUBLIC_ vars are baked at build time by Next.js, so Docker images
-    # contain placeholder values. We MUST also set non-NEXT_PUBLIC_ runtime
-    # env vars (SUPABASE_URL, SUPABASE_ANON_KEY, BACKEND_URL) for server-side
-    # code (middleware, server actions) to work correctly.
+    # Frontend env vars for Supabase connection.
+    #
+    # CRITICAL: The server-side SUPABASE_URL MUST match the client-side
+    # NEXT_PUBLIC_SUPABASE_URL. The @supabase/ssr library derives cookie
+    # names from the URL hostname. If server uses "supabase-kong" but client
+    # uses "152.53.134.91", the cookie names won't match and auth breaks
+    # (redirect loop after sign-in).
+    #
+    # In VPS mode, both use the public HTTPS URL. NODE_TLS_REJECT_UNAUTHORIZED=0
+    # is needed because the server-side calls go through Caddy's self-signed cert
+    # (when using IP-only mode without a real domain).
+    #
+    # In local mode, both use http://localhost:13740 (Kong exposed on host).
+    # The frontend container uses extra_hosts to resolve localhost to the host.
     if [ "$DEPLOY_MODE" = "local" ]; then
       frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=http://localhost:13740
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
       - SUPABASE_URL=http://localhost:13740
       - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
-      - BACKEND_URL=http://localhost:13738/v1"
+      - BACKEND_URL=http://kortix-api:8008/v1"
     else
       frontend_supabase_env="      - NEXT_PUBLIC_SUPABASE_URL=\${SUPABASE_PUBLIC_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
       - SUPABASE_URL=\${SUPABASE_PUBLIC_URL}
       - SUPABASE_ANON_KEY=\${SUPABASE_ANON_KEY}
-      - BACKEND_URL=http://kortix-api:8008/v1"
+      - BACKEND_URL=http://kortix-api:8008/v1
+      - NODE_TLS_REJECT_UNAUTHORIZED=0"
     fi
 
     supabase_url_env="      - SUPABASE_URL=http://supabase-kong:8000"
