@@ -6,7 +6,7 @@ import { HTTPException } from 'hono/http-exception';
 import { config } from './config';
 import { BillingError } from './errors';
 
-// ─── Sub-Service Imports ────────────────────────────────────────────────────
+// ─── Sub-Service Imports ──────────────────────────────────────────────────── 
 
 import { router } from './router';
 import { billingApp } from './billing';
