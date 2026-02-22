@@ -39,6 +39,12 @@ interface UseAutoScrollReturn {
   scrollToBottom: () => void;
   scrollToLastTurn: () => void;
   scrollToEnd: () => void;
+  /** Instant scroll to the absolute bottom of the scroll container.
+   *  For short responses the spacer keeps the user bubble near the top.
+   *  For long responses this shows the end of the AI response. */
+  scrollToAbsoluteBottom: () => void;
+  /** Same as scrollToAbsoluteBottom but with smooth animation. */
+  smoothScrollToAbsoluteBottom: () => void;
 }
 
 const BOTTOM_THRESHOLD = 80;
@@ -167,18 +173,49 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
 
   const scrollToLastTurn = useCallback(() => scrollToBottom(), [scrollToBottom]);
 
+  // ── Absolute-bottom scroll (for initial load / tab switch) ────────
+  // Scrolls to scrollHeight - clientHeight. When the last turn fits in
+  // the viewport the spacer makes this equivalent to measureTarget.
+  // When the last turn overflows the viewport (spacer = 0), this shows
+  // the actual end of the conversation instead of the user bubble.
+  const scrollToAbsoluteBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    recalcSpacer();
+    userScrolledRef.current = false;
+    setShowScrollButton(false);
+    programmaticScrollRef.current = true;
+    clearTimeout(programmaticScrollTimer.current);
+    el.scrollTop = el.scrollHeight - el.clientHeight;
+    programmaticScrollTimer.current = setTimeout(() => { programmaticScrollRef.current = false; }, 50);
+  }, [recalcSpacer]);
+
+  const smoothScrollToAbsoluteBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    recalcSpacer();
+    userScrolledRef.current = false;
+    setShowScrollButton(false);
+    programmaticScrollRef.current = true;
+    clearTimeout(programmaticScrollTimer.current);
+    el.scrollTo({ top: el.scrollHeight - el.clientHeight, behavior: 'smooth' });
+    programmaticScrollTimer.current = setTimeout(() => { programmaticScrollRef.current = false; }, 500);
+  }, [recalcSpacer]);
+
   // ── On working → idle: re-anchor after DOM settles ────────────────
   useEffect(() => {
     const was = prevWorkingRef.current;
     prevWorkingRef.current = working;
     if (was && !working && !userScrolledRef.current) {
       // Spacer is already correct (MO keeps it updated).
-      // Just re-anchor in case steps collapsed / response moved.
-      const t1 = setTimeout(scrollToEnd, 100);
-      const t2 = setTimeout(scrollToEnd, 500);
+      // Re-anchor to the absolute bottom so the user sees the end of
+      // the response (for long responses) or the user bubble (for short
+      // ones where the spacer fills the gap).
+      const t1 = setTimeout(scrollToAbsoluteBottom, 100);
+      const t2 = setTimeout(scrollToAbsoluteBottom, 500);
       return () => { clearTimeout(t1); clearTimeout(t2); };
     }
-  }, [working, scrollToEnd]);
+  }, [working, scrollToAbsoluteBottom]);
 
   // ── RAF auto-scroll during streaming ──────────────────────────────
   // Phase 1 (spacer > 0): scrollHeight is constant, no scrolling needed.
@@ -294,5 +331,5 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     return () => el.removeEventListener('scroll', handle);
   }, [working]);
 
-  return { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd };
+  return { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd, scrollToAbsoluteBottom, smoothScrollToAbsoluteBottom };
 }

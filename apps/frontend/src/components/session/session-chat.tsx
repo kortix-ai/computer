@@ -2936,13 +2936,15 @@ export function SessionChat({
 	const hasActiveQuestion = useOpenCodePendingStore((s) =>
 		Object.values(s.questions).some((q) => q.sessionID === sessionId),
 	);
-	const { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd } =
+	const { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd, scrollToAbsoluteBottom, smoothScrollToAbsoluteBottom } =
 		useAutoScroll({
 			working: isBusy && !hasActiveQuestion,
 		});
 
-	// Scroll to the last turn on initial load / session change.
-	// Uses scrollToEnd (instant) so there's no visible smooth animation.
+	// Scroll to the bottom on initial load / session change.
+	// Uses scrollToAbsoluteBottom (instant) so there's no visible smooth
+	// animation. For short responses the spacer keeps the user bubble near
+	// the top. For long responses this shows the end of the conversation.
 	// Staggered attempts cover async markdown/code-block rendering.
 	const initialScrollDoneRef = useRef<string | null>(null);
 	const messageCount = messages?.length ?? 0;
@@ -2951,15 +2953,17 @@ export function SessionChat({
 		if (messageCount === 0) return;
 		initialScrollDoneRef.current = sessionId;
 
-		const t1 = setTimeout(scrollToEnd, 0);
-		const t2 = setTimeout(scrollToEnd, 100);
-		const t3 = setTimeout(scrollToEnd, 500);
-		const t4 = setTimeout(scrollToEnd, 1500);
+		const t1 = setTimeout(scrollToAbsoluteBottom, 0);
+		const t2 = setTimeout(scrollToAbsoluteBottom, 100);
+		const t3 = setTimeout(scrollToAbsoluteBottom, 500);
+		const t4 = setTimeout(scrollToAbsoluteBottom, 1500);
 
 		return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
-	}, [messageCount, sessionId, scrollToEnd]);
+	}, [messageCount, sessionId, scrollToAbsoluteBottom]);
 
-	// Scroll to the last turn when switching back to this tab.
+	// Scroll to the bottom when switching back to this tab.
+	// Uses smoothScrollToAbsoluteBottom so short responses show the user
+	// bubble near the top (spacer) and long responses show the conversation end.
 	const activeTabId = useTabStore((s) => s.activeTabId);
 	const isActiveTab = activeTabId === sessionId;
 	const wasActiveRef = useRef(isActiveTab);
@@ -2967,10 +2971,10 @@ export function SessionChat({
 		const was = wasActiveRef.current;
 		wasActiveRef.current = isActiveTab;
 		if (!was && isActiveTab && messageCount > 0) {
-			const t = setTimeout(scrollToBottom, 100);
+			const t = setTimeout(smoothScrollToAbsoluteBottom, 100);
 			return () => clearTimeout(t);
 		}
-	}, [isActiveTab, messageCount, scrollToBottom]);
+	}, [isActiveTab, messageCount, smoothScrollToAbsoluteBottom]);
 
 	// ---- Pending permissions & questions ----
 	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
@@ -3589,7 +3593,7 @@ export function SessionChat({
 							variant="outline"
 							size="sm"
 							className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
-							onClick={scrollToBottom}
+							onClick={smoothScrollToAbsoluteBottom}
 						>
 							<ArrowDown className="size-3 mr-1" />
 							Scroll to bottom
