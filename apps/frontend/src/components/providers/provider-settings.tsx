@@ -30,17 +30,17 @@ export function ProviderSettings({
   const { data: providersData } = useOpenCodeProviders();
 
   const hasProvider = providersData?.all?.some(
-    (p) => (p.models?.length ?? 0) > 0
+    (p) => p.models && Object.keys(p.models).length > 0
   );
   const hasLLMProvider = providersData?.all?.some(
-    (p) => LLM_PROVIDERS.has(p.id) && (p.models?.length ?? 0) > 0
+    (p) => LLM_PROVIDERS.has(p.id) && p.models && Object.keys(p.models).length > 0
   );
 
   const canContinue = variant === 'setup' ? hasLLMProvider : true;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto p-1">
         <ConnectProviderContent
           providers={providersData}
           onProviderConnected={onProviderChange}
@@ -48,19 +48,19 @@ export function ProviderSettings({
       </div>
 
       {variant === 'setup' && (
-        <div className="flex-shrink-0 border-t border-border/40 pt-4 mt-4">
+        <div className="flex-shrink-0 pt-4 mt-2">
+          {!canContinue && !hasProvider && (
+            <p className="text-xs text-muted-foreground text-center mb-3">
+              At least one LLM provider is required
+            </p>
+          )}
           <Button
             onClick={onContinue}
             disabled={!canContinue}
             className="w-full"
           >
-            {canContinue ? 'Continue' : 'Connect a provider to continue'}
+            Continue
           </Button>
-          {!hasProvider && (
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              At least one LLM provider is required
-            </p>
-          )}
         </div>
       )}
     </div>

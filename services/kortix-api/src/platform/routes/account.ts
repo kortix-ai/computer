@@ -202,7 +202,8 @@ export function createAccountRouter(
       );
     } catch (err) {
       console.error('[PLATFORM] initAccount error:', err);
-      return c.json({ success: false, error: 'Failed to initialize account' }, 500);
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ success: false, error: `Failed to initialize account: ${message}` }, 500);
     }
   });
 

@@ -404,7 +404,7 @@ export function ConnectProviderContent({
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 mt-1">
+          <div className="flex-1 min-h-0 mt-1">
             {/* Custom provider */}
             {(!search || 'custom'.includes(search.toLowerCase())) && (
               <button

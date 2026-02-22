@@ -37,6 +37,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const {
           data: { session: currentSession },
         } = await supabase.auth.getSession();
+
+        if (currentSession) {
+          // Validate the session against the auth server — catches stale
+          // sessions after a DB reset where the JWT is valid but the user
+          // no longer exists.
+          const { error: userError } = await supabase.auth.getUser();
+          if (userError) {
+            console.warn('[AuthProvider] Stale session detected, signing out:', userError.message);
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            return;
+          }
+        }
+
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
       } catch (error) {
