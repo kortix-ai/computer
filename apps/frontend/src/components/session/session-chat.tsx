@@ -33,7 +33,6 @@ import {
 	RevertBanner,
 } from "@/components/session/message-actions";
 import { ConnectProviderDialog } from "@/components/session/model-selector";
-import { QuestionPrompt } from "@/components/session/question-prompt";
 import {
 	type AttachedFile,
 	SessionChatInput,
@@ -1492,10 +1491,6 @@ interface SessionTurnProps {
 		requestId: string,
 		reply: "once" | "always" | "reject",
 	) => Promise<void>;
-	/** Question reply handler */
-	onQuestionReply: (requestId: string, answers: string[][]) => Promise<void>;
-	/** Question reject handler */
-	onQuestionReject: (requestId: string) => Promise<void>;
 }
 
 function SessionTurn({
@@ -1516,8 +1511,6 @@ function SessionTurn({
 	commandMessages,
 	commands,
 	onPermissionReply,
-	onQuestionReply,
-	onQuestionReject,
 }: SessionTurnProps) {
 	const [copied, setCopied] = useState(false);
 	const [userCopied, setUserCopied] = useState(false);
@@ -2049,11 +2042,8 @@ function SessionTurn({
 							if (part.tool === "todowrite") return null;
 							if (part.tool === "task") return null;
 							if (part.tool === "question") {
-								if (answeredQuestionIds.has(part.id)) {
-									return (
-										<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
-									);
-								}
+								// Answered questions render in the inline content section below;
+								// skip here to avoid duplicate cards during streaming.
 								return null;
 							}
 
@@ -2194,14 +2184,7 @@ function SessionTurn({
 				<TurnErrorDisplay errorText={turnError} />
 			)}
 
-			{/* Question prompt — always rendered at the bottom of the turn, after the response */}
-			{nextQuestion && (
-				<QuestionPrompt
-					request={nextQuestion}
-					onReply={onQuestionReply}
-					onReject={onQuestionReject}
-				/>
-			)}
+			{/* Question prompt — now rendered inside the chat input card (questionSlot) */}
 
 			{/* ── Action bar (copy, fork, revert) ── */}
 			{!working && response && (
@@ -3005,11 +2988,12 @@ export function SessionChat({
 
 	const handleQuestionReply = useCallback(
 		async (requestId: string, answers: string[][]) => {
+			// Optimistically remove the question so the textarea shows immediately
+			removeQuestion(requestId);
 			try {
 				await replyToQuestion(requestId, answers);
-				removeQuestion(requestId);
 			} catch {
-				// ignore
+				// ignore — SSE "question.replied" event will also remove it
 			}
 		},
 		[removeQuestion],
@@ -3017,11 +3001,12 @@ export function SessionChat({
 
 	const handleQuestionReject = useCallback(
 		async (requestId: string) => {
+			// Optimistically remove the question so the textarea shows immediately
+			removeQuestion(requestId);
 			try {
 				await rejectQuestion(requestId);
-				removeQuestion(requestId);
 			} catch {
-				// ignore
+				// ignore — SSE "question.rejected" event will also remove it
 			}
 		},
 		[removeQuestion],
@@ -3545,8 +3530,6 @@ export function SessionChat({
 												commandMessages={commandMessagesRef.current}
 												commands={commands}
 												onPermissionReply={handlePermissionReply}
-												onQuestionReply={handleQuestionReply}
-												onQuestionReject={handleQuestionReject}
 											/>
 										</div>
 									);
@@ -3735,6 +3718,9 @@ export function SessionChat({
 						</div>
 					) : undefined
 				}
+				activeQuestion={pendingQuestions.length > 0 ? pendingQuestions[0] : undefined}
+				onQuestionReply={handleQuestionReply}
+				onQuestionReject={handleQuestionReject}
 			/>
 			)}
 		</div>

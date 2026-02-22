@@ -1,12 +1,11 @@
 /**
- * QuestionPrompt — inline chip inside the chat input card.
+ * QuestionPrompt — compact self-contained inline chip inside the chat input card.
  *
- * Styled to match TodoChip and message queue:
  * - Compact header row (icon + summary + dismiss/chevron)
- * - Expandable body with question options (max-height constrained)
+ * - Expandable body with question options
  * - Single-question immediate submit on pick
  * - Multi-select toggle + Next/Confirm flow
- * - "Type own answer" inline input
+ * - "Type your own answer" inline input
  */
 
 "use client";
@@ -168,7 +167,7 @@ export function QuestionPrompt({
 	}, [request.id, onReject]);
 
 	// -----------------------------------------------------------------------
-	// Once replied, hide completely — server will clear the pending question
+	// Once replied, hide completely
 	// -----------------------------------------------------------------------
 
 	if (replying) return null;
@@ -180,8 +179,8 @@ export function QuestionPrompt({
 	const headerSummary = (() => {
 		if (isSingle) {
 			const q = questions[0];
-			return q.question.length > 50
-				? q.question.slice(0, 50) + "…"
+			return q.question.length > 60
+				? q.question.slice(0, 60) + "\u2026"
 				: q.question;
 		}
 		const answered = answers.filter((a) => a.length > 0).length;
@@ -194,21 +193,20 @@ export function QuestionPrompt({
 
 	return (
 		<div className="rounded-xl border border-border/40 bg-muted/40 overflow-hidden">
-			{/* Header row — matches TodoChip / queue */}
+			{/* Header row */}
 			<button
 				type="button"
 				onClick={() => setExpanded((v) => !v)}
-				className="flex items-center gap-2.5 w-full px-4 py-3 hover:bg-muted/70 transition-colors cursor-pointer"
+				className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/70 transition-colors cursor-pointer"
 			>
-				<MessageCircle className="size-4 text-muted-foreground flex-shrink-0" />
-				<span className="text-sm text-muted-foreground flex-1 min-w-0 truncate text-left">
-					{isSingle ? "Question" : `${questions.length} questions`}
+				<MessageCircle className="size-3.5 text-muted-foreground flex-shrink-0" />
+				<span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
+					{isSingle ? "" : `${questions.length} questions \u00B7 `}
 					<span className="text-foreground/80 font-medium">
-						{" "}
-						· {headerSummary}
+						{headerSummary}
 					</span>
 				</span>
-				<div className="flex items-center gap-1 shrink-0">
+				<div className="flex items-center gap-0.5 shrink-0">
 					<span
 						role="button"
 						tabIndex={0}
@@ -222,25 +220,25 @@ export function QuestionPrompt({
 								reject();
 							}
 						}}
-						className="inline-flex items-center justify-center size-7 rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+						className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
 					>
-						<X className="size-4" />
+						<X className="size-3" />
 					</span>
 					<ChevronDown
 						className={cn(
-							"size-4 text-muted-foreground/50 transition-transform",
+							"size-3 text-muted-foreground/40 transition-transform",
 							!expanded && "rotate-180",
 						)}
 					/>
 				</div>
 			</button>
 
-			{/* Expanded body — max-height constrained like TodoChip / queue */}
+			{/* Expanded body */}
 			{expanded && (
 				<div className="border-t border-border/30">
 					{/* Tab bar (multi-question only) */}
 					{!isSingle && (
-						<div className="flex items-center gap-1 px-3 py-1.5 overflow-x-auto scrollbar-hide border-b border-border/30 bg-muted/20">
+						<div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto scrollbar-hide border-b border-border/30 bg-muted/20">
 							{questions.map((q, i) => {
 								const isAnswered = (answers[i]?.length ?? 0) > 0;
 								return (
@@ -251,7 +249,7 @@ export function QuestionPrompt({
 											setEditing(false);
 										}}
 										className={cn(
-											"flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-all duration-150 cursor-pointer whitespace-nowrap",
+											"flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition-all duration-150 cursor-pointer whitespace-nowrap",
 											tab === i
 												? "bg-background/80 text-foreground border-border/70"
 												: "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70",
@@ -259,7 +257,7 @@ export function QuestionPrompt({
 									>
 										<span
 											className={cn(
-												"size-3.5 rounded-sm flex-shrink-0 flex items-center justify-center border",
+												"size-3 rounded-sm flex-shrink-0 flex items-center justify-center border",
 												isAnswered
 													? "border-border bg-muted"
 													: tab === i
@@ -268,23 +266,12 @@ export function QuestionPrompt({
 											)}
 										>
 											{isAnswered && (
-												<svg
-													viewBox="0 0 12 12"
-													fill="none"
-													width="8"
-													height="8"
-												>
-													<path
-														d="M3 7.17905L5.02703 8.85135L9 3.5"
-														stroke="currentColor"
-														strokeWidth="1.5"
-														strokeLinecap="square"
-														className="text-foreground"
-													/>
+												<svg viewBox="0 0 12 12" fill="none" width="7" height="7">
+													<path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" />
 												</svg>
 											)}
 											{!isAnswered && tab === i && (
-												<div className="size-1 rounded-full bg-foreground" />
+												<div className="size-0.5 rounded-full bg-foreground" />
 											)}
 										</span>
 										{q.header || `Q${i + 1}`}
@@ -297,7 +284,7 @@ export function QuestionPrompt({
 									setEditing(false);
 								}}
 								className={cn(
-									"px-2.5 py-1 text-xs font-medium rounded-md border transition-all duration-150 cursor-pointer",
+									"px-2 py-0.5 text-[11px] font-medium rounded-md border transition-all duration-150 cursor-pointer",
 									isConfirm
 										? "bg-background/80 text-foreground border-border/70"
 										: "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70",
@@ -308,10 +295,10 @@ export function QuestionPrompt({
 						</div>
 					)}
 
-					<div className="px-4 py-3">
+					<div className="px-3 py-2">
 						{/* Confirm / review tab */}
 						{isConfirm ? (
-							<div className="space-y-1">
+							<div className="space-y-0.5">
 								{questions.map((q, i) => {
 									const ans = answers[i] ?? [];
 									const done = ans.length > 0;
@@ -319,123 +306,100 @@ export function QuestionPrompt({
 										<div
 											key={i}
 											className={cn(
-												"flex items-center gap-2 py-1",
+												"flex items-center gap-1.5 py-0.5",
 												!done && "opacity-40",
 											)}
 										>
 											<span
 												className={cn(
-													"size-3.5 rounded-sm flex-shrink-0 flex items-center justify-center border",
+													"size-3 rounded-sm flex-shrink-0 flex items-center justify-center border",
 													done ? "border-border bg-muted" : "border-border",
 												)}
 											>
 												{done && (
-													<svg
-														viewBox="0 0 12 12"
-														fill="none"
-														width="9"
-														height="9"
-													>
-														<path
-															d="M3 7.17905L5.02703 8.85135L9 3.5"
-															stroke="currentColor"
-															strokeWidth="1.5"
-															strokeLinecap="square"
-															className="text-foreground"
-														/>
+													<svg viewBox="0 0 12 12" fill="none" width="7" height="7">
+														<path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" />
 													</svg>
 												)}
 											</span>
 											<span
 												className={cn(
-													"text-xs leading-tight truncate flex-1 min-w-0",
+													"text-[11px] leading-tight truncate flex-1 min-w-0",
 													done ? "text-foreground" : "text-muted-foreground",
 												)}
 											>
 												{q.header || q.question}
 											</span>
-											<span className="text-[11px] text-muted-foreground truncate max-w-[40%] shrink-0">
-												{ans.length > 0 ? ans.join(", ") : "—"}
+											<span className="text-[10px] text-muted-foreground truncate max-w-[40%] shrink-0">
+												{ans.length > 0 ? ans.join(", ") : "\u2014"}
 											</span>
 										</div>
 									);
 								})}
-								<div className="flex items-center justify-end pt-1.5">
+								<div className="flex items-center justify-end pt-2">
 									<button
 										onClick={submit}
-										className="px-3 py-1 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer"
+										className="px-4 py-1.5 text-xs font-medium rounded-lg bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer"
 									>
 										Submit
 									</button>
 								</div>
 							</div>
 						) : currentQuestion ? (
-							<div className="space-y-1.5">
-								{/* Question text — truncated to 2 lines */}
-							<p className="text-sm text-foreground leading-snug line-clamp-3">
+							<div className="space-y-1">
+								{/* Question text */}
+								<p className="text-xs text-foreground leading-snug line-clamp-2">
 									{currentQuestion.question}
 									{isMulti && (
 										<span className="text-muted-foreground/60 font-normal ml-1">
-											{" "}
 											(select multiple)
 										</span>
 									)}
 								</p>
 
-								{/* Options — compact rows like todo items */}
-								<div className="space-y-1">
+								{/* Options — compact rows */}
+								<div className="space-y-px">
 									{options.map((opt, i) => {
 										const isPicked = currentAnswers.includes(opt.label);
-									return (
-										<button
-											key={i}
-											onClick={() => selectOption(i)}
-											className={cn(
-												"w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-left cursor-pointer group border transition-all duration-150 ease-out active:scale-[0.995]",
-												isPicked
-													? "bg-primary/10 border-primary/30 shadow-sm"
-													: "border-transparent hover:bg-muted/40",
-											)}
-										>
-											<span
+										return (
+											<button
+												key={i}
+												onClick={() => selectOption(i)}
 												className={cn(
-													"size-5 rounded-md flex-shrink-0 flex items-center justify-center border transition-colors",
+													"w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left cursor-pointer group border transition-all duration-150 ease-out active:scale-[0.998]",
 													isPicked
-														? "border-primary/50 bg-primary/10"
-														: "border-border group-hover:border-foreground/30",
+														? "bg-primary/10 border-primary/30"
+														: "border-transparent hover:bg-muted/40",
 												)}
 											>
-													{isPicked && (
-														<svg
-															viewBox="0 0 12 12"
-															fill="none"
-													width="10"
-													height="10"
+												<span
+													className={cn(
+														"size-4 rounded-[4px] flex-shrink-0 flex items-center justify-center border transition-colors",
+														isPicked
+															? "border-primary/50 bg-primary/10"
+															: "border-border group-hover:border-foreground/30",
+													)}
 												>
-															<path
-																d="M3 7.17905L5.02703 8.85135L9 3.5"
-																stroke="currentColor"
-																strokeWidth="1.5"
-																strokeLinecap="square"
-																className="text-foreground"
-															/>
+													{isPicked && (
+														<svg viewBox="0 0 12 12" fill="none" width="8" height="8">
+															<path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" />
 														</svg>
 													)}
 												</span>
-										<span className="text-sm leading-tight truncate min-w-0">
+												<span className="text-xs leading-tight truncate min-w-0">
 													<span
-											className={cn(
-												"font-semibold transition-colors duration-150",
-												isPicked ? "text-foreground" : "text-foreground/80",
-											)}
-												>
-													{opt.label}
-												</span>
-												{opt.description && (
-													<span className={cn("ml-1.5", isPicked ? "text-muted-foreground/90" : "text-muted-foreground")}>
-														{opt.description}
+														className={cn(
+															"font-semibold transition-colors duration-150",
+															isPicked ? "text-foreground" : "text-foreground/80",
+														)}
+													>
+														{opt.label}
 													</span>
-												)}
+													{opt.description && (
+														<span className={cn("ml-1", isPicked ? "text-muted-foreground/90" : "text-muted-foreground")}>
+															{opt.description}
+														</span>
+													)}
 												</span>
 											</button>
 										);
@@ -445,22 +409,22 @@ export function QuestionPrompt({
 									{showCustom && !editing && (
 										<button
 											onClick={() => selectOption(options.length)}
-										className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-left cursor-pointer group border border-transparent hover:bg-muted/40 transition-colors"
-									>
-										<Pencil className="size-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 flex-shrink-0 transition-colors" />
-										<span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-											Type your own answer
-										</span>
-									</button>
-								)}
+											className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left cursor-pointer group border border-transparent hover:bg-muted/40 transition-colors"
+										>
+											<Pencil className="size-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 flex-shrink-0 transition-colors" />
+											<span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+												Type your own answer
+											</span>
+										</button>
+									)}
 
-								{/* Custom input */}
-								{editing && (
-									<form
-										className="flex items-center gap-2 mt-2"
-										onSubmit={(e) => {
-											e.preventDefault();
-											handleCustomSubmit(inputRef.current?.value ?? "");
+									{/* Custom input */}
+									{editing && (
+										<form
+											className="flex items-center gap-1.5 mt-1"
+											onSubmit={(e) => {
+												e.preventDefault();
+												handleCustomSubmit(inputRef.current?.value ?? "");
 											}}
 										>
 											<input
@@ -468,29 +432,29 @@ export function QuestionPrompt({
 												type="text"
 												placeholder="Type your answer..."
 												defaultValue={customInputs[tab]}
-											onKeyDown={(e) => {
-												if (e.key === "Escape") {
-													e.preventDefault();
-													setEditing(false);
-												}
-											}}
-											className="h-10 flex-1 min-w-0 px-3.5 text-sm bg-background/90 border border-border/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
-										/>
-										<button
-											type="submit"
-											className="h-10 px-3 text-sm font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all duration-150 cursor-pointer shrink-0 self-auto"
-										>
-											{isMulti ? "Add" : "Go"}
-										</button>
-										<button
-											type="button"
-											onClick={() => setEditing(false)}
-											className="size-10 inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50 cursor-pointer shrink-0"
-										>
-											<X className="size-4" />
-										</button>
-									</form>
-								)}
+												onKeyDown={(e) => {
+													if (e.key === "Escape") {
+														e.preventDefault();
+														setEditing(false);
+													}
+												}}
+												className="h-8 flex-1 min-w-0 px-3 text-xs bg-background/90 border border-border/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
+											/>
+											<button
+												type="submit"
+												className="h-8 px-2.5 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all duration-150 cursor-pointer shrink-0"
+											>
+												{isMulti ? "Add" : "Go"}
+											</button>
+											<button
+												type="button"
+												onClick={() => setEditing(false)}
+												className="size-8 inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50 cursor-pointer shrink-0"
+											>
+												<X className="size-3.5" />
+											</button>
+										</form>
+									)}
 								</div>
 
 								{/* Next button for multi-select */}
@@ -503,7 +467,7 @@ export function QuestionPrompt({
 											}}
 											disabled={currentAnswers.length === 0}
 											className={cn(
-												"px-3 py-1 text-xs font-medium rounded-md transition-all",
+												"px-2.5 py-0.5 text-[11px] font-medium rounded-md transition-all",
 												currentAnswers.length > 0
 													? "bg-muted text-foreground hover:bg-muted/80 cursor-pointer"
 													: "bg-muted/30 text-muted-foreground/50 cursor-not-allowed",

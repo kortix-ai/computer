@@ -45,6 +45,8 @@ import type { Session } from '@/hooks/opencode/use-opencode-sessions';
 import { toast } from '@/lib/toast';
 import { useMessageQueueStore } from '@/stores/message-queue-store';
 import { getClient } from '@/lib/opencode-sdk';
+import { QuestionPrompt } from './question-prompt';
+import type { QuestionRequest, QuestionAnswer } from '@/ui';
 
 export type { ProviderListResponse };
 
@@ -959,6 +961,13 @@ export interface SessionChatInputProps {
 
   /** Slot rendered inside the input card, above the textarea (e.g. queue chip) */
   inputSlot?: React.ReactNode;
+
+  /** Active question request to display inline in the input card */
+  activeQuestion?: QuestionRequest;
+  /** Handler called when the user answers a question */
+  onQuestionReply?: (requestId: string, answers: QuestionAnswer[]) => void;
+  /** Handler called when the user rejects/dismisses a question */
+  onQuestionReject?: (requestId: string) => void;
 }
 
 export function SessionChatInput({
@@ -987,6 +996,9 @@ export function SessionChatInput({
   threadContext,
   onContextClick,
   inputSlot,
+  activeQuestion,
+  onQuestionReply,
+  onQuestionReject,
 }: SessionChatInputProps) {
   const placeholderVariants = useMemo(
     () => [
@@ -1603,8 +1615,8 @@ export function SessionChatInput({
             />
           )}
 
-          {/* Inline chips: thread context, todos, queue — unified spacing */}
-          {(threadContext || sessionId || inputSlot) && (
+          {/* Inline chips: thread context, todos, queue, questions — unified spacing */}
+          {(threadContext || sessionId || inputSlot || activeQuestion) && (
             <div className="flex flex-col gap-1.5 mx-3 mt-2.5 empty:hidden">
               {threadContext && (
                 <button
@@ -1623,117 +1635,129 @@ export function SessionChatInput({
                 </button>
               )}
               {sessionId && <TodoChip sessionId={sessionId} />}
+              {activeQuestion && onQuestionReply && onQuestionReject && (
+                <QuestionPrompt
+                  request={activeQuestion}
+                  onReply={onQuestionReply}
+                  onReject={onQuestionReject}
+                />
+              )}
               {inputSlot}
             </div>
           )}
 
-          {/* Attached files preview */}
-          <AttachmentPreview files={attachedFiles} onRemove={removeAttachedFile} />
+          {/* Attached files preview, textarea — hidden when a question is active */}
+          {!activeQuestion && (
+            <>
+              {/* Attached files preview */}
+              <AttachmentPreview files={attachedFiles} onRemove={removeAttachedFile} />
 
-          {/* Staged command badge */}
-          {stagedCommand && (
-            <div className="flex items-center gap-2 px-4 pt-3 pb-0">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 border border-border/50">
-                <Terminal className="size-3 text-muted-foreground" />
-                <span className="font-mono text-xs font-medium text-foreground">/{stagedCommand.name}</span>
-                <button
-                  type="button"
-                  onClick={() => { setStagedCommand(null); setText(''); }}
-                  className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Cancel command"
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
-              {stagedCommand.description && (
-                <span className="text-xs text-muted-foreground truncate">{stagedCommand.description}</span>
-              )}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1 px-3.5">
-            <div className="relative w-full">
-              {/* Add to queue button — floats top-right of textarea when busy and text is typed */}
-              {isBusy && text.trim() && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      onClick={handleSubmit}
-                      variant="ghost"
-                      className="absolute right-0 top-1 z-20 h-7 gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80"
+              {/* Staged command badge */}
+              {stagedCommand && (
+                <div className="flex items-center gap-2 px-4 pt-3 pb-0">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 border border-border/50">
+                    <Terminal className="size-3 text-muted-foreground" />
+                    <span className="font-mono text-xs font-medium text-foreground">/{stagedCommand.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setStagedCommand(null); setText(''); }}
+                      className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Cancel command"
                     >
-                      <ListPlus className="size-3.5" />
-                      <span>Queue</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top"><p>Add to queue</p></TooltipContent>
-                </Tooltip>
-              )}
-              {text.trim().length === 0 && !stagedCommand && (
-                <div
-                  aria-hidden
-                  className={cn(
-                    'absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground pointer-events-none transition-all duration-200',
-                    showAnimatedPlaceholder ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-0.5',
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                  {stagedCommand.description && (
+                    <span className="text-xs text-muted-foreground truncate">{stagedCommand.description}</span>
                   )}
-                >
-                  {placeholderVariants[placeholderIndex]}
                 </div>
               )}
-              {text.trim().length === 0 && stagedCommand && (
-                <div
-                  aria-hidden
-                  className="absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground/50 pointer-events-none"
-                >
-                  Enter details and press Enter, or press Esc to cancel
-                </div>
-              )}
-              {/* Highlight overlay — mirrors textarea text with colored mention spans */}
-              {highlightSegments && (
-                <div
-                  ref={highlightRef}
-                  aria-hidden
-                  className="absolute inset-0 pointer-events-none px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto text-[16px] sm:text-[15px] whitespace-pre-wrap break-words text-foreground"
-                  style={{ wordBreak: 'break-word', lineHeight: 'normal' }}
-                >
-                  {highlightSegments.map((seg, i) => (
-                    <span
-                      key={i}
+
+              <div className="flex flex-col gap-1 px-3.5">
+                <div className="relative w-full">
+                  {/* Add to queue button — floats top-right of textarea when busy and text is typed */}
+                  {isBusy && text.trim() && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          onClick={handleSubmit}
+                          variant="ghost"
+                          className="absolute right-0 top-1 z-20 h-7 gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                        >
+                          <ListPlus className="size-3.5" />
+                          <span>Queue</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top"><p>Add to queue</p></TooltipContent>
+                    </Tooltip>
+                  )}
+                  {text.trim().length === 0 && !stagedCommand && (
+                    <div
+                      aria-hidden
                       className={cn(
-                        seg.kind === 'file' && 'text-blue-500 font-medium',
-                        seg.kind === 'agent' && 'text-purple-500 font-medium',
-                        seg.kind === 'session' && 'text-emerald-500 font-medium',
+                        'absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground pointer-events-none transition-all duration-200',
+                        showAnimatedPlaceholder ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-0.5',
                       )}
                     >
-                      {seg.text}
-                    </span>
-                  ))}
+                      {placeholderVariants[placeholderIndex]}
+                    </div>
+                  )}
+                  {text.trim().length === 0 && stagedCommand && (
+                    <div
+                      aria-hidden
+                      className="absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground/50 pointer-events-none"
+                    >
+                      Enter details and press Enter, or press Esc to cancel
+                    </div>
+                  )}
+                  {/* Highlight overlay — mirrors textarea text with colored mention spans */}
+                  {highlightSegments && (
+                    <div
+                      ref={highlightRef}
+                      aria-hidden
+                      className="absolute inset-0 pointer-events-none px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto text-[16px] sm:text-[15px] whitespace-pre-wrap break-words text-foreground"
+                      style={{ wordBreak: 'break-word', lineHeight: 'normal' }}
+                    >
+                      {highlightSegments.map((seg, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            seg.kind === 'file' && 'text-blue-500 font-medium',
+                            seg.kind === 'agent' && 'text-purple-500 font-medium',
+                            seg.kind === 'session' && 'text-emerald-500 font-medium',
+                          )}
+                        >
+                          {seg.text}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={handleInput}
+                    onKeyDown={handleKeyDown}
+                    onScroll={() => {
+                      if (highlightRef.current && textareaRef.current) {
+                        highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+                      }
+                    }}
+                    placeholder=""
+                    rows={1}
+                    disabled={disabled}
+                    className={cn(
+                      'relative w-full bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-[24px] text-[16px] sm:text-[15px] outline-none placeholder:text-muted-foreground disabled:opacity-50',
+                      highlightSegments && 'caret-foreground text-transparent',
+                    )}
+                    autoFocus={shouldAutoFocus}
+                  />
                 </div>
-              )}
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={handleInput}
-                onKeyDown={handleKeyDown}
-                onScroll={() => {
-                  if (highlightRef.current && textareaRef.current) {
-                    highlightRef.current.scrollTop = textareaRef.current.scrollTop;
-                  }
-                }}
-                placeholder=""
-                rows={1}
-                disabled={disabled}
-                className={cn(
-                  'relative w-full bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-[24px] text-[16px] sm:text-[15px] outline-none placeholder:text-muted-foreground disabled:opacity-50',
-                  highlightSegments && 'caret-foreground text-transparent',
-                )}
-                autoFocus={shouldAutoFocus}
-              />
-            </div>
-          </div>
+              </div>
+            </>
+          )}
 
-          {/* Bottom toolbar */}
+          {/* Bottom toolbar — always visible */}
           <div className="flex items-center justify-between mb-1.5 pl-2 pr-1.5 gap-1 overflow-visible">
             {/* LEFT: Attach + Agent + Model + Variant */}
             <div className="flex items-center gap-0 min-w-0 overflow-visible">

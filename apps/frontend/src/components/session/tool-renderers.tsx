@@ -1825,22 +1825,25 @@ function InlineGrepResults({
 function GlobTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
 	const output = partOutput(part);
+	const status = partStatus(part);
 	const { openFile, openFileWithList, toDisplayPath } = useOcFileOpen();
 	const directory = getDirectory(input.path as string) || undefined;
 	const args: string[] = [];
 	if (input.pattern) args.push("pattern=" + String(input.pattern));
 
 	const filePaths = useMemo(() => parseFilePaths(output), [output]);
+	const hasResults = filePaths && filePaths.length > 0;
+	const isNoResults = !hasResults && status === "completed" && !!output;
 
 	return (
 		<BasicTool
 			icon={<Search className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Glob", subtitle: directory, args }}
+			trigger={{ title: "Glob", subtitle: directory, args: [...args, ...(isNoResults ? [] : []), ...(hasResults ? [`${filePaths.length} ${filePaths.length === 1 ? "file" : "files"}`] : isNoResults ? ["no matches"] : [])] }}
 			defaultOpen={defaultOpen}
 			forceOpen={forceOpen}
 			locked={locked}
 		>
-			{filePaths && filePaths.length > 0 ? (
+			{hasResults ? (
 				<div data-scrollable className="max-h-72 overflow-auto">
 					<InlineFileList
 						paths={filePaths}
@@ -1848,7 +1851,7 @@ function GlobTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 						toDisplayPath={toDisplayPath}
 					/>
 				</div>
-			) : output ? (
+			) : !isNoResults && output ? (
 				<div
 					data-scrollable
 					className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}
