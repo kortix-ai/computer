@@ -10,7 +10,7 @@
 
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getAuthToken } from '@/lib/auth-token';
+import { getAuthToken, authenticatedFetch } from '@/lib/auth-token';
 import type {
   FileContent,
   FileNode,
@@ -56,27 +56,42 @@ export async function readFile(filePath: string): Promise<FileContent> {
 }
 
 // ---------------------------------------------------------------------------
-// Binary helpers — decode readFile() response into Blob / trigger download
+// Binary helpers — fetch raw file bytes from /file/raw and trigger download
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a readFile() response into a Blob.
- * Handles both base64-encoded binary and plain text content.
+ * Fetch a file as a Blob via the `/file/raw` endpoint.
+ *
+ * This uses a dedicated binary endpoint that streams the raw file bytes
+ * instead of wrapping them in JSON. This is critical because the JSON
+ * `/file/content` endpoint returns `content: ""` for binary files
+ * (PDF, DOCX, PPTX, XLSX, videos, archives, etc.), making downloads of
+ * those files impossible through the old readFile() path.
+ *
+ * Falls back to decoding the JSON readFile() response only for text files
+ * where the raw endpoint isn't necessary (but still works).
  */
 export async function readFileAsBlob(filePath: string): Promise<Blob> {
-  const result = await readFile(filePath);
-  const bytes =
-    result.encoding === 'base64'
-      ? Uint8Array.from(atob(result.content), (c) => c.charCodeAt(0))
-      : new TextEncoder().encode(result.content);
-  return new Blob([bytes], {
-    type: result.mimeType || 'application/octet-stream',
-  });
+  const baseUrl = getActiveOpenCodeUrl();
+  const url = `${baseUrl}/file/raw?path=${encodeURIComponent(filePath)}`;
+
+  const response = await authenticatedFetch(url);
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to fetch file (${response.status}): ${text || response.statusText}`,
+    );
+  }
+
+  return response.blob();
 }
 
 /**
  * Download a file from the project to the user's machine.
- * Uses readFile() under the hood and triggers a browser download.
+ *
+ * Uses the `/file/raw` binary endpoint to fetch the actual file bytes
+ * and triggers a browser download via a temporary <a> element.
  */
 export async function downloadFile(
   filePath: string,

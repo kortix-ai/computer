@@ -13,7 +13,7 @@ import { Project } from '@/types/project';
 
 import { ViewType } from '@/stores/kortix-computer-store';
 import { cn } from '@/lib/utils';
-import { useFileList, readFile, fileListKeys, useFileUpload, useFileMkdir, useFileDelete, useFileRename, useFilesStore, FileBrowser, FileViewer, FileHistoryPanel } from '@/features/files';
+import { useFileList, fileListKeys, useFileUpload, useFileMkdir, useFileDelete, useFileRename, useFilesStore, FileBrowser, FileViewer, FileHistoryPanel, downloadFile } from '@/features/files';
 import { DesktopContextMenu } from './DesktopContextMenu';
 import { QuickLaunch } from './QuickLaunch';
 import { DesktopIcons } from './DesktopIcons';
@@ -556,31 +556,9 @@ export const SandboxDesktop = memo(function SandboxDesktop({
 
   const handleFileDownload = useCallback(async (filePath: string) => {
     const fileName = filePath.split('/').pop() || 'download';
-    
     try {
       toast.loading(`Downloading ${fileName}...`, { id: 'download' });
-      
-      // Use OpenCode readFile API
-      const result = await readFile(filePath);
-      let blob: Blob;
-      if (result.encoding === 'base64') {
-        const binary = atob(result.content);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        blob = new Blob([bytes], { type: result.mimeType || 'application/octet-stream' });
-      } else {
-        blob = new Blob([result.content], { type: 'text/plain' });
-      }
-      
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
+      await downloadFile(filePath, fileName);
       toast.success(`Downloaded ${fileName}`, { id: 'download' });
     } catch (error) {
       console.error('Download failed:', error);
