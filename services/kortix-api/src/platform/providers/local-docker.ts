@@ -337,6 +337,22 @@ export class LocalDockerProvider implements SandboxProvider {
     // INTERNAL_SERVICE_KEY: used for proxy/cron → sandbox auth
     const serviceKey = config.INTERNAL_SERVICE_KEY;
 
+    // Vars we set explicitly — sandbox/.env must NOT override these
+    const MANAGED_VARS = new Set([
+      'KORTIX_TOKEN',
+      'KORTIX_API_URL',
+      'SANDBOX_ID',
+      'INTERNAL_SERVICE_KEY',
+      'PROJECT_ID',
+      'ENV_MODE',
+    ]);
+
+    // Filter sandbox/.env: drop any var we manage ourselves
+    const filteredSandboxEnv = sandboxEnvVars.filter((entry) => {
+      const varName = entry.split('=')[0];
+      return !MANAGED_VARS.has(varName);
+    });
+
     const env = [
       'PUID=1000',
       'PGID=1000',
@@ -357,7 +373,8 @@ export class LocalDockerProvider implements SandboxProvider {
       'ENV_MODE=local',
       // INTERNAL_SERVICE_KEY: proxy/cron → sandbox auth
       ...(serviceKey ? [`INTERNAL_SERVICE_KEY=${serviceKey}`] : []),
-      ...sandboxEnvVars,
+      // Extra env from sandbox/.env (API keys, etc.) — managed vars already filtered out
+      ...filteredSandboxEnv,
     ];
 
     const container = await this.docker.createContainer({
