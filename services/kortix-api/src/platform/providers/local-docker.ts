@@ -100,6 +100,24 @@ function getDocker(): Docker {
   return new Docker();
 }
 
+// ─── Image Pull State ────────────────────────────────────────────────────────
+
+export interface ImagePullStatus {
+  state: 'idle' | 'pulling' | 'done' | 'error';
+  /** 0-100 progress percentage */
+  progress: number;
+  /** Human-readable status message */
+  message: string;
+  error?: string;
+}
+
+/** Singleton pull state — one sandbox, one pull at a time. */
+let _pullStatus: ImagePullStatus = { state: 'idle', progress: 0, message: '' };
+
+export function getImagePullStatus(): ImagePullStatus {
+  return { ..._pullStatus };
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export class LocalDockerProvider implements SandboxProvider {
@@ -243,7 +261,76 @@ export class LocalDockerProvider implements SandboxProvider {
 
   private _lastCreateOpts?: CreateSandboxOpts;
 
+  /**
+   * Check if the sandbox image exists locally.
+   */
+  async hasImage(): Promise<boolean> {
+    try {
+      await this.docker.getImage(config.SANDBOX_IMAGE).inspect();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Pull the sandbox image with progress tracking.
+   * Resolves when pull is complete. Updates _pullStatus throughout.
+   */
+  async pullImage(): Promise<void> {
+    const image = config.SANDBOX_IMAGE;
+    _pullStatus = { state: 'pulling', progress: 0, message: `Pulling ${image}...` };
+
+    await new Promise<void>((resolve, reject) => {
+      this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+        if (err) {
+          _pullStatus = { state: 'error', progress: 0, message: err.message, error: err.message };
+          return reject(err);
+        }
+        const layerProgress: Record<string, { current: number; total: number }> = {};
+        this.docker.modem.followProgress(
+          stream,
+          (err2: Error | null) => {
+            if (err2) {
+              _pullStatus = { state: 'error', progress: 0, message: err2.message, error: err2.message };
+              return reject(err2);
+            }
+            _pullStatus = { state: 'done', progress: 100, message: 'Image pulled successfully' };
+            console.log(`[LOCAL-DOCKER] Image ${image} pulled successfully`);
+            resolve();
+          },
+          (event: any) => {
+            // Track layer-level progress
+            if (event.id && event.progressDetail?.total) {
+              layerProgress[event.id] = {
+                current: event.progressDetail.current || 0,
+                total: event.progressDetail.total,
+              };
+              const layers = Object.values(layerProgress);
+              const totalBytes = layers.reduce((s, l) => s + l.total, 0);
+              const currentBytes = layers.reduce((s, l) => s + l.current, 0);
+              const pct = totalBytes > 0 ? Math.round((currentBytes / totalBytes) * 100) : 0;
+              _pullStatus = {
+                state: 'pulling',
+                progress: Math.min(pct, 99), // never show 100 until fully done
+                message: `Pulling image... ${pct}%`,
+              };
+            } else if (event.status) {
+              _pullStatus = { ..._pullStatus, message: event.status };
+            }
+          },
+        );
+      });
+    });
+  }
+
   private async createContainer(): Promise<void> {
+    // Pull image if not present locally
+    if (!(await this.hasImage())) {
+      console.log(`[LOCAL-DOCKER] Image ${config.SANDBOX_IMAGE} not found locally, pulling...`);
+      await this.pullImage();
+    }
+
     const authToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN || generateSandboxToken();
     const sandboxEnvVars = readSandboxEnv();
 
