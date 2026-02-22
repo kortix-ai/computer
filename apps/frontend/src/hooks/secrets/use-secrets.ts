@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
+import { authenticatedFetch } from '@/lib/auth-token';
 
 const getInstanceUrl = () => getActiveOpenCodeUrl();
 
@@ -17,7 +18,7 @@ export function useSecrets() {
   return useQuery({
     queryKey: secretsKeys.all,
     queryFn: async (): Promise<Record<string, string>> => {
-      const res = await fetch(`${getInstanceUrl()}/env`);
+      const res = await authenticatedFetch(`${getInstanceUrl()}/env`);
       if (!res.ok) throw new Error('Failed to fetch secrets');
       const data = await res.json();
       return data.secrets ?? {};
@@ -32,7 +33,7 @@ export function useSetSecret() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const res = await fetch(`${getInstanceUrl()}/env/${encodeURIComponent(key)}`, {
+      const res = await authenticatedFetch(`${getInstanceUrl()}/env/${encodeURIComponent(key)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value }),
@@ -67,7 +68,7 @@ export function useDeleteSecret() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (key: string) => {
-      const res = await fetch(`${getInstanceUrl()}/env/${encodeURIComponent(key)}`, {
+      const res = await authenticatedFetch(`${getInstanceUrl()}/env/${encodeURIComponent(key)}`, {
         method: 'DELETE',
       });
       if (!res.ok) {

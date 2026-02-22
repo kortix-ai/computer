@@ -283,7 +283,7 @@ export function OcMemGetToolView({
     );
   }
 
-  // --- File read result (MEMORY.md style) ---
+  // --- File read result ---
   if (fileResult) {
     const filename = getFilename(fileResult.path);
     return (
