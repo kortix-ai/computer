@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { mkdir, rm } from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync, readdirSync } from 'fs'
 import { SecretStore } from '../services/secret-store'
 
 const envRouter = new Hono()
@@ -33,27 +33,69 @@ async function deleteS6Env(key: string): Promise<void> {
   try { await rm(`${S6_ENV_DIR}/${key}`) } catch {}
 }
 
-async function run(cmd: string): Promise<{ ok: boolean; output: string }> {
+/**
+ * Get the innermost PID namespace PID for a given /proc entry.
+ * Returns the PID to use with process.kill() from within this namespace.
+ */
+function getInnerNsPid(procPid: number): number | null {
   try {
-    const proc = Bun.spawn(['bash', '-c', cmd], {
-      stdout: 'pipe', stderr: 'pipe',
-      env: { ...process.env, HOME: '/workspace' },
-    })
-    const [stdout, stderr] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ])
-    const exitCode = await proc.exited
-    return { ok: exitCode === 0, output: (stdout + '\n' + stderr).trim() }
-  } catch (e) {
-    return { ok: false, output: String(e) }
+    const status = readFileSync(`/proc/${procPid}/status`, 'utf-8')
+    const nspidLine = status.split('\n').find(l => l.startsWith('NSpid:'))
+    if (!nspidLine) return null
+    const nspids = nspidLine.split(/\s+/).slice(1).map(Number)
+    const innerPid = nspids[nspids.length - 1]
+    return (!isNaN(innerPid) && innerPid > 0) ? innerPid : null
+  } catch {
+    return null
   }
 }
 
 async function restartServices(): Promise<void> {
-  const r1 = await run('sudo s6-svc -r /run/service/svc-opencode-serve')
-  const r2 = await run('sudo s6-svc -r /run/service/svc-opencode-web')
-  console.log(`[ENV API] restart serve: ok=${r1.ok}, web: ok=${r2.ok}`)
+  // Restart OpenCode so it picks up new env vars via s6 with-contenv.
+  //
+  // The opencode CLI is a Node wrapper → native binary chain. s6-svc -r
+  // only SIGTERMs the supervised PID and doesn't propagate to grandchildren.
+  //
+  // CRITICAL: This container uses `unshare --pid` creating a nested PID
+  // namespace. `pgrep`/`kill`/`killall` all fail because they resolve PIDs
+  // in the outer namespace but kill() operates in the inner namespace.
+  // We read NSpid from /proc/{pid}/status to get the inner namespace PID.
+  try {
+    const killed: number[] = []
+
+    for (const entry of readdirSync('/proc')) {
+      const pid = parseInt(entry, 10)
+      if (isNaN(pid) || pid <= 1) continue
+      try {
+        const comm = readFileSync(`/proc/${pid}/comm`, 'utf-8').trim()
+        // Kill native opencode binaries (comm="opencode")
+        if (comm === 'opencode') {
+          const innerPid = getInnerNsPid(pid)
+          if (innerPid) {
+            process.kill(innerPid, 9)
+            killed.push(innerPid)
+          }
+          continue
+        }
+        // Kill node wrappers (comm="node", cmdline contains opencode)
+        if (comm === 'node' || comm === 'MainThread') {
+          const cmdline = readFileSync(`/proc/${pid}/cmdline`, 'utf-8')
+          if (cmdline.includes('/usr/local/bin/opencode')) {
+            const innerPid = getInnerNsPid(pid)
+            if (innerPid) {
+              process.kill(innerPid, 9)
+              killed.push(innerPid)
+            }
+          }
+        }
+      } catch {}
+    }
+
+    console.log(`[ENV API] restart opencode: killed inner pids=${killed.join(',')}`)
+    // s6 detects longrun died → auto-restarts with fresh env via with-contenv.
+  } catch (e) {
+    console.error(`[ENV API] restart opencode: error=${e}`)
+  }
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
