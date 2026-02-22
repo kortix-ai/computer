@@ -8,7 +8,7 @@ import type {
 	QuestionRequest,
 	SessionStatus,
 	Todo,
-} from "@kortix/opencode-sdk/v2/client";
+} from "@opencode-ai/sdk/v2/client";
 import { useEffect, useRef } from "react";
 import { getClient } from "@/lib/opencode-sdk";
 import {

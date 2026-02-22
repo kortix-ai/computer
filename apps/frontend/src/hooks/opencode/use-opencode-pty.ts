@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import type { Pty } from '@kortix/opencode-sdk/v2/client';
+import type { Pty } from '@opencode-ai/sdk/v2/client';
 
 export type { Pty };
 

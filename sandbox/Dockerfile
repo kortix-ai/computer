@@ -99,28 +99,27 @@ ENV AGENT_BROWSER_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWeb
 COPY sandbox/browser-viewer/ /opt/agent-browser-viewer/
 
 # ── OpenCode CLI ────────────────────────────────────────────────────────────
-# Initial install for Docker image; postinstall.sh handles version updates.
+# Install upstream OpenCode from npm. File I/O is handled by kortix-master,
+# so we only need the core CLI for sessions, agents, PTY, MCP, etc.
 # npm installs the glibc binary by default; force-install the musl variant
 # and symlink it over the glibc one so the wrapper script finds it.
-# Falls back to "latest" if the pinned version isn't on npm yet (e.g. Docker
-# build runs before or without CLI publish).
-RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['@kortix/opencode-ai']||'latest')" 2>/dev/null || echo "latest") \
-    && echo "Attempting CLI install @kortix/opencode-ai@$CLI_VERSION..." \
-    && if ! npm view "@kortix/opencode-ai@$CLI_VERSION" version >/dev/null 2>&1; then \
+RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['opencode-ai']||'latest')" 2>/dev/null || echo "latest") \
+    && echo "Installing opencode-ai@$CLI_VERSION..." \
+    && if ! npm view "opencode-ai@$CLI_VERSION" version >/dev/null 2>&1; then \
          echo "Version $CLI_VERSION not on npm — falling back to latest"; \
          CLI_VERSION="latest"; \
        fi \
-    && npm install -g "@kortix/opencode-ai@$CLI_VERSION" \
+    && npm install -g "opencode-ai@$CLI_VERSION" \
     && ARCH=$(uname -m) \
     && if [ "$ARCH" = "x86_64" ]; then \
-         npm install -g "@kortix/opencode-ai-linux-x64-musl@$CLI_VERSION" --force \
-         && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-x64-musl/bin/opencode \
-         && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-x64/bin/opencode \
+         npm install -g "opencode-linux-x64-musl@$CLI_VERSION" --force \
+         && MUSL_BIN=$(npm root -g)/opencode-linux-x64-musl/bin/opencode \
+         && GLIBC_BIN=$(npm root -g)/opencode-ai/node_modules/opencode-linux-x64/bin/opencode \
          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
        else \
-         npm install -g "@kortix/opencode-ai-linux-arm64-musl@$CLI_VERSION" --force \
-         && MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-arm64-musl/bin/opencode \
-         && GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-arm64/bin/opencode \
+         npm install -g "opencode-linux-arm64-musl@$CLI_VERSION" --force \
+         && MUSL_BIN=$(npm root -g)/opencode-linux-arm64-musl/bin/opencode \
+         && GLIBC_BIN=$(npm root -g)/opencode-ai/node_modules/opencode-linux-arm64/bin/opencode \
          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
        fi \
     && rm /tmp/sandbox-pkg-versions.json \

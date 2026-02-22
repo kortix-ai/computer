@@ -1,7 +1,7 @@
 /**
  * OpenCode File API — filesystem access via the SDK client.
  *
- * All calls go through the `@kortix/opencode-sdk` client singleton,
+ * All calls go through the `@opencode-ai/sdk` client singleton,
  * which handles base URL, headers, and error handling consistently.
  *
  * Read endpoints: list, read, status, find
@@ -153,7 +153,7 @@ export async function uploadFile(
   file: File | Blob,
   targetPath?: string,
 ): Promise<UploadResult[]> {
-  const client = getClient();
+  const baseUrl = getActiveOpenCodeUrl();
   const rawPath = (targetPath ?? '').trim();
   const normalizedPath =
     !rawPath || rawPath === '/' || rawPath === '.'
@@ -161,26 +161,68 @@ export async function uploadFile(
       : rawPath.startsWith('/')
         ? rawPath
         : `/${rawPath}`;
-  const result = await client.file.upload({ file, path: normalizedPath });
-  return unwrap(result) as UploadResult[];
+
+  const form = new FormData();
+  const fileName = file instanceof File ? file.name : 'upload';
+  form.append('file', file, fileName);
+  form.append('path', normalizedPath);
+
+  const token = await getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${baseUrl}/file/upload`, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Upload failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 /**
  * Delete a file or directory (recursively).
  */
 export async function deleteFile(filePath: string): Promise<boolean> {
-  const client = getClient();
-  const result = await client.file.delete({ path: filePath });
-  return unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Delete failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 /**
  * Create a directory (recursive, idempotent).
  */
 export async function mkdirFile(dirPath: string): Promise<boolean> {
-  const client = getClient();
-  const result = await client.file.mkdir({ path: dirPath });
-  return unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file/mkdir`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: dirPath }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Mkdir failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 /**
@@ -253,9 +295,19 @@ export async function copyFile(
  * Rename or move a file/directory.
  */
 export async function renameFile(from: string, to: string): Promise<boolean> {
-  const client = getClient();
-  const result = await client.file.rename({ from, to });
-  return unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Rename failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 // ---------------------------------------------------------------------------

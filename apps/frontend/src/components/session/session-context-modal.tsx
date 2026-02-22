@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/accordion';
 import type { MessageWithParts } from '@/ui/types';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
-import type { Session, AssistantMessage, Message, Part } from '@kortix/opencode-sdk/v2/client';
+import type { Session, AssistantMessage, Message, Part } from '@opencode-ai/sdk/v2/client';
 
 // ============================================================================
 // Context metrics — ported 1:1 from SolidJS session-context-metrics.ts

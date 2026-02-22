@@ -12,7 +12,7 @@
 
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getAuthToken } from '@/lib/auth-token';
+import { getAuthToken, authenticatedFetch } from '@/lib/auth-token';
 import type {
   Skill,
   CreateSkillInput,
@@ -145,9 +145,16 @@ export async function createSkill(input: CreateSkillInput): Promise<void> {
   const skillDir = `${SKILLS_DIR}/${input.name}`;
 
   // Ensure the skill directory exists
-  const client = getClient();
-  const mkdirResult = await client.file.mkdir({ path: skillDir });
-  unwrap(mkdirResult);
+  const baseUrl = getActiveOpenCodeUrl();
+  const mkdirRes = await authenticatedFetch(`${baseUrl}/file/mkdir`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: skillDir }),
+  });
+  if (!mkdirRes.ok) {
+    const text = await mkdirRes.text().catch(() => '');
+    throw new Error(`Failed to create skill directory (${mkdirRes.status}): ${text || mkdirRes.statusText}`);
+  }
 
   // Write the SKILL.md file
   const filePath = `${skillDir}/SKILL.md`;
@@ -193,9 +200,16 @@ export async function deleteSkill(location: string): Promise<void> {
   const relativePath = toRelativePath(location);
   // Remove the /SKILL.md suffix to get the directory
   const skillDir = relativePath.replace(/\/SKILL\.md$/, '');
-  const client = getClient();
-  const result = await client.file.delete({ path: skillDir });
-  unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: skillDir }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to delete skill (${res.status}): ${text || res.statusText}`);
+  }
 
   // Force rescan so the deleted skill is removed from the list
   await refreshSkills();

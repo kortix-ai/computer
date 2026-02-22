@@ -72,9 +72,6 @@ importers:
       '@icons-pack/react-simple-icons':
         specifier: ^13.7.0
         version: 13.11.2(react@18.3.1)
-      '@kortix/opencode-sdk':
-        specifier: ^0.5.2
-        version: 0.5.5
       '@kortix/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -93,6 +90,9 @@ importers:
       '@number-flow/react':
         specifier: ^0.5.7
         version: 0.5.11(react-dom@18.3.1)(react@18.3.1)
+      '@opencode-ai/sdk':
+        specifier: ^1.2.10
+        version: 1.2.10
       '@pipedream/sdk':
         specifier: ^2.3.7
         version: 2.3.7
@@ -3543,10 +3543,6 @@ packages:
       solid-js: 1.9.11
     dev: false
 
-  /@kortix/opencode-sdk@0.5.5:
-    resolution: {integrity: sha512-aFE5dsv6573wHGZEREKLDjWs1Zq9k4jwQgY0lwBvQWajZ2mVs8AFbbxtEENoXZLi16eNxHc4vnFhR+NgJUXSoQ==}
-    dev: false
-
   /@kurkle/color@0.3.4:
     resolution: {integrity: sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w==}
     dev: false
@@ -4136,6 +4132,10 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /@opencode-ai/sdk@1.2.10:
+    resolution: {integrity: sha512-SyXcVqry2hitPVvQtvXOhqsWyFhSycG/+LTLYXrcq8AFmd9FR7dyBSDB3f5Ol6IPkYOegk8P2Eg2kKPNSNiKGw==}
+    dev: false
 
   /@opentelemetry/api-logs@0.207.0:
     resolution: {integrity: sha512-lAb0jQRVyleQQGiuuvCOTDVspc14nx6XJjP4FspJ1sNARo3Regq4ZZbrc3rN4b1TYSuUCvgH+UXUPug4SLOqEQ==}
