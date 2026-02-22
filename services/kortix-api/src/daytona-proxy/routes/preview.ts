@@ -224,7 +224,8 @@ preview.all('/:sandboxId/:port/*', async (c) => {
         method,
         headers,
         body,
-        // @ts-ignore - Bun supports duplex
+        // @ts-ignore — Bun extensions: no decompression (raw byte passthrough), duplex streaming
+        decompress: false,
         duplex: 'half',
       });
 

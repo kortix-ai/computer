@@ -11,7 +11,7 @@ import { MermaidRenderer } from '@/components/ui/mermaid-renderer';
 import { isMermaidCode } from '@/lib/mermaid-utils';
 import { autoLinkUrls } from '@kortix/shared';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
-import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from '@/stores/server-store';
 import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
 
 // Helper to check if a URL is internal (same origin)
@@ -457,11 +457,12 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
     s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
   );
   const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
+  const subdomainOpts = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
 
   /** Rewrite a localhost:PORT URL through the sandbox proxy, or pass through. */
   const proxy = useCallback(
-    (url: string | undefined) => proxyLocalhostUrl(url, serverUrl),
-    [serverUrl],
+    (url: string | undefined) => proxyLocalhostUrl(url, serverUrl, undefined, subdomainOpts),
+    [serverUrl, subdomainOpts],
   );
 
   // Memoize the Streamdown components object so that Block's React.memo
@@ -471,7 +472,6 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   // ALL blocks re-render → browser Selection/Range destroyed → text unselected.
   // With memoized components, only the LAST block (whose content actually changed)
   // re-renders, while completed blocks keep their DOM intact, preserving selection.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const components = useMemo(() => ({
     // ═══════════════════════════════════════════════════════════════
     // HEADINGS - Clean hierarchy with proper weight distribution

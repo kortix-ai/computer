@@ -26,7 +26,7 @@ import {
   parseLocalhostUrl,
   proxyLocalhostUrl,
 } from '@/lib/utils/sandbox-url';
-import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from '@/stores/server-store';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 
@@ -40,19 +40,20 @@ function SidePanelIframePreview({ url, title }: { url: string; title?: string })
   });
   const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
   const mappedPorts = activeServer?.mappedPorts;
+  const subdomainOpts = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
 
   const proxy = useMemo(() => {
     if (!url) return null;
     if (!isProxiableLocalhostUrl(url)) return null;
     const parsed = parseLocalhostUrl(url);
     if (!parsed) return null;
-    const proxyUrl = proxyLocalhostUrl(url, serverUrl, mappedPorts);
+    const proxyUrl = proxyLocalhostUrl(url, serverUrl, mappedPorts, subdomainOpts);
     if (!proxyUrl) return null;
     return {
       proxyUrl,
       port: parsed.port,
     };
-  }, [url, serverUrl, mappedPorts]);
+  }, [url, serverUrl, mappedPorts, subdomainOpts]);
 
   const authenticatedUrl = useAuthenticatedPreviewUrl(proxy?.proxyUrl || url);
   const [isLoading, setIsLoading] = useState(true);
@@ -205,9 +206,10 @@ export function OcShowUserToolView({
   });
   const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
   const mappedPorts = activeServer?.mappedPorts;
+  const subdomainOpts2 = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
   const resolvedUrl = useMemo(
-    () => proxyLocalhostUrl(url, serverUrl, mappedPorts) ?? url,
-    [url, serverUrl, mappedPorts],
+    () => proxyLocalhostUrl(url, serverUrl, mappedPorts, subdomainOpts2) ?? url,
+    [url, serverUrl, mappedPorts, subdomainOpts2],
   );
 
   const displayTitle = title || description || 'Output';

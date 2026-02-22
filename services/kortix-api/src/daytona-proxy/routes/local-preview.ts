@@ -1,193 +1,117 @@
 /**
- * Local Preview Proxy — handles /preview/{sandboxId}/{port}/* requests in local mode.
+ * Local Preview Proxy — dumb pipe to Kortix Master inside the sandbox.
  *
- * This is the local-mode counterpart of the Daytona preview proxy.
- * Instead of going through Daytona SDK, it proxies directly to the sandbox
- * container on the Docker network using the sandbox ID as the Docker DNS name.
+ * TRUE TRANSPARENT PROXY:
+ *   - decompress: false — raw bytes pass through untouched
+ *   - Response body streamed 1:1 (never buffered)
+ *   - Only touches: Host, Authorization (service key), CORS
  *
- * URL pattern:
- *   /v1/preview/{sandboxId}/{port}/*
+ * Called from index.ts subdomain handler for subdomain-based routing:
+ *   http://p{port}-{sandboxId}.localhost:{backendPort}/
  *
- * Routing:
- *   - Port 8000 (Kortix Master): proxy to http://{sandboxId}:8000/{path}
- *   - Other ports: proxy to http://{sandboxId}:8000/proxy/{port}/{path}
- *     (Kortix Master's built-in port proxy)
- *
- * The sandboxId is the Docker container name (e.g. 'kortix-sandbox'),
- * which resolves via Docker DNS on the shared network.
- *
- * Handles HTTP, SSE (text/event-stream), and regular responses.
  * WebSocket upgrades are handled at the Bun server level (see index.ts).
  */
 
-import { Hono } from 'hono';
 import { config } from '../../config';
 
 const KORTIX_MASTER_PORT = 8000;
 const FETCH_TIMEOUT_MS = 30_000;
 
-const localPreview = new Hono();
+const STRIP_REQUEST_HEADERS = new Set([
+  'host',
+  'authorization',
+  'connection',
+  'keep-alive',
+  'te',
+  'upgrade',
+]);
 
 /**
- * Resolve the sandbox's Kortix Master URL from its container name.
- * Inside Docker: http://{sandboxId}:8000 (Docker DNS resolves the container name)
- * On host (pnpm dev): http://localhost:{SANDBOX_PORT_BASE} (fixed port mapping)
+ * Resolve the sandbox's Kortix Master URL.
+ * Inside Docker: http://{sandboxId}:8000 (Docker DNS)
+ * On host (pnpm dev): http://localhost:{SANDBOX_PORT_BASE}
  */
 export function getSandboxBaseUrl(sandboxId: string): string {
-  // SANDBOX_NETWORK is only set when the API runs inside Docker (via docker-compose).
-  // In that case, Docker DNS resolves the container name directly.
-  // When running on the host (pnpm dev), even with DOCKER_HOST set for socket access,
-  // Docker DNS won't work — use localhost with mapped ports instead.
   if (config.SANDBOX_NETWORK) {
     return `http://${sandboxId}:8000`;
   }
   return `http://localhost:${config.SANDBOX_PORT_BASE}`;
 }
 
-// Match any sandboxId — the conditional mount in daytona-proxy/index.ts ensures
-// this handler is only active in local mode.
-localPreview.all('/:sandboxId/:port/*', async (c) => {
-  const sandboxId = c.req.param('sandboxId');
-  const portStr = c.req.param('port');
-  const port = parseInt(portStr, 10);
-
-  if (isNaN(port) || port < 1 || port > 65535) {
-    return c.json({ error: `Invalid port: ${portStr}` }, 400);
-  }
-
-  // Build remaining path after /{sandboxId}/{port}
-  const fullPath = new URL(c.req.url).pathname;
-  const prefixPattern = `/${sandboxId}/${portStr}`;
-  const prefixIndex = fullPath.indexOf(prefixPattern);
-  const remainingPath = prefixIndex !== -1
-    ? fullPath.slice(prefixIndex + prefixPattern.length) || '/'
-    : '/';
-  const queryString = new URL(c.req.url).search;
-
-  // Build target URL
+/**
+ * Core proxy function — used by both Hono route handler and subdomain handler.
+ * Exported so index.ts can call it directly for subdomain routing.
+ */
+export async function proxyToSandbox(
+  sandboxId: string,
+  port: number,
+  method: string,
+  path: string,
+  queryString: string,
+  incomingHeaders: Headers,
+  incomingBody: ArrayBuffer | undefined,
+  acceptsSSE: boolean,
+  origin: string,
+): Promise<Response> {
   const sandboxBaseUrl = getSandboxBaseUrl(sandboxId);
-  let targetUrl: string;
+  const targetUrl = port === KORTIX_MASTER_PORT
+    ? `${sandboxBaseUrl}${path}${queryString}`
+    : `${sandboxBaseUrl}/proxy/${port}${path}${queryString}`;
 
-  if (port === KORTIX_MASTER_PORT) {
-    // Direct to Kortix Master root
-    targetUrl = `${sandboxBaseUrl}${remainingPath}${queryString}`;
-  } else {
-    // Through Kortix Master's port proxy: /proxy/{port}/{path}
-    targetUrl = `${sandboxBaseUrl}/proxy/${port}${remainingPath}${queryString}`;
-  }
-
-  // Forward headers (strip Host, replace Authorization with service key)
+  // Forward headers transparently
   const headers = new Headers();
-  for (const [key, value] of c.req.raw.headers.entries()) {
-    const lower = key.toLowerCase();
-    // Strip Host (proxied separately) and Authorization (replaced with service key)
-    if (lower === 'host' || lower === 'authorization') continue;
+  for (const [key, value] of incomingHeaders.entries()) {
+    if (STRIP_REQUEST_HEADERS.has(key.toLowerCase())) continue;
     headers.set(key, value);
   }
-
-  // Inject internal service key for sandbox-side auth (if configured).
-  // The user's JWT was already validated by the middleware;
-  // now we forward the INTERNAL_SERVICE_KEY so the sandbox trusts the proxy.
+  headers.set('Host', new URL(sandboxBaseUrl).host);
   if (config.INTERNAL_SERVICE_KEY) {
     headers.set('Authorization', `Bearer ${config.INTERNAL_SERVICE_KEY}`);
   }
 
-  // SSE detection for proper timeout/streaming handling
-  const acceptsSSE = (c.req.header('accept') || '').includes('text/event-stream');
-
-  // Abort controller: SSE links to client disconnect, HTTP has 30s timeout
+  // Abort handling
   const controller = new AbortController();
-  const { signal } = controller;
-
-  if (acceptsSSE) {
-    const clientSignal = c.req.raw.signal;
-    if (clientSignal) {
-      if (clientSignal.aborted) {
-        controller.abort();
-      } else {
-        clientSignal.addEventListener('abort', () => controller.abort(), { once: true });
-      }
-    }
-  } else {
+  if (!acceptsSSE) {
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+    controller.signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
   }
 
-  try {
-    // Read body as ArrayBuffer (Bun drops ReadableStream bodies on small payloads)
-    let body: ArrayBuffer | undefined;
-    if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
-      body = await c.req.raw.arrayBuffer();
-    }
+  const response = await fetch(targetUrl, {
+    method,
+    headers,
+    body: incomingBody,
+    signal: acceptsSSE ? undefined : controller.signal,
+    // @ts-ignore — Bun extension: no decompression, raw byte passthrough
+    decompress: false,
+    redirect: 'manual',
+  });
 
-    const response = await fetch(targetUrl, {
-      method: c.req.method,
-      headers,
-      body,
-      signal,
-    });
-
-    // Inject CORS headers
-    const respHeaders = new Headers(response.headers);
-    const origin = c.req.header('Origin') || '';
-    if (origin) {
-      respHeaders.set('Access-Control-Allow-Origin', origin);
-      respHeaders.set('Access-Control-Allow-Credentials', 'true');
-    }
-
-    // SSE/streaming: pass body through without buffering
-    const contentType = response.headers.get('content-type') || '';
-    if (
-      contentType.includes('text/event-stream') ||
-      contentType.includes('application/octet-stream')
-    ) {
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: respHeaders,
-      });
-    }
-
-    // Regular response: buffer to avoid Bun ReadableStream issues
-    const responseBody = await response.arrayBuffer();
-    return new Response(responseBody, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: respHeaders,
-    });
-  } catch (error) {
-    if (
-      error instanceof DOMException &&
-      (error.name === 'AbortError' || error.name === 'TimeoutError')
-    ) {
-      if (!acceptsSSE) {
-        return c.json(
-          {
-            error: 'Sandbox not responding',
-            details: `${remainingPath} timed out after ${FETCH_TIMEOUT_MS / 1000}s`,
-          },
-          504,
-        );
-      }
-      return new Response(null, { status: 499 });
-    }
-
-    console.error(
-      `[local-preview] Error for ${sandboxId}:${port}${remainingPath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return c.json(
-      { error: 'Failed to proxy to sandbox', details: String(error) },
-      502,
-    );
+  // Stream response 1:1, only add CORS + fix redirects
+  const respHeaders = new Headers(response.headers);
+  if (origin) {
+    respHeaders.set('Access-Control-Allow-Origin', origin);
+    respHeaders.set('Access-Control-Allow-Credentials', 'true');
   }
-});
 
-// Handle /{sandboxId}/:port without trailing path — redirect to /{sandboxId}/:port/
-localPreview.all('/:sandboxId/:port', async (c) => {
-  const sandboxId = c.req.param('sandboxId');
-  const port = c.req.param('port');
-  const url = new URL(c.req.url);
-  return c.redirect(`/${sandboxId}/${port}/${url.search}`, 301);
-});
+  // Fix Location header for redirects.
+  // Kortix Master's proxy rewrites e.g. http://localhost:5173/path → /proxy/5173/path.
+  // For subdomain routing (p5173-sandbox.localhost:8008), the client already "is" at
+  // the right port — strip the /proxy/{port} prefix so the redirect is just /path.
+  // For path-based routing (OpenCode API at port 8000), there's no /proxy/ prefix, so
+  // this is a no-op.
+  const location = respHeaders.get('location');
+  if (location && port !== KORTIX_MASTER_PORT) {
+    const proxyPrefix = `/proxy/${port}`;
+    if (location.startsWith(proxyPrefix)) {
+      respHeaders.set('location', location.slice(proxyPrefix.length) || '/');
+    }
+  }
 
-export { localPreview };
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: respHeaders,
+  });
+}
+
+

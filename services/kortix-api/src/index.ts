@@ -15,7 +15,9 @@ import { cronApp, startScheduler, stopScheduler, getSchedulerStatus } from './cr
 import { channelsApp, startChannelService, stopChannelService, getChannelServiceStatus } from './channels';
 import { daytonaProxyApp } from './daytona-proxy';
 import { deploymentsApp } from './deployments';
-import { getSandboxBaseUrl } from './daytona-proxy/routes/local-preview';
+import { getSandboxBaseUrl, proxyToSandbox } from './daytona-proxy/routes/local-preview';
+import { validateSandboxToken } from './repositories/sandboxes';
+import { getSupabase } from './shared/supabase';
 import { setupApp } from './setup';
 import { providersApp } from './providers/routes';
 import { secretsApp } from './secrets/routes';
@@ -398,86 +400,211 @@ function resetIdleTimer(ws: { data: WsProxyData; close: (code?: number, reason?:
 
 let activeWsConnections = 0;
 
+// ── Subdomain preview routing ───────────────────────────────────────────────
+// Pattern: p{port}-{sandboxId}.localhost:{serverPort}
+// Parsed from the Host header before Hono routing kicks in.
+
+const SUBDOMAIN_REGEX = /^p(\d+)-([^.]+)\.localhost/;
+const PREVIEW_SESSION_COOKIE = '__preview_session';
+
+function parsePreviewSubdomain(host: string): { port: number; sandboxId: string } | null {
+  const match = host.match(SUBDOMAIN_REGEX);
+  if (!match) return null;
+  const port = parseInt(match[1], 10);
+  if (isNaN(port) || port < 1 || port > 65535) return null;
+  return { port, sandboxId: match[2] };
+}
+
+function extractCookieToken(req: Request): string | null {
+  const cookieHeader = req.headers.get('Cookie') || '';
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${PREVIEW_SESSION_COOKIE}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function validatePreviewToken(token: string): Promise<boolean> {
+  if (token.startsWith('sbt_')) {
+    const result = await validateSandboxToken(token);
+    return result.isValid;
+  }
+  try {
+    const supabase = getSupabase();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    return !error && !!user;
+  } catch {
+    return false;
+  }
+}
+
+// ── Local-mode session tracking ─────────────────────────────────────────────
+// Once a subdomain is authenticated via ?token= on the first request, all
+// subsequent requests to that subdomain pass through without auth.
+// This avoids third-party cookie issues in iframes (Chrome blocks them).
+// Like ngrok free tier — auth on first load, then open access.
+// Map key: "p{port}-{sandboxId}" → timestamp when authenticated.
+const authenticatedSubdomains = new Map<string, number>();
+const AUTH_SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+function getSubdomainKey(sandboxId: string, port: number): string {
+  return `p${port}-${sandboxId}`;
+}
+
+function isSubdomainAuthenticated(sandboxId: string, port: number): boolean {
+  const key = getSubdomainKey(sandboxId, port);
+  const ts = authenticatedSubdomains.get(key);
+  if (!ts) return false;
+  if (Date.now() - ts > AUTH_SESSION_TTL_MS) {
+    authenticatedSubdomains.delete(key);
+    return false;
+  }
+  return true;
+}
+
+function markSubdomainAuthenticated(sandboxId: string, port: number): void {
+  authenticatedSubdomains.set(getSubdomainKey(sandboxId, port), Date.now());
+}
+
+// Periodic cleanup of expired sessions (every 30 min)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, ts] of authenticatedSubdomains) {
+    if (now - ts > AUTH_SESSION_TTL_MS) authenticatedSubdomains.delete(key);
+  }
+}, 30 * 60 * 1000);
+
+/** Build WS target URL for a given sandbox/port/path. */
+function buildWsTargetUrl(sandboxId: string, port: number, remainingPath: string, searchParams: URLSearchParams): string {
+  const sandboxBaseUrl = getSandboxBaseUrl(sandboxId);
+  const wsBase = sandboxBaseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+  const targetPath = port === 8000 ? remainingPath : `/proxy/${port}${remainingPath}`;
+
+  const upstreamParams = new URLSearchParams(searchParams);
+  upstreamParams.delete('token');
+  if (config.INTERNAL_SERVICE_KEY) {
+    upstreamParams.set('token', config.INTERNAL_SERVICE_KEY);
+  }
+  const search = upstreamParams.toString() ? `?${upstreamParams.toString()}` : '';
+  return `${wsBase}${targetPath}${search}`;
+}
+
 export default {
   port: config.PORT,
 
   async fetch(req: Request, server: any): Promise<Response | undefined> {
-    // ── WebSocket upgrade for /v1/preview/{sandboxId}/{port}/* ────────
-    // For local_docker provider: proxy via Docker DNS.
-    // For daytona: WS is handled by Daytona's preview links (not proxied here).
-    if (req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
-      const url = new URL(req.url);
-      const previewPrefix = '/v1/preview/';
-      // Local Docker WS proxy: only when NOT using Daytona (Daytona handles its own WS)
-      const isLocalDockerPreview = !config.isDaytonaEnabled() && url.pathname.startsWith(previewPrefix);
+    const host = req.headers.get('host') || '';
+    const url = new URL(req.url);
+    const isWsUpgrade = req.headers.get('upgrade')?.toLowerCase() === 'websocket';
 
-      if (isLocalDockerPreview) {
-        // Auth: WebSocket can't set headers, so token comes via ?token= query param.
-        // Validate as Supabase JWT or sbt_ token.
-        const wsToken = url.searchParams.get('token');
+    // ── Subdomain preview routing (primary) ────────────────────────────
+    // Matches: p{port}-{sandboxId}.localhost:{serverPort}
+    // Only for local_docker mode (Daytona has its own preview URLs).
+    const subdomain = !config.isDaytonaEnabled() ? parsePreviewSubdomain(host) : null;
 
-        if (wsToken?.startsWith('sbt_')) {
-          const { validateSandboxToken } = await import('./repositories/sandboxes');
-          const result = await validateSandboxToken(wsToken);
-          if (!result.isValid) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-              status: 401,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-        } else if (wsToken) {
-          // Try as Supabase JWT
-          try {
-            const { getSupabase } = await import('./shared/supabase');
-            const supabase = getSupabase();
-            const { data: { user }, error } = await supabase.auth.getUser(wsToken);
-            if (error || !user) {
-              return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' },
-              });
-            }
-          } catch {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-              status: 401,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-        } else {
-          // No token at all — reject. All WS connections must authenticate.
-          return new Response(JSON.stringify({ error: 'Unauthorized: token required' }), {
+    if (subdomain) {
+      const { port, sandboxId } = subdomain;
+
+      // ── Auth: first request validates, then the subdomain is "open" ──
+      // Like ngrok free tier — ?token= on first load proves you're legit,
+      // then all subsequent requests (sub-resources, WS, etc.) pass through.
+      // This avoids third-party cookie issues in iframes.
+      if (!isSubdomainAuthenticated(sandboxId, port)) {
+        const queryToken = url.searchParams.get('token');
+        const authHeader = req.headers.get('Authorization');
+        const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        const cookieToken = extractCookieToken(req);
+        const token = queryToken || bearerToken || cookieToken;
+
+        if (!token || !(await validatePreviewToken(token))) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': req.headers.get('Origin') || '*',
+              'Access-Control-Allow-Credentials': 'true',
+            },
           });
         }
+        // Auth succeeded — mark this subdomain as authenticated
+        markSubdomainAuthenticated(sandboxId, port);
+      }
 
-        // Parse: /v1/preview/{sandboxId}/{port}/{rest}
-        const afterPreview = url.pathname.slice(previewPrefix.length); // e.g. "kortix-sandbox/8000/ws"
-        const segments = afterPreview.split('/');
-        const sandboxId = segments[0];   // e.g. "kortix-sandbox"
-        const portStr = segments[1] || '';
-        const remainingPath = segments.length > 2 ? '/' + segments.slice(2).join('/') : '/';
-        const port = parseInt(portStr, 10);
+      // ── WebSocket upgrade via subdomain ──────────────────────────────
+      if (isWsUpgrade) {
+        const targetUrl = buildWsTargetUrl(sandboxId, port, url.pathname, url.searchParams);
+        const success = server.upgrade(req, {
+          data: {
+            targetUrl,
+            upstream: null,
+            buffered: [],
+            bufferBytes: 0,
+            connectTimer: null,
+            idleTimer: null,
+            closed: false,
+          } satisfies WsProxyData,
+        });
+        if (success) return undefined;
+      }
 
-        if (sandboxId && !isNaN(port) && port >= 1 && port <= 65535) {
-          const sandboxBaseUrl = getSandboxBaseUrl(sandboxId);
-          const wsBase = sandboxBaseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+      // ── HTTP/SSE via subdomain — direct proxy, no Hono ───────────────
+      const acceptsSSE = (req.headers.get('accept') || '').includes('text/event-stream');
+      const origin = req.headers.get('Origin') || '';
+      let body: ArrayBuffer | undefined;
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        body = await req.arrayBuffer();
+      }
 
-          // Port 8000 = direct to Kortix Master, others = through port proxy
-          const targetPath = port === 8000
-            ? remainingPath
-            : `/proxy/${port}${remainingPath}`;
+      // Handle CORS preflight
+      if (req.method === 'OPTIONS') {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': origin || '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+            'Access-Control-Allow-Headers': req.headers.get('Access-Control-Request-Headers') || '*',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400',
+          },
+        });
+      }
 
-          // Build upstream query string: strip user's auth token, inject service key for sandbox
-          const upstreamParams = new URLSearchParams(url.searchParams);
-          upstreamParams.delete('token');
-          const serviceKey = config.INTERNAL_SERVICE_KEY;
-          if (serviceKey) {
-            upstreamParams.set('token', serviceKey);
-          }
-          const upstreamSearch = upstreamParams.toString() ? `?${upstreamParams.toString()}` : '';
-          const targetUrl = `${wsBase}${targetPath}${upstreamSearch}`;
+      try {
+        // Strip ?token= from query string before forwarding to sandbox
+        const forwardParams = new URLSearchParams(url.searchParams);
+        forwardParams.delete('token');
+        const forwardSearch = forwardParams.toString() ? `?${forwardParams.toString()}` : '';
 
+        return await proxyToSandbox(
+          sandboxId, port, req.method, url.pathname, forwardSearch,
+          req.headers, body, acceptsSSE, origin,
+        );
+      } catch (error) {
+        console.error(`[subdomain-proxy] Error for ${sandboxId}:${port}${url.pathname}: ${error instanceof Error ? error.message : String(error)}`);
+        return new Response(JSON.stringify({ error: 'Failed to proxy to sandbox', details: String(error) }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // ── Path-based WebSocket proxy (local mode) ──────────────────────────
+    // Matches: ws://localhost:8008/v1/preview/{sandboxId}/{port}/*
+    // Used for OpenCode PTY terminals, SSE-over-WS, etc.
+    // Must be handled HERE (at Bun server level) because Hono can't do WS upgrades.
+    if (isWsUpgrade && !config.isDaytonaEnabled()) {
+      const wsPathMatch = url.pathname.match(/^\/v1\/preview\/([^/]+)\/(\d+)(\/.*)?$/);
+      if (wsPathMatch) {
+        const wsSandboxId = wsPathMatch[1];
+        const wsPort = parseInt(wsPathMatch[2], 10);
+        const wsRemainingPath = wsPathMatch[3] || '/';
+
+        // Auth: header → query param → cookie (same as subdomain handler)
+        const wsAuthHeader = req.headers.get('Authorization');
+        const wsBearerToken = wsAuthHeader?.startsWith('Bearer ') ? wsAuthHeader.slice(7) : null;
+        const wsQueryToken = url.searchParams.get('token');
+        const wsCookieToken = extractCookieToken(req);
+        const wsToken = wsBearerToken || wsQueryToken || wsCookieToken;
+
+        if (wsToken && (await validatePreviewToken(wsToken))) {
+          const targetUrl = buildWsTargetUrl(wsSandboxId, wsPort, wsRemainingPath, url.searchParams);
           const success = server.upgrade(req, {
             data: {
               targetUrl,
@@ -489,7 +616,7 @@ export default {
               closed: false,
             } satisfies WsProxyData,
           });
-          if (success) return undefined; // Bun took over
+          if (success) return undefined;
         }
       }
     }

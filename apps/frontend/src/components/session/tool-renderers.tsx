@@ -85,7 +85,7 @@ import {
 	proxyLocalhostUrl,
 } from "@/lib/utils/sandbox-url";
 import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
-import { useServerStore, getActiveOpenCodeUrl } from "@/stores/server-store";
+import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from "@/stores/server-store";
 import { openTabAndNavigate } from "@/stores/tab-store";
 
 import {
@@ -128,19 +128,20 @@ function useProxyUrl(localhostUrl: string): { proxyUrl: string; port: number } |
 	});
 	const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
 	const mappedPorts = activeServer?.mappedPorts;
+	const subdomainOpts = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
 
 	return useMemo(() => {
 		if (!localhostUrl) return null;
 		if (!isProxiableLocalhostUrl(localhostUrl)) return null;
 		const parsed = parseLocalhostUrl(localhostUrl);
 		if (!parsed) return null;
-		const proxyUrl = proxyLocalhostUrl(localhostUrl, serverUrl, mappedPorts);
+		const proxyUrl = proxyLocalhostUrl(localhostUrl, serverUrl, mappedPorts, subdomainOpts);
 		if (!proxyUrl) return null;
 		return {
 			proxyUrl,
 			port: parsed.port,
 		};
-	}, [localhostUrl, serverUrl, mappedPorts]);
+	}, [localhostUrl, serverUrl, mappedPorts, subdomainOpts]);
 }
 
 function InlineServicePreview({
@@ -2930,15 +2931,16 @@ function PresentationGenTool({
 	const parsed = useMemo(() => parsePresentationOutput(output), [output]);
 	const isError = parsed ? !parsed.success : false;
 
-	// Proxy-rewrite viewer URL so localhost:3210 → proxy/3210
+	// Proxy-rewrite viewer URL so localhost:3210 → subdomain URL
 	const activeServer = useServerStore((s) =>
 		s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
 	);
+	const subdomainOpts2 = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
 	const viewerProxyUrl = useMemo(() => {
 		if (!parsed?.viewer_url) return undefined;
 		const sUrl = activeServer?.url || getActiveOpenCodeUrl();
-		return proxyLocalhostUrl(parsed.viewer_url, sUrl, activeServer?.mappedPorts);
-	}, [parsed?.viewer_url, activeServer?.url, activeServer?.mappedPorts]);
+		return proxyLocalhostUrl(parsed.viewer_url, sUrl, activeServer?.mappedPorts, subdomainOpts2);
+	}, [parsed?.viewer_url, activeServer?.url, activeServer?.mappedPorts, subdomainOpts2]);
 
 	// Build a nice trigger subtitle
 	const triggerSubtitle = useMemo(() => {

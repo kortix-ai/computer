@@ -2,14 +2,18 @@
  * Sandbox URL detection and rewriting utilities.
  *
  * Detects localhost URLs in agent output (e.g. "Website is live at http://localhost:8080")
- * and rewrites them to be accessible through the proxy layer.
+ * and rewrites them to subdomain-based preview URLs (like ngrok):
  *
- * All modes route through the backend's unified preview proxy:
- *   {BACKEND_URL}/preview/{sandboxId}/8000/proxy/{port}/
- * The sandboxId is the container name (local) or Daytona ID (cloud).
+ *   http://p{port}-{sandboxId}.localhost:{backendPort}/{path}
+ *
+ * The subdomain scheme means the proxied app thinks it's at root `/` — absolute
+ * paths, Service Workers, WebSocket connections all work without any rewriting.
+ * Auth is handled via a cookie set on the first `?token=` authenticated request.
  */
 
 import { SANDBOX_PORTS } from '@/lib/platform-client';
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface DetectedLocalhostUrl {
   /** The original full URL found in text (e.g. "http://localhost:8080/api/docs") */
@@ -35,6 +39,16 @@ export interface ParsedLocalhostUrl {
   path: string;
 }
 
+/** Options for subdomain URL generation */
+export interface SubdomainUrlOptions {
+  /** Sandbox ID (e.g. 'kortix-sandbox' for local, Daytona ID for cloud) */
+  sandboxId: string;
+  /** Backend port (e.g. 8008) — the port kortix-api listens on */
+  backendPort: number;
+}
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
 /**
  * Regex to detect localhost URLs in text.
  * Matches: http://localhost:PORT, http://127.0.0.1:PORT, https://localhost:PORT
@@ -43,6 +57,12 @@ export interface ParsedLocalhostUrl {
  */
 const LOCALHOST_URL_REGEX =
   /https?:\/\/(?:localhost|127\.0\.0\.1):\d{1,5}[^\s)"'<>]*/g;
+
+/**
+ * Regex to parse subdomain preview URLs.
+ * Matches: http://p{port}-{sandboxId}.localhost:{backendPort}/{path}
+ */
+const SUBDOMAIN_URL_REGEX = /^https?:\/\/p(\d+)-([^.]+)\.localhost(?::(\d+))?(\/.*)?$/;
 
 /**
  * Ports that should NOT be rewritten — they're already exposed/handled natively
@@ -54,18 +74,13 @@ const EXCLUDED_PORTS = new Set([
   parseInt(SANDBOX_PORTS.KORTIX_MASTER, 10),  // Kortix Master itself
 ]);
 
+// ── Internal helpers ─────────────────────────────────────────────────────────
+
 /**
- * Check if a URL path indicates the URL has already been proxied.
- * Prevents double-proxy issues like localhost:14000/proxy/14000/proxy/3210/...
- *
- * Catches both forms:
- *   - /proxy/{port}/...            (Kortix Master direct)
- *   - /v1/preview/{id}/{port}/...  (backend preview proxy)
- *   - /preview/{id}/{port}/...     (legacy/short form)
+ * Check if a URL is a subdomain preview URL (p{port}-{sandboxId}.localhost).
  */
-function isAlreadyProxied(path: string): boolean {
-  return /^\/proxy\/\d+/.test(path) ||
-    /^\/(?:v1\/)?preview\//.test(path);
+function isSubdomainUrl(url: string): boolean {
+  return SUBDOMAIN_URL_REGEX.test(url);
 }
 
 function normalizePath(path: string): string {
@@ -93,7 +108,6 @@ function normalizePath(path: string): string {
  * Markdown/plain-text extraction can include trailing markdown syntax when the
  * link label is itself a URL, e.g.:
  *   [http://localhost:3210/viewer.html](http://localhost:3210/viewer.html)
- * For the label URL token, regex extraction sees `...viewer.html](http://...`.
  * Trim that markdown boundary before URL parsing.
  */
 function stripMarkdownArtifacts(url: string): string {
@@ -102,8 +116,21 @@ function stripMarkdownArtifacts(url: string): string {
   return url.slice(0, markerIndex);
 }
 
+// ── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Regex to detect Kortix Master proxy URLs: localhost:8000/proxy/{port}/...
+ * The agent inside the sandbox sees these URLs; the frontend needs to
+ * extract the real service port and remaining path.
+ */
+const KORTIX_MASTER_PROXY_REGEX = /^\/proxy\/(\d{1,5})(\/.*)?$/;
+
 /**
  * Parse a localhost URL in one place so all consumers share identical rules.
+ *
+ * Handles a special case: `http://localhost:8000/proxy/{port}/{path}` URLs
+ * from inside the sandbox (Kortix Master). These are rewritten to appear as
+ * `localhost:{port}/{path}` so they get proxied correctly.
  */
 export function parseLocalhostUrl(rawUrl: string | undefined): ParsedLocalhostUrl | null {
   if (!rawUrl) return null;
@@ -116,10 +143,31 @@ export function parseLocalhostUrl(rawUrl: string | undefined): ParsedLocalhostUr
     if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') return null;
     if (!parsed.port) return null;
 
-    const port = parseInt(parsed.port, 10);
+    let port = parseInt(parsed.port, 10);
     if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
 
-    const path = normalizePath(`${parsed.pathname || '/'}${parsed.search}${parsed.hash}`);
+    let pathStr = `${parsed.pathname || '/'}${parsed.search}${parsed.hash}`;
+
+    // Special case: localhost:8000/proxy/{port}/... (Kortix Master proxy URL).
+    // Extract the real port and remaining path so detection/rewriting works.
+    const kortixMasterPort = parseInt(SANDBOX_PORTS.KORTIX_MASTER, 10);
+    if (port === kortixMasterPort) {
+      const proxyMatch = parsed.pathname.match(KORTIX_MASTER_PROXY_REGEX);
+      if (proxyMatch) {
+        const realPort = parseInt(proxyMatch[1], 10);
+        if (realPort >= 1 && realPort <= 65535) {
+          port = realPort;
+          pathStr = normalizePath(`${proxyMatch[2] || '/'}${parsed.search}${parsed.hash}`);
+          return {
+            originalUrl: `http://localhost:${port}${pathStr}`,
+            port,
+            path: pathStr,
+          };
+        }
+      }
+    }
+
+    const path = normalizePath(pathStr);
 
     return {
       originalUrl: `${parsed.protocol}//${parsed.hostname}:${port}${path}`,
@@ -195,10 +243,6 @@ export function detectLocalhostUrls(text: string): DetectedLocalhostUrl[] {
     if (seen.has(originalUrl)) continue;
     seen.add(originalUrl);
 
-    // Skip URLs that are already proxied (e.g. http://localhost:14000/proxy/3210/...)
-    // to prevent double-proxy chains
-    if (isAlreadyProxied(path)) continue;
-
     results.push({
       originalUrl,
       port,
@@ -220,25 +264,24 @@ export function hasLocalhostUrls(text: string): boolean {
 }
 
 /**
- * Rewrite a localhost URL to go through the sandbox proxy.
+ * Build a subdomain preview URL.
  *
- * The serverUrl always routes through the backend's unified preview proxy:
- *   {BACKEND_URL}/preview/{sandboxId}/8000
- * Exposes Kortix Master's /proxy/{port}/ endpoint for dynamic port proxying.
- *
- * @param port - The port number to proxy
- * @param path - The path to append (e.g. "/api/docs")
- * @param serverUrl - The active server URL (always routed through backend)
- * @returns The proxied URL
+ * @example rewriteLocalhostUrl(3210, '/viewer.html', { sandboxId: 'kortix-sandbox', backendPort: 8008 })
+ *          → 'http://p3210-kortix-sandbox.localhost:8008/viewer.html'
  */
 export function rewriteLocalhostUrl(
   port: number,
   path: string,
-  serverUrl: string,
+  _serverUrl: string,
+  subdomainOpts?: SubdomainUrlOptions,
 ): string {
+  if (!subdomainOpts) {
+    // No subdomain opts — shouldn't happen in practice, but degrade gracefully
+    const safePath = normalizePath(path);
+    return `http://localhost:${port}${safePath}`;
+  }
   const safePath = normalizePath(path);
-  const base = serverUrl.replace(/\/+$/, '');
-  return `${base}/proxy/${port}${safePath}`;
+  return `http://p${port}-${subdomainOpts.sandboxId}.localhost:${subdomainOpts.backendPort}${safePath}`;
 }
 
 /**
@@ -248,15 +291,16 @@ export function rewriteLocalhostUrl(
 export function getProxyBaseUrl(
   port: number,
   serverUrl: string,
+  subdomainOpts?: SubdomainUrlOptions,
 ): string {
-  return rewriteLocalhostUrl(port, '/', serverUrl);
+  return rewriteLocalhostUrl(port, '/', serverUrl, subdomainOpts);
 }
 
 /**
  * Check if a URL is a localhost URL that we can proxy.
  * Excludes infrastructure ports AND the current app's own port so we never
  * rewrite the frontend's own navigation links.
- * Also excludes URLs that are already proxied (path starts with /proxy/ or /v1/preview/).
+ * Also excludes URLs that are already subdomain preview URLs.
  */
 export function isProxiableLocalhostUrl(url: string): boolean {
   const parsed = parseLocalhostUrl(url);
@@ -264,14 +308,7 @@ export function isProxiableLocalhostUrl(url: string): boolean {
 
   if (EXCLUDED_PORTS.has(parsed.port)) return false;
 
-  // Skip URLs whose path already contains /proxy/ or /preview/ (already rewritten)
-  if (isAlreadyProxied(parsed.path)) return false;
-
   // Never proxy URLs that point at the app itself or the backend API.
-  // The backend typically runs on a different port (e.g., 8008) than the app (e.g., 3000),
-  // but a URL like localhost:8008/v1/preview/.../proxy/3210/ is already proxied and
-  // should NOT be re-proxied. The path check above catches this, but we also
-  // guard by origin to be safe.
   if (typeof window !== 'undefined') {
     try {
       const appOrigin = window.location.origin;
@@ -296,6 +333,7 @@ export function proxyLocalhostUrl(
   url: string | undefined,
   serverUrl: string,
   _mappedPorts?: Record<string, string>,
+  subdomainOpts?: SubdomainUrlOptions,
 ): string | undefined {
   if (!url) return url;
 
@@ -305,7 +343,7 @@ export function proxyLocalhostUrl(
   // Don't rewrite URLs pointing at the app itself or already-proxied URLs
   if (!isProxiableLocalhostUrl(parsed.originalUrl)) return parsed.originalUrl;
 
-  return rewriteLocalhostUrl(parsed.port, parsed.path, serverUrl);
+  return rewriteLocalhostUrl(parsed.port, parsed.path, serverUrl, subdomainOpts);
 }
 
 /**
@@ -319,11 +357,33 @@ export function toInternalUrl(port: number, path: string = '/'): string {
 }
 
 /**
+ * Parse a subdomain preview URL back to its components.
+ *
+ * @example parseSubdomainUrl('http://p3210-kortix-sandbox.localhost:8008/viewer.html')
+ *          → { port: 3210, sandboxId: 'kortix-sandbox', backendPort: 8008, path: '/viewer.html' }
+ */
+export function parseSubdomainUrl(url: string): {
+  port: number;
+  sandboxId: string;
+  backendPort: number;
+  path: string;
+} | null {
+  const match = url.match(SUBDOMAIN_URL_REGEX);
+  if (!match) return null;
+
+  return {
+    port: parseInt(match[1], 10),
+    sandboxId: match[2],
+    backendPort: match[3] ? parseInt(match[3], 10) : 80,
+    path: match[4] || '/',
+  };
+}
+
+/**
  * Try to reverse-map a proxy URL back to its internal localhost equivalent.
  *
- * Handles patterns like:
- *   - `http://host:PORT/proxy/{containerPort}{path}` → `http://localhost:{containerPort}{path}`
- *   - `{BACKEND_URL}/preview/{sandboxId}/{containerPort}{path}` → `http://localhost:{containerPort}{path}`
+ * Handles:
+ *   - `http://p{port}-{sandboxId}.localhost:{backendPort}/{path}` → `http://localhost:{port}{path}`
  *   - Direct mapped port URLs (e.g. `http://localhost:14002/...`) → `http://localhost:6080/...`
  *
  * Returns null if the URL can't be reverse-mapped.
@@ -333,27 +393,15 @@ export function proxyUrlToInternal(
   mappedPorts?: Record<string, string>,
 ): string | null {
   try {
-    const url = new URL(proxyUrl);
-
-    // Pattern 1: /proxy/{containerPort}/... (the most common case)
-    const proxyMatch = url.pathname.match(/^\/proxy\/(\d+)(\/.*)?$/);
-    if (proxyMatch) {
-      const containerPort = proxyMatch[1];
-      const path = proxyMatch[2] || '/';
-      return `http://localhost:${containerPort}${path}`;
+    // Subdomain URL — http://p{port}-{sandboxId}.localhost:{backendPort}/{path}
+    const subdomain = parseSubdomainUrl(proxyUrl);
+    if (subdomain) {
+      return `http://localhost:${subdomain.port}${subdomain.path}`;
     }
 
-    // Pattern 2: /preview/{sandboxId}/{containerPort}/... (cloud mode)
-    const previewMatch = url.pathname.match(/^\/(?:v1\/)?preview\/[^/]+\/(\d+)(\/.*)?$/);
-    if (previewMatch) {
-      const containerPort = previewMatch[1];
-      const path = previewMatch[2] || '/';
-      return `http://localhost:${containerPort}${path}`;
-    }
-
-    // Pattern 3: Direct mapped port URL (e.g. http://localhost:14002/path)
-    // Reverse-lookup: find which container port maps to this host port
+    // Direct mapped port URL (e.g. http://localhost:14002/path)
     if (mappedPorts) {
+      const url = new URL(proxyUrl);
       const hostPort = url.port;
       for (const [containerPort, mappedHostPort] of Object.entries(mappedPorts)) {
         if (mappedHostPort === hostPort) {
@@ -366,4 +414,12 @@ export function proxyUrlToInternal(
   } catch {
     return null;
   }
+}
+
+/**
+ * Check if a URL is already a subdomain preview URL.
+ * Use this to prevent double-proxying.
+ */
+export function isPreviewUrl(url: string): boolean {
+  return isSubdomainUrl(url);
 }

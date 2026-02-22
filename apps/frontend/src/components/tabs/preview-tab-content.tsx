@@ -14,11 +14,12 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useTabStore } from '@/stores/tab-store';
 import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-url';
-import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, getSubdomainOpts } from '@/stores/server-store';
 import {
   parseLocalhostUrl,
   rewriteLocalhostUrl,
   toInternalUrl,
+  proxyUrlToInternal,
 } from '@/lib/utils/sandbox-url';
 
 interface PreviewTabContentProps {
@@ -45,6 +46,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   const rawPreviewUrl = (tab?.metadata?.url as string) || '';
   const port = (tab?.metadata?.port as number) || 0;
   const originalUrl = (tab?.metadata?.originalUrl as string) || '';
+  const refreshCounter = (tab?.metadata?.refreshCounter as number) || 0;
 
   // Address bar state — shows the internal localhost URL
   const [addressValue, setAddressValue] = useState(originalUrl || (port ? `http://localhost:${port}/` : ''));
@@ -61,6 +63,19 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   });
   const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
 
+  // Subdomain URL options for proxy URL generation
+  const subdomainOpts = useMemo(() => {
+    if (activeServer?.provider === 'daytona') return undefined;
+    const sandboxId = activeServer?.sandboxId || 'kortix-sandbox';
+    try {
+      const url = new URL(serverUrl);
+      const backendPort = parseInt(url.port, 10) || 8008;
+      return { sandboxId, backendPort };
+    } catch {
+      return { sandboxId, backendPort: 8008 };
+    }
+  }, [activeServer?.provider, activeServer?.sandboxId, serverUrl]);
+
   // Inject auth token for cloud preview proxy URLs
   const previewUrl = useAuthenticatedPreviewUrl(rawPreviewUrl);
 
@@ -70,6 +85,17 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
       setAddressValue(originalUrl || (port ? `http://localhost:${port}/` : ''));
     }
   }, [originalUrl, port, isAddressEditing]);
+
+  // Refresh the iframe when the tab is re-opened (refreshCounter bumped by openTab)
+  const prevCounterRef = useRef(refreshCounter);
+  useEffect(() => {
+    if (refreshCounter > prevCounterRef.current) {
+      prevCounterRef.current = refreshCounter;
+      setIsLoading(true);
+      setHasError(false);
+      setRefreshKey((k) => k + 1);
+    }
+  }, [refreshCounter]);
 
   /** Clear any pending load timeout. */
   const clearLoadTimeout = useCallback(() => {
@@ -108,7 +134,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     if (!parsed) return;
 
     const { port: newPort, path: newPath } = parsed;
-    const newProxyUrl = rewriteLocalhostUrl(newPort, newPath, serverUrl);
+    const newProxyUrl = rewriteLocalhostUrl(newPort, newPath, serverUrl, subdomainOpts);
     const newInternalUrl = toInternalUrl(newPort, newPath);
 
     // Update tab metadata
@@ -134,7 +160,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     setIsLoading(true);
     setHasError(false);
     setRefreshKey((k) => k + 1);
-  }, [serverUrl, tabId, updateTabMetadata, historyIndex]);
+  }, [serverUrl, subdomainOpts, tabId, updateTabMetadata, historyIndex]);
 
   /** Handle address bar submission. */
   const handleAddressSubmit = useCallback((e: React.FormEvent) => {
@@ -168,50 +194,52 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     const newIndex = historyIndex - 1;
     setHistoryIndex(newIndex);
     const prevUrl = history[newIndex];
-    // We need to update the tab metadata to the previous URL
-    // Extract port from the proxy URL
-    const proxyMatch = prevUrl.match(/\/proxy\/(\d+)(\/.*)?/);
-    if (proxyMatch) {
-      const prevPort = parseInt(proxyMatch[1], 10);
-      const prevPath = proxyMatch[2] || '/';
-      const internalUrl = toInternalUrl(prevPort, prevPath);
-      updateTabMetadata({
-        id: tabId,
-        title: `localhost:${prevPort}`,
-        type: 'preview',
-        href: `/preview/${prevPort}`,
-        metadata: { url: prevUrl, port: prevPort, originalUrl: internalUrl, path: prevPath },
-      });
-      setAddressValue(internalUrl);
-      setIsLoading(true);
-      setHasError(false);
-      setRefreshKey((k) => k + 1);
+    // Parse port from proxy URL (supports both subdomain and path-based)
+    const internal = proxyUrlToInternal(prevUrl, activeServer?.mappedPorts);
+    if (internal) {
+      const parsed = parseLocalhostUrl(internal);
+      if (parsed) {
+        const internalUrl = toInternalUrl(parsed.port, parsed.path);
+        updateTabMetadata({
+          id: tabId,
+          title: `localhost:${parsed.port}`,
+          type: 'preview',
+          href: `/preview/${parsed.port}`,
+          metadata: { url: prevUrl, port: parsed.port, originalUrl: internalUrl, path: parsed.path },
+        });
+        setAddressValue(internalUrl);
+        setIsLoading(true);
+        setHasError(false);
+        setRefreshKey((k) => k + 1);
+      }
     }
-  }, [canGoBack, historyIndex, history, tabId, updateTabMetadata]);
+  }, [canGoBack, historyIndex, history, tabId, updateTabMetadata, activeServer?.mappedPorts]);
 
   const handleForward = useCallback(() => {
     if (!canGoForward) return;
     const newIndex = historyIndex + 1;
     setHistoryIndex(newIndex);
     const nextUrl = history[newIndex];
-    const proxyMatch = nextUrl.match(/\/proxy\/(\d+)(\/.*)?/);
-    if (proxyMatch) {
-      const nextPort = parseInt(proxyMatch[1], 10);
-      const nextPath = proxyMatch[2] || '/';
-      const internalUrl = toInternalUrl(nextPort, nextPath);
-      updateTabMetadata({
-        id: tabId,
-        title: `localhost:${nextPort}`,
-        type: 'preview',
-        href: `/preview/${nextPort}`,
-        metadata: { url: nextUrl, port: nextPort, originalUrl: internalUrl, path: nextPath },
-      });
-      setAddressValue(internalUrl);
-      setIsLoading(true);
-      setHasError(false);
-      setRefreshKey((k) => k + 1);
+    // Parse port from proxy URL (supports both subdomain and path-based)
+    const internal = proxyUrlToInternal(nextUrl, activeServer?.mappedPorts);
+    if (internal) {
+      const parsed = parseLocalhostUrl(internal);
+      if (parsed) {
+        const internalUrl = toInternalUrl(parsed.port, parsed.path);
+        updateTabMetadata({
+          id: tabId,
+          title: `localhost:${parsed.port}`,
+          type: 'preview',
+          href: `/preview/${parsed.port}`,
+          metadata: { url: nextUrl, port: parsed.port, originalUrl: internalUrl, path: parsed.path },
+        });
+        setAddressValue(internalUrl);
+        setIsLoading(true);
+        setHasError(false);
+        setRefreshKey((k) => k + 1);
+      }
     }
-  }, [canGoForward, historyIndex, history, tabId, updateTabMetadata]);
+  }, [canGoForward, historyIndex, history, tabId, updateTabMetadata, activeServer?.mappedPorts]);
 
   // Fallback: if onLoad doesn't fire within 5s, dismiss the loading state.
   // Cross-origin iframes frequently fail to fire onLoad events.

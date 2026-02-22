@@ -165,11 +165,23 @@ export async function supabaseAuthWithQueryParam(c: Context, next: Next) {
 }
 
 /**
+ * Cookie name for preview session auth.
+ * Set on first authenticated request so all sub-resource loads (CSS, JS,
+ * images, fonts) automatically carry auth without needing ?token= on every URL.
+ */
+const PREVIEW_SESSION_COOKIE = '__preview_session';
+
+/**
  * Combined auth for preview proxy routes.
  *
- * Accepts EITHER:
- *   1. Supabase JWT (from header or ?token= query param) — sets userId
- *   2. Sandbox token (sbt_xxx) from header or ?token= — sets userId from account lookup
+ * Token resolution order:
+ *   1. Authorization: Bearer <token> header
+ *   2. ?token=<token> query parameter
+ *   3. __preview_session cookie (set by this middleware on prior requests)
+ *
+ * On successful auth, sets a session cookie scoped to /v1/preview/ so that
+ * all sub-resource requests (CSS, JS, images, fonts loaded by proxied HTML)
+ * are automatically authenticated without requiring ?token= on every URL.
  *
  * All requests go through kortix-api which authenticates via Supabase JWT
  * or sbt_ token. No additional sak_ sandbox lock needed.
@@ -181,7 +193,7 @@ export async function previewProxyAuth(c: Context, next: Next) {
     return;
   }
 
-  // Extract token from header or query param
+  // Extract token: header → query param → cookie
   const authHeader = c.req.header('Authorization');
   let token: string | undefined;
 
@@ -194,6 +206,15 @@ export async function previewProxyAuth(c: Context, next: Next) {
   }
 
   if (!token) {
+    // Check for session cookie (set by a prior authenticated request)
+    const cookieHeader = c.req.header('Cookie') || '';
+    const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${PREVIEW_SESSION_COOKIE}=([^;]+)`));
+    if (match) {
+      token = decodeURIComponent(match[1]);
+    }
+  }
+
+  if (!token) {
     throw new HTTPException(401, { message: 'Missing authentication token' });
   }
 
@@ -203,6 +224,7 @@ export async function previewProxyAuth(c: Context, next: Next) {
     if (result.isValid) {
       c.set('userId', result.accountId);
       c.set('userEmail', '');
+      setPreviewSessionCookie(c, token);
       await next();
       return;
     }
@@ -220,12 +242,29 @@ export async function previewProxyAuth(c: Context, next: Next) {
 
     c.set('userId', user.id);
     c.set('userEmail', user.email || '');
+    setPreviewSessionCookie(c, token);
     await next();
   } catch (err) {
     if (err instanceof HTTPException) throw err;
     console.error('[PREVIEW-AUTH] Error:', err);
     throw new HTTPException(401, { message: 'Authentication failed' });
   }
+}
+
+/**
+ * Set (or refresh) the preview session cookie.
+ * Scoped to /v1/preview/ so it only applies to preview proxy routes.
+ * SameSite=Lax allows the cookie on same-site navigations and sub-resource loads.
+ * Max-Age=3600 (1 hour) — the frontend refreshes the JWT token periodically,
+ * so the cookie gets updated on each authenticated request.
+ */
+function setPreviewSessionCookie(c: Context, token: string) {
+  const encoded = encodeURIComponent(token);
+  c.header(
+    'Set-Cookie',
+    `${PREVIEW_SESSION_COOKIE}=${encoded}; Path=/v1/preview/; HttpOnly; SameSite=Lax; Max-Age=3600`,
+    { append: true },
+  );
 }
 
 /**

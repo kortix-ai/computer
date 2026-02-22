@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { UnifiedMarkdown } from '@/components/markdown';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { openTabAndNavigate } from '@/stores/tab-store';
-import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from '@/stores/server-store';
 import {
   detectLocalhostUrls,
   proxyLocalhostUrl,
@@ -544,12 +544,13 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
   });
   const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
+  const subdomainOpts = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
 
   const detected = useMemo(() => detectLocalhostUrls(safeContent), [safeContent]);
 
   const proxyUrls = useMemo(
-    () => detected.map((d) => proxyLocalhostUrl(d.originalUrl, serverUrl) ?? d.originalUrl),
-    [detected, serverUrl],
+    () => detected.map((d) => proxyLocalhostUrl(d.originalUrl, serverUrl, undefined, subdomainOpts) ?? d.originalUrl),
+    [detected, serverUrl, subdomainOpts],
   );
 
   // Split into two tiers: live service URLs (plain text) vs example URLs (code blocks)

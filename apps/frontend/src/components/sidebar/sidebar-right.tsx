@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/sidebar-right-provider';
 import { SidebarFileBrowser } from '@/components/sidebar/sidebar-explorer';
 import { useFilesStore } from '@/features/files/store/files-store';
-import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, getSubdomainOpts } from '@/stores/server-store';
 import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
@@ -78,10 +78,11 @@ export function SidebarRight() {
    */
   const openSandboxServiceTab = useCallback(
     (containerPort: string, title: string) => {
+      const subdomainOpts = getSubdomainOpts();
       // Prefer provider-aware URL: /preview/{sandboxId}/{port}
       const url = activeServer
-        ? (getDirectPortUrl(activeServer, containerPort) || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl))
-        : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl);
+        ? (getDirectPortUrl(activeServer, containerPort) || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts))
+        : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts);
 
       const tabId = `preview:${containerPort}`;
       const tabHref = `/preview/${containerPort}`;
