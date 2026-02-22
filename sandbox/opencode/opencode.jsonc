@@ -3,16 +3,15 @@
   "permission": "allow",
   "plugin": ["opencode-pty", "./plugin/worktree.ts", "./plugin/memory.ts"],
   "autoupdate": true,
-  "default_agent": "kortix-main",
+  "default_agent": "kortix",
   "agent": {
     // Disable all built-in agents -- Kortix provides its own
-    "build": { "disable": true },
-    "plan": { "disable": true },
-    "explore": { "disable": true },
-    "general": { "disable": true }
+    // "build": { "disable": true },
+    // "plan": { "disable": true },
+    // "explore": { "disable": true },
+    // "general": { "disable": true }
     // compaction, title, summary are hidden infra agents -- leave them
   },
-  "model": "anthropic/claude-sonnet-4-20250514",
   "provider": {
     "kortix": {
       "npm": "@ai-sdk/openai-compatible",

@@ -111,7 +111,7 @@ export default tool({
     agent_name: tool.schema
       .string()
       .optional()
-      .describe("Agent to run the task, e.g. 'kortix-main'. Default: the default agent."),
+      .describe("Agent to run the task, e.g. 'kortix'. Default: the default agent."),
     model_id: tool.schema
       .string()
       .optional()

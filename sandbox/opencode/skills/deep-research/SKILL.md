@@ -226,7 +226,7 @@ scrape-webpage("https://source1.com/article, https://source2.com/study")
 
 ### Academic Paper Search (OpenAlex)
 
-Load the `paper-search` skill for full API reference. Quick patterns:
+Load the `openalex-paper-search` skill for full API reference. Quick patterns:
 
 ```bash
 # Find highly-cited papers on a topic

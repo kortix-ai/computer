@@ -21,6 +21,8 @@ import { getClient } from '@/lib/opencode-sdk';
 import { useServerStore } from '@/stores/server-store';
 import { Button } from '@/components/ui/button';
 import { WallpaperBackground } from '@/components/ui/wallpaper-background';
+import { authenticatedFetch } from '@/lib/auth-token';
+import { useSandbox } from '@/hooks/platform/use-sandbox';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -63,7 +65,7 @@ type BootPhase = 'power' | 'bios' | 'logo' | 'login' | 'onboarding' | 'session';
 /** Persist the onboarding session ID to the sandbox instance (fire-and-forget). */
 function persistOnboardingSessionId(sessionId: string) {
   const instanceUrl = getInstanceUrl();
-  fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`, {
+  authenticatedFetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: sessionId }),
@@ -137,6 +139,10 @@ export default function OnboardingPage() {
   const retriesRef = useRef(0);
   const { resolvedTheme } = useTheme();
   const { user, isLoading, signOut } = useAuth();
+
+  // Ensure sandbox is registered in server store (same as dashboard layout).
+  // This makes getInstanceUrl() return the correct sandbox URL.
+  useSandbox();
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState<BootPhase>('power');
   const [visibleLines, setVisibleLines] = useState(0);
@@ -164,7 +170,7 @@ export default function OnboardingPage() {
 
     if (params.has('skip_onboarding')) {
       // Directly mark complete and redirect — only allowed via query param
-      fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+      authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: 'true' }),
@@ -174,7 +180,7 @@ export default function OnboardingPage() {
 
     if (params.has('redo')) {
       // Reset onboarding flag so the full flow runs again
-      fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+      authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: 'false' }),
@@ -193,7 +199,7 @@ export default function OnboardingPage() {
     const check = async () => {
       try {
         const instanceUrl = getInstanceUrl();
-        const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
+        const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
         if (res.ok) {
           const data = await res.json();
           if (data.ONBOARDING_COMPLETE === 'true') {
@@ -239,7 +245,7 @@ export default function OnboardingPage() {
         let isNewSession = false;
 
         // 1. Try to resume an existing onboarding session
-        const res = await fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`).catch(() => null);
+        const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`).catch(() => null);
         const existingId = res?.ok ? (await res.json()).ONBOARDING_SESSION_ID : null;
 
         if (existingId && existingId !== '' && existingId !== null) {
@@ -250,7 +256,7 @@ export default function OnboardingPage() {
               finalSessionId = existingId;
             }
           } catch {
-            fetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`, {
+            authenticatedFetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ value: '' }),
@@ -303,7 +309,7 @@ export default function OnboardingPage() {
     const instanceUrl = getInstanceUrl();
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
+        const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
         if (res.ok) {
           const data = await res.json();
           if (data.ONBOARDING_COMPLETE === 'true') {

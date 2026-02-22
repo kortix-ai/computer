@@ -342,3 +342,72 @@ new Chart(document.getElementById('myChart'), {
   </p>
 </div>
 ```
+
+---
+
+# Presentation Viewer
+
+A polished slide viewer and preview server for HTML presentations (1920x1080).
+
+## Architecture
+
+The viewer consists of two parts:
+
+1. **`viewer.html`** — a self-contained HTML template that renders slides in scaled iframes with keyboard navigation, fullscreen, and a thumbnail strip.
+2. **`serve.ts`** — a lightweight Bun HTTP server that serves the presentation folder and injects the viewer at `/`.
+
+Both files live in `skills/presentations/` alongside this SKILL.md.
+
+## Why a Server (Not Just a Static HTML File)?
+
+Standalone 1920x1080 HTML slides opened directly in a browser are an unscaled, scrollable mess. The viewer fixes this by loading slides into iframes and CSS-scaling them to fit any viewport.
+
+The problem: **loading `<iframe src="slide_XX.html">` does not work reliably over `file://`**. Browsers enforce CORS/sandboxing restrictions on `file://` origins. An HTTP server on `localhost` eliminates all of this.
+
+## In the Sandbox (Container)
+
+**The viewer is already running as a service inside the sandbox container.** It starts automatically on boot via s6-overlay and listens on **port 3210**.
+
+- The service watches `/workspace/presentations/` for any presentation with a `metadata.json`
+- It serves the most recently created/updated presentation at `http://localhost:3210`
+- Port 3210 is exposed in docker-compose and mapped to the host
+
+**The agent does not need to start the server manually.** After creating slides, tell the user to open `http://localhost:3210`.
+
+| Item | Value |
+|------|-------|
+| Service location | `/etc/s6-overlay/s6-rc.d/svc-presentation-viewer/run` |
+| Viewer files | `/opt/opencode/skills/presentations/` |
+| Port | `3210` (mapped to host) |
+| Presentations dir | `/workspace/presentations/` |
+| Managed by | s6-overlay (auto-restart on crash) |
+
+## Local Development (Outside Container)
+
+```bash
+bun run .opencode/skills/presentations/serve.ts presentations/my-deck
+```
+
+Or via the `presentation-gen` tool:
+
+```
+presentation-gen(action: "preview", presentation_name: "my-deck")
+```
+
+## Viewer Controls
+
+| Key | Action |
+|-----|--------|
+| `→` / `Space` / `↓` | Next slide |
+| `←` / `↑` | Previous slide |
+| `Home` | First slide |
+| `End` | Last slide |
+| `F` | Toggle fullscreen |
+| `T` | Toggle thumbnail strip |
+| `?` | Toggle keyboard shortcuts |
+| `Esc` | Exit fullscreen / close panels |
+| Swipe left/right | Navigate (touch) |
+
+## How Scaling Works
+
+Each slide is a 1920x1080 iframe. The viewer measures the stage area, computes `min(availWidth / 1920, availHeight / 1080)`, sets the wrapper to displayed pixel size, and applies `transform: scale(factor)` with `transform-origin: 0 0`. The 16:9 aspect ratio is maintained at any viewport size.

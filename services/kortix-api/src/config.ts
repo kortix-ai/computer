@@ -39,7 +39,6 @@ export const config = {
   // ─── Supabase ──────────────────────────────────────────────────────────────
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-  SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
 
   // ─── API Key Hashing ──────────────────────────────────────────────────────
   API_KEY_SECRET: process.env.API_KEY_SECRET || '',

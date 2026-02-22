@@ -65,7 +65,6 @@ write_env "services/kortix-api/.env" \
   "" \
   "$(kv SUPABASE_URL)" \
   "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
-  "$(kv SUPABASE_JWT_SECRET)" \
   "" \
   "$(kv API_KEY_SECRET)" \
   "" \
@@ -115,7 +114,6 @@ write_env "apps/frontend/.env" \
   "$(kv NEXT_PUBLIC_POSTHOG_KEY)" \
   "$(kv KORTIX_ADMIN_API_KEY)" \
   "" \
-  "NEXT_PUBLIC_FORCE_LOCALHOST=true"
 
 echo ""
 echo "Done! All .env files generated from $ENV_FILE"

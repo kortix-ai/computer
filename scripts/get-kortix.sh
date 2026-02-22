@@ -933,7 +933,6 @@ ${api_ports}
 ${supabase_url_env}
 ${supabase_db_env}
       - SUPABASE_SERVICE_ROLE_KEY=\${SUPABASE_SERVICE_ROLE_KEY}
-      - SUPABASE_JWT_SECRET=\${SUPABASE_JWT_SECRET}
       - ALLOWED_SANDBOX_PROVIDERS=local_docker
       - SANDBOX_IMAGE=${SANDBOX_IMAGE}
       - DOCKER_HOST=unix:///var/run/docker.sock

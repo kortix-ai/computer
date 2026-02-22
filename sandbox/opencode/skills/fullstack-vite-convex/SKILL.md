@@ -1,24 +1,15 @@
 ---
-description: Full-stack web development specialist. Builds Convex + Vite React apps fully autonomously with TDD and strict TypeScript — scaffolds projects, writes tests first, implements code, starts servers, and delivers a running app with 0 errors. Use for any web app, site, or frontend task.
-mode: subagent
-permission:
-  bash: allow
-  edit: allow
-  read: allow
-  glob: allow
-  grep: allow
-  web-search: allow
-  scrape-webpage: allow
-  image-gen: allow
-  image-search: allow
-  skill: allow
+name: fullstack-vite-convex
+description: "Full-stack web development with Convex + Vite React. TDD-driven, strict TypeScript, fully autonomous. Covers scaffolding, schema design, backend functions, frontend components, testing, styling, and deployment. Use when building web apps, sites, or frontend tasks from scratch or adding features to Convex projects. Triggers on: 'build a web app', 'create a site', 'Convex app', 'React app', 'full-stack', 'frontend', 'build me an app', any request to create or modify a Convex + Vite React application."
 ---
 
-You are a full-stack web developer that builds production-quality Convex + Vite React applications **fully autonomously** with **test-driven development** and **strict TypeScript**. You handle the entire stack end-to-end: scaffolding, tests, database, backend, frontend, styling, starting servers, verifying the build, running tests, and delivering a running app.
+# Full-Stack Web Development — Convex + Vite React
 
-## CORE PRINCIPLES
+Build production-quality Convex + Vite React applications with **test-driven development** and **strict TypeScript**. Handle the entire stack end-to-end: scaffolding, tests, database, backend, frontend, styling, starting servers, verifying the build, running tests, and delivering a running app.
 
-### 1. AUTONOMY IS NON-NEGOTIABLE
+## Core Principles
+
+### 1. Autonomy Is Non-Negotiable
 
 - **NEVER** tell the user to run commands. YOU run them.
 - **NEVER** say "you can now run..." or "please execute...". Just do it.
@@ -26,7 +17,7 @@ You are a full-stack web developer that builds production-quality Convex + Vite 
 - The user should receive a **working, running, tested application** with a URL they can open.
 - If something fails, fix it yourself. Don't report errors without attempting resolution.
 
-### 2. TDD BY DEFAULT
+### 2. TDD By Default
 
 - **Write tests BEFORE implementation.** Always.
 - Backend: write Convex function tests before writing the functions.
@@ -34,7 +25,7 @@ You are a full-stack web developer that builds production-quality Convex + Vite 
 - Every feature gets a test. No exceptions.
 - Tests must pass before moving to the next phase. Run them yourself and fix failures.
 
-### 3. STRICT TYPESCRIPT — ZERO TOLERANCE
+### 3. Strict TypeScript — Zero Tolerance
 
 - All code uses strict TypeScript. No `any`. No `as unknown as X` hacks. No `@ts-ignore`.
 - Enable all strict flags in `tsconfig.json` — `strict: true`, `noUncheckedIndexedAccess: true`, `noImplicitReturns: true`, `noFallthroughCasesInSwitch: true`, `exactOptionalPropertyTypes: true`.
@@ -47,21 +38,9 @@ You are a full-stack web developer that builds production-quality Convex + Vite 
 
 Always use Context7 MCP tools (`resolve-library-id` then `query-docs`) when you need library, API, or framework documentation. Do NOT ask the user. Proactively use Context7 whenever the task involves a library, framework, or API you are not fully confident about. This includes Convex, React, Vite, Tailwind, Vitest, any npm package, or third-party API.
 
-## Memory
-
-Read `workspace/.kortix/MEMORY.md` for project architecture and user preferences before starting. Update the Project section when you make architectural decisions.
-
-## Available Tools
-
-- **`web-search`** — Search for docs, APIs, examples. Batch with `|||`.
-- **`scrape-webpage`** — Fetch page content as markdown.
-- **`image-gen`** — Generate visual assets (hero images, icons, backgrounds).
-- **`image-search`** — Find reference images and assets.
-- **Context7 MCP** — `resolve-library-id` + `query-docs` for up-to-date library docs. Use proactively.
-
 ---
 
-## WORKFLOW
+## Workflow
 
 ### Phase 1: Scaffold & Setup (Local by Default)
 
@@ -332,7 +311,7 @@ Report to the user:
 
 ---
 
-## SCHEMA DESIGN
+## Schema Design
 
 Always define the schema first in `convex/schema.ts`:
 
@@ -359,7 +338,7 @@ Rules:
 - System fields `_id` and `_creationTime` are auto-added — never define them
 - Field names must not start with `$` or `_`
 
-## BACKEND FUNCTIONS
+## Backend Functions
 
 Write functions in `convex/` using the NEW function syntax. Every function MUST have `args` and `returns` validators.
 
@@ -419,7 +398,7 @@ export const callExternalAPI = internalAction({
 });
 ```
 
-## FRONTEND
+## Frontend
 
 Use `convex/react` hooks for real-time data. Always type props with interfaces:
 
@@ -477,7 +456,7 @@ ReactDOM.createRoot(rootEl).render(
 );
 ```
 
-## STYLING
+## Styling
 
 - Use Tailwind CSS (install if not present: `npm install -D tailwindcss @tailwindcss/vite`)
 - Responsive design — mobile hamburger menu, responsive grids, touch-friendly targets
@@ -488,7 +467,7 @@ ReactDOM.createRoot(rootEl).render(
 
 ---
 
-## CONVEX RULES (CRITICAL)
+## Convex Rules (Critical)
 
 ### Functions
 - ALWAYS use the new function syntax with `args` and `returns` validators
@@ -552,7 +531,7 @@ export default http;
 
 ---
 
-## DEPLOYMENT (Cloud — Only When User Asks)
+## Deployment (Cloud — Only When User Asks)
 
 Local dev is the default. Only handle cloud deployment when the user explicitly asks.
 
@@ -562,7 +541,7 @@ Local dev is the default. Only handle cloud deployment when the user explicitly 
 
 The `.env.local` updates automatically. No code changes needed.
 
-## GENERAL RULES
+## General Rules
 
 - Match existing project conventions if working in an existing codebase
 - Verify the dev server runs and check for errors — fix them yourself

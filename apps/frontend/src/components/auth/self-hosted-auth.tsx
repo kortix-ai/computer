@@ -1,13 +1,17 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { toast } from '@/lib/toast';
 import { createClient } from '@/lib/supabase/client';
+import { ProviderSettings } from '@/components/providers/provider-settings';
+import { getSandboxUrl } from '@/lib/platform-client';
+import { useServerStore } from '@/stores/server-store';
+import { resetClient } from '@/lib/opencode-sdk';
+import { invalidateTokenCache } from '@/lib/auth-token';
 
 /* ─── Install Status Hook ──────────────────────────────────────────────────── */
 
@@ -32,16 +36,64 @@ export function useInstallStatus() {
   return { installed, loading };
 }
 
+/* ─── Step Indicator ───────────────────────────────────────────────────────── */
+
+function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 }) {
+  const steps = [
+    { num: 1, label: 'Create account' },
+    { num: 2, label: 'Connect provider' },
+    { num: 3, label: 'Start using' },
+  ];
+
+  return (
+    <div className="flex items-center gap-2 mb-6 px-1">
+      {steps.map((step, i) => {
+        const isDone = step.num < currentStep;
+        const isActive = step.num === currentStep;
+        return (
+          <div key={step.num} className="contents">
+            <div className="flex items-center gap-1.5 flex-1">
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 ${
+                  isDone
+                    ? 'bg-primary/20 text-primary'
+                    : isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {isDone ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.num}
+              </div>
+              <span
+                className={`text-xs truncate ${
+                  isActive ? 'font-medium text-foreground' : 'text-muted-foreground'
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && <div className="h-px flex-1 bg-border max-w-8" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─── Self-Hosted Form Panel ───────────────────────────────────────────────── */
 
 interface SelfHostedFormProps {
   returnUrl: string | null;
   installed: boolean | null;
+  /** Called when the wizard transitions between steps so the parent can suppress auto-redirects. */
+  onWizardStepChange?: (step: number) => void;
 }
 
-export function SelfHostedForm({ returnUrl, installed }: SelfHostedFormProps) {
+export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: SelfHostedFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+  const [sandboxReady, setSandboxReady] = useState(false);
   const router = useRouter();
 
   if (installed === null) {
@@ -50,6 +102,7 @@ export function SelfHostedForm({ returnUrl, installed }: SelfHostedFormProps) {
 
   const isInstaller = !installed;
 
+  // ── Account creation handler (step 1) ──
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -75,7 +128,6 @@ export function SelfHostedForm({ returnUrl, installed }: SelfHostedFormProps) {
 
     try {
       if (isInstaller) {
-        // Installer: sign up + sign in
         const confirmPassword = (form.elements.namedItem('confirmPassword') as HTMLInputElement).value;
         if (password !== confirmPassword) {
           setErrorMessage('Passwords do not match');
@@ -90,45 +142,137 @@ export function SelfHostedForm({ returnUrl, installed }: SelfHostedFormProps) {
           return;
         }
 
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        // Tell the parent we're entering step 2 BEFORE signIn — because
+        // signInWithPassword triggers AuthProvider.onAuthStateChange which
+        // makes `user` truthy, and SelfHostedLoginContent auto-redirects
+        // to /onboarding if wizardStep is still 1. The ref-based callback
+        // is synchronous, so the parent sees step=2 immediately.
+        setWizardStep(2);
+        onWizardStepChange?.(2);
+
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) {
+          // Revert wizard step on sign-in failure
+          setWizardStep(1);
+          onWizardStepChange?.(1);
           setErrorMessage(signInError.message);
           setPending(false);
           return;
         }
 
-        // Provision sandbox (fire-and-forget)
+        // We have the JWT right here — use it directly instead of going through
+        // getSupabaseAccessToken() which may have a stale null cached from before signup.
+        const jwt = signInData.session?.access_token;
+
+        // Invalidate the token cache so subsequent calls (e.g. ProviderSettings)
+        // pick up the fresh session instead of stale null.
+        invalidateTokenCache();
+
+        // Provision sandbox using the JWT we already have
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          fetch(`${backendUrl}/platform/init`, {
+        try {
+          const initRes = await fetch(`${backendUrl}/platform/init`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${session.access_token}`,
+              'Authorization': `Bearer ${jwt}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({}),
-          }).catch(() => {});
+          });
+          const initData = await initRes.json();
+
+          if (initData.success && initData.data) {
+            const sandbox = initData.data;
+            const url = getSandboxUrl(sandbox);
+            const store = useServerStore.getState();
+            // Clear stale sandbox entries from previous sessions/users
+            const staleIds = store.servers.filter((s) => s.provider).map((s) => s.id);
+            for (const id of staleIds) store.removeServer(id);
+            store.registerOrUpdateSandbox(
+              {
+                url,
+                label: sandbox.name || 'Local Sandbox',
+                provider: sandbox.provider,
+                sandboxId: sandbox.external_id,
+                mappedPorts: sandbox.metadata?.mappedPorts,
+              },
+              { autoSwitch: true, isLocal: sandbox.provider === 'local_docker' },
+            );
+            resetClient();
+            setSandboxReady(true);
+          } else {
+            console.warn('[Setup] Sandbox init failed:', initData.error);
+            setSandboxReady(false);
+          }
+        } catch {
+          // Sandbox provision failed — still show step 2, provider settings
+          // will show a connection error but won't block the flow
+          setSandboxReady(false);
         }
+
+        setPending(false);
       } else {
-        // Returning user: just sign in
+        // Returning user: just sign in and go
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           setErrorMessage(error.message);
           setPending(false);
           return;
         }
+        router.push(returnUrl || '/dashboard');
       }
-
-      // Auth succeeded — AuthProvider will pick up the session via onAuthStateChange.
-      // Navigate to onboarding/dashboard.
-      router.push(returnUrl || '/onboarding');
     } catch (err: any) {
       setErrorMessage(err?.message || 'An unexpected error occurred');
       setPending(false);
     }
   };
 
+  // ── Provider setup done (step 2 → navigate) ──
+  const handleProviderContinue = useCallback(() => {
+    router.push(returnUrl || '/onboarding');
+  }, [router, returnUrl]);
+
+  // ── Step 2: Provider setup ──
+  if (isInstaller && wizardStep === 2) {
+    return (
+      <div className="w-full max-w-sm">
+        {/* Wizard badge */}
+        <div className="flex justify-center mb-5">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            Setup Wizard
+          </span>
+        </div>
+
+        <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
+            Connect a Provider
+          </h1>
+          <p className="text-sm text-muted-foreground text-center max-w-xs">
+            Connect an LLM provider so your agent can think. You can add more later in Settings.
+          </p>
+        </div>
+
+        <StepIndicator currentStep={2} />
+
+        {!sandboxReady ? (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <KortixLoader size="medium" />
+            <p className="text-xs text-muted-foreground">Waiting for sandbox to start…</p>
+          </div>
+        ) : (
+          <div className="h-[400px]">
+            <ProviderSettings
+              variant="setup"
+              onContinue={handleProviderContinue}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Step 1: Account creation (installer) ──
   if (isInstaller) {
     return (
       <div className="w-full max-w-sm">
@@ -145,27 +289,11 @@ export function SelfHostedForm({ returnUrl, installed }: SelfHostedFormProps) {
             Welcome to Kortix
           </h1>
           <p className="text-sm text-muted-foreground text-center max-w-xs">
-            Create your admin account to complete the installation. You'll be the owner of this instance.
+            Create your admin account to complete the installation. You&apos;ll be the owner of this instance.
           </p>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-2 mb-6 px-1">
-          <div className="flex items-center gap-1.5 flex-1">
-            <div className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[11px] font-semibold shrink-0">1</div>
-            <span className="text-xs font-medium text-foreground truncate">Create account</span>
-          </div>
-          <div className="h-px flex-1 bg-border max-w-8" />
-          <div className="flex items-center gap-1.5 flex-1">
-            <div className="w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[11px] font-semibold shrink-0">2</div>
-            <span className="text-xs text-muted-foreground truncate">Set up agent</span>
-          </div>
-          <div className="h-px flex-1 bg-border max-w-8" />
-          <div className="flex items-center gap-1.5 flex-1">
-            <div className="w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[11px] font-semibold shrink-0">3</div>
-            <span className="text-xs text-muted-foreground truncate">Start using</span>
-          </div>
-        </div>
+        <StepIndicator currentStep={1} />
 
         {errorMessage && (
           <div className="mb-4 p-3 rounded-lg flex items-center gap-2 bg-destructive/10 border border-destructive/20 text-destructive">

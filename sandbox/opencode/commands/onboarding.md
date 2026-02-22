@@ -1,6 +1,6 @@
 ---
 description: First-run onboarding — gatekeeper. Dashboard is locked until this completes. Researches the user in realtime, builds a profile, walks them through capabilities with a live demo.
-agent: kortix-main
+agent: kortix
 ---
 
 # Onboarding

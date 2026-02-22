@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useMediaQuery } from '@/hooks/utils';
-import { useState, useEffect, Suspense, lazy, useRef } from 'react';
+import { useState, useEffect, Suspense, lazy, useRef, useCallback } from 'react';
 import { signUp, verifyOtp } from './actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Mail, MailCheck, Clock, ExternalLink } from 'lucide-react';
@@ -804,13 +804,24 @@ function SelfHostedLoginContent() {
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
   const [validatingSession, setValidatingSession] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Track wizard step — when the wizard is on step 2+ (provider setup),
+  // we suppress the auto-redirect that normally fires when `user` becomes truthy.
+  // Uses a ref so the value is instantly readable (no async React state batching).
+  const wizardStepRef = useRef(1);
+  const [wizardStep, setWizardStep] = useState(1);
+  const handleWizardStepChange = useCallback((step: number) => {
+    wizardStepRef.current = step;
+    setWizardStep(step);
+  }, []);
 
   useEffect(() => { setMounted(true); }, []);
 
   // Stale session handling: if bounced here by middleware with ?redirect=,
   // validate the session — sign out if invalid so the form shows.
+  // SKIP auto-redirect when the setup wizard is in progress (step 2+).
   useEffect(() => {
     if (isLoading || !user) return;
+    if (wizardStepRef.current > 1) return; // wizard in progress — don't redirect
     const redirectParam = searchParams.get('redirect');
     if (!redirectParam) {
       router.push(returnUrl || '/onboarding');
@@ -824,9 +835,10 @@ function SelfHostedLoginContent() {
         router.push(returnUrl || '/onboarding');
       }
     });
-  }, [user, isLoading, returnUrl, searchParams, supabase, router]);
+  }, [user, isLoading, returnUrl, searchParams, supabase, router, wizardStep]);
 
-  if (isLoading || validatingSession || statusLoading || user) {
+  // Show loader only when loading auth state or validating — NOT when wizard is in progress.
+  if (isLoading || validatingSession || statusLoading || (user && wizardStepRef.current <= 1)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <KortixLoader size="medium" />
@@ -844,7 +856,7 @@ function SelfHostedLoginContent() {
       <div className="flex min-h-[100dvh]">
         {/* Left panel — self-hosted form */}
         <div className="relative flex-1 flex items-center justify-center px-4 py-16 sm:p-8">
-          <SelfHostedForm returnUrl={returnUrl} installed={installed} />
+          <SelfHostedForm returnUrl={returnUrl} installed={installed} onWizardStepChange={handleWizardStepChange} />
         </div>
         {/* Right panel — same showcase as cloud */}
         <div className="hidden lg:flex flex-1 items-center justify-center relative overflow-hidden">
