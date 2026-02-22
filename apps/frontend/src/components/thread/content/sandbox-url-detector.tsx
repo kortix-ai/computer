@@ -406,16 +406,133 @@ function SandboxPreviewCard({
 }
 
 // ---------------------------------------------------------------------------
-// SandboxUrlDetector — wraps markdown content + appends preview cards
+// SandboxUrlChip — compact chip for URLs found inside code blocks
+// ---------------------------------------------------------------------------
+
+/**
+ * A lightweight, single-line chip for localhost URLs that were found inside
+ * markdown code blocks. These are typically example/documentation URLs rather
+ * than live services, so we show a minimal UI without an iframe or
+ * reachability polling.
+ */
+function SandboxUrlChip({
+  detected,
+  proxyUrl,
+}: {
+  detected: DetectedLocalhostUrl;
+  proxyUrl: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const tabId = `preview:${detected.port}`;
+  const tabHref = `/preview/${detected.port}`;
+  const internalUrl = toInternalUrl(detected.port, detected.path);
+
+  const navigateToPreviewTab = useCallback(() => {
+    openTabAndNavigate({
+      id: tabId,
+      title: `localhost:${detected.port}`,
+      type: 'preview',
+      href: tabHref,
+      metadata: {
+        url: proxyUrl,
+        port: detected.port,
+        originalUrl: internalUrl,
+      },
+    });
+  }, [detected, proxyUrl, internalUrl, tabId, tabHref]);
+
+  const handleCopyUrl = useCallback(() => {
+    navigator.clipboard.writeText(proxyUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [proxyUrl]);
+
+  const handleOpenExternal = useCallback(() => {
+    window.open(proxyUrl, '_blank', 'noopener,noreferrer');
+  }, [proxyUrl]);
+
+  const displayPath = detected.path !== '/' ? detected.path : '';
+
+  return (
+    <div className="group/chip flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/40 bg-muted/15 hover:border-border/60 hover:bg-muted/25 transition-colors">
+      {/* Globe icon */}
+      <Globe className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+
+      {/* URL label — clickable to open preview tab */}
+      <button
+        onClick={navigateToPreviewTab}
+        className="flex items-baseline gap-1 min-w-0 text-left group/link"
+      >
+        <span className="text-xs font-medium text-foreground/80 tabular-nums group-hover/link:text-primary transition-colors whitespace-nowrap">
+          localhost:{detected.port}
+        </span>
+        {displayPath && (
+          <span className="text-xs text-muted-foreground/60 font-mono truncate group-hover/link:text-primary/70 transition-colors">
+            {displayPath}
+          </span>
+        )}
+      </button>
+
+      {/* Compact action buttons — only visible on hover */}
+      <div className="flex items-center gap-0.5 ml-auto shrink-0 opacity-0 group-hover/chip:opacity-100 transition-opacity">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleCopyUrl}
+              className="p-1 rounded hover:bg-muted/60 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            >
+              {copied ? (
+                <Check className="h-3 w-3 text-emerald-500" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{copied ? 'Copied!' : 'Copy URL'}</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleOpenExternal}
+              className="p-1 rounded hover:bg-muted/60 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Open in browser</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={navigateToPreviewTab}
+              className="p-1 rounded hover:bg-muted/60 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            >
+              <MonitorPlay className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Open preview</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SandboxUrlDetector — wraps markdown content + appends preview cards/chips
 // ---------------------------------------------------------------------------
 
 /**
  * Detects localhost URLs in assistant message content and renders
- * interactive preview cards after the full markdown content.
+ * interactive preview elements after the full markdown content.
  *
- * Renders the entire content as one markdown block (preserving code blocks,
- * headings, etc.) then appends compact preview cards below for each
- * detected service URL.
+ * URLs found in plain text get full preview cards with iframe embeds
+ * (these typically represent live running services). URLs found inside
+ * code blocks get compact chips (these are typically examples/docs
+ * but can still be opened if the user wants to check).
  */
 export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
   content,
@@ -435,6 +552,21 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
     [detected, serverUrl],
   );
 
+  // Split into two tiers: live service URLs (plain text) vs example URLs (code blocks)
+  const { liveUrls, codeBlockUrls } = useMemo(() => {
+    const live: Array<{ detected: DetectedLocalhostUrl; proxyUrl: string }> = [];
+    const code: Array<{ detected: DetectedLocalhostUrl; proxyUrl: string }> = [];
+    detected.forEach((d, i) => {
+      const entry = { detected: d, proxyUrl: proxyUrls[i] };
+      if (d.inCodeBlock) {
+        code.push(entry);
+      } else {
+        live.push(entry);
+      }
+    });
+    return { liveUrls: live, codeBlockUrls: code };
+  }, [detected, proxyUrls]);
+
   if (detected.length === 0) {
     return <UnifiedMarkdown content={safeContent} isStreaming={isStreaming} />;
   }
@@ -442,13 +574,31 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
   return (
     <div>
       <UnifiedMarkdown content={safeContent} isStreaming={isStreaming} />
-      {detected.map((d, i) => (
+
+      {/* Full preview cards for URLs in plain text (live services) */}
+      {liveUrls.map(({ detected: d, proxyUrl }) => (
         <SandboxPreviewCard
-          key={`${d.port}-${d.path}`}
+          key={`live-${d.port}-${d.path}`}
           detected={d}
-          proxyUrl={proxyUrls[i]}
+          proxyUrl={proxyUrl}
         />
       ))}
+
+      {/* Compact chips for URLs found inside code blocks (examples/docs) */}
+      {codeBlockUrls.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5">
+          <span className="text-[11px] text-muted-foreground/50 font-medium uppercase tracking-wider">
+            Endpoints mentioned in code
+          </span>
+          {codeBlockUrls.map(({ detected: d, proxyUrl }) => (
+            <SandboxUrlChip
+              key={`code-${d.port}-${d.path}`}
+              detected={d}
+              proxyUrl={proxyUrl}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

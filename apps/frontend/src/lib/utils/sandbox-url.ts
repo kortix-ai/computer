@@ -22,6 +22,8 @@ export interface DetectedLocalhostUrl {
   startIndex: number;
   /** End index in the source text */
   endIndex: number;
+  /** Whether the URL was found inside a markdown code block or inline code span */
+  inCodeBlock: boolean;
 }
 
 export interface ParsedLocalhostUrl {
@@ -124,11 +126,52 @@ export function parseLocalhostUrl(rawUrl: string | undefined): ParsedLocalhostUr
 }
 
 /**
+ * Build a sorted array of [start, end] ranges covering all fenced code blocks
+ * (```...```) and inline code spans (`...`) in the markdown text.
+ * Used to exclude URLs that appear inside code from generating preview cards.
+ */
+function getCodeRanges(text: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+
+  // Fenced code blocks: ```...``` (may have language specifier on opening line)
+  const fencedRegex = /```[\s\S]*?```/g;
+  let m: RegExpExecArray | null;
+  while ((m = fencedRegex.exec(text)) !== null) {
+    ranges.push([m.index, m.index + m[0].length]);
+  }
+
+  // Inline code spans: `...` (but not inside already-found fenced blocks)
+  const inlineRegex = /`[^`\n]+`/g;
+  while ((m = inlineRegex.exec(text)) !== null) {
+    const start = m.index;
+    const end = start + m[0].length;
+    // Only add if not already inside a fenced block range
+    const insideFenced = ranges.some(([rs, re]) => start >= rs && end <= re);
+    if (!insideFenced) {
+      ranges.push([start, end]);
+    }
+  }
+
+  return ranges;
+}
+
+/**
+ * Check if an index falls inside any of the given ranges.
+ */
+function isInsideCodeBlock(index: number, ranges: Array<[number, number]>): boolean {
+  return ranges.some(([start, end]) => index >= start && index < end);
+}
+
+/**
  * Detect all localhost URLs in a text string.
+ * Tags each result with `inCodeBlock` so consumers can render URLs found
+ * inside markdown code blocks / inline code differently (e.g. compact chips
+ * instead of full preview cards with iframes).
  */
 export function detectLocalhostUrls(text: string): DetectedLocalhostUrl[] {
   const results: DetectedLocalhostUrl[] = [];
   const seen = new Set<string>();
+  const codeRanges = getCodeRanges(text);
 
   // Reset regex state
   LOCALHOST_URL_REGEX.lastIndex = 0;
@@ -156,6 +199,7 @@ export function detectLocalhostUrls(text: string): DetectedLocalhostUrl[] {
       path,
       startIndex: match.index,
       endIndex: match.index + originalUrl.length,
+      inCodeBlock: isInsideCodeBlock(match.index, codeRanges),
     });
   }
 
