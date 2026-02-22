@@ -25,6 +25,36 @@
         "type": "fix",
         "text": "Installer Caddyfile includes /auth/v1/* and /rest/v1/* reverse proxy routes to supabase-kong"
       }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/opencode-ai@0.6.2",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.6.2",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.6.2",
+        "target": "npm"
+      },
+      {
+        "name": "v0.6.2",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.6.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-api:0.6.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.6.2",
+        "target": "docker-hub"
+      }
     ]
   },
   {
