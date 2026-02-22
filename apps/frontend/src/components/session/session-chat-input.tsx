@@ -1824,7 +1824,14 @@ export function SessionChatInput({
                   <TooltipTrigger asChild>
                     <Button
                       size="sm"
-                      onClick={onStop}
+                      onClick={() => {
+                        // If a question is active, reject it (which also aborts the session)
+                        if (activeQuestion && onQuestionReject) {
+                          onQuestionReject(activeQuestion.id);
+                          return;
+                        }
+                        onStop();
+                      }}
                       className="flex-shrink-0 h-8 w-8 rounded-full p-0"
                     >
                       <div className="w-3 h-3 rounded-[3px] bg-current" />

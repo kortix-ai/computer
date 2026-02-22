@@ -1580,8 +1580,23 @@ function SessionTurn({
 		[allParts, working],
 	);
 
-	// Turn error — derived directly from message data (same approach as SolidJS reference)
-	const turnError = useMemo(() => getTurnError(turn), [turn]);
+	// Turn error — derived directly from message data (same approach as SolidJS reference).
+	// Falls back to checking for dismissed question tool errors when no message-level error exists.
+	const turnError = useMemo(() => {
+		const msgError = getTurnError(turn);
+		if (msgError) return msgError;
+		// Check for dismissed question tool errors
+		for (const msg of turn.assistantMessages) {
+			for (const part of msg.parts) {
+				if (part.type !== 'tool') continue;
+				const tool = part as ToolPart;
+				if (tool.tool === 'question' && tool.state.status === 'error' && 'error' in tool.state) {
+					return (tool.state as { error: string }).error.replace(/^Error:\s*/, '');
+				}
+			}
+		}
+		return undefined;
+	}, [turn]);
 
 	// Shell mode detection
 	const shellModePart = useMemo(() => getShellModePart(turn), [turn]);
@@ -2043,7 +2058,7 @@ function SessionTurn({
 							if (part.tool === "task") return null;
 							if (part.tool === "question") {
 								// Answered questions render in the inline content section below;
-								// skip here to avoid duplicate cards during streaming.
+								// dismissed questions show via the turnError banner.
 								return null;
 							}
 
@@ -3008,8 +3023,12 @@ export function SessionChat({
 			} catch {
 				// ignore — SSE "question.rejected" event will also remove it
 			}
+			// Also abort the session so the "The operation was aborted." banner appears
+			if (!abortSession.isPending) {
+				abortSession.mutate(sessionId);
+			}
 		},
-		[removeQuestion],
+		[removeQuestion, abortSession, sessionId],
 	);
 
 	// ---- Group messages into turns ----

@@ -10,7 +10,7 @@
 
 "use client";
 
-import { ChevronDown, MessageCircle, Pencil, X } from "lucide-react";
+import { MessageCircle, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { QuestionAnswer, QuestionInfo, QuestionRequest } from "@/ui";
@@ -37,7 +37,6 @@ export function QuestionPrompt({
 	const questions = request.questions;
 	const isSingle = questions.length === 1 && !questions[0].multiple;
 
-	const [expanded, setExpanded] = useState(true);
 	const [tab, setTab] = useState(0);
 	const [answers, setAnswers] = useState<QuestionAnswer[]>(() =>
 		questions.map(() => []),
@@ -194,11 +193,7 @@ export function QuestionPrompt({
 	return (
 		<div className="rounded-xl border border-border/40 bg-muted/40 overflow-hidden">
 			{/* Header row */}
-			<button
-				type="button"
-				onClick={() => setExpanded((v) => !v)}
-				className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/70 transition-colors cursor-pointer"
-			>
+			<div className="flex items-center gap-2 w-full px-3 py-1.5">
 				<MessageCircle className="size-3.5 text-muted-foreground flex-shrink-0" />
 				<span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
 					{isSingle ? "" : `${questions.length} questions \u00B7 `}
@@ -206,36 +201,23 @@ export function QuestionPrompt({
 						{headerSummary}
 					</span>
 				</span>
-				<div className="flex items-center gap-0.5 shrink-0">
-					<span
-						role="button"
-						tabIndex={0}
-						onClick={(e) => {
-							e.stopPropagation();
+				<span
+					role="button"
+					tabIndex={0}
+					onClick={reject}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
 							reject();
-						}}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" || e.key === " ") {
-								e.stopPropagation();
-								reject();
-							}
-						}}
-						className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
-					>
-						<X className="size-3" />
-					</span>
-					<ChevronDown
-						className={cn(
-							"size-3 text-muted-foreground/40 transition-transform",
-							!expanded && "rotate-180",
-						)}
-					/>
-				</div>
-			</button>
+						}
+					}}
+					className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
+				>
+					<X className="size-3" />
+				</span>
+			</div>
 
-			{/* Expanded body */}
-			{expanded && (
-				<div className="border-t border-border/30">
+			{/* Body */}
+			<div className="border-t border-border/30">
 					{/* Tab bar (multi-question only) */}
 					{!isSingle && (
 						<div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto scrollbar-hide border-b border-border/30 bg-muted/20">
@@ -481,7 +463,6 @@ export function QuestionPrompt({
 						) : null}
 					</div>
 				</div>
-			)}
 		</div>
 	);
 }
