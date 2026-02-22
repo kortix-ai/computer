@@ -94,6 +94,7 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
   const [pending, setPending] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [sandboxReady, setSandboxReady] = useState(false);
+  const [pullProgress, setPullProgress] = useState<{ progress: number; message: string } | null>(null);
   const router = useRouter();
 
   if (installed === null) {
@@ -101,6 +102,62 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
   }
 
   const isInstaller = !installed;
+
+  // ── Helpers ──
+
+  const registerSandbox = useCallback((sandbox: any) => {
+    const url = getSandboxUrl(sandbox);
+    const store = useServerStore.getState();
+    // Clear stale sandbox entries from previous sessions/users
+    const staleIds = store.servers.filter((s: any) => s.provider).map((s: any) => s.id);
+    for (const id of staleIds) store.removeServer(id);
+    store.registerOrUpdateSandbox(
+      {
+        url,
+        label: sandbox.name || 'Local Sandbox',
+        provider: sandbox.provider,
+        sandboxId: sandbox.external_id,
+        mappedPorts: sandbox.metadata?.mappedPorts,
+      },
+      { autoSwitch: true, isLocal: sandbox.provider === 'local_docker' },
+    );
+    resetClient();
+  }, []);
+
+  const pollLocalStatus = useCallback((jwt: string, backendUrl: string) => {
+    const poll = async () => {
+      try {
+        const res = await fetch(`${backendUrl}/platform/init/local/status`, {
+          headers: { 'Authorization': `Bearer ${jwt}` },
+        });
+        const data = await res.json();
+
+        if (data.status === 'ready' && data.data) {
+          registerSandbox(data.data);
+          setSandboxReady(true);
+          setPullProgress(null);
+          return; // stop polling
+        }
+
+        if (data.status === 'error') {
+          setPullProgress({ progress: 0, message: data.message || 'Failed to pull image' });
+          return; // stop polling
+        }
+
+        // Still pulling
+        setPullProgress({
+          progress: data.progress || 0,
+          message: data.message || 'Pulling sandbox image...',
+        });
+
+        // Poll again in 2s
+        setTimeout(poll, 2000);
+      } catch {
+        setTimeout(poll, 3000);
+      }
+    };
+    setTimeout(poll, 2000);
+  }, [registerSandbox]);
 
   // ── Account creation handler (step 1) ──
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -168,45 +225,34 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
         // pick up the fresh session instead of stale null.
         invalidateTokenCache();
 
-        // Provision sandbox using the JWT we already have
+        // Provision local sandbox using the JWT we already have
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const authHeaders = {
+          'Authorization': `Bearer ${jwt}`,
+          'Content-Type': 'application/json',
+        };
+
         try {
-          const initRes = await fetch(`${backendUrl}/platform/init`, {
+          const initRes = await fetch(`${backendUrl}/platform/init/local`, {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${jwt}`,
-              'Content-Type': 'application/json',
-            },
+            headers: authHeaders,
             body: JSON.stringify({}),
           });
           const initData = await initRes.json();
 
-          if (initData.success && initData.data) {
-            const sandbox = initData.data;
-            const url = getSandboxUrl(sandbox);
-            const store = useServerStore.getState();
-            // Clear stale sandbox entries from previous sessions/users
-            const staleIds = store.servers.filter((s) => s.provider).map((s) => s.id);
-            for (const id of staleIds) store.removeServer(id);
-            store.registerOrUpdateSandbox(
-              {
-                url,
-                label: sandbox.name || 'Local Sandbox',
-                provider: sandbox.provider,
-                sandboxId: sandbox.external_id,
-                mappedPorts: sandbox.metadata?.mappedPorts,
-              },
-              { autoSwitch: true, isLocal: sandbox.provider === 'local_docker' },
-            );
-            resetClient();
+          if (initData.status === 'ready' && initData.data) {
+            // Image existed, sandbox created synchronously
+            registerSandbox(initData.data);
             setSandboxReady(true);
-          } else {
-            console.warn('[Setup] Sandbox init failed:', initData.error);
+          } else if (initData.status === 'pulling') {
+            // Image is being pulled — poll for progress
+            setPullProgress({ progress: 0, message: initData.message || 'Pulling sandbox image...' });
+            pollLocalStatus(jwt, backendUrl);
+          } else if (!initData.success) {
+            console.warn('[Setup] Local init failed:', initData.error);
             setSandboxReady(false);
           }
         } catch {
-          // Sandbox provision failed — still show step 2, provider settings
-          // will show a connection error but won't block the flow
           setSandboxReady(false);
         }
 
@@ -258,7 +304,21 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
         {!sandboxReady ? (
           <div className="flex flex-col items-center gap-3 py-8">
             <KortixLoader size="medium" />
-            <p className="text-xs text-muted-foreground">Waiting for sandbox to start…</p>
+            {pullProgress ? (
+              <div className="w-full max-w-xs flex flex-col items-center gap-2">
+                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-primary h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.max(pullProgress.progress, 2)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {pullProgress.message}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Preparing sandbox…</p>
+            )}
           </div>
         ) : (
           <div className="h-[400px]">

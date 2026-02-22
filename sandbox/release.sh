@@ -283,6 +283,14 @@ if ! step_done "bump"; then
       warn "get-kortix.sh not found, skipping stamp"
     fi
 
+    # kortix-api config.ts — SANDBOX_VERSION constant
+    API_CONFIG="$REPO_ROOT/services/kortix-api/src/config.ts"
+    if [ -f "$API_CONFIG" ]; then
+      sed -i.bak "s/^export const SANDBOX_VERSION = '[^']*'/export const SANDBOX_VERSION = '$VERSION'/" "$API_CONFIG"
+      rm -f "${API_CONFIG}.bak"
+      ok "config.ts SANDBOX_VERSION → $VERSION"
+    fi
+
     step_complete "bump"
   fi
 else
