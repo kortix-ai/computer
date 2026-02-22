@@ -1,5 +1,8 @@
 export type SandboxProviderName = 'daytona' | 'local_docker';
 
+/** Single source of truth for the sandbox version. Update on each release. */
+export const SANDBOX_VERSION = '0.6.2';
+
 /** Parse comma-separated provider list (e.g. "daytona,local_docker") */
 function parseAllowedProviders(raw: string): SandboxProviderName[] {
   if (!raw) return ['local_docker'];
@@ -97,7 +100,7 @@ export const config = {
   DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || '',
   DAYTONA_SERVER_URL: process.env.DAYTONA_SERVER_URL || '',
   DAYTONA_TARGET: process.env.DAYTONA_TARGET || '',
-  DAYTONA_SNAPSHOT: process.env.DAYTONA_SNAPSHOT || '',
+  DAYTONA_SNAPSHOT: process.env.DAYTONA_SNAPSHOT || `kortix-sandbox-v${SANDBOX_VERSION}`,
 
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: process.env.KORTIX_URL || '',
@@ -107,7 +110,7 @@ export const config = {
    * First entry is the default provider for new sandboxes.
    */
   ALLOWED_SANDBOX_PROVIDERS: parseAllowedProviders(process.env.ALLOWED_SANDBOX_PROVIDERS || ''),
-  SANDBOX_IMAGE: process.env.SANDBOX_IMAGE || 'kortix/computer:latest',
+  SANDBOX_IMAGE: `kortix/sandbox:${SANDBOX_VERSION}`,
   DOCKER_HOST: process.env.DOCKER_HOST || '',
   SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
   /**
