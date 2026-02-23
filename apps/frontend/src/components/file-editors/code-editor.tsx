@@ -289,6 +289,8 @@ interface CodeEditorProps {
   readOnly?: boolean;
   className?: string;
   showLineNumbers?: boolean;
+  showHeader?: boolean; // Show the built-in header with save/discard/language badge (default: true)
+  fontSize?: string; // CSS font-size for the editor (default: 'text-sm' / 14px)
 }
 
 export function CodeEditor({
@@ -304,6 +306,8 @@ export function CodeEditor({
   readOnly = false,
   className,
   showLineNumbers = true,
+  showHeader = true,
+  fontSize,
 }: CodeEditorProps) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -313,8 +317,8 @@ export function CodeEditor({
   const savedContent = useRef<string>(originalContent ?? content);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [editorHeight, setEditorHeight] = useState<string>('100%');
-  // Track initialization state
-  const [isReady, setIsReady] = useState(false);
+  // Track initialization state — ready once content is present
+  const [isReady, setIsReady] = useState(!!content);
   
   // Store callback in ref to avoid it being a dependency
   const onUnsavedChangeRef = useRef(onUnsavedChange);
@@ -339,11 +343,18 @@ export function CodeEditor({
   }, [hasChanges]);
   
   // Update savedContent ref when originalContent prop changes (e.g., after external save)
+  // Also sync localContent if it matches the old saved content (no local edits)
   useEffect(() => {
     if (originalContent !== undefined) {
+      const hadChanges = localContent !== savedContent.current;
       savedContent.current = originalContent;
+      // If the new original matches what's in the editor, notify parent that changes are cleared
+      if (hadChanges && localContent === originalContent) {
+        onUnsavedChangeRef.current?.(false);
+        prevHasChanges.current = false;
+      }
     }
-  }, [originalContent]);
+  }, [originalContent, localContent]);
 
   // Set mounted state
   useEffect(() => {
@@ -611,7 +622,7 @@ export function CodeEditor({
       style={readOnly ? undefined : { contain: 'strict' }}
     >
       {/* Header with save controls and language */}
-      {!readOnly && (
+      {!readOnly && showHeader && (
         <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30 flex-shrink-0 max-w-full min-w-0">
           {/* Left: Save/Discard/Unsaved */}
           <div className="flex items-center gap-1 min-w-0">
@@ -688,7 +699,8 @@ export function CodeEditor({
             }}
             editable={!readOnly}
             className={cn(
-              "w-full max-w-full text-sm",
+              "w-full max-w-full",
+              fontSize || "text-sm",
               readOnly 
                 ? "[&_.cm-scroller]:!overflow-visible" // No scroll in read-only, parent handles it
                 : "[&_.cm-editor]:max-h-full [&_.cm-scroller]:overflow-auto"
