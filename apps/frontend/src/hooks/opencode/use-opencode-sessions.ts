@@ -21,7 +21,7 @@ import type {
   WorktreeCreateInput,
   WorktreeRemoveInput,
   WorktreeResetInput,
-} from '@kortix/opencode-sdk/v2/client';
+} from '@opencode-ai/sdk/v2/client';
 
 // ============================================================================
 // Re-export SDK types for consumers
@@ -408,22 +408,6 @@ export function useOpenCodeAgent(agentName: string) {
     },
     enabled: !!agentName,
     staleTime: Infinity,
-  });
-}
-
-export function useUpdateOpenCodeAgent() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ name, patch }: { name: string; patch: Partial<Agent> }) => {
-      const client = getClient();
-      const result = await client.agent.update({ name, ...patch } as any);
-      return unwrap(result);
-    },
-    onSuccess: () => {
-      // Only refetch if agents query is currently mounted
-      queryClient.refetchQueries({ queryKey: opencodeKeys.agents(), type: 'active' });
-    },
   });
 }
 

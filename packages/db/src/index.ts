@@ -15,12 +15,19 @@ export {
   channelTypeEnum,
   sessionStrategyEnum,
   apiKeyStatusEnum,
+  // Kortix tables — accounts
+  accounts,
+  accountMembers,
+  accountRoleEnum,
+  accountsRelations,
+  accountMembersRelations,
   // Kortix tables
   sandboxes,
   triggers,
   executions,
   deployments,
   channelConfigs,
+  channelPlatformCredentials,
   channelSessions,
   channelMessages,
   channelIdentityMap,
@@ -63,6 +70,10 @@ export {
 } from './schema/public';
 
 export type {
+  Account,
+  AccountMember,
+  NewAccount,
+  NewAccountMember,
   Sandbox,
   Trigger,
   Execution,
@@ -81,6 +92,8 @@ export type {
   ChannelMessage,
   ChannelIdentity,
   NewChannelConfig,
+  ChannelPlatformCredential,
+  NewChannelPlatformCredential,
   NewChannelSession,
   NewChannelMessage,
   NewChannelIdentity,

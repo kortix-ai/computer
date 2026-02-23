@@ -70,22 +70,22 @@ fi
 # Update the globally-installed CLI to the version declared in this package.
 # This mirrors the Dockerfile's install logic: install the meta-package, then
 # force-install the musl variant and symlink it over the glibc binary.
-CLI_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').dependencies['@kortix/opencode-ai'] || '')" 2>/dev/null || echo "")
+CLI_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').dependencies['opencode-ai'] || '')" 2>/dev/null || echo "")
 if [ -n "$CLI_VERSION" ]; then
   CURRENT_CLI=$(opencode --version 2>/dev/null || echo "none")
   if [ "$CURRENT_CLI" != "$CLI_VERSION" ]; then
     echo "[sandbox-postinstall] Updating OpenCode CLI: $CURRENT_CLI -> $CLI_VERSION..."
-    npm install -g "@kortix/opencode-ai@$CLI_VERSION" 2>/dev/null || true
+    npm install -g "opencode-ai@$CLI_VERSION" 2>/dev/null || true
     ARCH=$(uname -m)
     if [ "$ARCH" = "x86_64" ]; then
-      npm install -g "@kortix/opencode-ai-linux-x64-musl@$CLI_VERSION" --force 2>/dev/null || true
-      MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-x64-musl/bin/opencode
-      GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-x64/bin/opencode
+      npm install -g "opencode-linux-x64-musl@$CLI_VERSION" --force 2>/dev/null || true
+      MUSL_BIN=$(npm root -g)/opencode-linux-x64-musl/bin/opencode
+      GLIBC_BIN=$(npm root -g)/opencode-ai/node_modules/opencode-linux-x64/bin/opencode
       [ -f "$MUSL_BIN" ] && [ -f "$GLIBC_BIN" ] && ln -sf "$MUSL_BIN" "$GLIBC_BIN"
     else
-      npm install -g "@kortix/opencode-ai-linux-arm64-musl@$CLI_VERSION" --force 2>/dev/null || true
-      MUSL_BIN=$(npm root -g)/@kortix/opencode-ai-linux-arm64-musl/bin/opencode
-      GLIBC_BIN=$(npm root -g)/@kortix/opencode-ai/node_modules/@kortix/opencode-ai-linux-arm64/bin/opencode
+      npm install -g "opencode-linux-arm64-musl@$CLI_VERSION" --force 2>/dev/null || true
+      MUSL_BIN=$(npm root -g)/opencode-linux-arm64-musl/bin/opencode
+      GLIBC_BIN=$(npm root -g)/opencode-ai/node_modules/opencode-linux-arm64/bin/opencode
       [ -f "$MUSL_BIN" ] && [ -f "$GLIBC_BIN" ] && ln -sf "$MUSL_BIN" "$GLIBC_BIN"
     fi
     echo "[sandbox-postinstall] CLI updated to $(opencode --version 2>/dev/null || echo 'unknown')"

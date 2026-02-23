@@ -16,7 +16,7 @@ import { access, copyFile, cp, mkdir, rm, stat, symlink } from "node:fs/promises
 import * as os from "node:os"
 import * as path from "node:path"
 import { type Plugin, tool } from "@opencode-ai/plugin"
-import type { Event } from "@kortix/opencode-sdk"
+import type { Event } from "@opencode-ai/sdk"
 import type { OpencodeClient } from "./kdco-primitives/types"
 
 /** Logger interface for structured logging */

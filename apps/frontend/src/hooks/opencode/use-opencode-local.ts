@@ -14,7 +14,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useModelStore, type ModelKey } from './use-model-store';
 import type { FlatModel } from '@/components/session/session-chat-input';
-import type { Agent, ProviderListResponse, Config } from '@kortix/opencode-sdk/v2/client';
+import type { Agent, ProviderListResponse, Config } from '@opencode-ai/sdk/v2/client';
 
 export type { ModelKey };
 

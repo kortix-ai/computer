@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Search, Globe, Image, Mic, BookOpen, Flame } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -15,25 +15,34 @@ import { invalidateTokenCache } from '@/lib/auth-token';
 
 /* ─── Install Status Hook ──────────────────────────────────────────────────── */
 
+export type SandboxProviderName = 'local_docker' | 'daytona';
+
 export function useInstallStatus() {
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sandboxProviders, setSandboxProviders] = useState<SandboxProviderName[]>([]);
+  const [defaultProvider, setDefaultProvider] = useState<SandboxProviderName>('local_docker');
 
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-    fetch(`${backendUrl}/setup/install-status`)
-      .then((res) => res.json())
-      .then((data) => {
-        setInstalled(data.installed === true);
-        setLoading(false);
-      })
-      .catch(() => {
-        setInstalled(false);
-        setLoading(false);
-      });
+
+    // Fetch both install-status and sandbox-providers in parallel
+    Promise.all([
+      fetch(`${backendUrl}/setup/install-status`)
+        .then((res) => res.json())
+        .catch(() => ({ installed: false })),
+      fetch(`${backendUrl}/setup/sandbox-providers`)
+        .then((res) => res.json())
+        .catch(() => ({ providers: ['local_docker'], default: 'local_docker' })),
+    ]).then(([statusData, providerData]) => {
+      setInstalled(statusData.installed === true);
+      setSandboxProviders(providerData.providers || ['local_docker']);
+      setDefaultProvider(providerData.default || 'local_docker');
+      setLoading(false);
+    });
   }, []);
 
-  return { installed, loading };
+  return { installed, loading, sandboxProviders, defaultProvider };
 }
 
 /* ─── Step Indicator ───────────────────────────────────────────────────────── */
@@ -254,36 +263,57 @@ function ToolSecretsStep({ onContinue, onSkip }: { onContinue: () => void; onSki
 interface SelfHostedFormProps {
   returnUrl: string | null;
   installed: boolean | null;
+  /** Available sandbox providers from the API. */
+  sandboxProviders?: SandboxProviderName[];
+  /** Default sandbox provider. */
+  defaultProvider?: SandboxProviderName;
   /** Called when the wizard transitions between steps so the parent can suppress auto-redirects. */
   onWizardStepChange?: (step: number) => void;
 }
 
-export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: SelfHostedFormProps) {
+export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['local_docker'], defaultProvider = 'local_docker', onWizardStepChange }: SelfHostedFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [sandboxReady, setSandboxReady] = useState(false);
   const [pullProgress, setPullProgress] = useState<{ progress: number; message: string } | null>(null);
+  /** Which provider the user chose (or was auto-selected). null = not chosen yet. */
+  const [chosenProvider, setChosenProvider] = useState<SandboxProviderName | null>(null);
+  /** JWT stored after signup so we can provision later if user needs to pick a provider. */
+  const jwtRef = useRef<string | null>(null);
   const router = useRouter();
+
+  const hasMultipleProviders = sandboxProviders.length > 1;
 
   // ── Helpers (hooks must be before any early return) ──
 
   const registerSandbox = useCallback((sandbox: any) => {
     const url = getSandboxUrl(sandbox);
     const store = useServerStore.getState();
-    // Clear stale sandbox entries from previous sessions/users
-    const staleIds = store.servers.filter((s: any) => s.provider).map((s: any) => s.id);
+    const isLocal = sandbox.provider === 'local_docker';
+
+    // Clear stale non-default sandbox entries from previous sessions/users
+    const staleIds = store.servers
+      .filter((s: any) => s.provider && s.id !== 'default')
+      .map((s: any) => s.id);
     for (const id of staleIds) store.removeServer(id);
-    store.registerOrUpdateSandbox(
+
+    const registeredId = store.registerOrUpdateSandbox(
       {
         url,
-        label: sandbox.name || 'Local Sandbox',
+        label: sandbox.name || (isLocal ? 'Local Sandbox' : 'Cloud Sandbox'),
         provider: sandbox.provider,
         sandboxId: sandbox.external_id,
         mappedPorts: sandbox.metadata?.mappedPorts,
       },
-      { autoSwitch: true, isLocal: sandbox.provider === 'local_docker' },
+      { autoSwitch: true, isLocal },
     );
+
+    // Force-switch to the registered sandbox — autoSwitch may be suppressed
+    // if userSelected is true from a previous session.
+    if (registeredId) {
+      store.setActiveServer(registeredId, { auto: true });
+    }
     resetClient();
   }, []);
 
@@ -321,6 +351,64 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
     };
     setTimeout(poll, 2000);
   }, [registerSandbox]);
+
+  // ── Provision sandbox via generic /platform/init (works for any provider) ──
+  const provisionSandbox = useCallback(async (jwt: string, backendUrl: string, provider: SandboxProviderName) => {
+    if (provider === 'local_docker') {
+      // Use the specialized local Docker init endpoint (supports async image pull)
+      try {
+        const initRes = await fetch(`${backendUrl}/platform/init/local`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const initData = await initRes.json();
+
+        if (initData.status === 'ready' && initData.data) {
+          registerSandbox(initData.data);
+          setSandboxReady(true);
+        } else if (initData.status === 'pulling') {
+          setPullProgress({ progress: 0, message: initData.message || 'Pulling sandbox image...' });
+          pollLocalStatus(jwt, backendUrl);
+        } else if (!initData.success) {
+          console.warn('[Setup] Local init failed:', initData.error);
+          setSandboxReady(false);
+        }
+      } catch {
+        setSandboxReady(false);
+      }
+    } else {
+      // Daytona (or any non-local provider) — uses generic init, synchronous
+      try {
+        const initRes = await fetch(`${backendUrl}/platform/init`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider }),
+        });
+        const initData = await initRes.json();
+
+        if (initData.success && initData.data) {
+          registerSandbox(initData.data);
+          setSandboxReady(true);
+        } else {
+          console.warn(`[Setup] ${provider} init failed:`, initData.error);
+          setSandboxReady(false);
+        }
+      } catch {
+        setSandboxReady(false);
+      }
+    }
+  }, [registerSandbox, pollLocalStatus]);
+
+  // ── User picks a sandbox provider (multi-provider flow) ──
+  const handleSandboxProviderSelect = useCallback(async (provider: SandboxProviderName) => {
+    setChosenProvider(provider);
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const jwt = jwtRef.current;
+    if (jwt) {
+      await provisionSandbox(jwt, backendUrl, provider);
+    }
+  }, [provisionSandbox]);
 
   // ── Provider setup done (step 2 → step 3: tool keys) ──
   const handleProviderContinue = useCallback(() => {
@@ -401,41 +489,22 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
         // We have the JWT right here — use it directly instead of going through
         // getSupabaseAccessToken() which may have a stale null cached from before signup.
         const jwt = signInData.session?.access_token;
+        jwtRef.current = jwt || null;
 
         // Invalidate the token cache so subsequent calls (e.g. ProviderSettings)
         // pick up the fresh session instead of stale null.
         invalidateTokenCache();
 
-        // Provision local sandbox using the JWT we already have
+        // Provision sandbox — if only one provider, auto-provision immediately.
+        // If multiple providers, defer to step 2 where user picks.
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-        const authHeaders = {
-          'Authorization': `Bearer ${jwt}`,
-          'Content-Type': 'application/json',
-        };
 
-        try {
-          const initRes = await fetch(`${backendUrl}/platform/init/local`, {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify({}),
-          });
-          const initData = await initRes.json();
-
-          if (initData.status === 'ready' && initData.data) {
-            // Image existed, sandbox created synchronously
-            registerSandbox(initData.data);
-            setSandboxReady(true);
-          } else if (initData.status === 'pulling') {
-            // Image is being pulled — poll for progress
-            setPullProgress({ progress: 0, message: initData.message || 'Pulling sandbox image...' });
-            pollLocalStatus(jwt, backendUrl);
-          } else if (!initData.success) {
-            console.warn('[Setup] Local init failed:', initData.error);
-            setSandboxReady(false);
-          }
-        } catch {
-          setSandboxReady(false);
+        if (!hasMultipleProviders && jwt) {
+          const autoProvider = sandboxProviders[0] || 'local_docker';
+          setChosenProvider(autoProvider);
+          await provisionSandbox(jwt, backendUrl, autoProvider);
         }
+        // else: multiple providers — step 2 will show the picker
 
         setPending(false);
       } else {
@@ -479,6 +548,65 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
 
   // ── Step 2: Provider setup ──
   if (isInstaller && wizardStep === 2) {
+    // ── Sub-state: multiple providers, user hasn't chosen yet ──
+    if (hasMultipleProviders && !chosenProvider) {
+      return (
+        <div className="w-full max-w-sm">
+          <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
+              Choose Sandbox Environment
+            </h1>
+            <p className="text-sm text-muted-foreground text-center max-w-xs">
+              Where should your agent&apos;s sandbox run? You can change this later.
+            </p>
+          </div>
+
+          <StepIndicator currentStep={2} />
+
+          <div className="flex flex-col gap-3">
+            {sandboxProviders.includes('local_docker') && (
+              <button
+                type="button"
+                onClick={() => handleSandboxProviderSelect('local_docker')}
+                className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-card/50 hover:border-primary/40 hover:bg-card transition-all text-left"
+              >
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <svg className="h-5 w-5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="7" width="20" height="14" rx="2" />
+                    <path d="M16 3h-8l-2 4h12z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground">Local Docker</span>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    Run the sandbox on this machine using Docker. Best for development and full control.
+                  </p>
+                </div>
+              </button>
+            )}
+            {sandboxProviders.includes('daytona') && (
+              <button
+                type="button"
+                onClick={() => handleSandboxProviderSelect('daytona')}
+                className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-card/50 hover:border-primary/40 hover:bg-card transition-all text-left"
+              >
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <Globe className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground">Daytona (Cloud)</span>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    Run the sandbox on Daytona cloud infrastructure. No local Docker required.
+                  </p>
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Sub-state: provider chosen, sandbox provisioning / ready ──
     return (
       <div className="w-full max-w-sm">
         <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">

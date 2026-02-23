@@ -12,7 +12,7 @@
 import {
 	createOpencodeClient,
 	type OpencodeClient,
-} from "@kortix/opencode-sdk/v2/client";
+} from "@opencode-ai/sdk/v2/client";
 import { authenticatedFetch } from "@/lib/auth-token";
 import { getActiveOpenCodeUrl, registerClientResetter } from "@/stores/server-store";
 

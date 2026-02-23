@@ -452,9 +452,11 @@ export const useServerStore = create<ServerStore>()(
         );
 
         // Active server will be set by useSandbox hook once it loads.
-        // If current activeServerId was a removed entry, clear it.
+        // If current activeServerId was a removed entry, clear it and
+        // reset userSelected so useSandbox can auto-switch.
         if (state.activeServerId && !state.servers.some((s) => s.id === state.activeServerId)) {
           state.activeServerId = state.servers[0]?.id ?? '';
+          state.userSelected = false;
         }
 
         // Load custom entries from API (user-added URLs).

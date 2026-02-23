@@ -15,8 +15,9 @@ import { buildBlockKitMessage, type UsageMetadata } from './block-kit-builder';
 import { config } from '../../../config';
 import { db } from '../../../shared/db';
 import { channelConfigs, sandboxes } from '@kortix/db';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { encryptCredentials } from '../../lib/credentials';
+import { getSlackPlatformCredentials } from '../../lib/platform-credentials';
 
 export class SlackAdapter extends BaseAdapter {
   readonly type = 'slack' as const;
@@ -359,8 +360,8 @@ export class SlackAdapter extends BaseAdapter {
       return c.json({ error: 'Missing sandboxId or accountId' }, 400);
     }
 
-    const clientId = config.SLACK_CLIENT_ID;
-    if (!clientId) {
+    const platformCreds = await getSlackPlatformCredentials(resolvedAccountId, sandboxId);
+    if (!platformCreds?.clientId) {
       return c.json({ error: 'Slack OAuth not configured (missing client ID)' }, 500);
     }
 
@@ -371,7 +372,7 @@ export class SlackAdapter extends BaseAdapter {
     const scopes = 'chat:write,chat:write.customize,reactions:read,reactions:write,app_mentions:read,im:history,im:write,channels:history,channels:read,channels:join,channels:manage,groups:history,mpim:history,commands,files:read,files:write,links:read,links:write,users:read,users:read.email,users.profile:read,search:read.public,search:read.files,search:read.users,pins:read,pins:write,usergroups:read,bookmarks:read,bookmarks:write,dnd:read,team:read,emoji:read';
 
     const slackUrl = new URL('https://slack.com/oauth/v2/authorize');
-    slackUrl.searchParams.set('client_id', clientId);
+    slackUrl.searchParams.set('client_id', platformCreds.clientId);
     slackUrl.searchParams.set('scope', scopes);
     slackUrl.searchParams.set('state', state);
 
@@ -403,9 +404,8 @@ export class SlackAdapter extends BaseAdapter {
       return c.redirect(`${frontendUrl}/channels?slack=error&message=${encodeURIComponent('Invalid state parameter')}`);
     }
 
-    const clientId = config.SLACK_CLIENT_ID;
-    const clientSecret = config.SLACK_CLIENT_SECRET;
-    if (!clientId || !clientSecret) {
+    const platformCreds = await getSlackPlatformCredentials(accountId, sandboxId);
+    if (!platformCreds?.clientId || !platformCreds?.clientSecret) {
       return c.redirect(`${frontendUrl}/channels?slack=error&message=${encodeURIComponent('Slack OAuth not configured')}`);
     }
 
@@ -413,8 +413,8 @@ export class SlackAdapter extends BaseAdapter {
     const redirectUri = publicUrl ? `${publicUrl}/webhooks/slack/oauth_callback` : undefined;
 
     const body: Record<string, string> = {
-      client_id: clientId,
-      client_secret: clientSecret,
+      client_id: platformCreds.clientId,
+      client_secret: platformCreds.clientSecret,
       code,
     };
     if (redirectUri) body.redirect_uri = redirectUri;
@@ -456,18 +456,56 @@ export class SlackAdapter extends BaseAdapter {
       };
       const encryptedCreds = await encryptCredentials(rawCreds);
 
-      await db
-        .insert(channelConfigs)
-        .values({
-          sandboxId,
-          accountId,
-          channelType: 'slack',
-          name: `${teamName} Slack`,
-          enabled: true,
-          credentials: encryptedCreds,
-          sessionStrategy: 'per-user',
-          metadata: {},
-        });
+      // Upsert: if a slack channel already exists for this sandbox, update it
+      if (sandboxId) {
+        const [existing] = await db
+          .select({ channelConfigId: channelConfigs.channelConfigId })
+          .from(channelConfigs)
+          .where(
+            and(
+              eq(channelConfigs.sandboxId, sandboxId),
+              eq(channelConfigs.channelType, 'slack'),
+            ),
+          );
+
+        if (existing) {
+          await db
+            .update(channelConfigs)
+            .set({
+              credentials: encryptedCreds,
+              name: `${teamName} Slack`,
+              enabled: true,
+              updatedAt: new Date(),
+            })
+            .where(eq(channelConfigs.channelConfigId, existing.channelConfigId));
+        } else {
+          await db
+            .insert(channelConfigs)
+            .values({
+              sandboxId,
+              accountId,
+              channelType: 'slack',
+              name: `${teamName} Slack`,
+              enabled: true,
+              credentials: encryptedCreds,
+              sessionStrategy: 'per-user',
+              metadata: {},
+            });
+        }
+      } else {
+        await db
+          .insert(channelConfigs)
+          .values({
+            sandboxId,
+            accountId,
+            channelType: 'slack',
+            name: `${teamName} Slack`,
+            enabled: true,
+            credentials: encryptedCreds,
+            sessionStrategy: 'per-user',
+            metadata: {},
+          });
+      }
     } catch (err) {
       console.error('[SLACK] Failed to create channel config:', err);
       return c.redirect(`${frontendUrl}/channels?slack=error&message=${encodeURIComponent('Failed to save channel config')}`);

@@ -31,7 +31,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@kortix/opencode-ai": "0.6.3",
+    "opencode-ai": "1.2.10",
     "agent-browser": "^0.10.0"
   },
   "peerDependencies": {},

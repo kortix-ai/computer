@@ -54,7 +54,7 @@ SecretStore.loadIntoProcessEnv() → bulk load into process.env
 
 **Auth types:** `api` (key string), `oauth` (refresh/access/expires), `wellknown` (key/token)
 
-**Code:** `services/opencode/packages/opencode/src/auth/index.ts`
+**Code:** OpenCode's `auth/index.ts` (upstream, in the `opencode-ai` npm package)
 
 ---
 
@@ -196,4 +196,4 @@ docker exec kortix-sandbox s6-svc -r /run/service/svc-kortix-master
 | `sandbox/s6-services/svc-opencode-web/run` | OpenCode web UI (port 3111) |
 | `services/kortix-api/src/providers/routes.ts` | Backend provider API (calls sandbox /env) |
 | `services/kortix-api/src/providers/registry.ts` | Provider definitions (single source of truth) |
-| `services/opencode/.../auth/index.ts` | OpenCode auth.json read/write |
+| OpenCode `auth/index.ts` (upstream) | OpenCode auth.json read/write |

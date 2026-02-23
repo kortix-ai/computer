@@ -1,6 +1,10 @@
-# Dev override: mount local services/opencode source into the sandbox
-# and run the opencode server from source using Bun instead of the
-# globally-installed npm binary.
+# Dev override: mount local dev entry points into the sandbox
+# to run the opencode server from custom entry points using Bun
+# instead of the globally-installed npm binary.
+#
+# Note: The fork (services/opencode) has been removed. OpenCode is now
+# installed from upstream `opencode-ai` via npm. This file only mounts
+# the minimal dev entry points and s6 overrides.
 #
 # Usage (standalone sandbox):
 #   cd sandbox
@@ -9,7 +13,6 @@
 services:
   desktop:
     volumes:
-      - ../services/opencode:/opt/opencode-src
       - ./dev/serve-entry.ts:/opt/opencode-dev/serve-entry.ts:ro
       - ./dev/web-entry.ts:/opt/opencode-dev/web-entry.ts:ro
       - ./dev/svc-opencode-serve-run:/etc/s6-overlay/s6-rc.d/svc-opencode-serve/run:ro

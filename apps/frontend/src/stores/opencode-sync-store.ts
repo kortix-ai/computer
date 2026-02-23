@@ -9,7 +9,7 @@ import type {
 	QuestionRequest,
 	SessionStatus,
 	Todo,
-} from "@kortix/opencode-sdk/v2/client";
+} from "@opencode-ai/sdk/v2/client";
 import { create } from "zustand";
 
 // ============================================================================

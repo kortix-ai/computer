@@ -2,8 +2,8 @@
  * Skills API — CRUD operations for SKILL.md files.
  *
  * - List: uses `client.app.skills()` (GET /skill)
- * - Create/Update: writes SKILL.md via the file upload endpoint
- * - Delete: removes the skill directory via `client.file.delete()`
+ * - Create/Update: writes SKILL.md via kortix-master /file/upload
+ * - Delete: removes the skill directory via kortix-master DELETE /file
  *
  * Skills are created in .opencode/skills/<name>/SKILL.md (project-relative).
  * After any mutation, `instance.dispose()` is called to force the OpenCode
@@ -12,7 +12,7 @@
 
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getAuthToken } from '@/lib/auth-token';
+import { authenticatedFetch } from '@/lib/auth-token';
 import type {
   Skill,
   CreateSkillInput,
@@ -76,8 +76,7 @@ export async function listSkills(): Promise<Skill[]> {
  * Upload content to a specific file path (project-relative).
  *
  * Uses the FormData field-name-as-path convention (same as the files feature).
- * The SDK's generated upload method doesn't correctly handle the path,
- * so we build the request manually.
+ * Posts directly to kortix-master's /file/upload endpoint.
  */
 async function uploadToPath(
   filePath: string,
@@ -93,16 +92,9 @@ async function uploadToPath(
   const fileName = filePath.split('/').pop() || 'SKILL.md';
   form.append(filePath, blob, fileName);
 
-  const headers: Record<string, string> = {};
-  const token = await getAuthToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(`${baseUrl}/file/upload`, {
+  const res = await authenticatedFetch(`${baseUrl}/file/upload`, {
     method: 'POST',
     body: form,
-    headers,
   });
 
   if (!res.ok) {
@@ -145,9 +137,16 @@ export async function createSkill(input: CreateSkillInput): Promise<void> {
   const skillDir = `${SKILLS_DIR}/${input.name}`;
 
   // Ensure the skill directory exists
-  const client = getClient();
-  const mkdirResult = await client.file.mkdir({ path: skillDir });
-  unwrap(mkdirResult);
+  const baseUrl = getActiveOpenCodeUrl();
+  const mkdirRes = await authenticatedFetch(`${baseUrl}/file/mkdir`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: skillDir }),
+  });
+  if (!mkdirRes.ok) {
+    const text = await mkdirRes.text().catch(() => '');
+    throw new Error(`Failed to create skill directory (${mkdirRes.status}): ${text || mkdirRes.statusText}`);
+  }
 
   // Write the SKILL.md file
   const filePath = `${skillDir}/SKILL.md`;
@@ -193,9 +192,16 @@ export async function deleteSkill(location: string): Promise<void> {
   const relativePath = toRelativePath(location);
   // Remove the /SKILL.md suffix to get the directory
   const skillDir = relativePath.replace(/\/SKILL\.md$/, '');
-  const client = getClient();
-  const result = await client.file.delete({ path: skillDir });
-  unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: skillDir }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to delete skill (${res.status}): ${text || res.statusText}`);
+  }
 
   // Force rescan so the deleted skill is removed from the list
   await refreshSkills();

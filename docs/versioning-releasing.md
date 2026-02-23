@@ -5,10 +5,13 @@
 Kortix Computer uses **one version number** across all artifacts. The release
 script (`sandbox/release.sh`) publishes everything from your local machine.
 
+> **Note:** The OpenCode CLI (`opencode-ai`) and SDK (`@opencode-ai/sdk`) are
+> upstream packages published by anomalyco. We pin the CLI version in
+> `sandbox/package.json` but do **not** publish our own fork. Only the sandbox
+> npm package and Docker images are Kortix-published.
+
 | Artifact | Published to | How |
 |---|---|---|
-| `@kortix/opencode-ai` | npm (11 platform binaries) | `publish-kortix.ts` |
-| `@kortix/opencode-sdk` | npm | `publish-kortix.ts` |
 | `@kortix/sandbox` | npm | `npm publish` |
 | GitHub Release | `kortix-ai/computer` | `gh release create` |
 | Docker images (3) | Docker Hub | `docker buildx` (multi-platform) |
@@ -35,26 +38,23 @@ For Docker releases (`--docker`), also need:
 ## Quick Reference
 
 ```bash
-# Full release (CLI + SDK + sandbox + GitHub)
-./sandbox/release.sh 0.6.0
+# Full release (sandbox + GitHub)
+./sandbox/release.sh 0.7.0
 
 # Dry run — validate everything, publish nothing
-./sandbox/release.sh --dry-run 0.6.0
-
-# Sandbox-only npm release (skip CLI + SDK rebuild)
-./sandbox/release.sh --skip-cli --skip-sdk 0.6.0
+./sandbox/release.sh --dry-run 0.7.0
 
 # Full release + Docker images + Daytona snapshot
-./sandbox/release.sh --docker 0.6.0
+./sandbox/release.sh --docker 0.7.0
 
 # Full release + Docker Hub only (no Daytona)
-./sandbox/release.sh --docker --skip-daytona 0.6.0
+./sandbox/release.sh --docker --skip-daytona 0.7.0
 
 # Full release + Docker sandbox image only (skip API + frontend Docker)
-./sandbox/release.sh --docker --sandbox-only 0.6.0
+./sandbox/release.sh --docker --sandbox-only 0.7.0
 
 # Full release + Docker, skip auto-commit
-./sandbox/release.sh --docker --no-commit 0.6.0
+./sandbox/release.sh --docker --no-commit 0.7.0
 ```
 
 ## How to Release
@@ -66,8 +66,8 @@ Edit `sandbox/CHANGELOG.json`. Add a new entry **at the top** of the array:
 ```json
 [
   {
-    "version": "0.6.0",
-    "date": "2026-02-20",
+    "version": "0.7.0",
+    "date": "2026-02-23",
     "title": "Short descriptive title",
     "description": "One paragraph summary of this release.",
     "changes": [
@@ -83,39 +83,51 @@ Edit `sandbox/CHANGELOG.json`. Add a new entry **at the top** of the array:
 
 Do **not** add an `artifacts` array — the release script populates it automatically.
 
-### 2. Dry run
+### 2. Pin the upstream CLI version (if updating)
+
+If you're bumping the OpenCode CLI version, update `sandbox/package.json`:
+
+```json
+{
+  "dependencies": {
+    "opencode-ai": "1.2.10"
+  }
+}
+```
+
+This version is read by both the Dockerfile (initial build) and `postinstall.sh` (live updates).
+
+### 3. Dry run
 
 ```bash
-./sandbox/release.sh --dry-run 0.6.0
+./sandbox/release.sh --dry-run 0.7.0
 ```
 
 This validates the changelog, checks npm/GitHub/Daytona availability, previews
 release notes, and shows what files would be published — publishes nothing.
 
-### 3. Release
+### 4. Release
 
 ```bash
-./sandbox/release.sh 0.6.0
+./sandbox/release.sh 0.7.0
 ```
 
 The script does everything in order:
 
 | Step | What happens |
 |------|-------------|
-| **0. Prerequisites** | Checks `node`, `bun`, `npm`, `gh` on PATH. Verifies npm + gh auth. If `--docker`: checks Docker daemon, buildx builder, and daytona CLI **upfront** (not at step 8). |
+| **0. Prerequisites** | Checks `node`, `bun`, `npm`, `gh` on PATH. Verifies npm + gh auth. If `--docker`: checks Docker daemon, buildx builder, and daytona CLI **upfront**. |
 | **1. Validate changelog** | Reads `CHANGELOG.json`, ensures entry for this version exists with `title` and `changes`. |
-| **2. Check existing** | Detects already-published artifacts (npm, GitHub, Daytona) and auto-skips them. This makes re-runs after partial failure safe — no need to unpublish anything. |
-| **3. Bump versions** | Stamps `sandbox/package.json` (version + CLI dep) and `scripts/get-kortix.sh` (VERSION line). |
-| **4. Build + publish CLI** | Builds 11 platform binaries, publishes `@kortix/opencode-ai@{version}` to npm. Skipped with `--skip-cli` or if already on npm. The publish script handles partial publishes (some binaries already exist) gracefully. |
-| **5. Build + publish SDK** | Builds and publishes `@kortix/opencode-sdk@{version}` to npm. Skipped with `--skip-sdk` or if already on npm. |
-| **6. Publish sandbox** | `npm publish` for `@kortix/sandbox@{version}`. This triggers live auto-update on all running sandboxes. Waits 5s and verifies on npm registry. |
-| **7. GitHub Release** | Creates `v{version}` release on `kortix-ai/computer` with formatted release notes from the changelog entry. |
-| **8. Docker** *(optional)* | Only runs when `--docker` is passed. Order: (a) sandbox image, (b) Daytona snapshot (right after sandbox — doesn't wait for API/frontend), (c) API image, (d) frontend image. See [Docker details](#docker-details) below. |
-| **9. Write artifacts** | Records every successful publish step in the `artifacts[]` array of the `CHANGELOG.json` entry. |
-| **10. Validate** | Checks every expected artifact actually exists on npm, GitHub, Docker Hub. Reports pass/fail for each. |
-| **11. Auto-commit** | Commits `sandbox/package.json`, `sandbox/CHANGELOG.json`, and `scripts/get-kortix.sh` with message `release: v{version}`. (Skipped with `--no-commit`.) |
+| **2. Check existing** | Detects already-published artifacts (npm, GitHub, Daytona) and auto-skips them. This makes re-runs after partial failure safe. |
+| **3. Bump versions** | Stamps `sandbox/package.json` (version) and `scripts/get-kortix.sh` (VERSION line). |
+| **4. Publish sandbox** | `npm publish` for `@kortix/sandbox@{version}`. This triggers live auto-update on all running sandboxes. Waits 5s and verifies on npm registry. |
+| **5. GitHub Release** | Creates `v{version}` release on `kortix-ai/computer` with formatted release notes from the changelog entry. |
+| **6. Docker** *(optional)* | Only runs when `--docker` is passed. Order: (a) sandbox image, (b) Daytona snapshot, (c) API image, (d) frontend image. See [Docker details](#docker-details) below. |
+| **7. Write artifacts** | Records every successful publish step in the `artifacts[]` array of the `CHANGELOG.json` entry. |
+| **8. Validate** | Checks every expected artifact actually exists on npm, GitHub, Docker Hub. Reports pass/fail for each. |
+| **9. Auto-commit** | Commits `sandbox/package.json`, `sandbox/CHANGELOG.json`, and `scripts/get-kortix.sh` with message `release: v{version}`. (Skipped with `--no-commit`.) |
 
-### 4. Push
+### 5. Push
 
 The script auto-commits but does NOT push. Review the commit, then:
 
@@ -123,13 +135,11 @@ The script auto-commits but does NOT push. Review the commit, then:
 git push
 ```
 
-### 5. Verify
+### 6. Verify
 
 ```bash
-npm view @kortix/sandbox@0.6.0 version
-npm view @kortix/opencode-ai@0.6.0 version
-npm view @kortix/opencode-sdk@0.6.0 version
-gh release view v0.6.0 --repo kortix-ai/computer
+npm view @kortix/sandbox@0.7.0 version
+gh release view v0.7.0 --repo kortix-ai/computer
 ```
 
 Running sandboxes auto-detect the new version within ~5 minutes.
@@ -139,8 +149,6 @@ Running sandboxes auto-detect the new version within ~5 minutes.
 | Flag | What it does |
 |---|---|
 | `--dry-run` | Validate only, publish nothing |
-| `--skip-cli` | Skip CLI build+publish (when opencode source didn't change) |
-| `--skip-sdk` | Skip SDK build+publish (when SDK didn't change) |
 | `--docker` | Build+push Docker images (all 3) + create Daytona snapshot |
 | `--sandbox-only` | With `--docker`: only build sandbox image (skip API + frontend) |
 | `--skip-daytona` | With `--docker`: push to Docker Hub only, skip Daytona snapshot |
@@ -212,13 +220,9 @@ it automatically with `docker buildx create --name multiarch --use --bootstrap`.
 
 The script publishes in this specific order:
 
-1. **CLI first** — because `postinstall.sh` runs `npm install -g @kortix/opencode-ai@{version}`. If the CLI isn't on npm yet, every sandbox update would fail.
-2. **SDK second** — because `bun install` in the sandbox resolves `@kortix/opencode-sdk@^X.Y.Z`.
-3. **Sandbox last** — this triggers live updates on all running sandboxes.
-
-This is critical. If you skip CLI (`--skip-cli`) but the `sandbox/package.json` references
-a CLI version that doesn't exist on npm, sandbox installs will fail. The Dockerfile handles
-this gracefully by falling back to the latest published CLI version.
+1. **Sandbox first** — this triggers live updates on all running sandboxes. The sandbox's `postinstall.sh` handles installing the correct upstream CLI version (`opencode-ai`) declared in `sandbox/package.json`.
+2. **GitHub Release second** — creates the tagged release with formatted notes.
+3. **Docker last** — only when `--docker` is passed.
 
 ## Resumability
 
@@ -228,11 +232,11 @@ same command:
 
 ```bash
 # First run — fails at Docker step
-./sandbox/release.sh --docker 0.6.0
+./sandbox/release.sh --docker 0.7.0
 # ... sandbox Docker fails ...
 
 # Re-run — skips npm/GitHub (already done), resumes at Docker
-./sandbox/release.sh --docker 0.6.0
+./sandbox/release.sh --docker 0.7.0
 ```
 
 The state file is automatically deleted on successful completion. It's also ignored
@@ -254,11 +258,86 @@ The release script auto-stamps these files:
 
 | File | What changes |
 |---|---|
-| `sandbox/package.json` | `version` field + `@kortix/opencode-ai` dep version |
+| `sandbox/package.json` | `version` field |
 | `scripts/get-kortix.sh` | `VERSION="X.Y.Z"` embedded version |
 | `sandbox/CHANGELOG.json` | `artifacts[]` array added to the version's entry |
 
 You do NOT need to manually edit versions in these files.
+
+## Upstream OpenCode Version Control
+
+The OpenCode CLI and SDK are **upstream packages** published by anomalyco — we do not
+publish our own fork. We control which version runs in every sandbox via exact pins.
+
+### Single source of truth
+
+```
+sandbox/package.json
+  "dependencies": {
+    "opencode-ai": "1.2.10"        ← CLI version (exact pin, no ^ or ~)
+  }
+
+sandbox/opencode/package.json
+  "dependencies": {
+    "@opencode-ai/plugin": "1.2.10" ← plugin version (exact pin, SDK is transitive dep)
+  }
+```
+
+### Why it will never auto-update
+
+1. **Exact pin** — `"1.2.10"` not `"^1.2.10"`. npm will never resolve a different version.
+2. **Explicit version check** — `postinstall.sh` compares `opencode --version` against the
+   pinned value. If they match, it skips installation entirely.
+3. **No background updater** — there is no cron, watcher, or auto-update mechanism for the
+   CLI anywhere in the sandbox. It only changes when you publish a new `@kortix/sandbox`
+   with a different pin.
+4. **Release script doesn't touch it** — Step 3 (bump versions) only stamps the top-level
+   `"version"` field in `sandbox/package.json`. It does **not** modify `dependencies.opencode-ai`.
+
+### Two paths consume the pin
+
+| Path | When | Behavior |
+|------|------|----------|
+| **Dockerfile** (line ~107) | Docker image build | Reads pin, installs exactly that version. Falls back to `latest` only if the pinned version doesn't exist on npm yet. |
+| **postinstall.sh** (line ~73) | Live sandbox update | Reads pin, compares with current `opencode --version`, installs only if different. |
+
+### How to bump the CLI version
+
+```bash
+# 1. Check available versions
+npm view opencode-ai versions --json
+
+# 2. Update the pin in sandbox/package.json
+#    "opencode-ai": "1.2.10"  →  "opencode-ai": "1.3.0"
+
+# 3. Release as usual — the new sandbox package will carry the new pin
+./sandbox/release.sh 0.8.0
+```
+
+When running sandboxes update to `@kortix/sandbox@0.8.0`, `postinstall.sh` sees the
+version mismatch and installs `opencode-ai@1.3.0`.
+
+### How to bump the SDK / plugin version
+
+The SDK (`@opencode-ai/sdk`) is a **transitive dependency** of `@opencode-ai/plugin`.
+To update:
+
+```bash
+# 1. Update sandbox/opencode/package.json
+#    "@opencode-ai/plugin": "1.2.10"  →  "@opencode-ai/plugin": "1.3.0"
+
+# 2. Update apps/frontend/package.json (if SDK types changed)
+#    "@opencode-ai/sdk": "^1.2.10"  →  "@opencode-ai/sdk": "^1.3.0"
+#    Then: pnpm install --filter Kortix-Computer-Frontend
+
+# 3. Release as usual
+```
+
+### How to keep OpenCode the same across a release
+
+Just don't touch the `"opencode-ai"` or `"@opencode-ai/plugin"` values. A sandbox-only
+release (new agents, skills, tools, configs, etc.) will ship with the exact same CLI and
+SDK versions as before.
 
 ## Artifact Tracking
 
@@ -269,16 +348,14 @@ checklist showing what was published for each version.
 Example after a full release with Docker:
 ```json
 {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "artifacts": [
-    { "name": "@kortix/opencode-ai@0.6.0", "target": "npm" },
-    { "name": "@kortix/opencode-sdk@0.6.0", "target": "npm" },
-    { "name": "@kortix/sandbox@0.6.0", "target": "npm" },
-    { "name": "v0.6.0", "target": "github-release" },
-    { "name": "kortix/sandbox:0.6.0", "target": "docker-hub" },
-    { "name": "kortix/kortix-api:0.6.0", "target": "docker-hub" },
-    { "name": "kortix/kortix-frontend:0.6.0", "target": "docker-hub" },
-    { "name": "kortix-sandbox-v0.6.0", "target": "daytona" }
+    { "name": "@kortix/sandbox@0.7.0", "target": "npm" },
+    { "name": "v0.7.0", "target": "github-release" },
+    { "name": "kortix/sandbox:0.7.0", "target": "docker-hub" },
+    { "name": "kortix/kortix-api:0.7.0", "target": "docker-hub" },
+    { "name": "kortix/kortix-frontend:0.7.0", "target": "docker-hub" },
+    { "name": "kortix-sandbox-v0.7.0", "target": "daytona" }
   ]
 }
 ```
@@ -300,20 +377,19 @@ Every release includes a structured changelog at `sandbox/CHANGELOG.json`. This 
 
 ### Partial failure
 
-If CLI published but sandbox didn't — fix the issue and re-run with `--skip-cli --skip-sdk`.
-The script checks npm before publishing, so it won't try to re-publish what already exists.
+Fix the issue and re-run — the script auto-detects what's already published and skips it.
 
 ### Version already on npm
 
 ```bash
-npm unpublish @kortix/sandbox@0.6.0
+npm unpublish @kortix/sandbox@0.7.0
 # Then re-run the release script
 ```
 
 ### GitHub release already exists
 
 ```bash
-gh release delete v0.6.0 --repo kortix-ai/computer -y
+gh release delete v0.7.0 --repo kortix-ai/computer -y
 # Then re-run the release script
 ```
 
@@ -323,21 +399,21 @@ The script auto-detects this and sets `--skip-daytona` internally. No manual
 intervention needed. To force recreation:
 
 ```bash
-daytona snapshot delete kortix-sandbox-v0.6.0
+daytona snapshot delete kortix-sandbox-v0.7.0
 # Then re-run the release script
 ```
 
 ### Docker build fails with CLI version not on npm
 
 The Dockerfile falls back to the latest published CLI version automatically. This
-happens when you build Docker without publishing CLI first (e.g. `--skip-cli`).
+happens when the pinned version in `sandbox/package.json` isn't published yet.
 The live sandbox update via `postinstall.sh` will install the correct version later.
 
 ### Testing locally before release
 
 Validate your changelog entry:
 ```bash
-node -e "const c=require('./sandbox/CHANGELOG.json');const e=c.find(e=>e.version==='0.6.0');if(!e)throw 'missing';console.log('✓',e.title)"
+node -e "const c=require('./sandbox/CHANGELOG.json');const e=c.find(e=>e.version==='0.7.0');if(!e)throw 'missing';console.log('OK',e.title)"
 ```
 
 Check what files would be published:

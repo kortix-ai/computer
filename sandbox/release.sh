@@ -7,22 +7,23 @@ set -euo pipefail
 # ║  Usage:                                                                    ║
 # ║    ./sandbox/release.sh 0.6.0                                              ║
 # ║    ./sandbox/release.sh --dry-run 0.6.0                                    ║
-# ║    ./sandbox/release.sh --skip-cli --skip-sdk 0.6.0   (sandbox-only)       ║
 # ║    ./sandbox/release.sh --docker 0.6.0                 (include Docker)    ║
 # ║    ./sandbox/release.sh --docker --sandbox-only 0.6.0  (Docker sandbox)    ║
 # ║                                                                            ║
-# ║  Publishes: CLI → SDK → Sandbox (npm), GitHub Release, Docker (optional)   ║
+# ║  Publishes: Sandbox (npm), GitHub Release, Docker (optional)               ║
 # ║  Stamps:    sandbox/package.json, scripts/get-kortix.sh                    ║
 # ║  Tracks:    artifacts[] in CHANGELOG.json (auto-populated)                 ║
 # ║  Commits:   auto-commits version bump at the end (unless --no-commit)      ║
 # ║  Resumes:   state tracked in .release-state.json — re-run to resume        ║
+# ║                                                                            ║
+# ║  Note: CLI (opencode-ai) and SDK (@opencode-ai/sdk) are upstream packages  ║
+# ║  published by anomalyco — we no longer publish our own fork.               ║
 # ║                                                                            ║
 # ║  See docs/releasing.md for full documentation.                             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SANDBOX_DIR="$REPO_ROOT/sandbox"
-OPENCODE_DIR="$REPO_ROOT/services/opencode"
 CHANGELOG="$SANDBOX_DIR/CHANGELOG.json"
 PACKAGE_JSON="$SANDBOX_DIR/package.json"
 GET_KORTIX="$REPO_ROOT/scripts/get-kortix.sh"
@@ -39,8 +40,6 @@ warn() { echo "  ${YELLOW}⚠${NC} $*"; }
 
 # ─── Parse args ──────────────────────────────────────────────────────────────
 DRY_RUN=false
-SKIP_CLI=false
-SKIP_SDK=false
 BUILD_DOCKER=false
 DOCKER_SANDBOX_ONLY=false
 SKIP_DAYTONA=false
@@ -50,8 +49,6 @@ VERSION=""
 for arg in "$@"; do
   case "$arg" in
     --dry-run)        DRY_RUN=true ;;
-    --skip-cli)       SKIP_CLI=true ;;
-    --skip-sdk)       SKIP_SDK=true ;;
     --docker)         BUILD_DOCKER=true ;;
     --sandbox-only)   DOCKER_SANDBOX_ONLY=true ;;
     --skip-daytona)   SKIP_DAYTONA=true ;;
@@ -61,17 +58,17 @@ for arg in "$@"; do
       echo ""
       echo "Flags:"
       echo "  --dry-run        Validate only, publish nothing"
-      echo "  --skip-cli       Skip CLI build+publish (if opencode unchanged)"
-      echo "  --skip-sdk       Skip SDK build+publish (if SDK unchanged)"
       echo "  --docker         Also build+push Docker images + Daytona snapshot"
       echo "  --sandbox-only   With --docker: only push sandbox image (skip API + frontend)"
       echo "  --skip-daytona   With --docker: push to Docker Hub only, skip Daytona snapshot"
       echo "  --no-commit      Don't auto-commit the version bump at the end"
       echo ""
+      echo "Note: CLI (opencode-ai) and SDK (@opencode-ai/sdk) are upstream packages."
+      echo "      We pin the CLI version in sandbox/package.json but do not publish it."
+      echo ""
       echo "Examples:"
       echo "  ./sandbox/release.sh 0.6.0                                  # Full release"
       echo "  ./sandbox/release.sh --dry-run 0.6.0                        # Validate only"
-      echo "  ./sandbox/release.sh --skip-cli --skip-sdk 0.6.0            # Sandbox-only npm"
       echo "  ./sandbox/release.sh --docker 0.6.0                         # All + Docker"
       echo "  ./sandbox/release.sh --docker --sandbox-only 0.6.0          # All + Docker sandbox"
       echo "  ./sandbox/release.sh --docker --skip-daytona 0.6.0          # Docker Hub only"
@@ -222,21 +219,11 @@ ok "Changelog: \"$TITLE\""
 info "Checking existing artifacts..."
 
 SANDBOX_EXISTS=false
-CLI_EXISTS=false
-SDK_EXISTS=false
 GH_EXISTS=false
 
 if npm view "@kortix/sandbox@$VERSION" version &>/dev/null 2>&1; then
   SANDBOX_EXISTS=true
   warn "@kortix/sandbox@$VERSION already on npm — will skip"
-fi
-if npm view "@kortix/opencode-ai@$VERSION" version &>/dev/null 2>&1; then
-  CLI_EXISTS=true
-  warn "@kortix/opencode-ai@$VERSION already on npm — will skip"
-fi
-if npm view "@kortix/opencode-sdk@$VERSION" version &>/dev/null 2>&1; then
-  SDK_EXISTS=true
-  warn "@kortix/opencode-sdk@$VERSION already on npm — will skip"
 fi
 if gh release view "v$VERSION" --repo kortix-ai/computer &>/dev/null 2>&1; then
   GH_EXISTS=true
@@ -264,12 +251,11 @@ if ! step_done "bump"; then
     ok "(dry-run) Would bump sandbox/package.json → $VERSION"
     ok "(dry-run) Would bump get-kortix.sh VERSION → $VERSION"
   else
-    # sandbox/package.json — version + CLI dep
+    # sandbox/package.json — version (CLI dep is upstream opencode-ai, pinned separately)
     node -e "
       const fs = require('fs');
       const pkg = JSON.parse(fs.readFileSync('$PACKAGE_JSON', 'utf8'));
       pkg.version = '$VERSION';
-      pkg.dependencies['@kortix/opencode-ai'] = '$VERSION';
       fs.writeFileSync('$PACKAGE_JSON', JSON.stringify(pkg, null, 2) + '\n');
     "
     ok "sandbox/package.json → $VERSION"
@@ -297,58 +283,10 @@ else
   ok "Versions already bumped (resuming)"
 fi
 
-# ─── Step 4: Build + publish CLI ────────────────────────────────────────────
-if $SKIP_CLI || $CLI_EXISTS; then
-  $CLI_EXISTS && info "CLI already on npm — skipping" || info "Skipping CLI (--skip-cli)"
-  $CLI_EXISTS && add_artifact "@kortix/opencode-ai@$VERSION" "npm"
-elif ! step_done "cli"; then
-  info "Building CLI v$VERSION (all platforms)..."
-  CLI_DIR="$OPENCODE_DIR/packages/opencode"
-
-  if $DRY_RUN; then
-    ok "(dry-run) Would build + publish @kortix/opencode-ai@$VERSION"
-  else
-    (cd "$OPENCODE_DIR" && bun install)
-    (cd "$CLI_DIR" && KORTIX_BUILD=true OPENCODE_VERSION="$VERSION" bun run build)
-    ok "CLI built"
-
-    info "Publishing @kortix/opencode-ai@$VERSION..."
-    (cd "$CLI_DIR" && KORTIX_VERSION="$VERSION" bun ./script/publish-kortix.ts latest)
-    ok "@kortix/opencode-ai@$VERSION published"
-    add_artifact "@kortix/opencode-ai@$VERSION" "npm"
-    step_complete "cli"
-  fi
-else
-  ok "CLI already published (resuming)"
-  add_artifact "@kortix/opencode-ai@$VERSION" "npm"
-fi
-
-# ─── Step 5: Build + publish SDK ────────────────────────────────────────────
-if $SKIP_SDK || $SDK_EXISTS; then
-  $SDK_EXISTS && info "SDK already on npm — skipping" || info "Skipping SDK (--skip-sdk)"
-  $SDK_EXISTS && add_artifact "@kortix/opencode-sdk@$VERSION" "npm"
-elif ! step_done "sdk"; then
-  info "Building SDK v$VERSION..."
-  SDK_DIR="$OPENCODE_DIR/packages/sdk/js"
-
-  if $DRY_RUN; then
-    ok "(dry-run) Would build + publish @kortix/opencode-sdk@$VERSION"
-  else
-    (cd "$SDK_DIR" && bun run build)
-    ok "SDK built"
-
-    info "Publishing @kortix/opencode-sdk@$VERSION..."
-    (cd "$SDK_DIR" && KORTIX_SDK_VERSION="$VERSION" bun ./script/publish-kortix.ts latest)
-    ok "@kortix/opencode-sdk@$VERSION published"
-    add_artifact "@kortix/opencode-sdk@$VERSION" "npm"
-    step_complete "sdk"
-  fi
-else
-  ok "SDK already published (resuming)"
-  add_artifact "@kortix/opencode-sdk@$VERSION" "npm"
-fi
-
-# ─── Step 6: Publish @kortix/sandbox ─────────────────────────────────────────
+# ─── Step 4: Publish @kortix/sandbox ─────────────────────────────────────────
+# Note: Steps 4 and 5 used to be CLI and SDK fork publishing. Those are removed
+# since we now use upstream opencode-ai from npm directly. The sandbox package
+# is the only Kortix-published npm artifact.
 if $SANDBOX_EXISTS; then
   info "Sandbox already on npm — skipping"
   add_artifact "@kortix/sandbox@$VERSION" "npm"
@@ -380,7 +318,7 @@ else
   add_artifact "@kortix/sandbox@$VERSION" "npm"
 fi
 
-# ─── Step 7: GitHub Release ─────────────────────────────────────────────────
+# ─── Step 5: GitHub Release ─────────────────────────────────────────────────
 if $GH_EXISTS; then
   info "GitHub release already exists — skipping"
   add_artifact "v$VERSION" "github-release"
@@ -419,7 +357,7 @@ else
   add_artifact "v$VERSION" "github-release"
 fi
 
-# ─── Step 8: Docker (optional) ──────────────────────────────────────────────
+# ─── Step 6: Docker (optional) ──────────────────────────────────────────────
 if $BUILD_DOCKER && ! $DRY_RUN; then
   DOCKER_ORG="kortix"
   PLATFORMS="linux/amd64,linux/arm64"
@@ -434,7 +372,7 @@ if $BUILD_DOCKER && ! $DRY_RUN; then
   # Ensure buildx is ready
   docker buildx use multiarch 2>/dev/null || true
 
-  # ── 8a: Sandbox image ──────────────────────────────────────────────────
+  # ── 6a: Sandbox image ──────────────────────────────────────────────────
   if ! step_done "docker-sandbox"; then
     info "Building + pushing sandbox Docker image..."
     docker buildx build --platform "${PLATFORMS}" \
@@ -450,7 +388,7 @@ if $BUILD_DOCKER && ! $DRY_RUN; then
     add_artifact "${DOCKER_ORG}/sandbox:${VERSION}" "docker-hub"
   fi
 
-  # ── 8b: Daytona snapshot (right after sandbox — only depends on sandbox)
+  # ── 6b: Daytona snapshot (right after sandbox — only depends on sandbox)
   if ! $SKIP_DAYTONA; then
     if ! step_done "daytona"; then
       DAYTONA_SNAPSHOT_NAME="kortix-sandbox-v${VERSION}"
@@ -474,7 +412,7 @@ if $BUILD_DOCKER && ! $DRY_RUN; then
     fi
   fi
 
-  # ── 8c: API image ─────────────────────────────────────────────────────
+  # ── 6c: API image ─────────────────────────────────────────────────────
   if ! $DOCKER_SANDBOX_ONLY; then
     if ! step_done "docker-api"; then
       info "Building + pushing API Docker image..."
@@ -493,7 +431,7 @@ if $BUILD_DOCKER && ! $DRY_RUN; then
     fi
   fi
 
-  # ── 8d: Frontend image ────────────────────────────────────────────────
+  # ── 6d: Frontend image ────────────────────────────────────────────────
   if ! $DOCKER_SANDBOX_ONLY; then
     if ! step_done "docker-frontend"; then
       # Auto-build frontend standalone if not already built
@@ -536,7 +474,7 @@ else
   info "Skipping Docker (pass --docker to include)"
 fi
 
-# ─── Step 9: Write artifacts to CHANGELOG.json ──────────────────────────────
+# ─── Step 7: Write artifacts to CHANGELOG.json ──────────────────────────────
 if [ ${#ARTIFACTS[@]} -gt 0 ] && ! $DRY_RUN; then
   info "Writing artifacts to CHANGELOG.json..."
   ARTIFACTS_JSON=$(node -e "
@@ -559,7 +497,7 @@ if [ ${#ARTIFACTS[@]} -gt 0 ] && ! $DRY_RUN; then
   ok "Artifacts written to CHANGELOG.json (${#ARTIFACTS[@]} items)"
 fi
 
-# ─── Step 10: Final validation ──────────────────────────────────────────────
+# ─── Step 8: Final validation ──────────────────────────────────────────────
 if ! $DRY_RUN; then
   echo ""
   info "Validating published artifacts..."
@@ -571,24 +509,6 @@ if ! $DRY_RUN; then
   else
     fail "npm: @kortix/sandbox@$VERSION NOT FOUND"
     VALID=false
-  fi
-
-  if ! $SKIP_CLI; then
-    if npm view "@kortix/opencode-ai@$VERSION" version &>/dev/null 2>&1; then
-      ok "npm: @kortix/opencode-ai@$VERSION"
-    else
-      fail "npm: @kortix/opencode-ai@$VERSION NOT FOUND"
-      VALID=false
-    fi
-  fi
-
-  if ! $SKIP_SDK; then
-    if npm view "@kortix/opencode-sdk@$VERSION" version &>/dev/null 2>&1; then
-      ok "npm: @kortix/opencode-sdk@$VERSION"
-    else
-      fail "npm: @kortix/opencode-sdk@$VERSION NOT FOUND"
-      VALID=false
-    fi
   fi
 
   # GitHub
@@ -628,7 +548,7 @@ if ! $DRY_RUN; then
   fi
 fi
 
-# ─── Step 11: Auto-commit ───────────────────────────────────────────────────
+# ─── Step 9: Auto-commit ───────────────────────────────────────────────────
 if ! $DRY_RUN && ! $NO_COMMIT; then
   info "Committing version bump..."
   (

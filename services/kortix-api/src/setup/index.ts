@@ -22,8 +22,8 @@ export const setupApp = new Hono<AppEnv>();
 // All setup routes require Supabase JWT auth EXCEPT /install-status which must
 // remain public (the installer/login page calls it before any user exists).
 setupApp.use('/*', async (c, next) => {
-  // Allow /install-status without auth
-  if (c.req.path.endsWith('/install-status')) {
+  // Allow public routes without auth
+  if (c.req.path.endsWith('/install-status') || c.req.path.endsWith('/sandbox-providers')) {
     return next();
   }
   // Everything else requires a valid Supabase JWT
@@ -230,6 +230,27 @@ setupApp.get('/install-status', async (c) => {
     console.error('[setup] install-status error:', err);
     return c.json({ installed: false });
   }
+});
+
+/**
+ * GET /v1/setup/sandbox-providers
+ *
+ * Public (no auth) — the installer wizard calls this to know which sandbox
+ * providers are enabled so it can branch the setup flow accordingly.
+ *
+ * Response: { providers: string[], default: string }
+ *   e.g. { providers: ["local_docker"], default: "local_docker" }
+ *   e.g. { providers: ["daytona", "local_docker"], default: "daytona" }
+ */
+setupApp.get('/sandbox-providers', async (c) => {
+  const available: string[] = [];
+  if (config.isLocalDockerEnabled()) available.push('local_docker');
+  if (config.isDaytonaEnabled()) available.push('daytona');
+
+  return c.json({
+    providers: available,
+    default: available[0] || 'local_docker',
+  });
 });
 
 /**

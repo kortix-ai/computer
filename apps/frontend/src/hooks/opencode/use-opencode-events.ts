@@ -3,7 +3,7 @@
 import type {
 	Event as OpenCodeEvent,
 	Part,
-} from "@kortix/opencode-sdk/v2/client";
+} from "@opencode-ai/sdk/v2/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { fileContentKeys } from "@/features/files/hooks/use-file-content";
