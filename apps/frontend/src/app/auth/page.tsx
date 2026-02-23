@@ -800,7 +800,7 @@ function SelfHostedLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading, supabase } = useAuth();
-  const { installed, loading: statusLoading } = useInstallStatus();
+  const { installed, loading: statusLoading, sandboxProviders, defaultProvider } = useInstallStatus();
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
   const [validatingSession, setValidatingSession] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -856,7 +856,7 @@ function SelfHostedLoginContent() {
       <div className="flex min-h-[100dvh]">
         {/* Left panel — self-hosted form */}
         <div className="relative flex-1 flex items-center justify-center px-4 py-16 sm:p-8">
-          <SelfHostedForm returnUrl={returnUrl} installed={installed} onWizardStepChange={handleWizardStepChange} />
+          <SelfHostedForm returnUrl={returnUrl} installed={installed} sandboxProviders={sandboxProviders} defaultProvider={defaultProvider} onWizardStepChange={handleWizardStepChange} />
         </div>
         {/* Right panel — same showcase as cloud */}
         <div className="hidden lg:flex flex-1 items-center justify-center relative overflow-hidden">
