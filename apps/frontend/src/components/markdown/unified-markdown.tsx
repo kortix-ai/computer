@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Streamdown } from 'streamdown';
-import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Globe, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
+import { Check, ChevronRight, Copy, ExternalLink, Globe, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 import { codeToHtml } from 'shiki';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
@@ -142,7 +142,7 @@ function InlineLocalhostPreview({
       <div
         className={cn(
           'group/preview relative rounded-xl border border-border/50 bg-muted/20 overflow-hidden',
-          'transition-all duration-200 hover:border-border/80 hover:bg-muted/30',
+          'transition-colors duration-200 hover:border-border/80 hover:bg-muted/30',
         )}
       >
         {/* Header bar — clicking it collapses/expands the preview */}
@@ -150,11 +150,12 @@ function InlineLocalhostPreview({
           className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
           onClick={handleToggleCollapse}
         >
-          {collapsed ? (
-            <ChevronRight className="size-3.5 flex-shrink-0 text-muted-foreground/60" />
-          ) : (
-            <ChevronDown className="size-3.5 flex-shrink-0 text-muted-foreground/60" />
-          )}
+          <ChevronRight
+            className={cn(
+              'size-3.5 flex-shrink-0 text-muted-foreground/60 transition-transform duration-200',
+              !collapsed && 'rotate-90',
+            )}
+          />
           <Globe className="size-3.5 flex-shrink-0 text-primary" />
           <span className="text-xs font-medium text-foreground tabular-nums">
             localhost:{port}
@@ -177,7 +178,7 @@ function InlineLocalhostPreview({
                 <button
                   onClick={handleToggleExpand}
                   className="p-1 rounded cursor-pointer hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                  title={expanded ? 'Collapse' : 'Expand'}
+                  title={expanded ? 'Shrink' : 'Expand'}
                 >
                   {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
                 </button>
@@ -193,52 +194,59 @@ function InlineLocalhostPreview({
           </div>
         </div>
 
-        {/* Iframe preview — hidden when collapsed */}
-        {!collapsed && (
-          <div
-            className={cn(
-              'relative border-t border-border/30 transition-all duration-200',
-              expanded ? 'h-[520px]' : 'h-[300px]',
-            )}
-          >
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  <span className="text-[11px]">Loading preview...</span>
-                </div>
-              </div>
-            )}
-            {hasError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
-                <div className="text-center text-muted-foreground">
-                  <p className="text-xs">Failed to load preview</p>
-                  <button
-                    onClick={handleRefresh}
-                    className="text-xs text-primary hover:underline mt-1 cursor-pointer"
-                  >
-                    Retry
-                  </button>
-                </div>
-              </div>
-            )}
-            {/* Clickable overlay on top of iframe to open preview tab */}
+        {/* Iframe preview — animated collapse/expand via grid rows */}
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-200 ease-out',
+            collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
+          )}
+        >
+          <div className="overflow-hidden">
             <div
-              className="absolute inset-0 z-[5] cursor-pointer"
-              onClick={navigateToPreviewTab}
-            />
-            <iframe
-              key={refreshKey}
-              src={authenticatedUrl}
-              title={`Preview :${port}`}
-              className="w-full h-full border-0 bg-white pointer-events-none"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
-              onLoad={handleLoad}
-              onError={handleError}
-              tabIndex={-1}
-            />
+              className={cn(
+                'relative border-t border-border/30 transition-[height] duration-200 ease-out',
+                expanded ? 'h-[520px]' : 'h-[300px]',
+              )}
+            >
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span className="text-[11px]">Loading preview...</span>
+                  </div>
+                </div>
+              )}
+              {hasError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+                  <div className="text-center text-muted-foreground">
+                    <p className="text-xs">Failed to load preview</p>
+                    <button
+                      onClick={handleRefresh}
+                      className="text-xs text-primary hover:underline mt-1 cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+              {/* Clickable overlay on top of iframe to open preview tab */}
+              <div
+                className="absolute inset-0 z-[5] cursor-pointer"
+                onClick={navigateToPreviewTab}
+              />
+              <iframe
+                key={refreshKey}
+                src={authenticatedUrl}
+                title={`Preview :${port}`}
+                className="w-full h-full border-0 bg-white pointer-events-none"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
+                onLoad={handleLoad}
+                onError={handleError}
+                tabIndex={-1}
+              />
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
