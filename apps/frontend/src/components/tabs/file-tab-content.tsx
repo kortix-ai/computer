@@ -230,7 +230,7 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
     }
   }, [filePath, fileName]);
 
-  // Save handler for CodeEditor
+  // Save handler for CodeEditor and header save button
   const handleSave = useCallback(async (content: string) => {
     setIsSaving(true);
     try {
@@ -239,6 +239,7 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
       const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
       await uploadFile(file, parentPath || undefined);
       await refetch();
+      setHasUnsavedChanges(false);
       toast.success('File saved');
     } catch (err) {
       toast.error(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -251,6 +252,21 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
   const handleEditorChange = useCallback((content: string) => {
     latestContentRef.current = content;
   }, []);
+
+  // Cmd+S handler for when CodeEditor is not mounted (e.g. markdown preview)
+  useEffect(() => {
+    if (!isMarkdownPreview) return; // CodeEditor handles its own Cmd+S
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (hasUnsavedChanges && latestContentRef.current) {
+          handleSave(latestContentRef.current);
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isMarkdownPreview, hasUnsavedChanges, handleSave]);
 
   const imageDataUrl = useMemo(() => {
     if (fileContent?.encoding === 'base64' && isImageMime(fileContent.mimeType)) {
@@ -423,11 +439,11 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
             )}
             {isMarkdownPreview && isMarkdownFile ? (
               <div className="w-full h-full overflow-auto p-6">
-                <UnifiedMarkdown content={displayContent} />
+                <UnifiedMarkdown content={latestContentRef.current || displayContent} />
               </div>
             ) : (
               <CodeEditor
-                content={fileContent.content}
+                content={latestContentRef.current || fileContent.content}
                 originalContent={fileContent.content}
                 fileName={fileName}
                 onSave={handleSave}

@@ -271,7 +271,7 @@ export function FileViewer() {
     }
   }, [selectedFilePath, fileName]);
 
-  // Save handler for CodeEditor
+  // Save handler for CodeEditor and header save button
   const handleSave = useCallback(async (content: string) => {
     if (!selectedFilePath) return;
     setIsSaving(true);
@@ -281,6 +281,7 @@ export function FileViewer() {
       const parentPath = selectedFilePath.substring(0, selectedFilePath.lastIndexOf('/'));
       await uploadFile(file, parentPath || undefined);
       await refetch();
+      setHasUnsavedChanges(false);
       toast.success('File saved');
     } catch (err) {
       toast.error(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -293,6 +294,21 @@ export function FileViewer() {
   const handleEditorChange = useCallback((content: string) => {
     latestContentRef.current = content;
   }, []);
+
+  // Cmd+S handler for when CodeEditor is not mounted (e.g. markdown preview)
+  useEffect(() => {
+    if (!isMarkdownPreview) return; // CodeEditor handles its own Cmd+S
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (hasUnsavedChanges && latestContentRef.current) {
+          handleSave(latestContentRef.current);
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isMarkdownPreview, hasUnsavedChanges, handleSave]);
 
   // Image rendering
   const imageDataUrl = useMemo(() => {
@@ -554,11 +570,11 @@ export function FileViewer() {
               )}
               {isMarkdownPreview && isMarkdownFile ? (
                 <div className="w-full h-full overflow-auto p-6">
-                  <UnifiedMarkdown content={displayContent} />
+                  <UnifiedMarkdown content={latestContentRef.current || displayContent} />
                 </div>
               ) : (
                 <CodeEditor
-                  content={fileContent.content}
+                  content={latestContentRef.current || fileContent.content}
                   originalContent={fileContent.content}
                   fileName={fileName}
                   onSave={handleSave}
