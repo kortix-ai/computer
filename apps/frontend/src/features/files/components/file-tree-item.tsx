@@ -248,7 +248,11 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, on
       )}
     >
       {getNodeIcon(node)}
-      <span className={cn('truncate flex-1', gitStatus && gitStatusTextColor[gitStatus])}>
+      <span className={cn(
+        'truncate flex-1',
+        gitStatus && gitStatusTextColor[gitStatus],
+        !gitStatus && node.name.startsWith('.') && 'opacity-50',
+      )}>
         {node.name}
       </span>
       {/* Right-side indicators: git status + diagnostics */}
