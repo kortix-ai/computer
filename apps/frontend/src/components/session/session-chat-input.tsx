@@ -870,21 +870,21 @@ function TodoChip({ sessionId }: { sessionId: string }) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
+        className="flex items-center gap-2.5 w-full px-3.5 py-2 hover:bg-muted/80 transition-colors cursor-pointer"
       >
-        <ListTodo className="size-3.5 text-muted-foreground flex-shrink-0" />
-        <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
+        <ListTodo className="size-4 text-muted-foreground flex-shrink-0" />
+        <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate text-left">
           {completed} of {total} tasks done
           {inProgress && (
             <span className="text-foreground/80 font-medium"> · {inProgress.content}</span>
           )}
         </span>
-        <ChevronDown className={cn('size-3 text-muted-foreground/40 transition-transform', expanded && 'rotate-180')} />
+        <ChevronDown className={cn('size-3.5 text-muted-foreground/40 transition-transform', expanded && 'rotate-180')} />
       </button>
 
       {/* Expanded task list */}
       {expanded && (
-        <div className="border-t border-border/30 max-h-[160px] overflow-y-auto scrollbar-hide px-3 py-1.5 space-y-px">
+        <div className="border-t border-border/30 max-h-[200px] overflow-y-auto scrollbar-hide px-3.5 py-2 space-y-0.5">
           {sorted.map((todo: any, i: number) => {
             const done = todo.status === 'completed';
             const cancelled = todo.status === 'cancelled';
@@ -892,20 +892,20 @@ function TodoChip({ sessionId }: { sessionId: string }) {
             if (cancelled) return null;
             return (
               <div key={todo.id || i} className={cn(
-                'flex items-center gap-2 py-0.5',
+                'flex items-center gap-2.5 py-1',
                 done && 'opacity-40',
               )}>
                 <span className={cn(
-                  'size-3 rounded-sm flex-shrink-0 flex items-center justify-center border',
+                  'size-3.5 rounded-sm flex-shrink-0 flex items-center justify-center border',
                   done ? 'border-border bg-muted' : active ? 'border-foreground/30' : 'border-border',
                 )}>
                   {done && (
-                    <svg viewBox="0 0 12 12" fill="none" width="8" height="8"><path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" /></svg>
+                    <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><path d="M3 7.17905L5.02703 8.85135L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" className="text-foreground" /></svg>
                   )}
-                  {active && <div className="size-1 rounded-full bg-foreground" />}
+                  {active && <div className="size-1.5 rounded-full bg-foreground" />}
                 </span>
                 <span className={cn(
-                  'text-[11px] leading-tight truncate',
+                  'text-[13px] leading-snug truncate',
                   done && 'line-through text-muted-foreground',
                   !done && 'text-foreground',
                 )}>
