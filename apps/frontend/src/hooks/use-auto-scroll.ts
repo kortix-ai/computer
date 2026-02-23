@@ -29,6 +29,9 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 
 interface UseAutoScrollOptions {
   working: boolean;
+  /** Whether the scroll container has content. Used to re-attach listeners
+   *  when the scroll area mounts (it's conditionally rendered). */
+  hasContent?: boolean;
 }
 
 interface UseAutoScrollReturn {
@@ -65,7 +68,7 @@ function isNearScrollEnd(el: HTMLDivElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
 }
 
-export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollReturn {
+export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOptions): UseAutoScrollReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const spacerElRef = useRef<HTMLDivElement>(null);
@@ -124,7 +127,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     recalcSpacer();
 
     return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(rafId); };
-  }, [recalcSpacer, working]);
+  }, [recalcSpacer, working, hasContent]);
 
   // ── isAtBottom (DOM-measured, uses measureTarget) ─────────────────
   const isAtBottom = useCallback(() => {
@@ -252,11 +255,11 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
 
     rafIdRef.current = requestAnimationFrame(tick);
     return () => { active = false; cancelAnimationFrame(rafIdRef.current); };
-  }, [working, isAtBottom, recalcSpacer]);
+  }, [working, hasContent, isAtBottom, recalcSpacer]);
 
   // ── Wheel intent ──────────────────────────────────────────────────
-  // Depends on `working` so listeners are (re-)attached when the scroll
-  // area mounts (it's conditionally rendered; refs may be null on mount).
+  // Depends on `working`/`hasContent` so listeners are (re-)attached
+  // when the scroll area mounts (it's conditionally rendered).
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -282,7 +285,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     };
     el.addEventListener('wheel', handle, { passive: true });
     return () => el.removeEventListener('wheel', handle);
-  }, [working]);
+  }, [working, hasContent]);
 
   // ── Touch intent ──────────────────────────────────────────────────
   useEffect(() => {
@@ -310,7 +313,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: true });
     return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); };
-  }, [working]);
+  }, [working, hasContent]);
 
   // ── Keyboard / scrollbar drag catch-all ───────────────────────────
   useEffect(() => {
@@ -329,7 +332,7 @@ export function useAutoScroll({ working }: UseAutoScrollOptions): UseAutoScrollR
     };
     el.addEventListener('scroll', handle, { passive: true });
     return () => el.removeEventListener('scroll', handle);
-  }, [working]);
+  }, [working, hasContent]);
 
   return { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd, scrollToAbsoluteBottom, smoothScrollToAbsoluteBottom };
 }
