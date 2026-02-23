@@ -57,9 +57,30 @@ const EXCLUDED_PORTS = new Set([
 /**
  * Check if a URL path indicates the URL has already been proxied.
  * Prevents double-proxy issues like localhost:14000/proxy/14000/proxy/3210/...
+ * Uses a non-anchored regex because the server URL may add a prefix before
+ * /proxy/ (e.g. /v1/preview/kortix-sandbox/8000/proxy/3210/).
  */
 function isAlreadyProxied(path: string): boolean {
-  return /^\/proxy\/\d+/.test(path);
+  return /\/proxy\/\d+/.test(path);
+}
+
+/**
+ * Extract port and remaining path from an already-proxied localhost URL.
+ * e.g. "http://localhost:8008/v1/preview/.../proxy/3210/foo" → { port: 3210, path: "/foo", proxyUrl: "..." }
+ * Returns null if the URL is not a localhost URL or doesn't contain a /proxy/ segment.
+ */
+export function parseProxiedUrl(url: string): { port: number; path: string; proxyUrl: string } | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') return null;
+    const match = parsed.pathname.match(/\/proxy\/(\d+)(\/.*)?$/);
+    if (!match) return null;
+    const port = parseInt(match[1], 10);
+    const path = match[2] || '/';
+    return { port, path, proxyUrl: url };
+  } catch {
+    return null;
+  }
 }
 
 function normalizePath(path: string): string {

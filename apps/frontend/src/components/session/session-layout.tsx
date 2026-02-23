@@ -49,8 +49,8 @@ export const SessionLayout = memo(function SessionLayout({
   const isBusy = sessionStatus?.type === 'busy';
 
   const toolCalls = useMemo(
-    () => (messages ? adaptMessagesToToolCalls(messages, !isBusy) : []),
-    [messages, isBusy],
+    () => (messages ? adaptMessagesToToolCalls(messages) : []),
+    [messages],
   );
   const agentStatus = adaptAgentStatus(isBusy);
 

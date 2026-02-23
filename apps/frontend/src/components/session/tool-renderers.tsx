@@ -505,6 +505,11 @@ export function BasicTool({
 		[locked],
 	);
 
+	// Determine if trigger content is effectively empty so we can show skeleton
+	const triggerIsEmpty = isTriggerTitle(trigger)
+		? !trigger.title && !trigger.subtitle
+		: false;
+
 	return (
 		<Collapsible open={open} onOpenChange={handleOpenChange}>
 			<CollapsibleTrigger asChild>
@@ -560,6 +565,13 @@ export function BasicTool({
 							</>
 						) : (
 							trigger
+						)}
+						{/* Skeleton placeholders when running but trigger has no content yet */}
+						{running && triggerIsEmpty && (
+							<>
+								<span className="h-3 w-16 rounded bg-muted-foreground/10 animate-pulse" />
+								<span className="h-3 w-28 rounded bg-muted-foreground/10 animate-pulse" />
+							</>
 						)}
 					</div>
 
@@ -1592,6 +1604,7 @@ function WriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
 	const metadata = partMetadata(part);
 	const status = partStatus(part);
+	const running = useContext(ToolRunningContext);
 	const filePath = input.filePath as string | undefined;
 	const filename = getFilename(filePath) || "";
 	const directory = filePath ? getDirectory(filePath) : undefined;
@@ -1602,10 +1615,10 @@ function WriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 		filePath,
 	);
 
-	// Detect stale pending: no input was ever received
-	const isStalePending =
-		status === "pending" &&
-		Object.keys(input).length === 0;
+	// Detect stale pending: tool part is pending/running but no longer actively
+	// loading (ToolRunningContext is false) and no filename was received.
+	const isStalePending = !running && !filename &&
+		(status === "pending" || status === "running");
 
 	return (
 		<BasicTool
@@ -2922,6 +2935,7 @@ function PresentationGenTool({
 	const input = partInput(part);
 	const output = partOutput(part);
 	const status = partStatus(part);
+	const running = useContext(ToolRunningContext);
 	const action = input.action;
 	const presentationName = input.presentation_name;
 	const slideTitle = input.slide_title;
@@ -2977,12 +2991,20 @@ function PresentationGenTool({
 			icon={<Presentation className="size-3.5 flex-shrink-0" />}
 			trigger={
 				<div className="flex items-center gap-1.5 min-w-0 flex-1">
-					<span className="font-medium text-xs text-foreground whitespace-nowrap">
-						{actionLabel}
-					</span>
-					<span className="text-muted-foreground text-xs truncate font-mono">
-						{triggerSubtitle}
-					</span>
+					{actionLabel ? (
+						<span className="font-medium text-xs text-foreground whitespace-nowrap">
+							{actionLabel}
+						</span>
+					) : running ? (
+						<span className="h-3 w-20 rounded bg-muted-foreground/10 animate-pulse" />
+					) : null}
+					{triggerSubtitle ? (
+						<span className="text-muted-foreground text-xs truncate font-mono">
+							{triggerSubtitle}
+						</span>
+					) : running && actionLabel ? (
+						<span className="h-3 w-32 rounded bg-muted-foreground/10 animate-pulse" />
+					) : null}
 					{parsed?.success &&
 						action === "create_slide" &&
 						parsed.total_slides && (
@@ -5774,9 +5796,6 @@ interface ToolPartRendererProps {
 	onQuestionReply?: (requestId: string, answers: string[][]) => void;
 	onQuestionReject?: (requestId: string) => void;
 	defaultOpen?: boolean;
-	/** Whether the session/turn is still actively working. When false,
-	 *  any pending/running tool parts are treated as stale (no spinner). */
-	sessionWorking?: boolean;
 }
 
 export function ToolPartRenderer({
@@ -5788,7 +5807,6 @@ export function ToolPartRenderer({
 	onQuestionReply,
 	onQuestionReject,
 	defaultOpen,
-	sessionWorking,
 }: ToolPartRendererProps & { sessionId?: string }) {
 	// Skip todoread
 	if (part.tool === "todoread") return null;
@@ -5839,19 +5857,16 @@ export function ToolPartRenderer({
 	const forceOpen = !!permission || !!question;
 	const isLocked = !!permission || !!question;
 
-	// A tool part is "stale" (should not show a spinner) when:
-	// 1. The session is no longer working but the tool is still pending/running, OR
-	// 2. The backend sent a pending state with empty input/raw and never followed
-	//    up with running/completed (session ended abruptly).
-	const isStale =
-		(sessionWorking === false &&
-			(part.state.status === "pending" || part.state.status === "running")) ||
-		(part.state.status === "pending" &&
-			Object.keys(part.state.input ?? {}).length === 0 &&
-			!(part.state as any).raw);
+	// A tool part is "stale pending" when the backend sent a pending state
+	// with empty input/raw and never followed up with running/completed.
+	// This happens when the session ends abruptly. Don't show a spinner for these.
+	const isStalePending =
+		part.state.status === "pending" &&
+		Object.keys(part.state.input ?? {}).length === 0 &&
+		!(part.state as any).raw;
 
 	const isRunning =
-		!isStale &&
+		!isStalePending &&
 		(part.state.status === "running" || part.state.status === "pending");
 
 	const toolElement = RegisteredComponent ? (

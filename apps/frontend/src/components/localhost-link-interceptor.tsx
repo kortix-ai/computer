@@ -15,6 +15,7 @@ import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import {
   isProxiableLocalhostUrl,
   parseLocalhostUrl,
+  parseProxiedUrl,
   rewriteLocalhostUrl,
   toInternalUrl,
 } from '@/lib/utils/sandbox-url';
@@ -32,7 +33,27 @@ export function LocalhostLinkInterceptor() {
       if (!anchor) return;
 
       const href = anchor.href; // resolved absolute URL
-      if (!href || !isProxiableLocalhostUrl(href)) return;
+      if (!href) return;
+
+      // Check if this is an already-proxied URL (e.g. markdown renderer
+      // already rewrote localhost:3210 → .../proxy/3210/). If so, extract
+      // the original port and open in the preview tab without re-proxying.
+      const proxied = parseProxiedUrl(href);
+      if (proxied) {
+        e.preventDefault();
+        e.stopPropagation();
+        const internalUrl = toInternalUrl(proxied.port, proxied.path);
+        openTabAndNavigate({
+          id: `preview:${proxied.port}`,
+          title: `localhost:${proxied.port}`,
+          type: 'preview',
+          href: `/preview/${proxied.port}`,
+          metadata: { url: proxied.proxyUrl, port: proxied.port, originalUrl: internalUrl, path: proxied.path },
+        });
+        return;
+      }
+
+      if (!isProxiableLocalhostUrl(href)) return;
 
       // Never intercept links pointing at the app itself (same origin)
       try {

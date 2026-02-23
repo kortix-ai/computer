@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Streamdown } from 'streamdown';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, ExternalLink, Globe } from 'lucide-react';
 import { codeToHtml } from 'shiki';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,7 @@ import { isMermaidCode } from '@/lib/mermaid-utils';
 import { autoLinkUrls } from '@kortix/shared';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
 import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
-import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
+import { proxyLocalhostUrl, parseLocalhostUrl } from '@/lib/utils/sandbox-url';
 
 // Helper to check if a URL is internal (same origin)
 function isInternalUrl(href: string | undefined): boolean {
@@ -546,6 +546,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
       const resolvedHref = proxy(href) ?? href;
       const isInternal = isInternalUrl(resolvedHref);
       const isHashLink = resolvedHref?.startsWith('#');
+      const localhostParsed = parseLocalhostUrl(href);
       const linkClassName = cn(
         "font-medium text-foreground",
         "underline decoration-foreground/30 underline-offset-[3px] decoration-[1px]",
@@ -560,6 +561,27 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
             className={linkClassName}
           >
             {children}
+          </a>
+        );
+      }
+
+      // Render localhost links as styled preview chips
+      if (localhostParsed) {
+        return (
+          <a
+            href={resolvedHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
+              "bg-primary/10 border border-primary/20",
+              "text-primary text-xs font-medium no-underline",
+              "hover:bg-primary/15 hover:border-primary/30 transition-colors duration-150",
+            )}
+          >
+            <Globe className="size-3.5 flex-shrink-0" />
+            <span>localhost:{localhostParsed.port}</span>
+            <ExternalLink className="size-3 flex-shrink-0 opacity-50" />
           </a>
         );
       }

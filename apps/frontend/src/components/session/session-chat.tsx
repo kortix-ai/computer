@@ -1820,7 +1820,6 @@ function SessionTurn({
 					sessionId={sessionId}
 					permission={nextPermission?.tool ? nextPermission : undefined}
 					onPermissionReply={onPermissionReply}
-					sessionWorking={working}
 					defaultOpen
 				/>
 				{turnError && (
@@ -2075,7 +2074,6 @@ function SessionTurn({
 										sessionId={sessionId}
 										permission={perm}
 										onPermissionReply={onPermissionReply}
-										sessionWorking={working}
 									/>
 								</div>
 							);
@@ -2190,7 +2188,6 @@ function SessionTurn({
 								sessionId={sessionId}
 								permission={perm}
 								onPermissionReply={onPermissionReply}
-								sessionWorking={working}
 							/>
 						);
 					})}
