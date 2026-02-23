@@ -25,7 +25,6 @@ import {
   Keyboard,
   Slash,
   ArrowRightLeft,
-  FolderOpen,
   Blocks,
   Wrench,
   KeyRound,
@@ -485,7 +484,7 @@ export function CommandPalette() {
 
   const handleNavigate = useCallback(
     (path: string, label?: string) => {
-      const type = path.startsWith('/settings') || path === '/configuration'
+      const type = path.startsWith('/settings')
         ? 'settings' as const
         : 'page' as const;
       openTabAndNavigate({
@@ -949,10 +948,6 @@ export function CommandPalette() {
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/projects', 'Projects')}>
-                  <FolderOpen className="mr-2 h-4 w-4" />
-                  <span>Projects</span>
-                </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/workspace', 'Workspace')}>
                   <Blocks className="mr-2 h-4 w-4" />
                   <span>Workspace</span>
@@ -1001,7 +996,7 @@ export function CommandPalette() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>API Keys</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/configuration', 'Configuration')}>
+                <CommandItem onSelect={() => handleNavigate('/workspace', 'Workspace')}>
                   <Cog className="mr-2 h-4 w-4" />
                   <span>Configuration</span>
                 </CommandItem>

@@ -73,8 +73,9 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     '/skills': { title: 'Skills Browser', type: 'page' },
     '/tools': { title: 'Tools', type: 'page' },
     '/commands': { title: 'Commands', type: 'page' },
+    '/projects': { title: 'Workspace', type: 'page' },
     '/files': { title: 'Files', type: 'file' },
-    '/configuration': { title: 'Configuration', type: 'settings' },
+    '/configuration': { title: 'Workspace', type: 'page' },
     '/settings/credentials': { title: 'Integrations', type: 'settings' },
     '/settings/api-keys': { title: 'API Keys', type: 'settings' },
     '/credits-explained': { title: 'Credits', type: 'page' },
@@ -100,16 +101,6 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
   }
 
   // Dynamic routes
-  const projectMatch = pathname.match(/^\/projects\/([^/]+)$/);
-  if (projectMatch) {
-    return {
-      id: `page:${pathname}`,
-      title: 'Project',
-      type: 'project',
-      href: pathname,
-    };
-  }
-
   const agentThreadMatch = pathname.match(/^\/agents\/([^/]+)$/);
   if (agentThreadMatch) {
     return {
