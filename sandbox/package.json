@@ -1,6 +1,6 @@
 {
   "name": "@kortix/sandbox",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Kortix sandbox runtime — kortix-master, opencode config/agents/skills, and dependencies",
   "license": "Elastic-2.0",
   "private": false,
@@ -31,7 +31,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@kortix/opencode-ai": "0.6.2",
+    "@kortix/opencode-ai": "0.6.3",
     "agent-browser": "^0.10.0"
   },
   "peerDependencies": {},
