@@ -455,17 +455,9 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
   };
 
   // ── Step 3: Tool API keys ──
-  if (isInstaller && wizardStep === 3) {
+   if (isInstaller && wizardStep === 3) {
     return (
       <div className="w-full max-w-sm">
-        {/* Wizard badge */}
-        <div className="flex justify-center mb-5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Setup Wizard
-          </span>
-        </div>
-
         <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
           <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
             Tool API Keys
@@ -489,14 +481,6 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
   if (isInstaller && wizardStep === 2) {
     return (
       <div className="w-full max-w-sm">
-        {/* Wizard badge */}
-        <div className="flex justify-center mb-5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Setup Wizard
-          </span>
-        </div>
-
         <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
           <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
             Connect a Provider
@@ -543,14 +527,6 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
   if (isInstaller) {
     return (
       <div className="w-full max-w-sm">
-        {/* Wizard badge */}
-        <div className="flex justify-center mb-5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Setup Wizard
-          </span>
-        </div>
-
         <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
           <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
             Welcome to Kortix
@@ -601,7 +577,7 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
           <Button
             type="submit"
             disabled={pending}
-            className="w-full h-10 sm:h-11 text-sm sm:text-base"
+            className="w-full h-10 sm:h-11 text-sm"
           >
             {pending ? 'Setting up...' : 'Create account & continue'}
           </Button>
@@ -656,9 +632,9 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
         <Button
           type="submit"
           disabled={pending}
-          className="w-full h-10 sm:h-11 text-sm sm:text-base"
-        >
-          {pending ? 'Signing in...' : 'Sign in'}
+            className="w-full h-10 sm:h-11 text-sm"
+          >
+            {pending ? 'Signing in...' : 'Sign in'}
         </Button>
       </form>
 

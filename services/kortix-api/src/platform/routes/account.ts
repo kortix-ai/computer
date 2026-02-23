@@ -24,6 +24,7 @@ import {
 } from '../providers';
 import type { AuthVariables } from '../../types';
 import { resolveAccountId as defaultResolveAccountId } from '../../shared/resolve-account';
+import { config } from '../../config';
 
 // ─── Dependency Injection ────────────────────────────────────────────────────
 
@@ -214,6 +215,10 @@ export function createAccountRouter(
   // Frontend polls GET /init/local/status for pull progress.
 
   router.post('/init/local', async (c) => {
+    if (!config.isLocalDockerEnabled()) {
+      return c.json({ success: false, error: 'Local Docker provider is not enabled' }, 403);
+    }
+
     const userId = c.get('userId');
 
     try {
@@ -365,6 +370,10 @@ export function createAccountRouter(
   // Poll endpoint for local sandbox provisioning progress.
 
   router.get('/init/local/status', async (c) => {
+    if (!config.isLocalDockerEnabled()) {
+      return c.json({ success: false, error: 'Local Docker provider is not enabled' }, 403);
+    }
+
     const userId = c.get('userId');
 
     try {
