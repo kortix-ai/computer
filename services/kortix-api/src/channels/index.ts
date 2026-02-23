@@ -3,6 +3,7 @@ import { supabaseAuth } from '../middleware/auth';
 import { createAdapters } from './adapters/registry';
 import { ChannelEngineImpl } from './core/engine';
 import { createChannelsRouter } from './routes/channels';
+import { createPlatformCredentialsRouter } from './routes/platform-credentials';
 import { webhooksRouter } from './routes/webhooks';
 import { filesRouter } from './routes/files';
 import { startChannels, stopChannels, getChannelsStatus } from './core/lifecycle';
@@ -14,6 +15,7 @@ const engine = new ChannelEngineImpl(adapters);
 const channelsApp = new Hono();
 
 channelsApp.use('/v1/channels/*', supabaseAuth);
+channelsApp.route('/v1/channels/platform-credentials', createPlatformCredentialsRouter());
 channelsApp.route('/v1/channels', createChannelsRouter(engine));
 channelsApp.route('/v1/files', filesRouter);
 

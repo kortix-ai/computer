@@ -15,3 +15,12 @@ export {
   type CreateChannelData,
   type UpdateChannelData,
 } from './use-channels';
+
+export {
+  usePlatformCredentialStatus,
+  usePlatformCredentialsList,
+  useSavePlatformCredentials,
+  useDeletePlatformCredentials,
+  type PlatformCredentialStatus,
+  type PlatformCredentialEntry,
+} from './use-platform-credentials';
