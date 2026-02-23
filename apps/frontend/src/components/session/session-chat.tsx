@@ -101,7 +101,7 @@ import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
 import { useOpenCodeSessionStatusStore } from "@/stores/opencode-session-status-store";
 import { useSyncStore } from "@/stores/opencode-sync-store";
 import { useServerStore } from "@/stores/server-store";
-import { openTabAndNavigate, useTabStore } from "@/stores/tab-store";
+import { openTabAndNavigate } from "@/stores/tab-store";
 // Shared UI primitives (framework-agnostic, reusable on mobile)
 import {
 	type AgentPart,
@@ -2941,52 +2941,51 @@ export function SessionChat({
 	const hasActiveQuestion = useOpenCodePendingStore((s) =>
 		Object.values(s.questions).some((q) => q.sessionID === sessionId),
 	);
+	const messageCount = messages?.length ?? 0;
 	const { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd, scrollToAbsoluteBottom, smoothScrollToAbsoluteBottom } =
 		useAutoScroll({
 			working: isBusy && !hasActiveQuestion,
+			hasContent: messageCount > 0,
 		});
 
 	// Scroll to the bottom on initial load / session change.
-	// Uses scrollToAbsoluteBottom (instant) so there's no visible smooth
-	// animation. For short responses the spacer keeps the user bubble near
-	// the top. For long responses this shows the end of the conversation.
-	// Staggered attempts cover async markdown/code-block rendering.
+	// Uses a callback ref on the scroll container to guarantee it's mounted.
+	// Strategy: start scrolled to ~90% instantly (no flash at top), then
+	// smooth-scroll the last bit once content has rendered for a nice effect.
 	const initialScrollDoneRef = useRef<string | null>(null);
-	const messageCount = messages?.length ?? 0;
-	useEffect(() => {
+	const scrollContainerCallbackRef = useCallback((node: HTMLDivElement | null) => {
+		// Always keep scrollRef updated
+		(scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+		if (!node) return;
 		if (initialScrollDoneRef.current === sessionId) return;
-		if (messageCount === 0) return;
 		initialScrollDoneRef.current = sessionId;
 
-		const t1 = setTimeout(scrollToAbsoluteBottom, 0);
-		const t2 = setTimeout(scrollToAbsoluteBottom, 100);
-		const t3 = setTimeout(scrollToAbsoluteBottom, 500);
-		const t4 = setTimeout(scrollToAbsoluteBottom, 1500);
+		// Instant scroll to near-bottom so user doesn't see top-of-page flash.
+		// Position slightly above the bottom so the smooth scroll has room to animate.
+		const scrollNearBottom = () => {
+			const max = node.scrollHeight - node.clientHeight;
+			node.scrollTop = Math.max(0, max - 300);
+		};
+		scrollNearBottom();
 
-		return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
-	}, [messageCount, sessionId, scrollToAbsoluteBottom]);
+		// After content settles, smooth scroll the final stretch to the bottom.
+		setTimeout(() => {
+			node.scrollTo({
+				top: node.scrollHeight - node.clientHeight,
+				behavior: 'smooth',
+			});
+		}, 150);
+		// Follow-up in case async content changed scrollHeight
+		setTimeout(() => {
+			node.scrollTo({
+				top: node.scrollHeight - node.clientHeight,
+				behavior: 'smooth',
+			});
+		}, 600);
+	}, [sessionId, scrollRef]);
 
-	// Scroll to the bottom when switching back to this tab — but only if
-	// new messages arrived while away.
-	const activeTabId = useTabStore((s) => s.activeTabId);
-	const isActiveTab = activeTabId === sessionId;
-	const wasActiveRef = useRef(isActiveTab);
-	const messageCountWhenLeftRef = useRef(messageCount);
-	useEffect(() => {
-		const was = wasActiveRef.current;
-		wasActiveRef.current = isActiveTab;
-		if (was && !isActiveTab) {
-			// Leaving this tab — snapshot message count
-			messageCountWhenLeftRef.current = messageCount;
-		}
-		if (!was && isActiveTab && messageCount > 0) {
-			// Returning to this tab — only scroll if new messages arrived
-			if (messageCount !== messageCountWhenLeftRef.current) {
-				const t = setTimeout(smoothScrollToAbsoluteBottom, 100);
-				return () => clearTimeout(t);
-			}
-		}
-	}, [isActiveTab, messageCount, smoothScrollToAbsoluteBottom]);
+	// Tab switch: the DOM stays mounted (hidden class), so the browser
+	// preserves scroll position automatically. No action needed here.
 
 	// ---- Pending permissions & questions ----
 	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
@@ -3449,7 +3448,7 @@ export function SessionChat({
 			) : hasMessages || showOptimistic ? (
 				<div className="relative flex-1 min-h-0">
 					<div
-						ref={scrollRef}
+						ref={scrollContainerCallbackRef}
 						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 bg-background h-full [scroll-behavior:auto]"
 					>
 						<div
