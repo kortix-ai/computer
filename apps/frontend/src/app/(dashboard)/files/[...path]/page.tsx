@@ -1,9 +1,23 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useTabStore } from '@/stores/tab-store';
+
+/**
+ * Fully decode a string that may be multi-encoded.
+ * e.g. "presentations%252Fslide.html" → "presentations%2Fslide.html" → "presentations/slide.html"
+ */
+function fullyDecode(value: string): string {
+  let prev = value;
+  for (let i = 0; i < 5; i++) {
+    const decoded = decodeURIComponent(prev);
+    if (decoded === prev) return decoded;
+    prev = decoded;
+  }
+  return prev;
+}
 
 /**
  * Catch-all route for /files/<encoded-file-path>
@@ -15,32 +29,38 @@ import { useTabStore } from '@/stores/tab-store';
  */
 export default function FilePathPage() {
   const params = useParams<{ path: string[] }>();
+  const didOpen = useRef(false);
+
+  // Build a stable string key from the path segments so the effect
+  // doesn't re-fire on every render due to array identity changes.
+  const pathKey = params.path?.join('/') ?? '';
 
   useEffect(() => {
-    if (!params.path || params.path.length === 0) return;
+    if (!pathKey) return;
 
-    // Reconstruct the file path from the URL segments.
-    // The original URL is /files/<encodeURIComponent(filePath)>, so a path like
-    // "Desktop/tables-and-code-examples.md" becomes /files/Desktop%2Ftables-and-code-examples.md
-    // Next.js decodes %2F into a real slash, producing multiple path segments.
-    // Re-join them to reconstruct the original file path.
-    const filePath = params.path.join('/');
+    // Only open once per mount — prevents re-opening after close.
+    if (didOpen.current) return;
+    didOpen.current = true;
+
+    // Next.js already decodes each path segment, but the original URL
+    // may have been double-encoded (e.g. %252F). Fully decode to get
+    // the real file path.
+    const filePath = fullyDecode(pathKey);
     const fileName = filePath.split('/').pop() || filePath;
     const tabId = `file:${filePath}`;
 
-    // Open the file tab in the store. The pre-mounted SessionTabsContainer
-    // in layout-content.tsx will render the FileTabContent for this tab,
-    // and the route-based children (this page) will be hidden since
-    // showingMountedTab becomes true.
-    useTabStore.getState().openTab({
+    // Don't reopen if a tab with this ID already exists and is active
+    const state = useTabStore.getState();
+    if (state.tabs[tabId] && state.activeTabId === tabId) return;
+
+    state.openTab({
       id: tabId,
       title: fileName,
       type: 'file',
       href: `/files/${encodeURIComponent(filePath)}`,
     });
-  }, [params.path]);
+  }, [pathKey]);
 
-  // Brief loading state while the tab store picks up the file tab
   return (
     <div className="flex items-center justify-center h-full">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
