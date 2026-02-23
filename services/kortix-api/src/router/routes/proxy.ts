@@ -7,8 +7,10 @@ import {
 } from '../config/proxy-services';
 import { validateSecretKey } from '../../repositories/api-keys';
 import { validateSandboxToken } from '../../repositories/sandboxes';
-import { config } from '../../config';
-import { checkCredits, deductToolCredits } from '../services/billing';
+import { config, PLATFORM_FEE_MARKUP } from '../../config';
+import { checkCredits, deductToolCredits, deductLLMCredits } from '../services/billing';
+import { getModel, type ModelConfig } from '../config/models';
+import { calculateCost, extractUsage } from '../services/llm';
 
 const proxy = new Hono();
 
@@ -21,12 +23,16 @@ for (const [prefix, serviceConfig] of Object.entries(services)) {
 
 // === Core Proxy Handler ===
 //
-// 1. Valid KORTIX token (sk_xxx in our DB)
-//    → Match against allowedRoutes (exact model paths for replicate, etc.)
-//    → Inject Kortix's API key, forward, bill user with route-specific pricing.
+// Three authentication/billing modes:
 //
-// 2. Not a Kortix token (user's own API key)
-//    → Pure passthrough. No billing, no gating.
+// 1. Kortix token (sk_xxx/sbt_xxx in our DB) in Authorization header
+//    → Inject Kortix's API key, forward, bill at KORTIX_MARKUP (1.2×).
+//
+// 2. User's own API key in Authorization + Kortix token in X-Kortix-Token header
+//    → Passthrough (no key injection), bill at PLATFORM_FEE_MARKUP (0.1×).
+//
+// 3. User's own API key, no Kortix token anywhere
+//    → Pure passthrough. No billing, no gating (self-hosted / non-Kortix user).
 
 async function handleProxy(c: any, service: ProxyServiceConfig, prefix: string) {
   const fullPath = new URL(c.req.url).pathname;
@@ -41,9 +47,14 @@ async function handleProxy(c: any, service: ProxyServiceConfig, prefix: string) 
 
   const auth = await tryAuthenticate(c);
 
-  if (auth.isKortixUser && auth.accountId) {
+  if (auth.isKortixUser && auth.accountId && !auth.isPassthrough) {
+    // Mode 1: Kortix-owned key — inject our key, bill at 1.2×
     return handleKortixProxy(c, service, subPath, queryString, method, auth.accountId);
+  } else if (auth.isPassthrough && auth.accountId) {
+    // Mode 2: User's own key — passthrough, bill at 0.1×
+    return handleKortixPassthrough(c, service, subPath, queryString, method, auth.accountId);
   } else {
+    // Mode 3: Unknown user — pure passthrough, no billing
     return handlePassthrough(c, service, subPath, queryString, method);
   }
 }
@@ -113,6 +124,72 @@ async function handleKortixProxy(
   });
 }
 
+// === Kortix user with own key: passthrough + bill at platform fee (0.1×) ===
+
+async function handleKortixPassthrough(
+  c: any,
+  service: ProxyServiceConfig,
+  subPath: string,
+  queryString: string,
+  method: string,
+  accountId: string,
+) {
+  const creditCheck = await checkCredits(accountId, 0.01, { skipDevCheck: true });
+  if (!creditCheck.hasCredits) {
+    throw new HTTPException(402, { message: creditCheck.message });
+  }
+
+  const targetUrl = `${service.targetBaseUrl}${subPath}${queryString}`;
+  const headers = buildForwardHeaders(c);
+  // Remove X-Kortix-Token from forwarded headers — upstream doesn't need it
+  headers.delete('x-kortix-token');
+  const body = await getRequestBody(c, method);
+
+  const billingToolName = service.billingToolName;
+  const isLlm = service.isLlm === true;
+
+  console.log(`[PROXY] ${service.name} (passthrough:${accountId}) ${method} ${subPath} → ${targetUrl} [bill:${billingToolName}@${PLATFORM_FEE_MARKUP}x]`);
+
+  const upstream = await fetch(targetUrl, {
+    method,
+    headers,
+    body,
+    // @ts-ignore
+    duplex: 'half',
+  });
+
+  if (isLlm && upstream.ok) {
+    // For LLM passthrough: extract token usage and bill at platform fee
+    return billLlmPassthrough(upstream, service, subPath, accountId);
+  }
+
+  if (isLlm) {
+    // LLM call failed upstream — don't bill for failed requests
+    console.warn(`[PROXY] LLM passthrough ${service.name} upstream error ${upstream.status} — no billing`);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: upstream.headers,
+    });
+  }
+
+  // For tool passthrough: fixed per-call billing at platform fee
+  deductToolCredits(
+    accountId,
+    billingToolName,
+    0,
+    `Passthrough ${service.name}: ${method} ${subPath}`,
+    undefined,
+    { skipDevCheck: true },
+  ).catch((err) => console.error(`[PROXY] Passthrough billing error: ${err}`));
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
+    headers: upstream.headers,
+  });
+}
+
 // === Not Kortix user: pure passthrough ===
 
 async function handlePassthrough(
@@ -143,39 +220,244 @@ async function handlePassthrough(
   });
 }
 
+// === LLM Passthrough Billing ===
+//
+// For LLM calls using the user's own key routed through our proxy,
+// extract token usage from the response and bill at PLATFORM_FEE_MARKUP.
+
+async function billLlmPassthrough(
+  upstream: Response,
+  service: ProxyServiceConfig,
+  subPath: string,
+  accountId: string,
+) {
+  const contentType = upstream.headers.get('Content-Type') || '';
+  const isStreaming = contentType.includes('text/event-stream');
+
+  if (isStreaming) {
+    const upstreamBody = upstream.body;
+    if (!upstreamBody) {
+      return new Response(null, { status: 502 });
+    }
+
+    const [clientStream, billingStream] = upstreamBody.tee();
+
+    // Fire-and-forget: extract usage from billing stream
+    extractUsageFromPassthroughStream(billingStream, service, subPath, accountId);
+
+    return new Response(clientStream, {
+      status: upstream.status,
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+  }
+
+  // Non-streaming: read response, extract usage, bill, return
+  const responseBody = await upstream.json();
+  const isAnthropic = service.name === 'anthropic';
+
+  // Extract usage — handle both OpenAI and Anthropic response formats
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let modelId = 'unknown';
+
+  if (isAnthropic && responseBody?.usage) {
+    // Anthropic: { usage: { input_tokens, output_tokens }, model }
+    promptTokens = responseBody.usage.input_tokens ?? 0;
+    completionTokens = responseBody.usage.output_tokens ?? 0;
+    modelId = responseBody.model || modelId;
+  } else {
+    // OpenAI-compatible: { usage: { prompt_tokens, completion_tokens }, model }
+    const usage = extractUsage(responseBody);
+    if (usage) {
+      promptTokens = usage.promptTokens;
+      completionTokens = usage.completionTokens;
+    }
+    modelId = responseBody?.model || modelId;
+  }
+
+  if (promptTokens > 0 || completionTokens > 0) {
+    const modelConfig = getModel(modelId);
+    const cost = calculateCost(modelConfig, promptTokens, completionTokens, PLATFORM_FEE_MARKUP);
+
+    deductLLMCredits(
+      accountId,
+      modelId,
+      promptTokens,
+      completionTokens,
+      cost,
+    ).catch((err) => console.error(`[PROXY] LLM passthrough billing error: ${err}`));
+
+    console.log(`[PROXY] LLM passthrough ${modelId}: ${promptTokens}/${completionTokens} tokens, cost=$${cost.toFixed(6)} (${PLATFORM_FEE_MARKUP}x)`);
+  }
+
+  return new Response(JSON.stringify(responseBody), {
+    status: upstream.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Extract usage from an SSE stream and bill at platform fee.
+ * Runs in background (fire-and-forget).
+ *
+ * Handles both SSE formats:
+ *   - OpenAI-compatible: usage in final chunk's `usage` field
+ *   - Anthropic: input tokens in `message_start`, output in `message_delta`
+ */
+async function extractUsageFromPassthroughStream(
+  stream: ReadableStream<Uint8Array>,
+  service: ProxyServiceConfig,
+  subPath: string,
+  accountId: string,
+) {
+  try {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let detectedModel = 'unknown';
+    const isAnthropic = service.name === 'anthropic';
+
+    // OpenAI-compatible tracking
+    let lastUsage: { promptTokens: number; completionTokens: number } | null = null;
+
+    // Anthropic-specific tracking
+    let anthropicInputTokens = 0;
+    let anthropicOutputTokens = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+        try {
+          const chunk = JSON.parse(line.slice(6));
+
+          if (isAnthropic) {
+            // Anthropic SSE: message_start → input tokens, message_delta → output tokens
+            if (chunk.type === 'message_start' && chunk.message) {
+              detectedModel = chunk.message.model || detectedModel;
+              anthropicInputTokens = chunk.message.usage?.input_tokens ?? 0;
+            }
+            if (chunk.type === 'message_delta' && chunk.usage) {
+              anthropicOutputTokens = chunk.usage.output_tokens ?? 0;
+            }
+          } else {
+            // OpenAI-compatible SSE
+            if (chunk.model) detectedModel = chunk.model;
+            if (chunk.usage) {
+              lastUsage = {
+                promptTokens: chunk.usage.prompt_tokens ?? 0,
+                completionTokens: chunk.usage.completion_tokens ?? 0,
+              };
+            }
+          }
+        } catch {
+          // Not valid JSON — skip
+        }
+      }
+    }
+
+    let promptTokens: number;
+    let completionTokens: number;
+
+    if (isAnthropic) {
+      promptTokens = anthropicInputTokens;
+      completionTokens = anthropicOutputTokens;
+    } else if (lastUsage) {
+      promptTokens = lastUsage.promptTokens;
+      completionTokens = lastUsage.completionTokens;
+    } else {
+      console.warn(`[PROXY] LLM passthrough stream (${service.name}): no usage data — billing skipped`);
+      return;
+    }
+
+    if (promptTokens > 0 || completionTokens > 0) {
+      const modelConfig = getModel(detectedModel);
+      const cost = calculateCost(modelConfig, promptTokens, completionTokens, PLATFORM_FEE_MARKUP);
+      await deductLLMCredits(
+        accountId,
+        detectedModel,
+        promptTokens,
+        completionTokens,
+        cost,
+      );
+      console.log(`[PROXY] LLM passthrough stream ${detectedModel}: ${promptTokens}/${completionTokens} tokens, cost=$${cost.toFixed(6)} (${PLATFORM_FEE_MARKUP}x)`);
+    } else {
+      console.warn(`[PROXY] LLM passthrough stream (${service.name}): zero tokens — billing skipped`);
+    }
+  } catch (err) {
+    console.error(`[PROXY] Error extracting usage from passthrough stream:`, err);
+  }
+}
+
 // === Helpers ===
 
-async function tryAuthenticate(c: any): Promise<{ isKortixUser: boolean; accountId?: string }> {
+interface AuthResult {
+  isKortixUser: boolean;
+  accountId?: string;
+  /** True when the user's own API key is in Authorization (passthrough) but we identified the account via X-Kortix-Token. */
+  isPassthrough?: boolean;
+}
+
+async function tryAuthenticate(c: any): Promise<AuthResult> {
   const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { isKortixUser: false };
-  }
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+  const isKortixBearer = bearerToken && (bearerToken.startsWith('sk_') || bearerToken.startsWith('sbt_'));
 
-  const token = authHeader.slice(7);
-  if (!token) return { isKortixUser: false };
+  // --- Mode 1: Kortix token directly in Authorization header ---
+  // The user sent sk_ or sbt_ as the Bearer token — full Kortix-managed flow.
+  // If it looks like a Kortix token but fails validation → hard reject.
 
-  if (token.startsWith('sk_') && config.DATABASE_URL) {
+  if (isKortixBearer && config.DATABASE_URL) {
+    const validate = bearerToken.startsWith('sk_') ? validateSecretKey : validateSandboxToken;
     try {
-      const result = await validateSecretKey(token);
+      const result = await validate(bearerToken);
       if (result.isValid && result.accountId) {
         return { isKortixUser: true, accountId: result.accountId };
       }
     } catch {
-      // Not valid → passthrough
+      // Fall through to reject below
     }
+    // Looks like a Kortix token but didn't validate — reject.
+    // Never allow an invalid Kortix token to fall through to free passthrough.
+    throw new HTTPException(401, { message: 'Invalid Kortix token' });
   }
 
-  if (token.startsWith('sbt_') && config.DATABASE_URL) {
-    try {
-      const result = await validateSandboxToken(token);
-      if (result.isValid && result.accountId) {
-        return { isKortixUser: true, accountId: result.accountId };
+  // --- Mode 2: User's own key + Kortix token in X-Kortix-Token ---
+  // The user's own API key is in Authorization (Bearer) or a provider-specific
+  // header (e.g. Anthropic's x-api-key). The Kortix sandbox token rides in
+  // X-Kortix-Token so we can identify the account for platform-fee billing.
+  // If X-Kortix-Token looks like a Kortix token but fails → hard reject.
+
+  if (config.DATABASE_URL) {
+    const kortixToken = c.req.header('X-Kortix-Token');
+    if (kortixToken) {
+      const isKortixToken = kortixToken.startsWith('sbt_') || kortixToken.startsWith('sk_');
+      if (isKortixToken) {
+        const validate = kortixToken.startsWith('sk_') ? validateSecretKey : validateSandboxToken;
+        try {
+          const result = await validate(kortixToken);
+          if (result.isValid && result.accountId) {
+            return { isKortixUser: true, accountId: result.accountId, isPassthrough: true };
+          }
+        } catch {
+          // Fall through to reject below
+        }
+        throw new HTTPException(401, { message: 'Invalid X-Kortix-Token' });
       }
-    } catch {
-      // Not valid → passthrough
     }
   }
 
+  // --- Mode 3: No Kortix token anywhere — pure passthrough, no billing ---
   return { isKortixUser: false };
 }
 

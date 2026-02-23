@@ -26,6 +26,7 @@ import { queueApp, startDrainer, stopDrainer } from './queue';
 import { serversApp } from './servers';
 import { supabaseAuth, combinedAuth } from './middleware/auth';
 import { ensureSchema } from './ensure-schema';
+import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -363,6 +364,12 @@ console.log(`
 ╚═══════════════════════════════════════════════════════════╝
 `);
 
+// Load LLM pricing from models.dev (non-blocking if it fails).
+// Awaited so pricing is available before the first billing request.
+initModelPricing().catch((err) =>
+  console.error('[startup] Model pricing init failed (will retry in 24h):', err),
+);
+
 // Ensure DB schema exists before starting services that depend on it.
 // This is idempotent — safe to run on every startup.
 ensureSchema()
@@ -391,6 +398,7 @@ function shutdown(signal: string) {
   stopScheduler();
   stopChannelService();
   stopDrainer();
+  stopModelPricing();
   process.exit(0);
 }
 
