@@ -165,7 +165,7 @@ export class ChannelEngineImpl {
         content: responseText,
         sessionId,
         truncated: false,
-        modelName: model.modelID,
+        modelName: model?.modelID ?? 'default',
         durationMs: Date.now() - startTime,
       };
 
@@ -303,7 +303,7 @@ export class ChannelEngineImpl {
     await connector.replyPermission(perm.id, approved);
   }
 
-  private resolveModel(config: ChannelConfig): { providerID: string; modelID: string } {
+  private resolveModel(config: ChannelConfig): { providerID: string; modelID: string } | undefined {
     const meta = config.metadata as Record<string, unknown> | null;
 
     if (meta?.model && typeof meta.model === 'object' && !Array.isArray(meta.model)) {
@@ -313,7 +313,7 @@ export class ChannelEngineImpl {
       }
     }
 
-    return { providerID: 'kortix', modelID: 'kortix/power' };
+    return undefined;
   }
 
   private buildPrompt(config: ChannelConfig, message: NormalizedMessage): string {
