@@ -1,5 +1,73 @@
 [
   {
+    "version": "0.6.3",
+    "date": "2026-02-23",
+    "title": "Setup wizard overhaul, sandbox-on-demand, and frontend UX improvements",
+    "description": "Major self-hosted setup improvements: sandbox is no longer started at install time — the frontend wizard provisions it on-demand with image pull progress. Added Tool API Keys as a new wizard step. Installer script now only pre-pulls the sandbox image. Multiple frontend UX fixes including streaming, tool calls, file downloads, tab persistence, and preview proxy.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Setup wizard now has 4 steps: Account → LLM Provider → Tool API Keys → Start using. Tool keys step lets users configure Tavily, Firecrawl, Serper, Replicate, Context7, and ElevenLabs during initial setup"
+      },
+      {
+        "type": "feature",
+        "text": "Sandbox is provisioned on-demand by the frontend wizard (via /init/local) instead of being started as a static Docker Compose service. Installer script only pre-pulls the image"
+      },
+      {
+        "type": "feature",
+        "text": "Subdomain-based preview proxy with ngrok-style auth for sandbox web services"
+      },
+      {
+        "type": "feature",
+        "text": "Binary file download support via new /file/raw route in kortix-master with robust fallback to /file/content"
+      },
+      {
+        "type": "feature",
+        "text": "Pre-mount all tab types (terminal, browser, files, etc.) to preserve state and scroll position on tab switch"
+      },
+      {
+        "type": "improvement",
+        "text": "Consolidated sandbox: removed redundant agents/skills/tools, renamed skills for clarity, audited and updated kortix-system SKILL.md"
+      },
+      {
+        "type": "improvement",
+        "text": "Improved tool call rendering while streaming — fixes loading spinner stuck forever and scroll behavior"
+      },
+      {
+        "type": "improvement",
+        "text": "Questions UX improvements and abort handling"
+      },
+      {
+        "type": "fix",
+        "text": "Installer get-kortix.sh no longer starts a sandbox container — only pulls the image. The API creates it when the wizard triggers provisioning"
+      },
+      {
+        "type": "fix",
+        "text": "Protected /init/local and /init/local/status routes with explicit local_docker provider check — returns 403 when local Docker is not enabled"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed React hooks-of-rules violation in self-hosted auth — useCallback hooks moved before conditional returns"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed double-proxy URL nesting and replaced hardcoded localhost:4096 fallbacks with proper internal browser routing"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed env var propagation failure on sandbox restart"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed cron execution reliability"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed opening files from chat actions"
+      }
+    ]
+  },
+  {
     "version": "0.6.2",
     "date": "2026-02-22",
     "title": "Fix auth redirect loop and Docker entrypoint rewrite",
