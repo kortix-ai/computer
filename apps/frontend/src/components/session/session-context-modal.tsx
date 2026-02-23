@@ -246,7 +246,7 @@ function RawMessage({ message, parts, formatTime }: {
             <span className="text-muted-foreground">{message.id}</span>
           </div>
           <div className="shrink-0 text-[10px] text-muted-foreground/60">
-            {formatTime(message.time.created)}
+            {formatTime(message.time?.created)}
           </div>
         </div>
       </AccordionTrigger>
