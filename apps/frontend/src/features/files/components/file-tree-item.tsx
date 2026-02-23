@@ -2,26 +2,6 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
-  Folder,
-  FileText,
-  FileCode,
-  FileCode2,
-  FileImage,
-  FileVideo,
-  FileSpreadsheet,
-  FileType,
-  FileJson,
-  FileTerminal,
-  FileArchive,
-  FileAudio,
-  FileCog,
-  FileKey,
-  FileLock,
-  FileMusic,
-  FileBadge,
-  FileBox,
-  FileChartLine,
-  File as FileIcon,
   ChevronRight,
   Download,
   History,
@@ -35,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FileNode } from '../types';
+import { getFileIcon } from './file-icon';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -70,203 +51,9 @@ interface FileTreeItemProps {
 // Custom MIME type for internal drag-and-drop
 const DRAG_MIME = 'application/x-file-tree-path';
 
-/** Icon class shorthand */
-const IC = 'h-4 w-4 shrink-0';
-
 /** File extension / filename to icon mapping */
 function getNodeIcon(node: FileNode) {
-  if (node.type === 'directory') {
-    return <Folder className={`${IC} text-blue-400`} />;
-  }
-
-  const name = node.name.toLowerCase();
-  const ext = name.split('.').pop() || '';
-
-  // ── Special filenames ──────────────────────────────────────────
-  if (name === 'dockerfile' || name === 'docker-compose.yml' || name === 'docker-compose.yaml') {
-    return <FileBox className={`${IC} text-sky-400`} />;
-  }
-  if (name === '.env' || name.startsWith('.env.')) {
-    return <FileKey className={`${IC} text-yellow-500`} />;
-  }
-  if (name === 'package.json' || name === 'package-lock.json' || name === 'pnpm-lock.yaml' || name === 'yarn.lock' || name === 'bun.lockb') {
-    return <FileBox className={`${IC} text-green-400`} />;
-  }
-  if (name === 'license' || name === 'license.md' || name === 'license.txt') {
-    return <FileBadge className={`${IC} text-amber-400`} />;
-  }
-  if (name === '.gitignore' || name === '.gitattributes' || name === '.gitmodules') {
-    return <FileCog className={`${IC} text-orange-400`} />;
-  }
-  if (name === 'makefile' || name === 'cmakelists.txt') {
-    return <FileTerminal className={`${IC} text-amber-500`} />;
-  }
-
-  // ── By extension ───────────────────────────────────────────────
-
-  // TypeScript
-  if (ext === 'ts' || ext === 'tsx') {
-    return <FileCode2 className={`${IC} text-blue-400`} />;
-  }
-  // JavaScript
-  if (ext === 'js' || ext === 'jsx' || ext === 'mjs' || ext === 'cjs') {
-    return <FileCode2 className={`${IC} text-yellow-400`} />;
-  }
-  // Python
-  if (ext === 'py' || ext === 'pyi' || ext === 'pyx' || ext === 'pyw') {
-    return <FileCode className={`${IC} text-sky-400`} />;
-  }
-  // Rust
-  if (ext === 'rs') {
-    return <FileCode className={`${IC} text-orange-400`} />;
-  }
-  // Go
-  if (ext === 'go') {
-    return <FileCode className={`${IC} text-cyan-400`} />;
-  }
-  // Ruby
-  if (ext === 'rb' || ext === 'erb' || ext === 'gemspec') {
-    return <FileCode className={`${IC} text-red-400`} />;
-  }
-  // Java / Kotlin
-  if (ext === 'java' || ext === 'kt' || ext === 'kts') {
-    return <FileCode className={`${IC} text-orange-500`} />;
-  }
-  // C / C++ / Objective-C
-  if (ext === 'c' || ext === 'cpp' || ext === 'cc' || ext === 'cxx' || ext === 'h' || ext === 'hpp' || ext === 'hxx' || ext === 'm' || ext === 'mm') {
-    return <FileCode className={`${IC} text-blue-500`} />;
-  }
-  // C#
-  if (ext === 'cs') {
-    return <FileCode className={`${IC} text-violet-400`} />;
-  }
-  // Swift
-  if (ext === 'swift') {
-    return <FileCode className={`${IC} text-orange-400`} />;
-  }
-  // PHP
-  if (ext === 'php') {
-    return <FileCode className={`${IC} text-indigo-400`} />;
-  }
-  // Vue / Svelte
-  if (ext === 'vue') {
-    return <FileCode2 className={`${IC} text-emerald-400`} />;
-  }
-  if (ext === 'svelte') {
-    return <FileCode2 className={`${IC} text-orange-500`} />;
-  }
-  // HTML
-  if (ext === 'html' || ext === 'htm') {
-    return <FileCode className={`${IC} text-orange-400`} />;
-  }
-  // CSS / SCSS / LESS
-  if (ext === 'css' || ext === 'scss' || ext === 'sass' || ext === 'less' || ext === 'styl') {
-    return <FileCode className={`${IC} text-pink-400`} />;
-  }
-
-  // JSON
-  if (ext === 'json' || ext === 'jsonc' || ext === 'json5') {
-    return <FileJson className={`${IC} text-yellow-500`} />;
-  }
-  // YAML / TOML
-  if (ext === 'yaml' || ext === 'yml' || ext === 'toml') {
-    return <FileCog className={`${IC} text-purple-400`} />;
-  }
-  // XML
-  if (ext === 'xml' || ext === 'xsl' || ext === 'xslt' || ext === 'wsdl') {
-    return <FileCode className={`${IC} text-amber-500`} />;
-  }
-
-  // Shell / Terminal
-  if (ext === 'sh' || ext === 'bash' || ext === 'zsh' || ext === 'fish' || ext === 'bat' || ext === 'cmd' || ext === 'ps1') {
-    return <FileTerminal className={`${IC} text-green-400`} />;
-  }
-
-  // Markdown / Text
-  if (ext === 'md' || ext === 'mdx' || ext === 'txt' || ext === 'rst' || ext === 'rtf') {
-    return <FileText className={`${IC} text-muted-foreground`} />;
-  }
-
-  // Images
-  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif', 'tiff', 'tif'].includes(ext)) {
-    return <FileImage className={`${IC} text-purple-400`} />;
-  }
-  // Video
-  if (['mp4', 'webm', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'ogv'].includes(ext)) {
-    return <FileVideo className={`${IC} text-pink-400`} />;
-  }
-  // Audio
-  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'opus'].includes(ext)) {
-    return <FileAudio className={`${IC} text-teal-400`} />;
-  }
-  // Music (midi)
-  if (ext === 'mid' || ext === 'midi') {
-    return <FileMusic className={`${IC} text-teal-400`} />;
-  }
-
-  // Spreadsheets
-  if (['xlsx', 'xls', 'csv', 'tsv', 'ods'].includes(ext)) {
-    return <FileSpreadsheet className={`${IC} text-green-400`} />;
-  }
-  // PDF / Documents
-  if (ext === 'pdf') {
-    return <FileType className={`${IC} text-red-500`} />;
-  }
-  if (['doc', 'docx', 'odt'].includes(ext)) {
-    return <FileType className={`${IC} text-blue-500`} />;
-  }
-  if (['ppt', 'pptx', 'odp'].includes(ext)) {
-    return <FileType className={`${IC} text-orange-500`} />;
-  }
-
-  // Archives
-  if (['zip', 'tar', 'gz', 'bz2', 'xz', 'rar', '7z', 'tgz', 'zst'].includes(ext)) {
-    return <FileArchive className={`${IC} text-amber-500`} />;
-  }
-
-  // Config files
-  if (['ini', 'cfg', 'conf', 'properties', 'editorconfig'].includes(ext)) {
-    return <FileCog className={`${IC} text-gray-400`} />;
-  }
-  // Dotfiles / RC files
-  if (name.startsWith('.') && (name.endsWith('rc') || name.endsWith('rc.js') || name.endsWith('rc.json') || name.endsWith('rc.yml'))) {
-    return <FileCog className={`${IC} text-gray-400`} />;
-  }
-  if (ext === 'eslintrc' || name.includes('eslint') || name.includes('prettier') || name.includes('babel')) {
-    return <FileCog className={`${IC} text-purple-400`} />;
-  }
-  // tsconfig, etc
-  if (name.startsWith('tsconfig') || name.startsWith('jsconfig')) {
-    return <FileCog className={`${IC} text-blue-400`} />;
-  }
-
-  // Lock files / security
-  if (ext === 'lock' || ext === 'pem' || ext === 'crt' || ext === 'cer' || ext === 'key') {
-    return <FileLock className={`${IC} text-yellow-500`} />;
-  }
-
-  // Database / SQL
-  if (ext === 'sql' || ext === 'sqlite' || ext === 'db' || ext === 'sqlite3') {
-    return <FileChartLine className={`${IC} text-blue-400`} />;
-  }
-
-  // Protobuf / GraphQL
-  if (ext === 'proto' || ext === 'graphql' || ext === 'gql') {
-    return <FileCode2 className={`${IC} text-pink-500`} />;
-  }
-
-  // WASM
-  if (ext === 'wasm' || ext === 'wat') {
-    return <FileBox className={`${IC} text-violet-500`} />;
-  }
-
-  // Log files
-  if (ext === 'log') {
-    return <FileText className={`${IC} text-gray-400`} />;
-  }
-
-  // Fallback
-  return <FileIcon className={`${IC} text-muted-foreground`} />;
+  return getFileIcon(node.name, { isDirectory: node.type === 'directory' });
 }
 
 /** Git status → text color class */
