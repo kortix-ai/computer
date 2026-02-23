@@ -34,6 +34,12 @@ export interface ProxyServiceConfig {
   allowedRoutes: AllowedRoute[];
   /** Default tool name for billing attribution (can be overridden per-route) */
   billingToolName: string;
+  /**
+   * Whether this is an LLM provider (affects passthrough billing).
+   * LLM passthrough extracts token usage and bills per-token at platform fee.
+   * Tool passthrough uses fixed per-call billing.
+   */
+  isLlm?: boolean;
 }
 
 // === Service Registry ===
@@ -111,6 +117,70 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
         { path: '/api/v2/context', methods: ['GET', 'POST'] },
       ],
       billingToolName: 'proxy_context7',
+    },
+
+    // ─── LLM Providers (passthrough-only, no Kortix key injection) ────────
+    //
+    // These exist so that user-owned LLM API keys can be proxied through
+    // Kortix for usage metering and billing at the platform fee rate.
+    // Kortix does NOT provide keys for these — the Kortix LLM routes
+    // (/chat/completions, /messages) handle Kortix-key traffic via OpenRouter.
+
+    // LLM provider targetBaseUrl matches the SDK's expected baseURL
+    // (including /v1 suffix). The SDK strips the proxy prefix and appends
+    // just the endpoint path (e.g. /messages), so:
+    //   SDK calls: KORTIX_API_URL/anthropic/messages
+    //   Proxy subPath: /messages
+    //   Target: https://api.anthropic.com/v1/messages ✓
+
+    anthropic: {
+      name: 'anthropic',
+      targetBaseUrl: config.ANTHROPIC_API_URL,   // https://api.anthropic.com/v1
+      getKortixApiKey: () => '',  // No Kortix key — passthrough only
+      keyInjection: { type: 'header', headerName: 'x-api-key' },
+      allowedRoutes: [],  // No routes allowed with Kortix's key (we don't provide one)
+      billingToolName: 'llm_anthropic_passthrough',
+      isLlm: true,
+    },
+
+    openai: {
+      name: 'openai',
+      targetBaseUrl: config.OPENAI_API_URL,      // https://api.openai.com/v1
+      getKortixApiKey: () => '',
+      keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
+      allowedRoutes: [],
+      billingToolName: 'llm_openai_passthrough',
+      isLlm: true,
+    },
+
+    xai: {
+      name: 'xai',
+      targetBaseUrl: config.XAI_API_URL,         // https://api.x.ai/v1
+      getKortixApiKey: () => '',
+      keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
+      allowedRoutes: [],
+      billingToolName: 'llm_xai_passthrough',
+      isLlm: true,
+    },
+
+    gemini: {
+      name: 'gemini',
+      targetBaseUrl: config.GEMINI_API_URL,      // https://generativelanguage.googleapis.com/v1beta
+      getKortixApiKey: () => '',
+      keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
+      allowedRoutes: [],
+      billingToolName: 'llm_gemini_passthrough',
+      isLlm: true,
+    },
+
+    groq: {
+      name: 'groq',
+      targetBaseUrl: config.GROQ_API_URL,        // https://api.groq.com/openai/v1
+      getKortixApiKey: () => '',
+      keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
+      allowedRoutes: [],
+      billingToolName: 'llm_groq_passthrough',
+      isLlm: true,
     },
   };
 }

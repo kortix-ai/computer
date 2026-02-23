@@ -48,6 +48,12 @@ export {
   kortixApiKeysRelations,
   integrationsRelations,
   sandboxIntegrationsRelations,
+  // Billing / Credits (moved from public → kortix schema)
+  creditAccounts,
+  creditLedger,
+  creditUsage,
+  accountDeletionRequests,
+  creditPurchases,
 } from './schema/kortix';
 
 export type {
@@ -59,11 +65,6 @@ export type {
 // Public/basejump tables
 export {
   apiKeys,
-  creditAccounts,
-  creditLedger,
-  creditUsage,
-  accountDeletionRequests,
-  creditPurchases,
   billingCustomers,
   accountUser,
 } from './schema/public';

@@ -370,7 +370,9 @@ export class LocalDockerProvider implements SandboxProvider {
       `KORTIX_TOKEN=${serviceKey || authToken}`,
       `SANDBOX_ID=${CONTAINER_NAME}`,
       'PROJECT_ID=local',
-      'ENV_MODE=local',
+      // Cloud mode when billing is enabled — routes LLM traffic through the proxy for metering.
+      // Local mode otherwise — SDKs call providers directly (no billing).
+      `ENV_MODE=${config.KORTIX_BILLING_INTERNAL_ENABLED ? 'cloud' : 'local'}`,
       // INTERNAL_SERVICE_KEY: proxy/cron → sandbox auth
       ...(serviceKey ? [`INTERNAL_SERVICE_KEY=${serviceKey}`] : []),
       // Extra env from sandbox/.env (API keys, etc.) — managed vars already filtered out

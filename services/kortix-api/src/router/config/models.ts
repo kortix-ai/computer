@@ -1,17 +1,5 @@
 import { config } from '../../config';
-
-// =============================================================================
-// Model Registry
-// =============================================================================
-
-export interface ModelConfig {
-  /** The actual model ID to send to OpenRouter */
-  openrouterId: string;
-  inputPer1M: number;   // Cost per 1M input tokens (USD)
-  outputPer1M: number;  // Cost per 1M output tokens (USD)
-  contextWindow: number;
-  tier: 'free' | 'paid';
-}
+import { getModelPricing } from './model-pricing';
 
 /**
  * Kortix model aliases → OpenRouter model IDs.
@@ -42,8 +30,9 @@ export const MODELS: Record<string, ModelConfig> = {
 
 /**
  * Resolve a user-provided model ID to a ModelConfig.
- * - Known aliases (kortix/basic, etc.) → mapped config with pricing
- * - Unknown models → passed through to OpenRouter as-is (zero local pricing → use provider cost)
+ * - Known Kortix aliases (kortix/basic, etc.) → mapped config with pricing
+ * - Unknown models → look up live pricing from models.dev (refreshed every 24 h)
+ * - If models.dev has no pricing → fall back to zero (billing will skip)
  */
 export function getModel(modelId: string): ModelConfig {
   if (MODELS[modelId]) {
@@ -54,6 +43,18 @@ export function getModel(modelId: string): ModelConfig {
   const openrouterId = modelId.startsWith('openrouter/')
     ? modelId.replace('openrouter/', '')
     : modelId;
+
+  // Live pricing from models.dev — covers all major LLM providers
+  const livePricing = getModelPricing(modelId);
+  if (livePricing) {
+    return {
+      openrouterId,
+      inputPer1M: livePricing.inputPer1M,
+      outputPer1M: livePricing.outputPer1M,
+      contextWindow: 128000,
+      tier: 'paid',
+    };
+  }
 
   return {
     openrouterId,
