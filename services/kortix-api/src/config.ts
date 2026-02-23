@@ -100,7 +100,7 @@ export const config = {
   DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || '',
   DAYTONA_SERVER_URL: process.env.DAYTONA_SERVER_URL || '',
   DAYTONA_TARGET: process.env.DAYTONA_TARGET || '',
-  DAYTONA_SNAPSHOT: process.env.DAYTONA_SNAPSHOT || `kortix-sandbox-v${SANDBOX_VERSION}`,
+  DAYTONA_SNAPSHOT: `kortix-sandbox-v${SANDBOX_VERSION}`,
 
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: process.env.KORTIX_URL || '',
