@@ -1,12 +1,17 @@
-import { sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries } from './schema/kortix';
+import { sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers } from './schema/kortix';
 import { apiKeys, creditAccounts, accountUser } from './schema/public';
 
 // Select types (what you get back from queries)
+export type Account = typeof accounts.$inferSelect;
+export type AccountMember = typeof accountMembers.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type NewAccountMember = typeof accountMembers.$inferInsert;
 export type Sandbox = typeof sandboxes.$inferSelect;
 export type Trigger = typeof triggers.$inferSelect;
 export type Execution = typeof executions.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type CreditAccount = typeof creditAccounts.$inferSelect;
+/** @deprecated Use AccountMember instead — basejump.account_user is being migrated to kortix.account_members */
 export type AccountUser = typeof accountUser.$inferSelect;
 export type ChannelConfig = typeof channelConfigs.$inferSelect;
 export type ChannelSession = typeof channelSessions.$inferSelect;

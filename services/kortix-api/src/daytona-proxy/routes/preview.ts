@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { eq, and, ne } from 'drizzle-orm';
-import { sandboxes, accountUser } from '@kortix/db';
+import { sandboxes, accountMembers, accountUser } from '@kortix/db';
 import { getDaytona } from '../../shared/daytona';
 import { db } from '../../shared/db';
 
@@ -72,7 +72,7 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
   if (cached !== null) return cached;
 
   try {
-    // Find sandbox by externalId (the Daytona sandbox ID) in kortix.sandboxes.
+    // Find sandbox by externalId in kortix.sandboxes.
     // Allow any status except 'pooled' (unassigned) — the auto-wake logic
     // downstream handles stopped/archived sandboxes gracefully.
     const [sandbox] = await db
@@ -92,19 +92,48 @@ async function verifyOwnership(sandboxId: string, userId: string): Promise<boole
       return false;
     }
 
-    // Check if user belongs to the account that owns this sandbox
-    const [membership] = await db
-      .select({ accountRole: accountUser.accountRole })
-      .from(accountUser)
-      .where(
-        and(
-          eq(accountUser.userId, userId),
-          eq(accountUser.accountId, sandbox.accountId),
-        )
-      )
-      .limit(1);
+    // Check if user belongs to the account that owns this sandbox.
+    // Dual-read: try kortix.account_members first, fall back to basejump.account_user.
+    let allowed = false;
 
-    const allowed = !!membership;
+    // Try kortix.account_members (new table)
+    try {
+      const [membership] = await db
+        .select({ accountRole: accountMembers.accountRole })
+        .from(accountMembers)
+        .where(
+          and(
+            eq(accountMembers.userId, userId),
+            eq(accountMembers.accountId, sandbox.accountId),
+          )
+        )
+        .limit(1);
+      if (membership) allowed = true;
+    } catch {
+      // Table may not exist yet
+    }
+
+    // Fall back to basejump.account_user (legacy, cloud prod)
+    if (!allowed) {
+      try {
+        const [legacy] = await db
+          .select({ accountRole: accountUser.accountRole })
+          .from(accountUser)
+          .where(
+            and(
+              eq(accountUser.userId, userId),
+              eq(accountUser.accountId, sandbox.accountId),
+            )
+          )
+          .limit(1);
+        if (legacy) allowed = true;
+      } catch {
+        // basejump schema doesn't exist (self-hosted) — check direct match
+        // In self-hosted, accountId === userId for personal accounts
+        allowed = sandbox.accountId === userId;
+      }
+    }
+
     setCachedOwnership(sandboxId, userId, allowed);
     return allowed;
   } catch (err) {
@@ -146,52 +175,34 @@ async function wakeSandbox(sandboxId: string): Promise<void> {
   }
 }
 
-// === Route handler: ALL /:sandboxId/:port/* ===
+// === Core Daytona proxy function ================================================
 //
-// Zero-overhead proxy with auto-wake:
-// - Happy path (sandbox alive): single fetch, no extra API calls
-// - Sandbox down: connection error -> wake sandbox -> retry up to 2 more times
+// Exported so index.ts can call it directly in dual-provider mode.
+// Handles ownership verification, Daytona preview link resolution,
+// auto-wake retry, CORS injection — the full Daytona proxy pipeline.
 //
+// Parameters mirror what the route handler extracts from the Hono context.
 
-
-preview.all('/:sandboxId/:port/*', async (c) => {
-  const sandboxId = c.req.param('sandboxId');
-  const portStr = c.req.param('port');
-  const port = parseInt(portStr, 10);
-
-  if (isNaN(port) || port < 1 || port > 65535) {
-    throw new HTTPException(400, { message: `Invalid port: ${portStr}` });
-  }
-
-  const userId = c.get('userId') as string;
-
+export async function proxyToDaytona(
+  sandboxId: string,
+  port: number,
+  userId: string,
+  method: string,
+  remainingPath: string,
+  queryString: string,
+  incomingHeaders: Headers,
+  body: ArrayBuffer | undefined,
+  origin: string,
+): Promise<Response> {
   // 1. Verify ownership (cached after first check)
   const allowed = await verifyOwnership(sandboxId, userId);
   if (!allowed) {
-    throw new HTTPException(403, { message: "Not authorized to access this sandbox, userId: " + userId + ", sandboxId: " + sandboxId });
+    throw new HTTPException(403, {
+      message: `Not authorized to access this sandbox, userId: ${userId}, sandboxId: ${sandboxId}`,
+    });
   }
 
-  // 2. Read body once up front (needed across retries)
-  const method = c.req.method;
-  let body: ArrayBuffer | undefined;
-  if (method !== 'GET' && method !== 'HEAD') {
-    body = await c.req.raw.clone().arrayBuffer();
-  }
-
-  // 3. Build path & query (invariant across retries)
-  // c.req.url includes the full mount prefix (e.g. /v1/preview/{sandboxId}/{port}/agent)
-  // so we use indexOf instead of startsWith to find /{sandboxId}/{port} anywhere in the path
-  const fullPath = new URL(c.req.url).pathname;
-  const prefixPattern = `/${sandboxId}/${portStr}`;
-  const prefixIndex = fullPath.indexOf(prefixPattern);
-  const remainingPath = prefixIndex !== -1
-    ? fullPath.slice(prefixIndex + prefixPattern.length) || '/'
-    : '/';
-  const upstreamUrl = new URL(c.req.url);
-  upstreamUrl.searchParams.delete('token');
-  const queryString = upstreamUrl.search;
-
-  // 4. Proxy with auto-wake retry
+  // 2. Proxy with auto-wake retry
   const MAX_RETRIES = 3;
   const RETRY_DELAYS_MS = [2000, 5000, 8000]; // progressive delays to let sandbox boot
   let wakeTriggered = false;
@@ -204,7 +215,7 @@ preview.all('/:sandboxId/:port/*', async (c) => {
 
       // Build forwarding headers
       const headers = new Headers();
-      for (const [key, value] of c.req.raw.headers.entries()) {
+      for (const [key, value] of incomingHeaders.entries()) {
         const lower = key.toLowerCase();
         if (lower === 'host' || lower === 'authorization') continue;
         headers.set(key, value);
@@ -256,9 +267,8 @@ preview.all('/:sandboxId/:port/*', async (c) => {
         }
         // Not a Daytona stopped error -- pass through
         const errHeaders = new Headers(upstream.headers);
-        const errOrigin = c.req.header('Origin') || '';
-        if (errOrigin) {
-          errHeaders.set('Access-Control-Allow-Origin', errOrigin);
+        if (origin) {
+          errHeaders.set('Access-Control-Allow-Origin', origin);
           errHeaders.set('Access-Control-Allow-Credentials', 'true');
         }
         return new Response(bodyText, {
@@ -271,7 +281,6 @@ preview.all('/:sandboxId/:port/*', async (c) => {
       // Got an HTTP response -> sandbox is alive, pass it through
       // Inject CORS headers since the raw upstream response won't have them
       const respHeaders = new Headers(upstream.headers);
-      const origin = c.req.header('Origin') || '';
       if (origin) {
         respHeaders.set('Access-Control-Allow-Origin', origin);
         respHeaders.set('Access-Control-Allow-Credentials', 'true');
@@ -308,6 +317,51 @@ preview.all('/:sandboxId/:port/*', async (c) => {
   throw new HTTPException(503, {
     message: 'Sandbox is waking up. Please retry in a few seconds.',
   });
+}
+
+// === Route handler: ALL /:sandboxId/:port/* ===
+//
+// Zero-overhead proxy with auto-wake:
+// - Happy path (sandbox alive): single fetch, no extra API calls
+// - Sandbox down: connection error -> wake sandbox -> retry up to 2 more times
+//
+// Thin wrapper around proxyToDaytona() — extracts params from Hono context.
+
+preview.all('/:sandboxId/:port/*', async (c) => {
+  const sandboxId = c.req.param('sandboxId');
+  const portStr = c.req.param('port');
+  const port = parseInt(portStr, 10);
+
+  if (isNaN(port) || port < 1 || port > 65535) {
+    throw new HTTPException(400, { message: `Invalid port: ${portStr}` });
+  }
+
+  const userId = c.get('userId') as string;
+
+  // Read body once up front (needed across retries)
+  const method = c.req.method;
+  let body: ArrayBuffer | undefined;
+  if (method !== 'GET' && method !== 'HEAD') {
+    body = await c.req.raw.clone().arrayBuffer();
+  }
+
+  // Build path & query
+  const fullPath = new URL(c.req.url).pathname;
+  const prefixPattern = `/${sandboxId}/${portStr}`;
+  const prefixIndex = fullPath.indexOf(prefixPattern);
+  const remainingPath = prefixIndex !== -1
+    ? fullPath.slice(prefixIndex + prefixPattern.length) || '/'
+    : '/';
+  const upstreamUrl = new URL(c.req.url);
+  upstreamUrl.searchParams.delete('token');
+  const queryString = upstreamUrl.search;
+
+  const origin = c.req.header('Origin') || '';
+
+  return proxyToDaytona(
+    sandboxId, port, userId, method, remainingPath, queryString,
+    c.req.raw.headers, body, origin,
+  );
 });
 
 // Also handle requests without trailing path (e.g. /:sandboxId/:port)

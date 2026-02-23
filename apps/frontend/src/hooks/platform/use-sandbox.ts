@@ -55,8 +55,11 @@ function registerSandboxServer(sandbox: SandboxInfo) {
     mappedPorts: extractMappedPorts(sandbox),
   });
 
-  // Auto-switch if the user hasn't manually selected anything
-  if (!store.userSelected && (!previousActiveId || previousActiveId === 'default')) {
+  // Auto-switch if the user hasn't manually selected a server, or if there's
+  // no active server (e.g. after rehydration cleared stale managed entries).
+  const shouldAutoSwitch = !store.userSelected || !previousActiveId ||
+    !store.servers.some((s: any) => s.id === previousActiveId);
+  if (shouldAutoSwitch) {
     store.setActiveServer(entry.id, { auto: true });
     useTabStore.getState().swapForServer(entry.id, previousActiveId);
   }

@@ -119,19 +119,50 @@ app.post('/v1/prewarm', (c) => {
   return c.json({ success: true });
 });
 
-// GET /v1/accounts — returns user's accounts (Basejump-compatible shape).
-// Requires Supabase JWT auth. Queries basejump.account_user if available.
+// GET /v1/accounts — returns user's accounts.
+// Dual-read: kortix.account_members first, falls back to basejump.account_user.
 app.get('/v1/accounts', supabaseAuth, async (c: any) => {
   const userId = c.get('userId') as string;
   const userEmail = c.get('userEmail') as string;
 
-  try {
-    const { eq } = await import('drizzle-orm');
-    const { accountUser } = await import('@kortix/db');
-    const { db } = await import('./shared/db');
+  const { eq } = await import('drizzle-orm');
+  const { accountMembers, accounts, accountUser } = await import('@kortix/db');
+  const { db } = await import('./shared/db');
 
-    // Query basejump.account_user for this user's memberships
+  // 1. Try kortix.account_members (new table)
+  try {
     const memberships = await db
+      .select({
+        accountId: accountMembers.accountId,
+        accountRole: accountMembers.accountRole,
+        name: accounts.name,
+        personalAccount: accounts.personalAccount,
+        createdAt: accounts.createdAt,
+        updatedAt: accounts.updatedAt,
+      })
+      .from(accountMembers)
+      .innerJoin(accounts, eq(accountMembers.accountId, accounts.accountId))
+      .where(eq(accountMembers.userId, userId));
+
+    if (memberships.length > 0) {
+      return c.json(memberships.map(m => ({
+        account_id: m.accountId,
+        name: m.name || userEmail || 'User',
+        slug: m.accountId.slice(0, 8),
+        personal_account: m.personalAccount,
+        created_at: m.createdAt?.toISOString() ?? new Date().toISOString(),
+        updated_at: m.updatedAt?.toISOString() ?? new Date().toISOString(),
+        account_role: m.accountRole || 'owner',
+        is_primary_owner: m.accountRole === 'owner',
+      })));
+    }
+  } catch {
+    // Table doesn't exist yet — continue to basejump fallback
+  }
+
+  // 2. Fall back to basejump.account_user (legacy, cloud prod)
+  try {
+    const legacyMemberships = await db
       .select({
         accountId: accountUser.accountId,
         accountRole: accountUser.accountRole,
@@ -139,8 +170,8 @@ app.get('/v1/accounts', supabaseAuth, async (c: any) => {
       .from(accountUser)
       .where(eq(accountUser.userId, userId));
 
-    if (memberships.length > 0) {
-      return c.json(memberships.map(m => ({
+    if (legacyMemberships.length > 0) {
+      return c.json(legacyMemberships.map(m => ({
         account_id: m.accountId,
         name: userEmail || 'User',
         slug: m.accountId.slice(0, 8),
@@ -152,10 +183,10 @@ app.get('/v1/accounts', supabaseAuth, async (c: any) => {
       })));
     }
   } catch {
-    // basejump schema doesn't exist — fall through to default
+    // basejump doesn't exist — continue to fallback
   }
 
-  // Fallback: return the userId as a personal account
+  // 3. No memberships anywhere — return userId as personal account
   return c.json([
     {
       account_id: userId,
