@@ -105,6 +105,43 @@ export interface ChannelPlatformUser {
   avatar?: string;
 }
 
+// ─── Accounts & Members ─────────────────────────────────────────────────────
+// Replaces basejump.account_user. Fully kortix-native.
+
+export const accountRoleEnum = kortixSchema.enum('account_role', [
+  'owner',
+  'admin',
+  'member',
+]);
+
+export const accounts = kortixSchema.table(
+  'accounts',
+  {
+    accountId: uuid('account_id').defaultRandom().primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    personalAccount: boolean('personal_account').default(true).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
+export const accountMembers = kortixSchema.table(
+  'account_members',
+  {
+    userId: uuid('user_id').notNull(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.accountId, { onDelete: 'cascade' }),
+    accountRole: accountRoleEnum('account_role').default('owner').notNull(),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_account_members_user_id').on(table.userId),
+    index('idx_account_members_account_id').on(table.accountId),
+    uniqueIndex('idx_account_members_user_account').on(table.userId, table.accountId),
+  ],
+);
+
 export const sandboxes = kortixSchema.table(
   'sandboxes',
   {
@@ -442,7 +479,11 @@ export const serverEntries = kortixSchema.table(
   ],
 );
 
-export const sandboxesRelations = relations(sandboxes, ({ many }) => ({
+export const sandboxesRelations = relations(sandboxes, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [sandboxes.accountId],
+    references: [accounts.accountId],
+  }),
   triggers: many(triggers),
   executions: many(executions),
   deployments: many(deployments),
@@ -527,5 +568,19 @@ export const sandboxIntegrationsRelations = relations(sandboxIntegrations, ({ on
   integration: one(integrations, {
     fields: [sandboxIntegrations.integrationId],
     references: [integrations.integrationId],
+  }),
+}));
+
+// ─── Account Relations ──────────────────────────────────────────────────────
+
+export const accountsRelations = relations(accounts, ({ many }) => ({
+  members: many(accountMembers),
+  sandboxes: many(sandboxes),
+}));
+
+export const accountMembersRelations = relations(accountMembers, ({ one }) => ({
+  account: one(accounts, {
+    fields: [accountMembers.accountId],
+    references: [accounts.accountId],
   }),
 }));
