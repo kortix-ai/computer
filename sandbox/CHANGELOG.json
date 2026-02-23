@@ -65,6 +65,40 @@
         "type": "fix",
         "text": "Fixed opening files from chat actions"
       }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/opencode-ai@0.6.3",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/opencode-sdk@0.6.3",
+        "target": "npm"
+      },
+      {
+        "name": "@kortix/sandbox@0.6.3",
+        "target": "npm"
+      },
+      {
+        "name": "v0.6.3",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.6.3",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.6.3",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.6.3",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.6.3",
+        "target": "docker-hub"
+      }
     ]
   },
   {
