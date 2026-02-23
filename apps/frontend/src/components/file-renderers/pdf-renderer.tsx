@@ -76,7 +76,6 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
   }
 
   function onDocumentLoadError(err: Error): void {
-    console.error('PDF load error:', err, '| URL:', url);
     setError(err.message || 'Failed to load PDF');
     setIsLoading(false);
   }
