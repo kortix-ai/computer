@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Streamdown } from 'streamdown';
-import { Check, Copy, ExternalLink, Globe } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Globe, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 import { codeToHtml } from 'shiki';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,9 @@ import { isMermaidCode } from '@/lib/mermaid-utils';
 import { autoLinkUrls } from '@kortix/shared';
 import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
 import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from '@/stores/server-store';
-import { proxyLocalhostUrl, parseLocalhostUrl } from '@/lib/utils/sandbox-url';
+import { proxyLocalhostUrl, parseLocalhostUrl, toInternalUrl } from '@/lib/utils/sandbox-url';
+import { openTabAndNavigate } from '@/stores/tab-store';
+import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-url';
 
 // Helper to check if a URL is internal (same origin)
 function isInternalUrl(href: string | undefined): boolean {
@@ -43,6 +45,203 @@ function handleHashClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// InlineLocalhostPreview — mini preview card rendered inside markdown text
+// ---------------------------------------------------------------------------
+
+/**
+ * A compact, inline preview widget for localhost URLs detected in markdown.
+ * Shows the URL chip at the top and a small iframe preview below it.
+ * Clicking the chip or the iframe overlay opens the full preview tab.
+ */
+function InlineLocalhostPreview({
+  port,
+  path,
+  proxyUrl,
+}: {
+  port: number;
+  path: string;
+  proxyUrl: string;
+}) {
+  const authenticatedUrl = useAuthenticatedPreviewUrl(proxyUrl);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const internalUrl = toInternalUrl(port, path);
+  const tabId = `preview:${port}`;
+  const tabHref = `/preview/${port}`;
+
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleLoad = useCallback(() => {
+    clearLoadTimeout();
+    setIsLoading(false);
+  }, [clearLoadTimeout]);
+
+  const handleError = useCallback(() => {
+    clearLoadTimeout();
+    setIsLoading(false);
+    setHasError(true);
+  }, [clearLoadTimeout]);
+
+  const handleRefresh = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsLoading(true);
+    setHasError(false);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  // Fallback: cross-origin iframes may not fire onLoad. Clear loading after 5s.
+  useEffect(() => {
+    if (!isLoading) return;
+    clearLoadTimeout();
+    loadTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false);
+    }, 5000);
+    return clearLoadTimeout;
+  }, [isLoading, refreshKey, clearLoadTimeout]);
+
+  const navigateToPreviewTab = useCallback(() => {
+    openTabAndNavigate({
+      id: tabId,
+      title: `localhost:${port}`,
+      type: 'preview',
+      href: tabHref,
+      metadata: {
+        url: proxyUrl,
+        port,
+        originalUrl: internalUrl,
+        path,
+      },
+    });
+  }, [tabId, port, tabHref, proxyUrl, internalUrl, path]);
+
+  const [expanded, setExpanded] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const handleToggleExpand = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded((v) => !v);
+  }, []);
+
+  const handleToggleCollapse = useCallback(() => {
+    setCollapsed((v) => !v);
+  }, []);
+
+  return (
+    <div className="my-3">
+      <div
+        className={cn(
+          'group/preview relative rounded-xl border border-border/50 bg-muted/20 overflow-hidden',
+          'transition-all duration-200 hover:border-border/80 hover:bg-muted/30',
+        )}
+      >
+        {/* Header bar — clicking it collapses/expands the preview */}
+        <div
+          className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
+          onClick={handleToggleCollapse}
+        >
+          {collapsed ? (
+            <ChevronRight className="size-3.5 flex-shrink-0 text-muted-foreground/60" />
+          ) : (
+            <ChevronDown className="size-3.5 flex-shrink-0 text-muted-foreground/60" />
+          )}
+          <Globe className="size-3.5 flex-shrink-0 text-primary" />
+          <span className="text-xs font-medium text-foreground tabular-nums">
+            localhost:{port}
+          </span>
+          {path !== '/' && (
+            <span className="text-xs text-muted-foreground font-mono truncate">
+              {path}
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-0.5">
+            {!collapsed && (
+              <>
+                <button
+                  onClick={handleRefresh}
+                  className="p-1 rounded cursor-pointer hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className={cn('h-3 w-3', isLoading && 'animate-spin')} />
+                </button>
+                <button
+                  onClick={handleToggleExpand}
+                  className="p-1 rounded cursor-pointer hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  title={expanded ? 'Collapse' : 'Expand'}
+                >
+                  {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                </button>
+              </>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); navigateToPreviewTab(); }}
+              className="p-1 rounded cursor-pointer hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              title="Open in preview tab"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Iframe preview — hidden when collapsed */}
+        {!collapsed && (
+          <div
+            className={cn(
+              'relative border-t border-border/30 transition-all duration-200',
+              expanded ? 'h-[520px]' : 'h-[300px]',
+            )}
+          >
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <span className="text-[11px]">Loading preview...</span>
+                </div>
+              </div>
+            )}
+            {hasError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+                <div className="text-center text-muted-foreground">
+                  <p className="text-xs">Failed to load preview</p>
+                  <button
+                    onClick={handleRefresh}
+                    className="text-xs text-primary hover:underline mt-1 cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Clickable overlay on top of iframe to open preview tab */}
+            <div
+              className="absolute inset-0 z-[5] cursor-pointer"
+              onClick={navigateToPreviewTab}
+            />
+            <iframe
+              key={refreshKey}
+              src={authenticatedUrl}
+              title={`Preview :${port}`}
+              className="w-full h-full border-0 bg-white pointer-events-none"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
+              onLoad={handleLoad}
+              onError={handleError}
+              tabIndex={-1}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Copy button component for code blocks
@@ -565,24 +764,14 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
         );
       }
 
-      // Render localhost links as styled preview chips
+      // Render localhost links as inline preview cards with mini iframe
       if (localhostParsed) {
         return (
-          <a
-            href={resolvedHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
-              "bg-primary/10 border border-primary/20",
-              "text-primary text-xs font-medium no-underline",
-              "hover:bg-primary/15 hover:border-primary/30 transition-colors duration-150",
-            )}
-          >
-            <Globe className="size-3.5 flex-shrink-0" />
-            <span>localhost:{localhostParsed.port}</span>
-            <ExternalLink className="size-3 flex-shrink-0 opacity-50" />
-          </a>
+          <InlineLocalhostPreview
+            port={localhostParsed.port}
+            path={localhostParsed.path}
+            proxyUrl={resolvedHref ?? href ?? ''}
+          />
         );
       }
 
