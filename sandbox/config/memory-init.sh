@@ -13,26 +13,6 @@ mkdir -p \
     "$KORTIX_DIR/sessions" \
     "$KORTIX_DIR/mem"
 
-# ── MEMORY.md ────────────────────────────────────────────────────────────────
-if [ ! -f "$KORTIX_DIR/MEMORY.md" ]; then
-    cat > "$KORTIX_DIR/MEMORY.md" << 'EOF'
-# Memory
-
-## Identity
-Kortix — autonomous AI agent with persistent memory, full Linux access, and internet connectivity.
-
-## User
-Not yet known. Awaiting first interaction.
-
-## Project
-Not yet scanned. Will populate on first workspace scan.
-
-## Scratchpad
-Memory system initialized automatically. Ready for tasks.
-EOF
-    echo "[kortix-memory] Created MEMORY.md"
-fi
-
 # ── SOUL.md ──────────────────────────────────────────────────────────────────
 if [ ! -f "$KORTIX_DIR/SOUL.md" ]; then
     cat > "$KORTIX_DIR/SOUL.md" << 'EOF'

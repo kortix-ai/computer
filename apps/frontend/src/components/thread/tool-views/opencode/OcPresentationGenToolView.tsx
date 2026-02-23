@@ -19,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
-import { useServerStore } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from '@/stores/server-store';
 import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
 
 // ============================================================================
@@ -109,17 +109,18 @@ export function OcPresentationGenToolView({
   const actionLabel = ACTION_LABELS[action] || action || 'Presentation';
   const ActionIcon = getActionIcon(action);
 
-  // Proxy-rewrite viewer URL so localhost:3210 → proxy/3210
+  // Proxy-rewrite viewer URL so localhost:3210 → subdomain URL
   const activeServer = useServerStore((s) =>
     s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
   );
-  const serverUrl = activeServer?.url || 'http://localhost:4096';
+  const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
   const mappedPorts = activeServer?.mappedPorts;
+  const subdomainOpts = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
 
   const viewerUrl = useMemo(() => {
     if (!parsed?.viewer_url) return undefined;
-    return proxyLocalhostUrl(parsed.viewer_url, serverUrl, mappedPorts);
-  }, [parsed?.viewer_url, serverUrl, mappedPorts]);
+    return proxyLocalhostUrl(parsed.viewer_url, serverUrl, mappedPorts, subdomainOpts);
+  }, [parsed?.viewer_url, serverUrl, mappedPorts, subdomainOpts]);
 
   // Subtitle
   const subtitle = useMemo(() => {

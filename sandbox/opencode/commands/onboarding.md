@@ -99,7 +99,7 @@ question({
 })
 ```
 
-Once you have a URL, **`web-search` and/or `scrape-webpage` it**. Present a tight summary of what the company does — product, industry, stage, anything relevant. This shows you actually paid attention and feeds MEMORY.md.
+Once you have a URL, **`web-search` and/or `scrape-webpage` it**. Present a tight summary of what the company does — product, industry, stage, anything relevant. This shows you actually paid attention and seeds the memory system.
 
 For users without a company (students, hobbyists, freelancers), ask what they're building or learning instead.
 
@@ -169,33 +169,51 @@ If they skipped, go straight to Phase 7.
 
 ---
 
-## Phase 7: Write MEMORY.md
+## Phase 7: Save to Memory
 
-Write a rich profile with everything from web search + conversation:
+Use `mem_save` to persist everything you learned into the observation memory system. This is the **real** memory — stored in SQLite, indexed for semantic search via LSS, and automatically injected into all future sessions.
 
-```bash
-mkdir -p /workspace/.kortix
-cat > /workspace/.kortix/MEMORY.md << 'MEMORY_EOF'
-# Core Identity
+Save **multiple focused observations** rather than one giant blob. Each `mem_save` call creates a separate searchable observation. Use descriptive titles and the right type.
 
-## User Profile
-- **Name:** [name]
-- **Role:** [title/role]
-- **Company:** [company + URL]
-- **Background:** [career summary, expertise, notable work — from web search]
-- **Goals:** [what they want from Kortix]
-- **Preferences:** [communication style, anything they mentioned]
+**Required saves (call `mem_save` for each):**
 
-## Company/Project Context
-[What the company does, product, industry, stage, team — from web search + conversation]
-
-## Key Intel
-[Social profiles, GitHub, publications, projects, anything useful discovered]
-
-## Scratchpad
-First session. Onboarding complete.
-MEMORY_EOF
+1. **User profile** — who they are:
 ```
+mem_save({
+  title: "User Profile: [Name]",
+  text: "Name: [name]. Role: [title/role]. Company: [company + URL]. Background: [career summary, expertise, notable work from web search]. Communication style: [anything noted].",
+  type: "discovery"
+})
+```
+
+2. **Company/project context** — what they work on:
+```
+mem_save({
+  title: "Company Context: [Company Name]",
+  text: "[What the company does, product, industry, stage, team — from web search + conversation. Include URL.]",
+  type: "discovery"
+})
+```
+
+3. **Goals and use cases** — what they want from Kortix:
+```
+mem_save({
+  title: "User Goals and Use Cases",
+  text: "[What they want to use Kortix for, specific needs mentioned, relevant capabilities discussed.]",
+  type: "discovery"
+})
+```
+
+4. **Key intel** (if applicable) — social profiles, GitHub, publications, anything useful:
+```
+mem_save({
+  title: "Key Intel: [Name]",
+  text: "[Social profiles, GitHub URL, publications, projects, any other useful links or facts discovered during research.]",
+  type: "discovery"
+})
+```
+
+**Why multiple saves?** Each observation is independently searchable. A future session asking "what does the user's company do?" will find the company context observation directly. One big dump is harder to search and retrieve.
 
 ---
 
@@ -231,7 +249,7 @@ mkdir -p ~/.kortix && echo "true" > ~/.kortix/.onboarding-complete
 - **Wrong person? Ask for links, research again.**
 - Do NOT ask about API keys or credentials.
 - Do NOT stack questions. One phase, one message.
-- Do NOT skip MEMORY.md.
+- Do NOT skip the `mem_save` calls. Every piece of profile data must be persisted to memory.
 - Do NOT skip the demo unless the user opts out via `question`.
 - ~5-8 exchanges total. Tight and personal.
 

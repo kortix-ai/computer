@@ -5,17 +5,22 @@
  * localhost:PORT (or 127.0.0.1:PORT) and opens it in the preview tab instead
  * of navigating the browser to an unreachable address.
  *
+ * Also intercepts clicks on already-proxied URLs (e.g. links whose href was
+ * rewritten by the markdown renderer to go through the backend preview proxy)
+ * so that they open as preview tabs instead of navigating the top-level page.
+ *
  * Mount once at the app root — it uses a single delegated listener on
  * `document` so every link in the tree is covered automatically, including
  * links rendered by tool views, JSON viewers, markdown, etc.
  */
 
 import { useEffect } from 'react';
-import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, getSubdomainOpts } from '@/stores/server-store';
 import {
   isProxiableLocalhostUrl,
   parseLocalhostUrl,
-  parseProxiedUrl,
+  proxyUrlToInternal,
+  isPreviewUrl,
   rewriteLocalhostUrl,
   toInternalUrl,
 } from '@/lib/utils/sandbox-url';
@@ -35,56 +40,67 @@ export function LocalhostLinkInterceptor() {
       const href = anchor.href; // resolved absolute URL
       if (!href) return;
 
-      // Check if this is an already-proxied URL (e.g. markdown renderer
-      // already rewrote localhost:3210 → .../proxy/3210/). If so, extract
-      // the original port and open in the preview tab without re-proxying.
-      const proxied = parseProxiedUrl(href);
-      if (proxied) {
-        e.preventDefault();
-        e.stopPropagation();
-        const internalUrl = toInternalUrl(proxied.port, proxied.path);
-        openTabAndNavigate({
-          id: `preview:${proxied.port}`,
-          title: `localhost:${proxied.port}`,
-          type: 'preview',
-          href: `/preview/${proxied.port}`,
-          metadata: { url: proxied.proxyUrl, port: proxied.port, originalUrl: internalUrl, path: proxied.path },
-        });
-        return;
-      }
-
-      if (!isProxiableLocalhostUrl(href)) return;
-
       // Never intercept links pointing at the app itself (same origin)
       try {
         if (new URL(href).origin === window.location.origin) return;
       } catch { /* not a valid URL, skip */ }
-
-      const parsed = parseLocalhostUrl(href);
-      if (!parsed) return;
-
-      const { port, path } = parsed;
 
       // Resolve the proxy URL using the active server
       const state = useServerStore.getState();
       const activeServer =
         state.servers.find((s) => s.id === state.activeServerId) ?? null;
       const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
-      const proxyUrl = rewriteLocalhostUrl(port, path, serverUrl);
+      const subdomainOpts = getSubdomainOpts();
 
-      e.preventDefault();
-      e.stopPropagation();
+      // ── Case 1: Fresh localhost:PORT URL (not yet proxied) ──
+      if (isProxiableLocalhostUrl(href)) {
+        const parsed = parseLocalhostUrl(href);
+        if (!parsed) return;
 
-      // Build the internal URL (what the user sees in the browser bar)
-      const internalUrl = toInternalUrl(port, path);
+        const { port, path } = parsed;
+        const proxyUrl = rewriteLocalhostUrl(port, path, serverUrl, subdomainOpts);
+        const internalUrl = toInternalUrl(port, path);
 
-      openTabAndNavigate({
-        id: `preview:${port}`,
-        title: `localhost:${port}`,
-        type: 'preview',
-        href: `/preview/${port}`,
-        metadata: { url: proxyUrl, port, originalUrl: internalUrl, path },
-      });
+        e.preventDefault();
+        e.stopPropagation();
+
+        openTabAndNavigate({
+          id: `preview:${port}`,
+          title: `localhost:${port}`,
+          type: 'preview',
+          href: `/preview/${port}`,
+          metadata: { url: proxyUrl, port, originalUrl: internalUrl, path },
+        });
+        return;
+      }
+
+      // ── Case 2: Already-proxied URL (subdomain or path-based) ──
+      // The href is something like http://p3210-kortix-sandbox.localhost:8008/
+      // or http://localhost:8008/v1/preview/.../proxy/3210/
+      // which would navigate the browser away from the app. Instead, open as tab.
+      if (isPreviewUrl(href)) {
+        const internal = proxyUrlToInternal(href, activeServer?.mappedPorts);
+        if (internal) {
+          const parsed = parseLocalhostUrl(internal);
+          if (parsed) {
+            const { port, path } = parsed;
+            const proxyUrl = rewriteLocalhostUrl(port, path, serverUrl, subdomainOpts);
+            const internalUrl = toInternalUrl(port, path);
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            openTabAndNavigate({
+              id: `preview:${port}`,
+              title: `localhost:${port}`,
+              type: 'preview',
+              href: `/preview/${port}`,
+              metadata: { url: proxyUrl, port, originalUrl: internalUrl, path },
+            });
+            return;
+          }
+        }
+      }
     }
 
     document.addEventListener('click', handleClick, { capture: true });

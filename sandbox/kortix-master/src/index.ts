@@ -146,6 +146,11 @@ app.route('/api/integrations', integrationsRouter)
 // Dynamic port proxy — /proxy/:port/* forwards to localhost:{port} inside the sandbox
 app.route('/proxy', proxyRouter)
 
+// File management — direct sandbox filesystem access for downloads, uploads, etc.
+// Mounted BEFORE the catch-all OpenCode proxy so it works regardless of OpenCode version.
+import filesRouter from './routes/files'
+app.route('/file', filesRouter)
+
 // Proxy all other requests to OpenCode
 app.all('*', async (c) => {
   return proxyToOpenCode(c)

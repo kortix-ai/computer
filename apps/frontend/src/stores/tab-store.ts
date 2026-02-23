@@ -129,14 +129,16 @@ export const useTabStore = create<TabState>()(
       openTab: (tabInput) => {
         const { tabs, tabOrder } = get();
 
-        // If tab already exists, update its metadata (URL may have changed) and activate it
+        // If tab already exists, update its metadata (URL may have changed) and activate it.
+        // Bump refreshCounter so preview tabs know to reload the iframe.
         if (tabs[tabInput.id]) {
           const existing = tabs[tabInput.id];
+          const prevCounter = (existing.metadata?.refreshCounter as number) || 0;
           const merged: Tab = {
             ...existing,
             ...tabInput,
             openedAt: existing.openedAt,
-            metadata: { ...existing.metadata, ...tabInput.metadata },
+            metadata: { ...existing.metadata, ...tabInput.metadata, refreshCounter: prevCounter + 1 },
           };
           set({
             tabs: { ...tabs, [tabInput.id]: merged },
@@ -396,7 +398,7 @@ export const useTabStore = create<TabState>()(
 // ============================================================================
 
 /** Tab types rendered via pre-mounted CSS show/hide (use pushState, not router). */
-const PRE_MOUNTED_TAB_TYPES: ReadonlySet<TabType> = new Set(['session', 'file', 'preview', 'terminal']);
+const PRE_MOUNTED_TAB_TYPES: ReadonlySet<TabType> = new Set(['session', 'file', 'preview', 'terminal', 'settings', 'page', 'project', 'dashboard']);
 
 /**
  * Open (or activate) a tab AND navigate the browser to it.

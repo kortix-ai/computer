@@ -17,17 +17,17 @@ import { proxyLocalhostUrl, parseLocalhostUrl } from '@/lib/utils/sandbox-url';
 // Helper to check if a URL is internal (same origin)
 function isInternalUrl(href: string | undefined): boolean {
   if (!href) return false;
-  
+
   // External URLs (http/https/mailto/tel)
   if (href.startsWith('http://') || href.startsWith('https://')) {
     return false;
   }
-  
+
   // Protocol links (mailto, tel, etc.)
   if (href.includes('://')) {
     return false;
   }
-  
+
   // Internal links (starting with / or #)
   return href.startsWith('/') || href.startsWith('#');
 }
@@ -38,7 +38,7 @@ function handleHashClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
     e.preventDefault();
     const targetId = href.substring(1);
     const element = document.getElementById(targetId);
-    
+
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -334,7 +334,7 @@ function CodeBlock({ children, isStreaming }: { children: React.ReactNode; isStr
 
   return (
     <div className="relative group my-5">
-      <pre 
+      <pre
         ref={preRef}
         className={cn(
           "p-4 rounded-xl overflow-x-auto",
@@ -437,10 +437,10 @@ export interface UnifiedMarkdownProps {
 
 /**
  * UNIFIED MARKDOWN RENDERER
- * 
+ *
  * Single source of truth for all markdown rendering across the application.
  * Optimized for Kortix brand with Vercel-level UX/UI polish.
- * 
+ *
  * Design principles:
  * - Clean, minimal aesthetic
  * - Consistent spacing rhythm
@@ -457,11 +457,12 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
     s.servers.find((srv) => srv.id === s.activeServerId) ?? null,
   );
   const serverUrl = activeServer?.url || getActiveOpenCodeUrl();
+  const subdomainOpts = useMemo(() => deriveSubdomainOpts(activeServer), [activeServer]);
 
   /** Rewrite a localhost:PORT URL through the sandbox proxy, or pass through. */
   const proxy = useCallback(
-    (url: string | undefined) => proxyLocalhostUrl(url, serverUrl),
-    [serverUrl],
+    (url: string | undefined) => proxyLocalhostUrl(url, serverUrl, undefined, subdomainOpts),
+    [serverUrl, subdomainOpts],
   );
 
   // Memoize the Streamdown components object so that Block's React.memo
@@ -471,7 +472,6 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   // ALL blocks re-render → browser Selection/Range destroyed → text unselected.
   // With memoized components, only the LAST block (whose content actually changed)
   // re-renders, while completed blocks keep their DOM intact, preserving selection.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const components = useMemo(() => ({
     // ═══════════════════════════════════════════════════════════════
     // HEADINGS - Clean hierarchy with proper weight distribution
@@ -793,7 +793,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   }), [isStreaming, proxy]);
 
   const safeContent = typeof content === 'string' ? content : (content ? String(content) : '');
-  
+
   if (!safeContent) {
     return (
       <div className={cn('text-muted-foreground text-sm', className)}>
@@ -806,7 +806,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
   const processedContent = autoLinkUrls(safeContent);
 
   return (
-    <div 
+    <div
       className={cn('kortix-markdown', isStreaming && 'streaming-active', className)}
       data-streaming={isStreaming ? 'true' : 'false'}
     >

@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  Compass,
   FolderTree,
   TerminalSquare,
   Monitor,
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/sidebar-right-provider';
 import { SidebarFileBrowser } from '@/components/sidebar/sidebar-explorer';
 import { useFilesStore } from '@/features/files/store/files-store';
-import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl, getSubdomainOpts } from '@/stores/server-store';
 import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
@@ -77,10 +78,11 @@ export function SidebarRight() {
    */
   const openSandboxServiceTab = useCallback(
     (containerPort: string, title: string) => {
+      const subdomainOpts = getSubdomainOpts();
       // Prefer provider-aware URL: /preview/{sandboxId}/{port}
       const url = activeServer
-        ? (getDirectPortUrl(activeServer, containerPort) || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl))
-        : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl);
+        ? (getDirectPortUrl(activeServer, containerPort) || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts))
+        : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts);
 
       const tabId = `preview:${containerPort}`;
       const tabHref = `/preview/${containerPort}`;
@@ -107,6 +109,17 @@ export function SidebarRight() {
   const handleOpenAgentBrowser = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');
   }, [openSandboxServiceTab]);
+
+  /** Open a blank internal browser tab for navigating any sandbox service. */
+  const handleOpenInternalBrowser = useCallback(() => {
+    openTabAndNavigate({
+      id: 'preview:browser',
+      title: 'Browser',
+      type: 'preview',
+      href: '/preview/browser',
+      metadata: { url: '', port: 0, originalUrl: '', path: '/' },
+    });
+  }, []);
 
   const handleOpenSecrets = useCallback(() => {
     openTabAndNavigate(
@@ -281,6 +294,19 @@ export function SidebarRight() {
                   Agent Browser
                 </TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleOpenInternalBrowser}
+                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                  >
+                    <Compass className="h-[16px] w-[16px]" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Internal Browser
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* --- Expanded content --- */}
@@ -327,6 +353,13 @@ export function SidebarRight() {
                 >
                   <Globe className="h-[16px] w-[16px] flex-shrink-0" />
                   <span>Agent Browser</span>
+                </button>
+                <button
+                  onClick={handleOpenInternalBrowser}
+                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                >
+                  <Compass className="h-[16px] w-[16px] flex-shrink-0" />
+                  <span>Internal Browser</span>
                 </button>
               </nav>
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   X,
@@ -561,7 +561,6 @@ function TabItem({
 // ============================================================================
 
 export function TabBar() {
-  const router = useRouter();
   const pathname = usePathname();
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -783,25 +782,18 @@ export function TabBar() {
     [getPendingCount, statuses],
   );
 
-  // Tab switching: update URL via history.pushState for session/file tabs (no re-mount),
-  // fall back to router.push for non-session tabs.
+  // Tab switching: all types are pre-mounted, so always use pushState (no re-mount).
   const handleActivate = useCallback(
     (tabId: string, href: string) => {
-      const tab = useTabStore.getState().tabs[tabId];
       setActiveTab(tabId);
-      if (tab?.type === 'session' || tab?.type === 'file' || tab?.type === 'preview' || tab?.type === 'terminal') {
-        // pushState changes the URL without triggering a Next.js navigation,
-        // so the pre-mounted session/file/preview/terminal component just becomes visible instantly.
-        window.history.pushState(null, '', href);
-      } else {
-        router.push(href);
-      }
+      // All tab types are pre-mounted — use pushState to avoid Next.js unmount/remount.
+      window.history.pushState(null, '', href);
       // Focus the textarea in the activated tab (session or dashboard)
       requestAnimationFrame(() => {
         window.dispatchEvent(new CustomEvent('focus-session-textarea'));
       });
     },
-    [setActiveTab, router]
+    [setActiveTab]
   );
 
   const handleClose = useCallback(
@@ -812,17 +804,14 @@ export function TabBar() {
       if (nextTabId) {
         const nextTab = useTabStore.getState().tabs[nextTabId];
         if (nextTab) {
-          if (nextTab.type === 'session' || nextTab.type === 'file' || nextTab.type === 'preview' || nextTab.type === 'terminal') {
-            window.history.pushState(null, '', nextTab.href);
-          } else {
-            router.push(nextTab.href);
-          }
+          // All tab types are pre-mounted — use pushState to switch without unmounting.
+          window.history.pushState(null, '', nextTab.href);
         }
       } else {
-        router.push('/dashboard');
+        window.history.pushState(null, '', '/dashboard');
       }
     },
-    [router]
+    []
   );
 
   const handleContextMenu = useCallback(
@@ -852,11 +841,11 @@ export function TabBar() {
           break;
         case 'closeAll':
           closeAllTabs();
-          router.push('/dashboard');
+          window.history.pushState(null, '', '/dashboard');
           break;
       }
     },
-    [pinTab, handleClose, closeOtherTabs, closeTabsToRight, closeAllTabs, router]
+    [pinTab, handleClose, closeOtherTabs, closeTabsToRight, closeAllTabs]
   );
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -923,14 +912,10 @@ export function TabBar() {
   // Respects user preference for modifier key (Cmd vs Ctrl)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    /** Navigate to a tab, updating URL appropriately based on tab type */
+    /** Navigate to a tab — all types are pre-mounted, so always use pushState */
     const navigateToTab = (tab: Tab) => {
       setActiveTab(tab.id);
-      if (tab.type === 'session' || tab.type === 'file' || tab.type === 'preview' || tab.type === 'terminal') {
-        window.history.pushState(null, '', tab.href);
-      } else {
-        router.push(tab.href);
-      }
+      window.history.pushState(null, '', tab.href);
     };
 
     /** Switch to the tab at the given offset from the active tab (+1 = next, -1 = prev) */
@@ -958,7 +943,8 @@ export function TabBar() {
       // ── New tab: Modifier + T ────────────────────────────────────────
       if (modHeld && !modOther && !e.shiftKey && !e.altKey && e.code === 'KeyT') {
         e.preventDefault();
-        router.push('/dashboard');
+        setActiveTab('page:/dashboard');
+        window.history.pushState(null, '', '/dashboard');
         return;
       }
 
@@ -1033,7 +1019,7 @@ export function TabBar() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveTab, router, handleClose]);
+  }, [setActiveTab, handleClose]);
 
   // Scroll active tab into view when it changes
   useEffect(() => {
@@ -1074,8 +1060,9 @@ export function TabBar() {
   }, [orderedTabs]);
 
   const handleNewTab = useCallback(() => {
-    router.push('/dashboard');
-  }, [router]);
+    setActiveTab(DASHBOARD_TAB_ID);
+    window.history.pushState(null, '', '/dashboard');
+  }, [setActiveTab]);
 
   // Always render the bar so the bg-sidebar strip above the content curve is consistent
   if (orderedTabs.length === 0) {

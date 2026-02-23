@@ -503,5 +503,76 @@ export function getActiveServerMappedPort(containerPort: string): string | null 
   return server?.mappedPorts?.[containerPort] ?? null;
 }
 
+// ── Subdomain proxy helpers ──────────────────────────────────────────────────
+
+/**
+ * Extract the backend port from NEXT_PUBLIC_BACKEND_URL (e.g. 8008 from
+ * "http://localhost:8008/v1"). Used for subdomain URL construction:
+ *   http://p{port}-{sandboxId}.localhost:{backendPort}/
+ */
+export function getBackendPort(): number {
+  try {
+    const url = new URL(BACKEND_URL);
+    return parseInt(url.port, 10) || (url.protocol === 'https:' ? 443 : 80);
+  } catch {
+    return 8008; // fallback for local dev
+  }
+}
+
+/**
+ * Get the sandboxId for the active server.
+ * - Local mode: defaults to 'kortix-sandbox' (the Docker container name)
+ * - Cloud mode: uses the server's sandboxId from the store
+ */
+export function getActiveSandboxId(): string {
+  const server = getActiveServer();
+  return server?.sandboxId || 'kortix-sandbox';
+}
+
+/**
+ * Whether the active server is using Daytona (cloud) mode.
+ * Cloud mode has its own preview URL scheme — subdomain routing is only for local.
+ */
+export function isCloudMode(): boolean {
+  const server = getActiveServer();
+  return server?.provider === 'daytona';
+}
+
+/**
+ * Get SubdomainUrlOptions for the active server.
+ * Returns { sandboxId, backendPort } for subdomain URL construction.
+ * Returns undefined for cloud/Daytona mode (uses its own URL scheme).
+ *
+ * Use in non-React contexts: call directly (reads from store snapshot).
+ */
+export function getSubdomainOpts(): { sandboxId: string; backendPort: number } | undefined {
+  if (isCloudMode()) return undefined;
+  return {
+    sandboxId: getActiveSandboxId(),
+    backendPort: getBackendPort(),
+  };
+}
+
+/**
+ * Derive SubdomainUrlOptions from a ServerEntry (pure function).
+ *
+ * Use inside useMemo with [server?.provider, server?.sandboxId] as deps
+ * to satisfy react-hooks/exhaustive-deps:
+ *
+ *   const subdomainOpts = useMemo(
+ *     () => deriveSubdomainOpts(activeServer),
+ *     [activeServer],
+ *   );
+ */
+export function deriveSubdomainOpts(
+  server: ServerEntry | null | undefined,
+): { sandboxId: string; backendPort: number } | undefined {
+  if (server?.provider === 'daytona') return undefined;
+  return {
+    sandboxId: server?.sandboxId || 'kortix-sandbox',
+    backendPort: getBackendPort(),
+  };
+}
+
 /** Stable server IDs for managed sandbox entries */
 export { DEFAULT_SERVER_ID, CLOUD_SANDBOX_SERVER_ID };

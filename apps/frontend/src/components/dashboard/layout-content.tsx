@@ -146,6 +146,11 @@ const TerminalTabContent = lazy(() =>
 		default: mod.TerminalTabContent,
 	})),
 );
+const PageTabContent = lazy(() =>
+	import("@/components/tabs/page-tab-content").then((mod) => ({
+		default: mod.PageTabContent,
+	})),
+);
 
 // Skeleton shell that renders immediately for FCP
 function DashboardSkeleton() {
@@ -189,12 +194,13 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
 	const fileTabIds = tabOrder.filter((id) => tabs[id]?.type === "file");
 	const previewTabIds = tabOrder.filter((id) => tabs[id]?.type === "preview");
 	const terminalTabIds = tabOrder.filter((id) => tabs[id]?.type === "terminal");
+	const pageTabIds = tabOrder.filter((id) => {
+		const t = tabs[id]?.type;
+		return t === "settings" || t === "page" || t === "project" || t === "dashboard";
+	});
 	const activeTab = activeTabId ? tabs[activeTabId] : null;
-	const showingMountedTab =
-		activeTab?.type === "session" ||
-		activeTab?.type === "file" ||
-		activeTab?.type === "preview" ||
-		activeTab?.type === "terminal";
+	// All tab types are now pre-mounted — route-based children are never shown
+	const showingMountedTab = !!activeTab;
 
 	return (
 		<div
@@ -278,8 +284,26 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
 				);
 			})}
 
-			{/* Route-based children (dashboard, settings, etc.)
-          Hidden when a pre-mounted tab is active. */}
+			{/* Page/settings/dashboard tabs — pre-mounted, shown/hidden via CSS */}
+			{pageTabIds.map((id) => {
+				const tab = tabs[id];
+				if (!tab) return null;
+				return (
+					<div
+						key={id}
+						className={cn(
+							"absolute inset-0 flex flex-col overflow-y-auto",
+							id !== activeTabId && "hidden",
+						)}
+					>
+						<Suspense fallback={null}>
+							<PageTabContent href={tab.href} />
+						</Suspense>
+					</div>
+				);
+			})}
+
+			{/* Route-based children (fallback — hidden since all types are pre-mounted) */}
 			<div
 				className={cn(
 					"flex-1 min-h-0 flex flex-col overflow-y-auto",

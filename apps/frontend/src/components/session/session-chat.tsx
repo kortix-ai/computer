@@ -2961,18 +2961,25 @@ export function SessionChat({
 		return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
 	}, [messageCount, sessionId, scrollToAbsoluteBottom]);
 
-	// Scroll to the bottom when switching back to this tab.
-	// Uses smoothScrollToAbsoluteBottom so short responses show the user
-	// bubble near the top (spacer) and long responses show the conversation end.
+	// Scroll to the bottom when switching back to this tab — but only if
+	// new messages arrived while away.
 	const activeTabId = useTabStore((s) => s.activeTabId);
 	const isActiveTab = activeTabId === sessionId;
 	const wasActiveRef = useRef(isActiveTab);
+	const messageCountWhenLeftRef = useRef(messageCount);
 	useEffect(() => {
 		const was = wasActiveRef.current;
 		wasActiveRef.current = isActiveTab;
+		if (was && !isActiveTab) {
+			// Leaving this tab — snapshot message count
+			messageCountWhenLeftRef.current = messageCount;
+		}
 		if (!was && isActiveTab && messageCount > 0) {
-			const t = setTimeout(smoothScrollToAbsoluteBottom, 100);
-			return () => clearTimeout(t);
+			// Returning to this tab — only scroll if new messages arrived
+			if (messageCount !== messageCountWhenLeftRef.current) {
+				const t = setTimeout(smoothScrollToAbsoluteBottom, 100);
+				return () => clearTimeout(t);
+			}
 		}
 	}, [isActiveTab, messageCount, smoothScrollToAbsoluteBottom]);
 

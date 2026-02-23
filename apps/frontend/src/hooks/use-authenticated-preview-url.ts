@@ -4,30 +4,28 @@ import { useEffect, useState } from 'react';
 import { getAuthToken } from '@/lib/auth-token';
 
 /**
- * Appends the current Supabase JWT as a `?token=` query parameter
- * to a preview proxy URL so that the backend `supabaseAuthWithQueryParam`
- * middleware can authenticate iframe requests.
+ * Injects the current Supabase JWT as a `?token=` query parameter on preview
+ * proxy URLs so the backend can authenticate the initial iframe load.
  *
- * Only injects the token for cloud preview URLs (those containing `/preview/`).
- * Local/direct URLs are returned unchanged.
+ * On the first successful request, the backend sets a `__preview_session`
+ * host-only cookie so all subsequent sub-resource requests (CSS, JS, images,
+ * fonts, WebSocket upgrades, etc.) are authenticated via cookie automatically
+ * — no ?token= needed on every URL.
  *
- * The token is refreshed every 30 seconds to avoid expiry issues.
+ * This works for both:
+ *   - Subdomain URLs: http://p3210-kortix-sandbox.localhost:8008/?token=JWT
+ *   - Path-based URLs: http://localhost:8008/v1/preview/.../proxy/3210/?token=JWT
+ *
+ * The token is refreshed every 30 seconds to stay ahead of JWT expiry.
  *
  * @param previewUrl - The proxy URL for the preview iframe
- * @returns The URL with `?token=<jwt>` appended (or the original URL if local)
+ * @returns The URL with `?token=<jwt>` appended
  */
 export function useAuthenticatedPreviewUrl(previewUrl: string): string {
   const [authenticatedUrl, setAuthenticatedUrl] = useState(previewUrl);
 
   useEffect(() => {
     if (!previewUrl) {
-      setAuthenticatedUrl(previewUrl);
-      return;
-    }
-
-    // Only inject token for cloud preview proxy URLs
-    const isCloudPreview = previewUrl.includes('/preview/');
-    if (!isCloudPreview) {
       setAuthenticatedUrl(previewUrl);
       return;
     }

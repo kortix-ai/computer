@@ -10,7 +10,7 @@
 
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
-import { getAuthToken } from '@/lib/auth-token';
+import { getAuthToken, authenticatedFetch } from '@/lib/auth-token';
 import type {
   FileContent,
   FileNode,
@@ -56,27 +56,67 @@ export async function readFile(filePath: string): Promise<FileContent> {
 }
 
 // ---------------------------------------------------------------------------
-// Binary helpers — decode readFile() response into Blob / trigger download
+// Binary helpers — fetch file bytes and trigger download
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a readFile() response into a Blob.
- * Handles both base64-encoded binary and plain text content.
+ * Fetch a file as a Blob.
+ *
+ * Strategy:
+ *   1. Try the `/file/raw` endpoint (streams raw bytes — best for binary files).
+ *   2. If that 404s (older server without the route), fall back to the JSON
+ *      `/file/content` endpoint and decode from base64 / text.
+ *
+ * The JSON endpoint now returns base64-encoded content for binary files,
+ * so both paths produce correct output.
  */
 export async function readFileAsBlob(filePath: string): Promise<Blob> {
+  // ── Primary: /file/raw (binary stream) ──
+  try {
+    const baseUrl = getActiveOpenCodeUrl();
+    const rawUrl = `${baseUrl}/file/raw?path=${encodeURIComponent(filePath)}`;
+    const response = await authenticatedFetch(rawUrl);
+
+    if (response.ok) {
+      return response.blob();
+    }
+
+    // Only fall through on 404 (endpoint doesn't exist on this server).
+    // Any other error (403, 500, etc.) should be thrown immediately.
+    if (response.status !== 404) {
+      const text = await response.text().catch(() => '');
+      throw new Error(
+        `Failed to fetch file (${response.status}): ${text || response.statusText}`,
+      );
+    }
+  } catch (err) {
+    // Network errors or non-404 HTTP errors — rethrow unless it's a 404
+    // that was already handled above (the throw won't reach here).
+    // If we reach here it's a genuine network failure; fall through to
+    // the JSON endpoint as a last resort.
+    if (err instanceof Error && !err.message.includes('404')) {
+      // For non-404 errors from the raw endpoint, still try the JSON
+      // fallback — the server may be partially available.
+    }
+  }
+
+  // ── Fallback: /file/content (JSON with base64) ──
   const result = await readFile(filePath);
-  const bytes =
-    result.encoding === 'base64'
-      ? Uint8Array.from(atob(result.content), (c) => c.charCodeAt(0))
-      : new TextEncoder().encode(result.content);
-  return new Blob([bytes], {
-    type: result.mimeType || 'application/octet-stream',
+  if (result.encoding === 'base64' && result.content) {
+    const bytes = Uint8Array.from(atob(result.content), (c) => c.charCodeAt(0));
+    return new Blob([bytes], {
+      type: result.mimeType || 'application/octet-stream',
+    });
+  }
+  // Text content
+  return new Blob([result.content], {
+    type: result.mimeType || 'text/plain;charset=utf-8',
   });
 }
 
 /**
  * Download a file from the project to the user's machine.
- * Uses readFile() under the hood and triggers a browser download.
+ * Fetches via readFileAsBlob() and triggers a browser download.
  */
 export async function downloadFile(
   filePath: string,

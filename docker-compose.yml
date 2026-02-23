@@ -1,0 +1,29 @@
+# Production compose — used by deploy-api.yml CI workflow on the VPS.
+# Build from repo root: docker compose --profile backend up -d
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: apps/frontend/.env
+        required: false
+    profiles: [frontend, all]
+    restart: unless-stopped
+
+  kortix-api:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+      args:
+        SERVICE: kortix-api
+    ports:
+      - "8008:8008"
+    env_file:
+      - path: services/kortix-api/.env
+        required: false
+    profiles: [backend, all]
+    restart: unless-stopped

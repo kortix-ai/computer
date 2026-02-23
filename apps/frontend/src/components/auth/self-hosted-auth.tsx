@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Search, Globe, Image, Mic, BookOpen, Flame } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { createClient } from '@/lib/supabase/client';
 import { ProviderSettings } from '@/components/providers/provider-settings';
 import { getSandboxUrl } from '@/lib/platform-client';
-import { useServerStore } from '@/stores/server-store';
+import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import { resetClient } from '@/lib/opencode-sdk';
 import { invalidateTokenCache } from '@/lib/auth-token';
 
@@ -38,11 +38,12 @@ export function useInstallStatus() {
 
 /* ─── Step Indicator ───────────────────────────────────────────────────────── */
 
-function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 }) {
+function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
   const steps = [
-    { num: 1, label: 'Create account' },
-    { num: 2, label: 'Connect provider' },
-    { num: 3, label: 'Start using' },
+    { num: 1, label: 'Account' },
+    { num: 2, label: 'LLM provider' },
+    { num: 3, label: 'Tool keys' },
+    { num: 4, label: 'Start using' },
   ];
 
   return (
@@ -80,6 +81,174 @@ function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 }) {
   );
 }
 
+/* ─── Tool Secrets Config ──────────────────────────────────────────────────── */
+
+/** Tool API keys the agent uses — shown in wizard step 3. All optional. */
+const TOOL_SECRETS = [
+  {
+    key: 'TAVILY_API_KEY',
+    label: 'Tavily',
+    description: 'Web search — lets the agent search the internet',
+    icon: Search,
+    signupUrl: 'https://tavily.com',
+    recommended: true,
+  },
+  {
+    key: 'FIRECRAWL_API_KEY',
+    label: 'Firecrawl',
+    description: 'Web scraping — read and extract web page content',
+    icon: Flame,
+    signupUrl: 'https://firecrawl.dev',
+    recommended: true,
+  },
+  {
+    key: 'SERPER_API_KEY',
+    label: 'Serper',
+    description: 'Google image search for finding visual content',
+    icon: Image,
+    signupUrl: 'https://serper.dev',
+  },
+  {
+    key: 'REPLICATE_API_TOKEN',
+    label: 'Replicate',
+    description: 'AI image & video generation',
+    icon: Image,
+    signupUrl: 'https://replicate.com',
+  },
+  {
+    key: 'CONTEXT7_API_KEY',
+    label: 'Context7',
+    description: 'Documentation search for coding libraries',
+    icon: BookOpen,
+    signupUrl: 'https://context7.com',
+  },
+  {
+    key: 'ELEVENLABS_API_KEY',
+    label: 'ElevenLabs',
+    description: 'Text-to-speech and voice generation',
+    icon: Mic,
+    signupUrl: 'https://elevenlabs.io',
+  },
+] as const;
+
+/* ─── Tool Secrets Step ───────────────────────────────────────────────────── */
+
+function ToolSecretsStep({ onContinue, onSkip }: { onContinue: () => void; onSkip: () => void }) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+
+  const filledCount = Object.values(values).filter((v) => v.trim()).length;
+
+  const handleSave = useCallback(async () => {
+    const toSave = Object.entries(values).filter(([, v]) => v.trim());
+    if (toSave.length === 0) {
+      onContinue();
+      return;
+    }
+
+    setSaving(true);
+    const baseUrl = getActiveOpenCodeUrl();
+
+    try {
+      for (const [key, value] of toSave) {
+        const res = await fetch(`${baseUrl}/env/${encodeURIComponent(key)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: value.trim() }),
+        });
+        if (res.ok) {
+          setSavedKeys((prev) => new Set([...prev, key]));
+        }
+      }
+      onContinue();
+    } catch (err) {
+      console.warn('[Setup] Failed to save some secrets:', err);
+      // Continue anyway — user can fix in Settings later
+      onContinue();
+    } finally {
+      setSaving(false);
+    }
+  }, [values, onContinue]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+        {TOOL_SECRETS.map((secret) => {
+          const Icon = secret.icon;
+          const isSaved = savedKeys.has(secret.key);
+          return (
+            <div key={secret.key} className="flex items-start gap-3 p-2.5 rounded-lg border border-border/50 bg-card/50">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">{secret.label}</span>
+                  {'recommended' in secret && secret.recommended && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                      Recommended
+                    </span>
+                  )}
+                  <a
+                    href={secret.signupUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+                    title={`Get ${secret.label} API key`}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{secret.description}</p>
+                <Input
+                  type="password"
+                  placeholder={`${secret.key}`}
+                  value={values[secret.key] || ''}
+                  onChange={(e) => setValues((prev) => ({ ...prev, [secret.key]: e.target.value }))}
+                  className="h-8 text-xs font-mono shadow-none"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <Button
+          variant="outline"
+          onClick={onSkip}
+          className="flex-1 h-10 text-sm"
+          disabled={saving}
+        >
+          Skip for now
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 h-10 text-sm"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              Saving...
+            </>
+          ) : filledCount > 0 ? (
+            `Save ${filledCount} key${filledCount > 1 ? 's' : ''} & continue`
+          ) : (
+            'Continue'
+          )}
+        </Button>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+        All keys are optional. You can add or change them later in Settings → Secrets Manager.
+      </p>
+    </div>
+  );
+}
+
 /* ─── Self-Hosted Form Panel ───────────────────────────────────────────────── */
 
 interface SelfHostedFormProps {
@@ -92,18 +261,12 @@ interface SelfHostedFormProps {
 export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: SelfHostedFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [sandboxReady, setSandboxReady] = useState(false);
   const [pullProgress, setPullProgress] = useState<{ progress: number; message: string } | null>(null);
   const router = useRouter();
 
-  if (installed === null) {
-    return <KortixLoader size="medium" />;
-  }
-
-  const isInstaller = !installed;
-
-  // ── Helpers ──
+  // ── Helpers (hooks must be before any early return) ──
 
   const registerSandbox = useCallback((sandbox: any) => {
     const url = getSandboxUrl(sandbox);
@@ -158,6 +321,24 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
     };
     setTimeout(poll, 2000);
   }, [registerSandbox]);
+
+  // ── Provider setup done (step 2 → step 3: tool keys) ──
+  const handleProviderContinue = useCallback(() => {
+    setWizardStep(3);
+    onWizardStepChange?.(3);
+  }, [onWizardStepChange]);
+
+  // ── Tool keys done (step 3 → navigate to onboarding) ──
+  const handleToolKeysContinue = useCallback(() => {
+    router.push(returnUrl || '/onboarding');
+  }, [router, returnUrl]);
+
+  // ── Early return: loading state ──
+  if (installed === null) {
+    return <KortixLoader size="medium" />;
+  }
+
+  const isInstaller = !installed;
 
   // ── Account creation handler (step 1) ──
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -273,23 +454,33 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
     }
   };
 
-  // ── Provider setup done (step 2 → navigate) ──
-  const handleProviderContinue = useCallback(() => {
-    router.push(returnUrl || '/onboarding');
-  }, [router, returnUrl]);
+  // ── Step 3: Tool API keys ──
+   if (isInstaller && wizardStep === 3) {
+    return (
+      <div className="w-full max-w-sm">
+        <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
+            Tool API Keys
+          </h1>
+          <p className="text-sm text-muted-foreground text-center max-w-xs">
+            Add API keys for tools your agent can use — web search, image generation, and more.
+          </p>
+        </div>
+
+        <StepIndicator currentStep={3} />
+
+        <ToolSecretsStep
+          onContinue={handleToolKeysContinue}
+          onSkip={handleToolKeysContinue}
+        />
+      </div>
+    );
+  }
 
   // ── Step 2: Provider setup ──
   if (isInstaller && wizardStep === 2) {
     return (
       <div className="w-full max-w-sm">
-        {/* Wizard badge */}
-        <div className="flex justify-center mb-5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Setup Wizard
-          </span>
-        </div>
-
         <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
           <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
             Connect a Provider
@@ -336,14 +527,6 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
   if (isInstaller) {
     return (
       <div className="w-full max-w-sm">
-        {/* Wizard badge */}
-        <div className="flex justify-center mb-5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Setup Wizard
-          </span>
-        </div>
-
         <div className="mb-4 sm:mb-6 flex items-center flex-col gap-2 justify-center">
           <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground text-center leading-tight">
             Welcome to Kortix
@@ -394,7 +577,7 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
           <Button
             type="submit"
             disabled={pending}
-            className="w-full h-10 sm:h-11 text-sm sm:text-base"
+            className="w-full h-10 sm:h-11 text-sm"
           >
             {pending ? 'Setting up...' : 'Create account & continue'}
           </Button>
@@ -449,9 +632,9 @@ export function SelfHostedForm({ returnUrl, installed, onWizardStepChange }: Sel
         <Button
           type="submit"
           disabled={pending}
-          className="w-full h-10 sm:h-11 text-sm sm:text-base"
-        >
-          {pending ? 'Signing in...' : 'Sign in'}
+            className="w-full h-10 sm:h-11 text-sm"
+          >
+            {pending ? 'Signing in...' : 'Sign in'}
         </Button>
       </form>
 

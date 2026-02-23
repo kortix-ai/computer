@@ -955,54 +955,7 @@ ${supabase_db_env}
 ${api_depends}
     restart: unless-stopped
 
-  sandbox:
-    image: ${SANDBOX_IMAGE}
-    container_name: kortix-sandbox
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp=unconfined
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - SUBFOLDER=/
-      - TITLE=Kortix Sandbox
-      - OPENCODE_CONFIG_DIR=/opt/opencode
-      - OPENCODE_PERMISSION={"*":"allow"}
-      - DISPLAY=:1
-      - LSS_DIR=/workspace/.lss
-      - KORTIX_WORKSPACE=/workspace
-      - KORTIX_API_URL=http://kortix-api:8008/v1/router
-      - SANDBOX_ID=kortix-sandbox
-      - PROJECT_ID=local
-      - INTERNAL_SERVICE_KEY=\${INTERNAL_SERVICE_KEY}
-      - CORS_ALLOWED_ORIGINS=\${PUBLIC_URL}
-    env_file:
-      - .env
-    volumes:
-      - sandbox-workspace:/workspace
-      - sandbox-secrets:/app/secrets
-    expose:
-      - "8000"
-      - "3111"
-      - "6080"
-      - "6081"
-      - "3210"
-      - "9223"
-      - "9224"
-    shm_size: "2gb"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/kortix/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
 volumes:
-  sandbox-workspace:
-  sandbox-secrets:
 ${supabase_volumes}
 ${caddy_volumes}
 COMPOSE
@@ -1054,6 +1007,9 @@ SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
 
 # ─── Deployments (Freestyle) ────────────────────────────────────────────────
 FREESTYLE_API_KEY=${FREESTYLE_API_KEY}
+
+# ─── Sandbox ─────────────────────────────────────────────────────────────────
+SANDBOX_IMAGE=${SANDBOX_IMAGE}
 ENVEOF
 
   chmod 600 "$INSTALL_DIR/.env"
@@ -1095,7 +1051,7 @@ cd "$DIR"
 
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-VERSION="0.6.2"
+VERSION="0.6.3"
 
 _open() {
   if command -v open &>/dev/null; then open "$1" 2>/dev/null
@@ -1135,6 +1091,7 @@ case "${1:-help}" in
     ;;
   stop)
     docker compose --profile vps down 2>/dev/null || docker compose down
+    docker stop kortix-sandbox 2>/dev/null || true
     echo "  ${G}Stopped.${N}"
     ;;
   restart)
@@ -1161,6 +1118,10 @@ case "${1:-help}" in
   update)
     echo "  ${C}Pulling latest images...${N}"
     docker compose pull
+    # Pull sandbox image (managed by API, not in compose)
+    local sb_img
+    sb_img=$(grep -m1 '^SANDBOX_IMAGE=' "$DIR/.env" 2>/dev/null | cut -d= -f2-)
+    [ -n "$sb_img" ] && docker pull "$sb_img" 2>/dev/null || true
     docker compose --profile vps down 2>/dev/null || docker compose down
     if [ "$(_mode)" = "vps" ]; then
       docker compose --profile vps up -d
@@ -1261,6 +1222,11 @@ pull_and_start() {
 
   cd "$INSTALL_DIR"
   docker compose pull
+
+  echo ""
+  info "Pre-pulling sandbox image (${SANDBOX_IMAGE})..."
+  docker pull "${SANDBOX_IMAGE}"
+  success "Sandbox image ready"
 
   echo ""
   info "Starting Kortix..."
