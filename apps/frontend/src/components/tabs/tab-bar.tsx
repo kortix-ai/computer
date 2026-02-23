@@ -119,19 +119,11 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     };
   }
 
-  // File viewer routes: /files/<encoded-file-path>
-  // Next.js decodes %2F in the URL, so the pathname arrives as /files/path/to/file.ext
-  const fileMatch = pathname.match(/^\/files\/(.+)$/);
-  if (fileMatch) {
-    const filePath = fileMatch[1];
-    const fileName = filePath.split('/').pop() || filePath;
-    return {
-      id: `file:${filePath}`,
-      title: fileName,
-      type: 'file',
-      href: `/files/${encodeURIComponent(filePath)}`,
-    };
-  }
+  // File viewer routes (/files/<path>) are NOT auto-opened here.
+  // They are opened explicitly by the sidebar explorer or the catch-all
+  // route page ([...path]/page.tsx). Auto-opening from the sync effect
+  // would re-create a file tab immediately after closing it, because
+  // pushState doesn't update usePathname() and the old URL lingers.
 
   return null;
 }
@@ -709,9 +701,19 @@ export function TabBar() {
     if (!pathname) return;
 
     closingTabIds.current.forEach((id) => {
-      // For session tabs, id is the sessionId; for page tabs, id is "page:/path"
-      const closedHref = id.startsWith('page:') ? id.slice(5) : `/sessions/${id}`;
-      if (pathname !== closedHref) {
+      // Derive the href that corresponds to this tab's ID so we can tell
+      // whether the browser is still on the closed tab's route.
+      let closedHref: string;
+      if (id.startsWith('page:')) {
+        closedHref = id.slice(5);
+      } else if (id.startsWith('file:')) {
+        closedHref = `/files/${encodeURIComponent(id.slice(5))}`;
+      } else {
+        closedHref = `/sessions/${id}`;
+      }
+      // Only remove from the set once we've navigated away.
+      // Compare decoded to handle %2F vs / mismatches from Next.js.
+      if (pathname !== closedHref && decodeURIComponent(closedHref) !== pathname) {
         closingTabIds.current.delete(id);
       }
     });
