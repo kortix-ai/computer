@@ -31,6 +31,7 @@ import { DiscordIcon } from '@/components/ui/icons/discord';
 import { WhatsAppIcon } from '@/components/ui/icons/whatsapp';
 import { ChannelConfigDialog } from './channel-config-dialog';
 import { ChannelEditDialog } from './channel-detail-panel';
+import { ChannelCredentialsTab } from './channel-credentials-tab';
 
 const getChannelIcon = (channelType: string): React.ComponentType<{ className?: string }> => {
   switch (channelType) {
@@ -178,6 +179,7 @@ export function ChannelsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'channels' | 'credentials'>('channels');
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -271,75 +273,110 @@ export function ChannelsPage() {
       </div>
 
       <div className="container mx-auto max-w-7xl px-3 sm:px-4">
-        <div className="flex items-center justify-between gap-2 sm:gap-4 pb-3 sm:pb-4 pt-2 sm:pt-3 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both delay-75">
-          <div className="flex-1 max-w-md">
-            <div className="relative group">
-              <input
-                type="text"
-                placeholder="Search channels..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-11 w-full rounded-2xl border border-input bg-card px-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              />
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
-                <Search className="h-4 w-4" />
+        <div className="flex items-center gap-1 border-b border-border/50 mb-4 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both delay-50">
+          <button
+            onClick={() => setActiveTab('channels')}
+            className={cn(
+              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
+              activeTab === 'channels'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Channels
+          </button>
+          <button
+            onClick={() => setActiveTab('credentials')}
+            className={cn(
+              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
+              activeTab === 'credentials'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Credentials
+          </button>
+        </div>
+
+        {activeTab === 'channels' && (
+          <>
+            <div className="flex items-center justify-between gap-2 sm:gap-4 pb-3 sm:pb-4 pt-2 sm:pt-3 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both delay-75">
+              <div className="flex-1 max-w-md">
+                <div className="relative group">
+                  <input
+                    type="text"
+                    placeholder="Search channels..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-11 w-full rounded-2xl border border-input bg-card px-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                    <Search className="h-4 w-4" />
+                  </div>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              <Button
+                variant="default"
+                className="px-3 sm:px-4 rounded-2xl gap-1.5 sm:gap-2 text-sm"
+                onClick={() => setShowCreateDialog(true)}
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden xs:inline">Add Channel</span>
+                <span className="xs:hidden">Add</span>
+              </Button>
+            </div>
+
+            <div className="pb-6 sm:pb-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both delay-150">
+              {isLoading ? (
+                <LoadingSkeleton />
+              ) : filteredChannels.length === 0 && !searchQuery ? (
+                <EmptyState onCreateClick={() => setShowCreateDialog(true)} />
+              ) : filteredChannels.length === 0 && searchQuery ? (
+                <div className="text-center py-12 text-muted-foreground text-sm">
+                  No channels matching &ldquo;{searchQuery}&rdquo;
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Your Channels
+                    </span>
+                    <Badge variant="secondary" className="text-xs tabular-nums">
+                      {filteredChannels.length}
+                    </Badge>
+                  </div>
+
+                  <AnimatePresence mode="popLayout">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {filteredChannels.map((channel, index) => (
+                        <ChannelListItem
+                          key={channel.channelConfigId}
+                          channel={channel}
+                          onClick={() => handleChannelClick(channel)}
+                          index={index}
+                        />
+                      ))}
+                    </div>
+                  </AnimatePresence>
+                </>
               )}
             </div>
+          </>
+        )}
+
+        {activeTab === 'credentials' && (
+          <div className="pb-6 sm:pb-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
+            <ChannelCredentialsTab />
           </div>
-          <Button
-            variant="default"
-            className="px-3 sm:px-4 rounded-2xl gap-1.5 sm:gap-2 text-sm"
-            onClick={() => setShowCreateDialog(true)}
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden xs:inline">Add Channel</span>
-            <span className="xs:hidden">Add</span>
-          </Button>
-        </div>
-
-        <div className="pb-6 sm:pb-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both delay-150">
-          {isLoading ? (
-            <LoadingSkeleton />
-          ) : filteredChannels.length === 0 && !searchQuery ? (
-            <EmptyState onCreateClick={() => setShowCreateDialog(true)} />
-          ) : filteredChannels.length === 0 && searchQuery ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              No channels matching &ldquo;{searchQuery}&rdquo;
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Your Channels
-                </span>
-                <Badge variant="secondary" className="text-xs tabular-nums">
-                  {filteredChannels.length}
-                </Badge>
-              </div>
-
-              <AnimatePresence mode="popLayout">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredChannels.map((channel, index) => (
-                    <ChannelListItem
-                      key={channel.channelConfigId}
-                      channel={channel}
-                      onClick={() => handleChannelClick(channel)}
-                      index={index}
-                    />
-                  ))}
-                </div>
-              </AnimatePresence>
-            </>
-          )}
-        </div>
+        )}
       </div>
 
       {selectedChannel && (

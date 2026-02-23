@@ -259,6 +259,23 @@ export const channelConfigs = kortixSchema.table(
   ],
 );
 
+export const channelPlatformCredentials = kortixSchema.table(
+  'channel_platform_credentials',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').notNull(),
+    sandboxId: uuid('sandbox_id').references(() => sandboxes.sandboxId, { onDelete: 'set null' }),
+    channelType: channelTypeEnum('channel_type').notNull(),
+    credentials: jsonb('credentials').default({}).$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_channel_platform_creds_account').on(table.accountId),
+    index('idx_channel_platform_creds_sandbox').on(table.sandboxId),
+  ],
+);
+
 export const channelSessions = kortixSchema.table(
   'channel_sessions',
   {

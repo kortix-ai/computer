@@ -74,6 +74,24 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       if (!sandbox) {
         throw new NotFoundError('Sandbox', parsed.data.sandbox_id);
       }
+
+      // Enforce one channel per (sandbox, channelType)
+      const [existing] = await db
+        .select({ channelConfigId: channelConfigs.channelConfigId })
+        .from(channelConfigs)
+        .where(
+          and(
+            eq(channelConfigs.sandboxId, parsed.data.sandbox_id),
+            eq(channelConfigs.channelType, parsed.data.channel_type),
+          ),
+        );
+
+      if (existing) {
+        return c.json(
+          { error: `A ${parsed.data.channel_type} channel already exists for this sandbox` },
+          409,
+        );
+      }
     }
 
     const adapter = engine.getAdapter(parsed.data.channel_type);
@@ -263,6 +281,39 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
 
     if (!sandbox) {
       throw new NotFoundError('Sandbox', sandboxId);
+    }
+
+    // Get the current channel config to know its type
+    const [current] = await db
+      .select()
+      .from(channelConfigs)
+      .where(
+        and(
+          eq(channelConfigs.channelConfigId, configId),
+          eq(channelConfigs.accountId, accountId),
+        ),
+      );
+
+    if (!current) {
+      throw new NotFoundError('Channel config', configId);
+    }
+
+    // Enforce one channel per (sandbox, channelType)
+    const [existing] = await db
+      .select({ channelConfigId: channelConfigs.channelConfigId })
+      .from(channelConfigs)
+      .where(
+        and(
+          eq(channelConfigs.sandboxId, sandboxId),
+          eq(channelConfigs.channelType, current.channelType),
+        ),
+      );
+
+    if (existing && existing.channelConfigId !== configId) {
+      return c.json(
+        { error: `A ${current.channelType} channel is already linked to this sandbox` },
+        409,
+      );
     }
 
     const [updated] = await db

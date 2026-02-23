@@ -4,6 +4,7 @@ import { channelConfigs } from '@kortix/db';
 import type { ChannelConfig } from '@kortix/db';
 import { config as appConfig } from '../../../config';
 import { decryptCredentials } from '../../lib/credentials';
+import { getSlackPlatformCredentials } from '../../lib/platform-credentials';
 
 export async function verifySlackSignature(
   signingSecret: string,
@@ -62,8 +63,15 @@ export async function findConfigByTeamId(teamId: string): Promise<ChannelConfig 
 export async function verifySlackRequest(
   rawBody: string,
   headers: { timestamp: string; signature: string },
+  accountId?: string,
 ): Promise<boolean> {
-  const signingSecret = appConfig.SLACK_SIGNING_SECRET;
+  let signingSecret = appConfig.SLACK_SIGNING_SECRET;
+
+  if (!signingSecret && accountId) {
+    const platformCreds = await getSlackPlatformCredentials(accountId);
+    signingSecret = platformCreds?.signingSecret || '';
+  }
+
   if (!signingSecret) return true;
 
   const now = Math.floor(Date.now() / 1000);
