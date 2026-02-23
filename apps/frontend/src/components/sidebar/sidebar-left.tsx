@@ -9,7 +9,6 @@ import {
   ChevronRight,
   ChevronLeft,
   SquarePen,
-  FolderOpen,
   ListTree,
   ChevronDown,
   Search,
@@ -84,7 +83,7 @@ import { useDocumentModalStore } from '@/stores/use-document-modal-store';
 import { isBillingEnabled } from '@/lib/config';
 import { useAccountState, accountStateSelectors } from '@/hooks/billing';
 import { getPlanIcon } from '@/components/billing/plan-utils';
-import { useCreateOpenCodeSession, useOpenCodeSessions, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
+import { useCreateOpenCodeSession, useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore, openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
@@ -285,87 +284,6 @@ function SessionsFlyout() {
 }
 
 // ============================================================================
-// Projects Flyout
-// ============================================================================
-
-function ProjectsFlyout() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { data: projects } = useOpenCodeProjects();
-
-  const sortedProjects = React.useMemo(() => {
-    if (!projects) return [];
-    return [...projects].sort((a: any, b: any) => {
-      // Global project always first
-      const aIsGlobal = a.id === 'global' || a.worktree === '/';
-      const bIsGlobal = b.id === 'global' || b.worktree === '/';
-      if (aIsGlobal && !bIsGlobal) return -1;
-      if (!aIsGlobal && bIsGlobal) return 1;
-      return b.time.updated - a.time.updated;
-    });
-  }, [projects]);
-
-  const getProjectDisplayName = (project: any): string => {
-    if (project.name) return project.name;
-    if (project.worktree === '/' || project.id === 'global') return 'Global';
-    const parts = project.worktree.split('/');
-    return parts[parts.length - 1] || project.worktree;
-  };
-
-  const handleClick = (projectId: string, name: string) => {
-    openTabAndNavigate({
-      id: `page:/projects/${projectId}`,
-      title: name,
-      type: 'project',
-      href: `/projects/${projectId}`,
-    }, router);
-  };
-
-  const activeProjectId = React.useMemo(() => {
-    const match = pathname?.match(/^\/projects\/([^/]+)/);
-    return match ? match[1] : null;
-  }, [pathname]);
-
-  return (
-    <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-      {sortedProjects.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-          No projects detected
-        </div>
-      ) : (
-        sortedProjects.map((project) => {
-          const name = getProjectDisplayName(project);
-          const isActive = activeProjectId === project.id;
-          return (
-            <button
-              key={project.id}
-              onClick={() => handleClick(project.id, name)}
-              className={cn(
-                'flex items-center gap-3 w-full px-3.5 py-2 text-sm cursor-pointer',
-                'transition-colors duration-150',
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
-              )}
-            >
-              <FolderOpen
-                className={cn(
-                  'flex-shrink-0',
-                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground',
-                )}
-                size={16}
-                style={project.icon?.color ? { color: project.icon.color } : undefined}
-              />
-              <span className="flex-1 truncate text-left">{name}</span>
-            </button>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
 // User Profile Section
 // ============================================================================
 
@@ -443,17 +361,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-    const match = typeof window !== 'undefined' && window.location.pathname.match(/^\/projects\/([^/]+)/);
-    return match ? match[1] : null;
-  });
-
-  useEffect(() => {
-    const match = pathname?.match(/^\/projects\/([^/]+)/);
-    if (match) {
-      setSelectedProjectId(match[1]);
-    }
-  }, [pathname]);
+  // Project filtering for session list removed — projects page merged into workspace
 
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
 
@@ -672,11 +580,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             }}
           />
           <CollapsedIconButton
-            icon={<FolderOpen className="h-[18px] w-[18px]" />}
-            label="Projects"
-            flyoutContent={<ProjectsFlyout />}
-          />
-          <CollapsedIconButton
             icon={<ListTree className="h-[18px] w-[18px]" />}
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
@@ -754,23 +657,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               </kbd>
             </button>
 
-            {/* Projects */}
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/projects',
-                  title: 'Projects',
-                  type: 'project',
-                  href: '/projects',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
-            >
-              <FolderOpen className="h-[18px] w-[18px] flex-shrink-0" />
-              <span>Projects</span>
-            </button>
-
             {/* Sessions — expandable, default open */}
           </nav>
 
@@ -788,7 +674,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               }}
               className={cn(
                 'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer',
-                (pathname === '/workspace' || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
+                (pathname === '/workspace' || pathname?.startsWith('/projects') || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent',
               )}
@@ -829,7 +715,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               </CollapsibleTrigger>
             </div>
             <CollapsibleContent className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <SessionList projectId={selectedProjectId} />
+              <SessionList projectId={null} />
             </CollapsibleContent>
           </Collapsible>
         </div>
