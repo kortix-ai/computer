@@ -1,32 +1,62 @@
 /**
  * Shared account resolution: userId → accountId.
  *
- * Queries `basejump.account_user` to find the account that owns the given user.
- * If the basejump schema doesn't exist (fresh self-hosted DB without Supabase's
- * basejump extension), gracefully falls back to treating userId as accountId.
+ * Resolution order:
+ *   1. kortix.account_members (new, native)
+ *   2. basejump.account_user  (legacy read-only fallback for cloud prod)
+ *   3. Auto-create personal account if neither table has a row
+ *
+ * The basejump fallback is read-only — no data is copied into kortix tables.
+ * A manual migration will move basejump data to kortix later.
  */
 
 import { eq } from 'drizzle-orm';
-import { accountUser } from '@kortix/db';
+import { accounts, accountMembers, accountUser } from '@kortix/db';
 import { db } from './db';
 
-/**
- * Resolve the account ID for a given user.
- *
- * Queries `basejump.account_user`; falls back to `userId` if no membership
- * row is found or if the basejump schema doesn't exist.
- */
 export async function resolveAccountId(userId: string): Promise<string> {
+  // 1. Try kortix.account_members (new table)
   try {
     const [membership] = await db
+      .select({ accountId: accountMembers.accountId })
+      .from(accountMembers)
+      .where(eq(accountMembers.userId, userId))
+      .limit(1);
+
+    if (membership) return membership.accountId;
+  } catch {
+    // Table may not exist yet (first boot before schema push)
+  }
+
+  // 2. Read-only fallback to basejump.account_user (cloud prod)
+  try {
+    const [legacy] = await db
       .select({ accountId: accountUser.accountId })
       .from(accountUser)
       .where(eq(accountUser.userId, userId))
       .limit(1);
 
-    return membership?.accountId ?? userId;
+    if (legacy) return legacy.accountId;
   } catch {
-    // If basejump.account_user doesn't exist (e.g. fresh self-hosted DB), fall back.
-    return userId;
+    // basejump schema doesn't exist (self-hosted)
   }
+
+  // 3. No membership anywhere — auto-create personal account in kortix
+  try {
+    await db.insert(accounts).values({
+      accountId: userId,
+      name: 'Personal',
+      personalAccount: true,
+    }).onConflictDoNothing();
+
+    await db.insert(accountMembers).values({
+      userId,
+      accountId: userId,
+      accountRole: 'owner',
+    }).onConflictDoNothing();
+  } catch {
+    // Tables may not exist yet
+  }
+
+  return userId;
 }

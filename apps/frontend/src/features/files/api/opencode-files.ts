@@ -1,11 +1,12 @@
 /**
- * OpenCode File API — filesystem access via the SDK client.
+ * OpenCode File API — filesystem access via the SDK client + kortix-master.
  *
- * All calls go through the `@kortix/opencode-sdk` client singleton,
- * which handles base URL, headers, and error handling consistently.
+ * Read endpoints (list, read, status, find) go through the upstream
+ * `@opencode-ai/sdk` client singleton which proxies to OpenCode.
  *
- * Read endpoints: list, read, status, find
- * Write endpoints: upload, delete, mkdir, rename
+ * Write endpoints (upload, delete, mkdir, rename) and binary downloads
+ * use `authenticatedFetch()` to hit kortix-master's /file/* routes
+ * directly, since the upstream SDK has no write methods.
  */
 
 import { getClient } from '@/lib/opencode-sdk';
@@ -153,7 +154,7 @@ export async function uploadFile(
   file: File | Blob,
   targetPath?: string,
 ): Promise<UploadResult[]> {
-  const client = getClient();
+  const baseUrl = getActiveOpenCodeUrl();
   const rawPath = (targetPath ?? '').trim();
   const normalizedPath =
     !rawPath || rawPath === '/' || rawPath === '.'
@@ -161,35 +162,67 @@ export async function uploadFile(
       : rawPath.startsWith('/')
         ? rawPath
         : `/${rawPath}`;
-  const result = await client.file.upload({ file, path: normalizedPath });
-  return unwrap(result) as UploadResult[];
+
+  const form = new FormData();
+  form.append('path', normalizedPath);
+  form.append('file', file);
+
+  const res = await authenticatedFetch(`${baseUrl}/file/upload`, {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Upload failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 /**
  * Delete a file or directory (recursively).
  */
 export async function deleteFile(filePath: string): Promise<boolean> {
-  const client = getClient();
-  const result = await client.file.delete({ path: filePath });
-  return unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Delete failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 /**
  * Create a directory (recursive, idempotent).
  */
 export async function mkdirFile(dirPath: string): Promise<boolean> {
-  const client = getClient();
-  const result = await client.file.mkdir({ path: dirPath });
-  return unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file/mkdir`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: dirPath }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Mkdir failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 /**
  * Upload a file to a specific path using the field-name-as-path convention.
  *
- * The generated SDK's `client.file.upload()` doesn't correctly pass the
- * filename through FormData serialization, so we build the request manually
- * using the approach documented by the hand-written SDK helper: set the
- * FormData field name to the desired relative path.
+ * Sets the FormData field name to the desired relative path so
+ * kortix-master's /file/upload endpoint places it correctly.
  */
 async function uploadToPath(
   filePath: string,
@@ -253,9 +286,19 @@ export async function copyFile(
  * Rename or move a file/directory.
  */
 export async function renameFile(from: string, to: string): Promise<boolean> {
-  const client = getClient();
-  const result = await client.file.rename({ from, to });
-  return unwrap(result);
+  const baseUrl = getActiveOpenCodeUrl();
+  const res = await authenticatedFetch(`${baseUrl}/file/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Rename failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return res.json();
 }
 
 // ---------------------------------------------------------------------------

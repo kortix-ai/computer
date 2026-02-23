@@ -3,3 +3,9 @@ packages:
   - 'packages/*'
   - 'services/*'
   - '!services/opencode'
+
+catalog:
+  '@tsconfig/bun': ^1.0.7
+  'typescript': ^5.4.0
+  '@types/bun': ^1.1.0
+  '@types/node': ^22.0.0

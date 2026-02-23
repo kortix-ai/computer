@@ -105,6 +105,43 @@ export interface ChannelPlatformUser {
   avatar?: string;
 }
 
+// ─── Accounts & Members ─────────────────────────────────────────────────────
+// Replaces basejump.account_user. Fully kortix-native.
+
+export const accountRoleEnum = kortixSchema.enum('account_role', [
+  'owner',
+  'admin',
+  'member',
+]);
+
+export const accounts = kortixSchema.table(
+  'accounts',
+  {
+    accountId: uuid('account_id').defaultRandom().primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    personalAccount: boolean('personal_account').default(true).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
+export const accountMembers = kortixSchema.table(
+  'account_members',
+  {
+    userId: uuid('user_id').notNull(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.accountId, { onDelete: 'cascade' }),
+    accountRole: accountRoleEnum('account_role').default('owner').notNull(),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_account_members_user_id').on(table.userId),
+    index('idx_account_members_account_id').on(table.accountId),
+    uniqueIndex('idx_account_members_user_account').on(table.userId, table.accountId),
+  ],
+);
+
 export const sandboxes = kortixSchema.table(
   'sandboxes',
   {
@@ -256,6 +293,23 @@ export const channelConfigs = kortixSchema.table(
     index('idx_channel_configs_account').on(table.accountId),
     index('idx_channel_configs_type').on(table.channelType),
     index('idx_channel_configs_enabled').on(table.enabled),
+  ],
+);
+
+export const channelPlatformCredentials = kortixSchema.table(
+  'channel_platform_credentials',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').notNull(),
+    sandboxId: uuid('sandbox_id').references(() => sandboxes.sandboxId, { onDelete: 'set null' }),
+    channelType: channelTypeEnum('channel_type').notNull(),
+    credentials: jsonb('credentials').default({}).$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_channel_platform_creds_account').on(table.accountId),
+    index('idx_channel_platform_creds_sandbox').on(table.sandboxId),
   ],
 );
 
@@ -425,7 +479,11 @@ export const serverEntries = kortixSchema.table(
   ],
 );
 
-export const sandboxesRelations = relations(sandboxes, ({ many }) => ({
+export const sandboxesRelations = relations(sandboxes, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [sandboxes.accountId],
+    references: [accounts.accountId],
+  }),
   triggers: many(triggers),
   executions: many(executions),
   deployments: many(deployments),
@@ -510,5 +568,19 @@ export const sandboxIntegrationsRelations = relations(sandboxIntegrations, ({ on
   integration: one(integrations, {
     fields: [sandboxIntegrations.integrationId],
     references: [integrations.integrationId],
+  }),
+}));
+
+// ─── Account Relations ──────────────────────────────────────────────────────
+
+export const accountsRelations = relations(accounts, ({ many }) => ({
+  members: many(accountMembers),
+  sandboxes: many(sandboxes),
+}));
+
+export const accountMembersRelations = relations(accountMembers, ({ one }) => ({
+  account: one(accounts, {
+    fields: [accountMembers.accountId],
+    references: [accounts.accountId],
   }),
 }));

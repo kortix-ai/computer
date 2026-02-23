@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { PtyTerminal, type PtyTerminalHandle } from './pty-terminal';
 import { useOpenCodePtyList, useCreatePty, useRemovePty } from '@/hooks/opencode/use-opencode-pty';
 import { useServerStore } from '@/stores/server-store';
-import type { Pty } from '@kortix/opencode-sdk/v2/client';
+import type { Pty } from '@opencode-ai/sdk/v2/client';
 
 // ============================================================================
 // Per-instance localStorage persistence

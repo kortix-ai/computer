@@ -47,7 +47,7 @@ export type {
   Provider,
   Todo,
   FileDiff,
-} from '@kortix/opencode-sdk/v2/client';
+} from '@opencode-ai/sdk/v2/client';
 
 // ---------------------------------------------------------------------------
 // View-model types
@@ -58,8 +58,8 @@ export type {
  * `session.messages()`.
  */
 export interface MessageWithParts {
-  info: import('@kortix/opencode-sdk/v2/client').Message;
-  parts: import('@kortix/opencode-sdk/v2/client').Part[];
+  info: import('@opencode-ai/sdk/v2/client').Message;
+  parts: import('@opencode-ai/sdk/v2/client').Part[];
 }
 
 /**

@@ -37,7 +37,7 @@ Every running Kortix sandbox can be updated remotely via a single npm package: `
   "name": "@kortix/sandbox",
   "version": "0.4.16",
   "dependencies": {
-    "@kortix/opencode-ai": "0.3.0",
+    "opencode-ai": "1.2.10",
     "agent-browser": "^0.10.0"
   },
   "kortix": {
@@ -80,8 +80,7 @@ These live in `sandbox/opencode/package.json` and auto-resolve within their `^` 
 
 | Package | Range | Purpose |
 |---|---|---|
-| `@kortix/opencode-sdk` | `^0.4.0` | TypeScript SDK for OpenCode API |
-| `@opencode-ai/plugin` | `^1.2.6` | OpenCode plugin system |
+| `@opencode-ai/plugin` | `^1.2.10` | OpenCode plugin system (includes SDK as transitive dep) |
 | `@mendable/firecrawl-js` | `^4.12.0` | Web scraping |
 | `@tavily/core` | `^0.7.1` | Web search |
 | `agent-browser` | `^0.10.0` | Browser automation (local import) |
@@ -122,7 +121,7 @@ postinstall.sh (runs inside sandbox)
   2. rsync opencode/      → /opt/opencode/           (+ bun install, resolves SDK/plugin/etc.)
   3. rsync services/      → /etc/s6-overlay/s6-rc.d/ (s6 service scripts)
   4. cp config/           → /custom-cont-init.d/      (init scripts)
-  5. npm install -g @kortix/opencode-ai@{version}     (CLI binary + musl symlink)
+  5. npm install -g opencode-ai@{version}              (CLI binary + musl symlink)
   6. npm install -g agent-browser@{version}            (browser automation)
   7. node patch-agent-browser.js                       (browser patches)
   8. rsync browser-viewer/ → /opt/agent-browser-viewer/
@@ -154,7 +153,7 @@ Edit files under `sandbox/` — agents, skills, tools, configs, kortix-master, e
 ```json
 {
   "dependencies": {
-    "@kortix/opencode-ai": "0.4.0",     ← bump CLI version
+    "opencode-ai": "1.2.10",            ← pin upstream CLI version
     "agent-browser": "^0.11.0"           ← bump browser version
   },
   "kortix": {
@@ -213,7 +212,7 @@ sandbox/package.json  ←── SINGLE SOURCE OF TRUTH
 ├── version: "0.4.16"
 │
 ├── dependencies:
-│   ├── @kortix/opencode-ai: "0.3.0"        ← CLI binary
+│   ├── opencode-ai: "1.2.10"               ← upstream CLI binary (pinned)
 │   └── agent-browser: "^0.10.0"            ← browser automation
 │
 ├── kortix.pythonDependencies:
@@ -222,8 +221,7 @@ sandbox/package.json  ←── SINGLE SOURCE OF TRUTH
 │
 ├── bundled files:
 │   └── opencode/package.json               ← secondary deps (auto-resolve):
-│       ├── @kortix/opencode-sdk: "^0.4.0"
-│       ├── @opencode-ai/plugin: "^1.2.6"
+│       ├── @opencode-ai/plugin: "^1.2.10"  (SDK is a transitive dep of plugin)
 │       └── firecrawl, tavily, replicate...
 │
 │

@@ -28,8 +28,11 @@ import {
   ArrowLeft,
   Radio,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { useCreateChannel, type ChannelType, type SessionStrategy } from '@/hooks/channels';
+import { backendApi } from '@/lib/api-client';
+import type { PlatformCredentialStatus } from '@/hooks/channels';
 import { SlackIcon } from '@/components/ui/icons/slack';
 import { TelegramIcon } from '@/components/ui/icons/telegram';
 import { DiscordIcon } from '@/components/ui/icons/discord';
@@ -39,6 +42,7 @@ import { useServerStore } from '@/stores/server-store';
 import { ensureSandbox } from '@/lib/platform-client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { SlackPlatformCredentialsForm } from './slack-platform-credentials-form';
 
 interface ChannelConfigDialogProps {
   open: boolean;
@@ -65,7 +69,7 @@ const SESSION_STRATEGIES: { value: SessionStrategy; label: string; description: 
 ];
 
 export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelConfigDialogProps) {
-  const [step, setStep] = useState<'type' | 'config'>('type');
+  const [step, setStep] = useState<'type' | 'slack-creds' | 'config'>('type');
   const [channelType, setChannelType] = useState<ChannelType | null>(null);
   const [name, setName] = useState('');
   const [botToken, setBotToken] = useState('');
@@ -74,6 +78,7 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
 
   const { sandbox } = useSandbox();
   const createMutation = useCreateChannel();
+  const [checkingSlack, setCheckingSlack] = useState(false);
 
   const handleClose = () => {
     setStep('type');
@@ -83,6 +88,21 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
     setSessionStrategy('per-user');
     setSystemPrompt('');
     onOpenChange(false);
+  };
+
+  const proceedToSlackOAuth = async () => {
+    const sandboxId = await resolveSandboxId();
+    const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/v1\/?$/, '');
+    const params = new URLSearchParams();
+    if (sandboxId) {
+      params.set('sandboxId', sandboxId);
+    } else {
+      toast.error('Please create an instance first, then connect Slack.');
+      return;
+    }
+    const installUrl = `${backendUrl}/webhooks/slack/install?${params.toString()}`;
+    handleClose();
+    window.location.href = installUrl;
   };
 
   const resolveSandboxId = async (): Promise<string | null> => {
@@ -101,18 +121,26 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
 
   const handleSelectType = async (type: ChannelType) => {
     if (type === 'slack') {
-      const sandboxId = await resolveSandboxId();
-      const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/v1\/?$/, '');
-      const params = new URLSearchParams();
-      if (sandboxId) {
-        params.set('sandboxId', sandboxId);
-      } else {
-        toast.error('Please create an instance first, then connect Slack.');
-        return;
+      setCheckingSlack(true);
+      try {
+        const res = await backendApi.get<PlatformCredentialStatus>(
+          '/channels/platform-credentials/slack',
+          { showErrors: false },
+        );
+
+        if (res.success && res.data?.configured) {
+          // Credentials configured — go straight to OAuth
+          await proceedToSlackOAuth();
+        } else {
+          // Not configured — show credentials form
+          setStep('slack-creds');
+        }
+      } catch {
+        // On error, show credentials form as fallback
+        setStep('slack-creds');
+      } finally {
+        setCheckingSlack(false);
       }
-      const installUrl = `${backendUrl}/webhooks/slack/install?${params.toString()}`;
-      handleClose();
-      window.location.href = installUrl;
       return;
     }
     setChannelType(type);
@@ -167,6 +195,32 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
 
   if (!open) return null;
 
+  if (step === 'slack-creds') {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+          <div className="bg-muted/30 border-b px-6 pt-6 pb-5">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-muted border border-border/50">
+                  <SlackIcon className="h-4.5 w-4.5" />
+                </div>
+                Configure Slack App
+              </DialogTitle>
+              <DialogDescription className="mt-1.5">
+                Enter your Slack App credentials to enable the integration
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <SlackPlatformCredentialsForm
+            onSaved={() => proceedToSlackOAuth()}
+            onBack={() => setStep('type')}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   if (step === 'type') {
     return (
       <Dialog open={open} onOpenChange={handleClose}>
@@ -188,16 +242,22 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
                   <button
                     key={type}
                     onClick={() => handleSelectType(type)}
-                    className="group flex items-center gap-3 rounded-xl p-4 text-left transition-all border border-border bg-card hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 cursor-pointer"
+                    disabled={type === 'slack' && checkingSlack}
+                    className="group flex items-center gap-3 rounded-xl p-4 text-left transition-all border border-border bg-card hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                   >
                     <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 group-hover:bg-primary/15 transition-colors">
                       <Icon className="h-5 w-5 text-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{label}</div>
-                      <div className="text-xs text-primary/70">Ready to connect</div>
+                      <div className="text-xs text-primary/70">
+                        {type === 'slack' && checkingSlack ? 'Checking...' : 'Ready to connect'}
+                      </div>
                     </div>
-                    {type === 'slack' && (
+                    {type === 'slack' && checkingSlack && (
+                      <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+                    )}
+                    {type === 'slack' && !checkingSlack && (
                       <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary/70 transition-colors" />
                     )}
                     {type !== 'slack' && (

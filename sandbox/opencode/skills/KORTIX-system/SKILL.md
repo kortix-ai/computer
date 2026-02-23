@@ -130,7 +130,7 @@ All services are managed by s6-rc.d as longruns. Service scripts live at `/etc/s
 | Service | Script | Internal Port | Host Port | Description |
 |---|---|---|---|---|
 | Kortix Master | `svc-kortix-master` | 8000 | 14000 | Reverse proxy + secret store + deployer. Entry point for API access. |
-| OpenCode Web | `svc-opencode-web` | 3111 | 14001 | Web UI (SolidJS app from `@kortix/opencode-ai` npm package) |
+| OpenCode Web | `svc-opencode-web` | 3111 | 14001 | Web UI (SolidJS app from `opencode-ai` npm package) |
 | OpenCode Serve | `svc-opencode-serve` | 4096 | (proxied via 8000) | Backend API server. Not exposed directly — proxied by Kortix Master. |
 | Desktop (noVNC) | (base image) | 6080 / 6081 | 14002 / 14003 | XFCE desktop via VNC. HTTP / HTTPS. |
 | Presentation Viewer | `svc-presentation-viewer` | 3210 | 14004 | Serves generated slide decks |
