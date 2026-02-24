@@ -153,27 +153,38 @@ for d in .vscode-server .cursor-server; do
   chown -R abc:abc /config/$d
 done
 
+# ── Cache dir (Cursor needs /config/.cache/Microsoft) ───────────────────────
+# /config/.cache may be owned by a different UID from the base image;
+# ensure abc can write to it.
+mkdir -p /config/.cache/Microsoft
+chown -R abc:abc /config/.cache 2>/dev/null
+
+# ── Fix Cursor's bundled Node.js (segfaults on Alpine ARM64) ────────────────
+# Cursor downloads a Node.js v22 binary compiled for alpine-arm64 (musl).
+# This binary intermittently segfaults (SIGSEGV / signal 11) when processing
+# WebSocket connections, causing the code server to crash on first connection.
+# The container's system Node.js (v24, also musl/ARM64) does not have this bug.
+# If Cursor has installed its server, replace the bundled node with a symlink
+# to the system node. The install script already has fallback logic for this.
+_fix_cursor_node() {
+  local cursor_base="/config/.cursor-server/bin"
+  [ -d "$cursor_base" ] || return 0
+  for node_bin in "$cursor_base"/*/511523af765daeb1fa69500ab0df5b6524424610/node "$cursor_base"/*/*/node; do
+    [ -f "$node_bin" ] || continue
+    [ -L "$node_bin" ] && continue  # already a symlink, skip
+    local sys_node
+    sys_node="$(command -v node 2>/dev/null)" || continue
+    cp "$node_bin" "${node_bin}.bundled" 2>/dev/null
+    rm -f "$node_bin"
+    ln -s "$sys_node" "$node_bin"
+    echo "[init] Replaced Cursor bundled node with system node ($sys_node) at $node_bin"
+  done
+}
+_fix_cursor_node
+
 # ── Login profile for SSH sessions ──────────────────────────────────────────
-# Handles two critical issues with Cursor Remote SSH:
-# 1. Stale cursor-server processes from previous SSH sessions pile up
-# 2. Background processes (code server) die when SSH disconnects (SIGHUP)
 cat > /config/.profile <<'PROFILE'
 export PATH="$HOME/.local/bin:$PATH"
-
-# ── Cursor Remote SSH: clean up stale servers from previous sessions ──
-# Each new Cursor SSH session starts its own servers; old ones just waste RAM.
-_cursor_cleanup() {
-  local stale
-  stale=$(pgrep -c -f 'cursor-server.*--start-server' 2>/dev/null || echo 0)
-  if [ "$stale" -gt 0 ]; then
-    pkill -f 'cursor-server.*--start-server' 2>/dev/null
-    pkill -f 'multiplex-server.*\.js' 2>/dev/null
-    pkill -f 'bootstrap-fork.*--type=extensionHost' 2>/dev/null
-    sleep 0.2
-  fi
-}
-_cursor_cleanup
-unset -f _cursor_cleanup
 
 # ── Ensure background processes survive SSH disconnect ──
 # When SSH drops, the kernel sends SIGHUP to the session. This trap
