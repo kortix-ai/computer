@@ -132,16 +132,9 @@ export function UserMenu({ user }: UserMenuProps) {
   const generalItems: MenuItemConfig[] = [
     ...(billingActive ? [
       { icon: Zap, label: 'Plan', onClick: () => { trackCtaUpgrade(); setShowPlanModal(true); } },
-      { icon: LifeBuoy, label: 'Support', href: '/support' },
       { icon: CreditCard, label: 'Billing', onClick: () => openSettings('billing') },
     ] : []),
-    { icon: KeyRound, label: 'Secrets Manager', href: '/settings/credentials' },
-    { icon: Key, label: 'API Keys', href: '/settings/api-keys' },
     { icon: Settings, label: 'Settings', onClick: () => openSettings('general') },
-    { icon: Sparkles, label: 'Skills', href: '/skills' },
-    { icon: MessageSquare, label: 'Channels', href: '/channels' },
-    { icon: Calendar, label: 'Scheduled Tasks', href: '/scheduled-tasks' },
-    { icon: BookOpen, label: 'Tutorials', href: '/tutorials' },
   ];
 
   const adminItems: MenuItemConfig[] = [

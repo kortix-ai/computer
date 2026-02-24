@@ -1,13 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Check, Monitor, Sun, Moon, Palette, ImageIcon } from 'lucide-react';
+import { Search, Check, Monitor, Sun, Moon, Palette, ImageIcon, ZoomIn } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useUserPreferencesStore } from '@/stores/user-preferences-store';
+import { useUserPreferencesStore, ZOOM_LEVELS, type UIZoom } from '@/stores/user-preferences-store';
 import { THEMES, DEFAULT_THEME_ID, type KortixTheme } from '@/lib/themes';
 import { WALLPAPERS, DEFAULT_WALLPAPER_ID, type Wallpaper } from '@/lib/wallpapers';
 
@@ -156,6 +156,8 @@ export function AppearanceTab() {
     (s) => s.preferences.wallpaperId ?? DEFAULT_WALLPAPER_ID
   );
   const setWallpaperId = useUserPreferencesStore((s) => s.setWallpaperId);
+  const uiZoom = useUserPreferencesStore((s) => s.preferences.uiZoom ?? 'default');
+  const setUIZoom = useUserPreferencesStore((s) => s.setUIZoom);
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -173,7 +175,7 @@ export function AppearanceTab() {
   }, [search]);
 
   const hasCustomSettings =
-    themeId !== DEFAULT_THEME_ID || wallpaperId !== DEFAULT_WALLPAPER_ID;
+    themeId !== DEFAULT_THEME_ID || wallpaperId !== DEFAULT_WALLPAPER_ID || uiZoom !== 'default';
 
   return (
     <div className="flex flex-col h-full">
@@ -213,6 +215,37 @@ export function AppearanceTab() {
                 >
                   <Icon className="size-3.5" />
                   {mode.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Interface Scale Section ── */}
+        <div className="pb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <ZoomIn className="size-4 text-muted-foreground" />
+            <label className="text-xs font-medium text-muted-foreground">
+              Interface Scale
+            </label>
+          </div>
+          <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+            {ZOOM_LEVELS.map((level) => {
+              const isActive = uiZoom === level.id;
+              return (
+                <button
+                  key={level.id}
+                  type="button"
+                  onClick={() => setUIZoom(level.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150',
+                    isActive
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {level.label}
+                  <span className="text-[10px] opacity-60">{level.value}%</span>
                 </button>
               );
             })}
@@ -284,6 +317,7 @@ export function AppearanceTab() {
             onClick={() => {
               setThemeId(DEFAULT_THEME_ID);
               setWallpaperId(DEFAULT_WALLPAPER_ID);
+              setUIZoom('default');
             }}
           >
             Reset to defaults

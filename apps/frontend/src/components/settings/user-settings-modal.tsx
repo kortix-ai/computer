@@ -102,7 +102,7 @@ import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
 import { previewSound } from '@/lib/sounds';
-type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'integrations' | 'api-keys' | 'referrals' | 'shortcuts';
+type TabId = 'general' | 'appearance' | 'sounds' | 'notifications' | 'plan' | 'billing' | 'transactions' | 'referrals' | 'shortcuts';
 
 interface Tab {
     id: TabId;
@@ -129,20 +129,29 @@ export function UserSettingsModal({
     const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
     const [showPlanModal, setShowPlanModal] = useState(false);
     const billingActive = isBillingEnabled();
-    const tabs: Tab[] = [
+
+    const preferenceTabs: Tab[] = [
         { id: 'general', label: 'General', icon: Settings },
         { id: 'appearance', label: 'Appearance', icon: Palette },
         { id: 'sounds', label: 'Sounds', icon: Volume2 },
         { id: 'notifications', label: 'Notifications', icon: Bell },
         { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+    ];
+
+    const accountTabs: Tab[] = [
         { id: 'plan', label: 'Plan', icon: Zap },
         { id: 'billing', label: 'Billing', icon: CreditCard },
         { id: 'transactions', label: 'Transactions', icon: Receipt },
-
         ...(billingActive ? [{ id: 'referrals' as TabId, label: 'Referrals', icon: Users }] : []),
-        { id: 'integrations', label: 'Secrets Manager', icon: Plug },
-        { id: 'api-keys', label: 'API Keys', icon: Key },
     ];
+
+    const tabGroups = [
+        { label: 'Preferences', tabs: preferenceTabs },
+        { label: 'Account', tabs: accountTabs },
+    ];
+
+    // Flat list for mobile horizontal scroll
+    const allTabs = [...preferenceTabs, ...accountTabs];
     
     useEffect(() => {
         setActiveTab(defaultTab);
@@ -151,12 +160,6 @@ export function UserSettingsModal({
     const handleTabClick = (tabId: TabId) => {
         if (tabId === 'plan') {
             setShowPlanModal(true);
-        } else if (tabId === 'integrations') {
-            onOpenChange(false);
-            router.push('/settings/credentials');
-        } else if (tabId === 'api-keys') {
-            onOpenChange(false);
-            router.push('/settings/api-keys');
         } else {
             setActiveTab(tabId);
         }
@@ -196,7 +199,7 @@ export function UserSettingsModal({
                         {/* Mobile Tabs - Horizontal Scroll */}
                         <div className="px-3 py-2.5 border-b border-border flex-shrink-0 bg-background">
                             <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                {tabs.map((tab) => {
+                                {allTabs.map((tab) => {
                                     const Icon = tab.icon;
                                     const isActive = activeTab === tab.id;
 
@@ -250,29 +253,38 @@ export function UserSettingsModal({
                                 </Button>
                             </div>
 
-                            {/* Desktop Tabs */}
-                            <div className="flex flex-col gap-1.5">
-                                {tabs.map((tab) => {
-                                    const Icon = tab.icon;
-                                    const isActive = activeTab === tab.id;
+                            {/* Desktop Tabs - Grouped */}
+                            <div className="flex flex-col gap-4">
+                                {tabGroups.map((group) => (
+                                    <div key={group.label}>
+                                        <div className="px-4 pb-1.5">
+                                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">{group.label}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            {group.tabs.map((tab) => {
+                                                const Icon = tab.icon;
+                                                const isActive = activeTab === tab.id;
 
-                                    return (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => handleTabClick(tab.id)}
-                                            disabled={tab.disabled}
-                                            className={cn(
-                                                "w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg transition-colors",
-                                                isActive
-                                                    ? "bg-muted text-foreground"
-                                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                            )}
-                                        >
-                                            <Icon className="h-4 w-4 flex-shrink-0" />
-                                            <span>{tab.label}</span>
-                                        </button>
-                                    );
-                                })}
+                                                return (
+                                                    <button
+                                                        key={tab.id}
+                                                        onClick={() => handleTabClick(tab.id)}
+                                                        disabled={tab.disabled}
+                                                        className={cn(
+                                                            "w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-colors",
+                                                            isActive
+                                                                ? "bg-muted text-foreground"
+                                                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                                        )}
+                                                    >
+                                                        <Icon className="h-4 w-4 flex-shrink-0" />
+                                                        <span>{tab.label}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
