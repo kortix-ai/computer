@@ -114,14 +114,14 @@ function SessionItem({
     >
       <div
         className={cn(
-          'flex items-center gap-2 py-1.5 rounded-lg text-[13px] cursor-pointer',
+          'flex items-center gap-1.5 py-1 rounded-md text-[12px] cursor-pointer',
           'transition-colors duration-150',
           isActive
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
-          'pr-3',
+          'pr-2',
         )}
-        style={{ paddingLeft: `${16 + depth * 14}px` }}
+        style={{ paddingLeft: `${12 + depth * 12}px` }}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >

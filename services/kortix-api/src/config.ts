@@ -115,7 +115,7 @@ export const config = {
   SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
   /**
    * Base host port used for local Docker sandbox fixed port mappings.
-   * The sandbox uses 7 contiguous ports starting at this base.
+   * The sandbox uses 8 contiguous ports starting at this base.
    */
   SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
 

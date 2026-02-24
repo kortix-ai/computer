@@ -38,6 +38,7 @@ RUN apk update \
         gcc g++ musl-dev linux-headers \
         libffi-dev libxml2-dev libxslt-dev \
         gcompat \
+        openssh-server openssh-sftp-server \
     && rm -rf /var/cache/apk/*
 
 # Install bun to /opt/bun (NOT /workspace which is a volume mount at runtime)
@@ -198,13 +199,15 @@ ENV KORTIX_WORKSPACE=/workspace
 # Each service is a directory with: run, type (longrun), dependencies.d/init-services
 COPY sandbox/s6-services/ /etc/s6-overlay/s6-rc.d/
 # Register all custom services in the user bundle so s6 starts them
-RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-lss-sync svc-agent-browser-viewer svc-presentation-viewer; do \
+RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-lss-sync svc-agent-browser-viewer svc-presentation-viewer svc-sshd; do \
         touch "/etc/s6-overlay/s6-rc.d/user/contents.d/${svc}"; \
     done \
     && chmod +x /etc/s6-overlay/s6-rc.d/svc-*/run
 
 # ── Container init scripts (s6 cont-init.d) ─────────────────────────────────
 RUN mkdir -p /custom-cont-init.d
+COPY sandbox/config/95-setup-sshd.sh /custom-cont-init.d/95-setup-sshd
+RUN chmod +x /custom-cont-init.d/95-setup-sshd
 COPY sandbox/config/96-fix-bun-pty.sh /custom-cont-init.d/96-fix-bun-pty
 RUN chmod +x /custom-cont-init.d/96-fix-bun-pty
 COPY sandbox/config/97-secrets-to-s6-env.sh /custom-cont-init.d/97-secrets-to-s6-env
@@ -229,6 +232,6 @@ ENV SELKIES_MANUAL_HEIGHT=1080
 ENV SELKIES_USE_CSS_SCALING=true
 ENV TITLE="Kortix Computer"
 
-EXPOSE 6080 6081 3111 3210 8000 9223 9224
+EXPOSE 22 6080 6081 3111 3210 8000 9223 9224
 
 ENTRYPOINT ["/opt/startup.sh"]

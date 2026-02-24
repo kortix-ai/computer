@@ -151,7 +151,7 @@ function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center justify-center w-full py-2.5 rounded-xl cursor-pointer',
+        'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer',
         'transition-all duration-150 ease-out',
         'text-sidebar-foreground hover:bg-sidebar-accent',
         disabled && 'opacity-50 cursor-not-allowed',
@@ -177,7 +177,7 @@ function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: 
           side="right"
           align="start"
           sideOffset={12}
-          className="w-[280px] max-h-[75vh] p-0 overflow-hidden"
+          className="w-[240px] max-h-[75vh] p-0 overflow-hidden"
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -481,8 +481,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       {...props}
     >
       {/* ====== HEADER: Logo + collapse/expand ====== */}
-      <SidebarHeader className="pt-4 pb-0 overflow-visible">
-        <div className="relative flex h-[32px] items-center px-4 justify-between">
+      <SidebarHeader className="pt-3 pb-0 overflow-visible">
+        <div className="relative flex h-[28px] items-center px-3 justify-between">
           {/* Collapsed: Kortix symbol (always visible), chevron on hover */}
           {state === 'collapsed' && (
             <div
@@ -553,17 +553,17 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative overflow-visible">
         {/* --- Collapsed: 3 icon buttons — New Chat, Projects, Sessions --- */}
         <div className={cn(
-          'absolute inset-0 px-3 pt-3 space-y-1 flex flex-col items-center overflow-visible',
+          'absolute inset-0 px-1.5 pt-2 space-y-0.5 flex flex-col items-center overflow-visible',
           state === 'collapsed' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}>
           <CollapsedIconButton
-            icon={<SquarePen className="h-[18px] w-[18px]" />}
+            icon={<SquarePen className="h-4 w-4" />}
             label="New session"
             onClick={handleNewSession}
             disabled={createSession.isPending}
           />
           <CollapsedIconButton
-            icon={<Search className="h-[18px] w-[18px]" />}
+            icon={<Search className="h-4 w-4" />}
             label="Search"
             onClick={() => {
               const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent);
@@ -580,13 +580,13 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             }}
           />
           <CollapsedIconButton
-            icon={<ListTree className="h-[18px] w-[18px]" />}
+            icon={<ListTree className="h-4 w-4" />}
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
           />
-          <div className="w-6 border-t border-sidebar-border my-1" />
+          <div className="w-5 border-t border-sidebar-border my-0.5" />
           <CollapsedIconButton
-            icon={<Blocks className="h-[18px] w-[18px]" />}
+            icon={<Blocks className="h-4 w-4" />}
             label="Workspace"
             onClick={() => {
               openTabAndNavigate({
@@ -617,19 +617,19 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
         )}>
           {/* Navigation */}
-          <nav className="flex-shrink-0 px-3 pt-3 pb-2 space-y-1">
+          <nav className="flex-shrink-0 px-2 pt-2 pb-1 space-y-0.5">
             {/* New session */}
             <button
               onClick={handleNewSession}
               disabled={createSession.isPending}
               className={cn(
-                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm cursor-pointer',
+                'flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[13px] cursor-pointer',
                 'transition-colors duration-150',
                 'text-sidebar-foreground hover:bg-sidebar-accent',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
               )}
             >
-              <SquarePen className="h-[18px] w-[18px] flex-shrink-0" />
+              <SquarePen className="h-4 w-4 flex-shrink-0" />
               <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
             </button>
 
@@ -648,11 +648,11 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                   }),
                 );
               }}
-              className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+              className="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
             >
-              <Search className="h-[18px] w-[18px] flex-shrink-0" />
+              <Search className="h-4 w-4 flex-shrink-0" />
               <span className="flex-1 text-left">Search</span>
-              <kbd className="text-[11px] text-muted-foreground">
+              <kbd className="text-[10px] text-muted-foreground">
                 {typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '\u2318K' : 'Ctrl K'}
               </kbd>
             </button>
@@ -661,7 +661,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           </nav>
 
           {/* Workspace link */}
-          <nav className="flex-shrink-0 px-3 space-y-1">
+          <nav className="flex-shrink-0 px-2 space-y-0.5">
             <button
               onClick={() => {
                 openTabAndNavigate({
@@ -673,13 +673,13 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 if (isMobile) setOpenMobile(false);
               }}
               className={cn(
-                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer',
+                'flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
                 (pathname === '/workspace' || pathname?.startsWith('/projects') || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent',
               )}
             >
-              <Blocks className="h-[18px] w-[18px] flex-shrink-0" />
+              <Blocks className="h-4 w-4 flex-shrink-0" />
               <span>Workspace</span>
             </button>
             <button
@@ -693,7 +693,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 if (isMobile) setOpenMobile(false);
               }}
               className={cn(
-                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer',
+                'flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
                 pathname === '/integrations'
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent',
@@ -705,12 +705,12 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           </nav>
 
           <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
-            <div className="px-3 flex-shrink-0">
+            <div className="px-2 flex-shrink-0">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
-                  <ListTree className="h-[18px] w-[18px] flex-shrink-0" />
+                <button className="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
+                  <ListTree className="h-4 w-4 flex-shrink-0" />
                   <span className="flex-1 text-left">Sessions</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
                 </button>
               </CollapsibleTrigger>
             </div>
@@ -722,7 +722,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       </SidebarContent>
 
       {/* ====== FOOTER ====== */}
-      <SidebarFooter className="px-3 pb-3 pt-0 group-data-[collapsible=icon]:px-0">
+      <SidebarFooter className="px-2 pb-2 pt-0 group-data-[collapsible=icon]:px-0">
         <SidebarUpdateIndicator collapsed={state === 'collapsed'} />
         <UserProfileSection user={user} />
       </SidebarFooter>

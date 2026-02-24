@@ -216,21 +216,21 @@ export function UserMenu({ user }: UserMenuProps) {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="bg-transparent hover:bg-transparent data-[state=open]:bg-transparent border-[1.5px] border-border h-[64px] p-3 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!h-10 group-data-[collapsible=icon]:!w-10 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:!mx-auto"
+                className="bg-transparent hover:bg-transparent data-[state=open]:bg-transparent border-[1.5px] border-border h-[48px] p-2 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!w-8 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:!mx-auto"
               >
-                <Avatar className="h-10 w-10 rounded-full flex-shrink-0">
+                <Avatar className="h-8 w-8 rounded-full flex-shrink-0">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-full">{getInitials(user.name)}</AvatarFallback>
+                  <AvatarFallback className="rounded-full text-xs">{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col justify-between flex-1 min-w-0 h-10 group-data-[collapsible=icon]:hidden">
-                  <span className="truncate font-medium text-sm leading-tight">{user.name}</span>
+                <div className="flex flex-col justify-center flex-1 min-w-0 gap-0.5 group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-medium text-[13px] leading-tight">{user.name}</span>
                   {user.planName ? (
                     <TierBadge planName={user.planName} size="xs" variant="default" />
                   ) : (
-                    <span className="truncate text-xs text-muted-foreground leading-tight">{user.email}</span>
+                    <span className="truncate text-[11px] text-muted-foreground leading-tight">{user.email}</span>
                   )}
                 </div>
-                <ChevronsUpDown className="ml-auto size-4 flex-shrink-0 group-data-[collapsible=icon]:hidden" />
+                <ChevronsUpDown className="ml-auto size-3.5 flex-shrink-0 group-data-[collapsible=icon]:hidden" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
 
