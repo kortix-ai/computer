@@ -731,7 +731,7 @@ export const KortixComputer = memo(function KortixComputer({
               opacity: { duration: disableInitialAnimation ? 0 : 0.15 },
               layout: { type: "spring", stiffness: 400, damping: 35 }
             }}
-            className="m-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] border rounded-2xl flex flex-col z-30 overflow-hidden bg-card"
+            className="m-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] border rounded-[24px] flex flex-col z-30 overflow-hidden bg-card"
             style={{ contain: 'strict' }}
           >
             {renderContent()}
@@ -750,7 +750,7 @@ export const KortixComputer = memo(function KortixComputer({
       className={cn(
         "h-full w-full flex flex-col bg-card overflow-hidden min-w-0 min-h-0",
         "transition-[border-radius,border-color] duration-300 ease-out",
-        isExpanded ? "rounded-none border-transparent" : "border rounded-2xl"
+        isExpanded ? "rounded-none border-transparent" : "border rounded-[24px]"
       )}
       style={{ contain: 'strict' }}
     >

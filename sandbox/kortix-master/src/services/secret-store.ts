@@ -15,8 +15,8 @@ export class SecretStore {
   private salt: Buffer | null = null
 
   constructor() {
-    this.secretsPath = process.env.SECRET_FILE_PATH || '/app/secrets/.secrets.json'
-    this.saltPath = process.env.SALT_FILE_PATH || '/app/secrets/.salt'
+    this.secretsPath = process.env.SECRET_FILE_PATH || '/workspace/.secrets/.secrets.json'
+    this.saltPath = process.env.SALT_FILE_PATH || '/workspace/.secrets/.salt'
   }
 
   private async ensureDirectories() {

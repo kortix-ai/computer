@@ -12,10 +12,13 @@ import {
   ChevronRight,
   Plug,
   FolderOpen,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { OpenCodeSettingsDialog } from '@/components/session/opencode-settings-dialog';
 import { useOpenCodeAgents, useOpenCodeCommands, useOpenCodeToolIds, useOpenCodeMcpStatus, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
 import { useSkills } from '@/features/skills/hooks';
 import { getSkillSource } from '@/features/skills/types';
@@ -91,6 +94,7 @@ export default function WorkspacePage() {
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Data
   const { data: projects, isLoading: projectsLoading } = useOpenCodeProjects();
@@ -152,7 +156,7 @@ export default function WorkspacePage() {
           description: s.description,
           kind: 'skill',
           scope,
-          href: `/skills/${encodeURIComponent(s.name)}`,
+          // Detail page removed – no href for skills
         });
       }
     }
@@ -166,7 +170,7 @@ export default function WorkspacePage() {
           description: c.description,
           kind: 'command',
           scope: getCommandScope(c.source),
-          href: `/commands/${encodeURIComponent(c.name)}`,
+          // Detail page removed – no href for commands
           meta: c.agent,
         });
       }
@@ -268,12 +272,25 @@ export default function WorkspacePage() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            All agents, skills, commands, tools, and MCP servers in your environment.
-          </p>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              All agents, skills, commands, tools, and MCP servers in your environment.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            className="shrink-0 gap-2 h-9 px-3 mt-0.5"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
         </div>
+
+        <OpenCodeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">

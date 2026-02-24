@@ -23,7 +23,7 @@ import {
   adaptMessagesToToolCalls,
   adaptAgentStatus,
 } from '@/lib/adapters/opencode-to-kortix-computer';
-import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { X } from 'lucide-react';
 
 // ============================================================================
 // Session Layout
@@ -276,7 +276,7 @@ export const SessionLayout = memo(function SessionLayout({
           >
             <div className={cn(
               "h-full transition-[padding] duration-300 ease-out",
-              isExpanded ? "p-0" : "pt-3 pb-5 pr-3 pl-1.5"
+              isExpanded ? "p-0" : "pt-3 pb-6 pr-3 sm:pr-4 pl-1.5"
             )}>
               <KortixComputer
                 isOpen={isSidePanelOpen && hasToolCalls}
@@ -295,19 +295,13 @@ export const SessionLayout = memo(function SessionLayout({
                 sidePanelRef={sidePanelRef}
                 hideTopBar={true}
                 headerSlot={
-                  <div className="flex-shrink-0 h-10 flex items-center justify-end px-3 gap-0.5">
-                    <button
-                      onClick={toggleExpanded}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                      title={isExpanded ? 'Collapse' : 'Expand'}
-                    >
-                      {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                    </button>
+                  <div className="flex-shrink-0 flex items-center justify-between pl-4 pr-1.5 pt-1.5">
+                    <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase select-none">Actions</span>
                     <button
                       onClick={handleSidePanelClose}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 }
