@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTabStore } from '@/stores/tab-store';
 
@@ -12,31 +12,27 @@ import { useTabStore } from '@/stores/tab-store';
  * (e.g. browser refresh, link sharing).
  *
  * If the services tab already exists in the store, it activates it.
- * Otherwise, it creates and activates it.
+ * Otherwise, it redirects to the dashboard (the tab can only be created
+ * via the sidebar action).
  */
 export default function RunningServicesPage() {
   const router = useRouter();
-  const { tabs, setActiveTab, openTab } = useTabStore();
+  const { tabs, setActiveTab } = useTabStore();
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+
     const tabId = 'services:running';
     const existingTab = tabs[tabId];
 
     if (existingTab) {
-      // Tab exists — activate it
       setActiveTab(tabId);
     } else {
-      // Tab doesn't exist — create it
-      openTab({
-        id: tabId,
-        title: 'Running Services',
-        type: 'services',
-        href: '/services/running',
-      });
+      router.replace('/dashboard');
     }
-  }, [tabs, setActiveTab, openTab, router]);
+  }, [tabs, setActiveTab, router]);
 
-  // The actual panel is rendered by SessionTabsContainer in layout-content.tsx
-  // This page renders nothing visible — it just ensures the tab is activated
   return null;
 }
