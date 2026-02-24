@@ -60,6 +60,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { TextShimmer } from "@/components/ui/text-shimmer";
 import {
 	Tooltip,
 	TooltipContent,
@@ -481,6 +482,8 @@ interface BasicToolProps {
 
 /** Context to pass running state from ToolPartRenderer into BasicTool without prop drilling */
 const ToolRunningContext = createContext(false);
+/** Context to pass stale-pending state from ToolPartRenderer into BasicTool */
+const StalePendingContext = createContext(false);
 
 export function BasicTool({
 	icon,
@@ -493,6 +496,18 @@ export function BasicTool({
 }: BasicToolProps) {
 	const running = useContext(ToolRunningContext);
 	const [open, setOpen] = useState(defaultOpen);
+
+	// Track if this tool just finished (running → not running) so we can
+	// play a single completion shimmer. If it was already completed on mount
+	// (e.g. reopening a session), don't shimmer.
+	const wasRunningRef = useRef(running);
+	const [justCompleted, setJustCompleted] = useState(false);
+	useEffect(() => {
+		if (wasRunningRef.current && !running) {
+			setJustCompleted(true);
+		}
+		wasRunningRef.current = running;
+	}, [running]);
 
 	useEffect(() => {
 		if (forceOpen) setOpen(true);
@@ -534,7 +549,12 @@ export function BasicTool({
 								<span className="font-medium text-xs text-foreground whitespace-nowrap">
 									{trigger.title}
 								</span>
-								{trigger.subtitle && (
+							{trigger.subtitle && (
+								running ? (
+									<TextShimmer duration={1} spread={2} className="text-xs truncate font-mono">
+										{trigger.subtitle}
+									</TextShimmer>
+								) : (
 									<span
 										className={cn(
 											"text-muted-foreground text-xs truncate font-mono",
@@ -550,9 +570,14 @@ export function BasicTool({
 												: undefined
 										}
 									>
-										{trigger.subtitle}
+										{justCompleted ? (
+											<TextShimmer duration={1} spread={2} repeat={1} className="text-xs font-mono">
+												{trigger.subtitle}
+											</TextShimmer>
+										) : trigger.subtitle}
 									</span>
-								)}
+								)
+							)}
 								{trigger.args &&
 									trigger.args.length > 0 &&
 									trigger.args.map((arg, i) => (
@@ -1226,7 +1251,14 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	return (
 		<BasicTool
 			icon={<Terminal className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Shell", subtitle: description || (isWaiting ? "Preparing command..." : isStalePending ? "Not completed" : undefined) }}
+			trigger={isStalePending ? (
+			<div className="flex items-center gap-1.5 min-w-0 flex-1">
+				<span className="font-medium text-xs text-foreground whitespace-nowrap">Shell</span>
+				<TextShimmer duration={1} spread={2} className="text-xs italic">
+					Working...
+				</TextShimmer>
+			</div>
+		) : { title: "Shell", subtitle: description || (isWaiting ? "Preparing command..." : undefined) }}
 			defaultOpen={defaultOpen}
 			forceOpen={forceOpen}
 			locked={locked}
@@ -1241,11 +1273,11 @@ function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 								<span>Preparing command...</span>
 							</div>
 						</div>
-					) : isStalePending ? (
-						<div className="px-3 py-2 text-muted-foreground/60 text-[11px] italic">
-							Tool call was not completed
-						</div>
-					) : (
+				) : isStalePending ? (
+					<div className="px-3 py-2 text-muted-foreground/60 text-[11px] italic">
+						Preparing command...
+					</div>
+				) : (
 						<HighlightedCode code={`$ ${command}`} language="bash">
 							{`$ ${command}`}
 						</HighlightedCode>
@@ -1629,22 +1661,22 @@ function WriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 					<span className="font-medium text-xs text-foreground whitespace-nowrap">
 						Write
 					</span>
-					{filename ? (
-						<>
-							<span className="text-xs text-foreground font-mono truncate">
-								{filename}
-							</span>
-							{directory && (
-								<span className="text-muted-foreground text-[10px] font-mono truncate hidden sm:inline">
-									{directory}
-								</span>
-							)}
-						</>
-					) : isStalePending ? (
-						<span className="text-muted-foreground text-xs italic">
-							Not completed
+				{filename ? (
+					<>
+						<span className="text-xs text-foreground font-mono truncate">
+							{filename}
 						</span>
-					) : null}
+						{directory && (
+							<span className="text-muted-foreground text-[10px] font-mono truncate hidden sm:inline">
+								{directory}
+							</span>
+						)}
+					</>
+				) : isStalePending ? (
+					<TextShimmer duration={1} spread={2} className="text-xs italic">
+						Working...
+					</TextShimmer>
+				) : null}
 				</div>
 			}
 			defaultOpen={defaultOpen}
@@ -1663,11 +1695,11 @@ function WriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 						/>
 					</div>
 				</div>
-			) : isStalePending ? (
-				<div className="px-3 py-2 text-muted-foreground/60 text-[11px] italic">
-					Tool call was not completed
-				</div>
-			) : null}
+		) : isStalePending ? (
+			<div className="px-3 py-2 text-muted-foreground/60 text-[11px] italic">
+				Waiting for file content...
+			</div>
+		) : null}
 			<DiagnosticsDisplay diagnostics={diagnostics} />
 		</BasicTool>
 	);
@@ -5887,6 +5919,7 @@ export function ToolPartRenderer({
 
 	return (
 		<ToolRunningContext.Provider value={isRunning}>
+		<StalePendingContext.Provider value={isStalePending}>
 			<div className="relative">
 				{toolElement}
 
@@ -5911,6 +5944,7 @@ export function ToolPartRenderer({
 					</div>
 				)}
 			</div>
+		</StalePendingContext.Provider>
 		</ToolRunningContext.Provider>
 	);
 }

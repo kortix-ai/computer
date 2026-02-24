@@ -1,21 +1,23 @@
 'use client';
 
-import { useMemo, useCallback, useState, useEffect, lazy, Suspense } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
+  Code,
   Download,
+  Eye,
   FileWarning,
   GitBranch,
   Loader2,
   Save,
 } from 'lucide-react';
-import { codeToHtml } from 'shiki';
-import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useFileContent } from '@/features/files/hooks';
 import { downloadFile, uploadFile, readFileAsBlob } from '@/features/files/api/opencode-files';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useTabStore } from '@/stores/tab-store';
+import { UnifiedMarkdown } from '@/components/markdown';
+import { CodeEditor } from '@/components/file-editors/code-editor';
 
 // Lazy-load heavy renderers
 const PdfRenderer = lazy(() =>
@@ -188,54 +190,37 @@ interface FileTabContentProps {
 export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
   const { data: fileContent, isLoading, error, refetch } = useFileContent(filePath);
 
-  const [editedContent, setEditedContent] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [highlightedHtml, setHighlightedHtml] = useState<string>('');
-  const { resolvedTheme } = useTheme();
+  const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
+  const latestContentRef = useRef<string>('');
 
   const fileName = filePath.split('/').pop() || '';
   const language = getLanguageFromExt(fileName);
+  const isMarkdownFile = language === 'markdown';
   const fileCategory = getFileCategory(fileName, fileContent?.mimeType);
 
   const { blobUrl, blob: docxBlob, blobLoading, blobError } = useBinaryBlob(filePath, fileCategory);
 
-  const hasUnsavedChanges = editedContent !== null;
-  const displayContent = editedContent ?? fileContent?.content ?? '';
+  const displayContent = fileContent?.content ?? '';
 
   // Update tab dirty state
   useEffect(() => {
     useTabStore.getState().setTabDirty(tabId, hasUnsavedChanges);
   }, [tabId, hasUnsavedChanges]);
 
-  // Reset editing mode when file changes
+  // Keep latestContentRef in sync with loaded content
   useEffect(() => {
-    setIsEditing(false);
-    setHighlightedHtml('');
-    setEditedContent(null);
-  }, [filePath]);
+    if (fileContent?.content) {
+      latestContentRef.current = fileContent.content;
+    }
+  }, [fileContent?.content]);
 
-  // Syntax highlight with Shiki
-  const shikiTheme = resolvedTheme === 'dark' ? 'github-dark' : 'github-light';
+  // Reset state when file changes
   useEffect(() => {
-    if (isEditing || !displayContent || language === 'plaintext') return;
-    let cancelled = false;
-    codeToHtml(displayContent, {
-      lang: language,
-      theme: shikiTheme,
-      transformers: [{
-        pre(node) {
-          if (node.properties.style) {
-            node.properties.style = (node.properties.style as string)
-              .replace(/background-color:[^;]+;?/g, '');
-          }
-        },
-      }],
-    })
-      .then((html) => { if (!cancelled) setHighlightedHtml(html); })
-      .catch(() => { if (!cancelled) setHighlightedHtml(''); });
-    return () => { cancelled = true; };
-  }, [displayContent, language, shikiTheme, isEditing]);
+    setIsMarkdownPreview(false);
+    setHasUnsavedChanges(false);
+  }, [filePath]);
 
   const handleDownload = useCallback(async () => {
     try {
@@ -245,25 +230,43 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
     }
   }, [filePath, fileName]);
 
-  const handleSave = useCallback(async () => {
-    if (editedContent === null) return;
+  // Save handler for CodeEditor and header save button
+  const handleSave = useCallback(async (content: string) => {
     setIsSaving(true);
     try {
-      const blobData = new Blob([editedContent], { type: 'text/plain;charset=utf-8' });
+      const blobData = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const file = new File([blobData], fileName, { type: 'text/plain' });
       const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
       await uploadFile(file, parentPath || undefined);
-      // Refetch FIRST so the cache has the new content, then clear local edits.
-      // Clearing editedContent before refetch would flash the stale cached value.
       await refetch();
-      setEditedContent(null);
+      setHasUnsavedChanges(false);
       toast.success('File saved');
     } catch (err) {
       toast.error(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
-  }, [filePath, editedContent, fileName, refetch]);
+  }, [filePath, fileName, refetch]);
+
+  // Track editor content changes
+  const handleEditorChange = useCallback((content: string) => {
+    latestContentRef.current = content;
+  }, []);
+
+  // Cmd+S handler for when CodeEditor is not mounted (e.g. markdown preview)
+  useEffect(() => {
+    if (!isMarkdownPreview) return; // CodeEditor handles its own Cmd+S
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (hasUnsavedChanges && latestContentRef.current) {
+          handleSave(latestContentRef.current);
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isMarkdownPreview, hasUnsavedChanges, handleSave]);
 
   const imageDataUrl = useMemo(() => {
     if (fileContent?.encoding === 'base64' && isImageMime(fileContent.mimeType)) {
@@ -289,19 +292,37 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {/* Save button */}
           {hasUnsavedChanges && fileContent?.type === 'text' && (
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-yellow-500 hover:text-yellow-600"
-              onClick={handleSave}
+              onClick={() => handleSave(latestContentRef.current)}
               disabled={isSaving}
-              title="Save (Ctrl+S)"
+              title="Save (Cmd+S)"
             >
               {isSaving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Save className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          )}
+
+          {/* Markdown preview toggle */}
+          {isMarkdownFile && fileContent?.type === 'text' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('h-7 w-7', isMarkdownPreview && 'text-primary')}
+              onClick={() => setIsMarkdownPreview((v) => !v)}
+              title={isMarkdownPreview ? 'View source' : 'Preview markdown'}
+            >
+              {isMarkdownPreview ? (
+                <Code className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
               )}
             </Button>
           )}
@@ -409,52 +430,29 @@ export function FileTabContent({ tabId, filePath }: FileTabContentProps) {
         )}
 
         {!isLoading && !error && fileContent && fileContent.type === 'text' && !imageDataUrl && fileCategory !== 'csv' && (
-          <div className="relative h-full">
+          <div className="relative h-full flex flex-col">
             {fileContent.patch && fileContent.patch.hunks.length > 0 && (
-              <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-1.5 bg-yellow-500/5 border-b border-yellow-500/20 text-xs text-yellow-600 dark:text-yellow-400">
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-yellow-500/5 border-b border-yellow-500/20 text-xs text-yellow-600 dark:text-yellow-400 shrink-0">
                 <GitBranch className="h-3 w-3" />
                 File has uncommitted changes
               </div>
             )}
-            {isEditing ? (
-              <textarea
-                autoFocus
-                value={displayContent}
-                onChange={(e) => setEditedContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                    e.preventDefault();
-                    if (hasUnsavedChanges) handleSave();
-                  }
-                  if (e.key === 'Escape') setIsEditing(false);
-                }}
-                className={cn(
-                  'w-full h-full text-sm leading-relaxed p-4 font-mono',
-                  'bg-transparent resize-none outline-none',
-                  'selection:bg-primary/20',
-                )}
-                spellCheck={false}
-              />
-            ) : (
-              <div
-                className="w-full h-full overflow-auto cursor-text"
-                onDoubleClick={() => setIsEditing(true)}
-              >
-                {highlightedHtml ? (
-                  <div
-                    className={cn(
-                      'p-4 font-mono text-sm leading-relaxed min-h-full',
-                      '[&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_pre]:!overflow-visible',
-                      '[&_code]:!bg-transparent',
-                    )}
-                    dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-                  />
-                ) : (
-                  <pre className="p-4 font-mono text-sm leading-relaxed text-foreground whitespace-pre min-h-full">
-                    {displayContent}
-                  </pre>
-                )}
+            {isMarkdownPreview && isMarkdownFile ? (
+              <div className="w-full h-full overflow-auto p-6">
+                <UnifiedMarkdown content={latestContentRef.current || displayContent} />
               </div>
+            ) : (
+              <CodeEditor
+                content={latestContentRef.current || fileContent.content}
+                originalContent={fileContent.content}
+                fileName={fileName}
+                onSave={handleSave}
+                onChange={handleEditorChange}
+                onUnsavedChange={setHasUnsavedChanges}
+                showHeader={false}
+                fontSize="text-xs"
+                className="h-full"
+              />
             )}
           </div>
         )}

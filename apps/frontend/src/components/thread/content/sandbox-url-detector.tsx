@@ -576,14 +576,8 @@ export const SandboxUrlDetector: React.FC<SandboxUrlDetectorProps> = ({
     <div>
       <UnifiedMarkdown content={safeContent} isStreaming={isStreaming} />
 
-      {/* Full preview cards for URLs in plain text (live services) */}
-      {liveUrls.map(({ detected: d, proxyUrl }) => (
-        <SandboxPreviewCard
-          key={`live-${d.port}-${d.path}`}
-          detected={d}
-          proxyUrl={proxyUrl}
-        />
-      ))}
+      {/* Plain-text localhost URLs are now rendered as inline preview cards
+          directly inside UnifiedMarkdown — no separate SandboxPreviewCard needed. */}
 
       {/* Compact chips for URLs found inside code blocks (examples/docs) */}
       {codeBlockUrls.length > 0 && (

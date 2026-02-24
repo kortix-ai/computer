@@ -8,6 +8,7 @@ import { db } from '../../../shared/db';
 import { WebhookVerificationError } from '../../../errors';
 import { config as appConfig } from '../../../config';
 import { verifySlackSignature, findConfigByTeamId } from './utils';
+import { getSlackPlatformCredentials } from '../../lib/platform-credentials';
 import { parseCommand, fuzzyMatchModel } from './command-parser';
 import { SlackApi } from './api';
 import { SandboxConnector } from '../../core/sandbox-connector';
@@ -163,7 +164,21 @@ export async function handleSlackWebhook(
 ): Promise<Response> {
   const rawBody = await c.req.text();
 
-  const signingSecret = appConfig.SLACK_SIGNING_SECRET;
+  // Try env var first, then fall back to DB-stored credentials.
+  // We parse the payload early to extract team_id for DB lookup.
+  const payload = JSON.parse(rawBody) as SlackPayload;
+  const teamIdForCreds = (payload as SlackEventCallback).team_id;
+
+  let signingSecret = appConfig.SLACK_SIGNING_SECRET;
+  if (!signingSecret && teamIdForCreds) {
+    // Look up the channel config to get the accountId + sandboxId, then resolve platform creds
+    const cfgForCreds = await findConfigByTeamId(teamIdForCreds);
+    if (cfgForCreds) {
+      const platformCreds = await getSlackPlatformCredentials(cfgForCreds.accountId, cfgForCreds.sandboxId);
+      signingSecret = platformCreds?.signingSecret || '';
+    }
+  }
+
   if (signingSecret) {
     const timestamp = c.req.header('X-Slack-Request-Timestamp') || '';
     const signature = c.req.header('X-Slack-Signature') || '';
@@ -178,8 +193,6 @@ export async function handleSlackWebhook(
       throw new WebhookVerificationError('Invalid Slack request signature');
     }
   }
-
-  const payload = JSON.parse(rawBody) as SlackPayload;
 
   if (payload.type === 'url_verification') {
     const verification = payload as SlackUrlVerification;

@@ -2,14 +2,6 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
-  Folder,
-  FileText,
-  FileCode,
-  FileImage,
-  FileVideo,
-  FileSpreadsheet,
-  FileType,
-  File as FileIcon,
   ChevronRight,
   Download,
   History,
@@ -23,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FileNode } from '../types';
+import { getFileIcon } from './file-icon';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -58,43 +51,9 @@ interface FileTreeItemProps {
 // Custom MIME type for internal drag-and-drop
 const DRAG_MIME = 'application/x-file-tree-path';
 
-/** File extension to icon mapping */
+/** File extension / filename to icon mapping */
 function getNodeIcon(node: FileNode) {
-  if (node.type === 'directory') {
-    return <Folder className="h-4 w-4 text-blue-400 shrink-0" />;
-  }
-
-  const ext = node.name.split('.').pop()?.toLowerCase() || '';
-
-  // Images
-  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif'].includes(ext)) {
-    return <FileImage className="h-4 w-4 text-purple-400 shrink-0" />;
-  }
-  // Video
-  if (['mp4', 'webm', 'avi', 'mov', 'mkv'].includes(ext)) {
-    return <FileVideo className="h-4 w-4 text-pink-400 shrink-0" />;
-  }
-  // Spreadsheets
-  if (['xlsx', 'xls', 'csv', 'tsv'].includes(ext)) {
-    return <FileSpreadsheet className="h-4 w-4 text-green-400 shrink-0" />;
-  }
-  // Code files
-  if ([
-    'ts', 'tsx', 'js', 'jsx', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp',
-    'h', 'hpp', 'cs', 'swift', 'kt', 'php', 'vue', 'svelte',
-  ].includes(ext)) {
-    return <FileCode className="h-4 w-4 text-yellow-400 shrink-0" />;
-  }
-  // Markdown/text
-  if (['md', 'mdx', 'txt', 'rst'].includes(ext)) {
-    return <FileText className="h-4 w-4 text-muted-foreground shrink-0" />;
-  }
-  // PDF/docs
-  if (['pdf', 'doc', 'docx', 'ppt', 'pptx'].includes(ext)) {
-    return <FileType className="h-4 w-4 text-red-400 shrink-0" />;
-  }
-
-  return <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />;
+  return getFileIcon(node.name, { isDirectory: node.type === 'directory' });
 }
 
 /** Git status → text color class */
@@ -289,7 +248,11 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, on
       )}
     >
       {getNodeIcon(node)}
-      <span className={cn('truncate flex-1', gitStatus && gitStatusTextColor[gitStatus])}>
+      <span className={cn(
+        'truncate flex-1',
+        gitStatus && gitStatusTextColor[gitStatus],
+        !gitStatus && node.name.startsWith('.') && 'opacity-50',
+      )}>
         {node.name}
       </span>
       {/* Right-side indicators: git status + diagnostics */}

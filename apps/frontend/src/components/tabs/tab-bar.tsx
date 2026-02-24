@@ -28,6 +28,7 @@ import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode
 import { useServerStore } from '@/stores/server-store';
 import { childMapByParent } from '@/ui';
 import { getClient } from '@/lib/opencode-sdk';
+import { getFileIcon } from '@/features/files/components/file-icon';
 import {
   Tooltip,
   TooltipContent,
@@ -118,6 +119,12 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
       href: pathname,
     };
   }
+
+  // File viewer routes (/files/<path>) are NOT auto-opened here.
+  // They are opened explicitly by the sidebar explorer or the catch-all
+  // route page ([...path]/page.tsx). Auto-opening from the sync effect
+  // would re-create a file tab immediately after closing it, because
+  // pushState doesn't update usePathname() and the old URL lingers.
 
   return null;
 }
@@ -513,6 +520,8 @@ function TabItem({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">Home</TooltipContent>
         </Tooltip>
+      ) : tab.type === 'file' ? (
+        getFileIcon(tab.title || 'file', { className: 'h-3 w-3 flex-shrink-0' })
       ) : (
         <Icon className={cn('h-3 w-3 flex-shrink-0 transition-colors', isActive ? 'text-foreground/50' : 'text-muted-foreground/40')} />
       )}
@@ -695,15 +704,26 @@ export function TabBar() {
     if (!pathname) return;
 
     closingTabIds.current.forEach((id) => {
-      // For session tabs, id is the sessionId; for page tabs, id is "page:/path"
-      const closedHref = id.startsWith('page:') ? id.slice(5) : `/sessions/${id}`;
-      if (pathname !== closedHref) {
+      // Derive the href that corresponds to this tab's ID so we can tell
+      // whether the browser is still on the closed tab's route.
+      let closedHref: string;
+      if (id.startsWith('page:')) {
+        closedHref = id.slice(5);
+      } else if (id.startsWith('file:')) {
+        closedHref = `/files/${encodeURIComponent(id.slice(5))}`;
+      } else {
+        closedHref = `/sessions/${id}`;
+      }
+      // Only remove from the set once we've navigated away.
+      // Compare decoded to handle %2F vs / mismatches from Next.js.
+      if (pathname !== closedHref && decodeURIComponent(closedHref) !== pathname) {
         closingTabIds.current.delete(id);
       }
     });
 
-    // If the current URL matches an existing tab, activate it
-    const matchingTab = orderedTabs.find((t) => t.href === pathname);
+    // If the current URL matches an existing tab, activate it.
+    // Compare both raw and decoded hrefs since Next.js decodes %2F in pathnames.
+    const matchingTab = orderedTabs.find((t) => t.href === pathname || decodeURIComponent(t.href) === pathname);
     if (matchingTab && matchingTab.id !== activeTabId) {
       setActiveTab(matchingTab.id);
       return;

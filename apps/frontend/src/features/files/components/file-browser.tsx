@@ -64,7 +64,8 @@ function ParentDropTarget({
   const counterRef = useRef(0);
 
   const parentPath = useMemo(() => {
-    return currentPath.replace(/\/[^/]+\/?$/, '') || '/';
+    const lastSlash = currentPath.lastIndexOf('/');
+    return lastSlash <= 0 ? '/' : currentPath.slice(0, lastSlash);
   }, [currentPath]);
 
   return (
@@ -285,7 +286,10 @@ export function FileBrowser() {
   // Navigate up one level
   const handleNavigateUp = useCallback(() => {
     if (isRootPath) return;
-    const parent = currentPath.replace(/\/[^/]+\/?$/, '') || '/';
+    // Strip the last path segment. If the path has no slash (e.g. ".agent-browser"
+    // from root listing), go to root '/'. Otherwise remove the trailing /segment.
+    const lastSlash = currentPath.lastIndexOf('/');
+    const parent = lastSlash <= 0 ? '/' : currentPath.slice(0, lastSlash);
     navigateToPath(parent);
   }, [isRootPath, currentPath, navigateToPath]);
 
