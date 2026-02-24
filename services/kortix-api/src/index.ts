@@ -16,7 +16,8 @@ import { channelsApp, startChannelService, stopChannelService, getChannelService
 import { daytonaProxyApp } from './daytona-proxy';
 import { deploymentsApp } from './deployments';
 import { getSandboxBaseUrl, proxyToSandbox } from './daytona-proxy/routes/local-preview';
-import { validateSandboxToken } from './repositories/sandboxes';
+import { validateSecretKey } from './repositories/api-keys';
+import { isKortixToken } from './shared/crypto';
 import { getSupabase } from './shared/supabase';
 import { setupApp } from './setup';
 import { providersApp } from './providers/routes';
@@ -224,7 +225,7 @@ app.route('/', channelsApp);                 // /v1/channels/*, /webhooks/*
 // Setup — install-status is public (needed before any user exists), rest requires auth.
 app.route('/v1/setup', setupApp);          // /v1/setup/install-status (public), rest (auth inside router)
 
-// All remaining routes require authentication (JWT or sbt_ token).
+// All remaining routes require authentication (JWT or kortix_ token).
 app.use('/v1/providers/*', combinedAuth);
 app.route('/v1/providers', providersApp);   // /v1/providers, /v1/providers/schema, /v1/providers/:id/connect, /v1/providers/:id/disconnect, /v1/providers/health
 
@@ -241,7 +242,7 @@ app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queu
 // Pattern: /v1/preview/{sandboxId}/{port}/* for ALL modes.
 // Cloud:  sandboxId = Daytona external ID → proxied via Daytona SDK
 // Local:  sandboxId = container name (e.g. 'kortix-sandbox') → Docker DNS resolution
-// Auth: unified previewProxyAuth (accepts Supabase JWT and sbt_ tokens).
+// Auth: unified previewProxyAuth (accepts Supabase JWT and kortix_ tokens).
 // MUST be after all explicit routes (wildcard catch-all).
 app.route('/v1/preview', daytonaProxyApp);
 
@@ -461,8 +462,8 @@ function extractCookieToken(req: Request): string | null {
 }
 
 async function validatePreviewToken(token: string): Promise<boolean> {
-  if (token.startsWith('sbt_')) {
-    const result = await validateSandboxToken(token);
+  if (isKortixToken(token)) {
+    const result = await validateSecretKey(token);
     return result.isValid;
   }
   try {

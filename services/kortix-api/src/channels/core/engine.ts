@@ -384,7 +384,6 @@ export class ChannelEngineImpl {
     return {
       sandboxId: sandbox.sandboxId,
       baseUrl: sandbox.baseUrl,
-      authToken: sandbox.authToken,
       provider: sandbox.provider,
       externalId: sandbox.externalId,
     };

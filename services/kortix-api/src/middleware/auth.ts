@@ -1,16 +1,14 @@
 import { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { validateSecretKey } from '../repositories/api-keys';
-import { validateSandboxToken } from '../repositories/sandboxes';
+import { isKortixToken } from '../shared/crypto';
 import { getSupabase } from '../shared/supabase';
 
 /**
- * API key auth (sk_/sbt_ for search, LLM routes).
+ * API key auth for search, LLM, and router routes.
  *
- * Auth Flow:
- * - Token "sk_xxx"  = validate against api_keys table via Drizzle, get account_id
- * - Token "sbt_xxx" = validate against kortix.sandboxes table, get account_id
- * - No valid prefix = 401
+ * Single validation path — all Kortix tokens (kortix_, kortix_sb_) go through
+ * the same validateSecretKey() against the api_keys table.
  */
 export async function apiKeyAuth(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');
@@ -29,45 +27,26 @@ export async function apiKeyAuth(c: Context, next: Next) {
     });
   }
 
-  // API key validation (sk_xxx format)
-  if (token.startsWith('sk_')) {
-    const result = await validateSecretKey(token);
-
-    if (!result.isValid) {
-      throw new HTTPException(401, {
-        message: result.error || 'Invalid API key',
-      });
-    }
-
-    c.set('accountId', result.accountId);
-    c.set('keyId', result.keyId);
-    if (result.sandboxId) {
-      c.set('sandboxId', result.sandboxId);
-    }
-    await next();
-    return;
+  if (!isKortixToken(token)) {
+    throw new HTTPException(401, {
+      message: 'Invalid token format — expected kortix_ prefix',
+    });
   }
 
-  // Sandbox token validation (sbt_xxx format)
-  if (token.startsWith('sbt_')) {
-    const result = await validateSandboxToken(token);
+  const result = await validateSecretKey(token);
 
-    if (!result.isValid) {
-      throw new HTTPException(401, {
-        message: result.error || 'Invalid sandbox token',
-      });
-    }
+  if (!result.isValid) {
+    throw new HTTPException(401, {
+      message: result.error || 'Invalid API key',
+    });
+  }
 
-    c.set('accountId', result.accountId);
+  c.set('accountId', result.accountId);
+  c.set('keyId', result.keyId);
+  if (result.sandboxId) {
     c.set('sandboxId', result.sandboxId);
-    await next();
-    return;
   }
-
-  // No valid token format matched — reject
-  throw new HTTPException(401, {
-    message: 'Invalid token format. Use sk_ (API key) or sbt_ (sandbox token)',
-  });
+  await next();
 }
 
 /**
@@ -179,12 +158,7 @@ const PREVIEW_SESSION_COOKIE = '__preview_session';
  *   2. ?token=<token> query parameter
  *   3. __preview_session cookie (set by this middleware on prior requests)
  *
- * On successful auth, sets a session cookie scoped to /v1/preview/ so that
- * all sub-resource requests (CSS, JS, images, fonts loaded by proxied HTML)
- * are automatically authenticated without requiring ?token= on every URL.
- *
- * All requests go through kortix-api which authenticates via Supabase JWT
- * or sbt_ token. No additional sak_ sandbox lock needed.
+ * Accepts Kortix tokens (kortix_, kortix_sb_) or Supabase JWTs.
  */
 export async function previewProxyAuth(c: Context, next: Next) {
   // Skip auth for CORS preflight — OPTIONS never carries auth tokens.
@@ -218,9 +192,9 @@ export async function previewProxyAuth(c: Context, next: Next) {
     throw new HTTPException(401, { message: 'Missing authentication token' });
   }
 
-  // 1. Try sandbox token (sbt_xxx) — used by agents inside the sandbox
-  if (token.startsWith('sbt_')) {
-    const result = await validateSandboxToken(token);
+  // 1. Try Kortix token (kortix_ or kortix_sb_) — used by agents inside the sandbox
+  if (isKortixToken(token)) {
+    const result = await validateSecretKey(token);
     if (result.isValid) {
       c.set('userId', result.accountId);
       c.set('userEmail', '');
@@ -228,7 +202,7 @@ export async function previewProxyAuth(c: Context, next: Next) {
       await next();
       return;
     }
-    throw new HTTPException(401, { message: result.error || 'Invalid sandbox token' });
+    throw new HTTPException(401, { message: result.error || 'Invalid Kortix token' });
   }
 
   // 2. Try Supabase JWT — used by the frontend
@@ -272,7 +246,7 @@ function setPreviewSessionCookie(c: Context, token: string) {
  *
  * Accepts EITHER:
  *   1. Supabase JWT (from frontend) — sets userId, userEmail
- *   2. Sandbox token (sbt_xxx from agents) — sets userId from accountId lookup
+ *   2. Kortix token (kortix_/kortix_sb_ from agents) — sets userId from accountId lookup
  */
 export async function combinedAuth(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');
@@ -285,11 +259,11 @@ export async function combinedAuth(c: Context, next: Next) {
     throw new HTTPException(401, { message: 'Missing token' });
   }
 
-  // Sandbox token (sbt_) — used by agents inside the sandbox
-  if (token.startsWith('sbt_')) {
-    const result = await validateSandboxToken(token);
+  // Kortix token — used by agents inside the sandbox
+  if (isKortixToken(token)) {
+    const result = await validateSecretKey(token);
     if (!result.isValid) {
-      throw new HTTPException(401, { message: result.error || 'Invalid sandbox token' });
+      throw new HTTPException(401, { message: result.error || 'Invalid Kortix token' });
     }
     // Map accountId → userId so route handlers work unchanged
     c.set('userId', result.accountId);

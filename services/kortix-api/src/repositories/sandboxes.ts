@@ -1,46 +1,13 @@
-import { eq, and } from 'drizzle-orm';
-import { sandboxes } from '@kortix/db';
-import { db } from '../shared/db';
-
-export interface SandboxTokenResult {
-  isValid: boolean;
-  accountId?: string;
-  sandboxId?: string;
-  error?: string;
-}
-
 /**
- * Validate a sandbox token (sbt_xxx format).
- * Looks up kortix.sandboxes by auth_token, returns the account_id if active.
+ * Sandbox repository.
+ *
+ * validateSandboxToken() has been removed — all token validation now goes
+ * through validateSecretKey() in repositories/api-keys.ts using the unified
+ * kortix.api_keys table. Both kortix_ (user) and kortix_sb_ (sandbox) keys
+ * validate through the same path.
  */
-export async function validateSandboxToken(token: string): Promise<SandboxTokenResult> {
-  try {
-    const [row] = await db
-      .select({
-        sandboxId: sandboxes.sandboxId,
-        accountId: sandboxes.accountId,
-        status: sandboxes.status,
-      })
-      .from(sandboxes)
-      .where(
-        and(
-          eq(sandboxes.authToken, token),
-          eq(sandboxes.status, 'active'),
-        )
-      )
-      .limit(1);
 
-    if (!row) {
-      return { isValid: false, error: 'Sandbox token not found or sandbox inactive' };
-    }
-
-    return {
-      isValid: true,
-      accountId: row.accountId,
-      sandboxId: row.sandboxId,
-    };
-  } catch (err) {
-    console.error('Sandbox token validation error:', err);
-    return { isValid: false, error: 'Validation error' };
-  }
-}
+// Re-export the unified validation so existing imports don't break during migration.
+// Callers should migrate to importing directly from repositories/api-keys.
+export { validateSecretKey as validateSandboxToken } from './api-keys';
+export type { ApiKeyValidationResult as SandboxTokenResult } from './api-keys';

@@ -6,7 +6,7 @@ import {
   type ProxyServiceConfig,
 } from '../config/proxy-services';
 import { validateSecretKey } from '../../repositories/api-keys';
-import { validateSandboxToken } from '../../repositories/sandboxes';
+import { isKortixToken } from '../../shared/crypto';
 import { config, PLATFORM_FEE_MARKUP } from '../../config';
 import { checkCredits, deductToolCredits, deductLLMCredits } from '../services/billing';
 import { getModel, type ModelConfig } from '../config/models';
@@ -25,7 +25,7 @@ for (const [prefix, serviceConfig] of Object.entries(services)) {
 //
 // Three authentication/billing modes:
 //
-// 1. Kortix token (sk_xxx/sbt_xxx in our DB) in Authorization header
+// 1. Kortix token (kortix_/kortix_sb_ in our DB) in Authorization header
 //    → Inject Kortix's API key, forward, bill at KORTIX_MARKUP (1.2×).
 //
 // 2. User's own API key in Authorization + Kortix token in X-Kortix-Token header
@@ -411,16 +411,14 @@ interface AuthResult {
 async function tryAuthenticate(c: any): Promise<AuthResult> {
   const authHeader = c.req.header('Authorization');
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-  const isKortixBearer = bearerToken && (bearerToken.startsWith('sk_') || bearerToken.startsWith('sbt_'));
 
   // --- Mode 1: Kortix token directly in Authorization header ---
-  // The user sent sk_ or sbt_ as the Bearer token — full Kortix-managed flow.
+  // The user sent kortix_ or kortix_sb_ as the Bearer token — full Kortix-managed flow.
   // If it looks like a Kortix token but fails validation → hard reject.
 
-  if (isKortixBearer && config.DATABASE_URL) {
-    const validate = bearerToken.startsWith('sk_') ? validateSecretKey : validateSandboxToken;
+  if (bearerToken && isKortixToken(bearerToken) && config.DATABASE_URL) {
     try {
-      const result = await validate(bearerToken);
+      const result = await validateSecretKey(bearerToken);
       if (result.isValid && result.accountId) {
         return { isKortixUser: true, accountId: result.accountId };
       }
@@ -434,26 +432,22 @@ async function tryAuthenticate(c: any): Promise<AuthResult> {
 
   // --- Mode 2: User's own key + Kortix token in X-Kortix-Token ---
   // The user's own API key is in Authorization (Bearer) or a provider-specific
-  // header (e.g. Anthropic's x-api-key). The Kortix sandbox token rides in
+  // header (e.g. Anthropic's x-api-key). The Kortix token rides in
   // X-Kortix-Token so we can identify the account for platform-fee billing.
   // If X-Kortix-Token looks like a Kortix token but fails → hard reject.
 
   if (config.DATABASE_URL) {
-    const kortixToken = c.req.header('X-Kortix-Token');
-    if (kortixToken) {
-      const isKortixToken = kortixToken.startsWith('sbt_') || kortixToken.startsWith('sk_');
-      if (isKortixToken) {
-        const validate = kortixToken.startsWith('sk_') ? validateSecretKey : validateSandboxToken;
-        try {
-          const result = await validate(kortixToken);
-          if (result.isValid && result.accountId) {
-            return { isKortixUser: true, accountId: result.accountId, isPassthrough: true };
-          }
-        } catch {
-          // Fall through to reject below
+    const kortixTokenHeader = c.req.header('X-Kortix-Token');
+    if (kortixTokenHeader && isKortixToken(kortixTokenHeader)) {
+      try {
+        const result = await validateSecretKey(kortixTokenHeader);
+        if (result.isValid && result.accountId) {
+          return { isKortixUser: true, accountId: result.accountId, isPassthrough: true };
         }
-        throw new HTTPException(401, { message: 'Invalid X-Kortix-Token' });
+      } catch {
+        // Fall through to reject below
       }
+      throw new HTTPException(401, { message: 'Invalid X-Kortix-Token' });
     }
   }
 

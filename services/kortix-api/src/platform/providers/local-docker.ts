@@ -13,7 +13,7 @@ import Docker from 'dockerode';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { config } from '../../config';
-import { generateSandboxToken } from '../services/token';
+import { generateSandboxKeyPair } from '../../shared/crypto';
 import type {
   SandboxProvider,
   ProviderName,
@@ -331,7 +331,7 @@ export class LocalDockerProvider implements SandboxProvider {
       await this.pullImage();
     }
 
-    const authToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN || generateSandboxToken();
+    const authToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN || generateSandboxKeyPair().secretKey;
     const sandboxEnvVars = readSandboxEnv();
 
     // INTERNAL_SERVICE_KEY: used for proxy/cron → sandbox auth
@@ -366,7 +366,7 @@ export class LocalDockerProvider implements SandboxProvider {
       'KORTIX_WORKSPACE=/workspace',
       `KORTIX_API_URL=${config.KORTIX_URL || ''}`,
       // KORTIX_TOKEN: sandbox → kortix-api auth.
-      // Uses the service key if available, otherwise a generated sbt_ token.
+      // Uses the service key if available, otherwise the sandbox's kortix_sb_ key.
       `KORTIX_TOKEN=${serviceKey || authToken}`,
       `SANDBOX_ID=${CONTAINER_NAME}`,
       'PROJECT_ID=local',

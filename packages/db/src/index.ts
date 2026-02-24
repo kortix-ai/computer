@@ -15,6 +15,7 @@ export {
   channelTypeEnum,
   sessionStrategyEnum,
   apiKeyStatusEnum,
+  apiKeyTypeEnum,
   // Kortix tables — accounts
   accounts,
   accountMembers,

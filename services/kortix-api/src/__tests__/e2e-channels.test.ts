@@ -39,7 +39,6 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
     const res = await jsonPost(app, '/v1/cron/sandboxes', {
       name: 'channel-test-sandbox',
       base_url: 'http://localhost:9999',
-      auth_token: 'test-token',
       status: 'active',
     });
     const body = await res.json();

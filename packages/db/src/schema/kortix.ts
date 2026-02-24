@@ -85,6 +85,11 @@ export const apiKeyStatusEnum = kortixSchema.enum('api_key_status', [
   'expired',
 ]);
 
+export const apiKeyTypeEnum = kortixSchema.enum('api_key_type', [
+  'user',
+  'sandbox',
+]);
+
 export const integrationStatusEnum = kortixSchema.enum('integration_status', [
   'active',
   'revoked',
@@ -155,7 +160,6 @@ export const sandboxes = kortixSchema.table(
     externalId: text('external_id'),
     status: sandboxStatusEnum('status').default('provisioning').notNull(),
     baseUrl: text('base_url').notNull(),
-    authToken: text('auth_token'),
     config: jsonb('config').default({}).$type<Record<string, unknown>>(),
     metadata: jsonb('metadata').default({}).$type<Record<string, unknown>>(),
     pooledAt: timestamp('pooled_at', { withTimezone: true }),
@@ -168,7 +172,6 @@ export const sandboxes = kortixSchema.table(
     index('idx_sandboxes_external_id').on(table.externalId),
     index('idx_sandboxes_status').on(table.status),
     index('idx_sandboxes_pooled_fifo').on(table.pooledAt),
-    index('idx_sandboxes_auth_token').on(table.authToken),
   ],
 );
 
@@ -394,6 +397,7 @@ export const kortixApiKeys = kortixSchema.table(
     secretKeyHash: varchar('secret_key_hash', { length: 128 }).notNull(),
     title: varchar('title', { length: 255 }).notNull(),
     description: text('description'),
+    type: apiKeyTypeEnum('type').default('user').notNull(),
     status: apiKeyStatusEnum('status').default('active').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),

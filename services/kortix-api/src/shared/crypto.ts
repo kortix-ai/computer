@@ -13,14 +13,49 @@ export function randomAlphanumeric(length: number): string {
 }
 
 /**
- * Generate a public/secret key pair.
- * Public key: pk_<32 chars>  (safe to store/display)
- * Secret key: sk_<32 chars>  (shown once, only hash stored)
+ * Kortix API key prefixes.
+ *
+ *   kortix_      — user-created API key (for external programmatic access)
+ *   kortix_sb_   — sandbox-managed key (auto-created per sandbox, used by agents)
+ *   pk_          — public key identifier (safe to store/display)
+ *
+ * Both secret key variants validate through the same path — only the hash is stored.
+ */
+export const KEY_PREFIX = 'kortix_';
+export const KEY_PREFIX_SANDBOX = 'kortix_sb_';
+export const KEY_PREFIX_PUBLIC = 'pk_';
+
+const SECRET_RANDOM_LENGTH = 32;
+
+/**
+ * Check if a token is a Kortix-issued key (user or sandbox).
+ * Single check for the router — no branching on multiple prefixes.
+ */
+export function isKortixToken(token: string): boolean {
+  return token.startsWith(KEY_PREFIX);
+}
+
+/**
+ * Generate a public/secret key pair for a user-created API key.
+ * Secret key: kortix_<32 chars>  (shown once, only hash stored)
+ * Public key:  pk_<32 chars>     (safe to store/display)
  */
 export function generateApiKeyPair(): { publicKey: string; secretKey: string } {
   return {
-    publicKey: `pk_${randomAlphanumeric(32)}`,
-    secretKey: `sk_${randomAlphanumeric(32)}`,
+    publicKey: `${KEY_PREFIX_PUBLIC}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
+    secretKey: `${KEY_PREFIX}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
+  };
+}
+
+/**
+ * Generate a public/secret key pair for a sandbox-managed key.
+ * Secret key: kortix_sb_<32 chars>  (injected as KORTIX_TOKEN into sandbox)
+ * Public key: pk_<32 chars>          (safe to store/display)
+ */
+export function generateSandboxKeyPair(): { publicKey: string; secretKey: string } {
+  return {
+    publicKey: `${KEY_PREFIX_PUBLIC}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
+    secretKey: `${KEY_PREFIX_SANDBOX}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
   };
 }
 

@@ -2,6 +2,7 @@ import type { SandboxTarget } from '../types';
 import { getProvider } from '../../platform/providers';
 import type { ProviderName } from '../../platform/providers';
 import { getDaytona, isDaytonaConfigured } from '../../shared/daytona';
+import { config } from '../../config';
 
 interface CreateSessionResponse {
   id: string;
@@ -56,8 +57,8 @@ async function resolveDirectEndpoint(target: SandboxTarget): Promise<ResolvedEnd
   }
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (target.authToken) {
-    headers['Authorization'] = `Basic ${btoa(target.authToken)}`;
+  if (config.INTERNAL_SERVICE_KEY) {
+    headers['Authorization'] = `Bearer ${config.INTERNAL_SERVICE_KEY}`;
   }
   return { url: target.baseUrl.replace(/\/$/, ''), headers };
 }

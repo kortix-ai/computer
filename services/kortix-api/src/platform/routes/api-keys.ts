@@ -4,20 +4,21 @@
  * Mounted at /v1/platform/api-keys
  *
  * Routes:
- *   POST   /                → Create a new API key for a sandbox
- *   GET    /                → List all API keys for a sandbox (no secrets)
- *   PATCH  /:keyId/revoke   → Revoke an API key
- *   DELETE /:keyId          → Hard-delete an API key
+ *   POST   /                   → Create a new user API key for a sandbox
+ *   GET    /                   → List all API keys for a sandbox (no secrets)
+ *   PATCH  /:keyId/revoke      → Revoke an API key
+ *   DELETE /:keyId             → Hard-delete an API key
+ *   POST   /:keyId/regenerate  → Regenerate a sandbox-managed key (revoke old + create new)
  */
 
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import { sandboxes, kortixApiKeys, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
-import { supabaseAuth } from '../../middleware/auth';
-import { hashSecretKey, generateApiKeyPair, isApiKeySecretConfigured } from '../../shared/crypto';
+import { hashSecretKey, generateApiKeyPair, generateSandboxKeyPair, isApiKeySecretConfigured } from '../../shared/crypto';
 import type { AuthVariables } from '../../types';
 import { resolveAccountId as defaultResolveAccountId } from '../../shared/resolve-account';
+import { supabaseAuth } from '../../middleware/auth';
 
 // ─── Dependency Injection ────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ export function createApiKeysRouter(
   }
 
   // ─── POST / ─────────────────────────────────────────────────────────────
+  // Create a new user API key for a sandbox.
 
   router.post('/', async (c) => {
     const userId = c.get('userId');
@@ -113,6 +115,7 @@ export function createApiKeysRouter(
           secretKeyHash,
           title: title.trim(),
           description: description?.trim() ?? null,
+          type: 'user',
           expiresAt: expiresAt ?? null,
         })
         .returning();
@@ -130,6 +133,7 @@ export function createApiKeysRouter(
           sandbox_id: row.sandboxId,
           title: row.title,
           description: row.description,
+          type: row.type,
           status: row.status,
           expires_at: row.expiresAt?.toISOString() ?? null,
           created_at: row.createdAt.toISOString(),
@@ -142,6 +146,7 @@ export function createApiKeysRouter(
   });
 
   // ─── GET / ──────────────────────────────────────────────────────────────
+  // List all API keys for a sandbox (no secrets).
 
   router.get('/', async (c) => {
     const userId = c.get('userId');
@@ -164,6 +169,7 @@ export function createApiKeysRouter(
           publicKey: kortixApiKeys.publicKey,
           title: kortixApiKeys.title,
           description: kortixApiKeys.description,
+          type: kortixApiKeys.type,
           status: kortixApiKeys.status,
           sandboxId: kortixApiKeys.sandboxId,
           expiresAt: kortixApiKeys.expiresAt,
@@ -181,6 +187,7 @@ export function createApiKeysRouter(
           sandbox_id: k.sandboxId,
           title: k.title,
           description: k.description,
+          type: k.type,
           status: k.status,
           expires_at: k.expiresAt?.toISOString() ?? null,
           last_used_at: k.lastUsedAt?.toISOString() ?? null,
@@ -250,6 +257,93 @@ export function createApiKeysRouter(
     } catch (err) {
       console.error('[API-KEYS] Delete error:', err);
       return c.json({ error: 'Failed to delete API key' }, 500);
+    }
+  });
+
+  // ─── POST /:keyId/regenerate ───────────────────────────────────────────
+  // Regenerate a sandbox-managed key: revoke old + create new.
+  // Only works on type='sandbox' keys. Returns the new secret key ONCE.
+
+  router.post('/:keyId/regenerate', async (c) => {
+    const userId = c.get('userId');
+    const accountId = await resolveAccountId(userId);
+    const keyId = c.req.param('keyId');
+
+    try {
+      // Find the existing key and verify it's a sandbox key owned by this account
+      const [existing] = await db
+        .select({
+          keyId: kortixApiKeys.keyId,
+          sandboxId: kortixApiKeys.sandboxId,
+          type: kortixApiKeys.type,
+          status: kortixApiKeys.status,
+        })
+        .from(kortixApiKeys)
+        .where(
+          and(
+            eq(kortixApiKeys.keyId, keyId),
+            eq(kortixApiKeys.accountId, accountId),
+          ),
+        )
+        .limit(1);
+
+      if (!existing) {
+        return c.json({ error: 'API key not found' }, 404);
+      }
+
+      if (existing.type !== 'sandbox') {
+        return c.json({ error: 'Only sandbox-managed keys can be regenerated' }, 400);
+      }
+
+      if (!isApiKeySecretConfigured()) {
+        return c.json({ error: 'API_KEY_SECRET not configured' }, 500);
+      }
+
+      // Revoke the old key
+      if (existing.status === 'active') {
+        await db
+          .update(kortixApiKeys)
+          .set({ status: 'revoked' })
+          .where(eq(kortixApiKeys.keyId, keyId));
+      }
+
+      // Create a new sandbox key for the same sandbox
+      const { publicKey, secretKey } = generateSandboxKeyPair();
+      const secretKeyHash = hashSecretKey(secretKey);
+
+      const [newRow] = await db
+        .insert(kortixApiKeys)
+        .values({
+          sandboxId: existing.sandboxId,
+          accountId,
+          publicKey,
+          secretKeyHash,
+          title: 'Sandbox Token',
+          type: 'sandbox',
+        })
+        .returning();
+
+      if (!newRow) {
+        return c.json({ error: 'Failed to regenerate API key' }, 500);
+      }
+
+      return c.json({
+        success: true,
+        data: {
+          key_id: newRow.keyId,
+          public_key: newRow.publicKey,
+          secret_key: secretKey, // shown ONCE
+          sandbox_id: newRow.sandboxId,
+          title: newRow.title,
+          type: newRow.type,
+          status: newRow.status,
+          created_at: newRow.createdAt.toISOString(),
+        },
+        message: 'Sandbox key regenerated. Update KORTIX_TOKEN in your sandbox environment.',
+      });
+    } catch (err) {
+      console.error('[API-KEYS] Regenerate error:', err);
+      return c.json({ error: 'Failed to regenerate API key' }, 500);
     }
   });
 
