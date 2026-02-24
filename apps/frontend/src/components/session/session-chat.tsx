@@ -2353,8 +2353,10 @@ function SessionTurn({
 
 				{/* Answered question parts — shown after the response text only when
 				    there are no steps (no-steps turns). When hasSteps is true,
-				    answered questions render inline within the steps section above. */}
-				{!hasSteps && answeredQuestionParts.length > 0 && (
+				    answered questions render inline within the steps section above.
+				    Skip while working — the steps section (guarded by `working || hasSteps`)
+				    already renders them to avoid duplicates. */}
+				{!hasSteps && !working && answeredQuestionParts.length > 0 && (
 					<div className="space-y-2 mt-3">
 						{answeredQuestionParts.map(({ part }) => (
 							<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
@@ -3514,6 +3516,12 @@ export function SessionChat({
 	const handleStop = useCallback(() => {
 		// Guard against rapid clicks — ignore if an abort is already in flight
 		if (abortSession.isPending) return;
+		// Optimistically mark the session idle so the UI updates immediately
+		// (stop button hides, input re-enables) without waiting for the SSE
+		// round-trip. Also clear the busy debounce timer to bypass the 2s delay.
+		useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+		clearTimeout(busyTimerRef.current);
+		setIsBusy(false);
 		abortSession.mutate(sessionId);
 	}, [sessionId, abortSession]);
 
