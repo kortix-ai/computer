@@ -48,7 +48,6 @@ import {
   useOpenCodeProviders,
   useOpenCodeToolIds,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { ModelProviderIcon } from '@/lib/model-provider-icons';
 import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
@@ -292,9 +291,6 @@ function ProvidersSection({
                 className="rounded-xl border border-border/50 bg-card overflow-hidden"
               >
                 <div className="flex items-center gap-3 px-3 py-2.5">
-                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted/50 flex-shrink-0">
-                    <ModelProviderIcon modelId={p.id} size={16} />
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground">

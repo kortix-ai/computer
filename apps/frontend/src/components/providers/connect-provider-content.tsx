@@ -14,7 +14,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Search,
-  Plus,
   ArrowLeft,
   Loader2,
   ExternalLink,
@@ -22,8 +21,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ModelProviderIcon } from '@/lib/model-provider-icons';
-import { KortixLogo } from '@/components/sidebar/kortix-logo';
+
 import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
@@ -46,13 +44,6 @@ const POPULAR_PROVIDERS = [
 // =============================================================================
 // Helpers
 // =============================================================================
-
-function ProviderIcon({ providerID, size }: { providerID: string; size: number }) {
-  if (providerID === 'kortix') {
-    return <KortixLogo size={size} variant="symbol" />;
-  }
-  return <ModelProviderIcon modelId={providerID} size={size} />;
-}
 
 function Tag({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'recommended' | 'custom' }) {
   return (
@@ -380,12 +371,7 @@ export function ConnectProviderContent({
         )}
         <h3 className="text-base font-semibold flex-1">
           {view.type === 'custom' && 'Custom Provider'}
-          {view.type === 'connect' && (
-            <span className="flex items-center gap-3">
-              <ProviderIcon providerID={view.providerID} size={20} />
-              Connect {selectedProviderData?.name || view.providerID}
-            </span>
-          )}
+          {view.type === 'connect' && `Connect ${selectedProviderData?.name || view.providerID}`}
           {view.type === 'list' && 'Connect Provider'}
         </h3>
       </div>
@@ -412,9 +398,6 @@ export function ConnectProviderContent({
                 onClick={() => setView({ type: 'custom' })}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer"
               >
-                <div className="w-5 h-5 rounded flex items-center justify-center bg-muted text-muted-foreground">
-                  <Plus className="h-3 w-3" />
-                </div>
                 <span className="text-sm">Custom provider</span>
                 <Tag variant="custom">Custom</Tag>
               </button>
@@ -433,7 +416,6 @@ export function ConnectProviderContent({
                     onClick={() => handleSelectProvider(p.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer"
                   >
-                    <ProviderIcon providerID={p.id} size={20} />
                     <span className="text-sm">{p.name}</span>
                     {p.id === 'opencode' && <Tag variant="recommended">Recommended</Tag>}
                     {p.id === 'anthropic' && (
@@ -463,7 +445,6 @@ export function ConnectProviderContent({
                     onClick={() => handleSelectProvider(p.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer"
                   >
-                    <ProviderIcon providerID={p.id} size={20} />
                     <span className="text-sm">{p.name}</span>
                   </button>
                 ))}

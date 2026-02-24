@@ -30,8 +30,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ModelProviderIcon } from '@/lib/model-provider-icons';
-import { KortixLogo } from '@/components/sidebar/kortix-logo';
+
 import { useModelStore } from '@/hooks/opencode/use-model-store';
 import type { FlatModel } from './session-chat-input';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
@@ -74,38 +73,9 @@ const PROVIDER_LABELS: Record<string, string> = {
 // Helpers
 // =============================================================================
 
-function resolveIconModelId(providerID: string, modelID: string): string {
-  const knownSubstrings = [
-    'anthropic', 'claude', 'openai', 'gpt', 'google', 'gemini',
-    'xai', 'grok', 'moonshot', 'kimi',
-  ];
-  for (const sub of knownSubstrings) {
-    if (modelID.toLowerCase().includes(sub)) return modelID;
-  }
-  return `${providerID}/${modelID}`;
-}
-
 function formatContext(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
   return `${Math.round(tokens / 1000)}K`;
-}
-
-// =============================================================================
-// Provider / Model icons
-// =============================================================================
-
-export function ProviderIcon({ providerID, size }: { providerID: string; size: number }) {
-  if (providerID === 'kortix') {
-    return <KortixLogo size={size} variant="symbol" />;
-  }
-  return <ModelProviderIcon modelId={resolveIconModelId(providerID, '')} size={size} />;
-}
-
-function InlineModelIcon({ providerID, modelID, size }: { providerID: string; modelID: string; size: number }) {
-  if (providerID === 'kortix') {
-    return <KortixLogo size={size} variant="symbol" />;
-  }
-  return <ModelProviderIcon modelId={resolveIconModelId(providerID, modelID)} size={size} />;
 }
 
 // =============================================================================
@@ -305,15 +275,17 @@ export function ConnectProviderDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col" aria-describedby="connect-provider-desc">
+      <DialogContent className="sm:max-w-md max-h-[80vh] !grid-rows-[1fr] overflow-hidden" aria-describedby="connect-provider-desc">
         <DialogHeader className="sr-only">
           <DialogTitle>Connect Provider</DialogTitle>
           <DialogDescription id="connect-provider-desc">Select a provider to connect.</DialogDescription>
         </DialogHeader>
-        <ConnectProviderContent
-          providers={providers}
-          onClose={() => onOpenChange(false)}
-        />
+        <div className="flex flex-col min-h-0 overflow-hidden">
+          <ConnectProviderContent
+            providers={providers}
+            onClose={() => onOpenChange(false)}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -452,9 +424,6 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                 type="button"
                 className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
-                {current && (
-                  <InlineModelIcon providerID={current.providerID} modelID={current.modelID} size={14} />
-                )}
                 <span className="truncate max-w-[120px]">{displayName}</span>
                 <ChevronUp className={cn('size-3 transition-transform', open && 'rotate-180')} />
               </button>
