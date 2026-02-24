@@ -12,7 +12,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -24,11 +23,10 @@ import {
   FileDown,
   MoreHorizontal,
   GitCompareArrows,
-  Sparkles,
 } from 'lucide-react';
 import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
-import { InitProjectDialog } from '@/components/session/init-project-dialog';
+
 
 import { DiagnosticsBadge } from '@/components/session/diagnostics-panel';
 // Worktree indicator — disabled for now
@@ -56,7 +54,7 @@ export function SessionSiteHeader({
 }: SessionSiteHeaderProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
-  const [initOpen, setInitOpen] = useState(false);
+
 
   const isMobile = useIsMobile() || isMobileView;
   const { setOpen: setSidebarOpen, setOpenMobile } = useSidebar();
@@ -122,20 +120,10 @@ export function SessionSiteHeader({
                     View changes
                   </DropdownMenuItem>
 
-                  <DropdownMenuSeparator />
-
                   {/* Export transcript */}
                   <DropdownMenuItem onClick={() => setExportOpen(true)}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Export transcript
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  {/* Initialize project */}
-                  <DropdownMenuItem onClick={() => setInitOpen(true)}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Initialize project
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -189,11 +177,6 @@ export function SessionSiteHeader({
         sessionId={sessionId}
         open={diffOpen}
         onOpenChange={setDiffOpen}
-      />
-      <InitProjectDialog
-        sessionId={sessionId}
-        open={initOpen}
-        onOpenChange={setInitOpen}
       />
     </>
   );
