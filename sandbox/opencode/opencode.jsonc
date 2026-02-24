@@ -48,6 +48,51 @@
           }
         }
       }
+    },
+    // ── LLM provider overrides for Kortix Cloud billing ──────────────
+    //
+    // In cloud mode, LLM traffic is routed through the Kortix proxy for
+    // usage metering. X-Kortix-Token identifies the account for billing
+    // at the platform fee rate (0.1×) when using user-owned keys.
+    //
+    // Base URL routing:
+    //   Anthropic & OpenAI: routed via ANTHROPIC_BASE_URL / OPENAI_BASE_URL
+    //     env vars (set by kortix-env-setup.sh, read by the SDK natively).
+    //   XAI, Google, Groq: no SDK env var exists, so baseURL is set here
+    //     using {env:KORTIX_API_URL}/provider. In local mode KORTIX_API_URL
+    //     is empty and the SDK falls back to its hardcoded default.
+    "anthropic": {
+      "options": {
+        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
+      }
+    },
+    "openai": {
+      "options": {
+        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
+      }
+    },
+    "openrouter": {
+      "options": {
+        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
+      }
+    },
+    "xai": {
+      "options": {
+        "baseURL": "{env:XAI_BASE_URL}",
+        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
+      }
+    },
+    "google": {
+      "options": {
+        "baseURL": "{env:GOOGLE_BASE_URL}",
+        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
+      }
+    },
+    "groq": {
+      "options": {
+        "baseURL": "{env:GROQ_BASE_URL}",
+        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
+      }
     }
   },
   "mcp": {
