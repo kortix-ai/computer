@@ -157,7 +157,7 @@ function DashboardSkeleton() {
 	return (
 		<div className="flex h-full w-full bg-background">
 			{/* Sidebar skeleton */}
-			<div className="hidden md:flex w-[240px] flex-col bg-sidebar">
+			<div className="hidden md:flex w-[280px] flex-col bg-sidebar">
 				<div className="p-4 space-y-4">
 					<div className="h-8 w-32 bg-muted/40 rounded animate-pulse" />
 					<div className="space-y-2">

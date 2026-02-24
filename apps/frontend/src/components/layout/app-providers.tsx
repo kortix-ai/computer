@@ -17,7 +17,7 @@ const SidebarRight = lazy(() =>
 // Sidebar skeleton for immediate render
 function SidebarSkeleton() {
   return (
-    <div className="hidden md:flex w-[240px] flex-col bg-sidebar shrink-0">
+    <div className="hidden md:flex w-[280px] flex-col bg-sidebar shrink-0">
       <div className="p-4 space-y-4">
         <div className="h-8 w-32 bg-muted/40 rounded animate-pulse" />
         <div className="space-y-2">
