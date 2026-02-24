@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
 import Replicate from "replicate";
+import { getEnv } from "./lib/get-env";
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "fs";
 import { resolve, basename, extname, dirname } from "path";
 
@@ -260,7 +261,7 @@ export default tool({
       ),
   },
   async execute(args, _context) {
-    const token = process.env.REPLICATE_API_TOKEN;
+    const token = getEnv("REPLICATE_API_TOKEN");
     if (!token) return "Error: REPLICATE_API_TOKEN not set.";
 
     const action = args.action as Action;

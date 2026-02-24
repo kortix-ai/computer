@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
 import { tavily } from "@tavily/core";
+import { getEnv } from "./lib/get-env";
 
 interface SearchResult {
   title: string;
@@ -76,7 +77,7 @@ export default tool({
       ),
   },
   async execute(args, _context) {
-    const apiKey = process.env.TAVILY_API_KEY;
+    const apiKey = getEnv("TAVILY_API_KEY");
     if (!apiKey) return "Error: TAVILY_API_KEY not set.";
 
     const client = tavily({ apiKey });
