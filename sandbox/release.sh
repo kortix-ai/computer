@@ -521,7 +521,7 @@ if ! $DRY_RUN; then
 
   # Docker
   if $BUILD_DOCKER; then
-    for img in computer; do
+    for img in sandbox; do
       if docker manifest inspect "${DOCKER_ORG:-kortix}/$img:$VERSION" &>/dev/null 2>&1; then
         ok "Docker Hub: ${DOCKER_ORG:-kortix}/$img:$VERSION"
       else
