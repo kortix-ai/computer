@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import { dirname } from 'path'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto'
@@ -146,5 +146,32 @@ export class SecretStore {
   async deleteEnv(key: string): Promise<void> {
     await this.delete(key)
     delete process.env[key]
+  }
+
+  /**
+   * Rotate the KORTIX_TOKEN used as the encryption key.
+   * Atomically: decrypt everything with old key → update token → re-encrypt with new key.
+   */
+  async rotateToken(newToken: string): Promise<{ rotated: number }> {
+    // 1. Decrypt all secrets using the current key (derived from current KORTIX_TOKEN)
+    const allSecrets = await this.getAll()
+
+    // 2. Wipe the salt so a fresh one is generated for the new key
+    this.salt = null
+    try { await rm(this.saltPath) } catch {}
+
+    // 3. Switch to the new token — getKey() now derives from the new value
+    process.env.KORTIX_TOKEN = newToken
+
+    // 4. Re-encrypt and save all secrets (including KORTIX_TOKEN itself if present)
+    //    Remove KORTIX_TOKEN from the set — we don't store the token in its own encrypted store
+    delete allSecrets['KORTIX_TOKEN']
+    const data: SecretsData = { secrets: {}, version: 1 }
+    for (const [key, value] of Object.entries(allSecrets)) {
+      data.secrets[key] = await this.encrypt(value)
+    }
+    await this.saveSecrets(data)
+
+    return { rotated: Object.keys(data.secrets).length }
   }
 }

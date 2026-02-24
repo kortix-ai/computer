@@ -19,6 +19,7 @@ import { hashSecretKey, generateApiKeyPair, generateSandboxKeyPair, isApiKeySecr
 import type { AuthVariables } from '../../types';
 import { resolveAccountId as defaultResolveAccountId } from '../../shared/resolve-account';
 import { supabaseAuth } from '../../middleware/auth';
+import { getProvider, type ProviderName } from '../providers';
 
 // ─── Dependency Injection ────────────────────────────────────────────────────
 
@@ -88,7 +89,22 @@ export function createApiKeysRouter(
       return c.json({ error: 'title is required' }, 400);
     }
 
-    const owns = await verifySandboxOwnership(sandbox_id, accountId);
+    // Resolve: try as UUID first, then as external_id
+    let resolvedSandboxId = sandbox_id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sandbox_id);
+    if (!isUuid) {
+      const [row] = await db
+        .select({ sandboxId: sandboxes.sandboxId })
+        .from(sandboxes)
+        .where(and(eq(sandboxes.externalId, sandbox_id), eq(sandboxes.accountId, accountId)))
+        .limit(1);
+      if (!row) {
+        return c.json({ error: 'Sandbox not found' }, 404);
+      }
+      resolvedSandboxId = row.sandboxId;
+    }
+
+    const owns = await verifySandboxOwnership(resolvedSandboxId, accountId);
     if (!owns) {
       return c.json({ error: 'Sandbox not found' }, 404);
     }
@@ -109,7 +125,7 @@ export function createApiKeysRouter(
       const [row] = await db
         .insert(kortixApiKeys)
         .values({
-          sandboxId: sandbox_id,
+          sandboxId: resolvedSandboxId,
           accountId,
           publicKey,
           secretKeyHash,
@@ -147,14 +163,30 @@ export function createApiKeysRouter(
 
   // ─── GET / ──────────────────────────────────────────────────────────────
   // List all API keys for a sandbox (no secrets).
+  // Accepts sandbox_id as either the UUID or external_id (e.g. 'kortix-sandbox').
 
   router.get('/', async (c) => {
     const userId = c.get('userId');
     const accountId = await resolveAccountId(userId);
 
-    const sandboxId = c.req.query('sandbox_id');
-    if (!sandboxId) {
+    const sandboxIdParam = c.req.query('sandbox_id');
+    if (!sandboxIdParam) {
       return c.json({ error: 'sandbox_id query param is required' }, 400);
+    }
+
+    // Resolve: try as UUID first, then as external_id
+    let sandboxId = sandboxIdParam;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sandboxIdParam);
+    if (!isUuid) {
+      const [row] = await db
+        .select({ sandboxId: sandboxes.sandboxId })
+        .from(sandboxes)
+        .where(and(eq(sandboxes.externalId, sandboxIdParam), eq(sandboxes.accountId, accountId)))
+        .limit(1);
+      if (!row) {
+        return c.json({ error: 'Sandbox not found' }, 404);
+      }
+      sandboxId = row.sandboxId;
     }
 
     const owns = await verifySandboxOwnership(sandboxId, accountId);
@@ -261,8 +293,17 @@ export function createApiKeysRouter(
   });
 
   // ─── POST /:keyId/regenerate ───────────────────────────────────────────
-  // Regenerate a sandbox-managed key: revoke old + create new.
+  // Regenerate a sandbox-managed key: revoke old + create new + push to sandbox.
   // Only works on type='sandbox' keys. Returns the new secret key ONCE.
+  //
+  // Flow:
+  //   1. Revoke old key in DB
+  //   2. Create new kortix_sb_ key in DB
+  //   3. Resolve sandbox endpoint via provider
+  //   4. Read all secrets from sandbox (decrypted with old KORTIX_TOKEN)
+  //   5. Update KORTIX_TOKEN in sandbox (changes encryption key derivation)
+  //   6. Re-write all secrets (re-encrypted with new key)
+  //   7. Restart sandbox services
 
   router.post('/:keyId/regenerate', async (c) => {
     const userId = c.get('userId');
@@ -299,6 +340,16 @@ export function createApiKeysRouter(
         return c.json({ error: 'API_KEY_SECRET not configured' }, 500);
       }
 
+      // Look up sandbox to get provider + externalId for pushing the new token
+      const [sandbox] = await db
+        .select({
+          provider: sandboxes.provider,
+          externalId: sandboxes.externalId,
+        })
+        .from(sandboxes)
+        .where(eq(sandboxes.sandboxId, existing.sandboxId))
+        .limit(1);
+
       // Revoke the old key
       if (existing.status === 'active') {
         await db
@@ -327,6 +378,34 @@ export function createApiKeysRouter(
         return c.json({ error: 'Failed to regenerate API key' }, 500);
       }
 
+      // Push new token to the running sandbox (best-effort, don't fail the API call)
+      let sandboxUpdated = false;
+      if (sandbox?.externalId && sandbox?.provider) {
+        try {
+          const provider = getProvider(sandbox.provider as ProviderName);
+          const endpoint = await provider.resolveEndpoint(sandbox.externalId);
+
+          // Single atomic call: decrypt all secrets with old key → switch token → re-encrypt → restart
+          const rotateRes = await fetch(`${endpoint.url}/env/rotate-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...endpoint.headers },
+            body: JSON.stringify({ token: secretKey }),
+          });
+
+          if (!rotateRes.ok) {
+            const detail = await rotateRes.text().catch(() => '');
+            throw new Error(`rotate-token returned ${rotateRes.status}: ${detail}`);
+          }
+
+          sandboxUpdated = true;
+          console.log(`[API-KEYS] Pushed new KORTIX_TOKEN to sandbox ${sandbox.externalId}`);
+        } catch (err) {
+          // Sandbox may be stopped or unreachable — that's OK.
+          // The new key is in the DB; sandbox will need a restart.
+          console.warn(`[API-KEYS] Failed to push token to sandbox: ${err}`);
+        }
+      }
+
       return c.json({
         success: true,
         data: {
@@ -339,7 +418,7 @@ export function createApiKeysRouter(
           status: newRow.status,
           created_at: newRow.createdAt.toISOString(),
         },
-        message: 'Sandbox key regenerated. Update KORTIX_TOKEN in your sandbox environment.',
+        sandbox_updated: sandboxUpdated,
       });
     } catch (err) {
       console.error('[API-KEYS] Regenerate error:', err);

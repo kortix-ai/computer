@@ -149,6 +149,33 @@ envRouter.get('/:key', async (c) => {
   }
 })
 
+// POST /env/rotate-token — atomically rotate KORTIX_TOKEN and re-encrypt all secrets.
+// Called by the platform API after regenerating a sandbox key.
+envRouter.post('/rotate-token', async (c) => {
+  try {
+    const body = await c.req.json()
+    const newToken = body?.token
+    if (!newToken || typeof newToken !== 'string') {
+      return c.json({ error: 'Request body must contain a "token" string' }, 400)
+    }
+
+    // Atomic rotation: decrypt all with old key → switch → re-encrypt with new key
+    const result = await secretStore.rotateToken(newToken)
+
+    // Write new token to s6 env dir so restarted services pick it up
+    await writeS6Env('KORTIX_TOKEN', newToken)
+
+    // Restart OpenCode to pick up the new token
+    await restartServices()
+
+    console.log(`[ENV API] Token rotated, re-encrypted ${result.rotated} secrets`)
+    return c.json({ ok: true, ...result })
+  } catch (error) {
+    console.error('[ENV API] Token rotation error:', error)
+    return c.json({ error: 'Failed to rotate token' }, 500)
+  }
+})
+
 // POST /env/:key — set a single key. { value: "..." }
 envRouter.post('/:key', async (c) => {
   try {
