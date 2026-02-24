@@ -1,5 +1,83 @@
 [
   {
+    "version": "0.7.0",
+    "date": "2026-02-24",
+    "title": "Dual-markup LLM billing, live model pricing & schema migration",
+    "description": "Introduces usage-based LLM billing with two markup tiers: Kortix-key requests (via OpenRouter) are billed at 1.2x provider cost, while user's own-key requests routed through the Kortix proxy are billed at 0.1x (10% platform fee). Live model pricing is fetched from models.dev on boot and refreshed every 24 hours, covering 134+ models across 6 providers. Credit/billing tables migrated from public schema to kortix schema. Sandbox URL rewriting ensures all LLM traffic routes through the billing proxy in cloud mode.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Dual-markup LLM billing: Kortix-key requests billed at 1.2x provider cost, own-key proxy requests at 0.1x (10% platform fee)"
+      },
+      {
+        "type": "feature",
+        "text": "Three-mode proxy authentication: Kortix key (1.2x billing), user's own key with Kortix token (0.1x billing), or pure passthrough (no billing)"
+      },
+      {
+        "type": "feature",
+        "text": "Live model pricing from models.dev — 134+ models across Anthropic, OpenAI, xAI, Google, Groq, and DeepSeek with 24h background refresh"
+      },
+      {
+        "type": "feature",
+        "text": "Streaming usage extraction for both OpenAI and Anthropic response formats (SSE parser for token counting)"
+      },
+      {
+        "type": "feature",
+        "text": "LLM proxy service registry — Anthropic, OpenAI, xAI, Gemini, and Groq registered as billable LLM services"
+      },
+      {
+        "type": "security",
+        "text": "Hard 401 reject for invalid Kortix tokens (sbt_/sk_ prefix) — prevents falling through to free passthrough"
+      },
+      {
+        "type": "improvement",
+        "text": "Credit/billing tables migrated from public schema to kortix schema with atomic DB functions"
+      },
+      {
+        "type": "improvement",
+        "text": "Sandbox URL rewriting for all 5 LLM providers using correct SDK-specific env vars (ANTHROPIC_BASE_URL, OPENAI_BASE_URL, etc.)"
+      },
+      {
+        "type": "improvement",
+        "text": "X-Kortix-Token header injection in opencode.jsonc for automatic billing attribution from sandbox"
+      },
+      {
+        "type": "improvement",
+        "text": "Failed upstream LLM calls (non-2xx) are never billed — billing only on successful responses"
+      },
+      {
+        "type": "improvement",
+        "text": "Billing is cloud-only — self-hosted instances (KORTIX_BILLING_INTERNAL_ENABLED=false) get unlimited credits with no-op billing"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/sandbox@0.7.0",
+        "target": "npm"
+      },
+      {
+        "name": "v0.7.0",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.7.0",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.0",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.0",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.0",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.6.3",
     "date": "2026-02-23",
     "title": "Setup wizard overhaul, sandbox-on-demand, and frontend UX improvements",

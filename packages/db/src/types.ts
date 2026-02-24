@@ -1,5 +1,5 @@
-import { sandboxes, triggers, executions, deployments, channelConfigs, channelPlatformCredentials, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers } from './schema/kortix';
-import { apiKeys, creditAccounts, accountUser } from './schema/public';
+import { sandboxes, triggers, executions, deployments, channelConfigs, channelPlatformCredentials, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers, creditAccounts } from './schema/kortix';
+import { apiKeys, accountUser } from './schema/public';
 
 // Select types (what you get back from queries)
 export type Account = typeof accounts.$inferSelect;
