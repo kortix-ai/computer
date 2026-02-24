@@ -242,7 +242,8 @@ export const SessionLayout = memo(function SessionLayout({
             maxSize={shouldShowPanel ? (isAnimating ? 100 : isExpanded ? 0 : 65) : 100}
             collapsible={isExpanded || isAnimating}
             className={cn(
-              "flex flex-col overflow-hidden relative bg-transparent pl-3 pr-1.5",
+              "flex flex-col overflow-hidden relative bg-transparent transition-[padding] duration-300 ease-out",
+              shouldShowPanel && "pl-3 pr-1.5",
               isExpanded && !isAnimating && "opacity-0 pointer-events-none"
             )}
           >
