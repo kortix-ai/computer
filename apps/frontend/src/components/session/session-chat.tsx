@@ -2581,8 +2581,12 @@ export function SessionChat({
 		return true;
 	}, [messages]);
 
-	// Effective busy: server says busy OR the assistant message is incomplete.
-	const effectiveBusy = isServerBusy || hasIncompleteAssistant;
+	// Effective busy: server says busy, OR the assistant message is incomplete
+	// AND the server hasn't explicitly reported idle. The server is authoritative —
+	// if it says idle, the session is done even if the message's time.completed
+	// hasn't arrived via SSE yet (can happen after abort).
+	const serverExplicitlyIdle = sessionStatus?.type === "idle";
+	const effectiveBusy = isServerBusy || (hasIncompleteAssistant && !serverExplicitlyIdle);
 
 	// Debounced busy state: goes true immediately, but stays true for 2s
 	// after BOTH signals say idle. This prevents flickering between agentic
