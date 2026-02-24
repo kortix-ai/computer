@@ -133,6 +133,11 @@ RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');con
 COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
 RUN cd /opt/opencode && bun install
 
+# ── OpenCode binary patches ─────────────────────────────────────────────────
+# Apply patches to the compiled Bun binary (tool-input streaming, etc.).
+# Also runs via postinstall, but explicit step ensures it runs during build.
+RUN node /opt/opencode/patches/patch-opencode-streaming.js
+
 # Replace glibc-linked bun-pty .so with musl-compiled version from builder stage.
 # bun-pty ships .so files compiled against glibc, but Alpine uses musl.
 # We must replace the .so in ALL locations where bun-pty exists:

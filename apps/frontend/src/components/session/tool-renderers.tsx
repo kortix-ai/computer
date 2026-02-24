@@ -353,6 +353,82 @@ export const ToolRegistry = {
 };
 
 // ============================================================================
+// Helper: parse partial/incomplete JSON from streaming tool input
+// ============================================================================
+
+/**
+ * Attempts to extract key-value pairs from a partial/incomplete JSON string.
+ * This is used during fine-grained tool streaming when the tool arguments
+ * are still being streamed and may not yet form valid JSON.
+ *
+ * Strategy:
+ * 1. Try JSON.parse first (works if the JSON happens to be complete)
+ * 2. Fall back to regex extraction of "key": "value" pairs
+ */
+function parsePartialJSON(raw: string): Record<string, unknown> {
+	if (!raw) return {};
+	// Try full parse first
+	try {
+		const parsed = JSON.parse(raw);
+		if (typeof parsed === "object" && parsed !== null) return parsed;
+	} catch {
+		// expected — JSON is incomplete
+	}
+	// Try closing braces/brackets to make it valid
+	try {
+		let attempt = raw.trim();
+		// Count unclosed braces/brackets
+		let braces = 0;
+		let brackets = 0;
+		let inString = false;
+		let escape = false;
+		for (const ch of attempt) {
+			if (escape) { escape = false; continue; }
+			if (ch === "\\") { escape = true; continue; }
+			if (ch === '"') { inString = !inString; continue; }
+			if (inString) continue;
+			if (ch === "{") braces++;
+			if (ch === "}") braces--;
+			if (ch === "[") brackets++;
+			if (ch === "]") brackets--;
+		}
+		// If we're inside a string, close it
+		if (inString) attempt += '"';
+		// Close any open brackets/braces
+		for (let i = 0; i < brackets; i++) attempt += "]";
+		for (let i = 0; i < braces; i++) attempt += "}";
+		const parsed = JSON.parse(attempt);
+		if (typeof parsed === "object" && parsed !== null) return parsed;
+	} catch {
+		// still can't parse
+	}
+	// Last resort: regex extract complete "key": "value" pairs
+	const result: Record<string, unknown> = {};
+	const re = /"(\w+)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+	let m;
+	while ((m = re.exec(raw)) !== null) {
+		result[m[1]] = m[2].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+	}
+	return result;
+}
+
+/**
+ * Returns tool input, falling back to partial JSON from the streaming `raw`
+ * field during the pending state. This allows tool renderers to show early
+ * data (filenames, commands, etc.) before the full tool call is parsed.
+ */
+function partStreamingInput(part: ToolPart): Record<string, unknown> {
+	const input = part.state.input ?? {};
+	if (Object.keys(input).length > 0) return input;
+	// During pending state, try to parse the streaming raw field
+	if (part.state.status === "pending" && "raw" in part.state) {
+		const raw = (part.state as any).raw as string;
+		if (raw) return parsePartialJSON(raw);
+	}
+	return input;
+}
+
+// ============================================================================
 // Helper: extract input/metadata/output/status from part
 // ============================================================================
 
@@ -1223,13 +1299,14 @@ function InlineSessionMessagesList({
 
 function BashTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
+	const streamingInput = partStreamingInput(part);
 	const metadata = partMetadata(part);
 	const output = partOutput(part);
 	const status = partStatus(part);
 	const running = useContext(ToolRunningContext);
 	const command =
-		(input.command as string) || (metadata.command as string) || "";
-	const description = (input.description as string) || "";
+		(input.command as string) || (metadata.command as string) || (streamingInput.command as string) || "";
+	const description = (input.description as string) || (streamingInput.description as string) || "";
 	const strippedOutput = output ? stripAnsi(output) : "";
 
 	// Try to detect session metadata output for rich rendering
@@ -1590,9 +1667,10 @@ ToolRegistry.register("pty_kill", PtyKillTool);
 // --- Edit ---
 function EditTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
+	const streamingInput = partStreamingInput(part);
 	const metadata = partMetadata(part);
 	const filediff = metadata.filediff as Record<string, unknown> | undefined;
-	const filePath = input.filePath as string | undefined;
+	const filePath = (input.filePath as string) || (streamingInput.filePath as string) || (streamingInput.target_filepath as string) || undefined;
 	const filename = getFilename(filePath) || "";
 	const directory = filePath ? getDirectory(filePath) : undefined;
 	const diagnostics = getDiagnostics(
@@ -1652,10 +1730,11 @@ ToolRegistry.register("morph_edit", EditTool);
 // --- Write ---
 function WriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
+	const streamingInput = partStreamingInput(part);
 	const metadata = partMetadata(part);
 	const status = partStatus(part);
 	const running = useContext(ToolRunningContext);
-	const filePath = input.filePath as string | undefined;
+	const filePath = (input.filePath as string) || (streamingInput.filePath as string) || undefined;
 	const filename = getFilename(filePath) || "";
 	const directory = filePath ? getDirectory(filePath) : undefined;
 	const content = (input.content as string) || "";
@@ -1726,9 +1805,10 @@ ToolRegistry.register("write", WriteTool);
 // --- Read ---
 function ReadTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
+	const streamingInput = partStreamingInput(part);
 	const metadata = partMetadata(part);
 	const status = partStatus(part);
-	const filePath = input.filePath as string | undefined;
+	const filePath = (input.filePath as string) || (streamingInput.filePath as string) || undefined;
 	const filename = getFilename(filePath) || "";
 
 	const args: string[] = [];
@@ -1969,12 +2049,14 @@ function InlineGrepResults({
 // --- Glob ---
 function GlobTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
+	const streamingInput = partStreamingInput(part);
 	const output = partOutput(part);
 	const status = partStatus(part);
 	const { openFile, openFileWithList, toDisplayPath } = useOcFileOpen();
-	const directory = getDirectory(input.path as string) || undefined;
+	const directory = getDirectory((input.path as string) || (streamingInput.path as string)) || undefined;
 	const args: string[] = [];
-	if (input.pattern) args.push("pattern=" + String(input.pattern));
+	const pattern = (input.pattern || streamingInput.pattern) as string | undefined;
+	if (pattern) args.push("pattern=" + String(pattern));
 
 	const filePaths = useMemo(() => parseFilePaths(output), [output]);
 	const hasResults = filePaths && filePaths.length > 0;
@@ -2009,13 +2091,16 @@ ToolRegistry.register("glob", GlobTool);
 // --- Grep ---
 function GrepTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
+	const streamingInput = partStreamingInput(part);
 	const output = partOutput(part);
 	const status = partStatus(part);
 	const { openFile, toDisplayPath } = useOcFileOpen();
-	const directory = getDirectory(input.path as string) || undefined;
+	const directory = getDirectory((input.path as string) || (streamingInput.path as string)) || undefined;
 	const args: string[] = [];
-	if (input.pattern) args.push("pattern=" + String(input.pattern));
-	if (input.include) args.push("include=" + String(input.include));
+	const grepPattern = (input.pattern || streamingInput.pattern) as string | undefined;
+	const grepInclude = (input.include || streamingInput.include) as string | undefined;
+	if (grepPattern) args.push("pattern=" + String(grepPattern));
+	if (grepInclude) args.push("include=" + String(grepInclude));
 
 	const grepResult = useMemo(() => parseGrepOutput(output), [output]);
 	const hasResults = !!grepResult;

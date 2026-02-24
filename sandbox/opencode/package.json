@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "postinstall": "bash patches/apply.sh"
+  },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.13.0",
     "@opencode-ai/plugin": "1.2.10",
