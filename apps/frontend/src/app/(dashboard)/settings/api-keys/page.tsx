@@ -50,7 +50,8 @@ import {
   APIKeyCreateResponse,
   APIKeyRegenerateResponse,
 } from '@/lib/api/api-keys';
-import { useKortixComputerStore } from '@/stores/kortix-computer-store';
+import { getActiveSandboxId, getActiveServer } from '@/stores/server-store';
+import { useServerStore } from '@/stores/server-store';
 
 interface NewAPIKeyData {
   title: string;
@@ -59,7 +60,10 @@ interface NewAPIKeyData {
 }
 
 export default function APIKeysPage() {
-  const activeSandboxId = useKortixComputerStore((s) => s.currentSandboxId);
+  // Re-render when active server changes (sandboxId may change)
+  const activeServerId = useServerStore((s) => s.activeServerId);
+  const activeSandboxId = getActiveSandboxId();
+  const activeServer = getActiveServer();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyData, setNewKeyData] = useState<NewAPIKeyData>({
     title: '',
@@ -149,7 +153,12 @@ export default function APIKeysPage() {
         setCreatedApiKey(response.data.data);
         setShowCreatedKey(true);
         queryClient.invalidateQueries({ queryKey: ['api-keys'] });
-        toast.success('Sandbox key regenerated');
+        const sandboxUpdated = (response.data as any)?.sandbox_updated;
+        toast.success(
+          sandboxUpdated
+            ? 'Token regenerated and applied to sandbox'
+            : 'Token regenerated — restart sandbox to apply',
+        );
       } else {
         toast.error(response.error?.message || 'Failed to regenerate key');
       }
@@ -210,23 +219,11 @@ export default function APIKeysPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-200">
-            Active
-          </Badge>
-        );
+        return <Badge variant="secondary">Active</Badge>;
       case 'revoked':
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-200">
-            Revoked
-          </Badge>
-        );
+        return <Badge variant="destructive">Revoked</Badge>;
       case 'expired':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-            Expired
-          </Badge>
-        );
+        return <Badge variant="outline">Expired</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -252,102 +249,49 @@ export default function APIKeysPage() {
           </p>
         </div>
 
-        {/* ── Sandbox Token Section ──────────────────────────────────────── */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Bot className="w-4 h-4 text-muted-foreground" />
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Sandbox Token
-            </h2>
-          </div>
-
-          {isLoading ? (
-            <Card className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-muted rounded w-1/3"></div>
-                <div className="h-3 bg-muted rounded w-1/2"></div>
-              </CardHeader>
-            </Card>
-          ) : activeSandboxKey ? (
-            <Card className="border-violet-200/60 dark:border-violet-800/30">
-              <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                      {activeSandboxKey.title}
-                      <Badge variant="secondary" className="text-xs bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700">
-                        Managed
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription className="mt-0.5 sm:mt-1 text-xs sm:text-sm">
-                      Auto-created for your sandbox. Used by agents running inside the sandbox to authenticate with the Kortix API.
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {getStatusBadge(activeSandboxKey.status)}
-                  </div>
+        {/* ── Sandbox Token ─────────────────────────────────────────────── */}
+        {!isLoading && activeSandboxKey && (
+          <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Bot className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{activeServer?.label || 'Sandbox'}</span>
+                  {getStatusBadge(activeSandboxKey.status)}
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0 px-3 sm:px-6 pb-3 sm:pb-4">
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
-                    <div>
-                      <p className="text-muted-foreground mb-0.5">Public Key</p>
-                      <p className="font-mono text-xs truncate">{activeSandboxKey.public_key}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground mb-0.5">Created</p>
-                      <p className="font-medium truncate">{formatDate(activeSandboxKey.created_at)}</p>
-                    </div>
-                    {activeSandboxKey.last_used_at && (
-                      <div>
-                        <p className="text-muted-foreground mb-0.5">Last Used</p>
-                        <p className="font-medium truncate">{formatDate(activeSandboxKey.last_used_at)}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 pt-1">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                          Regenerate
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Regenerate Sandbox Token</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will revoke the current sandbox token and generate a new one.
-                            The sandbox will need to be restarted with the new token for agents to continue working.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => regenerateMutation.mutate(activeSandboxKey.key_id)}
-                            disabled={regenerateMutation.isPending}
-                          >
-                            {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : !error ? (
-            <Card className="border-dashed">
-              <CardContent className="p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No sandbox token found. A token will be created automatically when a sandbox is provisioned.
+                <p className="text-xs text-muted-foreground font-mono truncate mt-0.5">
+                  {activeSandboxKey.public_key}
                 </p>
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
+              </div>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex-shrink-0 text-muted-foreground hover:text-foreground">
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  Regenerate
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Regenerate Sandbox Token</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will revoke the current token and generate a new one.
+                    The sandbox will need to restart for agents to keep working.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => regenerateMutation.mutate(activeSandboxKey.key_id)}
+                    disabled={regenerateMutation.isPending}
+                  >
+                    {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
 
         {/* ── User API Keys Section ──────────────────────────────────────── */}
         <div className="space-y-3">
@@ -632,7 +576,7 @@ export default function APIKeysPage() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-green-600" />
+                <Shield className="w-5 h-5" />
                 {createdApiKey && 'secret_key' in createdApiKey
                   ? createdApiKey.type === 'sandbox'
                     ? 'Sandbox Token Regenerated'
@@ -641,8 +585,8 @@ export default function APIKeysPage() {
               </DialogTitle>
               <DialogDescription>
                 {createdApiKey?.type === 'sandbox'
-                  ? 'Your sandbox token has been regenerated. Update KORTIX_TOKEN in your sandbox.'
-                  : 'Your API key has been created successfully'}
+                  ? 'Your sandbox token has been regenerated and applied to the running sandbox.'
+                  : 'Your API key has been created successfully.'}
               </DialogDescription>
             </DialogHeader>
 

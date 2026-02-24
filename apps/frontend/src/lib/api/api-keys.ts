@@ -62,7 +62,7 @@ interface ApiKeyCreateEnvelope {
 interface ApiKeyRegenerateEnvelope {
   success: boolean;
   data: APIKeyRegenerateResponse;
-  message: string;
+  sandbox_updated: boolean;
 }
 
 // API Key Management API (sandbox-scoped, kortix schema)
