@@ -201,6 +201,61 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
 }
 
 // ============================================================================
+// Optimistic answers cache
+// ============================================================================
+// When a user answers a question, we save the answers here immediately.
+// This survives SSE `message.part.updated` events that may overwrite the
+// tool part's state before the server has merged the answers.  The cache
+// is keyed by the question tool part's `id` (stable across updates).
+// Entries are cleaned up once the server's authoritative part arrives with
+// real `metadata.answers`.
+
+const optimisticAnswersCache = new Map<string, { answers: string[][]; input: Record<string, unknown> }>();
+
+// ============================================================================
+// Parse answers from the question tool's output string
+// ============================================================================
+// When metadata.answers is missing (e.g. after page reload, or the server
+// never finalized the tool part), we can try to extract answers from the
+// output string. The server formats it as:
+//   "User has answered your questions: \"Q1\"=\"A1\". You can now continue..."
+// This is a best-effort parser; if it can't match, returns null.
+
+function parseAnswersFromOutput(
+	output: string,
+	input?: { questions?: Array<{ question: string }> },
+): string[][] | null {
+	if (!output) return null;
+
+	const questions = input?.questions;
+	if (!questions || questions.length === 0) return null;
+
+	// Try to extract "question"="answer" pairs from the output
+	const pairRegex = /"([^"]*)"="([^"]*)"/g;
+	const pairs: { question: string; answer: string }[] = [];
+	let match;
+	while ((match = pairRegex.exec(output)) !== null) {
+		pairs.push({ question: match[1], answer: match[2] });
+	}
+
+	if (pairs.length > 0) {
+		// Match pairs to input questions by order (they correspond 1:1)
+		return questions.map((_, i) => {
+			const pair = pairs[i];
+			return pair ? [pair.answer] : [];
+		});
+	}
+
+	// Fallback: if we can't parse pairs but the output mentions "answered",
+	// return a placeholder to indicate the question was answered
+	if (output.toLowerCase().includes("answered")) {
+		return questions.map(() => ["Answered"]);
+	}
+
+	return null;
+}
+
+// ============================================================================
 // Answered question card — collapsible summary of completed Q&A
 // ============================================================================
 
@@ -1629,19 +1684,129 @@ function SessionTurn({
 		[nextPermission, nextQuestion],
 	);
 
-	// Answered question parts — shown when steps are collapsed (matches SolidJS)
+	// Answered question parts — shown inline alongside streamed text.
+	// Uses the optimisticAnswersCache as a fallback: when the user answers a
+	// question we cache {answers, input} immediately. SSE message.part.updated
+	// events can overwrite the tool part's state (wiping metadata.answers)
+	// before the server has merged them. By checking the cache we guarantee
+	// the answered card stays visible regardless of SSE timing.
+	// Only skip tool parts whose callID matches a currently-pending question.
 	const answeredQuestionParts = useMemo(() => {
-		if (questions.filter((q) => q.sessionID === sessionId).length > 0)
-			return [];
-		const result: { part: ToolPart; messageId: string }[] = [];
-		for (const msg of turn.assistantMessages) {
-			for (const part of msg.parts) {
+		const pendingCallIds = new Set(
+			questions
+				.filter((q) => q.sessionID === sessionId)
+				.map((q) => q.tool?.callID)
+				.filter(Boolean),
+		);
+
+		// Collect ALL question tool parts first so we can determine which ones
+		// were implicitly answered (i.e. the assistant continued past them).
+		const questionInfos: {
+			tool: ToolPart;
+			msgId: string;
+			msgIndex: number;
+			partIndex: number;
+		}[] = [];
+		for (let mi = 0; mi < turn.assistantMessages.length; mi++) {
+			const msg = turn.assistantMessages[mi];
+			for (let pi = 0; pi < msg.parts.length; pi++) {
+				const part = msg.parts[pi];
 				if (part.type !== "tool") continue;
 				const tool = part as ToolPart;
 				if (tool.tool !== "question") continue;
-				const answers = (tool.state as any)?.metadata?.answers;
-				if (answers && answers.length > 0) {
-					result.push({ part: tool, messageId: msg.info.id });
+				questionInfos.push({ tool, msgId: msg.info.id, msgIndex: mi, partIndex: pi });
+			}
+		}
+
+		const result: { part: ToolPart; messageId: string }[] = [];
+		for (const qInfo of questionInfos) {
+			const { tool, msgId, msgIndex, partIndex } = qInfo;
+
+			// Check if there are subsequent parts/messages AFTER this question
+			// in the turn. If the assistant continued, this question was answered.
+			const hasSubsequentContent = (() => {
+				// Check for later parts in the same message
+				const msg = turn.assistantMessages[msgIndex];
+				for (let pi = partIndex + 1; pi < msg.parts.length; pi++) {
+					const p = msg.parts[pi];
+					if (p.type === "step-finish" || p.type === "step-start") continue;
+					return true;
+				}
+				// Check for later messages in the turn
+				return msgIndex < turn.assistantMessages.length - 1;
+			})();
+
+			const isPending = pendingCallIds.has(tool.callID);
+
+			// Skip only if it IS the currently-pending question AND there's no
+			// evidence it was already answered (no subsequent content).
+			if (isPending && !hasSubsequentContent) continue;
+
+			const serverAnswers = (tool.state as any)?.metadata?.answers;
+			const cached = optimisticAnswersCache.get(tool.id);
+			const toolOutput = (tool.state as any)?.output as string | undefined;
+
+			if (serverAnswers && serverAnswers.length > 0) {
+				// Server has real answers — clean up cache if present
+				if (cached) optimisticAnswersCache.delete(tool.id);
+				result.push({ part: tool, messageId: msgId });
+			} else if (cached) {
+				// Server hasn't confirmed yet — use cached answers.
+				// Build a synthetic tool part with the cached data so
+				// AnsweredQuestionCard can render.
+				const syntheticPart = {
+					...tool,
+					state: {
+						...(tool.state as any),
+						status: "completed",
+						input: cached.input,
+						metadata: {
+							...((tool.state as any)?.metadata ?? {}),
+							answers: cached.answers,
+						},
+					},
+				} as unknown as ToolPart;
+				result.push({ part: syntheticPart, messageId: msgId });
+			} else if (toolOutput && hasSubsequentContent) {
+				// Question was answered (output exists and assistant continued)
+				// but metadata.answers was never set (e.g. after page reload).
+				// Parse answers from the output string as a fallback.
+				const parsed = parseAnswersFromOutput(toolOutput, (tool.state as any)?.input);
+				if (parsed) {
+					const syntheticPart = {
+						...tool,
+						state: {
+							...(tool.state as any),
+							status: "completed",
+							metadata: {
+								...((tool.state as any)?.metadata ?? {}),
+								answers: parsed,
+							},
+						},
+					} as unknown as ToolPart;
+					result.push({ part: syntheticPart, messageId: msgId });
+				}
+			} else if (!toolOutput && hasSubsequentContent) {
+				// Question was implicitly answered (assistant continued past it)
+				// but neither metadata.answers nor output is available.
+				// Show a minimal answered card using the input questions
+				// with placeholder answers extracted from context.
+				const input = (tool.state as any)?.input;
+				const questionsList: { question: string }[] = Array.isArray(input?.questions) ? input.questions : [];
+				if (questionsList.length > 0) {
+					const placeholderAnswers = questionsList.map(() => ["Answered"]);
+					const syntheticPart = {
+						...tool,
+						state: {
+							...(tool.state as any),
+							status: "completed",
+							metadata: {
+								...((tool.state as any)?.metadata ?? {}),
+								answers: placeholderAnswers,
+							},
+						},
+					} as unknown as ToolPart;
+					result.push({ part: syntheticPart, messageId: msgId });
 				}
 			}
 		}
@@ -1657,14 +1822,22 @@ function SessionTurn({
 	// in their original order rather than extracting the last text as a separate "response".
 	// This works both during streaming and after completion so that answered questions
 	// stay in the correct position while the AI continues responding.
+	// Important: for question parts we use the (possibly synthetic) part from
+	// answeredQuestionParts — NOT the raw store part — so that optimistic
+	// answers from the cache are included even if the server hasn't confirmed yet.
+	const answeredQuestionPartsById = useMemo(
+		() => new Map(answeredQuestionParts.map(({ part }) => [part.id, part])),
+		[answeredQuestionParts],
+	);
 	const inlineContentParts = useMemo(() => {
 		if (answeredQuestionParts.length === 0) return null;
 		const items: Array<{ type: 'text'; part: TextPart; id: string } | { type: 'question'; part: ToolPart; id: string }> = [];
 		for (const { part } of allParts) {
 			if (isTextPart(part) && part.text?.trim()) {
 				items.push({ type: 'text', part, id: part.id });
-			} else if (isToolPart(part) && part.tool === 'question' && answeredQuestionIds.has(part.id)) {
-				items.push({ type: 'question', part, id: part.id });
+			} else if (isToolPart(part) && part.tool === 'question' && answeredQuestionPartsById.has(part.id)) {
+				// Use the answered part (may be synthetic with cached answers)
+				items.push({ type: 'question', part: answeredQuestionPartsById.get(part.id)!, id: part.id });
 			}
 		}
 		// Only use inline rendering if there are both text and question items
@@ -1672,7 +1845,7 @@ function SessionTurn({
 		const hasQuestion = items.some(i => i.type === 'question');
 		if (!hasText || !hasQuestion) return null;
 		return items;
-	}, [allParts, answeredQuestionIds, answeredQuestionParts.length]);
+	}, [allParts, answeredQuestionPartsById, answeredQuestionParts.length]);
 	const shouldUseInlineContent = !hasSteps && !!inlineContentParts;
 
 	const taskToolParts = useMemo(() => {
@@ -2062,8 +2235,19 @@ function SessionTurn({
 							if (part.tool === "todowrite") return null;
 							if (part.tool === "task") return null;
 							if (part.tool === "question") {
-								// Answered questions render in the inline content section below;
-								// dismissed questions show via the turnError banner.
+								// When inline content rendering is active, answered questions
+								// render in the inline content section — skip here to avoid duplicates.
+								if (shouldUseInlineContent) return null;
+								// Render answered questions inline at their natural position
+								// so they appear exactly where the user answered them.
+								const answeredPart = answeredQuestionPartsById.get(part.id);
+								if (answeredPart) {
+									return (
+										<AnsweredQuestionCard key={part.id} part={answeredPart} defaultExpanded />
+									);
+								}
+								// Unanswered/dismissed questions: don't render in steps;
+								// dismissed ones show via the turnError banner.
 								return null;
 							}
 
@@ -2167,14 +2351,16 @@ function SessionTurn({
 						</div>
 					)}
 
-					{/* Answered question parts — collapsible, shown after the response text */}
-					{!hasSteps && answeredQuestionParts.length > 0 && (
-						<div className="space-y-2 mt-3">
-							{answeredQuestionParts.map(({ part }) => (
-								<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
-							))}
-						</div>
-					)}
+				{/* Answered question parts — shown after the response text only when
+				    there are no steps (no-steps turns). When hasSteps is true,
+				    answered questions render inline within the steps section above. */}
+				{!hasSteps && answeredQuestionParts.length > 0 && (
+					<div className="space-y-2 mt-3">
+						{answeredQuestionParts.map(({ part }) => (
+							<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
+						))}
+					</div>
+				)}
 				</>
 			)}
 
@@ -3022,8 +3208,36 @@ export function SessionChat({
 
 	const handleQuestionReply = useCallback(
 		async (requestId: string, answers: string[][]) => {
+			// Snapshot the question BEFORE removing it so we can cache the
+			// answer against the tool part's ID.
+			const questionReq = useOpenCodePendingStore.getState().questions[requestId];
+
 			// Optimistically remove the question so the textarea shows immediately
 			removeQuestion(requestId);
+
+			// Save the answers in the optimistic cache keyed by the tool part ID.
+			// This cache survives SSE message.part.updated events that may
+			// overwrite the tool part before the server includes metadata.answers.
+			// answeredQuestionParts reads from this cache as a fallback.
+			if (questionReq?.tool?.messageID) {
+				const { messageID } = questionReq.tool;
+				const parts = useSyncStore.getState().parts[messageID];
+				if (parts) {
+					const match = parts.find(
+						(p) =>
+							p.type === "tool" &&
+							(p as ToolPart).tool === "question" &&
+							(p as ToolPart).callID === questionReq.tool!.callID,
+					);
+					if (match) {
+						optimisticAnswersCache.set(match.id, {
+							answers,
+							input: (match as ToolPart).state?.input as Record<string, unknown> ?? {},
+						});
+					}
+				}
+			}
+
 			try {
 				await replyToQuestion(requestId, answers);
 			} catch {
