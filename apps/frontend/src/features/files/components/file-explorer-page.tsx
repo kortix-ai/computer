@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ServerOff, RefreshCw } from 'lucide-react';
+import { Search, ServerOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   ResizablePanelGroup,
@@ -19,12 +19,8 @@ import { FileExplorerToolbar } from './file-explorer-toolbar';
 import { FileExplorerStatusBar } from './file-explorer-status-bar';
 
 /**
- * Full-page VS Code-style file explorer:
- * - Resizable tree sidebar on the left (sole navigator)
- * - File viewer/editor on the right
- * - Welcome screen when no file is open
- * - Toolbar at top, status bar at bottom
- * - Single search overlay (Ctrl+P)
+ * Full-page VS Code-style file explorer.
+ * Tree sidebar (left) + viewer/editor (right).
  */
 export function FileExplorerPage() {
   const panelMode = useFilesStore((s) => s.panelMode);
@@ -38,10 +34,9 @@ export function FileExplorerPage() {
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
   const { data: health, isLoading: isHealthLoading, refetch } = useServerHealth();
 
-  // Wire SSE events to auto-invalidate file queries when agent edits files
   useFileEventInvalidation();
 
-  // Global keyboard shortcuts
+  // Cmd+P search, Escape close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -49,14 +44,12 @@ export function FileExplorerPage() {
 
       const isMod = e.metaKey || e.ctrlKey;
 
-      // Ctrl+P / Cmd+P: Quick search
       if (isMod && e.key === 'p') {
         e.preventDefault();
         toggleSearch();
         return;
       }
 
-      // Escape: close search
       if (e.key === 'Escape' && isSearchOpen) {
         e.preventDefault();
         closeSearch();
@@ -72,20 +65,16 @@ export function FileExplorerPage() {
   if (!isHealthLoading && !health?.healthy) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center bg-background">
-        <ServerOff className="h-12 w-12 text-muted-foreground" />
+        <ServerOff className="h-10 w-10 text-muted-foreground/30" />
         <div>
-          <h3 className="text-lg font-medium">Server not reachable</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Could not connect to the OpenCode server at{' '}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{serverUrl}</code>
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Make sure <code className="text-xs bg-muted px-1.5 py-0.5 rounded">opencode serve</code> or{' '}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">opencode web</code> is running.
+          <h3 className="text-sm font-medium text-foreground">Server not reachable</h3>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Could not connect to{' '}
+            <code className="text-[10px] bg-muted px-1 py-0.5 rounded">{serverUrl}</code>
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => refetch()}>
+          <RefreshCw className="h-3 w-3 mr-1.5" />
           Retry
         </Button>
       </div>
@@ -94,23 +83,19 @@ export function FileExplorerPage() {
 
   return (
     <div className="h-full flex flex-col bg-background relative">
-      {/* Top toolbar */}
       <FileExplorerToolbar />
 
-      {/* Search overlay */}
       {isSearchOpen && <FileSearch />}
 
-      {/* Main content: tree + viewer */}
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="h-full">
-          {/* Tree sidebar */}
           {!isSidebarCollapsed && (
             <>
               <ResizablePanel
                 defaultSize={22}
                 minSize={15}
                 maxSize={40}
-                className="bg-muted/10 overflow-hidden"
+                className="overflow-hidden"
               >
                 <FileTree />
               </ResizablePanel>
@@ -118,7 +103,6 @@ export function FileExplorerPage() {
             </>
           )}
 
-          {/* Main content panel */}
           <ResizablePanel defaultSize={isSidebarCollapsed ? 100 : 78} minSize={40} className="overflow-hidden">
             <div className="h-full flex flex-col">
               {panelMode === 'history' && historyFilePath ? (
@@ -133,54 +117,53 @@ export function FileExplorerPage() {
         </ResizablePanelGroup>
       </div>
 
-      {/* Bottom status bar */}
       <FileExplorerStatusBar />
     </div>
   );
 }
 
-// ─── Welcome panel (VS Code style) ──────────────────────────────────────────
+// ─── Welcome panel ──────────────────────────────────────────────────────────
 
 function WelcomePanel() {
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
+  const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center select-none">
-      <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center justify-center h-full gap-5 p-8 text-center select-none">
+      {/* Subtle file icon */}
+      <div className="h-12 w-12 rounded-xl bg-muted/50 flex items-center justify-center">
         <svg
-          className="h-16 w-16 text-muted-foreground/20"
+          className="h-6 w-6 text-muted-foreground/30"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1"
+          strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
           <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
           <polyline points="14 2 14 8 20 8" />
         </svg>
-        <h3 className="text-sm font-medium text-muted-foreground">No file open</h3>
       </div>
 
-      <div className="flex flex-col items-center gap-1.5 text-xs text-muted-foreground/60">
-        <p>Select a file from the explorer tree to view or edit it.</p>
-        <p className="flex items-center gap-1.5">
-          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">
-            {typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '\u2318' : 'Ctrl'}+P
-          </kbd>
-          <span>to search files</span>
+      <div className="flex flex-col items-center gap-3">
+        <p className="text-[11px] text-muted-foreground/50">
+          Open a file from the tree or search
         </p>
 
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-[11px] gap-1.5 text-muted-foreground hover:text-foreground"
+          onClick={toggleSearch}
+        >
+          <Search className="h-3 w-3" />
+          <span>Open File</span>
+          <kbd className="ml-1 px-1 py-0 rounded bg-muted/80 text-[9px] font-mono text-muted-foreground/60">
+            {isMac ? '\u2318' : 'Ctrl'}P
+          </kbd>
+        </Button>
       </div>
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="mt-2"
-        onClick={toggleSearch}
-      >
-        Open File...
-      </Button>
     </div>
   );
 }

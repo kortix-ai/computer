@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { GitBranch, FileCode, AlertTriangle, CircleAlert } from 'lucide-react';
+import { GitBranch, AlertTriangle, CircleAlert } from 'lucide-react';
 import { useFilesStore } from '../store/files-store';
 import { useGitStatus, useServerHealth, useCurrentProject } from '../hooks';
 import { useDiagnosticsStore } from '@/stores/diagnostics-store';
@@ -20,11 +20,11 @@ function getLanguageLabel(filename: string): string {
     dockerfile: 'Dockerfile', makefile: 'Makefile',
     vue: 'Vue', svelte: 'Svelte',
     pdf: 'PDF', docx: 'Word', xlsx: 'Excel', pptx: 'PowerPoint',
-    png: 'PNG Image', jpg: 'JPEG Image', jpeg: 'JPEG Image', gif: 'GIF Image',
-    svg: 'SVG', webp: 'WebP Image', mp4: 'MP4 Video', webm: 'WebM Video',
-    mp3: 'MP3 Audio', wav: 'WAV Audio',
+    png: 'PNG', jpg: 'JPEG', jpeg: 'JPEG', gif: 'GIF',
+    svg: 'SVG', webp: 'WebP', mp4: 'MP4', webm: 'WebM',
+    mp3: 'MP3', wav: 'WAV', csv: 'CSV', tsv: 'TSV',
   };
-  return map[ext] || ext.toUpperCase() || 'Unknown';
+  return map[ext] || ext.toUpperCase() || '';
 }
 
 export function FileExplorerStatusBar() {
@@ -37,7 +37,6 @@ export function FileExplorerStatusBar() {
 
   const totalChanges = gitStatuses?.length ?? 0;
 
-  // Diagnostics summary
   const { totalErrors, totalWarnings } = useMemo(() => {
     let errors = 0;
     let warnings = 0;
@@ -54,63 +53,44 @@ export function FileExplorerStatusBar() {
   const languageLabel = fileName ? getLanguageLabel(fileName) : '';
 
   return (
-    <div className="flex items-center justify-between gap-4 px-3 py-1 border-t bg-muted/30 text-[11px] text-muted-foreground shrink-0">
+    <div className="flex items-center justify-between gap-4 px-2 border-t border-border/50 bg-background text-[10px] text-muted-foreground/70 shrink-0 h-6 select-none">
       {/* Left side */}
-      <div className="flex items-center gap-3 min-w-0">
-        {/* Git info */}
+      <div className="flex items-center gap-2.5 min-w-0">
         {project?.vcs === 'git' && (
           <span className="flex items-center gap-1 shrink-0">
-            <GitBranch className="h-3 w-3" />
+            <GitBranch className="h-2.5 w-2.5" />
             <span>main</span>
             {totalChanges > 0 && (
-              <span className="text-yellow-500 font-medium">
-                ({totalChanges} change{totalChanges !== 1 ? 's' : ''})
-              </span>
+              <span className="text-yellow-500/80">+{totalChanges}</span>
             )}
           </span>
         )}
 
-        {/* Diagnostics */}
         {(totalErrors > 0 || totalWarnings > 0) && (
-          <span className="flex items-center gap-2 shrink-0">
+          <span className="flex items-center gap-1.5 shrink-0">
             {totalErrors > 0 && (
-              <span className="flex items-center gap-0.5 text-red-500">
-                <CircleAlert className="h-3 w-3" />
+              <span className="flex items-center gap-0.5 text-red-500/80">
+                <CircleAlert className="h-2.5 w-2.5" />
                 {totalErrors}
               </span>
             )}
             {totalWarnings > 0 && (
-              <span className="flex items-center gap-0.5 text-yellow-500">
-                <AlertTriangle className="h-3 w-3" />
+              <span className="flex items-center gap-0.5 text-yellow-500/80">
+                <AlertTriangle className="h-2.5 w-2.5" />
                 {totalWarnings}
               </span>
             )}
           </span>
         )}
-
-        {/* Current file path */}
-        {selectedFilePath && (
-          <span className="truncate max-w-[300px]">
-            {selectedFilePath}
-          </span>
-        )}
       </div>
 
       {/* Right side */}
-      <div className="flex items-center gap-3 shrink-0">
-        {/* Language */}
+      <div className="flex items-center gap-2.5 shrink-0">
         {languageLabel && (
-          <span className="flex items-center gap-1">
-            <FileCode className="h-3 w-3" />
-            {languageLabel}
-          </span>
+          <span>{languageLabel}</span>
         )}
-
-        {/* Server version */}
         {health?.version && (
-          <span className="opacity-60">
-            v{health.version}
-          </span>
+          <span className="opacity-50">v{health.version}</span>
         )}
       </div>
     </div>

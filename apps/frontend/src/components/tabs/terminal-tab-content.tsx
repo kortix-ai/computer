@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { CircleDashed, Terminal } from 'lucide-react';
+import { CircleDashed, Plus, Terminal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { useServerStore } from '@/stores/server-store';
-import { useOpenCodePtyList, useRemovePty } from '@/hooks/opencode/use-opencode-pty';
-import { useTabStore } from '@/stores/tab-store';
+import { useOpenCodePtyList, useCreatePty, useRemovePty } from '@/hooks/opencode/use-opencode-pty';
+import { useTabStore, openTabAndNavigate } from '@/stores/tab-store';
 
 // Lazy-load terminal components to avoid SSR issues with xterm.js
 const SSHTerminal = dynamic(
@@ -43,6 +44,7 @@ export function TerminalTabContent({ ptyId, tabId, hidden = false }: TerminalTab
 
   const { data: ptys, isLoading } = useOpenCodePtyList();
   const removePty = useRemovePty();
+  const createPty = useCreatePty();
 
   // Find the PTY object for this tab
   const pty = ptys?.find((p) => p.id === ptyId) ?? null;
@@ -78,6 +80,26 @@ export function TerminalTabContent({ ptyId, tabId, hidden = false }: TerminalTab
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ptyId]);
 
+  // Replace this dead terminal tab with a fresh one
+  const handleNewTerminal = useCallback(async () => {
+    try {
+      // Close this dead tab first
+      useTabStore.getState().closeTab(tabId);
+      // Create a new PTY and open it
+      const newPty = await createPty.mutateAsync({
+        env: { TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+      });
+      openTabAndNavigate({
+        id: `terminal:${newPty.id}`,
+        title: newPty.title || newPty.command || 'Terminal',
+        type: 'terminal',
+        href: `/terminal/${newPty.id}`,
+      });
+    } catch {
+      // Tab was already closed, nothing more to do
+    }
+  }, [tabId, createPty]);
+
   // Sandbox mode — shared SSH terminal
   if (currentSandboxId) {
     return (
@@ -97,12 +119,21 @@ export function TerminalTabContent({ ptyId, tabId, hidden = false }: TerminalTab
     );
   }
 
-  // PTY not found (will auto-close via effect above)
+  // PTY not found — show prompt to open a new terminal
   if (!pty) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-background">
+      <div className="h-full w-full flex flex-col items-center justify-center bg-background gap-3">
         <Terminal className="h-8 w-8 text-muted-foreground/30" />
-        <span className="text-xs text-muted-foreground mt-2">Terminal session ended</span>
+        <span className="text-xs text-muted-foreground">Terminal session ended</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleNewTerminal}
+          className="gap-1.5"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New Terminal
+        </Button>
       </div>
     );
   }

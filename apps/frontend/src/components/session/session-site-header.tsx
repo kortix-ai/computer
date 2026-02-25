@@ -23,9 +23,11 @@ import {
   FileDown,
   MoreHorizontal,
   GitCompareArrows,
+  Layers,
 } from 'lucide-react';
 import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
+import { CompactDialog } from '@/components/session/compact-dialog';
 
 
 import { DiagnosticsBadge } from '@/components/session/diagnostics-panel';
@@ -54,6 +56,7 @@ export function SessionSiteHeader({
 }: SessionSiteHeaderProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
+  const [compactOpen, setCompactOpen] = useState(false);
 
 
   const isMobile = useIsMobile() || isMobileView;
@@ -125,6 +128,12 @@ export function SessionSiteHeader({
                     <FileDown className="mr-2 h-4 w-4" />
                     Export transcript
                   </DropdownMenuItem>
+
+                  {/* Compact session */}
+                  <DropdownMenuItem onClick={() => setCompactOpen(true)}>
+                    <Layers className="mr-2 h-4 w-4" />
+                    Compact session
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -177,6 +186,11 @@ export function SessionSiteHeader({
         sessionId={sessionId}
         open={diffOpen}
         onOpenChange={setDiffOpen}
+      />
+      <CompactDialog
+        sessionId={sessionId}
+        open={compactOpen}
+        onOpenChange={setCompactOpen}
       />
     </>
   );

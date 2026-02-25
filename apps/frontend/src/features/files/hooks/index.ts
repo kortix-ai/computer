@@ -46,6 +46,9 @@ export {
   gitStatusKeys,
 } from './use-git-status';
 
+// Binary blob loading (shared between file-content-renderer & show-content-renderer)
+export { useBinaryBlob, binaryBlobKeys } from './use-binary-blob';
+
 // SSE-based real-time invalidation
 export { useFileEventInvalidation } from './use-file-events';
 

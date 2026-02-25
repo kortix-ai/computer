@@ -17,6 +17,10 @@ const TYPES = [
   "markdown",
   "pdf",
   "html",
+  "csv",
+  "xlsx",
+  "docx",
+  "pptx",
 ] as const;
 type ShowType = (typeof TYPES)[number];
 
@@ -85,6 +89,12 @@ function defaultVariant(type: ShowType): ShowVariant {
     case "markdown":
     case "text":
       return "detail";
+    case "csv":
+    case "xlsx":
+      return "full";
+    case "docx":
+    case "pptx":
+      return "full";
     case "audio":
     case "file":
       return "compact";
@@ -93,6 +103,81 @@ function defaultVariant(type: ShowType): ShowVariant {
     default:
       return "detail";
   }
+}
+
+// ── Shared validation ──────────────────────────────────────────────────────
+
+const PATH_TYPES: ShowType[] = ["file", "image", "video", "audio", "pdf", "csv", "xlsx", "docx", "pptx"];
+const CONTENT_TYPES: ShowType[] = ["text", "error", "code", "markdown", "html"];
+
+function validateAndBuildEntry(item: Record<string, unknown>): string | ShowEntry {
+  const type = item.type as ShowType | undefined;
+  if (!type || !TYPES.includes(type as ShowType)) {
+    return `Error: 'type' is required. Use one of: ${TYPES.join(", ")}.`;
+  }
+
+  if (PATH_TYPES.includes(type) && !item.path) {
+    return `Error: 'path' is required when type is '${type}'.`;
+  }
+  if (type === "url" && !item.url) {
+    return `Error: 'url' is required when type is 'url'.`;
+  }
+  if (CONTENT_TYPES.includes(type) && !item.content) {
+    return `Error: 'content' is required when type is '${type}'.`;
+  }
+
+  if (PATH_TYPES.includes(type) && item.path) {
+    const absPath = resolve(item.path as string);
+    if (!existsSync(absPath)) {
+      return `Error: File not found: ${absPath}`;
+    }
+  }
+
+  const variant = (item.variant as ShowVariant) || undefined;
+  if (variant && !VARIANTS.includes(variant)) {
+    return `Error: Invalid variant '${variant}'. Use one of: ${VARIANTS.join(", ")}.`;
+  }
+
+  const aspectRatio = (item.aspect_ratio as ShowAspectRatio) || undefined;
+  if (aspectRatio && !ASPECT_RATIOS.includes(aspectRatio)) {
+    return `Error: Invalid aspect_ratio '${aspectRatio}'. Use one of: ${ASPECT_RATIOS.join(", ")}.`;
+  }
+
+  const theme = (item.theme as ShowTheme) || undefined;
+  if (theme && !THEMES.includes(theme)) {
+    return `Error: Invalid theme '${theme}'. Use one of: ${THEMES.join(", ")}.`;
+  }
+
+  let metadata: Record<string, unknown> | undefined;
+  if (item.metadata) {
+    if (typeof item.metadata === "string") {
+      try {
+        metadata = JSON.parse(item.metadata);
+      } catch {
+        return `Error: Invalid JSON in 'metadata' parameter.`;
+      }
+    } else if (typeof item.metadata === "object") {
+      metadata = item.metadata as Record<string, unknown>;
+    }
+  }
+
+  const resolvedVariant = variant || defaultVariant(type);
+
+  return {
+    id: generateId(),
+    timestamp: new Date().toISOString(),
+    type,
+    variant: resolvedVariant,
+    ...(item.title && { title: item.title as string }),
+    ...(item.description && { description: item.description as string }),
+    ...(item.path && { path: resolve(item.path as string) }),
+    ...(item.url && { url: item.url as string }),
+    ...(item.content && { content: item.content as string }),
+    ...(aspectRatio && { aspect_ratio: aspectRatio }),
+    ...(theme && theme !== "default" && { theme }),
+    ...(item.language && { language: item.language as string }),
+    ...(metadata && { metadata }),
+  };
 }
 
 // ── Tool definition ────────────────────────────────────────────────────────
@@ -104,12 +189,15 @@ export default tool({
     "code snippets, videos, audio, and errors all render in the user's UI via this tool. " +
     "ALWAYS call this after generating ANY deliverable so the human can see and interact with it. " +
     "Without calling this tool, the user cannot see your output.\n\n" +
-    "Types: file, image, url, text, error, video, audio, code, markdown, pdf, html.\n" +
+    "Types: file, image, url, text, error, video, audio, code, markdown, pdf, html, csv, xlsx, docx, pptx.\n" +
     "Variants (display hints): compact, full, gallery, detail — controls layout. " +
     "Defaults are smart per type but can be overridden.\n" +
     "aspect_ratio: auto, 1:1, 16:9, 9:16, 4:3, 3:2, 21:9 — for visual content.\n" +
     "theme: default, success, warning, info, danger — visual accent.\n" +
-    "language: for type='code', the language for syntax highlighting (e.g. 'python', 'typescript').",
+    "language: for type='code', the language for syntax highlighting (e.g. 'python', 'typescript').\n\n" +
+    "MULTI-ITEM MODE: To show multiple items at once (rendered as a carousel), pass a JSON array " +
+    "string to the 'items' parameter instead of individual type/path/url/content params. " +
+    "Each item in the array is an object with the same fields (type, title, path, url, content, etc.).",
   args: {
     action: tool.schema
       .string()
@@ -119,11 +207,13 @@ export default tool({
       .string()
       .optional()
       .describe(
-        "Type of item. Required for 'show'. " +
+        "Type of item. Required for single-item 'show' (omit when using 'items'). " +
           "Options: 'file' (any file on disk), 'image' (image file), 'url' (web link or localhost preview), " +
           "'text' (inline text), 'error' (error message), 'video' (video file), 'audio' (audio file), " +
           "'code' (syntax-highlighted code block), 'markdown' (rendered markdown), " +
-          "'pdf' (PDF document), 'html' (raw HTML rendered in sandboxed iframe).",
+          "'pdf' (PDF document), 'html' (raw HTML rendered in sandboxed iframe), " +
+          "'csv' (CSV/TSV tabular data), 'xlsx' (Excel spreadsheet), " +
+          "'docx' (Word document), 'pptx' (PowerPoint presentation).",
       ),
 
     title: tool.schema
@@ -142,7 +232,7 @@ export default tool({
       .string()
       .optional()
       .describe(
-        "Absolute file path. Required when type is 'file', 'image', 'video', 'audio', or 'pdf'. " +
+        "Absolute file path. Required when type is 'file', 'image', 'video', 'audio', 'pdf', 'csv', 'xlsx', 'docx', or 'pptx'. " +
           "E.g. '/workspace/output/logo.png'.",
       ),
 
@@ -204,6 +294,16 @@ export default tool({
       .describe(
         "Optional JSON string of extra metadata. E.g. '{\"width\":1024,\"format\":\"png\",\"duration\":\"3:42\"}'.",
       ),
+
+    items: tool.schema
+      .string()
+      .optional()
+      .describe(
+        "JSON array of items to show as a carousel. Each item is an object with: " +
+          "type (required), title, description, path, url, content, variant, aspect_ratio, theme, language, metadata. " +
+          "When provided, individual type/path/url/content params are ignored. " +
+          'Example: \'[{"type":"image","title":"Logo v1","path":"/workspace/v1.png"},{"type":"image","title":"Logo v2","path":"/workspace/v2.png"}]\'',
+      ),
   },
 
   async execute(args, _context) {
@@ -213,86 +313,72 @@ export default tool({
       return `Error: Invalid action '${action}'. Use 'show'.`;
     }
 
-    // ── Validate type ──
+    // ── Multi-item mode (items array) ──
+    if (args.items) {
+      let parsed: unknown;
+      try {
+        parsed = typeof args.items === "string" ? JSON.parse(args.items) : args.items;
+      } catch {
+        return `Error: Invalid JSON in 'items' parameter. Must be a JSON array of objects.`;
+      }
+
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return `Error: 'items' must be a non-empty JSON array.`;
+      }
+
+      const entries: ShowEntry[] = [];
+      const errors: string[] = [];
+
+      for (let i = 0; i < parsed.length; i++) {
+        const item = parsed[i];
+        if (!item || typeof item !== "object") {
+          errors.push(`Item ${i}: must be an object.`);
+          continue;
+        }
+        const result = validateAndBuildEntry(item as Record<string, unknown>);
+        if (typeof result === "string") {
+          errors.push(`Item ${i}: ${result}`);
+        } else {
+          entries.push(result);
+        }
+      }
+
+      if (errors.length > 0 && entries.length === 0) {
+        return `Error: All items failed validation:\n${errors.join("\n")}`;
+      }
+
+      const titleLabel = args.title || `${entries.length} items`;
+
+      return JSON.stringify(
+        {
+          success: true,
+          action: "show",
+          ...(args.title && { title: args.title }),
+          ...(args.description && { description: args.description }),
+          ...(args.theme && args.theme !== "default" && { theme: args.theme }),
+          items: entries,
+          ...(errors.length > 0 && { warnings: errors }),
+          message: `${entries.length} item(s) presented to user as carousel.`,
+        },
+        null,
+        2,
+      );
+    }
+
+    // ── Single-item mode (type is provided directly) ──
     const type = args.type as ShowType | undefined;
     if (!type || !TYPES.includes(type as ShowType)) {
-      return `Error: 'type' is required for 'show' action. Use one of: ${TYPES.join(", ")}.`;
+      return `Error: 'type' is required for 'show' action. Use one of: ${TYPES.join(", ")}. Or pass 'items' for multi-item carousel.`;
     }
 
-    // ── Validate required fields by type ──
-    const PATH_TYPES: ShowType[] = ["file", "image", "video", "audio", "pdf"];
-    const CONTENT_TYPES: ShowType[] = ["text", "error", "code", "markdown", "html"];
-
-    if (PATH_TYPES.includes(type) && !args.path) {
-      return `Error: 'path' is required when type is '${type}'.`;
-    }
-    if (type === "url" && !args.url) {
-      return `Error: 'url' is required when type is 'url'.`;
-    }
-    if (CONTENT_TYPES.includes(type) && !args.content) {
-      return `Error: 'content' is required when type is '${type}'.`;
-    }
-
-    // ── Validate file exists ──
-    if (PATH_TYPES.includes(type) && args.path) {
-      const absPath = resolve(args.path);
-      if (!existsSync(absPath)) {
-        return `Error: File not found: ${absPath}`;
-      }
-    }
-
-    // ── Validate variant ──
-    const variant = (args.variant as ShowVariant) || undefined;
-    if (variant && !VARIANTS.includes(variant)) {
-      return `Error: Invalid variant '${variant}'. Use one of: ${VARIANTS.join(", ")}.`;
-    }
-
-    // ── Validate aspect_ratio ──
-    const aspectRatio = (args.aspect_ratio as ShowAspectRatio) || undefined;
-    if (aspectRatio && !ASPECT_RATIOS.includes(aspectRatio)) {
-      return `Error: Invalid aspect_ratio '${aspectRatio}'. Use one of: ${ASPECT_RATIOS.join(", ")}.`;
-    }
-
-    // ── Validate theme ──
-    const theme = (args.theme as ShowTheme) || undefined;
-    if (theme && !THEMES.includes(theme)) {
-      return `Error: Invalid theme '${theme}'. Use one of: ${THEMES.join(", ")}.`;
-    }
-
-    // ── Parse metadata ──
-    let metadata: Record<string, unknown> | undefined;
-    if (args.metadata) {
-      try {
-        metadata = JSON.parse(args.metadata);
-      } catch {
-        return `Error: Invalid JSON in 'metadata' parameter.`;
-      }
-    }
-
-    // ── Build entry ──
-    const resolvedVariant = variant || defaultVariant(type);
-
-    const entry: ShowEntry = {
-      id: generateId(),
-      timestamp: new Date().toISOString(),
-      type,
-      variant: resolvedVariant,
-      ...(args.title && { title: args.title }),
-      ...(args.description && { description: args.description }),
-      ...(args.path && { path: resolve(args.path) }),
-      ...(args.url && { url: args.url }),
-      ...(args.content && { content: args.content }),
-      ...(aspectRatio && { aspect_ratio: aspectRatio }),
-      ...(theme && theme !== "default" && { theme }),
-      ...(args.language && { language: args.language }),
-      ...(metadata && { metadata }),
-    };
+    const result = validateAndBuildEntry(args);
+    if (typeof result === "string") return result;
 
     return JSON.stringify(
       {
         success: true,
         action: "show",
-        entry,
+        entry: result,
         message: `Item '${args.title || type}' presented to user.`,
       },
       null,

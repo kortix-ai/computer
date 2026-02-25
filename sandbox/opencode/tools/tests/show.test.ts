@@ -489,6 +489,289 @@ await test("show pdf returns structured entry", async () => {
   assert(result.entry.variant === "full", "pdf default variant should be 'full'");
 });
 
+// ── New path-based types: csv, xlsx, docx, pptx ──
+
+await test("csv type without path rejects", async () => {
+  const raw = await show.execute(
+    { action: "show", type: "csv" },
+    ctx,
+  );
+  assert(
+    (raw as string).includes("'path' is required"),
+    "should require path for csv type",
+  );
+});
+
+await test("xlsx type without path rejects", async () => {
+  const raw = await show.execute(
+    { action: "show", type: "xlsx" },
+    ctx,
+  );
+  assert(
+    (raw as string).includes("'path' is required"),
+    "should require path for xlsx type",
+  );
+});
+
+await test("docx type without path rejects", async () => {
+  const raw = await show.execute(
+    { action: "show", type: "docx" },
+    ctx,
+  );
+  assert(
+    (raw as string).includes("'path' is required"),
+    "should require path for docx type",
+  );
+});
+
+await test("pptx type without path rejects", async () => {
+  const raw = await show.execute(
+    { action: "show", type: "pptx" },
+    ctx,
+  );
+  assert(
+    (raw as string).includes("'path' is required"),
+    "should require path for pptx type",
+  );
+});
+
+await test("show csv returns structured entry with full variant", async () => {
+  mkdirSync(TEST_DIR, { recursive: true });
+  const tmpFile = resolve(TEST_DIR, "data.csv");
+  writeFileSync(tmpFile, "name,age\nAlice,30\nBob,25");
+
+  const raw = await show.execute(
+    {
+      action: "show",
+      type: "csv",
+      title: "User Data",
+      path: tmpFile,
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(result.entry.type === "csv", "entry type should be csv");
+  assert(result.entry.variant === "full", "csv default variant should be 'full'");
+});
+
+await test("show xlsx returns structured entry with full variant", async () => {
+  mkdirSync(TEST_DIR, { recursive: true });
+  const tmpFile = resolve(TEST_DIR, "spreadsheet.xlsx");
+  writeFileSync(tmpFile, "fake-xlsx-bytes");
+
+  const raw = await show.execute(
+    {
+      action: "show",
+      type: "xlsx",
+      title: "Sales Report",
+      path: tmpFile,
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(result.entry.type === "xlsx", "entry type should be xlsx");
+  assert(result.entry.variant === "full", "xlsx default variant should be 'full'");
+});
+
+await test("show docx returns structured entry with full variant", async () => {
+  mkdirSync(TEST_DIR, { recursive: true });
+  const tmpFile = resolve(TEST_DIR, "document.docx");
+  writeFileSync(tmpFile, "fake-docx-bytes");
+
+  const raw = await show.execute(
+    {
+      action: "show",
+      type: "docx",
+      title: "Research Paper",
+      path: tmpFile,
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(result.entry.type === "docx", "entry type should be docx");
+  assert(result.entry.variant === "full", "docx default variant should be 'full'");
+});
+
+await test("show pptx returns structured entry with full variant", async () => {
+  mkdirSync(TEST_DIR, { recursive: true });
+  const tmpFile = resolve(TEST_DIR, "presentation.pptx");
+  writeFileSync(tmpFile, "fake-pptx-bytes");
+
+  const raw = await show.execute(
+    {
+      action: "show",
+      type: "pptx",
+      title: "Quarterly Review",
+      path: tmpFile,
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(result.entry.type === "pptx", "entry type should be pptx");
+  assert(result.entry.variant === "full", "pptx default variant should be 'full'");
+});
+
+// ── Multi-item (carousel) tests ──
+
+await test("items with valid array returns entries", async () => {
+  mkdirSync(TEST_DIR, { recursive: true });
+  const img1 = resolve(TEST_DIR, "carousel1.png");
+  const img2 = resolve(TEST_DIR, "carousel2.png");
+  writeFileSync(img1, "fake-png");
+  writeFileSync(img2, "fake-png");
+
+  const raw = await show.execute(
+    {
+      action: "show",
+      title: "Logo Variations",
+      items: JSON.stringify([
+        { type: "image", title: "Version A", path: img1 },
+        { type: "image", title: "Version B", path: img2 },
+      ]),
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(Array.isArray(result.items), "should have items array");
+  assert(result.items.length === 2, `expected 2 items, got ${result.items.length}`);
+  assert(result.items[0].type === "image", "first item type should be image");
+  assert(result.items[0].title === "Version A", "first item title should match");
+  assert(result.items[1].title === "Version B", "second item title should match");
+  assert(result.title === "Logo Variations", "top-level title should pass through");
+  assert(!result.entry, "should not have single entry when items is present");
+});
+
+await test("items with mixed types works", async () => {
+  mkdirSync(TEST_DIR, { recursive: true });
+  const tmpFile = resolve(TEST_DIR, "carousel-mixed.png");
+  writeFileSync(tmpFile, "fake-png");
+
+  const raw = await show.execute(
+    {
+      action: "show",
+      items: JSON.stringify([
+        { type: "image", title: "Screenshot", path: tmpFile },
+        { type: "url", title: "Live Demo", url: "https://example.com" },
+        { type: "text", title: "Notes", content: "Some notes here" },
+      ]),
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(result.items.length === 3, "should have 3 items");
+  assert(result.items[0].type === "image", "first type");
+  assert(result.items[1].type === "url", "second type");
+  assert(result.items[2].type === "text", "third type");
+});
+
+await test("items with invalid JSON rejects", async () => {
+  const raw = await show.execute(
+    { action: "show", items: "not valid json[[[" },
+    ctx,
+  );
+  assert(
+    (raw as string).includes("Invalid JSON"),
+    "should reject invalid JSON in items",
+  );
+});
+
+await test("items with empty array rejects", async () => {
+  const raw = await show.execute(
+    { action: "show", items: "[]" },
+    ctx,
+  );
+  assert(
+    (raw as string).includes("non-empty"),
+    "should reject empty items array",
+  );
+});
+
+await test("items with all invalid items returns error", async () => {
+  const raw = await show.execute(
+    {
+      action: "show",
+      items: JSON.stringify([
+        { type: "file" }, // missing path
+        { type: "url" },  // missing url
+      ]),
+    },
+    ctx,
+  );
+  assert(
+    (raw as string).includes("All items failed"),
+    "should error when all items fail validation",
+  );
+});
+
+await test("items with partial failures returns valid ones + warnings", async () => {
+  mkdirSync(TEST_DIR, { recursive: true });
+  const tmpFile = resolve(TEST_DIR, "carousel-partial.png");
+  writeFileSync(tmpFile, "fake-png");
+
+  const raw = await show.execute(
+    {
+      action: "show",
+      items: JSON.stringify([
+        { type: "image", title: "Good", path: tmpFile },
+        { type: "file" }, // missing path — will fail
+      ]),
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, "should succeed with partial results");
+  assert(result.items.length === 1, "should have 1 valid item");
+  assert(result.items[0].title === "Good", "valid item should be included");
+  assert(Array.isArray(result.warnings), "should have warnings array");
+  assert(result.warnings.length === 1, "should have 1 warning");
+});
+
+await test("items preserves top-level theme and description", async () => {
+  const raw = await show.execute(
+    {
+      action: "show",
+      title: "Results",
+      description: "Here are the outputs",
+      theme: "success",
+      items: JSON.stringify([
+        { type: "text", title: "A", content: "hello" },
+        { type: "text", title: "B", content: "world" },
+      ]),
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(result.title === "Results", "top-level title");
+  assert(result.description === "Here are the outputs", "top-level description");
+  assert(result.theme === "success", "top-level theme");
+});
+
+await test("items ignores type param when items is provided", async () => {
+  const raw = await show.execute(
+    {
+      action: "show",
+      type: "text",
+      content: "ignored",
+      items: JSON.stringify([
+        { type: "text", title: "Used", content: "this one" },
+      ]),
+    },
+    ctx,
+  );
+  const result = JSON.parse(raw as string);
+  assert(result.success === true, `expected success: ${raw}`);
+  assert(Array.isArray(result.items), "should use items mode");
+  assert(result.items.length === 1, "should have 1 item from array");
+  assert(!result.entry, "should not have single entry");
+});
+
 // ── Cleanup ──
 
 if (!process.argv.includes("--keep-output")) {

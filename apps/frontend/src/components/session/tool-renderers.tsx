@@ -92,6 +92,7 @@ import {
 import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
 import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from "@/stores/server-store";
 import { openTabAndNavigate } from "@/stores/tab-store";
+import { enrichPreviewMetadata } from "@/lib/utils/session-context";
 
 import {
 	type ApplyPatchFile,
@@ -176,8 +177,23 @@ function InlineServicePreview({
 	const authenticatedUrl = useAuthenticatedPreviewUrl(proxy?.proxyUrl || url);
 	const [isLoading, setIsLoading] = useState(true);
 	const [hasError, setHasError] = useState(false);
-	const [expanded, setExpanded] = useState(false);
 	const [refreshKey, setRefreshKey] = useState(0);
+
+	// ── Scaled 1920×1080 viewport ──
+	const viewportRef = useRef<HTMLDivElement>(null);
+	const [viewportScale, setViewportScale] = useState(0);
+	useEffect(() => {
+		const el = viewportRef.current;
+		if (!el) return;
+		const update = () => {
+			const w = el.clientWidth;
+			if (w > 0) setViewportScale(w / 1920);
+		};
+		const ro = new ResizeObserver(update);
+		ro.observe(el);
+		update();
+		return () => ro.disconnect();
+	}, []);
 
 	const handleRefresh = useCallback(() => {
 		setIsLoading(true);
@@ -208,13 +224,10 @@ function InlineServicePreview({
 		});
 	}, [proxy, url]);
 
+	const scaledHeight = viewportScale > 0 ? Math.round(1080 * viewportScale) : 0;
+
 	return (
-		<div
-			className={cn(
-				"rounded-lg border border-border/50 overflow-hidden transition-all duration-200",
-				expanded ? "h-[420px]" : "h-[260px]",
-			)}
-		>
+		<div className="rounded-lg border border-border/50 overflow-hidden">
 			{/* Mini browser toolbar */}
 			<div className="flex items-center gap-1.5 h-8 px-2.5 bg-muted/40 border-b border-border/30 shrink-0">
 				<div className="flex-1 flex items-center gap-1.5 min-w-0">
@@ -236,24 +249,6 @@ function InlineServicePreview({
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="top">Refresh</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<button
-							type="button"
-							onClick={() => setExpanded((v) => !v)}
-							className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-						>
-							{expanded ? (
-								<Minimize2 className="h-3 w-3" />
-							) : (
-								<Maximize2 className="h-3 w-3" />
-							)}
-						</button>
-					</TooltipTrigger>
-					<TooltipContent side="top">
-						{expanded ? "Collapse" : "Expand"}
-					</TooltipContent>
 				</Tooltip>
 				<Tooltip>
 					<TooltipTrigger asChild>
@@ -284,8 +279,12 @@ function InlineServicePreview({
 				)}
 			</div>
 
-			{/* Iframe */}
-			<div className="relative flex-1 h-[calc(100%-2rem)]">
+			{/* Scaled 1920×1080 viewport — iframe renders at full desktop res, CSS-scaled to fit */}
+			<div
+				ref={viewportRef}
+				className="relative overflow-hidden bg-white"
+				style={{ height: scaledHeight > 0 ? `${scaledHeight}px` : "400px" }}
+			>
 				{isLoading && (
 					<div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
 						<div className="flex items-center gap-2 text-muted-foreground">
@@ -308,18 +307,29 @@ function InlineServicePreview({
 						</div>
 					</div>
 				)}
-				<iframe
-					key={refreshKey}
-					src={authenticatedUrl}
-					title={displayLabel}
-					className="w-full h-full border-0 bg-white"
-					sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
-					onLoad={() => setIsLoading(false)}
-					onError={() => {
-						setIsLoading(false);
-						setHasError(true);
-					}}
-				/>
+				{viewportScale > 0 && (
+					<iframe
+						key={refreshKey}
+						src={authenticatedUrl}
+						title={displayLabel}
+						className="border-0 bg-white"
+						style={{
+							width: "1920px",
+							height: "1080px",
+							transform: `scale(${viewportScale})`,
+							transformOrigin: "0 0",
+							position: "absolute",
+							top: 0,
+							left: 0,
+						}}
+						sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
+						onLoad={() => setIsLoading(false)}
+						onError={() => {
+							setIsLoading(false);
+							setHasError(true);
+						}}
+					/>
+				)}
 			</div>
 		</div>
 	);
@@ -3349,454 +3359,187 @@ function PresentationGenTool({
 }
 ToolRegistry.register("presentation-gen", PresentationGenTool);
 
-// --- Show (output to user) — variant-aware renderer ---
+// --- Show (output to user) — standalone hero card renderer ---
+// Uses ShowContentRenderer from file-renderers/ as the single source of truth
+// for content rendering. This component only handles the card chrome + Open in Tab.
 
-const SHOW_THEME_STYLES: Record<string, { border: string; badge: string; icon: string }> = {
-	default: { border: "border-border/40", badge: "bg-muted", icon: "text-muted-foreground" },
-	success: { border: "border-emerald-500/30", badge: "bg-emerald-500/10", icon: "text-emerald-500" },
-	warning: { border: "border-amber-500/30", badge: "bg-amber-500/10", icon: "text-amber-500" },
-	info: { border: "border-blue-500/30", badge: "bg-blue-500/10", icon: "text-blue-500" },
-	danger: { border: "border-red-500/30", badge: "bg-red-500/10", icon: "text-red-500" },
+import { ShowContentRenderer, ShowCarousel, showDomain } from "@/components/file-renderers/show-content-renderer";
+import type { ShowCarouselItem } from "@/components/file-renderers/show-content-renderer";
+
+const SHOW_BORDER_STYLES: Record<string, string> = {
+	default: "border-border/50",
+	success: "border-emerald-500/20",
+	warning: "border-amber-500/20",
+	info: "border-blue-500/20",
+	danger: "border-red-500/20",
 };
 
-function showAspectRatioToCSS(ar: string | undefined): string | undefined {
-	if (!ar || ar === "auto") return undefined;
-	const [w, h] = ar.split(":").map(Number);
-	if (w && h) return `${w}/${h}`;
-	return undefined;
-}
-
-function showTypeIcon(type: string) {
+function showTypeIcon(type: string, className = "size-4") {
 	switch (type) {
-		case "image": return <ImageIcon className="size-3.5 flex-shrink-0" />;
-		case "video": return <Video className="size-3.5 flex-shrink-0" />;
-		case "audio": return <Music className="size-3.5 flex-shrink-0" />;
-		case "code": return <Code2 className="size-3.5 flex-shrink-0" />;
-		case "markdown": return <Type className="size-3.5 flex-shrink-0" />;
-		case "html": return <Globe className="size-3.5 flex-shrink-0" />;
-		case "pdf": return <FileText className="size-3.5 flex-shrink-0" />;
-		case "url": return <Globe className="size-3.5 flex-shrink-0" />;
-		case "error": return <AlertTriangle className="size-3.5 flex-shrink-0" />;
-		case "file": return <FileIcon className="size-3.5 flex-shrink-0" />;
-		default: return <ExternalLink className="size-3.5 flex-shrink-0" />;
+		case "image": return <ImageIcon className={cn(className, "flex-shrink-0")} />;
+		case "video": return <Video className={cn(className, "flex-shrink-0")} />;
+		case "audio": return <Music className={cn(className, "flex-shrink-0")} />;
+		case "code": return <Code2 className={cn(className, "flex-shrink-0")} />;
+		case "markdown": return <Type className={cn(className, "flex-shrink-0")} />;
+		case "html": return <Globe className={cn(className, "flex-shrink-0")} />;
+		case "pdf": return <FileText className={cn(className, "flex-shrink-0")} />;
+		case "url": return <Globe className={cn(className, "flex-shrink-0")} />;
+		case "error": return <AlertTriangle className={cn(className, "flex-shrink-0")} />;
+		case "file": return <FileIcon className={cn(className, "flex-shrink-0")} />;
+		case "text": return <Type className={cn(className, "flex-shrink-0")} />;
+		default: return <ExternalLink className={cn(className, "flex-shrink-0")} />;
 	}
 }
 
-const SHOW_VIDEO_EXT_RE = /\.(mp4|webm|mov|avi|mkv|ogv)$/i;
-const SHOW_AUDIO_EXT_RE = /\.(mp3|wav|ogg|aac|flac|m4a|opus)$/i;
-const SHOW_PDF_EXT_RE = /\.pdf$/i;
+/** "Open in Tab" handler — opens the right tab type depending on content */
+function useShowOpenInTab(props: { type: string; url: string; path: string; title: string }) {
+	const { type, url, path, title } = props;
+	const proxy = useProxyUrl(url);
+	const hasLocalhostUrl = !!parseLocalhostUrl(url);
 
-function ShowTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+	return useCallback(() => {
+		if (hasLocalhostUrl && proxy) {
+			openTabAndNavigate({
+				id: `preview:${proxy.port}`,
+				title: title || `localhost:${proxy.port}`,
+				type: "preview",
+				href: `/preview/${proxy.port}`,
+				metadata: enrichPreviewMetadata({
+					url: proxy.proxyUrl,
+					port: proxy.port,
+					originalUrl: url,
+				}),
+			});
+			return;
+		}
+		if (url) {
+			window.open(url, "_blank", "noopener,noreferrer");
+			return;
+		}
+		if (path) {
+			const fileName = path.split("/").pop() || path;
+			openTabAndNavigate({
+				id: `file:${path}`,
+				title: fileName,
+				type: "file",
+				href: `/files/${encodeURIComponent(path)}`,
+			});
+		}
+	}, [hasLocalhostUrl, proxy, url, path, title]);
+}
+
+function ShowTool({ part }: ToolProps) {
 	const input = partInput(part);
+	const running = useContext(ToolRunningContext);
+
 	const title = (input.title as string) || "";
 	const description = (input.description as string) || "";
 	const type = (input.type as string) || "";
 	const path = (input.path as string) || "";
 	const url = (input.url as string) || "";
 	const content = (input.content as string) || "";
-	const variant = (input.variant as string) || "";
 	const aspectRatio = (input.aspect_ratio as string) || "";
 	const theme = (input.theme as string) || "default";
 	const language = (input.language as string) || "";
 
-	const themeStyle = SHOW_THEME_STYLES[theme] || SHOW_THEME_STYLES.default;
-	const arCSS = showAspectRatioToCSS(aspectRatio);
+	// ── Parse items[] for multi-item carousel mode ──
+	const items = useMemo<ShowCarouselItem[] | null>(() => {
+		const raw = input.items;
+		if (!raw) return null;
+		try {
+			const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+			if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+		} catch { /* ignore */ }
+		return null;
+	}, [input.items]);
 
-	const subtitle = title || description || path || url || type;
-	const isImage = type === "image" || IMAGE_EXT_RE.test(path);
-	const isVideo = type === "video" || SHOW_VIDEO_EXT_RE.test(path);
-	const isAudio = type === "audio" || SHOW_AUDIO_EXT_RE.test(path);
-	const isPdf = type === "pdf" || SHOW_PDF_EXT_RE.test(path);
-	const isCode = type === "code";
-	const isMarkdown = type === "markdown";
-	const isHtml = type === "html";
+	const isCarousel = !!items && items.length > 0;
+
+	const borderStyle = SHOW_BORDER_STYLES[theme] || SHOW_BORDER_STYLES.default;
 	const hasLocalhostUrl = !!parseLocalhostUrl(url);
 
-	// Image loading
-	const isLocalPath = isImage && path ? isLocalSandboxFilePath(path) : false;
-	const fileContentPath = useMemo(() => {
-		if (!isLocalPath || !path) return null;
-		return path.replace(/^\/workspace\//, "");
-	}, [isLocalPath, path]);
-	const { data: fileContentData, isLoading: isImageLoading } = useFileContent(
-		fileContentPath,
-		{ enabled: !!fileContentPath },
-	);
-	const imageUrl = useMemo(() => {
-		if (fileContentData?.encoding === "base64" && fileContentData?.content) {
-			const binary = atob(fileContentData.content);
-			const bytes = new Uint8Array(binary.length);
-			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-			const blob = new Blob([bytes], { type: fileContentData.mimeType || "image/webp" });
-			return URL.createObjectURL(blob);
-		}
-		return null;
-	}, [fileContentData]);
-	const displayImageSrc = isLocalPath ? (imageUrl || "") : (path || "");
+	const openInTab = useShowOpenInTab({ type, url, path, title });
+	const canOpenInTab = !isCarousel && !!(url || path);
+	const openInTabLabel = hasLocalhostUrl ? "Open in Tab" : url ? "Open Link" : "Open File";
 
-	// HTML blob URL (unconditional for hooks rules)
-	const htmlBlobUrl = useMemo(() => {
-		if (!isHtml || !content) return null;
-		const blob = new Blob([content], { type: "text/html" });
-		return URL.createObjectURL(blob);
-	}, [isHtml, content]);
-
-	// ── URL preview — localhost uses proxied InlineServicePreview, external gets direct iframe ──
-	if (hasLocalhostUrl) {
+	// Loading state
+	if (running && !type && !items) {
 		return (
-			<div className="space-y-1">
-				<BasicTool
-					icon={<Globe className="size-3.5 flex-shrink-0" />}
-					trigger={
-						<div className="flex items-center gap-1.5 min-w-0 flex-1">
-							<span className="font-medium text-xs text-foreground whitespace-nowrap">
-								{title || "Preview"}
-							</span>
-							{description && (
-								<span className="text-muted-foreground text-xs truncate">
-									{description}
-								</span>
-							)}
-						</div>
-					}
-					defaultOpen={defaultOpen}
-					forceOpen={forceOpen}
-					locked={locked}
-				>
-					<div className="p-2">
-						<InlineServicePreview
-							url={url}
-							label={title || description || undefined}
-						/>
-					</div>
-				</BasicTool>
+			<div className="rounded-xl border border-border/50 overflow-hidden bg-card">
+				<div className="flex items-center gap-3 px-5 py-4">
+					<Loader2 className="size-4 animate-spin text-muted-foreground" />
+					<TextShimmer duration={1} spread={2} className="text-sm">
+						Preparing output...
+					</TextShimmer>
+				</div>
 			</div>
 		);
 	}
 
-	// ── External URL — embedded iframe with toolbar ──
-	if (type === "url" && url) {
-		return (
-			<BasicTool
-				icon={<Globe className="size-3.5 flex-shrink-0" />}
-				trigger={
-					<div className="flex items-center gap-1.5 min-w-0 flex-1">
-						<span className="font-medium text-xs text-foreground whitespace-nowrap">
-							{title || "Web Preview"}
-						</span>
-						<span className="text-muted-foreground text-xs truncate font-mono">
-							{description || url}
-						</span>
-					</div>
-				}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div className="overflow-hidden rounded-b-lg">
-					{/* Mini toolbar */}
-					<div className="flex items-center gap-1.5 h-7 px-2.5 bg-muted/40 border-t border-b border-border/30">
-						<Globe className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-						<span className="text-[10px] text-muted-foreground font-mono truncate flex-1">{url}</span>
-						<a
-							href={url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="p-0.5 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-						>
-							<ExternalLink className="h-3 w-3" />
-						</a>
-					</div>
-					<iframe
-						src={url}
-						title={title || url}
-						className="w-full border-0 bg-white"
-						style={{ height: arCSS ? undefined : "280px", aspectRatio: arCSS || undefined }}
-						sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-					/>
-				</div>
-				{description && title && (
-					<div className="px-3 py-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
+	const displayTitle = isCarousel
+		? (title || `${items!.length} items`)
+		: (title || (type === "error" ? "Error" : type === "url" ? (showDomain(url) || "Link") : "Output"));
 
-	// ── Image — gallery with aspect ratio ──
-	if (isImage && path) {
-		const isGallery = variant === "gallery" || !variant;
-		return (
-			<BasicTool
-				icon={showTypeIcon("image")}
-				trigger={{ title: title || "Image", subtitle: (description || path).slice(0, 60) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div className={cn("flex justify-center p-3", isGallery && "bg-muted/10")}>
-					{displayImageSrc ? (
-						/* eslint-disable-next-line @next/next/no-img-element */
-						<img
-							src={displayImageSrc}
-							alt={title || "Output image"}
-							className={cn(
-								"max-w-full rounded-lg border object-contain",
-								themeStyle.border,
-								arCSS ? "" : "max-h-[400px]",
-							)}
-							style={arCSS ? { aspectRatio: arCSS, maxHeight: "500px", width: "auto" } : undefined}
-						/>
-					) : isImageLoading ? (
-						<div className="w-full rounded-lg border border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground flex items-center gap-2">
-							<Loader2 className="size-3 animate-spin" />
-							Loading image preview...
-						</div>
-					) : (
-						<div className="w-full rounded-lg border border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground font-mono break-all">
-							{path}
-						</div>
-					)}
-				</div>
-				{description && title && (
-					<div className="px-3 pb-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
+	const headerIcon = isCarousel ? "image" : type;
 
-	// ── Video — native player ──
-	if (isVideo && path) {
-		return (
-			<BasicTool
-				icon={showTypeIcon("video")}
-				trigger={{ title: title || "Video", subtitle: (description || path).slice(0, 60) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-			<div className={cn("p-3 bg-black/5 dark:bg-white/5 rounded-b-lg", themeStyle.border)}>
-				<video
-						src={path}
-						controls
-						className="w-full rounded-lg"
-						style={arCSS ? { aspectRatio: arCSS } : { aspectRatio: "16/9" }}
-						preload="metadata"
-					/>
-				</div>
-				{description && (
-					<div className="px-3 py-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
-
-	// ── Audio — native player, compact ──
-	if (isAudio && path) {
-		return (
-			<BasicTool
-				icon={showTypeIcon("audio")}
-				trigger={{ title: title || "Audio", subtitle: (description || path).slice(0, 60) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-			<div className="px-3 py-3">
-				<audio src={path} controls className="w-full" preload="metadata" />
-				</div>
-				{description && (
-					<div className="px-3 pb-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
-
-	// ── Code — syntax-highlighted block ──
-	if (isCode && content) {
-		return (
-			<BasicTool
-				icon={showTypeIcon("code")}
-				trigger={{ title: title || "Code", subtitle: language ? language : (description || "").slice(0, 40) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div className={cn("overflow-hidden rounded-b-lg border-t", themeStyle.border)}>
-					{language ? (
-						<HighlightedCode code={content} language={language}>
-							<code>{content}</code>
-						</HighlightedCode>
-					) : (
-						<pre className="p-3 text-xs font-mono overflow-x-auto bg-muted/30 max-h-96">
-							<code>{content}</code>
-						</pre>
-					)}
-				</div>
-				{description && (
-					<div className="px-3 py-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
-
-	// ── Markdown — rendered markdown ──
-	if (isMarkdown && content) {
-		return (
-			<BasicTool
-				icon={showTypeIcon("markdown")}
-				trigger={{ title: title || "Document", subtitle: (description || "").slice(0, 60) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div data-scrollable className={cn("px-3 py-3 max-h-96 overflow-auto prose-sm", themeStyle.border)}>
-					<UnifiedMarkdown content={content} />
-				</div>
-			</BasicTool>
-		);
-	}
-
-	// ── HTML — sandboxed iframe ──
-	if (isHtml && content && htmlBlobUrl) {
-		return (
-			<BasicTool
-				icon={showTypeIcon("html")}
-				trigger={{ title: title || "HTML Preview", subtitle: (description || "").slice(0, 60) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div className={cn("overflow-hidden rounded-b-lg", themeStyle.border)}>
-					<iframe
-						src={htmlBlobUrl}
-						title={title || "HTML Preview"}
-						className="w-full border-0 bg-white"
-						style={{ height: arCSS ? undefined : "320px", aspectRatio: arCSS || undefined }}
-						sandbox="allow-scripts allow-same-origin"
-					/>
-				</div>
-				{description && (
-					<div className="px-3 py-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
-
-	// ── PDF — file card ──
-	if (isPdf && path) {
-		return (
-			<BasicTool
-				icon={showTypeIcon("pdf")}
-				trigger={{ title: title || "PDF Document", subtitle: (description || path).slice(0, 60) }}
-				defaultOpen={defaultOpen}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div className="flex items-center gap-3 px-3 py-3">
-					<div className={cn("flex items-center justify-center w-10 h-10 rounded-lg", themeStyle.badge)}>
-						<FileText className={cn("size-5", themeStyle.icon)} />
-					</div>
-					<div className="flex-1 min-w-0">
-						<div className="text-xs font-medium text-foreground truncate">{title || "PDF Document"}</div>
-						<div className="text-[10px] text-muted-foreground font-mono truncate">{path}</div>
-					</div>
-				</div>
-				{description && (
-					<div className="px-3 pb-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
-
-	// ── Error — themed alert ──
-	if (type === "error") {
-		const errTheme = SHOW_THEME_STYLES.danger;
-		return (
-			<BasicTool
-				icon={<AlertTriangle className={cn("size-3.5 flex-shrink-0", errTheme.icon)} />}
-				trigger={{ title: title || "Error", subtitle: (description || content || "").slice(0, 60) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div className={cn("px-3 py-2.5 border-t", errTheme.border, errTheme.badge)}>
-					<p className="text-xs text-foreground whitespace-pre-wrap">{content}</p>
-				</div>
-			</BasicTool>
-		);
-	}
-
-	// ── Text — detail with theme accents ──
-	if (type === "text" && content) {
-		return (
-			<BasicTool
-				icon={showTypeIcon("text")}
-				trigger={{ title: title || "Output", subtitle: (subtitle || "").slice(0, 60) }}
-				defaultOpen={defaultOpen ?? true}
-				forceOpen={forceOpen}
-				locked={locked}
-			>
-				<div className={cn("px-3 py-2.5 border-t", themeStyle.border, theme !== "default" && themeStyle.badge)}>
-					<p className="text-xs text-foreground whitespace-pre-wrap">{content}</p>
-				</div>
-				{description && title && (
-					<div className="px-3 pb-2">
-						<p className="text-[11px] text-muted-foreground">{description}</p>
-					</div>
-				)}
-			</BasicTool>
-		);
-	}
-
-	// ── Fallback — generic file / url / unknown ──
 	return (
-		<BasicTool
-			icon={showTypeIcon(type)}
-			trigger={{ title: title || "Output", subtitle: (subtitle || "").slice(0, 60) }}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{content && (
-				<div className="px-3 py-2">
-					<p className="text-xs text-foreground whitespace-pre-wrap">{content}</p>
-				</div>
-			)}
-			{(path || url) && (
-				<div className="px-3 py-2 text-xs">
-					{path && (
-						<div className="flex items-center gap-1.5 text-muted-foreground font-mono text-[10px] truncate">
-							<FileIcon className="size-2.5 shrink-0" />
-							{path}
+		<div className={cn("rounded-xl border overflow-hidden bg-card", borderStyle)}>
+			{/* ── Header — always neutral colors, never themed ── */}
+			<div className="flex items-center gap-3 px-5 py-3 border-b border-border/15">
+				<span className="text-muted-foreground">
+					{showTypeIcon(headerIcon, "size-4")}
+				</span>
+				<div className="flex-1 min-w-0">
+					<div className="text-sm font-medium text-foreground truncate">
+						{displayTitle}
+					</div>
+					{description && (
+						<div className="text-xs text-muted-foreground/70 truncate mt-0.5">
+							{description}
 						</div>
 					)}
-					{url && (
-						<a
-							href={url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-muted-foreground font-mono text-[10px] truncate hover:text-foreground transition-colors flex items-center gap-1"
-						>
-							<ExternalLink className="size-2.5" />
-							{url}
-						</a>
-					)}
 				</div>
+				{isCarousel && (
+					<span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground/60 font-medium flex-shrink-0">
+						{items!.length} items
+					</span>
+				)}
+				{canOpenInTab && (
+					<button
+						type="button"
+						onClick={openInTab}
+						className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex-shrink-0 bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+					>
+						{hasLocalhostUrl ? <MonitorPlay className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+						{openInTabLabel}
+					</button>
+				)}
+			</div>
+
+			{/* ── Content — carousel or single ── */}
+			{isCarousel ? (
+				<ShowCarousel items={items!} LocalhostPreview={InlineServicePreview} />
+			) : (
+				<>
+					<ShowContentRenderer
+						type={type}
+						title={title}
+						description={description}
+						path={path}
+						url={url}
+						content={content}
+						language={language}
+						aspectRatio={aspectRatio}
+						LocalhostPreview={InlineServicePreview}
+					/>
+					{description && !title && (
+						<div className="px-5 py-3 border-t border-border/15">
+							<p className="text-xs text-muted-foreground/70">{description}</p>
+						</div>
+					)}
+				</>
 			)}
-		</BasicTool>
+		</div>
 	);
 }
 ToolRegistry.register("show", ShowTool);

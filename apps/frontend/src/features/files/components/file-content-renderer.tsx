@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFileContent } from '../hooks';
-import { downloadFile, uploadFile, readFileAsBlob } from '../api/opencode-files';
+import { downloadFile, uploadFile } from '../api/opencode-files';
+import { useBinaryBlob } from '../hooks/use-binary-blob';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { UnifiedMarkdown } from '@/components/markdown';
@@ -121,95 +122,8 @@ function RendererFallback() {
 }
 
 // ---------------------------------------------------------------------------
-// Hook: fetch binary blob via readFileAsBlob for preview renderers
+// Binary blob loading — uses shared hook from hooks/use-binary-blob.ts
 // ---------------------------------------------------------------------------
-
-const EMPTY_BLOB_RETRY_DELAYS = [1500, 3000, 5000];
-
-function useBinaryBlob(filePath: string | null, category: FileCategory) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const [blobLoading, setBlobLoading] = useState(false);
-  const [blobError, setBlobError] = useState<string | null>(null);
-  const prevPathRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!filePath || !isBlobCategory(category)) {
-      setBlobUrl(null);
-      setBlob(null);
-      setBlobError(null);
-      return;
-    }
-
-    // Skip if same path (already loaded)
-    if (filePath === prevPathRef.current && (blobUrl || blob)) return;
-    prevPathRef.current = filePath;
-
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    async function load(attempt = 0) {
-      setBlobLoading(true);
-      setBlobError(null);
-      try {
-        const result = await readFileAsBlob(filePath!);
-        if (cancelled) return;
-
-        // If blob is empty, the file may still be writing -- auto-retry
-        if (result.size === 0 && attempt < EMPTY_BLOB_RETRY_DELAYS.length) {
-          retryTimer = setTimeout(() => {
-            if (!cancelled) load(attempt + 1);
-          }, EMPTY_BLOB_RETRY_DELAYS[attempt]);
-          return;
-        }
-
-        if (result.size === 0) {
-          if (!cancelled) {
-            setBlobError('File is empty (0 bytes). It may still be generating -- try again in a moment.');
-            setBlobLoading(false);
-          }
-          return;
-        }
-
-        // DocxRenderer and PptxRenderer take a blob directly; others need a URL
-        if (category === 'docx' || category === 'pptx') {
-          setBlob(result);
-          setBlobUrl(null);
-        } else {
-          objectUrl = URL.createObjectURL(result);
-          setBlobUrl(objectUrl);
-          setBlob(null);
-        }
-        if (!cancelled) setBlobLoading(false);
-      } catch (err) {
-        if (!cancelled) {
-          setBlobError(err instanceof Error ? err.message : 'Failed to load file');
-          setBlobLoading(false);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePath, category]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return { blobUrl, blob, blobLoading, blobError };
-}
 
 // ---------------------------------------------------------------------------
 // FileContentRenderer — the shared file content rendering component
@@ -228,6 +142,9 @@ export interface FileContentRendererProps {
   onSaved?: () => void;
   /** Additional class name for the root container */
   className?: string;
+  /** Custom error UI. When provided, replaces the default error display.
+   *  Receives the error message and filePath so callers can render a graceful fallback. */
+  errorFallback?: (error: string, filePath: string) => React.ReactNode;
 }
 
 export function FileContentRenderer({
@@ -237,6 +154,7 @@ export function FileContentRenderer({
   onUnsavedChange,
   onSaved,
   className,
+  errorFallback,
 }: FileContentRendererProps) {
   // Text content (for code/text files, CSV, images)
   const { data: fileContent, isLoading, error, refetch } = useFileContent(filePath);
@@ -255,7 +173,8 @@ export function FileContentRenderer({
   const isJsonFile = language === 'json';
 
   // Binary blob for PDF, DOCX, video, audio, PPTX
-  const { blobUrl, blob: docxBlob, blobLoading, blobError } = useBinaryBlob(filePath, fileCategory);
+  const blobPath = isBlobCategory(fileCategory) ? filePath : null;
+  const { blobUrl, blob: rawBlob, isLoading: blobLoading, error: blobError } = useBinaryBlob(blobPath);
 
   const displayContent = fileContent?.content ?? '';
 
@@ -271,6 +190,7 @@ export function FileContentRenderer({
     setIsMarkdownPreview(false);
     setIsJsonTreeView(false);
     setHasUnsavedChanges(false);
+    latestContentRef.current = '';
   }, [filePath]);
 
   // Notify parent of unsaved state changes
@@ -416,7 +336,7 @@ export function FileContentRenderer({
               size="icon"
               className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
               onClick={handleDownload}
-              disabled={!fileContent && !blobUrl && !docxBlob}
+              disabled={!fileContent && !blobUrl && !rawBlob}
               title="Download"
             >
               <Download className="h-3 w-3" />
@@ -436,12 +356,14 @@ export function FileContentRenderer({
 
         {/* Error */}
         {contentError && !showLoadingState && (
-          <div className="flex flex-col items-center justify-center h-full gap-2 p-8 text-center">
-            <FileWarning className="h-6 w-6 text-muted-foreground/30" />
-            <p className="text-xs text-muted-foreground/60 max-w-sm">
-              {contentError}
-            </p>
-          </div>
+          errorFallback ? errorFallback(contentError, filePath) : (
+            <div className="flex flex-col items-center justify-center h-full gap-2 p-8 text-center">
+              <FileWarning className="h-6 w-6 text-muted-foreground/30" />
+              <p className="text-xs text-muted-foreground/60 max-w-sm">
+                {contentError}
+              </p>
+            </div>
+          )
         )}
 
         {/* Image content */}
@@ -452,16 +374,16 @@ export function FileContentRenderer({
         )}
 
         {/* PDF preview */}
-        {isContentReady && fileCategory === 'pdf' && blobUrl && (
+        {isContentReady && fileCategory === 'pdf' && rawBlob && (
           <Suspense fallback={<RendererFallback />}>
-            <PdfRenderer url={blobUrl} className="h-full" />
+            <PdfRenderer blob={rawBlob} className="h-full" />
           </Suspense>
         )}
 
         {/* DOCX preview */}
-        {isContentReady && fileCategory === 'docx' && docxBlob && (
+        {isContentReady && fileCategory === 'docx' && rawBlob && (
           <Suspense fallback={<RendererFallback />}>
-            <DocxRenderer blob={docxBlob} className="h-full" />
+            <DocxRenderer blob={rawBlob} className="h-full" />
           </Suspense>
         )}
 
@@ -504,10 +426,10 @@ export function FileContentRenderer({
         )}
 
         {/* PPTX preview */}
-        {isContentReady && fileCategory === 'pptx' && docxBlob && (
+        {isContentReady && fileCategory === 'pptx' && rawBlob && (
           <Suspense fallback={<RendererFallback />}>
             <PptxRenderer
-              blob={docxBlob}
+              blob={rawBlob}
               binaryUrl={blobUrl}
               filePath={filePath}
               fileName={fileName}
@@ -555,15 +477,15 @@ export function FileContentRenderer({
               )}
               {isJsonTreeView && isJsonFile ? (
                 <div className="w-full h-full overflow-auto">
-                  <JsonTreeView content={latestContentRef.current || displayContent} />
+                  <JsonTreeView content={hasUnsavedChanges ? latestContentRef.current : displayContent} />
                 </div>
               ) : isMarkdownPreview && isMarkdownFile ? (
                 <div className="w-full h-full overflow-auto p-6">
-                  <UnifiedMarkdown content={latestContentRef.current || displayContent} />
+                  <UnifiedMarkdown content={hasUnsavedChanges ? latestContentRef.current : displayContent} />
                 </div>
               ) : (
                 <CodeEditor
-                  content={latestContentRef.current || fileContent.content}
+                  content={hasUnsavedChanges ? latestContentRef.current : fileContent.content}
                   originalContent={fileContent.content}
                   fileName={fileName}
                   onSave={handleSave}
