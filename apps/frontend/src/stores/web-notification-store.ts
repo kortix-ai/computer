@@ -96,19 +96,20 @@ export const useWebNotificationStore = create<WebNotificationState>()(
         const wasEnabled = state.preferences.enabled;
 
         if (!wasEnabled) {
-          // Turning on — request permission if not yet granted
-          if (state.permission !== 'granted') {
-            const perm = await state.requestPermission();
-            if (perm !== 'granted') {
-              // User denied — keep disabled
-              return;
-            }
+          // Always request permission from the browser when enabling.
+          // This triggers the native browser prompt if not yet granted,
+          // and always syncs the latest permission state from the browser.
+          const perm = await state.requestPermission();
+          if (perm !== 'granted') {
+            // Browser denied or user dismissed — keep disabled
+            return;
           }
           set((s) => ({
             preferences: { ...s.preferences, enabled: true },
           }));
         } else {
-          // Turning off
+          // Turning off — also sync permission state so next toggle-on is accurate
+          state.syncPermission();
           set((s) => ({
             preferences: { ...s.preferences, enabled: false },
           }));
