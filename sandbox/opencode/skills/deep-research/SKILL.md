@@ -46,7 +46,7 @@ For exhaustive reviews: breadth=5, depth=3.
    ```
 
 2. **Search local filesystem first.** Before any web search, check if relevant content already exists:
-   - Past research in `workspace/.kortix/research/` and `workspace/.kortix/memory/`
+   - Past research in `research/` directories in the working directory
    - Relevant files in the working directory or project
     - Use `grep`, `glob`, or semantic search (`lss`) as appropriate for the task
    - If prior research exists on this topic, read it and build on it -- don't start from scratch
@@ -180,8 +180,7 @@ Compile `report.md` using findings from notes and metadata from `sources-index.m
 ### Phase 5: Finalize
 
 1. Save `report.md` in the research directory.
-2. Copy the report to `workspace/.kortix/memory/research-{topic-slug}.md` for long-term memory.
-3. Report to user: main conclusions (2-3 sentences), number of sources, confidence levels, file path.
+2. Report to user: main conclusions (2-3 sentences), number of sources, confidence levels, file path.
 
 ## Citation Rules
 
@@ -261,11 +260,11 @@ web-search("claim fact check ||| claim evidence ||| claim debunked OR confirmed"
 
 ### Local FS Search (check before web search)
 ```bash
-# Search past research and memory
-grep -r "keyword" workspace/.kortix/research/ workspace/.kortix/memory/
+# Search past research
+grep -r "keyword" research/
 
 # Semantic search if available
-lss "research question" -p /workspace/.kortix/ --json -k 10
+lss "research question" -p /workspace --json -k 10
 ```
 
 ## Handling Edge Cases

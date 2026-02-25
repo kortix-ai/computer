@@ -621,73 +621,33 @@ lss "query" -p /workspace --json -k 10
 
 ---
 
+## Memory & Context Management
+
+For the full memory, context, and filesystem persistence guide, load the **`memory-context-management`** skill.
+
+**Key rules:**
+- **The filesystem is forever persistent.** `/workspace` survives restarts, rebuilds, reboots. Write plans and notes to disk for anything that should survive across sessions.
+- **kortix-sys-oc-plugin** auto-captures observations, consolidates into LTM during compaction, and injects your session ID + relevant LTM on every turn.
+- **Four tools:** `mem_search`, `mem_save`, `session_list`, `session_get` — all in one plugin.
+- **Both systems reinforce each other:** files on disk are ground truth; the memory plugin surfaces relevant knowledge automatically.
+
+---
+
 ## Session Search & Management
 
-Full access to OpenCode's session data via REST API and the SQLite database.
+For the full session search guide (plugin tools, SQL, grep, lss, REST API, workflows), load the **`session-search`** skill.
 
-### Primary Storage
+Quick reference below; the `session-search` skill has the complete decision tree and all query examples.
 
-Sessions, messages, and parts are stored in **SQLite** at `/workspace/.local/share/opencode/opencode.db` (Drizzle ORM). This is the primary and authoritative storage. A legacy JSON-based `storage/` directory may also exist but is no longer the primary data source.
+### Key Facts
 
-### REST API (Base: http://localhost:4096, or http://localhost:8000 via Kortix Master proxy)
-
-```bash
-# List sessions (via Kortix Master proxy — preferred)
-curl http://localhost:8000/session
-
-# Or directly to OpenCode API server
-curl http://localhost:4096/session
-
-# Get session messages
-curl http://localhost:8000/session/SESSION_ID/message
-
-# What's running now
-curl http://localhost:8000/session/status
-
-# Delete session
-curl -X DELETE http://localhost:8000/session/SESSION_ID
-```
-
-### Direct Database Queries
-
-```bash
-# Open the database (read-only recommended)
-sqlite3 /workspace/.local/share/opencode/opencode.db
-
-# List recent sessions
-sqlite3 /workspace/.local/share/opencode/opencode.db \
-  "SELECT id, title, created_at FROM session ORDER BY created_at DESC LIMIT 10;"
-
-# Find sessions by title
-sqlite3 /workspace/.local/share/opencode/opencode.db \
-  "SELECT id, title FROM session WHERE title LIKE '%research%';"
-
-# Session cost summary
-sqlite3 /workspace/.local/share/opencode/opencode.db \
-  "SELECT m.session_id, s.title, SUM(m.cost) as total_cost
-   FROM message m JOIN session s ON m.session_id = s.id
-   GROUP BY m.session_id ORDER BY total_cost DESC LIMIT 10;"
-```
-
-### Legacy JSON Storage (Fallback)
-
-If the SQLite database is unavailable, legacy JSON files may exist at:
-
-```
-/workspace/.local/share/opencode/storage/
-├── session/global/ses_*.json     # Session metadata
-├── message/ses_*/msg_*.json      # Messages per session
-├── part/msg_*/prt_*.json         # Content parts per message
-└── todo/ses_*.json               # Todo lists per session
-```
-
-```bash
-# Find sessions by title (legacy JSON)
-rg -i '"title".*research' /workspace/.local/share/opencode/storage/session/global/ -l
-
-# Find sessions using a tool (legacy JSON)
-rg '"tool":"web-search"' /workspace/.local/share/opencode/storage/part/ -r -l
-```
+- **Primary storage:** SQLite at `/workspace/.local/share/opencode/opencode.db`
+- **Legacy JSON:** `/workspace/.local/share/opencode/storage/` (session, message, part, todo)
+- **Plugin tools:** `session_list` (browse/filter) + `session_get` (retrieve with TTC compression)
+- **REST API:** `GET /session`, `GET /session/:id/message`, `GET /session/status`, `DELETE /session/:id` (via localhost:8000 or :4096)
+- **Direct SQL:** `sqlite3 /workspace/.local/share/opencode/opencode.db`
+- **Grep:** `grep -rl 'keyword' /workspace/.local/share/opencode/storage/part/`
+- **Semantic:** `lss "query" -p /workspace/.local/share/opencode/storage/ -k 10 --json`
 
 ---
 
@@ -771,7 +731,7 @@ Main config at `/opt/opencode/opencode.jsonc`:
 - **Default agent**: `kortix`
 - **Built-in agents**: `build`, `plan`, `explore`, `general` are available but not default (disable lines are commented out in config)
 - **Permission**: `allow` (all tool calls auto-approved)
-- **Plugins**: `opencode-pty`, `./plugin/worktree.ts`, `./plugin/memory.ts`
+- **Plugins**: `opencode-pty`, `./plugin/worktree.ts`, `kortix-sys-oc-plugin` (memory + session tools)
 - **MCP servers**: Context7 (remote, for documentation lookup)
 - **Provider**: Kortix router (OpenAI-compatible) with two models: `kortix/basic` and `kortix/power`
 - **Auto-update**: enabled (`autoupdate: true`)
