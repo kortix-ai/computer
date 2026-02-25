@@ -42,6 +42,8 @@ interface FilesStoreState {
   clipboard: ClipboardItem | null;
   /** Target line number to scroll to after opening a file (1-indexed, null = none) */
   targetLine: number | null;
+  /** Whether to show hidden (dot) files and directories */
+  showHidden: boolean;
 
   // ── Explorer tree state ──────────────────────────────────────
   /** Set of expanded directory paths in the tree sidebar */
@@ -109,6 +111,8 @@ interface FilesStoreActions {
   toggleSidebar: () => void;
   /** Set sidebar collapsed state */
   setSidebarCollapsed: (collapsed: boolean) => void;
+  /** Toggle hidden files visibility */
+  toggleHidden: () => void;
 }
 
 type FilesStore = FilesStoreState & FilesStoreActions;
@@ -126,6 +130,7 @@ const initialState: FilesStoreState = {
   selectedCommitHash: null,
   clipboard: null,
   targetLine: null,
+  showHidden: false,
   expandedDirs: new Set(['/workspace']),
   isSidebarCollapsed: false,
   panelMode: 'welcome',
@@ -350,5 +355,9 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
 
   setSidebarCollapsed: (collapsed: boolean) => {
     set({ isSidebarCollapsed: collapsed });
+  },
+
+  toggleHidden: () => {
+    set((s) => ({ showHidden: !s.showHidden }));
   },
 }));

@@ -5,24 +5,25 @@ import {
   PanelLeftClose,
   PanelLeft,
   RefreshCw,
-  Server,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useFilesStore } from '../store/files-store';
 import { useCurrentProject } from '../hooks';
 import { useInvalidateFileList } from '../hooks/use-file-list';
 import { getFileIcon } from './file-icon';
 
 /**
- * Minimal top toolbar for the file explorer page.
- * Shows: sidebar toggle | open file path | search + refresh + project badge
+ * Minimal top toolbar — sidebar toggle | file path | search + refresh
  */
 export function FileExplorerToolbar() {
   const isSidebarCollapsed = useFilesStore((s) => s.isSidebarCollapsed);
   const toggleSidebar = useFilesStore((s) => s.toggleSidebar);
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
   const selectedFilePath = useFilesStore((s) => s.selectedFilePath);
+  const showHidden = useFilesStore((s) => s.showHidden);
+  const toggleHidden = useFilesStore((s) => s.toggleHidden);
 
   const { data: project } = useCurrentProject();
   const invalidateFileList = useInvalidateFileList();
@@ -31,12 +32,12 @@ export function FileExplorerToolbar() {
   const fileName = selectedFilePath?.split('/').pop() || '';
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1 border-b bg-muted/20 shrink-0 h-9">
+    <div className="flex items-center gap-1.5 px-1.5 border-b border-border/50 bg-background shrink-0 h-8">
       {/* Sidebar toggle */}
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 shrink-0"
+        className="h-6 w-6 shrink-0 text-muted-foreground/60 hover:text-foreground"
         onClick={toggleSidebar}
         title={isSidebarCollapsed ? 'Show explorer' : 'Hide explorer'}
       >
@@ -47,44 +48,56 @@ export function FileExplorerToolbar() {
         )}
       </Button>
 
-      {/* Open file indicator */}
-      <div className="flex items-center gap-1.5 flex-1 min-w-0 text-xs">
+      {/* Separator */}
+      <div className="w-px h-3.5 bg-border/40 shrink-0" />
+
+      {/* Open file path / project name */}
+      <div className="flex items-center gap-1.5 flex-1 min-w-0 text-[11px]">
         {selectedFilePath ? (
           <>
             {getFileIcon(fileName, { className: 'h-3.5 w-3.5 shrink-0' })}
-            <span className="truncate text-muted-foreground">
+            <span className="truncate text-muted-foreground/80">
               {selectedFilePath}
             </span>
           </>
         ) : (
-          <span className="text-muted-foreground/50 italic">No file open</span>
+          <span className="text-muted-foreground/40 text-[10px] select-none">{projectName}</span>
         )}
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-0.5 shrink-0">
+      <div className="flex items-center gap-0 shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className={`h-6 w-6 hover:text-foreground ${showHidden ? 'text-foreground' : 'text-muted-foreground/60'}`}
+          onClick={toggleHidden}
+          title={showHidden ? 'Hide dotfiles' : 'Show dotfiles'}
+        >
+          {showHidden ? (
+            <Eye className="h-3 w-3" />
+          ) : (
+            <EyeOff className="h-3 w-3" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
           onClick={toggleSearch}
-          title="Search files (\u2318P)"
+          title="Search files"
         >
           <Search className="h-3 w-3" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
           onClick={() => invalidateFileList()}
           title="Refresh"
         >
           <RefreshCw className="h-3 w-3" />
         </Button>
-        <Badge variant="outline" className="gap-1 text-[10px] font-normal h-5 px-1.5 ml-1">
-          <Server className="h-2.5 w-2.5" />
-          <span className="truncate max-w-[140px]">{projectName}</span>
-        </Badge>
       </div>
     </div>
   );
