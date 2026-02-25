@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowDownToLine, X, Loader2, Sparkles, ChevronRight } from 'lucide-react';
+import { ArrowDownToLine, X, Loader2, ChevronRight } from 'lucide-react';
 import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
 import { openTabAndNavigate } from '@/stores/tab-store';
 
@@ -63,61 +63,68 @@ export function UpdateBanner() {
         >
           <div className="pointer-events-auto mx-3 mt-2">
             <div className="flex items-center gap-2.5 px-3 py-1.5 text-xs rounded-lg bg-background/80 backdrop-blur-xl border border-border/60 shadow-sm">
-              {/* Accent dot */}
-              <span className="relative flex h-2 w-2 flex-shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-
-              {/* Version + title */}
-              <span className="text-foreground truncate">
-                <span className="font-semibold">v{latestVersion}</span>
-                {changelog?.title && (
-                  <span className="text-muted-foreground"> &mdash; {changelog.title}</span>
-                )}
-              </span>
-
-              {/* What's new link */}
-              <button
-                onClick={() =>
-                  openTabAndNavigate(
-                    { id: 'page:/changelog', title: 'Changelog', type: 'page', href: '/changelog' },
-                    router,
-                  )
-                }
-                className="flex items-center gap-0.5 text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer flex-shrink-0 whitespace-nowrap"
-              >
-                What&apos;s new
-                <ChevronRight className="h-3 w-3" />
-              </button>
-
-              {/* Separator */}
-              <div className="h-3 w-px bg-border/60 flex-shrink-0" />
-
-              {/* Update button */}
-              {!isUpdating ? (
-                <button
-                  onClick={() => update()}
-                  className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors cursor-pointer flex-shrink-0 whitespace-nowrap"
-                >
-                  <ArrowDownToLine className="h-3 w-3" />
-                  Update
-                </button>
-              ) : (
-                <span className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-amber-600 dark:text-amber-400 flex-shrink-0 whitespace-nowrap">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Updating&hellip;
+              {/* Left group */}
+              <div className="flex items-center gap-2.5 min-w-0">
+                {/* Accent dot */}
+                <span className="relative flex h-2 w-2 flex-shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
-              )}
 
-              {/* Dismiss */}
-              <button
-                onClick={handleDismiss}
-                className="p-1 rounded-md hover:bg-muted/80 transition-colors cursor-pointer flex-shrink-0"
-                aria-label="Dismiss"
-              >
-                <X className="h-3 w-3 text-muted-foreground" />
-              </button>
+                {/* Label + version */}
+                <span className="text-foreground truncate">
+                  <span className="font-semibold">New Kortix version</span>
+                  <span className="text-muted-foreground"> &mdash; v{latestVersion}</span>
+                </span>
+              </div>
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Right group */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* What's new link */}
+                <button
+                  onClick={() =>
+                    openTabAndNavigate(
+                      { id: 'page:/changelog', title: 'Changelog', type: 'page', href: '/changelog' },
+                      router,
+                    )
+                  }
+                  className="flex items-center gap-0.5 text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  What&apos;s new
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+
+                {/* Separator */}
+                <div className="h-3 w-px bg-border/60" />
+
+                {/* Update button */}
+                {!isUpdating ? (
+                  <button
+                    onClick={() => update()}
+                    className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <ArrowDownToLine className="h-3 w-3" />
+                    Update
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Updating&hellip;
+                  </span>
+                )}
+
+                {/* Dismiss */}
+                <button
+                  onClick={handleDismiss}
+                  className="p-1 rounded-md hover:bg-muted/80 transition-colors cursor-pointer ml-0.5"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

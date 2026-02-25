@@ -370,13 +370,12 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
         </span>
-        <span className="text-xs font-semibold text-foreground">v{latestVersion}</span>
-        {changelog?.title && (
-          <span className="text-[10px] text-muted-foreground truncate flex-1 min-w-0">{changelog.title}</span>
-        )}
+        <span className="text-xs font-semibold text-foreground truncate min-w-0">New Kortix version</span>
+        <span className="flex-1" />
+        <span className="text-[10px] text-muted-foreground flex-shrink-0">v{latestVersion}</span>
         <button
           onClick={handleDismiss}
-          className="p-0.5 rounded hover:bg-muted/80 transition-colors cursor-pointer flex-shrink-0 -mr-0.5"
+          className="p-0.5 rounded hover:bg-muted/80 transition-colors cursor-pointer flex-shrink-0"
           aria-label="Dismiss"
         >
           <X className="h-3 w-3 text-muted-foreground/60" />
