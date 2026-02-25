@@ -37,8 +37,8 @@ function StatusPill({
   // At latest + idle = static "Latest" pill (no action)
   if (isAtLatest) {
     return (
-      <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted border border-border text-xs font-medium text-muted-foreground">
-        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
+      <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-muted/60 text-[11px] font-medium text-muted-foreground select-none">
+        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
         Latest
       </div>
     );
@@ -49,7 +49,7 @@ function StatusPill({
     return (
       <button
         onClick={onJumpToLive}
-        className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary hover:bg-primary/15 transition-colors cursor-pointer"
+        className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-primary/10 text-[11px] font-medium text-primary hover:bg-primary/15 transition-colors cursor-pointer"
       >
         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         {isLiveMode ? 'Live' : 'Jump to Live'}
@@ -61,9 +61,9 @@ function StatusPill({
   return (
     <button
       onClick={onJumpToLatest}
-      className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted border border-border text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+      className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-muted/60 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
     >
-      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
+      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
       Jump to Latest
     </button>
   );
@@ -126,45 +126,45 @@ export const NavigationControls = memo(function NavigationControls({
   }
 
   return (
-    <div className="border-t border-border bg-muted/50 px-4 py-2">
-      <div className="flex items-center gap-3">
-        {/* Prev / counter / Next */}
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onPrevious}
-            disabled={displayIndex <= 0}
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-xs text-muted-foreground font-medium tabular-nums px-1 min-w-[44px] text-center">
-            {displayIndex + 1}/{displayTotalCalls}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onNext}
-            disabled={safeInternalIndex >= latestIndex}
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="flex items-center px-2 pb-1.5 pt-0.5 gap-1.5">
+      {/* Prev / counter / Next */}
+      <div className="flex items-center gap-0 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onPrevious}
+          disabled={displayIndex <= 0}
+          className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-xs text-muted-foreground font-medium tabular-nums px-0.5 min-w-[40px] text-center select-none">
+          {displayIndex + 1}/{displayTotalCalls}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onNext}
+          disabled={safeInternalIndex >= latestIndex}
+          className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
 
-        {/* Slider */}
-        <div className="flex-1">
-          <Slider
-            min={0}
-            max={Math.max(0, displayTotalCalls - 1)}
-            step={1}
-            value={[safeInternalIndex]}
-            onValueChange={onSliderChange}
-          />
-        </div>
+      {/* Slider — full width */}
+      <div className="flex-1 min-w-0 px-1">
+        <Slider
+          min={0}
+          max={Math.max(0, displayTotalCalls - 1)}
+          step={1}
+          value={[safeInternalIndex]}
+          onValueChange={onSliderChange}
+        />
+      </div>
 
-        {/* Status pill */}
+      {/* Status pill */}
+      <div className="flex items-center shrink-0">
         <StatusPill
           isLiveMode={isLiveMode}
           agentStatus={agentStatus}

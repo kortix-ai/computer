@@ -7,8 +7,9 @@ cd /workspace
 
 mkdir -p /workspace/.local/share/opencode/log \
          /workspace/.local/share/opencode/storage \
-         /workspace/.local/share/opencode/snapshot
-chown -R abc:abc /workspace/.local/share/opencode
+         /workspace/.local/share/opencode/snapshot \
+         /workspace/.lss
+chown -R abc:abc /workspace/.local/share/opencode /workspace/.lss
 
 echo "[opencode-serve] Starting OpenCode API server on port 4096"
 

@@ -30,8 +30,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ModelProviderIcon } from '@/lib/model-provider-icons';
-import { KortixLogo } from '@/components/sidebar/kortix-logo';
+
 import { useModelStore } from '@/hooks/opencode/use-model-store';
 import type { FlatModel } from './session-chat-input';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
@@ -74,42 +73,13 @@ const PROVIDER_LABELS: Record<string, string> = {
 // Helpers
 // =============================================================================
 
-function resolveIconModelId(providerID: string, modelID: string): string {
-  const knownSubstrings = [
-    'anthropic', 'claude', 'openai', 'gpt', 'google', 'gemini',
-    'xai', 'grok', 'moonshot', 'kimi',
-  ];
-  for (const sub of knownSubstrings) {
-    if (modelID.toLowerCase().includes(sub)) return modelID;
-  }
-  return `${providerID}/${modelID}`;
-}
-
 function formatContext(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
   return `${Math.round(tokens / 1000)}K`;
 }
 
 // =============================================================================
-// Provider / Model icons
-// =============================================================================
-
-export function ProviderIcon({ providerID, size }: { providerID: string; size: number }) {
-  if (providerID === 'kortix') {
-    return <KortixLogo size={size} variant="symbol" />;
-  }
-  return <ModelProviderIcon modelId={resolveIconModelId(providerID, '')} size={size} />;
-}
-
-function InlineModelIcon({ providerID, modelID, size }: { providerID: string; modelID: string; size: number }) {
-  if (providerID === 'kortix') {
-    return <KortixLogo size={size} variant="symbol" />;
-  }
-  return <ModelProviderIcon modelId={resolveIconModelId(providerID, modelID)} size={size} />;
-}
-
-// =============================================================================
-// Tag (matches reference Tag component)
+// Tag
 // =============================================================================
 
 export function Tag({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'free' | 'latest' | 'recommended' | 'custom' }) {
@@ -130,7 +100,7 @@ export function Tag({ children, variant = 'default' }: { children: React.ReactNo
 }
 
 // =============================================================================
-// Model Tooltip (matches reference ModelTooltip)
+// Model Tooltip
 // =============================================================================
 
 function ModelTooltipContent({ model, isLatest, isFree }: { model: FlatModel; isLatest: boolean; isFree: boolean }) {
@@ -145,7 +115,7 @@ function ModelTooltipContent({ model, isLatest, isFree }: { model: FlatModel; is
   if (model.capabilities?.toolcall) inputs.push('Tool Use');
 
   return (
-    <div className="flex flex-col gap-1 py-0.5 max-w-[240px]">
+    <div className="flex flex-col gap-0.5 py-0.5 max-w-[220px]">
       <div className="text-xs font-medium">{model.providerName} {model.modelName}{suffix}</div>
       {inputs.length > 0 && (
         <div className="text-[11px] text-muted-foreground">
@@ -159,7 +129,7 @@ function ModelTooltipContent({ model, isLatest, isFree }: { model: FlatModel; is
       )}
       {model.contextWindow && model.contextWindow > 0 && (
         <div className="text-[11px] text-muted-foreground">
-          Context: {model.contextWindow.toLocaleString()} tokens
+          Context: {formatContext(model.contextWindow)}
         </div>
       )}
     </div>
@@ -167,7 +137,7 @@ function ModelTooltipContent({ model, isLatest, isFree }: { model: FlatModel; is
 }
 
 // =============================================================================
-// Manage Models Dialog (matches reference dialog-manage-models.tsx)
+// Manage Models Dialog
 // =============================================================================
 
 export function ManageModelsDialog({
@@ -219,71 +189,77 @@ export function ManageModelsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col" aria-describedby="manage-models-desc">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Manage Models</DialogTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => {
-                onOpenChange(false);
-                onConnectProvider();
-              }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Connect Provider
-            </Button>
-          </div>
-          <DialogDescription id="manage-models-desc">
-            Choose which models appear in the model selector.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[80vh] !grid-rows-[auto_1fr] overflow-hidden p-0" aria-describedby="manage-models-desc">
+        {/* Fixed header */}
+        <div className="px-5 pt-5 pb-0 space-y-3">
+          <DialogHeader className="p-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm font-semibold">Manage Models</DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs gap-1.5 rounded-lg"
+                onClick={() => {
+                  onOpenChange(false);
+                  onConnectProvider();
+                }}
+              >
+                <Plus className="h-3 w-3" />
+                Connect Provider
+              </Button>
+            </div>
+            <DialogDescription id="manage-models-desc" className="text-xs text-muted-foreground/60">
+              Choose which models appear in the model selector.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search models..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9"
-            autoFocus
-          />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search models..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm rounded-lg"
+              autoFocus
+            />
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 space-y-4 mt-2">
-          {grouped.map(([providerID, providerModels]) => (
-            <div key={providerID}>
-              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pb-1.5">
-                {PROVIDER_LABELS[providerID] || providerModels[0]?.providerName || providerID}
-              </div>
-              <div className="space-y-0.5">
-                {providerModels.map((model) => {
-                  const key = { providerID: model.providerID, modelID: model.modelID };
-                  const visible = modelStore.isVisible(key);
-                  return (
-                    <div
-                      key={`${model.providerID}:${model.modelID}`}
-                       className="flex items-center justify-between gap-3 px-2 py-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                      onClick={() => modelStore.setVisibility(key, !visible)}
-                    >
-                      <span className="text-sm truncate">{model.modelName}</span>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <Switch
-                          checked={visible}
-                          onCheckedChange={(checked) => modelStore.setVisibility(key, checked)}
-                        />
+        {/* Scrollable model list */}
+        <div className="overflow-y-auto px-5 pb-5 pt-1">
+          <div className="space-y-3">
+            {grouped.map(([providerID, providerModels]) => (
+              <div key={providerID}>
+                <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-1 pb-1">
+                  {PROVIDER_LABELS[providerID] || providerModels[0]?.providerName || providerID}
+                </div>
+                <div className="rounded-lg border border-border/40 bg-card/50 divide-y divide-border/30">
+                  {providerModels.map((model) => {
+                    const key = { providerID: model.providerID, modelID: model.modelID };
+                    const visible = modelStore.isVisible(key);
+                    return (
+                      <div
+                        key={`${model.providerID}:${model.modelID}`}
+                        className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                        onClick={() => modelStore.setVisibility(key, !visible)}
+                      >
+                        <span className="text-sm truncate">{model.modelName}</span>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Switch
+                            checked={visible}
+                            onCheckedChange={(checked) => modelStore.setVisibility(key, checked)}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-          {grouped.length === 0 && (
-            <div className="text-sm text-center py-6 text-muted-foreground">No models found</div>
-          )}
+            ))}
+            {grouped.length === 0 && (
+              <div className="text-xs text-center py-8 text-muted-foreground/60">No models found</div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -291,7 +267,7 @@ export function ManageModelsDialog({
 }
 
 // =============================================================================
-// Connect Provider Dialog — thin wrapper around ConnectProviderContent
+// Connect Provider Dialog
 // =============================================================================
 
 export function ConnectProviderDialog({
@@ -305,31 +281,24 @@ export function ConnectProviderDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col" aria-describedby="connect-provider-desc">
+      <DialogContent className="sm:max-w-sm max-h-[80vh] !grid-rows-[1fr] overflow-hidden p-0" aria-describedby="connect-provider-desc">
         <DialogHeader className="sr-only">
           <DialogTitle>Connect Provider</DialogTitle>
           <DialogDescription id="connect-provider-desc">Select a provider to connect.</DialogDescription>
         </DialogHeader>
-        <ConnectProviderContent
-          providers={providers}
-          onClose={() => onOpenChange(false)}
-        />
+        <div className="flex flex-col min-h-0 overflow-hidden px-5 py-5">
+          <ConnectProviderContent
+            providers={providers}
+            onClose={() => onOpenChange(false)}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
 
 // =============================================================================
-// ModelSelector Popover (matches reference ModelSelectorPopover)
-//
-// - w-72 h-80 popover
-// - Search with + (connect) and sliders (manage) action buttons
-// - Flat list of visible models, grouped by provider name
-// - Groups sorted by popular providers
-// - Models sorted alphabetically within group
-// - Each row: model name + Free/Latest tags
-// - Tooltip on hover with model details
-// - Click selects and closes
+// ModelSelector Popover
 // =============================================================================
 
 export interface ModelSelectorProps {
@@ -349,18 +318,15 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
 
   const modelStore = useModelStore(models);
 
-  // Current model for trigger display
   const current = models.find(
     (m) => m.providerID === selectedModel?.providerID && m.modelID === selectedModel?.modelID,
   );
   const displayName = current?.modelName || models[0]?.modelName || 'Model';
 
-  // Visible models filtered by search, grouped by provider
   const visibleModels = useMemo(() => {
     const q = search.toLowerCase();
     return models
       .filter((m) => {
-        // Always show all when searching, otherwise only visible
         if (!q && !modelStore.isVisible({ providerID: m.providerID, modelID: m.modelID })) {
           return false;
         }
@@ -372,7 +338,6 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
       .sort((a, b) => a.modelName.localeCompare(b.modelName));
   }, [models, search, modelStore]);
 
-  // Group by provider, sort groups by popularity (matches reference sortGroupsBy)
   const grouped = useMemo(() => {
     const groups = new Map<string, { providerName: string; providerID: string; models: FlatModel[] }>();
     for (const m of visibleModels) {
@@ -399,10 +364,8 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
     return entries;
   }, [visibleModels]);
 
-  // Flat list for keyboard navigation
   const flatList = useMemo(() => grouped.flatMap((g) => g.models), [grouped]);
 
-  // Reset on close
   useEffect(() => {
     if (open) {
       setTimeout(() => searchRef.current?.focus(), 50);
@@ -450,11 +413,8 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
               >
-                {current && (
-                  <InlineModelIcon providerID={current.providerID} modelID={current.modelID} size={14} />
-                )}
                 <span className="truncate max-w-[120px]">{displayName}</span>
                 <ChevronUp className={cn('size-3 transition-transform', open && 'rotate-180')} />
               </button>
@@ -467,12 +427,11 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
           side="top"
           align="start"
           sideOffset={8}
-          className="w-72 p-2 overflow-hidden rounded-xl border"
-          style={{ height: '320px' }}
+          className="w-[280px] p-0 overflow-hidden rounded-xl border"
         >
-          <div className="flex flex-col h-full overflow-hidden">
+          <div className="flex flex-col h-[320px] overflow-hidden">
             {/* Search bar with action buttons */}
-            <div className="relative flex items-center gap-1 pb-2 flex-shrink-0">
+            <div className="flex items-center gap-1 p-2 border-b border-border/40 flex-shrink-0">
               <div className="relative flex-1">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <input
@@ -482,7 +441,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full h-7 pl-7 pr-6 rounded-md text-xs bg-muted border border-border focus:outline-none focus:border-border placeholder:text-muted-foreground transition-colors"
+                  className="w-full h-7 pl-7 pr-6 rounded-md text-xs bg-transparent focus:outline-none placeholder:text-muted-foreground/50 transition-colors"
                 />
                 {search && (
                   <button
@@ -494,45 +453,46 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                   </button>
                 )}
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      setConnectProviderOpen(true);
-                    }}
-                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">Connect provider</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      setManageModelsOpen(true);
-                    }}
-                    className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
-                  >
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">Manage models</TooltipContent>
-              </Tooltip>
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        setConnectProviderOpen(true);
+                      }}
+                      className="size-7 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Connect provider</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        setManageModelsOpen(true);
+                      }}
+                      className="size-7 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Manage models</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             {/* Model list */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+            <div className="flex-1 min-h-0 overflow-y-auto p-1">
               {grouped.length > 0 ? (
                 grouped.map((group) => (
                   <div key={group.providerID}>
-                    {/* Provider group header */}
-                    <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 pt-2 pb-1">
+                    <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-2 pt-2 pb-0.5">
                       {group.providerName}
                     </div>
                     {group.models.map((model) => {
@@ -551,10 +511,8 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                             <button
                               type="button"
                               className={cn(
-                                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[13px] transition-colors cursor-pointer',
-                                isHighlighted && !isSelected && 'bg-accent',
-                                isSelected && 'bg-accent',
-                                !isSelected && !isHighlighted && 'hover:bg-accent',
+                                'w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left text-[13px] transition-colors cursor-pointer',
+                                (isHighlighted || isSelected) ? 'bg-accent' : 'hover:bg-accent/50',
                               )}
                               onClick={() => handleSelect(model)}
                               onMouseEnter={() => setHighlightedIndex(idx)}
@@ -562,7 +520,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                               <span className="truncate flex-1">{model.modelName}</span>
                               {isFree && <Tag variant="free">Free</Tag>}
                               {isLatestModel && <Tag variant="latest">Latest</Tag>}
-                              {isSelected && <Check className="h-3.5 w-3.5 text-foreground flex-shrink-0" />}
+                              {isSelected && <Check className="h-3 w-3 text-foreground flex-shrink-0" />}
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" align="start" sideOffset={12} className="p-2">
@@ -574,7 +532,7 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                   </div>
                 ))
               ) : (
-                <div className="text-xs text-center py-6 text-muted-foreground">
+                <div className="text-xs text-center py-8 text-muted-foreground/60">
                   No models found
                 </div>
               )}

@@ -3,16 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowDownToLine, X, Loader2, Sparkles, ChevronRight } from 'lucide-react';
+import { ArrowDownToLine, X, Loader2, ChevronRight } from 'lucide-react';
 import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
 import { openTabAndNavigate } from '@/stores/tab-store';
 
 /**
- * UpdateBanner — shows a slim top bar when a sandbox update is available.
+ * UpdateBanner — a slim, non-intrusive top bar when a sandbox update is available.
  *
- * Placement: fixed top-0 full-width, slides down on mount.
+ * Uses absolute positioning so it overlays on top of the content area
+ * without pushing the layout down or breaking flex sizing.
  * Dismissible per version (localStorage).
- * Shows changelog title + "View changelog" link + "Update now" button.
  */
 export function UpdateBanner() {
   const router = useRouter();
@@ -49,66 +49,86 @@ export function UpdateBanner() {
   };
 
   // Don't show if: not mounted, loading, no update, dismissed, or just completed an update
-  if (!mounted || isLoading || !updateAvailable || dismissed) return null;
-  // After successful update, hide the banner
-  if (updateResult?.success) return null;
+  const visible = mounted && !isLoading && updateAvailable && !dismissed && !updateResult?.success;
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: -36 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -36 }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full bg-primary/10 border-b border-primary/20 z-[60]"
-      >
-        <div className="flex items-center justify-center gap-3 px-4 py-1.5 text-xs">
-          {/* Icon */}
-          <Sparkles className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute top-0 left-0 right-0 z-[60] pointer-events-none"
+        >
+          <div className="pointer-events-auto mx-3 mt-2">
+            <div className="flex items-center gap-2.5 px-3 py-1.5 text-xs rounded-lg bg-background/80 backdrop-blur-xl border border-border/60 shadow-sm">
+              {/* Left group */}
+              <div className="flex items-center gap-2.5 min-w-0">
+                {/* Accent dot */}
+                <span className="relative flex h-2 w-2 flex-shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
 
-          {/* Message */}
-          <span className="text-foreground">
-            <span className="font-medium">v{latestVersion}</span>
-            {changelog?.title && (
-              <span className="text-muted-foreground"> &mdash; {changelog.title}</span>
-            )}
-          </span>
+                {/* Label + version */}
+                <span className="text-foreground truncate">
+                  <span className="font-semibold">New Kortix version</span>
+                  <span className="text-muted-foreground"> &mdash; v{latestVersion}</span>
+                </span>
+              </div>
 
-          {/* View changelog link */}
-          <button
-            onClick={() => openTabAndNavigate({ id: 'page:/changelog', title: 'Changelog', type: 'page', href: '/changelog' }, router)}
-            className="flex items-center gap-0.5 text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
-          >
-            What&apos;s new
-            <ChevronRight className="h-3 w-3" />
-          </button>
+              {/* Spacer */}
+              <div className="flex-1" />
 
-          {/* Update button */}
-          {!isUpdating ? (
-            <button
-              onClick={() => update()}
-              className="flex items-center gap-1.5 h-6 px-3 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-full transition-colors cursor-pointer"
-            >
-              <ArrowDownToLine className="h-3 w-3" />
-              Update
-            </button>
-          ) : (
-            <span className="flex items-center gap-1.5 h-6 px-3 text-xs font-medium text-amber-600 dark:text-amber-400">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Updating...
-            </span>
-          )}
+              {/* Right group */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* What's new link */}
+                <button
+                  onClick={() =>
+                    openTabAndNavigate(
+                      { id: 'page:/changelog', title: 'Changelog', type: 'page', href: '/changelog' },
+                      router,
+                    )
+                  }
+                  className="flex items-center gap-0.5 text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  What&apos;s new
+                  <ChevronRight className="h-3 w-3" />
+                </button>
 
-          {/* Dismiss */}
-          <button
-            onClick={handleDismiss}
-            className="p-1 rounded-full hover:bg-primary/10 transition-colors cursor-pointer"
-            aria-label="Dismiss"
-          >
-            <X className="h-3 w-3 text-muted-foreground" />
-          </button>
-        </div>
-      </motion.div>
+                {/* Separator */}
+                <div className="h-3 w-px bg-border/60" />
+
+                {/* Update button */}
+                {!isUpdating ? (
+                  <button
+                    onClick={() => update()}
+                    className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <ArrowDownToLine className="h-3 w-3" />
+                    Update
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Updating&hellip;
+                  </span>
+                )}
+
+                {/* Dismiss */}
+                <button
+                  onClick={handleDismiss}
+                  className="p-1 rounded-md hover:bg-muted/80 transition-colors cursor-pointer ml-0.5"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }

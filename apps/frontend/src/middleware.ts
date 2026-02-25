@@ -53,6 +53,7 @@ const PROTECTED_ROUTES = [
   '/dashboard',
   '/agents',
   '/projects',
+  '/workspace',
   '/settings',
 ];
 

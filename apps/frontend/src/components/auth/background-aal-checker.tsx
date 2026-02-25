@@ -42,6 +42,7 @@ export function BackgroundAALChecker({
       // Allow users to stay on the home page "/" even if phone verification fails
       const isProtectedRoute = pathname.startsWith('/dashboard') || 
                               pathname.startsWith('/agents') || 
+                              pathname.startsWith('/workspace') ||
                               pathname.startsWith('/projects') ||
                               pathname.startsWith('/settings');
       

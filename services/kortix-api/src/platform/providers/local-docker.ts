@@ -42,6 +42,7 @@ const PORT_MAP: Record<string, string> = {
   '3210': String(PORT_BASE + 4), // Presentation Viewer
   '9223': String(PORT_BASE + 5), // Agent Browser Stream
   '9224': String(PORT_BASE + 6), // Agent Browser Viewer
+  '22':   String(PORT_BASE + 7), // SSH
 };
 
 const BASE_URL = `http://localhost:${PORT_MAP['8000']}`;
@@ -364,6 +365,8 @@ export class LocalDockerProvider implements SandboxProvider {
       'DISPLAY=:1',
       'LSS_DIR=/workspace/.lss',
       'KORTIX_WORKSPACE=/workspace',
+      'SECRET_FILE_PATH=/workspace/.secrets/.secrets.json',
+      'SALT_FILE_PATH=/workspace/.secrets/.salt',
       `KORTIX_API_URL=${config.KORTIX_URL || ''}`,
       // KORTIX_TOKEN: sandbox → kortix-api auth.
       // Uses the service key if available, otherwise the sandbox's kortix_sb_ key.
@@ -391,8 +394,8 @@ export class LocalDockerProvider implements SandboxProvider {
         ShmSize: 2 * 1024 * 1024 * 1024,
         RestartPolicy: { Name: 'unless-stopped' },
         Binds: [
-          `${CONTAINER_NAME}-workspace:/workspace`,
-          `${CONTAINER_NAME}-secrets:/app/secrets`,
+          `${CONTAINER_NAME}-data:/workspace`,
+          `${CONTAINER_NAME}-data:/config`,
         ],
         ...(config.SANDBOX_NETWORK ? { NetworkMode: config.SANDBOX_NETWORK } : {}),
       },
@@ -405,7 +408,7 @@ export class LocalDockerProvider implements SandboxProvider {
 
     await container.start();
     console.log(
-      `[LOCAL-DOCKER] Sandbox created and started on ports ${PORT_BASE}-${PORT_BASE + 6}`,
+      `[LOCAL-DOCKER] Sandbox created and started on ports ${PORT_BASE}-${PORT_BASE + 7}`,
     );
 
   }

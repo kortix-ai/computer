@@ -14,16 +14,15 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Search,
-  Plus,
   ArrowLeft,
   Loader2,
   ExternalLink,
   AlertCircle,
+  ChevronRight,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ModelProviderIcon } from '@/lib/model-provider-icons';
-import { KortixLogo } from '@/components/sidebar/kortix-logo';
+
 import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
@@ -43,30 +42,12 @@ const POPULAR_PROVIDERS = [
   'vercel',
 ];
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function ProviderIcon({ providerID, size }: { providerID: string; size: number }) {
-  if (providerID === 'kortix') {
-    return <KortixLogo size={size} variant="symbol" />;
-  }
-  return <ModelProviderIcon modelId={providerID} size={size} />;
-}
-
-function Tag({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'recommended' | 'custom' }) {
-  return (
-    <span
-      className={`px-1.5 py-0.5 rounded text-[10px] font-medium leading-none flex-shrink-0 ${
-        variant === 'recommended' ? 'bg-primary/10 text-primary' :
-        variant === 'custom' ? 'bg-muted text-muted-foreground' :
-        'bg-muted text-muted-foreground'
-      }`}
-    >
-      {children}
-    </span>
-  );
-}
+const PROVIDER_HINTS: Record<string, string> = {
+  opencode: 'Recommended',
+  anthropic: 'Bring your own key',
+  openai: 'Bring your own key',
+  'github-copilot': 'Use existing subscription',
+};
 
 // =============================================================================
 // ConnectProviderContent
@@ -166,7 +147,6 @@ export function ConnectProviderContent({
     } catch { /* ignore */ }
     queryClient.invalidateQueries({ queryKey: opencodeKeys.providers() });
     onProviderConnected?.();
-    // Reset to list view after connecting
     setView({ type: 'list' });
     setSearch('');
     resetConnect();
@@ -368,24 +348,19 @@ export function ConnectProviderContent({
   return (
     <>
       {/* Header */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pb-1">
         {view.type !== 'list' && (
           <button
             type="button"
             onClick={handleBack}
-            className="p-1.5 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="p-1 -ml-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
-        <h3 className="text-base font-semibold flex-1">
+        <h3 className="text-sm font-semibold flex-1">
           {view.type === 'custom' && 'Custom Provider'}
-          {view.type === 'connect' && (
-            <span className="flex items-center gap-3">
-              <ProviderIcon providerID={view.providerID} size={20} />
-              Connect {selectedProviderData?.name || view.providerID}
-            </span>
-          )}
+          {view.type === 'connect' && `Connect ${selectedProviderData?.name || view.providerID}`}
           {view.type === 'list' && 'Connect Provider'}
         </h3>
       </div>
@@ -393,37 +368,35 @@ export function ConnectProviderContent({
       {/* ============ PROVIDER LIST ============ */}
       {view.type === 'list' && (
         <>
-          <div className="relative mt-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search providers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9"
+              className="pl-8 h-8 text-sm rounded-lg"
               autoFocus
             />
           </div>
 
-          <div className="flex-1 min-h-0 mt-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 mt-2 overflow-y-auto -mx-1">
             {/* Custom provider */}
             {(!search || 'custom'.includes(search.toLowerCase())) && (
               <button
                 type="button"
                 onClick={() => setView({ type: 'custom' })}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer group"
               >
-                <div className="w-5 h-5 rounded flex items-center justify-center bg-muted text-muted-foreground">
-                  <Plus className="h-3 w-3" />
-                </div>
-                <span className="text-sm">Custom provider</span>
-                <Tag variant="custom">Custom</Tag>
+                <span className="text-sm flex-1">Custom provider</span>
+                <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wide">Custom</span>
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
               </button>
             )}
 
             {/* Popular providers */}
             {popularGroup.length > 0 && (
               <>
-                <div className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3 pt-3 pb-1.5">
+                <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-3 pt-3 pb-1">
                   Popular
                 </div>
                 {popularGroup.map((p) => (
@@ -431,20 +404,15 @@ export function ConnectProviderContent({
                     key={p.id}
                     type="button"
                     onClick={() => handleSelectProvider(p.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer group"
                   >
-                    <ProviderIcon providerID={p.id} size={20} />
-                    <span className="text-sm">{p.name}</span>
-                    {p.id === 'opencode' && <Tag variant="recommended">Recommended</Tag>}
-                    {p.id === 'anthropic' && (
-                      <span className="text-xs text-muted-foreground/60 ml-auto">Bring your own key</span>
+                    <span className="text-sm flex-1">{p.name}</span>
+                    {PROVIDER_HINTS[p.id] && (
+                      <span className="text-[10px] text-muted-foreground/50 font-medium">
+                        {PROVIDER_HINTS[p.id]}
+                      </span>
                     )}
-                    {p.id === 'openai' && (
-                      <span className="text-xs text-muted-foreground/60 ml-auto">Bring your own key</span>
-                    )}
-                    {p.id.startsWith('github-copilot') && (
-                      <span className="text-xs text-muted-foreground/60 ml-auto">Use existing subscription</span>
-                    )}
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                   </button>
                 ))}
               </>
@@ -453,7 +421,7 @@ export function ConnectProviderContent({
             {/* Other providers */}
             {otherGroup.length > 0 && (
               <>
-                <div className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3 pt-3 pb-1.5">
+                <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-3 pt-3 pb-1">
                   Other
                 </div>
                 {otherGroup.map((p) => (
@@ -461,17 +429,17 @@ export function ConnectProviderContent({
                     key={p.id}
                     type="button"
                     onClick={() => handleSelectProvider(p.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer group"
                   >
-                    <ProviderIcon providerID={p.id} size={20} />
-                    <span className="text-sm">{p.name}</span>
+                    <span className="text-sm flex-1">{p.name}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                   </button>
                 ))}
               </>
             )}
 
             {filteredProviders.length === 0 && !search.toLowerCase().startsWith('custom') && (
-              <div className="text-sm text-center py-6 text-muted-foreground">No providers found</div>
+              <div className="text-xs text-center py-8 text-muted-foreground/60">No providers found</div>
             )}
           </div>
         </>
@@ -479,52 +447,57 @@ export function ConnectProviderContent({
 
       {/* ============ CUSTOM PROVIDER FORM ============ */}
       {view.type === 'custom' && (
-        <form onSubmit={handleCustomSubmit} className="space-y-4 mt-2 overflow-y-auto max-h-[60vh]">
-          <p className="text-sm text-muted-foreground">
+        <form onSubmit={handleCustomSubmit} className="flex-1 min-h-0 overflow-y-auto space-y-3 mt-1">
+          <p className="text-xs text-muted-foreground">
             Add an OpenAI-compatible provider.{' '}
             <a href="https://opencode.ai/docs/providers/#custom-provider" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
               Learn more <ExternalLink className="h-3 w-3" />
             </a>
           </p>
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Provider ID</label>
-              <Input placeholder="my-provider" value={customForm.providerID} onChange={(e) => setCustomForm((f) => ({ ...f, providerID: e.target.value }))} autoFocus />
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Provider ID</label>
+              <Input placeholder="my-provider" value={customForm.providerID} onChange={(e) => setCustomForm((f) => ({ ...f, providerID: e.target.value }))} className="h-8 text-sm rounded-lg" autoFocus />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Display Name</label>
-              <Input placeholder="My Provider" value={customForm.name} onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))} />
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Display Name</label>
+              <Input placeholder="My Provider" value={customForm.name} onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))} className="h-8 text-sm rounded-lg" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Base URL</label>
-              <Input placeholder="https://api.example.com/v1" value={customForm.baseURL} onChange={(e) => setCustomForm((f) => ({ ...f, baseURL: e.target.value }))} />
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Base URL</label>
+              <Input placeholder="https://api.example.com/v1" value={customForm.baseURL} onChange={(e) => setCustomForm((f) => ({ ...f, baseURL: e.target.value }))} className="h-8 text-sm rounded-lg" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">API Key (optional)</label>
-              <Input placeholder="sk-..." type="password" value={customForm.apiKey} onChange={(e) => setCustomForm((f) => ({ ...f, apiKey: e.target.value }))} />
-              <p className="text-[11px] text-muted-foreground/60 mt-1">Use {'{env:VAR_NAME}'} to read from environment</p>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">API Key <span className="font-normal text-muted-foreground/50">(optional)</span></label>
+              <Input placeholder="sk-..." type="password" value={customForm.apiKey} onChange={(e) => setCustomForm((f) => ({ ...f, apiKey: e.target.value }))} className="h-8 text-sm rounded-lg" />
+              <p className="text-[10px] text-muted-foreground/50 mt-1">Use {'{env:VAR_NAME}'} to read from environment</p>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Models</label>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Model</label>
               <div className="flex gap-2">
-                <Input placeholder="Model ID" value={customForm.modelId} onChange={(e) => setCustomForm((f) => ({ ...f, modelId: e.target.value }))} className="flex-1" />
-                <Input placeholder="Display Name" value={customForm.modelName} onChange={(e) => setCustomForm((f) => ({ ...f, modelName: e.target.value }))} className="flex-1" />
+                <Input placeholder="Model ID" value={customForm.modelId} onChange={(e) => setCustomForm((f) => ({ ...f, modelId: e.target.value }))} className="flex-1 h-8 text-sm rounded-lg" />
+                <Input placeholder="Display Name" value={customForm.modelName} onChange={(e) => setCustomForm((f) => ({ ...f, modelName: e.target.value }))} className="flex-1 h-8 text-sm rounded-lg" />
               </div>
             </div>
           </div>
-          {error && <p className="text-sm text-destructive flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}</p>}
-          <Button type="submit" disabled={saving} className="w-auto">
-            {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Connecting...</> : 'Connect'}
+          {error && (
+            <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 rounded-lg px-3 py-2">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+          <Button type="submit" disabled={saving} size="sm" className="h-8">
+            {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Connecting...</> : 'Connect'}
           </Button>
         </form>
       )}
 
       {/* ============ CONNECT FLOW ============ */}
       {view.type === 'connect' && (
-        <div className="space-y-6 mt-2">
+        <div className="space-y-4 mt-1">
           {showMethodSelect && (
             <>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Choose how to connect {selectedProviderData?.name || view.providerID}:
               </p>
               <div className="space-y-1">
@@ -533,9 +506,10 @@ export function ConnectProviderContent({
                     key={i}
                     type="button"
                     onClick={() => selectMethod(view.providerID, authMethods, i)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-muted/40 transition-colors cursor-pointer text-sm"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer text-sm group"
                   >
-                    <span>{method.type === 'api' ? 'API Key' : method.label || 'OAuth'}</span>
+                    <span className="flex-1">{method.type === 'api' ? 'API Key' : method.label || 'OAuth'}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                   </button>
                 ))}
               </div>
@@ -543,83 +517,90 @@ export function ConnectProviderContent({
           )}
 
           {showApiKeyForm && (
-            <form onSubmit={handleApiKeySubmit} className="space-y-4">
+            <form onSubmit={handleApiKeySubmit} className="space-y-3">
               {view.providerID === 'opencode' ? (
-                <div className="space-y-3 text-sm text-muted-foreground">
+                <div className="space-y-2 text-xs text-muted-foreground">
                   <p>OpenCode Zen provides access to many AI models through a single API key.</p>
-                  <p>You can get an API key by signing up at{' '}
+                  <p>Get an API key at{' '}
                     <a href="https://opencode.ai/zen" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">opencode.ai/zen</a>.
                   </p>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Enter your {selectedProviderData?.name || view.providerID} API key.
                 </p>
               )}
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">
-                  {selectedProviderData?.name || view.providerID} API Key
-                </label>
-                <Input placeholder="Enter API key..." type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoFocus />
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">API Key</label>
+                <Input placeholder="Enter API key..." type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="h-8 text-sm rounded-lg" autoFocus />
               </div>
-              {error && <p className="text-sm text-destructive flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}</p>}
-              <Button type="submit" disabled={saving} className="w-auto">
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Connecting...</> : 'Submit'}
+              {error && (
+                <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 rounded-lg px-3 py-2">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <Button type="submit" disabled={saving} size="sm" className="h-8">
+                {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Connecting...</> : 'Connect'}
               </Button>
             </form>
           )}
 
           {showOAuthPending && (
-            <div className="flex items-center gap-3 py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Starting authorization...</span>
+            <div className="flex items-center gap-2.5 py-6 justify-center">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Starting authorization...</span>
             </div>
           )}
 
           {showOAuthCode && (
-            <form onSubmit={handleOAuthCodeSubmit} className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+            <form onSubmit={handleOAuthCodeSubmit} className="space-y-3">
+              <p className="text-xs text-muted-foreground">
                 Visit the{' '}
                 <a href={oauthUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">authorization page</a>
-                {' '}and paste the code below to connect {selectedProviderData?.name || view.providerID}.
+                {' '}and paste the code below.
               </p>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Authorization code</label>
-                <Input placeholder="Enter code..." type="text" value={oauthCode} onChange={(e) => setOauthCode(e.target.value)} autoFocus />
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Authorization code</label>
+                <Input placeholder="Enter code..." type="text" value={oauthCode} onChange={(e) => setOauthCode(e.target.value)} className="h-8 text-sm rounded-lg" autoFocus />
               </div>
-              {error && <p className="text-sm text-destructive flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}</p>}
-              <Button type="submit" disabled={saving} className="w-auto">
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Connecting...</> : 'Submit'}
+              {error && (
+                <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 rounded-lg px-3 py-2">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <Button type="submit" disabled={saving} size="sm" className="h-8">
+                {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Connecting...</> : 'Connect'}
               </Button>
             </form>
           )}
 
           {showOAuthAuto && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
                 Complete authorization in the{' '}
-                <a href={oauthUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">browser window</a>
-                {' '}to connect {selectedProviderData?.name || view.providerID}.
+                <a href={oauthUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">browser window</a>.
               </p>
               {oauthInstructions && (
-                <div className="px-3 py-2 rounded-lg bg-muted/40 border border-border/40 font-mono text-sm select-all">
+                <div className="px-3 py-2 rounded-lg bg-muted/30 border border-border/30 font-mono text-xs select-all break-all">
                   {oauthInstructions.includes(':') ? oauthInstructions.split(':')[1]?.trim() : oauthInstructions}
                 </div>
               )}
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 <span>Waiting for authorization...</span>
               </div>
             </div>
           )}
 
           {showOAuthError && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 rounded-lg px-3 py-2">
+                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
                 <span>{error || 'Authorization failed'}</span>
               </div>
-              <Button variant="outline" size="sm" onClick={() => { setOauthState('idle'); setMethodIndex(undefined); setError(''); }}>
+              <Button variant="outline" size="sm" className="h-8" onClick={() => { setOauthState('idle'); setMethodIndex(undefined); setError(''); }}>
                 Try again
               </Button>
             </div>

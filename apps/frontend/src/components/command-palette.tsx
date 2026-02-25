@@ -7,11 +7,8 @@ import {
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftIcon,
-  FileText,
   Loader2,
-  Database,
   Settings,
-  Cog,
   MessageCircle,
   FileCode,
   Folder,
@@ -21,17 +18,13 @@ import {
   Layers,
   GitCompareArrows,
   TextSearch,
-  Hash,
-  Keyboard,
-  Slash,
   ArrowRightLeft,
-  FolderOpen,
   Blocks,
-  Wrench,
   KeyRound,
   MessageSquare,
   Calendar,
   ScrollText,
+  FileText,
 } from 'lucide-react';
 
 import {
@@ -48,8 +41,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useSidebar } from '@/components/ui/sidebar';
 import {
   useOpenCodeSessions,
-  useOpenCodeCommands,
-  useExecuteOpenCodeCommand,
 } from '@/hooks/opencode/use-opencode-sessions';
 // Worktree hooks — disabled for now, will be re-enabled later
 // import {
@@ -63,10 +54,9 @@ import type { FindMatch } from '@/features/files';
 import { toast } from '@/lib/toast';
 import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
 import { openTabAndNavigate } from '@/stores/tab-store';
-import { useKortixComputerStore } from '@/stores/kortix-computer-store';
+import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { CompactDialog } from '@/components/session/compact-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
-import { InitProjectDialog } from '@/components/session/init-project-dialog';
 
 // ============================================================================
 // Helpers
@@ -142,11 +132,6 @@ function cleanSnippet(snippet: string): string {
     .slice(0, 200);
 }
 
-const isMacPlatform =
-  typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
-
-const MOD_KEY = isMacPlatform ? '⌘' : 'Ctrl+';
-
 // ============================================================================
 // Skeleton components for loading states
 // ============================================================================
@@ -203,21 +188,6 @@ function SearchSkeletons({
 }
 
 // ============================================================================
-// Keyboard shortcuts reference data
-// ============================================================================
-
-const KEYBOARD_SHORTCUTS = [
-  { label: 'Command palette', keys: `${MOD_KEY}K`, category: 'General' },
-  { label: 'New session', keys: `${MOD_KEY}J`, category: 'General' },
-  { label: 'Open terminal', keys: `${MOD_KEY}\``, category: 'General' },
-  { label: 'Toggle left sidebar', keys: `${MOD_KEY}B`, category: 'General' },
-  { label: 'Toggle right sidebar', keys: `${MOD_KEY}Shift+B`, category: 'General' },
-  { label: 'Switch tab 1-8', keys: `${MOD_KEY}1…8`, category: 'Tabs' },
-  { label: 'Last tab', keys: `${MOD_KEY}9`, category: 'Tabs' },
-  { label: 'Close tab', keys: `${MOD_KEY}W`, category: 'Tabs' },
-];
-
-// ============================================================================
 // Command Palette
 // ============================================================================
 
@@ -230,12 +200,11 @@ export function CommandPalette() {
   const [isCreating, setIsCreating] = useState(false);
   const [compactOpen, setCompactOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
-  const [initOpen, setInitOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const createSession = useCreateOpenCodeSession();
-  const executeCommand = useExecuteOpenCodeCommand();
+  const createPty = useCreatePty();
 
   // Worktree management — disabled for now
   // const [worktreeBrowsePath, setWorktreeBrowsePath] = useState<string | null>(null);
@@ -251,9 +220,6 @@ export function CommandPalette() {
 
   // Fetch all sessions (for client-side title filter)
   const { data: sessions } = useOpenCodeSessions();
-
-  // Fetch available slash commands
-  const { data: slashCommands = [] } = useOpenCodeCommands();
 
   // Debounce the query for file search API calls (300ms — fast)
   useEffect(() => {
@@ -311,6 +277,25 @@ export function CommandPalette() {
     enabled: textSearchDebouncedQuery.length >= 3,
   });
 
+  const close = useCallback(() => setOpen(false), []);
+
+  const handleOpenTerminal = useCallback(async () => {
+    try {
+      const pty = await createPty.mutateAsync({
+        env: { TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+      });
+      openTabAndNavigate({
+        id: `terminal:${pty.id}`,
+        title: pty.title || pty.command || 'Terminal',
+        type: 'terminal',
+        href: `/terminal/${pty.id}`,
+      });
+    } catch (e) {
+      toast.error('Failed to open terminal');
+    }
+    close();
+  }, [createPty, close]);
+
   // Global keyboard shortcut
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -321,14 +306,12 @@ export function CommandPalette() {
       // Cmd+J is handled by sidebar-left.tsx — no duplicate handler here.
       if (e.key === '`' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        const store = useKortixComputerStore.getState();
-        store.setActiveView('terminal');
-        store.openSidePanel();
+        handleOpenTerminal();
       }
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, []);
+  }, [handleOpenTerminal]);
 
   // Reset query and sub-views when dialog closes
   useEffect(() => {
@@ -340,20 +323,34 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  const close = useCallback(() => setOpen(false), []);
+  // ------------------------------------------------------------------
+  // Fuzzy match helper — checks if all query words appear in the text
+  // ------------------------------------------------------------------
+  const fuzzyMatch = useCallback((text: string, q: string): boolean => {
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const haystack = text.toLowerCase();
+    return words.every((w) => haystack.includes(w));
+  }, []);
 
-  // Filter sessions by query (client-side fuzzy match on title/slug)
+  // Filter sessions by query (client-side fuzzy match on title/slug/id)
   const filteredSessions = useMemo(() => {
     if (!sessions || !query.trim()) return [];
-    const q = query.toLowerCase();
+    const q = query.trim();
     return sessions
       .filter((s) => {
         if (s.parentID || s.time.archived) return false;
-        const title = (s.title || s.slug || '').toLowerCase();
-        return title.includes(q);
+        // Search across title, slug, and ID for maximum findability
+        const searchable = [s.title, s.slug, s.id].filter(Boolean).join(' ');
+        return fuzzyMatch(searchable, q);
       })
-      .slice(0, 8);
-  }, [sessions, query]);
+      .slice(0, 20);
+  }, [sessions, query, fuzzyMatch]);
+
+  // Non-archived, non-child sessions for "Recent Sessions" section
+  const recentSessions = useMemo(() => {
+    if (!sessions) return [];
+    return sessions.filter((s) => !s.parentID && !s.time.archived).slice(0, 10);
+  }, [sessions]);
 
   // Deduplicate LSS results against file results (prefer file results for name matches)
   const filteredLssResults = useMemo(() => {
@@ -395,21 +392,6 @@ export function CommandPalette() {
     return results.slice(0, 10);
   }, [textSearchResults]);
 
-  // Filter slash commands by query
-  const filteredSlashCommands = useMemo(() => {
-    if (!query.trim()) return [];
-    // Show slash commands when query starts with / or matches command names
-    const q = query.toLowerCase().replace(/^\//, '');
-    if (!q) return slashCommands.slice(0, 8);
-    return slashCommands
-      .filter((cmd) => {
-        const name = (cmd.name || '').toLowerCase();
-        const desc = (cmd.description || '').toLowerCase();
-        return name.includes(q) || desc.includes(q);
-      })
-      .slice(0, 8);
-  }, [slashCommands, query]);
-
   const hasQuery = query.trim().length > 0;
   const queryLongEnough = query.trim().length >= 2;
   const textQueryLongEnough = query.trim().length >= 3;
@@ -430,9 +412,8 @@ export function CommandPalette() {
   const hasFileResults = fileResults.length > 0;
   const hasLssResults = filteredLssResults.length > 0;
   const hasTextResults = filteredTextResults.length > 0;
-  const hasSlashCommandResults = filteredSlashCommands.length > 0;
   const hasAnyResults =
-    hasSessionResults || hasFileResults || hasLssResults || hasTextResults || hasSlashCommandResults;
+    hasSessionResults || hasFileResults || hasLssResults || hasTextResults;
 
   // Show semantic search section (results or skeletons)
   const showLssSection = hasQuery && queryLongEnough;
@@ -485,7 +466,7 @@ export function CommandPalette() {
 
   const handleNavigate = useCallback(
     (path: string, label?: string) => {
-      const type = path.startsWith('/settings') || path === '/configuration'
+      const type = path.startsWith('/settings')
         ? 'settings' as const
         : 'page' as const;
       openTabAndNavigate({
@@ -548,36 +529,11 @@ export function CommandPalette() {
     close();
   }, [toggleSidebar, close]);
 
-  const handleOpenTerminal = useCallback(() => {
-    const store = useKortixComputerStore.getState();
-    store.setActiveView('terminal');
-    store.openSidePanel();
-    close();
-  }, [close]);
-
   // Detect if we're on a session page and extract session ID
   const currentSessionId = useMemo(() => {
     const match = pathname?.match(/^\/sessions\/([^/]+)/);
     return match ? match[1] : null;
   }, [pathname]);
-
-  const handleExecuteSlashCommand = useCallback(
-    (commandName: string) => {
-      if (!currentSessionId) {
-        toast.error('Open a session first to run slash commands');
-        close();
-        return;
-      }
-      executeCommand.mutate(
-        { sessionId: currentSessionId, command: commandName },
-        {
-          onError: () => toast.error(`Failed to execute /${commandName}`),
-        },
-      );
-      close();
-    },
-    [currentSessionId, executeCommand, close],
-  );
 
   const handleCompactSession = useCallback(() => {
     if (!currentSessionId) return;
@@ -592,18 +548,6 @@ export function CommandPalette() {
   }, [currentSessionId, close]);
 
   // View tasks is now shown in the chat input todo panel — no modal needed
-
-  const handleInitProject = useCallback(() => {
-    if (!currentSessionId) return;
-    close();
-    setInitOpen(true);
-  }, [currentSessionId, close]);
-
-  // Worktree handlers — disabled for now
-  // const handleCreateWorktree = useCallback(() => { ... }, []);
-  // const handleSelectWorktreeDir = useCallback(...);
-  // const handleRemoveWorktree = useCallback(...);
-  // const handleResetWorktree = useCallback(...);
 
   // Group headings
   const lssHeading = (
@@ -655,41 +599,13 @@ export function CommandPalette() {
             </div>
           )}
 
-          {/* Slash commands (when query starts with / or matches command names) */}
-          {hasQuery && hasSlashCommandResults && (
-            <CommandGroup heading="Slash Commands">
-              {filteredSlashCommands.map((cmd) => (
-                <CommandItem
-                  key={`cmd-${cmd.name}`}
-                  value={`command-${cmd.name}`}
-                  onSelect={() => handleExecuteSlashCommand(cmd.name)}
-                >
-                  <Slash className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-                    <span className="truncate font-medium">/{cmd.name}</span>
-                    {cmd.description && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        {cmd.description}
-                      </span>
-                    )}
-                  </div>
-                  {!currentSessionId && (
-                    <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
-                      needs session
-                    </span>
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-
           {/* Session title matches (instant, client-side) */}
           {hasQuery && hasSessionResults && (
-            <CommandGroup heading="Sessions">
+            <CommandGroup heading="Sessions" forceMount>
               {filteredSessions.map((session) => (
                 <CommandItem
                   key={session.id}
-                  value={`session-${session.title || session.slug || session.id}`}
+                  value={`session-${session.id}`}
                   onSelect={() =>
                     handleSelectSession(
                       session.id,
@@ -718,9 +634,82 @@ export function CommandPalette() {
             </CommandGroup>
           )}
 
-          {/* Semantic file search (LSS — BM25 + embeddings) */}
+          {/* File name search results (fastest — 300ms debounce) */}
+          {hasQuery && hasFileResults && (
+            <CommandGroup heading="Files" forceMount>
+              {fileResults.map((filePath) => {
+                const FileIcon = getFileIcon(filePath);
+                const fileName = filePath.split('/').pop() || filePath;
+                const dirPath = filePath.split('/').slice(0, -1).join('/');
+                return (
+                  <CommandItem
+                    key={filePath}
+                    value={`file-${filePath}`}
+                    onSelect={() => handleSelectFile(filePath)}
+                  >
+                    <FileIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                      <span className="truncate">{fileName}</span>
+                      {dirPath && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          {dirPath}
+                        </span>
+                      )}
+                    </div>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          )}
+
+          {/* Text content search (ripgrep — 600ms debounce) */}
+          {showTextSection && (hasTextResults || showTextSkeletons) && (
+            <CommandGroup heading={textSearchHeading} forceMount>
+              {hasTextResults &&
+                filteredTextResults.map((match, index) => {
+                  const FileIcon = getFileIcon(match.path);
+                  const fileName = match.path.split('/').pop() || match.path;
+                  const dirPath = match.path.split('/').slice(0, -1).join('/');
+                  const linePreview = match.lines.trim().slice(0, 120);
+
+                  return (
+                    <CommandItem
+                      key={`text-${match.path}-${match.line_number}-${index}`}
+                      value={`text-${match.path}-${match.line_number}-${index}`}
+                      onSelect={() => handleSelectTextResult(match)}
+                    >
+                      <FileIcon className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-medium text-sm">
+                            {fileName}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 tabular-nums font-mono">
+                            L{match.line_number}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground/80 line-clamp-1 leading-relaxed font-mono">
+                          {linePreview}
+                        </span>
+                        {dirPath && (
+                          <span className="text-[11px] text-muted-foreground/50 truncate">
+                            {dirPath}
+                          </span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+
+              {showTextSkeletons && (
+                <SearchSkeletons count={3} variant="content" />
+              )}
+            </CommandGroup>
+          )}
+
+          {/* Semantic file search (LSS — BM25 + embeddings, slowest — 500ms debounce) */}
           {showLssSection && (hasLssResults || showLssSkeletons) && (
-            <CommandGroup heading={lssHeading}>
+            <CommandGroup heading={lssHeading} forceMount>
               {hasLssResults &&
                 filteredLssResults.map((hit) => {
                   const relativePath = stripWorkspacePrefix(hit.file_path);
@@ -770,79 +759,6 @@ export function CommandPalette() {
             </CommandGroup>
           )}
 
-          {/* Text content search (ripgrep) */}
-          {showTextSection && (hasTextResults || showTextSkeletons) && (
-            <CommandGroup heading={textSearchHeading}>
-              {hasTextResults &&
-                filteredTextResults.map((match, index) => {
-                  const FileIcon = getFileIcon(match.path);
-                  const fileName = match.path.split('/').pop() || match.path;
-                  const dirPath = match.path.split('/').slice(0, -1).join('/');
-                  const linePreview = match.lines.trim().slice(0, 120);
-
-                  return (
-                    <CommandItem
-                      key={`text-${match.path}-${match.line_number}-${index}`}
-                      value={`text-${match.path}-${match.line_number}-${index}`}
-                      onSelect={() => handleSelectTextResult(match)}
-                    >
-                      <FileIcon className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                      <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate font-medium text-sm">
-                            {fileName}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 tabular-nums font-mono">
-                            L{match.line_number}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground/80 line-clamp-1 leading-relaxed font-mono">
-                          {linePreview}
-                        </span>
-                        {dirPath && (
-                          <span className="text-[11px] text-muted-foreground/50 truncate">
-                            {dirPath}
-                          </span>
-                        )}
-                      </div>
-                    </CommandItem>
-                  );
-                })}
-
-              {showTextSkeletons && (
-                <SearchSkeletons count={3} variant="content" />
-              )}
-            </CommandGroup>
-          )}
-
-          {/* File name search results */}
-          {hasQuery && hasFileResults && (
-            <CommandGroup heading="Files">
-              {fileResults.map((filePath) => {
-                const FileIcon = getFileIcon(filePath);
-                const fileName = filePath.split('/').pop() || filePath;
-                const dirPath = filePath.split('/').slice(0, -1).join('/');
-                return (
-                  <CommandItem
-                    key={filePath}
-                    value={`file-${filePath}`}
-                    onSelect={() => handleSelectFile(filePath)}
-                  >
-                    <FileIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                    <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-                      <span className="truncate">{fileName}</span>
-                      {dirPath && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {dirPath}
-                        </span>
-                      )}
-                    </div>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          )}
-
           {/* Actions — always rendered so cmdk filtering can find them */}
           <CommandGroup heading="Actions">
                 <CommandItem onSelect={handleNewSession} disabled={isCreating}>
@@ -857,7 +773,6 @@ export function CommandPalette() {
                 <CommandItem onSelect={handleOpenTerminal}>
                   <TerminalSquare className="mr-2 h-4 w-4" />
                   <span>Open Terminal</span>
-                  <CommandShortcut>⌘`</CommandShortcut>
                 </CommandItem>
                 {currentSessionId && (
                   <CommandItem onSelect={handleCompactSession}>
@@ -871,55 +786,20 @@ export function CommandPalette() {
                     <span>View Changes</span>
                   </CommandItem>
                 )}
-                {currentSessionId && (
-                  <CommandItem onSelect={handleInitProject}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    <span>Initialize Project</span>
-                  </CommandItem>
-                )}
               </CommandGroup>
 
               <CommandSeparator />
 
               {/* Worktrees management — disabled for now, will be re-enabled later */}
 
-              {/* Slash commands quick access */}
-              {slashCommands.length > 0 && (
-                <>
-                  <CommandGroup heading="Slash Commands">
-                    {slashCommands.slice(0, 6).map((cmd) => (
-                      <CommandItem
-                        key={`quick-cmd-${cmd.name}`}
-                        value={`quick-command-${cmd.name}`}
-                        onSelect={() => handleExecuteSlashCommand(cmd.name)}
-                      >
-                        <Slash className="mr-2 h-4 w-4" />
-                        <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-                          <span className="truncate">/{cmd.name}</span>
-                          {cmd.description && (
-                            <span className="text-xs text-muted-foreground truncate">
-                              {cmd.description}
-                            </span>
-                          )}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                  <CommandSeparator />
-                </>
-              )}
-
-              {/* Session switching */}
-              {sessions && sessions.filter((s) => !s.parentID && !s.time.archived).length > 0 && (
+              {/* Session switching — show recent sessions (idle state) or all matches (search) */}
+              {!hasQuery && recentSessions.length > 0 && (
                 <>
                   <CommandGroup heading="Recent Sessions">
-                    {sessions
-                      .filter((s) => !s.parentID && !s.time.archived)
-                      .slice(0, 5)
-                      .map((session) => (
+                    {recentSessions.map((session) => (
                         <CommandItem
                           key={`recent-${session.id}`}
-                          value={`recent-session-${session.title || session.slug || session.id}`}
+                          value={`recent-session-${session.id}`}
                           onSelect={() =>
                             handleSelectSession(
                               session.id,
@@ -949,29 +829,9 @@ export function CommandPalette() {
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/projects', 'Projects')}>
-                  <FolderOpen className="mr-2 h-4 w-4" />
-                  <span>Projects</span>
-                </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/workspace', 'Workspace')}>
                   <Blocks className="mr-2 h-4 w-4" />
                   <span>Workspace</span>
-                </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/skills', 'Skills')}>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  <span>Skills</span>
-                </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/commands', 'Commands')}>
-                  <Slash className="mr-2 h-4 w-4" />
-                  <span>Commands</span>
-                </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/tools', 'Tools')}>
-                  <Wrench className="mr-2 h-4 w-4" />
-                  <span>Tools</span>
-                </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/files', 'Files')}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  <span>Files</span>
                 </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/channels', 'Channels')}>
                   <MessageSquare className="mr-2 h-4 w-4" />
@@ -1001,10 +861,6 @@ export function CommandPalette() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>API Keys</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleNavigate('/configuration', 'Configuration')}>
-                  <Cog className="mr-2 h-4 w-4" />
-                  <span>Configuration</span>
-                </CommandItem>
               </CommandGroup>
 
               <CommandSeparator />
@@ -1022,24 +878,6 @@ export function CommandPalette() {
                   <CommandShortcut>⌘B</CommandShortcut>
                 </CommandItem>
               </CommandGroup>
-
-              <CommandSeparator />
-
-              {/* Keyboard shortcuts reference */}
-              <CommandGroup heading="Keyboard Shortcuts">
-                {KEYBOARD_SHORTCUTS.map((shortcut) => (
-                  <CommandItem
-                    key={`shortcut-${shortcut.label}`}
-                    value={`shortcut-${shortcut.label}`}
-                    disabled
-                    className="cursor-default opacity-100"
-                  >
-                    <Keyboard className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{shortcut.label}</span>
-                    <CommandShortcut>{shortcut.keys}</CommandShortcut>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
         </CommandList>
       </CommandDialog>
 
@@ -1054,11 +892,6 @@ export function CommandPalette() {
             sessionId={currentSessionId}
             open={diffOpen}
             onOpenChange={setDiffOpen}
-          />
-          <InitProjectDialog
-            sessionId={currentSessionId}
-            open={initOpen}
-            onOpenChange={setInitOpen}
           />
         </>
       )}

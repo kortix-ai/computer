@@ -4,8 +4,8 @@
  * React port of the SolidJS `context/local.tsx` from the OpenCode reference app.
  *
  * Provides unified agent + model + variant state management with:
- * - Ephemeral per-agent model overrides (lost on refresh, matching SolidJS exactly)
- * - Fallback chain: config.model -> first valid recent -> provider default -> first model
+ * - Per-agent model selection persisted to localStorage (survives refresh/new tabs)
+ * - Fallback chain: persisted selection -> agent.model -> config.model -> recent -> provider default
  * - Agent switching auto-sets model when agent has a configured model
  * - Recent model list persisted via useModelStore
  * - Variant persistence via useModelStore
@@ -192,8 +192,7 @@ export function useOpenCodeLocal({
     return visibleAgents[0];
   }, [visibleAgents, currentAgentName]);
 
-  // ---- Ephemeral per-agent model overrides (NOT persisted, matching SolidJS exactly) ----
-  const [ephemeral, setEphemeral] = useState<Record<string, ModelKey | undefined>>({});
+  // ---- Per-agent model overrides (persisted to localStorage so selection survives refresh/new tabs) ----
 
   // ---- Fallback model (matching SolidJS local.tsx:94-126) ----
   const fallbackModel = useMemo<ModelKey | undefined>(() => {
@@ -237,15 +236,15 @@ export function useOpenCodeLocal({
     return undefined;
   }, [config?.model, modelStore.recent, providers, isModelValid]);
 
-  // ---- Current model resolution (matching SolidJS local.tsx:128-138) ----
+  // ---- Current model resolution (persisted per-agent -> agent.model -> fallback) ----
   const currentModelKey = useMemo<ModelKey | undefined>(() => {
     if (!currentAgent) return undefined;
     return getFirstValidModel(
-      () => ephemeral[currentAgent.name],
+      () => modelStore.getSelectedModel(currentAgent.name),
       () => currentAgent.model as ModelKey | undefined,
       () => fallbackModel,
     );
-  }, [currentAgent, ephemeral, getFirstValidModel, fallbackModel]);
+  }, [currentAgent, modelStore, getFirstValidModel, fallbackModel]);
 
   const currentModel = useMemo<FlatModel | undefined>(
     () => (currentModelKey ? findModel(currentModelKey) : undefined),
@@ -258,12 +257,12 @@ export function useOpenCodeLocal({
     [modelStore.recent, findModel],
   );
 
-  // ---- Model set (matching SolidJS local.tsx:171-178) ----
+  // ---- Model set (persists selection to localStorage) ----
   const setModel = useCallback(
     (model: ModelKey | undefined, options?: { recent?: boolean }) => {
       const next = model ?? fallbackModel;
       if (currentAgent && next) {
-        setEphemeral((prev) => ({ ...prev, [currentAgent.name]: next }));
+        modelStore.setSelectedModel(currentAgent.name, next);
       }
       if (model) {
         modelStore.setVisibility(model, true);
@@ -320,12 +319,15 @@ export function useOpenCodeLocal({
   );
 
   // ---- When agent changes externally (via setAgent), auto-set model if agent has one ----
-  // This matches the SolidJS TUI createEffect behavior (local.tsx:384-400)
+  // Only applies when there's no persisted selection for this agent yet.
   const prevAgentRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!currentAgent) return;
     if (prevAgentRef.current === currentAgent.name) return;
     prevAgentRef.current = currentAgent.name;
+    // Don't override if user already has a persisted selection for this agent
+    const persisted = modelStore.getSelectedModel(currentAgent.name);
+    if (persisted && isModelValid(persisted)) return;
     if (currentAgent.model) {
       if (isModelValid(currentAgent.model as ModelKey)) {
         setModel({
@@ -334,7 +336,7 @@ export function useOpenCodeLocal({
         });
       }
     }
-    // Only trigger on agent change — intentionally exclude setModel from deps
+    // Only trigger on agent change — intentionally exclude setModel/modelStore from deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAgent?.name, isModelValid]);
 
