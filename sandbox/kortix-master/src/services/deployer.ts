@@ -36,6 +36,8 @@ export interface RunningDeployment {
   sourcePath: string
   startedAt: Date
   logs: string[]
+  startCmd: string                    // stored for auto-restart
+  startEnv: Record<string, string>    // stored for auto-restart
 }
 
 interface FrameworkCommands {
@@ -46,7 +48,7 @@ interface FrameworkCommands {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Constants
 // ---------------------------------------------------------------------------
 
 const INSTALL_TIMEOUT_MS = 120_000  // 2 min for install
@@ -54,6 +56,30 @@ const BUILD_TIMEOUT_MS   = 120_000  // 2 min for build
 const START_WAIT_MS      = 15_000   // 15 s for port to accept connections
 const PORT_MIN           = 10_000
 const PORT_MAX           = 60_000
+
+// Auto-restart settings
+const MAX_RESTARTS       = 5        // max consecutive restarts before giving up
+const STABLE_RUNTIME_MS  = 60_000   // if process ran >60s, reset restart counter
+const BASE_RESTART_DELAY = 1_000    // initial backoff delay (doubles each retry)
+const MAX_RESTART_DELAY  = 30_000   // cap backoff at 30s
+
+// ECONNRESET guard — injected into NODE_OPTIONS for all deployed processes
+const ECONNRESET_GUARD_PATH = '/opt/kortix-master/econnreset-guard.cjs'
+
+/**
+ * Build NODE_OPTIONS value that includes the ECONNRESET guard.
+ * Preserves any existing NODE_OPTIONS from the environment.
+ */
+function buildNodeOptions(): string {
+  const existing = process.env.NODE_OPTIONS || ''
+  const guardRequire = `--require=${ECONNRESET_GUARD_PATH}`
+  if (existing.includes(guardRequire)) return existing
+  return `${existing} ${guardRequire}`.trim()
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Run a shell command via Bun.spawn, capture combined stdout+stderr.
@@ -387,6 +413,8 @@ export class Deployer {
         ...appEnv,
         PORT: String(port),
         HOST: '0.0.0.0',
+        // Inject ECONNRESET guard to prevent dev server crashes on client disconnect
+        NODE_OPTIONS: buildNodeOptions(),
       }
       log(`Starting: ${startCmd}`)
 
@@ -445,8 +473,13 @@ export class Deployer {
         sourcePath,
         startedAt: new Date(),
         logs,
+        startCmd,
+        startEnv,
       }
       this.runningDeployments.set(config.deploymentId, deployment)
+
+      // Start auto-restart monitoring
+      this.monitorProcess(deployment)
 
       log(`App started on port ${port} (pid ${appProcess.pid}) in ${Math.round(startDuration / 1000)}s`)
 
@@ -628,5 +661,105 @@ export class Deployer {
 
     readStream(proc.stdout as ReadableStream<Uint8Array> | null, 'stdout')
     readStream(proc.stderr as ReadableStream<Uint8Array> | null, 'stderr')
+  }
+
+  // -----------------------------------------------------------------------
+  // Internal: auto-restart monitoring
+  // -----------------------------------------------------------------------
+
+  /**
+   * Monitor a deployed process and auto-restart it if it crashes.
+   * Uses exponential backoff with a reset after stable runtime.
+   */
+  private monitorProcess(deployment: RunningDeployment): void {
+    let restartCount = 0
+    let lastStartTime = Date.now()
+
+    const onExit = async (exitCode: number) => {
+      const runtime = Date.now() - lastStartTime
+      const dep = this.runningDeployments.get(deployment.deploymentId)
+
+      // Deployment was stopped manually — don't restart
+      if (!dep) return
+
+      // Reset restart counter if the process ran long enough to be considered stable
+      if (runtime > STABLE_RUNTIME_MS) {
+        restartCount = 0
+      }
+
+      // Check restart limit
+      if (restartCount >= MAX_RESTARTS) {
+        console.error(
+          `[Deployer:${deployment.deploymentId}] Process crashed ${MAX_RESTARTS} times ` +
+          `consecutively — giving up. Last exit code: ${exitCode}`
+        )
+        dep.logs.push(`[deployer] Auto-restart limit reached (${MAX_RESTARTS}). Giving up.`)
+        this.runningDeployments.delete(deployment.deploymentId)
+        return
+      }
+
+      restartCount++
+      const delay = Math.min(BASE_RESTART_DELAY * Math.pow(2, restartCount - 1), MAX_RESTART_DELAY)
+
+      console.warn(
+        `[Deployer:${deployment.deploymentId}] Process exited (code ${exitCode}, ` +
+        `ran ${Math.round(runtime / 1000)}s), restarting in ${delay}ms ` +
+        `(attempt ${restartCount}/${MAX_RESTARTS})`
+      )
+      dep.logs.push(
+        `[deployer] Process exited (code ${exitCode}). ` +
+        `Restarting in ${delay}ms (attempt ${restartCount}/${MAX_RESTARTS})...`
+      )
+
+      await Bun.sleep(delay)
+
+      // Re-check if deployment was stopped during sleep
+      if (!this.runningDeployments.has(deployment.deploymentId)) return
+
+      try {
+        const proc = Bun.spawn(['sh', '-c', dep.startCmd], {
+          cwd: dep.sourcePath,
+          env: {
+            ...process.env as Record<string, string>,
+            ...dep.startEnv,
+          },
+          stdout: 'pipe',
+          stderr: 'pipe',
+        })
+
+        // Update deployment record
+        dep.process = proc
+        dep.pid = proc.pid
+        dep.startedAt = new Date()
+        lastStartTime = Date.now()
+
+        // Capture output
+        this.captureProcessOutput(dep.deploymentId, proc, dep.logs)
+
+        // Wait for port
+        const ready = await waitForPort(dep.port, 10_000)
+        if (ready) {
+          console.log(
+            `[Deployer:${dep.deploymentId}] Restarted successfully on port ${dep.port} (pid ${proc.pid})`
+          )
+          dep.logs.push(`[deployer] Restarted on port ${dep.port} (pid ${proc.pid})`)
+        } else {
+          console.warn(
+            `[Deployer:${dep.deploymentId}] Restarted but port ${dep.port} not responding`
+          )
+          dep.logs.push(`[deployer] Restarted but port ${dep.port} not responding yet`)
+        }
+
+        // Continue monitoring
+        proc.exited.then(onExit)
+      } catch (err) {
+        console.error(`[Deployer:${dep.deploymentId}] Restart failed:`, err)
+        dep.logs.push(`[deployer] Restart failed: ${String(err)}`)
+        this.runningDeployments.delete(dep.deploymentId)
+      }
+    }
+
+    // Start monitoring
+    deployment.process.exited.then(onExit)
   }
 }

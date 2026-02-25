@@ -326,13 +326,17 @@ export default {
           }
         })
 
-        upstream.addEventListener('close', () => {
+        upstream.addEventListener('close', (e: CloseEvent) => {
           if (!ws.data.closed) {
-            try { ws.close() } catch { /* already closed */ }
+            // Propagate close code/reason from upstream to downstream client
+            try { ws.close(e.code || 1000, e.reason || '') } catch { /* already closed */ }
           }
         })
 
-        upstream.addEventListener('error', () => {
+        upstream.addEventListener('error', (e: Event) => {
+          // Log the actual error for debugging — WS error events don't carry
+          // details, but the close that follows will have the code/reason.
+          console.warn(`[Kortix Master] WS upstream error for port ${targetPort} (path: ${targetPath})`)
           if (!ws.data.closed) {
             try { ws.close(1011, 'upstream error') } catch { /* already closed */ }
           }
