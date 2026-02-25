@@ -1071,7 +1071,7 @@ function NotificationsTab() {
                                 permission === 'granted'
                                     ? 'Browser permission granted'
                                     : permission === 'denied'
-                                        ? 'Blocked by browser — click to request permission'
+                                        ? 'Blocked by browser — update in browser site settings'
                                         : 'Will request browser permission when enabled'
                             }
                             enabled={preferences.enabled}

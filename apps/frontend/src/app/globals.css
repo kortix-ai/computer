@@ -1800,7 +1800,6 @@
   }
   html {
     scroll-behavior: smooth;
-    zoom: 100%;
     font-size: 105%;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;

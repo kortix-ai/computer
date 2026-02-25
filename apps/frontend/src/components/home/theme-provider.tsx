@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
-import { useUserPreferencesStore, getZoomValue } from '@/stores/user-preferences-store';
+import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { getThemeClassName, getAllThemeClassNames } from '@/lib/themes';
 
 function ThemeClassSync() {
@@ -23,22 +23,6 @@ function ThemeClassSync() {
   return null;
 }
 
-function ZoomSync() {
-  const uiZoom = useUserPreferencesStore((s) => s.preferences.uiZoom ?? 'default');
-
-  React.useEffect(() => {
-    const html = document.documentElement;
-    const zoomValue = getZoomValue(uiZoom);
-    if (zoomValue === 100) {
-      html.style.removeProperty('zoom');
-    } else {
-      html.style.zoom = `${zoomValue}%`;
-    }
-  }, [uiZoom]);
-
-  return null;
-}
-
 export function ThemeProvider({
   children,
   ...props
@@ -46,7 +30,6 @@ export function ThemeProvider({
   return (
     <NextThemesProvider {...props}>
       <ThemeClassSync />
-      <ZoomSync />
       {children}
     </NextThemesProvider>
   );
