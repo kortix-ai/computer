@@ -19,6 +19,7 @@ import {
   Clipboard,
   CircleAlert,
   AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFilesStore } from '../store/files-store';
@@ -58,6 +59,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDiagnosticsStore } from '@/stores/diagnostics-store';
 import { toast } from '@/lib/toast';
+import { openTabAndNavigate } from '@/stores/tab-store';
 
 // ─── Recursive tree node ────────────────────────────────────────────────────
 
@@ -198,11 +200,11 @@ function TreeNode({
     onDropMove(sourcePath, node.path);
   }, [isDir, node.path, onDropMove]);
 
-  const paddingLeft = 8 + depth * 16;
+  const paddingLeft = 6 + depth * 12;
 
   const rowContent = isRenaming ? (
     <div
-      className="flex items-center gap-1 w-full py-0.5"
+      className="flex items-center gap-1 w-full py-[2px]"
       style={{ paddingLeft }}
     >
       {getFileIcon(node.name, { isDirectory: isDir, className: 'h-3.5 w-3.5 shrink-0' })}
@@ -216,7 +218,7 @@ function TreeNode({
           if (e.key === 'Escape') { setIsRenaming(false); setRenameName(''); }
         }}
         onBlur={() => confirmRename()}
-        className="flex-1 text-xs bg-transparent border border-primary rounded px-1 py-0 outline-none min-w-0"
+        className="flex-1 text-[11px] bg-transparent border border-primary/50 rounded px-1 py-0 outline-none min-w-0"
       />
     </div>
   ) : (
@@ -230,25 +232,25 @@ function TreeNode({
       onDrop={handleDrop}
       onClick={handleClick}
       className={cn(
-        'flex items-center gap-1 w-full py-[3px] text-xs text-left transition-colors cursor-pointer',
-        'hover:bg-muted/80',
-        isSelected && 'bg-primary/10 text-primary font-medium',
+        'flex items-center gap-1 w-full py-[2px] text-[11px] text-left transition-colors cursor-pointer',
+        'hover:bg-muted/50',
+        isSelected && 'bg-primary/[0.08] text-primary',
         isCut && 'opacity-40',
         isDragging && 'opacity-30',
-        isDragOver && 'bg-primary/15 ring-1 ring-primary/40',
-        node.ignored && 'opacity-50',
+        isDragOver && 'bg-primary/[0.12] ring-1 ring-primary/30',
+        node.ignored && 'opacity-40',
       )}
       style={{ paddingLeft }}
     >
       {/* Chevron for dirs */}
       {isDir ? (
         isExpanded ? (
-          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+          <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/70 shrink-0" />
         ) : (
-          <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+          <ChevronRight className="h-2.5 w-2.5 text-muted-foreground/70 shrink-0" />
         )
       ) : (
-        <span className="w-3 shrink-0" />
+        <span className="w-2.5 shrink-0" />
       )}
 
       {/* Icon */}
@@ -262,28 +264,28 @@ function TreeNode({
       <span className={cn(
         'truncate flex-1',
         gitStatus && gitStatusTextColor[gitStatus],
-        !gitStatus && node.name.startsWith('.') && 'opacity-60',
+        !gitStatus && node.name.startsWith('.') && 'opacity-50',
       )}>
         {node.name}
       </span>
 
       {/* Indicators */}
       {(gitStatus || (diagCounts && (diagCounts.errors > 0 || diagCounts.warnings > 0))) && (
-        <span className="inline-flex items-center gap-1 shrink-0 pr-2">
+        <span className="inline-flex items-center gap-0.5 shrink-0 pr-1.5">
           {diagCounts && diagCounts.errors > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-red-500">
+            <span className="inline-flex items-center gap-0.5 text-red-500/80">
               <CircleAlert className="h-2.5 w-2.5" />
-              <span className="text-[9px] font-semibold leading-none">{diagCounts.errors}</span>
+              <span className="text-[9px] font-medium leading-none">{diagCounts.errors}</span>
             </span>
           )}
           {diagCounts && diagCounts.warnings > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-yellow-500">
+            <span className="inline-flex items-center gap-0.5 text-yellow-500/80">
               <AlertTriangle className="h-2.5 w-2.5" />
-              <span className="text-[9px] font-semibold leading-none">{diagCounts.warnings}</span>
+              <span className="text-[9px] font-medium leading-none">{diagCounts.warnings}</span>
             </span>
           )}
           {gitStatus && (
-            <span className={cn('text-[9px] font-semibold leading-none', gitStatusBadgeColor[gitStatus])}>
+            <span className={cn('text-[9px] font-medium leading-none ml-0.5', gitStatusBadgeColor[gitStatus])}>
               {gitStatusLabel[gitStatus]}
             </span>
           )}
@@ -303,6 +305,19 @@ function TreeNode({
             <ChevronRight className="mr-2 h-4 w-4" />
             {isDir ? 'Open folder' : 'Open file'}
           </ContextMenuItem>
+          {!isDir && (
+            <ContextMenuItem onClick={() => {
+              openTabAndNavigate({
+                id: `file:${node.path}`,
+                title: node.name,
+                type: 'file',
+                href: `/files/${encodeURIComponent(node.path)}`,
+              });
+            }}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open in new tab
+            </ContextMenuItem>
+          )}
           {!isDir && (
             <ContextMenuItem onClick={() => downloadFile(node.path, node.name)}>
               <Download className="mr-2 h-4 w-4" />
@@ -400,8 +415,8 @@ function TreeNodeChildren({
 
   if (isLoading) {
     return (
-      <div className="py-0.5" style={{ paddingLeft: 8 + depth * 16 }}>
-        <Skeleton className="h-4 w-20 rounded" />
+      <div className="py-0.5" style={{ paddingLeft: 6 + depth * 12 }}>
+        <Skeleton className="h-3.5 w-16 rounded" />
       </div>
     );
   }
@@ -409,8 +424,8 @@ function TreeNodeChildren({
   if (!sorted.length) {
     return (
       <div
-        className="py-0.5 text-[10px] text-muted-foreground/50 italic"
-        style={{ paddingLeft: 8 + depth * 16 + 16 }}
+        className="py-0.5 text-[10px] text-muted-foreground/40 italic select-none"
+        style={{ paddingLeft: 6 + depth * 12 + 12 }}
       >
         empty
       </div>
@@ -659,23 +674,23 @@ export function FileTree() {
   return (
     <div className="flex flex-col h-full">
       {/* Tree header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 select-none">
           Explorer
         </span>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0">
           <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => { setNewFileName('untitled.txt'); setIsCreatingFile(true); }} title="New file">
-            <FilePlus className="h-3 w-3" />
+            <FilePlus className="h-2.5 w-2.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => { setNewFolderName('New Folder'); setIsCreatingFolder(true); }} title="New folder">
-            <FolderPlus className="h-3 w-3" />
+            <FolderPlus className="h-2.5 w-2.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleUpload} title="Upload">
-            <Upload className="h-3 w-3" />
+            <Upload className="h-2.5 w-2.5" />
           </Button>
           {clipboard && (
             <Button variant="ghost" size="icon" className="h-5 w-5 text-primary" onClick={handlePaste} title={`Paste "${clipboard.name}"`}>
-              <Clipboard className="h-3 w-3" />
+              <Clipboard className="h-2.5 w-2.5" />
             </Button>
           )}
         </div>
@@ -686,10 +701,10 @@ export function FileTree() {
 
       {/* Tree content */}
       <ScrollArea className="flex-1 overflow-hidden min-h-0">
-        <div className="py-1">
+        <div className="py-0.5">
           {/* Inline create inputs */}
           {isCreatingFile && (
-            <div className="flex items-center gap-1 px-3 py-1">
+            <div className="flex items-center gap-1 px-2 py-0.5">
               <FilePlus className="h-3.5 w-3.5 text-green-400 shrink-0" />
               <input
                 type="text"
@@ -698,12 +713,12 @@ export function FileTree() {
                 onChange={(e) => setNewFileName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFile(); if (e.key === 'Escape') { setIsCreatingFile(false); setNewFileName(''); } }}
                 onBlur={() => handleCreateFile()}
-                className="flex-1 text-xs bg-transparent border border-primary rounded px-1 py-0 outline-none min-w-0"
+                className="flex-1 text-[11px] bg-transparent border border-primary/50 rounded px-1 py-0 outline-none min-w-0"
               />
             </div>
           )}
           {isCreatingFolder && (
-            <div className="flex items-center gap-1 px-3 py-1">
+            <div className="flex items-center gap-1 px-2 py-0.5">
               <FolderPlus className="h-3.5 w-3.5 text-blue-400 shrink-0" />
               <input
                 type="text"
@@ -712,7 +727,7 @@ export function FileTree() {
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); } }}
                 onBlur={() => handleCreateFolder()}
-                className="flex-1 text-xs bg-transparent border border-primary rounded px-1 py-0 outline-none min-w-0"
+                className="flex-1 text-[11px] bg-transparent border border-primary/50 rounded px-1 py-0 outline-none min-w-0"
               />
             </div>
           )}
@@ -734,11 +749,11 @@ export function FileTree() {
 
       {/* Clipboard indicator */}
       {clipboard && (
-        <div className="flex items-center justify-between gap-1 px-2 py-1 border-t bg-muted/30 text-[10px] text-muted-foreground shrink-0">
+        <div className="flex items-center justify-between gap-1 px-2 py-1 border-t border-border/50 bg-muted/20 text-[10px] text-muted-foreground shrink-0">
           <span className="truncate">
-            {clipboard.operation === 'cut' ? 'Move' : 'Copy'}: <span className="font-medium text-foreground">{clipboard.name}</span>
+            {clipboard.operation === 'cut' ? 'Move' : 'Copy'}: <span className="font-medium text-foreground/80">{clipboard.name}</span>
           </span>
-          <button onClick={clearClipboard} className="text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer">
+          <button onClick={clearClipboard} className="text-muted-foreground/60 hover:text-foreground transition-colors shrink-0 cursor-pointer">
             Cancel
           </button>
         </div>

@@ -89,6 +89,7 @@ export {
 export {
   FileBrowser,
   FileViewer,
+  FileContentRenderer,
   FileSearch,
   FileBreadcrumbs,
   FileTreeItem,
@@ -97,4 +98,7 @@ export {
   FileExplorerPage,
   FileExplorerToolbar,
   FileExplorerStatusBar,
+  getFileCategory,
+  getLanguageFromExt,
 } from './components';
+export type { FileContentRendererProps } from './components';
