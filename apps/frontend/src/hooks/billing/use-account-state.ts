@@ -137,7 +137,9 @@ export function useAccountState(options?: UseAccountStateOptions) {
     staleTime: options?.staleTime ?? 1000 * 60 * 2,
     gcTime: 1000 * 60 * 15,
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
-    refetchOnMount: options?.refetchOnMount ?? 'always',
+    // 'always' caused a fetch on every component mount (6+ consumers).
+    // Use true instead: only refetches if data is stale (past staleTime).
+    refetchOnMount: options?.refetchOnMount ?? true,
     refetchOnReconnect: true,
     structuralSharing: true,
     retry: enabled ? (failureCount, error) => {

@@ -125,6 +125,11 @@ export function useOpenCodeEventStream() {
 		// Quick reconnects (<5s) don't need to re-fetch permissions/questions/status
 		// because no events were missed or only a few were (SSE will catch up).
 		let lastEventTime = Date.now();
+		// Track when the stream connected — used to decide whether to reset retryCount.
+		// Only reset backoff if the connection was stable (>10s). Brief connections
+		// (connect → immediate drop) should NOT reset backoff, as that causes a
+		// reconnection storm with 100ms retries.
+		let streamConnectedAt = 0;
 
 		// Event coalescing queue (like the SolidJS reference)
 		let queue: ({ type: string; event: OpenCodeEvent } | undefined)[] = [];
@@ -184,6 +189,7 @@ export function useOpenCodeEventStream() {
 						sseMaxRetryDelay: 30000,
 					} as any);
 					const { stream } = result;
+					streamConnectedAt = Date.now();
 
 				// On reconnect, only re-hydrate if the gap was significant (>5s).
 				// Quick reconnects (<5s) don't need full re-hydration because SSE
@@ -229,7 +235,12 @@ export function useOpenCodeEventStream() {
 							.catch(() => {});
 					}
 				}
-					retryCount = 0;
+					// Only reset backoff if connection was stable (>10s).
+					// Brief connections (connect → immediate drop) keep incrementing
+					// retryCount so backoff grows, preventing reconnection storms.
+					if (Date.now() - streamConnectedAt > 10_000) {
+						retryCount = 0;
+					}
 
 					// Consume stream exactly like OpenCode global-sdk.tsx:
 					// queue + coalesce + 16ms flush + yield every 8ms
@@ -291,18 +302,17 @@ export function useOpenCodeEventStream() {
 					flush();
 				}
 
-				// Stream ended or errored — reconnect immediately on first attempt,
-				// then use exponential backoff. ERR_INCOMPLETE_CHUNKED_ENCODING is normal
-				// when the server closes the SSE connection between response cycles.
-				if (abortController.signal.aborted) break;
-				retryCount++;
-				if (retryCount > 1) {
-					logger.warn("SSE event stream reconnecting", { retryCount });
-				}
-				const delay =
-					retryCount <= 1
-						? 100
-						: Math.min(1000 * 2 ** Math.min(retryCount - 1, 5), 30000);
+			// Stream ended or errored — reconnect with exponential backoff.
+			// ERR_INCOMPLETE_CHUNKED_ENCODING is normal when the server closes
+			// the SSE connection between response cycles.
+			// Minimum 1s delay even on first retry to avoid reconnection storms
+			// when the server is flapping (connect → immediate disconnect loops).
+			if (abortController.signal.aborted) break;
+			retryCount++;
+			if (retryCount > 1) {
+				logger.warn("SSE event stream reconnecting", { retryCount });
+			}
+			const delay = Math.min(1000 * 2 ** Math.min(retryCount - 1, 5), 30000);
 				await new Promise<void>((resolve) => {
 					const timer = setTimeout(resolve, delay);
 					const onAbort = () => {
@@ -621,12 +631,18 @@ export function useOpenCodeEventStream() {
 					break;
 				}
 
-				// ---- Server disposed ----
-				case "server.instance.disposed": {
-					// Full refresh of all data — only refetch actively mounted queries
-					queryClient.invalidateQueries({ queryKey: opcodeKeys.all, type: 'active' });
-					break;
-				}
+			// ---- Server disposed ----
+			case "server.instance.disposed": {
+				// Targeted invalidation instead of nuclear opcodeKeys.all.
+				// The old approach refetched project/current, path, sessions,
+				// messages, tools, etc. all at once — causing request storms.
+				// Only invalidate session-level data (sessions + statuses);
+				// project/path data will be refreshed by the SSE reconnect
+				// rehydration logic if the gap is >5s.
+				queryClient.invalidateQueries({ queryKey: opcodeKeys.sessions(), type: 'active' });
+				queryClient.invalidateQueries({ queryKey: opcodeKeys.mcpStatus(), type: 'active' });
+				break;
+			}
 
 				// ---- LSP updated ----
 				case "lsp.updated": {
