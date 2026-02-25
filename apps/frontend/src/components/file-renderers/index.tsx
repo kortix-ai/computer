@@ -13,6 +13,8 @@ export { PptxRenderer } from './pptx-renderer';
 export { HtmlRenderer } from './html-renderer';
 export { JsonRenderer } from './JsonRenderer';
 export { DocxRenderer } from './docx-renderer';
+export { ShowContentRenderer, ShowCarousel, showFavicon, showDomain, showAspectRatioToCSS, SHOW_IMAGE_EXT_RE, SHOW_VIDEO_EXT_RE, SHOW_AUDIO_EXT_RE, SHOW_PDF_EXT_RE, SHOW_CSV_EXT_RE, SHOW_XLSX_EXT_RE, SHOW_DOCX_EXT_RE, SHOW_PPTX_EXT_RE } from './show-content-renderer';
+export type { ShowContentProps, ShowCarouselItem, ShowCarouselProps } from './show-content-renderer';
 
 // File type helpers
 export type BinaryFileType = 'pdf' | 'image' | 'video' | 'binary' | 'csv' | 'xlsx' | 'pptx' | 'docx';

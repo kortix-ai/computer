@@ -31,6 +31,7 @@ export const SANDBOX_PORTS = {
   KORTIX_MASTER: '8000',
   BROWSER_STREAM: '9223',
   BROWSER_VIEWER: '9224',
+  SSH: '22',
 } as const;
 
 /**
@@ -319,6 +320,33 @@ export async function removeSandbox(): Promise<void> {
   if (!result.success) {
     throw new Error(result.error || 'Failed to remove sandbox');
   }
+}
+
+// ─── SSH Setup API ──────────────────────────────────────────────────────────
+
+export interface SSHSetupResult {
+  private_key: string;
+  public_key: string;
+  ssh_command: string;
+  host: string;
+  port: number;
+  username: string;
+}
+
+/**
+ * Generate an SSH keypair and inject it into the active sandbox.
+ * Returns the private key and connection details for VS Code Remote SSH.
+ */
+export async function setupSSH(): Promise<SSHSetupResult> {
+  const result = await platformFetch<SSHSetupResult>('/platform/sandbox/ssh/setup', {
+    method: 'POST',
+  });
+
+  if (!result.success || !result.data) {
+    throw new Error(result.error || 'Failed to setup SSH');
+  }
+
+  return result.data;
 }
 
 // ─── Sandbox Update API ─────────────────────────────────────────────────────

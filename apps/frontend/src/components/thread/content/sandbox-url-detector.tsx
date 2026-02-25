@@ -82,6 +82,7 @@ function InlineIframePreview({
 }) {
   // Inject auth token for cloud preview proxy URLs
   const authenticatedUrl = useAuthenticatedPreviewUrl(proxyUrl);
+  const isAuthReady = authenticatedUrl !== null;
 
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -168,13 +169,13 @@ function InlineIframePreview({
         </Tooltip>
       </div>
 
-      {/* Iframe */}
+      {/* Iframe — only render once auth token is ready */}
       <div className="relative flex-1 h-[calc(100%-2rem)]">
-        {isLoading && (
+        {(isLoading || !isAuthReady) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
             <div className="flex items-center gap-2 text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin" />
-              <span className="text-xs">Loading...</span>
+              <span className="text-xs">{!isAuthReady ? 'Authenticating...' : 'Loading...'}</span>
             </div>
           </div>
         )}
@@ -191,16 +192,18 @@ function InlineIframePreview({
             </div>
           </div>
         )}
-        <iframe
-          key={refreshKey}
-          ref={iframeRef}
-          src={authenticatedUrl}
-          title={`Preview :${port}`}
-          className="w-full h-full border-0 bg-white"
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
-          onLoad={handleLoad}
-          onError={handleError}
-        />
+        {isAuthReady && (
+          <iframe
+            key={refreshKey}
+            ref={iframeRef}
+            src={authenticatedUrl}
+            title={`Preview :${port}`}
+            className="w-full h-full border-0 bg-white"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        )}
       </div>
     </div>
   );

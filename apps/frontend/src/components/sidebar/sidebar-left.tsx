@@ -9,7 +9,6 @@ import {
   ChevronRight,
   ChevronLeft,
   SquarePen,
-  FolderOpen,
   ListTree,
   ChevronDown,
   Search,
@@ -17,6 +16,15 @@ import {
   ArrowDownToLine,
   PanelLeftClose,
   PanelLeftOpen,
+  Plug,
+  MessageSquare,
+  Calendar,
+  Sparkles,
+  Bug,
+  Zap,
+  X,
+  Loader2,
+  FolderOpen,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -84,7 +92,7 @@ import { useDocumentModalStore } from '@/stores/use-document-modal-store';
 import { isBillingEnabled } from '@/lib/config';
 import { useAccountState, accountStateSelectors } from '@/hooks/billing';
 import { getPlanIcon } from '@/components/billing/plan-utils';
-import { useCreateOpenCodeSession, useOpenCodeSessions, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
+import { useCreateOpenCodeSession, useOpenCodeSessions } from '@/hooks/opencode/use-opencode-sessions';
 import { useTabStore, openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
@@ -152,7 +160,7 @@ function CollapsedIconButton({ icon, label, onClick, flyoutContent, disabled }: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center justify-center w-full py-2.5 rounded-xl cursor-pointer',
+        'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer',
         'transition-all duration-150 ease-out',
         'text-sidebar-foreground hover:bg-sidebar-accent',
         disabled && 'opacity-50 cursor-not-allowed',
@@ -255,7 +263,7 @@ function SessionsFlyout() {
               key={session.id}
               onClick={() => handleClick(session.id)}
               className={cn(
-                'flex items-center gap-3 w-full px-3.5 py-2 text-sm cursor-pointer',
+                'flex items-center gap-3 w-full px-3 py-2 text-sm cursor-pointer',
                 'transition-colors duration-150',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
@@ -285,87 +293,6 @@ function SessionsFlyout() {
 }
 
 // ============================================================================
-// Projects Flyout
-// ============================================================================
-
-function ProjectsFlyout() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { data: projects } = useOpenCodeProjects();
-
-  const sortedProjects = React.useMemo(() => {
-    if (!projects) return [];
-    return [...projects].sort((a: any, b: any) => {
-      // Global project always first
-      const aIsGlobal = a.id === 'global' || a.worktree === '/';
-      const bIsGlobal = b.id === 'global' || b.worktree === '/';
-      if (aIsGlobal && !bIsGlobal) return -1;
-      if (!aIsGlobal && bIsGlobal) return 1;
-      return b.time.updated - a.time.updated;
-    });
-  }, [projects]);
-
-  const getProjectDisplayName = (project: any): string => {
-    if (project.name) return project.name;
-    if (project.worktree === '/' || project.id === 'global') return 'Global';
-    const parts = project.worktree.split('/');
-    return parts[parts.length - 1] || project.worktree;
-  };
-
-  const handleClick = (projectId: string, name: string) => {
-    openTabAndNavigate({
-      id: `page:/projects/${projectId}`,
-      title: name,
-      type: 'project',
-      href: `/projects/${projectId}`,
-    }, router);
-  };
-
-  const activeProjectId = React.useMemo(() => {
-    const match = pathname?.match(/^\/projects\/([^/]+)/);
-    return match ? match[1] : null;
-  }, [pathname]);
-
-  return (
-    <div className="overflow-y-auto flex-1 py-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-      {sortedProjects.length === 0 ? (
-        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-          No projects detected
-        </div>
-      ) : (
-        sortedProjects.map((project) => {
-          const name = getProjectDisplayName(project);
-          const isActive = activeProjectId === project.id;
-          return (
-            <button
-              key={project.id}
-              onClick={() => handleClick(project.id, name)}
-              className={cn(
-                'flex items-center gap-3 w-full px-3.5 py-2 text-sm cursor-pointer',
-                'transition-colors duration-150',
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
-              )}
-            >
-              <FolderOpen
-                className={cn(
-                  'flex-shrink-0',
-                  isActive ? 'text-sidebar-accent-foreground' : 'text-muted-foreground',
-                )}
-                size={16}
-                style={project.icon?.color ? { color: project.icon.color } : undefined}
-              />
-              <span className="flex-1 truncate text-left">{name}</span>
-            </button>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
 // User Profile Section
 // ============================================================================
 
@@ -373,9 +300,37 @@ function ProjectsFlyout() {
 // Sidebar Update Indicator
 // ============================================================================
 
+const changeTypeIcon: Record<string, typeof Sparkles> = {
+  feature: Sparkles,
+  fix: Bug,
+  improvement: Zap,
+};
+const changeTypeColor: Record<string, string> = {
+  feature: 'text-emerald-500',
+  fix: 'text-red-400',
+  improvement: 'text-blue-400',
+};
+
 function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
-  const { updateAvailable, latestVersion, changelog } = useGlobalSandboxUpdate();
+  const { updateAvailable, latestVersion, changelog, update, isUpdating, updateResult } = useGlobalSandboxUpdate();
   const router = useRouter();
+  const [dismissed, setDismissed] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+
+  const dismissKey = `sidebar-update-dismissed-${latestVersion}`;
+
+  React.useEffect(() => {
+    setMounted(true);
+    try {
+      if (localStorage.getItem(dismissKey) === 'true') setDismissed(true);
+    } catch {}
+  }, [dismissKey]);
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDismissed(true);
+    try { localStorage.setItem(dismissKey, 'true'); } catch {}
+  };
 
   const navigateToChangelog = () => {
     openTabAndNavigate(
@@ -384,15 +339,16 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
     );
   };
 
-  if (!updateAvailable) return null;
+  if (!mounted || !updateAvailable || dismissed || updateResult?.success) return null;
 
+  // ── Collapsed state: icon with pulse dot ──
   if (collapsed) {
     return (
       <div className="flex justify-center">
         <button
           onClick={navigateToChangelog}
           className="relative p-2 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
-          title={`Update v${latestVersion} available`}
+          title={`v${latestVersion} available`}
         >
           <ArrowDownToLine className="h-4 w-4 text-primary" />
           <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
@@ -401,22 +357,79 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
     );
   }
 
+  // ── Expanded state: rich card ──
+  const changes = changelog?.changes ?? [];
+  const previewChanges = changes.slice(0, 3);
+  const remaining = changes.length - 3;
+
   return (
-    <button
-      onClick={navigateToChangelog}
-      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors cursor-pointer"
-    >
-      <div className="relative">
-        <ArrowDownToLine className="h-4 w-4 text-primary" />
-        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
+    <div className="rounded-xl border border-primary/15 bg-primary/[0.03] overflow-hidden">
+      {/* Header row */}
+      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
+        <span className="relative flex h-2 w-2 flex-shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+        </span>
+        <span className="text-xs font-semibold text-foreground truncate min-w-0">New Kortix version</span>
+        <span className="flex-1" />
+        <span className="text-[10px] text-muted-foreground flex-shrink-0">v{latestVersion}</span>
+        <button
+          onClick={handleDismiss}
+          className="p-0.5 rounded hover:bg-muted/80 transition-colors cursor-pointer flex-shrink-0"
+          aria-label="Dismiss"
+        >
+          <X className="h-3 w-3 text-muted-foreground/60" />
+        </button>
       </div>
-      <div className="flex-1 min-w-0 text-left">
-        <span className="font-medium text-foreground">v{latestVersion} available</span>
-        {changelog?.title && (
-          <p className="text-muted-foreground truncate text-[10px]">{changelog.title}</p>
+
+      {/* Change list */}
+      {previewChanges.length > 0 && (
+        <div className="px-3 pb-1.5 space-y-0.5">
+          {previewChanges.map((change, i) => {
+            const Icon = changeTypeIcon[change.type] ?? Zap;
+            const color = changeTypeColor[change.type] ?? 'text-muted-foreground';
+            return (
+              <div key={i} className="flex items-start gap-1.5">
+                <Icon className={cn('h-3 w-3 mt-[1px] flex-shrink-0', color)} />
+                <span className="text-[11px] text-muted-foreground leading-tight line-clamp-1">{change.text}</span>
+              </div>
+            );
+          })}
+          {remaining > 0 && (
+            <button
+              onClick={navigateToChangelog}
+              className="text-[10px] text-primary/70 hover:text-primary font-medium pl-[18px] cursor-pointer transition-colors"
+            >
+              +{remaining} more
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-1.5 px-2.5 pb-2.5 pt-1">
+        {!isUpdating ? (
+          <button
+            onClick={() => update()}
+            className="flex-1 flex items-center justify-center gap-1.5 h-7 text-[11px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors cursor-pointer"
+          >
+            <ArrowDownToLine className="h-3 w-3" />
+            Update
+          </button>
+        ) : (
+          <div className="flex-1 flex items-center justify-center gap-1.5 h-7 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Updating...
+          </div>
         )}
+        <button
+          onClick={navigateToChangelog}
+          className="flex items-center justify-center h-7 px-2.5 text-[11px] font-medium text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer"
+        >
+          Details
+        </button>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -443,17 +456,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-    const match = typeof window !== 'undefined' && window.location.pathname.match(/^\/projects\/([^/]+)/);
-    return match ? match[1] : null;
-  });
-
-  useEffect(() => {
-    const match = pathname?.match(/^\/projects\/([^/]+)/);
-    if (match) {
-      setSelectedProjectId(match[1]);
-    }
-  }, [pathname]);
+  // Project filtering for session list removed — projects page merged into workspace
 
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
 
@@ -573,8 +576,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       {...props}
     >
       {/* ====== HEADER: Logo + collapse/expand ====== */}
-      <SidebarHeader className="pt-4 pb-0 overflow-visible">
-        <div className="relative flex h-[32px] items-center px-4 justify-between">
+      <SidebarHeader className="pt-3 pb-0 overflow-visible">
+        <div className="relative flex h-[32px] items-center px-3 justify-between">
           {/* Collapsed: Kortix symbol (always visible), chevron on hover */}
           {state === 'collapsed' && (
             <div
@@ -645,17 +648,17 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative overflow-visible">
         {/* --- Collapsed: 3 icon buttons — New Chat, Projects, Sessions --- */}
         <div className={cn(
-          'absolute inset-0 px-3 pt-3 space-y-1 flex flex-col items-center overflow-visible',
+          'absolute inset-0 px-2 pt-2 space-y-0.5 flex flex-col items-center overflow-visible',
           state === 'collapsed' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}>
           <CollapsedIconButton
-            icon={<SquarePen className="h-[18px] w-[18px]" />}
+            icon={<SquarePen className="h-4 w-4" />}
             label="New session"
             onClick={handleNewSession}
             disabled={createSession.isPending}
           />
           <CollapsedIconButton
-            icon={<Search className="h-[18px] w-[18px]" />}
+            icon={<Search className="h-4 w-4" />}
             label="Search"
             onClick={() => {
               const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent);
@@ -672,18 +675,12 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             }}
           />
           <CollapsedIconButton
-            icon={<FolderOpen className="h-[18px] w-[18px]" />}
-            label="Projects"
-            flyoutContent={<ProjectsFlyout />}
-          />
-          <CollapsedIconButton
-            icon={<ListTree className="h-[18px] w-[18px]" />}
+            icon={<ListTree className="h-4 w-4" />}
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
           />
-          <div className="w-6 border-t border-sidebar-border my-1" />
           <CollapsedIconButton
-            icon={<Blocks className="h-[18px] w-[18px]" />}
+            icon={<Blocks className="h-4 w-4" />}
             label="Workspace"
             onClick={() => {
               openTabAndNavigate({
@@ -695,7 +692,19 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             }}
           />
           <CollapsedIconButton
-            icon={<IntegrationsIcon />}
+            icon={<FolderOpen className="h-4 w-4" />}
+            label="Files"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/files',
+                title: 'Files',
+                type: 'page',
+                href: '/files',
+              }, router);
+            }}
+          />
+          <CollapsedIconButton
+            icon={<Plug className="h-4 w-4" />}
             label="Integrations"
             onClick={() => {
               openTabAndNavigate({
@@ -703,6 +712,30 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 title: 'Integrations',
                 type: 'page',
                 href: '/integrations',
+              }, router);
+            }}
+          />
+          <CollapsedIconButton
+            icon={<MessageSquare className="h-4 w-4" />}
+            label="Channels"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/channels',
+                title: 'Channels',
+                type: 'page',
+                href: '/channels',
+              }, router);
+            }}
+          />
+          <CollapsedIconButton
+            icon={<Calendar className="h-4 w-4" />}
+            label="Scheduled Tasks"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/scheduled-tasks',
+                title: 'Scheduled Tasks',
+                type: 'page',
+                href: '/scheduled-tasks',
               }, router);
             }}
           />
@@ -714,19 +747,19 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
         )}>
           {/* Navigation */}
-          <nav className="flex-shrink-0 px-3 pt-3 pb-2 space-y-1">
+          <nav className="flex-shrink-0 px-3 pt-2 pb-1 space-y-0.5">
             {/* New session */}
             <button
               onClick={handleNewSession}
               disabled={createSession.isPending}
               className={cn(
-                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm cursor-pointer',
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] cursor-pointer',
                 'transition-colors duration-150',
                 'text-sidebar-foreground hover:bg-sidebar-accent',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
               )}
             >
-              <SquarePen className="h-[18px] w-[18px] flex-shrink-0" />
+              <SquarePen className="h-4 w-4 flex-shrink-0" />
               <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
             </button>
 
@@ -745,37 +778,20 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                   }),
                 );
               }}
-              className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
             >
-              <Search className="h-[18px] w-[18px] flex-shrink-0" />
+              <Search className="h-4 w-4 flex-shrink-0" />
               <span className="flex-1 text-left">Search</span>
-              <kbd className="text-[11px] text-muted-foreground">
+              <kbd className="text-[10px] text-muted-foreground">
                 {typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '\u2318K' : 'Ctrl K'}
               </kbd>
-            </button>
-
-            {/* Projects */}
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/projects',
-                  title: 'Projects',
-                  type: 'project',
-                  href: '/projects',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
-            >
-              <FolderOpen className="h-[18px] w-[18px] flex-shrink-0" />
-              <span>Projects</span>
             </button>
 
             {/* Sessions — expandable, default open */}
           </nav>
 
           {/* Workspace link */}
-          <nav className="flex-shrink-0 px-3 space-y-1">
+          <nav className="flex-shrink-0 px-3 space-y-0.5">
             <button
               onClick={() => {
                 openTabAndNavigate({
@@ -787,14 +803,34 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 if (isMobile) setOpenMobile(false);
               }}
               className={cn(
-                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer',
-                (pathname === '/workspace' || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                (pathname === '/workspace' || pathname?.startsWith('/projects') || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent',
               )}
             >
-              <Blocks className="h-[18px] w-[18px] flex-shrink-0" />
+              <Blocks className="h-4 w-4 flex-shrink-0" />
               <span>Workspace</span>
+            </button>
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/files',
+                  title: 'Files',
+                  type: 'page',
+                  href: '/files',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                pathname === '/files'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <span>Files</span>
             </button>
             <button
               onClick={() => {
@@ -807,29 +843,69 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 if (isMobile) setOpenMobile(false);
               }}
               className={cn(
-                'flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer',
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
                 pathname === '/integrations'
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent',
               )}
             >
-              <IntegrationsIcon className="flex-shrink-0" />
+              <Plug className="h-4 w-4 flex-shrink-0" />
               <span>Integrations</span>
+            </button>
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/channels',
+                  title: 'Channels',
+                  type: 'page',
+                  href: '/channels',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                pathname === '/channels'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <MessageSquare className="h-4 w-4 flex-shrink-0" />
+              <span>Channels</span>
+            </button>
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/scheduled-tasks',
+                  title: 'Scheduled Tasks',
+                  type: 'page',
+                  href: '/scheduled-tasks',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                pathname === '/scheduled-tasks'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <Calendar className="h-4 w-4 flex-shrink-0" />
+              <span>Scheduled Tasks</span>
             </button>
           </nav>
 
           <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
             <div className="px-3 flex-shrink-0">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
-                  <ListTree className="h-[18px] w-[18px] flex-shrink-0" />
+                <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
+                  <ListTree className="h-4 w-4 flex-shrink-0" />
                   <span className="flex-1 text-left">Sessions</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
                 </button>
               </CollapsibleTrigger>
             </div>
             <CollapsibleContent className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <SessionList projectId={selectedProjectId} />
+              <SessionList projectId={null} />
             </CollapsibleContent>
           </Collapsible>
         </div>

@@ -14,10 +14,6 @@ const DashboardContent = lazy(() =>
 	})),
 );
 
-const ConfigurationPage = lazy(() =>
-	import('@/app/(dashboard)/configuration/page'),
-);
-
 const SecretsPage = lazy(() =>
 	import('@/app/(dashboard)/settings/credentials/page'),
 );
@@ -32,10 +28,6 @@ const CreditsPage = lazy(() =>
 
 const ChangelogPage = lazy(() =>
 	import('@/app/(dashboard)/changelog/page'),
-);
-
-const ProjectsPage = lazy(() =>
-	import('@/app/(dashboard)/projects/page'),
 );
 
 const WorkspacePage = lazy(() =>
@@ -57,6 +49,12 @@ const ChannelsPage = lazy(() =>
 const IntegrationsPage = lazy(() =>
 	import('@/components/integrations/integrations-page').then((m) => ({
 		default: m.IntegrationsPage,
+	})),
+);
+
+const FilesPage = lazy(() =>
+	import('@/features/files/components/file-explorer-page').then((m) => ({
+		default: m.FileExplorerPage,
 	})),
 );
 
@@ -89,13 +87,13 @@ const AdminStressTestPage = lazy(() =>
 
 const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/dashboard': DashboardContent,
-	'/configuration': ConfigurationPage,
+	'/configuration': WorkspacePage,
 	'/settings/credentials': SecretsPage,
 	'/settings/api-keys': ApiKeysPage,
 	'/credits-explained': CreditsPage,
 	'/changelog': ChangelogPage,
-	'/projects': ProjectsPage,
 	'/workspace': WorkspacePage,
+	'/projects': WorkspacePage,
 	// Redirect-only routes point to workspace
 	'/skills': WorkspacePage,
 	'/tools': WorkspacePage,
@@ -105,6 +103,7 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/scheduled-tasks': ScheduledTasksPage,
 	'/channels': ChannelsPage,
 	'/integrations': IntegrationsPage,
+	'/files': FilesPage,
 	// Admin
 	'/admin/analytics': AdminAnalyticsPage,
 	'/admin/feedback': AdminFeedbackPage,

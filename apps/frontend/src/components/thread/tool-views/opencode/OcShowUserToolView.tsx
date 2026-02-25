@@ -1,16 +1,20 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Eye,
+  AlertTriangle,
   CheckCircle,
-  AlertCircle,
+  Code2,
   ExternalLink,
+  FileIcon,
   FileText,
   Globe,
   Image as ImageIcon,
   MonitorPlay,
+  Music,
   RefreshCw,
+  Type,
+  Video,
 } from 'lucide-react';
 import { ToolViewProps } from '../types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -30,14 +34,32 @@ import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from '@/sto
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { enrichPreviewMetadata } from '@/lib/utils/session-context';
 import { cn } from '@/lib/utils';
-import { useFileContent } from '@/features/files';
+import { ShowContentRenderer, ShowCarousel } from '@/components/file-renderers/show-content-renderer';
+import type { ShowCarouselItem } from '@/components/file-renderers/show-content-renderer';
 
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
+// ── Theme border styles — theme ONLY affects the card border color ──────────
+const THEME_BORDER: Record<string, string> = {
+  default: 'border-border',
+  success: 'border-emerald-500/20',
+  warning: 'border-amber-500/20',
+  info:    'border-blue-500/20',
+  danger:  'border-red-500/20',
+};
 
-function isLocalSandboxFilePath(value: string): boolean {
-  if (!value) return false;
-  if (/^(https?:|data:|blob:)/i.test(value)) return false;
-  return value.startsWith('/');
+function typeIcon(type: string) {
+  switch (type) {
+    case 'image':    return ImageIcon;
+    case 'video':    return Video;
+    case 'audio':    return Music;
+    case 'code':     return Code2;
+    case 'markdown': return Type;
+    case 'html':     return Globe;
+    case 'pdf':      return FileText;
+    case 'url':      return Globe;
+    case 'error':    return AlertTriangle;
+    case 'file':     return FileIcon;
+    default:         return FileIcon;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -59,16 +81,31 @@ function SidePanelIframePreview({ url, title }: { url: string; title?: string })
     if (!parsed) return null;
     const proxyUrl = proxyLocalhostUrl(url, serverUrl, mappedPorts, subdomainOpts);
     if (!proxyUrl) return null;
-    return {
-      proxyUrl,
-      port: parsed.port,
-    };
+    return { proxyUrl, port: parsed.port };
   }, [url, serverUrl, mappedPorts, subdomainOpts]);
 
   const authenticatedUrl = useAuthenticatedPreviewUrl(proxy?.proxyUrl || url);
+  const isAuthReady = authenticatedUrl !== null;
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // ── Scaled 1920x1080 viewport ──
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [vpScale, setVpScale] = useState(0);
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) setVpScale(Math.min(w / 1920, h / 1080));
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    update();
+    return () => ro.disconnect();
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
@@ -76,7 +113,6 @@ function SidePanelIframePreview({ url, title }: { url: string; title?: string })
     setRefreshKey((k) => k + 1);
   }, []);
 
-  // Fallback: cross-origin iframes often don't fire onLoad
   useEffect(() => {
     if (!isLoading) return;
     const t = setTimeout(() => setIsLoading(false), 5000);
@@ -102,19 +138,12 @@ function SidePanelIframePreview({ url, title }: { url: string; title?: string })
 
   return (
     <div className="flex flex-col h-full">
-      {/* Mini browser toolbar */}
       <div className="flex items-center gap-1.5 h-9 px-3 bg-muted/30 border-b border-border/30 shrink-0">
         <Globe className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-        <span className="text-xs text-muted-foreground font-mono truncate flex-1">
-          {displayLabel}
-        </span>
+        <span className="text-xs text-muted-foreground font-mono truncate flex-1">{displayLabel}</span>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            >
+            <button type="button" onClick={handleRefresh} className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
               <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
             </button>
           </TooltipTrigger>
@@ -122,36 +151,26 @@ function SidePanelIframePreview({ url, title }: { url: string; title?: string })
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => window.open(authenticatedUrl, '_blank', 'noopener,noreferrer')}
-              className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            >
+            <button type="button" onClick={() => authenticatedUrl && window.open(authenticatedUrl, '_blank', 'noopener,noreferrer')} disabled={!isAuthReady} className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-30">
               <ExternalLink className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top">Open in browser</TooltipContent>
         </Tooltip>
         {proxy && (
-          <Button
-            variant="default"
-            size="sm"
-            className="h-6 text-[10px] gap-1 px-2 rounded-md"
-            onClick={navigateToPreviewTab}
-          >
+          <Button variant="default" size="sm" className="h-6 text-[10px] gap-1 px-2 rounded-md" onClick={navigateToPreviewTab}>
             <MonitorPlay className="h-3 w-3" />
             Open Tab
           </Button>
         )}
       </div>
-
-      {/* Iframe fills remaining space */}
-      <div className="relative flex-1 min-h-0">
-        {isLoading && (
+      {/* Scaled 1920x1080 viewport — fits within available panel space */}
+      <div ref={viewportRef} className="relative flex-1 min-h-0 overflow-hidden bg-white">
+        {(isLoading || !isAuthReady) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
             <div className="flex items-center gap-2 text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin" />
-              <span className="text-xs">Loading preview...</span>
+              <span className="text-xs">{!isAuthReady ? 'Authenticating...' : 'Loading preview...'}</span>
             </div>
           </div>
         )}
@@ -159,35 +178,92 @@ function SidePanelIframePreview({ url, title }: { url: string; title?: string })
           <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
             <div className="text-center text-muted-foreground">
               <p className="text-sm">Failed to load preview</p>
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="text-xs text-primary hover:underline mt-1"
-              >
-                Retry
-              </button>
+              <button type="button" onClick={handleRefresh} className="text-xs text-primary hover:underline mt-1">Retry</button>
             </div>
           </div>
         )}
-        <iframe
-          key={refreshKey}
-          src={authenticatedUrl}
-          title={displayLabel}
-          className="w-full h-full border-0 bg-white"
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
-          onLoad={() => setIsLoading(false)}
-          onError={() => {
-            setIsLoading(false);
-            setHasError(true);
-          }}
-        />
+        {isAuthReady && vpScale > 0 && (
+          <iframe
+            key={refreshKey}
+            src={authenticatedUrl}
+            title={displayLabel}
+            className="border-0 bg-white"
+            style={{
+              width: '1920px',
+              height: '1080px',
+              transform: `scale(${vpScale})`,
+              transformOrigin: '0 0',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+            }}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
+            onLoad={() => setIsLoading(false)}
+            onError={() => { setIsLoading(false); setHasError(true); }}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Scaled external URL iframe for the side-panel
+// ---------------------------------------------------------------------------
+
+function ScaledExternalIframe({ url, title }: { url: string; title?: string }) {
+  const vpRef = useRef<HTMLDivElement>(null);
+  const [vpScale, setVpScale] = useState(0);
+  useEffect(() => {
+    const el = vpRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) setVpScale(Math.min(w / 1920, h / 1080));
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    update();
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-1.5 h-9 px-3 bg-muted/30 border-b border-border/30 shrink-0">
+        <Globe className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+        <span className="text-xs text-muted-foreground font-mono truncate flex-1">{url}</span>
+        <a href={url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      </div>
+      <div ref={vpRef} className="relative flex-1 min-h-0 overflow-hidden bg-white">
+        {vpScale > 0 && (
+          <iframe
+            src={url}
+            title={title || url}
+            className="border-0 bg-white"
+            style={{
+              width: '1920px',
+              height: '1080px',
+              transform: `scale(${vpScale})`,
+              transformOrigin: '0 0',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+            }}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component — side-panel renderer
+// Uses ShowContentRenderer as single source of truth for content rendering.
+// This component only handles the card chrome (header, footer, tabs).
 // ---------------------------------------------------------------------------
 
 export function OcShowUserToolView({
@@ -200,17 +276,38 @@ export function OcShowUserToolView({
 }: ToolViewProps) {
   const args = toolCall?.arguments || {};
   const ocState = args._oc_state as any;
-  const title = (args.title as string) || (ocState?.input?.title as string) || '';
-  const description = (args.description as string) || (ocState?.input?.description as string) || '';
-  const type = (args.type as string) || (ocState?.input?.type as string) || '';
-  const path = (args.path as string) || (ocState?.input?.path as string) || '';
-  const url = (args.url as string) || (ocState?.input?.url as string) || '';
-  const content = (args.content as string) || (ocState?.input?.content as string) || '';
 
-  const isError = toolResult?.success === false || !!toolResult?.error;
-  const isImage = type === 'image' || IMAGE_EXT_RE.test(path);
+  // ── Extract fields ──
+  const title       = (args.title as string)       || (ocState?.input?.title as string)       || '';
+  const description = (args.description as string) || (ocState?.input?.description as string) || '';
+  const type        = (args.type as string)        || (ocState?.input?.type as string)        || '';
+  const path        = (args.path as string)        || (ocState?.input?.path as string)        || '';
+  const url         = (args.url as string)         || (ocState?.input?.url as string)         || '';
+  const content     = (args.content as string)     || (ocState?.input?.content as string)     || '';
+  const aspectRatio = (args.aspect_ratio as string) || (ocState?.input?.aspect_ratio as string) || '';
+  const theme       = (args.theme as string)       || (ocState?.input?.theme as string)       || 'default';
+  const language    = (args.language as string)    || (ocState?.input?.language as string)    || '';
+
+  // ── Parse items[] for multi-item carousel mode ──
+  const rawItems = args.items || (ocState?.input?.items);
+  const items = useMemo<ShowCarouselItem[] | null>(() => {
+    if (!rawItems) return null;
+    try {
+      const parsed = typeof rawItems === 'string' ? JSON.parse(rawItems) : rawItems;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch { /* ignore */ }
+    return null;
+  }, [rawItems]);
+
+  const isCarousel = !!items && items.length > 0;
+
+  const borderStyle = THEME_BORDER[theme] || THEME_BORDER.default;
+  const Icon = isCarousel ? typeIcon(items![0].type || '') : typeIcon(type);
+
+  const isError = type === 'error' || toolResult?.success === false || !!toolResult?.error;
   const hasLocalhostUrl = !!parseLocalhostUrl(url);
 
+  // ── Server/proxy state (for header subtitle) ──
   const activeServer = useServerStore((s) => {
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
   });
@@ -221,178 +318,172 @@ export function OcShowUserToolView({
     () => proxyLocalhostUrl(url, serverUrl, mappedPorts, subdomainOpts2) ?? url,
     [url, serverUrl, mappedPorts, subdomainOpts2],
   );
-  // Use same approach as ImagePreview.tsx — useFileContent returns base64
-  // Strip /workspace/ prefix since the SDK expects paths relative to project root
-  const isLocalPath = isImage && path ? isLocalSandboxFilePath(path) : false;
-  const fileContentPath = useMemo(() => {
-    if (!isLocalPath || !path) return null;
-    return path.replace(/^\/workspace\//, '');
-  }, [isLocalPath, path]);
-  const { data: fileContentData, isLoading: isImageLoading } = useFileContent(
-    fileContentPath,
-    { enabled: !!fileContentPath },
-  );
 
-  const imageUrl = useMemo(() => {
-    if (fileContentData?.encoding === 'base64' && fileContentData?.content) {
-      const binary = atob(fileContentData.content);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: fileContentData.mimeType || 'image/webp' });
-      return URL.createObjectURL(blob);
+  const displayTitle = isCarousel
+    ? (title || `${items!.length} items`)
+    : (title || description || 'Output');
+
+  // ── Footer badge — always neutral colors, NEVER themed ──
+  const footerBadge = useMemo(() => {
+    if (isStreaming) return null;
+    if (isError && type === 'error') {
+      return (
+        <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+          <AlertTriangle className="h-3 w-3 text-red-500" />
+          Error
+        </Badge>
+      );
     }
-    return null;
-  }, [fileContentData]);
+    if (hasLocalhostUrl) {
+      return (
+        <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+          <CheckCircle className="h-3 w-3 text-muted-foreground" />
+          Live Preview
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="h-6 py-0.5 bg-muted">
+        <CheckCircle className="h-3 w-3 text-muted-foreground" />
+        Displayed
+      </Badge>
+    );
+  }, [isStreaming, isError, type, hasLocalhostUrl]);
 
-  const displayImageSrc = isLocalPath ? (imageUrl || '') : (path || '');
-
-  const displayTitle = title || description || 'Output';
-
-  // For localhost URLs — show embedded iframe preview that fills the panel
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LOCALHOST URL → full iframe preview
+  // ═══════════════════════════════════════════════════════════════════════════
   if (hasLocalhostUrl) {
     return (
-      <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
+      <Card className={cn("gap-0 flex shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card border-0", borderStyle)}>
         <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
           <div className="flex flex-row items-center justify-between">
-            <ToolViewIconTitle
-              icon={Globe}
-              title={displayTitle}
-              subtitle={resolvedUrl || undefined}
-            />
-            <a
-              href={resolvedUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-            >
+            <ToolViewIconTitle icon={Globe} title={displayTitle} subtitle={resolvedUrl || undefined} />
+            <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="p-1 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
         </CardHeader>
-
         <CardContent className="p-0 h-full flex-1 overflow-hidden">
           <SidePanelIframePreview url={url} title={title || description || undefined} />
         </CardContent>
-
-        <ToolViewFooter
-          assistantTimestamp={assistantTimestamp}
-          toolTimestamp={toolTimestamp}
-          isStreaming={isStreaming}
-        >
-          {!isStreaming && (
-            <Badge variant="outline" className="h-6 py-0.5 bg-muted">
-              <CheckCircle className="h-3 w-3 text-emerald-500" />
-              Live Preview
-            </Badge>
-          )}
+        <ToolViewFooter assistantTimestamp={assistantTimestamp} toolTimestamp={toolTimestamp} isStreaming={isStreaming}>
+          {footerBadge}
         </ToolViewFooter>
       </Card>
     );
   }
 
-  // Fallback — standard non-iframe output display
-  return (
-    <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
-        <div className="flex flex-row items-center justify-between">
-          <ToolViewIconTitle
-            icon={isImage ? ImageIcon : Eye}
-            title={displayTitle}
-            subtitle={path || url || undefined}
-          />
-          {url && (
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-            >
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EXTERNAL URL → full iframe preview
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (type === 'url' && url && !hasLocalhostUrl) {
+    return (
+      <Card className={cn("gap-0 flex shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card border-0", borderStyle)}>
+        <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+          <div className="flex flex-row items-center justify-between">
+            <ToolViewIconTitle icon={Globe} title={displayTitle} subtitle={url} />
+            <a href={url} target="_blank" rel="noopener noreferrer" className="p-1 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
-          )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 h-full flex-1 overflow-hidden">
+          <ScaledExternalIframe url={url} title={title || undefined} />
+        </CardContent>
+        <ToolViewFooter assistantTimestamp={assistantTimestamp} toolTimestamp={toolTimestamp} isStreaming={isStreaming}>
+          {footerBadge}
+        </ToolViewFooter>
+      </Card>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CAROUSEL — multiple items in a single show call
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (isCarousel) {
+    return (
+      <Card className={cn("gap-0 flex shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card border-0", borderStyle)}>
+        <CardHeader className="h-14 backdrop-blur-sm border-b p-2 px-4 space-y-2 bg-muted/50">
+          <div className="flex flex-row items-center justify-between">
+            <ToolViewIconTitle icon={Icon} title={displayTitle} subtitle={description || undefined} />
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground/60 font-medium flex-shrink-0">
+              {items!.length} items
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 h-full flex-1 overflow-hidden">
+          <ScrollArea className="h-full w-full">
+            <ShowCarousel items={items!} />
+          </ScrollArea>
+        </CardContent>
+        <ToolViewFooter assistantTimestamp={assistantTimestamp} toolTimestamp={toolTimestamp} isStreaming={isStreaming}>
+          {footerBadge}
+        </ToolViewFooter>
+      </Card>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Everything else — ShowContentRenderer handles all content types
+  // ═══════════════════════════════════════════════════════════════════════════
+  return (
+    <Card className={cn("gap-0 flex shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card border-0", borderStyle)}>
+      <CardHeader className="h-14 backdrop-blur-sm border-b p-2 px-4 space-y-2 bg-muted/50">
+        <div className="flex flex-row items-center justify-between">
+          <ToolViewIconTitle icon={Icon} title={displayTitle} subtitle={path || url || language || undefined} />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {url && (
+              <a href={url} target="_blank" rel="noopener noreferrer" className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+            {type && (
+              <span className={cn(
+                'text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider',
+                type === 'error'
+                  ? 'bg-red-500/10 text-red-500'
+                  : 'bg-muted/40 text-muted-foreground/60',
+              )}>
+                {type}
+              </span>
+            )}
+          </div>
         </div>
       </CardHeader>
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
         <ScrollArea className="h-full w-full">
-          <div className="p-3 space-y-3">
-            {/* Image preview */}
-            {isImage && path && (
-              <div className="flex justify-center">
-                {displayImageSrc ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={displayImageSrc}
-                    alt={title || 'Output image'}
-                    className="max-w-full max-h-[400px] rounded-lg border border-border object-contain"
-                  />
-                ) : isImageLoading ? (
-                  <div className="w-full rounded-lg border border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
-                    Loading image preview...
-                  </div>
-                ) : (
-                  <div className="w-full rounded-lg border border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground font-mono break-all">
-                    {path}
-                  </div>
-                )}
-              </div>
-            )}
+          <ShowContentRenderer
+            type={type}
+            title={title}
+            description={description}
+            path={path}
+            url={url}
+            content={content}
+            language={language}
+            aspectRatio={aspectRatio}
+          />
 
-            {/* Description */}
-            {description && title && (
+          {/* ── Description below content (when title exists) ── */}
+          {description && title && type !== 'code' && type !== 'markdown' && (
+            <div className="px-4 py-3 border-t border-border/20">
               <p className="text-sm text-muted-foreground">{description}</p>
-            )}
+            </div>
+          )}
 
-            {/* Content */}
-            {content && (
-              <div className="rounded-lg border border-border bg-muted/50 p-3">
-                <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>
-              </div>
-            )}
-
-            {/* URL link */}
-            {url && (
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-primary hover:underline"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                {url}
-              </a>
-            )}
-
-            {/* File path */}
-            {path && !isImage && (
-              <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/50">
-                <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-xs text-foreground font-mono truncate">{path}</span>
-              </div>
-            )}
-
-            {/* Error */}
-            {isError && (
-              <div className="flex items-start gap-2.5 text-muted-foreground">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <p className="text-sm">{toolResult?.error || 'Operation failed'}</p>
-              </div>
-            )}
-          </div>
+          {/* ── Generic error from toolResult ── */}
+          {isError && type !== 'error' && (
+            <div className="flex items-start gap-2.5 p-4 text-muted-foreground border-t border-border/20">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{toolResult?.error || 'Operation failed'}</p>
+            </div>
+          )}
         </ScrollArea>
       </CardContent>
 
-      <ToolViewFooter
-        assistantTimestamp={assistantTimestamp}
-        toolTimestamp={toolTimestamp}
-        isStreaming={isStreaming}
-      >
-        {!isStreaming && (
-          <Badge variant="outline" className="h-6 py-0.5 bg-muted">
-            <CheckCircle className="h-3 w-3 text-emerald-500" />
-            Displayed
-          </Badge>
-        )}
+      <ToolViewFooter assistantTimestamp={assistantTimestamp} toolTimestamp={toolTimestamp} isStreaming={isStreaming}>
+        {footerBadge}
       </ToolViewFooter>
     </Card>
   );

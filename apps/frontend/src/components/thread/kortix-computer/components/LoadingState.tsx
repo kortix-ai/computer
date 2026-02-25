@@ -57,7 +57,7 @@ export const LoadingState = memo(function LoadingState({
 
   // Desktop: render inline (container is provided by parent layout)
   return (
-    <div className="flex flex-col h-full bg-card rounded-2xl border overflow-hidden">
+    <div className="flex flex-col h-full bg-card rounded-[24px] border overflow-hidden">
       <PanelHeader
         agentName={agentName}
         onClose={onClose}

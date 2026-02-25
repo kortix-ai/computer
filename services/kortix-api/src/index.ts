@@ -249,13 +249,18 @@ app.route('/v1/preview', daytonaProxyApp);
 // === Error Handling ===
 
 app.onError((err, c) => {
-  console.error(`[ERROR] ${err.message}`, err.stack);
+  const method = c.req.method;
+  const path = c.req.path;
+  const errName = err.constructor?.name || 'Error';
 
   if (err instanceof BillingError) {
+    console.error(`[ERROR] ${method} ${path} -> ${err.statusCode} [BillingError] ${err.message}`);
     return c.json({ error: err.message }, err.statusCode as any);
   }
 
   if (err instanceof HTTPException) {
+    console.error(`[ERROR] ${method} ${path} -> ${err.status} [HTTPException] ${err.message}`);
+
     const response: Record<string, unknown> = {
       error: true,
       message: err.message,
@@ -268,6 +273,23 @@ app.onError((err, c) => {
     }
 
     return c.json(response, err.status);
+  }
+
+  // Database / postgres.js errors — extract the useful info, not the full SQL dump
+  const isDbError = errName === 'PostgresError' || (err as any).severity || (err as any).code?.match?.(/^[0-9]{5}$/);
+  if (isDbError) {
+    const pgErr = err as any;
+    const severity = pgErr.severity || 'ERROR';
+    const pgCode = pgErr.code || '?';
+    const table = pgErr.table ? ` table=${pgErr.table}` : '';
+    const schema = pgErr.schema_name || pgErr.schema || '';
+    const hint = pgErr.hint ? ` hint="${pgErr.hint}"` : '';
+    const detail = pgErr.detail ? ` detail="${pgErr.detail}"` : '';
+    console.error(`[ERROR] ${method} ${path} -> 500 [DB ${severity} ${pgCode}]${schema ? ` schema=${schema}` : ''}${table}${detail}${hint} ${err.message.split('\n')[0]}`);
+  } else {
+    // Generic unhandled error — log concisely with truncated stack
+    const stack = err.stack ? '\n' + err.stack.split('\n').slice(1, 4).join('\n') : '';
+    console.error(`[ERROR] ${method} ${path} -> 500 [${errName}] ${err.message}${stack}`);
   }
 
   return c.json(

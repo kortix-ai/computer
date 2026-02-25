@@ -55,7 +55,7 @@ export function AlertBanner({
   const [isDismissed, setIsDismissed] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
-  const isDashboardPage = pathname?.startsWith('/dashboard') || pathname?.startsWith('/agents') || pathname?.startsWith('/projects') || pathname?.startsWith('/settings') || pathname === '/';
+  const isDashboardPage = pathname?.startsWith('/dashboard') || pathname?.startsWith('/agents') || pathname?.startsWith('/workspace') || pathname?.startsWith('/projects') || pathname?.startsWith('/settings') || pathname === '/';
 
   const storageKey = `alert-dismissed-${dismissKey}`;
 

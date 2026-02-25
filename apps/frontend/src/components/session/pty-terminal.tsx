@@ -193,7 +193,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
     resizeObserver.observe(container);
 
     // Delay fit + WS connect to ensure the container has real dimensions
-    const initTimer = setTimeout(() => {
+    const initTimer = setTimeout(async () => {
       safeFit(fitAddon, container);
 
       // --- WebSocket connect ---
@@ -204,7 +204,9 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
       updateStatus('connecting');
       term.writeln('\x1b[33mConnecting to terminal...\x1b[0m');
 
-      const wsUrl = getPtyWebSocketUrl(pty.id, serverUrl);
+      const wsUrl = await getPtyWebSocketUrl(pty.id, serverUrl);
+      // Bail out if a newer connection was requested while we were resolving the URL
+      if (connectionIdRef.current !== myConnectionId) return;
       console.log('[PtyTerminal] Connecting WebSocket:', wsUrl);
 
       const ws = new WebSocket(wsUrl);

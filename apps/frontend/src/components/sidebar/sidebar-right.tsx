@@ -6,7 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Compass,
-  FolderTree,
+  FolderOpen,
   TerminalSquare,
   Monitor,
   Globe,
@@ -25,8 +25,6 @@ import {
   SIDEBAR_RIGHT_WIDTH,
   SIDEBAR_RIGHT_WIDTH_ICON,
 } from '@/components/ui/sidebar-right-provider';
-import { SidebarFileBrowser } from '@/components/sidebar/sidebar-explorer';
-import { useFilesStore } from '@/features/files/store/files-store';
 import { useServerStore, getActiveOpenCodeUrl, getSubdomainOpts } from '@/stores/server-store';
 import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { openTabAndNavigate } from '@/stores/tab-store';
@@ -34,7 +32,7 @@ import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
 import { getDirectPortUrl, SANDBOX_PORTS } from '@/lib/platform-client';
 
 // ============================================================================
-// Main Right Sidebar — Explorer + action buttons
+// Main Right Sidebar — Quick actions (no file explorer — that's /files now)
 // ============================================================================
 
 export function SidebarRight() {
@@ -47,7 +45,6 @@ export function SidebarRight() {
   } = useRightSidebar();
 
   const router = useRouter();
-  const toggleSearch = useFilesStore((s) => s.toggleSearch);
 
   const activeServer = useServerStore((s) => {
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
@@ -79,7 +76,6 @@ export function SidebarRight() {
   const openSandboxServiceTab = useCallback(
     (containerPort: string, title: string) => {
       const subdomainOpts = getSubdomainOpts();
-      // Prefer provider-aware URL: /preview/{sandboxId}/{port}
       const url = activeServer
         ? (getDirectPortUrl(activeServer, containerPort) || getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts))
         : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts);
@@ -102,6 +98,18 @@ export function SidebarRight() {
     [activeServer, serverUrl],
   );
 
+  const handleOpenFiles = useCallback(() => {
+    openTabAndNavigate(
+      {
+        id: 'page:/files',
+        title: 'Files',
+        type: 'page',
+        href: '/files',
+      },
+      router,
+    );
+  }, [router]);
+
   const handleOpenDesktop = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.DESKTOP, 'Desktop');
   }, [openSandboxServiceTab]);
@@ -110,7 +118,6 @@ export function SidebarRight() {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');
   }, [openSandboxServiceTab]);
 
-  /** Open a blank internal browser tab for navigating any sandbox service. */
   const handleOpenInternalBrowser = useCallback(() => {
     openTabAndNavigate({
       id: 'preview:browser',
@@ -167,9 +174,8 @@ export function SidebarRight() {
         <div className="bg-sidebar text-sidebar-foreground flex h-full w-full flex-col">
 
           {/* ====== HEADER ====== */}
-          <div className="flex flex-col pt-4 pb-0 overflow-visible">
+          <div className="flex flex-col pt-3 pb-0 overflow-visible">
             <div className="relative flex h-[32px] items-center px-3 justify-between">
-              {/* Collapsed: centered chevron to expand */}
               {state === 'collapsed' && (
                 <div className="absolute inset-0 flex items-center justify-center">
                     <button
@@ -182,13 +188,12 @@ export function SidebarRight() {
                 </div>
               )}
 
-              {/* Expanded: "Explorer" label + collapse chevron */}
               <div className={cn(
                 'flex items-center justify-between w-full',
                 state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100',
               )}>
                 <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider select-none px-1">
-                  Explorer
+                  Quick Actions
                 </span>
                 <button
                   className="flex items-center justify-center h-7 w-7 rounded-lg transition-colors duration-150 cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent"
@@ -208,20 +213,20 @@ export function SidebarRight() {
           )}>
             {/* --- Collapsed: icon buttons --- */}
             <div className={cn(
-              'absolute inset-0 px-3 pt-3 space-y-0.5 flex flex-col items-center overflow-visible',
+              'absolute inset-0 px-2 pt-2 space-y-0.5 flex flex-col items-center overflow-visible',
               state === 'collapsed' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
             )}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setOpen(true)}
-                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    onClick={handleOpenFiles}
+                    className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <FolderTree className="h-[16px] w-[16px]" />
+                    <FolderOpen className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
-                  Explorer
+                  Files
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -230,12 +235,12 @@ export function SidebarRight() {
                     onClick={handleNewTerminal}
                     disabled={createPty.isPending}
                     className={cn(
-                      'flex items-center justify-center w-full py-2 rounded-xl cursor-pointer',
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer',
                       'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
                       'disabled:opacity-50 disabled:cursor-not-allowed',
                     )}
                   >
-                    <TerminalSquare className="h-[16px] w-[16px]" />
+                    <TerminalSquare className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -245,23 +250,10 @@ export function SidebarRight() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => { setOpen(true); setTimeout(() => toggleSearch(), 100); }}
-                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
-                  >
-                    <Search className="h-[16px] w-[16px]" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="left" sideOffset={12} className="text-xs">
-                  Search files
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
                     onClick={handleOpenSecrets}
-                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <KeyRound className="h-[16px] w-[16px]" />
+                    <KeyRound className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -272,9 +264,9 @@ export function SidebarRight() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleOpenDesktop}
-                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <Monitor className="h-[16px] w-[16px]" />
+                    <Monitor className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -285,9 +277,9 @@ export function SidebarRight() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleOpenAgentBrowser}
-                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <Globe className="h-[16px] w-[16px]" />
+                    <Globe className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -298,9 +290,9 @@ export function SidebarRight() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleOpenInternalBrowser}
-                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
-                    <Compass className="h-[16px] w-[16px]" />
+                    <Compass className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
@@ -309,56 +301,57 @@ export function SidebarRight() {
               </Tooltip>
             </div>
 
-            {/* --- Expanded content --- */}
+            {/* --- Expanded: action list --- */}
             <div className={cn(
               'flex flex-col h-full',
               state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto',
             )}>
-              {/* File explorer — the main content */}
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                <SidebarFileBrowser openFileAsTab />
-              </div>
-
-              {/* Bottom action nav */}
-              <nav className="flex-shrink-0 px-3 py-2 space-y-0.5">
+              <nav className="flex-1 px-3 pt-2 space-y-0.5">
+                <button
+                  onClick={handleOpenFiles}
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                >
+                  <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                  <span>Files</span>
+                </button>
                 <button
                   onClick={handleNewTerminal}
                   disabled={createPty.isPending}
                   className={cn(
-                    'flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm cursor-pointer',
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] cursor-pointer',
                     'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                   )}
                 >
-                  <TerminalSquare className="h-[16px] w-[16px] flex-shrink-0" />
+                  <TerminalSquare className="h-4 w-4 flex-shrink-0" />
                   <span>{createPty.isPending ? 'Creating...' : 'New Terminal'}</span>
                 </button>
                 <button
                   onClick={handleOpenSecrets}
-                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
                 >
-                  <KeyRound className="h-[16px] w-[16px] flex-shrink-0" />
+                  <KeyRound className="h-4 w-4 flex-shrink-0" />
                   <span>Secrets Manager</span>
                 </button>
                 <button
                   onClick={handleOpenDesktop}
-                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
                 >
-                  <Monitor className="h-[16px] w-[16px] flex-shrink-0" />
+                  <Monitor className="h-4 w-4 flex-shrink-0" />
                   <span>Desktop</span>
                 </button>
                 <button
                   onClick={handleOpenAgentBrowser}
-                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
                 >
-                  <Globe className="h-[16px] w-[16px] flex-shrink-0" />
+                  <Globe className="h-4 w-4 flex-shrink-0" />
                   <span>Agent Browser</span>
                 </button>
                 <button
                   onClick={handleOpenInternalBrowser}
-                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
                 >
-                  <Compass className="h-[16px] w-[16px] flex-shrink-0" />
+                  <Compass className="h-4 w-4 flex-shrink-0" />
                   <span>Internal Browser</span>
                 </button>
               </nav>

@@ -9,6 +9,7 @@ import {
   GitFork,
   Loader2,
   Paperclip,
+  Reply,
   X,
   FileText,
   FileCode,
@@ -47,6 +48,7 @@ import { useMessageQueueStore } from '@/stores/message-queue-store';
 import { getClient } from '@/lib/opencode-sdk';
 import { QuestionPrompt } from './question-prompt';
 import type { QuestionRequest, QuestionAnswer } from '@/ui';
+import type { ReplyToContext } from './session-chat';
 
 export type { ProviderListResponse };
 
@@ -969,6 +971,11 @@ export interface SessionChatInputProps {
   onQuestionReply?: (requestId: string, answers: QuestionAnswer[]) => void;
   /** Handler called when the user rejects/dismisses a question */
   onQuestionReject?: (requestId: string) => void;
+
+  /** Reply-to context — when the user selected a message to reply to */
+  replyTo?: ReplyToContext | null;
+  /** Clear the reply-to context */
+  onClearReply?: () => void;
 }
 
 export function SessionChatInput({
@@ -1000,6 +1007,8 @@ export function SessionChatInput({
   activeQuestion,
   onQuestionReply,
   onQuestionReject,
+  replyTo,
+  onClearReply,
 }: SessionChatInputProps) {
   const placeholderVariants = useMemo(
     () => [
@@ -1159,6 +1168,13 @@ export function SessionChatInput({
     observer.observe(el);
     return () => observer.disconnect();
   }, [shouldAutoFocus]);
+
+  // Auto-focus textarea when a reply-to context is set
+  useEffect(() => {
+    if (replyTo) {
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  }, [replyTo]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1616,8 +1632,8 @@ export function SessionChatInput({
             />
           )}
 
-          {/* Inline chips: thread context, todos, queue, questions — unified spacing */}
-          {(threadContext || sessionId || inputSlot || activeQuestion) && (
+          {/* Inline chips: thread context, reply-to, todos, queue, questions — unified spacing */}
+          {(threadContext || replyTo || sessionId || inputSlot || activeQuestion) && (
             <div className="flex flex-col gap-1.5 mx-3 mt-2.5 empty:hidden">
               {threadContext && (
                 <button
@@ -1634,6 +1650,24 @@ export function SessionChatInput({
                     <span className="text-foreground/80 font-medium">{threadContext.parentTitle}</span>
                   </span>
                 </button>
+              )}
+              {replyTo && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/10">
+                  <Reply className="size-3.5 text-primary/70 flex-shrink-0" />
+                  <span className="flex-1 min-w-0 text-[11px] text-muted-foreground truncate">
+                    {replyTo.text.length > 120 ? `${replyTo.text.slice(0, 120)}...` : replyTo.text}
+                  </span>
+                  {onClearReply && (
+                    <button
+                      type="button"
+                      onClick={onClearReply}
+                      className="p-0.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors flex-shrink-0 cursor-pointer"
+                      aria-label="Cancel reply"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
               )}
               {sessionId && <TodoChip sessionId={sessionId} />}
               {activeQuestion && onQuestionReply && onQuestionReject && (

@@ -33,6 +33,8 @@ interface ModelStore {
   user: UserEntry[];
   recent: ModelKey[];
   variant: Record<string, string | undefined>;
+  /** Persisted per-agent model selection so it survives refresh/new tabs */
+  selectedModel?: Record<string, ModelKey | undefined>;
 }
 
 // ============================================================================
@@ -232,6 +234,25 @@ export function useModelStore(allModels: FlatModel[]) {
     setStore({ ...s, variant: { ...s.variant, [k]: value } });
   }, []);
 
+  // Per-agent persisted model selection
+  const getSelectedModel = useCallback(
+    (agentName: string): ModelKey | undefined => {
+      return store.selectedModel?.[agentName];
+    },
+    [store.selectedModel],
+  );
+
+  const setSelectedModel = useCallback((agentName: string, model: ModelKey | undefined) => {
+    const s = getStore();
+    const next = { ...s.selectedModel };
+    if (model) {
+      next[agentName] = model;
+    } else {
+      delete next[agentName];
+    }
+    setStore({ ...s, selectedModel: next });
+  }, []);
+
   return {
     isVisible,
     isLatest,
@@ -240,6 +261,8 @@ export function useModelStore(allModels: FlatModel[]) {
     pushRecent,
     getVariant,
     setVariant,
+    getSelectedModel,
+    setSelectedModel,
     /** All user visibility preferences (for manage models dialog) */
     userPrefs: store.user,
   };

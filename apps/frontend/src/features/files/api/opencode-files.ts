@@ -72,9 +72,11 @@ export async function readFile(filePath: string): Promise<FileContent> {
  * so both paths produce correct output.
  */
 export async function readFileAsBlob(filePath: string): Promise<Blob> {
+  const baseUrl = getActiveOpenCodeUrl();
+
   // ── Primary: /file/raw (binary stream) ──
+  let fallThroughToSdk = false;
   try {
-    const baseUrl = getActiveOpenCodeUrl();
     const rawUrl = `${baseUrl}/file/raw?path=${encodeURIComponent(filePath)}`;
     const response = await authenticatedFetch(rawUrl);
 
@@ -82,26 +84,37 @@ export async function readFileAsBlob(filePath: string): Promise<Blob> {
       return response.blob();
     }
 
-    // Only fall through on 404 (endpoint doesn't exist on this server).
-    // Any other error (403, 500, etc.) should be thrown immediately.
-    if (response.status !== 404) {
+    // 404 = endpoint doesn't exist on this server version → fall through to SDK
+    if (response.status === 404) {
+      fallThroughToSdk = true;
+    } else {
+      // Non-404 HTTP error (403, 500, etc.) — throw with details
       const text = await response.text().catch(() => '');
       throw new Error(
         `Failed to fetch file (${response.status}): ${text || response.statusText}`,
       );
     }
   } catch (err) {
-    // Network errors or non-404 HTTP errors — rethrow unless it's a 404
-    // that was already handled above (the throw won't reach here).
-    // If we reach here it's a genuine network failure; fall through to
-    // the JSON endpoint as a last resort.
-    if (err instanceof Error && !err.message.includes('404')) {
-      // For non-404 errors from the raw endpoint, still try the JSON
-      // fallback — the server may be partially available.
+    // If it's our own thrown error (non-404 HTTP), re-throw immediately
+    if (err instanceof Error && err.message.startsWith('Failed to fetch file')) {
+      throw err;
     }
+    // Network error (fetch itself failed) — server not reachable.
+    // Don't fall through to SDK — it hits the same server and will also fail.
+    if (err instanceof TypeError) {
+      throw new Error(`Server not reachable: ${err.message}`);
+    }
+    // Unknown error — fall through to SDK as last resort
+    fallThroughToSdk = true;
+  }
+
+  if (!fallThroughToSdk) {
+    // Should not reach here, but safeguard
+    throw new Error('Failed to fetch file: unexpected state');
   }
 
   // ── Fallback: /file/content (JSON with base64) ──
+  // Only reached when /file/raw returns 404 (older server without the route)
   const result = await readFile(filePath);
   if (result.encoding === 'base64' && result.content) {
     const bytes = Uint8Array.from(atob(result.content), (c) => c.charCodeAt(0));

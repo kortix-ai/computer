@@ -133,6 +133,18 @@ export function autoLinkUrls(text: string): string {
         continue; // Inside inline code
       }
     }
+
+    // Skip if inside LaTeX math delimiters ($...$ or $$...$$)
+    const doubleDollarCount = (beforeMatch.match(/\$\$/g) || []).length;
+    if (doubleDollarCount % 2 !== 0) {
+      continue; // Inside $$...$$ block math
+    }
+    // Count single $ that are NOT part of $$ pairs
+    const allDollarCount = (beforeMatch.match(/\$/g) || []).length;
+    const singleDollarCount = allDollarCount - doubleDollarCount * 2;
+    if (singleDollarCount % 2 !== 0) {
+      continue; // Inside $...$ inline math
+    }
     
     if (isValidUrl(url)) {
       urlMatches.push({ url, index });
