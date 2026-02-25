@@ -24,6 +24,7 @@ import {
   Zap,
   X,
   Loader2,
+  FolderOpen,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -692,6 +693,18 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             }}
           />
           <CollapsedIconButton
+            icon={<FolderOpen className="h-4 w-4" />}
+            label="Files"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/files',
+                title: 'Files',
+                type: 'page',
+                href: '/files',
+              }, router);
+            }}
+          />
+          <CollapsedIconButton
             icon={<Plug className="h-4 w-4" />}
             label="Integrations"
             onClick={() => {
@@ -799,6 +812,26 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             >
               <Blocks className="h-4 w-4 flex-shrink-0" />
               <span>Workspace</span>
+            </button>
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/files',
+                  title: 'Files',
+                  type: 'page',
+                  href: '/files',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                pathname === '/files'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <span>Files</span>
             </button>
             <button
               onClick={() => {

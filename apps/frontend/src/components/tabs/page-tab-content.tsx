@@ -52,6 +52,12 @@ const IntegrationsPage = lazy(() =>
 	})),
 );
 
+const FilesPage = lazy(() =>
+	import('@/features/files/components/file-explorer-page').then((m) => ({
+		default: m.FileExplorerPage,
+	})),
+);
+
 // Admin pages
 const AdminAnalyticsPage = lazy(() =>
 	import('@/app/(dashboard)/admin/analytics/page'),
@@ -97,6 +103,7 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/scheduled-tasks': ScheduledTasksPage,
 	'/channels': ChannelsPage,
 	'/integrations': IntegrationsPage,
+	'/files': FilesPage,
 	// Admin
 	'/admin/analytics': AdminAnalyticsPage,
 	'/admin/feedback': AdminFeedbackPage,

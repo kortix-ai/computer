@@ -93,4 +93,8 @@ export {
   FileBreadcrumbs,
   FileTreeItem,
   FileHistoryPanel,
+  FileTree,
+  FileExplorerPage,
+  FileExplorerToolbar,
+  FileExplorerStatusBar,
 } from './components';

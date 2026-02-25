@@ -42,6 +42,14 @@ interface FilesStoreState {
   clipboard: ClipboardItem | null;
   /** Target line number to scroll to after opening a file (1-indexed, null = none) */
   targetLine: number | null;
+
+  // ── Explorer tree state ──────────────────────────────────────
+  /** Set of expanded directory paths in the tree sidebar */
+  expandedDirs: Set<string>;
+  /** Whether the tree sidebar is collapsed */
+  isSidebarCollapsed: boolean;
+  /** Right panel mode: 'viewer' shows file, 'welcome' shows empty state */
+  panelMode: 'welcome' | 'viewer' | 'history';
 }
 
 interface FilesStoreActions {
@@ -87,6 +95,20 @@ interface FilesStoreActions {
   clearClipboard: () => void;
   /** Reset all state */
   reset: () => void;
+
+  // ── Explorer tree actions ────────────────────────────────────
+  /** Toggle a directory's expanded state in the tree */
+  toggleDir: (path: string) => void;
+  /** Expand a directory in the tree */
+  expandDir: (path: string) => void;
+  /** Collapse a directory in the tree */
+  collapseDir: (path: string) => void;
+  /** Expand all ancestor directories for a given file path */
+  revealPath: (filePath: string) => void;
+  /** Toggle sidebar collapsed state */
+  toggleSidebar: () => void;
+  /** Set sidebar collapsed state */
+  setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 type FilesStore = FilesStoreState & FilesStoreActions;
@@ -104,28 +126,42 @@ const initialState: FilesStoreState = {
   selectedCommitHash: null,
   clipboard: null,
   targetLine: null,
+  expandedDirs: new Set(['/workspace']),
+  isSidebarCollapsed: false,
+  panelMode: 'welcome',
 };
 
 export const useFilesStore = create<FilesStore>()((set, get) => ({
   ...initialState,
 
   navigateToPath: (path: string) => {
+    const normalized = path || '/workspace';
     set({
-      currentPath: path || '/workspace',
+      currentPath: normalized,
       view: 'browser',
       selectedFilePath: null,
     });
+    // Auto-expand the target directory in tree
+    get().expandDir(normalized);
   },
 
   openFile: (filePath: string, targetLine?: number) => {
+    // Derive the parent directory to keep the tree in sync
+    const lastSlash = filePath.lastIndexOf('/');
+    const parentDir = lastSlash > 0 ? filePath.slice(0, lastSlash) : '/workspace';
+
     set({
       selectedFilePath: filePath,
       view: 'viewer',
+      panelMode: 'viewer',
       filePathList: [filePath],
       currentFileIndex: 0,
       isSearchOpen: false,
       targetLine: targetLine ?? null,
+      currentPath: parentDir,
     });
+    // Reveal the file in the tree
+    get().revealPath(filePath);
   },
 
   clearTargetLine: () => {
@@ -133,18 +169,25 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
   },
 
   openFileWithList: (filePath: string, fileList: string[], index: number) => {
+    const lastSlash = filePath.lastIndexOf('/');
+    const parentDir = lastSlash > 0 ? filePath.slice(0, lastSlash) : '/workspace';
+
     set({
       selectedFilePath: filePath,
       view: 'viewer',
+      panelMode: 'viewer',
       filePathList: fileList,
       currentFileIndex: index,
       isSearchOpen: false,
+      currentPath: parentDir,
     });
+    get().revealPath(filePath);
   },
 
   goBackToBrowser: () => {
     set({
       view: 'browser',
+      panelMode: 'welcome',
       selectedFilePath: null,
     });
   },
@@ -219,6 +262,7 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
   openHistory: (filePath: string) => {
     set({
       view: 'history',
+      panelMode: 'history',
       historyFilePath: filePath,
       selectedCommitHash: null,
       isSearchOpen: false,
@@ -233,6 +277,7 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
     const { selectedFilePath } = get();
     set({
       view: selectedFilePath ? 'viewer' : 'browser',
+      panelMode: selectedFilePath ? 'viewer' : 'welcome',
       historyFilePath: null,
       selectedCommitHash: null,
     });
@@ -252,5 +297,58 @@ export const useFilesStore = create<FilesStore>()((set, get) => ({
 
   reset: () => {
     set(initialState);
+  },
+
+  // ── Explorer tree actions ────────────────────────────────────
+
+  toggleDir: (path: string) => {
+    set((state) => {
+      const next = new Set(state.expandedDirs);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return { expandedDirs: next };
+    });
+  },
+
+  expandDir: (path: string) => {
+    set((state) => {
+      if (state.expandedDirs.has(path)) return state;
+      const next = new Set(state.expandedDirs);
+      next.add(path);
+      return { expandedDirs: next };
+    });
+  },
+
+  collapseDir: (path: string) => {
+    set((state) => {
+      if (!state.expandedDirs.has(path)) return state;
+      const next = new Set(state.expandedDirs);
+      next.delete(path);
+      return { expandedDirs: next };
+    });
+  },
+
+  revealPath: (filePath: string) => {
+    set((state) => {
+      const next = new Set(state.expandedDirs);
+      const parts = filePath.split('/');
+      // Build ancestor paths and expand each
+      for (let i = 1; i < parts.length; i++) {
+        const ancestor = parts.slice(0, i).join('/');
+        if (ancestor) next.add(ancestor);
+      }
+      return { expandedDirs: next };
+    });
+  },
+
+  toggleSidebar: () => {
+    set((s) => ({ isSidebarCollapsed: !s.isSidebarCollapsed }));
+  },
+
+  setSidebarCollapsed: (collapsed: boolean) => {
+    set({ isSidebarCollapsed: collapsed });
   },
 }));

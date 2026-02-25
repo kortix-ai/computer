@@ -74,7 +74,7 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     '/tools': { title: 'Tools', type: 'page' },
     '/commands': { title: 'Commands', type: 'page' },
     '/projects': { title: 'Workspace', type: 'page' },
-    '/files': { title: 'Files', type: 'file' },
+    '/files': { title: 'Files', type: 'page' },
     '/configuration': { title: 'Workspace', type: 'page' },
     '/settings/credentials': { title: 'Integrations', type: 'settings' },
     '/settings/api-keys': { title: 'API Keys', type: 'settings' },

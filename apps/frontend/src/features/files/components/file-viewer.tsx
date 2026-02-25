@@ -2,9 +2,6 @@
 
 import { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
   Code,
   Download,
   Eye,
@@ -22,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { UnifiedMarkdown } from '@/components/markdown';
 import { CodeEditor } from '@/components/file-editors/code-editor';
+import { getFileIcon } from './file-icon';
 
 // Lazy-load heavy renderers to keep initial bundle small
 const PdfRenderer = lazy(() =>
@@ -219,11 +217,6 @@ function useBinaryBlob(filePath: string | null, category: FileCategory) {
 
 export function FileViewer() {
   const selectedFilePath = useFilesStore((s) => s.selectedFilePath);
-  const filePathList = useFilesStore((s) => s.filePathList);
-  const currentFileIndex = useFilesStore((s) => s.currentFileIndex);
-  const goBackToBrowser = useFilesStore((s) => s.goBackToBrowser);
-  const nextFile = useFilesStore((s) => s.nextFile);
-  const prevFile = useFilesStore((s) => s.prevFile);
   const openHistory = useFilesStore((s) => s.openHistory);
 
   // Text content (for code/text files, CSV, images)
@@ -242,9 +235,6 @@ export function FileViewer() {
 
   // Binary blob for PDF, DOCX, video, audio, PPTX
   const { blobUrl, blob: docxBlob, blobLoading, blobError } = useBinaryBlob(selectedFilePath, fileCategory);
-
-  const hasNext = currentFileIndex < filePathList.length - 1;
-  const hasPrev = currentFileIndex > 0;
 
   const displayContent = fileContent?.content ?? '';
 
@@ -332,18 +322,9 @@ export function FileViewer() {
   return (
     <div className="flex flex-col h-full">
       {/* Viewer header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={goBackToBrowser}
-          title="Back to browser"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
+          {getFileIcon(fileName, { className: 'h-4 w-4 shrink-0' })}
           <span className="font-medium text-sm truncate">{fileName}</span>
           {hasUnsavedChanges && (
             <span className="text-xs text-yellow-500 font-medium shrink-0">modified</span>
@@ -351,33 +332,6 @@ export function FileViewer() {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {/* File navigation */}
-          {filePathList.length > 1 && (
-            <div className="flex items-center gap-0.5 mr-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={prevFile}
-                disabled={!hasPrev}
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <span className="text-xs text-muted-foreground tabular-nums min-w-[3ch] text-center">
-                {currentFileIndex + 1}/{filePathList.length}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={nextFile}
-                disabled={!hasNext}
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          )}
-
           {/* Save button */}
           {hasUnsavedChanges && fileContent?.type === 'text' && (
             <Button
@@ -386,7 +340,7 @@ export function FileViewer() {
               className="h-7 w-7 text-yellow-500 hover:text-yellow-600"
               onClick={() => handleSave(latestContentRef.current)}
               disabled={isSaving}
-              title="Save (Cmd+S)"
+              title="Save (\u2318S)"
             >
               {isSaving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -589,12 +543,6 @@ export function FileViewer() {
           )}
       </div>
 
-      {/* Path bar */}
-      {selectedFilePath && (
-        <div className="px-3 py-1.5 border-t text-xs text-muted-foreground truncate shrink-0 bg-muted/30">
-          {selectedFilePath}
-        </div>
-      )}
     </div>
   );
 }
