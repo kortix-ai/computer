@@ -1,5 +1,8 @@
 export { FileBrowser } from './file-browser';
 export { FileViewer } from './file-viewer';
+export { FileContentRenderer } from './file-content-renderer';
+export type { FileContentRendererProps } from './file-content-renderer';
+export { getFileCategory, getLanguageFromExt } from './file-content-renderer';
 export { FileSearch } from './file-search';
 export { FileBreadcrumbs } from './file-breadcrumbs';
 export { FileTreeItem } from './file-tree-item';
