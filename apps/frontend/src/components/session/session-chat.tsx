@@ -22,7 +22,6 @@ import {
 	Scissors,
 	Send,
 	Terminal,
-	Trash2,
 	Undo2,
 	X,
 } from "lucide-react";
@@ -77,7 +76,6 @@ import {
 	replyToPermission,
 	replyToQuestion,
 	useAbortOpenCodeSession,
-	useDeletePart,
 	useExecuteOpenCodeCommand,
 	useForkSession,
 	useOpenCodeAgents,
@@ -87,7 +85,6 @@ import {
 	useRevertSession,
 	useSendOpenCodeMessage,
 	useUnrevertSession,
-	useUpdatePart,
 } from "@/hooks/opencode/use-opencode-sessions";
 import { useSessionSync } from "@/hooks/opencode/use-session-sync";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
@@ -870,18 +867,18 @@ function EditPartDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<DialogHeader>
-					<DialogTitle>Edit message</DialogTitle>
+			<DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+				<DialogHeader className="flex-shrink-0">
+					<DialogTitle>Edit & resend</DialogTitle>
 					<DialogDescription>
-						Modify the text content of this message part.
+						This will fork the session at this point and resend with your edited message. Files changed after this point may already be modified.
 					</DialogDescription>
 				</DialogHeader>
-				<div className="py-2">
+				<div className="flex-1 min-h-0 py-2">
 					<Textarea
 						value={text}
 						onChange={(e) => setText(e.target.value)}
-						className="min-h-[120px] text-sm"
+						className="min-h-[120px] max-h-[50vh] h-full text-sm resize-y"
 						autoFocus
 						onKeyDown={(e) => {
 							if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -891,7 +888,7 @@ function EditPartDialog({
 						}}
 					/>
 				</div>
-				<DialogFooter>
+				<DialogFooter className="flex-shrink-0">
 					<Button
 						variant="outline"
 						onClick={() => onOpenChange(false)}
@@ -906,7 +903,7 @@ function EditPartDialog({
 						{loading ? (
 							<Loader2 className="size-3.5 animate-spin mr-1.5" />
 						) : null}
-						Save
+						Fork & resend
 					</Button>
 				</DialogFooter>
 			</DialogContent>
@@ -915,132 +912,66 @@ function EditPartDialog({
 }
 
 // ============================================================================
-// Part Actions — edit/delete actions for individual message parts
+// Part Actions — edit & fork action for user message parts
 // ============================================================================
 
 function PartActions({
 	part,
-	messageId,
-	sessionId,
 	isBusy,
+	isReverted,
+	onEditFork,
+	loading,
 	className,
 }: {
 	part: Part;
-	messageId: string;
-	sessionId: string;
 	isBusy: boolean;
+	isReverted: boolean;
+	onEditFork: (newText: string) => void;
+	loading?: boolean;
 	className?: string;
 }) {
 	const [editOpen, setEditOpen] = useState(false);
-	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-	const updatePart = useUpdatePart();
-	const deletePart = useDeletePart();
 
 	// Only text parts are editable
 	const isEditable = isTextPart(part) && !!(part as TextPart).text?.trim();
 	const partText = isEditable ? (part as TextPart).text : "";
 
-	const handleUpdate = useCallback(
-		(newText: string) => {
-			updatePart.mutate(
-				{
-					sessionId,
-					messageId,
-					partId: part.id,
-					part: {
-						...part,
-						text: newText,
-						metadata: { ...((part as any).metadata || {}), edited: true },
-					} as any,
-				},
-				{
-					onSuccess: () => setEditOpen(false),
-				},
-			);
-		},
-		[sessionId, messageId, part, updatePart],
-	);
-
-	const handleDelete = useCallback(() => {
-		deletePart.mutate(
-			{
-				sessionId,
-				messageId,
-				partId: part.id,
-			},
-			{
-				onSuccess: () => setDeleteDialogOpen(false),
-			},
-		);
-	}, [sessionId, messageId, part.id, deletePart]);
+	if (!isEditable) return null;
 
 	return (
 		<>
 			<div className={cn("flex items-center gap-0.5", className)}>
-				{/* Edit button — only for text parts */}
-				{isEditable && (
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<button
-								onClick={() => setEditOpen(true)}
-								disabled={isBusy}
-								className={cn(
-									"p-1.5 rounded-md transition-colors cursor-pointer",
-									"text-muted-foreground/50 hover:text-foreground hover:bg-muted/60",
-									"disabled:opacity-30 disabled:cursor-not-allowed",
-								)}
-							>
-								<Pencil className="size-3.5" />
-							</button>
-						</TooltipTrigger>
-						<TooltipContent side="top" className="text-xs">
-							Edit
-						</TooltipContent>
-					</Tooltip>
-				)}
-
-				{/* Delete button */}
+				{/* Edit & fork button */}
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<button
-							onClick={() => setDeleteDialogOpen(true)}
-							disabled={isBusy}
+							onClick={() => setEditOpen(true)}
+							disabled={isBusy || isReverted}
 							className={cn(
 								"p-1.5 rounded-md transition-colors cursor-pointer",
-								"text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10",
+								"text-muted-foreground/50 hover:text-foreground hover:bg-muted/60",
 								"disabled:opacity-30 disabled:cursor-not-allowed",
 							)}
 						>
-							<Trash2 className="size-3.5" />
+							<Pencil className="size-3.5" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="top" className="text-xs">
-						Delete
+						Edit & resend
 					</TooltipContent>
 				</Tooltip>
 			</div>
 
-			{/* Edit dialog */}
-			{isEditable && (
-				<EditPartDialog
-					open={editOpen}
-					onOpenChange={setEditOpen}
-					initialText={partText}
-					onSave={handleUpdate}
-					loading={updatePart.isPending}
-				/>
-			)}
-
-			{/* Delete confirmation */}
-			<ConfirmDialog
-				open={deleteDialogOpen}
-				onOpenChange={setDeleteDialogOpen}
-				title="Delete message part"
-				description="This will permanently remove this part from the message. This action cannot be undone."
-				action={handleDelete}
-				actionLabel="Delete"
-				variant="destructive"
-				loading={deletePart.isPending}
+			{/* Edit & fork dialog */}
+			<EditPartDialog
+				open={editOpen}
+				onOpenChange={setEditOpen}
+				initialText={partText}
+				onSave={(newText) => {
+					onEditFork(newText);
+					setEditOpen(false);
+				}}
+				loading={loading}
 			/>
 		</>
 	);
@@ -1173,10 +1104,26 @@ function UserMessageRow({
 	const [copied, setCopied] = useState(false);
 	const textRef = useRef<HTMLDivElement>(null);
 
+	// Use ResizeObserver + rAF to reliably detect overflow after layout settles
 	useEffect(() => {
 		const el = textRef.current;
 		if (!el || expanded) return;
-		setCanExpand(el.scrollHeight > el.clientHeight + 2);
+
+		const measure = () => {
+			setCanExpand(el.scrollHeight > el.clientHeight + 2);
+		};
+
+		// Measure after next frame to ensure layout is computed
+		const rafId = requestAnimationFrame(measure);
+
+		// Also observe resize changes (font loads, container resize, etc.)
+		const ro = new ResizeObserver(measure);
+		ro.observe(el);
+
+		return () => {
+			cancelAnimationFrame(rafId);
+			ro.disconnect();
+		};
 	}, [text, expanded]);
 
 	const handleCopy = async () => {
@@ -1574,6 +1521,8 @@ interface SessionTurnProps {
 	isCompaction?: boolean;
 	/** Fork the session at a specific message */
 	onFork: (messageId: string) => Promise<void>;
+	/** Fork the session at a user message and resend with edited text */
+	onEditFork: (userMessageId: string, newText: string) => Promise<void>;
 	/** Revert the session to before a specific message */
 	onRevert: (messageId: string) => Promise<void>;
 	/** Providers data for the Connect Provider dialog */
@@ -1602,6 +1551,7 @@ function SessionTurn({
 	isReverted,
 	isCompaction,
 	onFork,
+	onEditFork,
 	onRevert,
 	providers,
 	commandMessages,
@@ -1613,6 +1563,7 @@ function SessionTurn({
 	const [revertDialogOpen, setRevertDialogOpen] = useState(false);
 	const [connectProviderOpen, setConnectProviderOpen] = useState(false);
 	const [revertLoading, setRevertLoading] = useState(false);
+	const [editForkLoading, setEditForkLoading] = useState(false);
 
 	// Derived state from shared helpers
 	const allParts = useMemo(() => collectTurnParts(turn), [turn]);
@@ -2119,23 +2070,24 @@ function SessionTurn({
 							</TooltipTrigger>
 							<TooltipContent>{userCopied ? "Copied!" : "Copy"}</TooltipContent>
 						</Tooltip>
-						{(() => {
-							const userTextPart = turn.userMessage.parts.find(
-								(p) =>
-									isTextPart(p) &&
-									(p as TextPart).text?.trim() &&
-									!(p as TextPart).synthetic,
-							);
-							if (!userTextPart) return null;
-							return (
-								<PartActions
-									part={userTextPart}
-									messageId={turn.userMessage.info.id}
-									sessionId={sessionId}
-									isBusy={isBusy}
-								/>
-							);
-						})()}
+					{(() => {
+						const userTextPart = turn.userMessage.parts.find(
+							(p) =>
+								isTextPart(p) &&
+								(p as TextPart).text?.trim() &&
+								!(p as TextPart).synthetic,
+						);
+						if (!userTextPart) return null;
+						return (
+							<PartActions
+								part={userTextPart}
+								isBusy={isBusy}
+								isReverted={isReverted}
+								onEditFork={(newText) => onEditFork(turn.userMessage.info.id, newText)}
+								loading={editForkLoading}
+							/>
+						);
+					})()}
 					</div>
 				)}
 			</div>
@@ -3436,6 +3388,37 @@ export function SessionChat({
 		[sessionId, forkSession, messages],
 	);
 
+	const handleEditFork = useCallback(
+		async (userMessageId: string, newText: string) => {
+			// Fork at the user message — the server copies all messages BEFORE
+			// the given messageID, so passing the user message ID gives us the
+			// conversation up to (but not including) that user turn.
+			const forkedSession = await forkSession.mutateAsync({
+				sessionId,
+				messageId: userMessageId,
+			});
+
+			// Open the forked session in a new tab and navigate
+			const title = forkedSession.title || "Forked session";
+			openTabAndNavigate({
+				id: forkedSession.id,
+				title,
+				type: "session",
+				href: `/sessions/${forkedSession.id}`,
+				parentSessionId: sessionId,
+				serverId: useServerStore.getState().activeServerId,
+			});
+			localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
+
+			// Auto-send the edited text in the forked session
+			sendMessage.mutate({
+				sessionId: forkedSession.id,
+				parts: [{ type: "text", text: newText }],
+			});
+		},
+		[sessionId, forkSession, sendMessage],
+	);
+
 	const handleRevert = useCallback(
 		async (messageId: string) => {
 			await revertSession.mutateAsync({
@@ -3898,8 +3881,9 @@ export function SessionChat({
 												isBusy={isBusy}
 												isReverted={isReverted}
 												isCompaction={hasCompaction}
-												onFork={handleFork}
-												onRevert={handleRevert}
+											onFork={handleFork}
+											onEditFork={handleEditFork}
+											onRevert={handleRevert}
 												providers={providers}
 												commandMessages={commandMessagesRef.current}
 												commands={commands}
