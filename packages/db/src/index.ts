@@ -56,12 +56,30 @@ export {
   creditUsage,
   accountDeletionRequests,
   creditPurchases,
+  // Tunnel
+  tunnelStatusEnum,
+  tunnelCapabilityEnum,
+  tunnelPermissionStatusEnum,
+  tunnelPermissionRequestStatusEnum,
+  tunnelConnections,
+  tunnelPermissions,
+  tunnelPermissionRequests,
+  tunnelAuditLogs,
+  tunnelConnectionsRelations,
+  tunnelPermissionsRelations,
+  tunnelPermissionRequestsRelations,
+  tunnelAuditLogsRelations,
 } from './schema/kortix';
 
 export type {
   ChannelCredentials,
   ChannelPlatformConfig,
   ChannelPlatformUser,
+  TunnelMachineInfo,
+  TunnelFilesystemScope,
+  TunnelShellScope,
+  TunnelNetworkScope,
+  TunnelPermissionScope,
 } from './schema/kortix';
 
 // Public/basejump tables
@@ -107,4 +125,12 @@ export type {
   NewSandboxIntegration,
   ServerEntry,
   NewServerEntry,
+  TunnelConnection,
+  NewTunnelConnection,
+  TunnelPermission,
+  NewTunnelPermission,
+  TunnelPermissionRequest,
+  NewTunnelPermissionRequest,
+  TunnelAuditLog,
+  NewTunnelAuditLog,
 } from './types';

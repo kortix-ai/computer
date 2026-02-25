@@ -28,6 +28,9 @@ import { serversApp } from './servers';
 import { supabaseAuth, combinedAuth } from './middleware/auth';
 import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
+import { tunnelApp, startTunnelService, stopTunnelService, getTunnelServiceStatus } from './tunnel';
+import { tunnelRelay } from './tunnel/core/relay';
+import { heartbeatManager } from './tunnel/core/heartbeat';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -88,6 +91,7 @@ app.get('/health', (c) => {
     env: config.ENV_MODE,
     scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
+    tunnel: getTunnelServiceStatus(),
   });
 });
 
@@ -100,6 +104,7 @@ app.get('/v1/health', (c) => {
     env: config.ENV_MODE,
     scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
+    tunnel: getTunnelServiceStatus(),
   });
 });
 
@@ -238,6 +243,9 @@ app.route('/v1/servers', serversApp);        // /v1/servers, /v1/servers/:id, /v
 app.use('/v1/queue/*', combinedAuth);
 app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queue/messages/:id, /v1/queue/all, /v1/queue/status
 
+app.use('/v1/tunnel/*', combinedAuth);
+app.route('/v1/tunnel', tunnelApp);          // /v1/tunnel/connections, /v1/tunnel/permissions, /v1/tunnel/rpc, /v1/tunnel/audit
+
 // Preview Proxy — unified route for both cloud (Daytona) and local mode.
 // Pattern: /v1/preview/{sandboxId}/{port}/* for ALL modes.
 // Cloud:  sandboxId = Daytona external ID → proxied via Daytona SDK
@@ -375,6 +383,7 @@ console.log(`
 ║    /v1/integrations (OAuth integrations)                    ║
 ║    /v1/setup      (setup & env management)                 ║
 ║    /v1/queue      (persistent message queue)               ║
+║    /v1/tunnel     (reverse-tunnel to local machines)         ║
 ║    /v1/preview    (sandbox proxy — local + cloud)           ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
@@ -383,6 +392,7 @@ console.log(`
 ║  Billing:    ${(config.KORTIX_BILLING_INTERNAL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Channels:   ${(config.CHANNELS_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Scheduler:  ${(config.SCHEDULER_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
+║  Tunnel:     ${(config.TUNNEL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Providers:  ${config.ALLOWED_SANDBOX_PROVIDERS.join(', ').padEnd(42)}║
 ╚═══════════════════════════════════════════════════════════╝
 `);
@@ -400,12 +410,14 @@ ensureSchema()
     startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
     startChannelService();
     startDrainer();
+    startTunnelService();
   })
   .catch(async (err) => {
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
     startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
     startChannelService();
     startDrainer();
+    startTunnelService();
   });
 
 // If local_docker is enabled and we have a DB, ensure the sandbox is registered
@@ -422,6 +434,7 @@ function shutdown(signal: string) {
   stopChannelService();
   stopDrainer();
   stopModelPricing();
+  stopTunnelService();
   process.exit(0);
 }
 
@@ -647,6 +660,109 @@ export default {
       }
     }
 
+    // ── Tunnel Agent WebSocket ──────────────────────────────────────────
+    // Matches: ws://host/v1/tunnel/ws?token=kortix_...&tunnelId=...
+    // Local agent connects here to receive RPC requests from sandbox tools.
+    if (isWsUpgrade && url.pathname === '/v1/tunnel/ws') {
+      const queryToken = url.searchParams.get('token');
+      const tunnelId = url.searchParams.get('tunnelId');
+
+      if (!queryToken || !tunnelId) {
+        return new Response(JSON.stringify({ error: 'Missing token or tunnelId' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Rate limit WS connections (keyed by tunnelId to prevent connection spam)
+      const { tunnelRateLimiter } = await import('./tunnel/core/rate-limiter');
+      const wsRateCheck = tunnelRateLimiter.check('wsConnect', tunnelId);
+      if (!wsRateCheck.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Too many connection attempts',
+          retryAfterMs: wsRateCheck.retryAfterMs,
+        }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate token — supports kortix_ API keys, kortix_tnl_ tunnel tokens, and Supabase JWTs
+      const { isTunnelToken, hashSecretKey: hashKey, verifySecretKey: verifyKey } = await import('./shared/crypto');
+      const { eq: eqOp, and: andOp } = await import('drizzle-orm');
+      const { tunnelConnections } = await import('@kortix/db');
+      const { db: tunnelDb } = await import('./shared/db');
+
+      let accountId: string | null = null;
+      let tunnel: any = null;
+
+      if (isTunnelToken(queryToken)) {
+        // Tunnel setup token — validate against stored hash on the tunnel row
+        const tokenHash = hashKey(queryToken);
+        const [row] = await tunnelDb
+          .select()
+          .from(tunnelConnections)
+          .where(andOp(
+            eqOp(tunnelConnections.tunnelId, tunnelId),
+            eqOp(tunnelConnections.setupTokenHash, tokenHash),
+          ));
+        if (row) {
+          accountId = row.accountId;
+          tunnel = row;
+        }
+      } else if (isKortixToken(queryToken)) {
+        const result = await validateSecretKey(queryToken);
+        if (result.isValid) accountId = result.accountId!;
+      } else {
+        try {
+          const supabase = getSupabase();
+          const { data: { user }, error } = await supabase.auth.getUser(queryToken);
+          if (!error && user) accountId = user.id;
+        } catch {}
+      }
+
+      if (!accountId) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verify tunnel ownership (skip if already loaded via tunnel token path)
+      if (!tunnel) {
+        const [row] = await tunnelDb
+          .select()
+          .from(tunnelConnections)
+          .where(andOp(
+            eqOp(tunnelConnections.tunnelId, tunnelId),
+            eqOp(tunnelConnections.accountId, accountId),
+          ));
+        tunnel = row;
+      }
+
+      if (!tunnel) {
+        return new Response(JSON.stringify({ error: 'Tunnel not found or unauthorized' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Derive signing key from the raw token (available transiently during handshake)
+      const { deriveSigningKey } = await import('./shared/crypto');
+      const tunnelSigningKey = deriveSigningKey(queryToken);
+
+      const success = server.upgrade(req, {
+        data: {
+          type: 'tunnel-agent',
+          tunnelId,
+          accountId,
+          capabilities: tunnel.capabilities || [],
+          signingKey: tunnelSigningKey,
+        },
+      });
+      if (success) return undefined;
+    }
+
     // ── Path-based WebSocket proxy (local mode) ──────────────────────────
     // Matches: ws://localhost:8008/v1/preview/{sandboxId}/{port}/*
     // Used for OpenCode PTY terminals, SSE-over-WS, etc.
@@ -688,7 +804,58 @@ export default {
   },
 
   websocket: {
-    open(ws: { data: WsProxyData; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
+    open(ws: { data: any; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
+      // ── Tunnel Agent WebSocket ──────────────────────────────────────
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId, accountId, signingKey } = ws.data;
+        tunnelRelay.registerAgent(tunnelId, ws as any, signingKey, accountId);
+        heartbeatManager.register(tunnelId);
+
+        // Update DB status (fire-and-forget)
+        import('drizzle-orm').then(({ eq, and: andOp }) =>
+          import('@kortix/db').then(({ tunnelConnections, tunnelPermissions }) =>
+            import('./shared/db').then(async ({ db }) => {
+              // Update connection status
+              db.update(tunnelConnections)
+                .set({ status: 'online', lastHeartbeatAt: new Date(), updatedAt: new Date() })
+                .where(eq(tunnelConnections.tunnelId, tunnelId))
+                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err));
+
+              // Send permission sync — bulk-load active permissions to the agent
+              try {
+                const activePerms = await db
+                  .select({
+                    permissionId: tunnelPermissions.permissionId,
+                    capability: tunnelPermissions.capability,
+                    scope: tunnelPermissions.scope,
+                    expiresAt: tunnelPermissions.expiresAt,
+                  })
+                  .from(tunnelPermissions)
+                  .where(
+                    andOp(
+                      eq(tunnelPermissions.tunnelId, tunnelId),
+                      eq(tunnelPermissions.status, 'active'),
+                    ),
+                  );
+
+                tunnelRelay.sendNotification(tunnelId, 'tunnel.permissions.sync', {
+                  permissions: activePerms.map((p) => ({
+                    permissionId: p.permissionId,
+                    capability: p.capability,
+                    scope: p.scope,
+                    expiresAt: p.expiresAt?.toISOString() ?? undefined,
+                  })),
+                });
+              } catch (err) {
+                console.warn(`[tunnel-ws] Permission sync failed:`, err);
+              }
+            })
+          )
+        );
+        return;
+      }
+
+      // ── Preview Proxy WebSocket ─────────────────────────────────────
       activeWsConnections++;
       resetIdleTimer(ws);
 
@@ -737,7 +904,32 @@ export default {
       }
     },
 
-    message(ws: { data: WsProxyData; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
+    message(ws: { data: any; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
+      // ── Tunnel Agent Message ────────────────────────────────────────
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId } = ws.data;
+
+        // Check message size limit
+        const msgSize = typeof message === 'string' ? message.length : (message as Buffer).byteLength;
+        if (msgSize > config.TUNNEL_MAX_WS_MESSAGE_SIZE) {
+          console.warn(`[tunnel-ws] Oversized message from ${tunnelId}: ${msgSize} bytes (limit: ${config.TUNNEL_MAX_WS_MESSAGE_SIZE})`);
+          return; // Drop oversized messages
+        }
+
+        // Check for pong
+        try {
+          const parsed = JSON.parse(typeof message === 'string' ? message : message.toString('utf-8'));
+          if (parsed.method === 'tunnel.pong') {
+            heartbeatManager.recordPong(tunnelId);
+            return;
+          }
+        } catch {}
+
+        tunnelRelay.handleAgentMessage(tunnelId, message);
+        return;
+      }
+
+      // ── Preview Proxy Message ───────────────────────────────────────
       resetIdleTimer(ws);
       const upstream = ws.data.upstream;
       if (upstream && upstream.readyState === WebSocket.OPEN) {
@@ -754,7 +946,28 @@ export default {
       }
     },
 
-    close(ws: { data: WsProxyData }) {
+    close(ws: { data: any }) {
+      // ── Tunnel Agent Close ──────────────────────────────────────────
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId } = ws.data;
+        tunnelRelay.unregisterAgent(tunnelId);
+        heartbeatManager.unregister(tunnelId);
+
+        // Update DB status (fire-and-forget)
+        import('drizzle-orm').then(({ eq }) =>
+          import('@kortix/db').then(({ tunnelConnections }) =>
+            import('./shared/db').then(({ db }) =>
+              db.update(tunnelConnections)
+                .set({ status: 'offline', updatedAt: new Date() })
+                .where(eq(tunnelConnections.tunnelId, tunnelId))
+                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err))
+            )
+          )
+        );
+        return;
+      }
+
+      // ── Preview Proxy Close ─────────────────────────────────────────
       activeWsConnections--;
       ws.data.closed = true;
       clearWsTimers(ws.data);

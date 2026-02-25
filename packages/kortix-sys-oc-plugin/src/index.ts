@@ -28,6 +28,7 @@ import { consolidateMemories } from "./consolidate"
 import { ensureMemDir, writeObservationFile, writeLTMFile } from "./lss"
 import { getEnv, shortTs, changeSummary, formatMessages, ttcCompress, STORAGE_BASE, DB_PATH } from "./session"
 import type { LogFn, CreateLTMInput, LTMType } from "./types"
+import { tunnelStatusTool, tunnelFsReadTool, tunnelFsWriteTool, tunnelFsListTool, tunnelShellExecTool } from "./tunnel"
 
 // ─── Plugin Entry ────────────────────────────────────────────────────────────
 
@@ -442,6 +443,12 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					].join("\n")
 				},
 			}),
+			// ── Tunnel Tools ────────────────────────────────────────────
+			tunnel_status: tunnelStatusTool,
+			tunnel_fs_read: tunnelFsReadTool,
+			tunnel_fs_write: tunnelFsWriteTool,
+			tunnel_fs_list: tunnelFsListTool,
+			tunnel_shell_exec: tunnelShellExecTool,
 		},
 	}
 }
