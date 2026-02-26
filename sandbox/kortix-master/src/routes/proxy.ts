@@ -83,11 +83,18 @@ proxyRouter.all('/:port{[0-9]+}/*', async (c) => {
       headers: responseHeaders,
     })
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error)
     if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      console.error(`[proxy] Timeout on ${c.req.method} /proxy/${port}${remainingPath} after ${FETCH_TIMEOUT_MS / 1000}s`)
       return c.json({ error: 'Upstream request timed out', port }, 504)
     }
-    console.error(`[proxy] Error (port ${port}): ${error instanceof Error ? error.message : String(error)}`)
-    return c.json({ error: 'Failed to connect to service', port, details: String(error) }, 502)
+    const isConnRefused = errMsg.includes('ECONNREFUSED') || errMsg.includes('Unable to connect')
+    if (isConnRefused) {
+      console.error(`[proxy] Port ${port} unreachable on ${c.req.method} ${remainingPath}: nothing is listening on localhost:${port}`)
+    } else {
+      console.error(`[proxy] Error on ${c.req.method} /proxy/${port}${remainingPath}: ${errMsg}`)
+    }
+    return c.json({ error: isConnRefused ? `Nothing listening on port ${port}` : 'Failed to connect to service', port, details: errMsg }, 502)
   }
 })
 

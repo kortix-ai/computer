@@ -2,6 +2,7 @@ import type { SandboxTarget } from '../types';
 import { getProvider } from '../../platform/providers';
 import type { ProviderName } from '../../platform/providers';
 import { getDaytona, isDaytonaConfigured } from '../../shared/daytona';
+import { config } from '../../config';
 
 interface CreateSessionResponse {
   id: string;
@@ -23,7 +24,7 @@ export interface StreamEvent {
   };
 }
 
-const FILE_PRODUCING_TOOLS = new Set(['show_user', 'show-user']);
+const FILE_PRODUCING_TOOLS = new Set(['show', 'show_user', 'show-user']);
 const FILE_ITEM_TYPES = new Set(['file', 'image']);
 
 interface ResolvedEndpoint {
@@ -56,8 +57,8 @@ async function resolveDirectEndpoint(target: SandboxTarget): Promise<ResolvedEnd
   }
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (target.authToken) {
-    headers['Authorization'] = `Basic ${btoa(target.authToken)}`;
+  if (config.INTERNAL_SERVICE_KEY) {
+    headers['Authorization'] = `Bearer ${config.INTERNAL_SERVICE_KEY}`;
   }
   return { url: target.baseUrl.replace(/\/$/, ''), headers };
 }
@@ -327,7 +328,7 @@ export class SandboxConnector {
     const input = state.input as Record<string, unknown> | undefined;
     const output = state.output as string | undefined;
 
-    if (toolName === 'show_user' || toolName === 'show-user') {
+    if (toolName === 'show' || toolName === 'show_user' || toolName === 'show-user') {
       const itemType = (input?.type as string) || '';
       let filePath: string | undefined;
       let publicUrl: string | undefined;
@@ -355,7 +356,7 @@ export class SandboxConnector {
         const name = (filePath || publicUrl || 'file').split('/').pop()?.split('?')[0] || 'file';
         const url = publicUrl || filePath!;
         const mimeType = itemType === 'image' ? this.guessImageMime(name) : undefined;
-        console.log(`[SANDBOX-CONNECTOR] show-user file: name=${name} publicUrl=${!!publicUrl} url=${url.slice(0, 120)}`);
+        console.log(`[SANDBOX-CONNECTOR] show file: name=${name} publicUrl=${!!publicUrl} url=${url.slice(0, 120)}`);
         return { name, url, mimeType };
       }
     }

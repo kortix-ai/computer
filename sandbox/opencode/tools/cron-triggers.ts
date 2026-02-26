@@ -6,7 +6,7 @@ import { tool } from "@opencode-ai/plugin";
  *
  * Env vars used:
  *   KORTIX_API_URL  — e.g. https://new-api.kortix.com/v1/router
- *   KORTIX_TOKEN    — sbt_xxx sandbox token
+ *   KORTIX_TOKEN    — kortix_sb_xxx sandbox token
  */
 
 function getCronUrl(): string {
@@ -29,7 +29,7 @@ async function cronFetch(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  // Auth is always required — sbt_ sandbox token or Supabase JWT.
+  // Auth is always required — kortix_ sandbox token or Supabase JWT.
   const token = getToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;

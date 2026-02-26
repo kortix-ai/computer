@@ -16,12 +16,21 @@ echo "[startup] Preparing Kortix sandbox..."
 # These must run as root before s6 takes over, because Daytona creates
 # /workspace dirs as root/dockremap and s6 services run as user abc.
 
-mkdir -p /workspace/.kortix \
-    /workspace/.agent-browser /workspace/.browser-profile /workspace/.lss \
+mkdir -p /workspace/.agent-browser /workspace/.browser-profile /workspace/.lss \
     /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
     /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \
     /workspace/.XDG /workspace/.config /workspace/ssl \
     /workspace/presentations
+
+# Remove stale LSS database if it has wrong ownership (e.g. created by UID 911).
+# lss-sync will rebuild a clean index on first run.
+if [ -f /workspace/.lss/lss.db ]; then
+    LSS_OWNER=$(stat -c '%u' /workspace/.lss/lss.db 2>/dev/null || echo "unknown")
+    if [ "$LSS_OWNER" != "1000" ] && [ "$LSS_OWNER" != "unknown" ]; then
+        echo "[startup] Removing stale LSS database (owned by UID $LSS_OWNER, expected 1000)"
+        rm -f /workspace/.lss/lss.db /workspace/.lss/lss.db-wal /workspace/.lss/lss.db-shm
+    fi
+fi
 
 # Ensure /config symlink exists (backward compat for linuxserver base image)
 if [ ! -L /config ] && [ ! -d /config ]; then

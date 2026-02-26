@@ -16,7 +16,8 @@ import { channelsApp, startChannelService, stopChannelService, getChannelService
 import { daytonaProxyApp } from './daytona-proxy';
 import { deploymentsApp } from './deployments';
 import { getSandboxBaseUrl, proxyToSandbox } from './daytona-proxy/routes/local-preview';
-import { validateSandboxToken } from './repositories/sandboxes';
+import { validateSecretKey } from './repositories/api-keys';
+import { isKortixToken } from './shared/crypto';
 import { getSupabase } from './shared/supabase';
 import { setupApp } from './setup';
 import { providersApp } from './providers/routes';
@@ -27,6 +28,10 @@ import { serversApp } from './servers';
 import { supabaseAuth, combinedAuth } from './middleware/auth';
 import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
+import { tunnelApp, startTunnelService, stopTunnelService, getTunnelServiceStatus } from './tunnel';
+import { tunnelRelay } from './tunnel/core/relay';
+import { heartbeatManager } from './tunnel/core/heartbeat';
+import { notifyTunnelEvent } from './tunnel/routes/permission-requests';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -87,6 +92,7 @@ app.get('/health', (c) => {
     env: config.ENV_MODE,
     scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
+    tunnel: getTunnelServiceStatus(),
   });
 });
 
@@ -99,6 +105,7 @@ app.get('/v1/health', (c) => {
     env: config.ENV_MODE,
     scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
+    tunnel: getTunnelServiceStatus(),
   });
 });
 
@@ -224,7 +231,7 @@ app.route('/', channelsApp);                 // /v1/channels/*, /webhooks/*
 // Setup — install-status is public (needed before any user exists), rest requires auth.
 app.route('/v1/setup', setupApp);          // /v1/setup/install-status (public), rest (auth inside router)
 
-// All remaining routes require authentication (JWT or sbt_ token).
+// All remaining routes require authentication (JWT or kortix_ token).
 app.use('/v1/providers/*', combinedAuth);
 app.route('/v1/providers', providersApp);   // /v1/providers, /v1/providers/schema, /v1/providers/:id/connect, /v1/providers/:id/disconnect, /v1/providers/health
 
@@ -237,24 +244,32 @@ app.route('/v1/servers', serversApp);        // /v1/servers, /v1/servers/:id, /v
 app.use('/v1/queue/*', combinedAuth);
 app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queue/messages/:id, /v1/queue/all, /v1/queue/status
 
+app.use('/v1/tunnel/*', combinedAuth);
+app.route('/v1/tunnel', tunnelApp);          // /v1/tunnel/connections, /v1/tunnel/permissions, /v1/tunnel/rpc, /v1/tunnel/audit
+
 // Preview Proxy — unified route for both cloud (Daytona) and local mode.
 // Pattern: /v1/preview/{sandboxId}/{port}/* for ALL modes.
 // Cloud:  sandboxId = Daytona external ID → proxied via Daytona SDK
 // Local:  sandboxId = container name (e.g. 'kortix-sandbox') → Docker DNS resolution
-// Auth: unified previewProxyAuth (accepts Supabase JWT and sbt_ tokens).
+// Auth: unified previewProxyAuth (accepts Supabase JWT and kortix_ tokens).
 // MUST be after all explicit routes (wildcard catch-all).
 app.route('/v1/preview', daytonaProxyApp);
 
 // === Error Handling ===
 
 app.onError((err, c) => {
-  console.error(`[ERROR] ${err.message}`, err.stack);
+  const method = c.req.method;
+  const path = c.req.path;
+  const errName = err.constructor?.name || 'Error';
 
   if (err instanceof BillingError) {
+    console.error(`[ERROR] ${method} ${path} -> ${err.statusCode} [BillingError] ${err.message}`);
     return c.json({ error: err.message }, err.statusCode as any);
   }
 
   if (err instanceof HTTPException) {
+    console.error(`[ERROR] ${method} ${path} -> ${err.status} [HTTPException] ${err.message}`);
+
     const response: Record<string, unknown> = {
       error: true,
       message: err.message,
@@ -267,6 +282,23 @@ app.onError((err, c) => {
     }
 
     return c.json(response, err.status);
+  }
+
+  // Database / postgres.js errors — extract the useful info, not the full SQL dump
+  const isDbError = errName === 'PostgresError' || (err as any).severity || (err as any).code?.match?.(/^[0-9]{5}$/);
+  if (isDbError) {
+    const pgErr = err as any;
+    const severity = pgErr.severity || 'ERROR';
+    const pgCode = pgErr.code || '?';
+    const table = pgErr.table ? ` table=${pgErr.table}` : '';
+    const schema = pgErr.schema_name || pgErr.schema || '';
+    const hint = pgErr.hint ? ` hint="${pgErr.hint}"` : '';
+    const detail = pgErr.detail ? ` detail="${pgErr.detail}"` : '';
+    console.error(`[ERROR] ${method} ${path} -> 500 [DB ${severity} ${pgCode}]${schema ? ` schema=${schema}` : ''}${table}${detail}${hint} ${err.message.split('\n')[0]}`);
+  } else {
+    // Generic unhandled error — log concisely with truncated stack
+    const stack = err.stack ? '\n' + err.stack.split('\n').slice(1, 4).join('\n') : '';
+    console.error(`[ERROR] ${method} ${path} -> 500 [${errName}] ${err.message}${stack}`);
   }
 
   return c.json(
@@ -352,6 +384,7 @@ console.log(`
 ║    /v1/integrations (OAuth integrations)                    ║
 ║    /v1/setup      (setup & env management)                 ║
 ║    /v1/queue      (persistent message queue)               ║
+║    /v1/tunnel     (reverse-tunnel to local machines)         ║
 ║    /v1/preview    (sandbox proxy — local + cloud)           ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
@@ -360,6 +393,7 @@ console.log(`
 ║  Billing:    ${(config.KORTIX_BILLING_INTERNAL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Channels:   ${(config.CHANNELS_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Scheduler:  ${(config.SCHEDULER_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
+║  Tunnel:     ${(config.TUNNEL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Providers:  ${config.ALLOWED_SANDBOX_PROVIDERS.join(', ').padEnd(42)}║
 ╚═══════════════════════════════════════════════════════════╝
 `);
@@ -377,12 +411,14 @@ ensureSchema()
     startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
     startChannelService();
     startDrainer();
+    startTunnelService();
   })
   .catch(async (err) => {
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
     startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
     startChannelService();
     startDrainer();
+    startTunnelService();
   });
 
 // If local_docker is enabled and we have a DB, ensure the sandbox is registered
@@ -399,6 +435,7 @@ function shutdown(signal: string) {
   stopChannelService();
   stopDrainer();
   stopModelPricing();
+  stopTunnelService();
   process.exit(0);
 }
 
@@ -461,8 +498,8 @@ function extractCookieToken(req: Request): string | null {
 }
 
 async function validatePreviewToken(token: string): Promise<boolean> {
-  if (token.startsWith('sbt_')) {
-    const result = await validateSandboxToken(token);
+  if (isKortixToken(token)) {
+    const result = await validateSecretKey(token);
     return result.isValid;
   }
   try {
@@ -624,6 +661,109 @@ export default {
       }
     }
 
+    // ── Tunnel Agent WebSocket ──────────────────────────────────────────
+    // Matches: ws://host/v1/tunnel/ws?token=kortix_...&tunnelId=...
+    // Local agent connects here to receive RPC requests from sandbox tools.
+    if (isWsUpgrade && url.pathname === '/v1/tunnel/ws') {
+      const queryToken = url.searchParams.get('token');
+      const tunnelId = url.searchParams.get('tunnelId');
+
+      if (!queryToken || !tunnelId) {
+        return new Response(JSON.stringify({ error: 'Missing token or tunnelId' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Rate limit WS connections (keyed by tunnelId to prevent connection spam)
+      const { tunnelRateLimiter } = await import('./tunnel/core/rate-limiter');
+      const wsRateCheck = tunnelRateLimiter.check('wsConnect', tunnelId);
+      if (!wsRateCheck.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Too many connection attempts',
+          retryAfterMs: wsRateCheck.retryAfterMs,
+        }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate token — supports kortix_ API keys, kortix_tnl_ tunnel tokens, and Supabase JWTs
+      const { isTunnelToken, hashSecretKey: hashKey, verifySecretKey: verifyKey } = await import('./shared/crypto');
+      const { eq: eqOp, and: andOp } = await import('drizzle-orm');
+      const { tunnelConnections } = await import('@kortix/db');
+      const { db: tunnelDb } = await import('./shared/db');
+
+      let accountId: string | null = null;
+      let tunnel: any = null;
+
+      if (isTunnelToken(queryToken)) {
+        // Tunnel setup token — validate against stored hash on the tunnel row
+        const tokenHash = hashKey(queryToken);
+        const [row] = await tunnelDb
+          .select()
+          .from(tunnelConnections)
+          .where(andOp(
+            eqOp(tunnelConnections.tunnelId, tunnelId),
+            eqOp(tunnelConnections.setupTokenHash, tokenHash),
+          ));
+        if (row) {
+          accountId = row.accountId;
+          tunnel = row;
+        }
+      } else if (isKortixToken(queryToken)) {
+        const result = await validateSecretKey(queryToken);
+        if (result.isValid) accountId = result.accountId!;
+      } else {
+        try {
+          const supabase = getSupabase();
+          const { data: { user }, error } = await supabase.auth.getUser(queryToken);
+          if (!error && user) accountId = user.id;
+        } catch {}
+      }
+
+      if (!accountId) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verify tunnel ownership (skip if already loaded via tunnel token path)
+      if (!tunnel) {
+        const [row] = await tunnelDb
+          .select()
+          .from(tunnelConnections)
+          .where(andOp(
+            eqOp(tunnelConnections.tunnelId, tunnelId),
+            eqOp(tunnelConnections.accountId, accountId),
+          ));
+        tunnel = row;
+      }
+
+      if (!tunnel) {
+        return new Response(JSON.stringify({ error: 'Tunnel not found or unauthorized' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Derive signing key from the raw token (available transiently during handshake)
+      const { deriveSigningKey } = await import('./shared/crypto');
+      const tunnelSigningKey = deriveSigningKey(queryToken);
+
+      const success = server.upgrade(req, {
+        data: {
+          type: 'tunnel-agent',
+          tunnelId,
+          accountId,
+          capabilities: tunnel.capabilities || [],
+          signingKey: tunnelSigningKey,
+        },
+      });
+      if (success) return undefined;
+    }
+
     // ── Path-based WebSocket proxy (local mode) ──────────────────────────
     // Matches: ws://localhost:8008/v1/preview/{sandboxId}/{port}/*
     // Used for OpenCode PTY terminals, SSE-over-WS, etc.
@@ -635,7 +775,6 @@ export default {
         const wsPort = parseInt(wsPathMatch[2], 10);
         const wsRemainingPath = wsPathMatch[3] || '/';
 
-        // Auth: header → query param → cookie (same as subdomain handler)
         const wsAuthHeader = req.headers.get('Authorization');
         const wsBearerToken = wsAuthHeader?.startsWith('Bearer ') ? wsAuthHeader.slice(7) : null;
         const wsQueryToken = url.searchParams.get('token');
@@ -660,12 +799,59 @@ export default {
       }
     }
 
-    // ── HTTP / SSE — delegate to Hono ──────────────────────────────────
     return app.fetch(req, server);
   },
 
   websocket: {
-    open(ws: { data: WsProxyData; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
+    open(ws: { data: any; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId, accountId, signingKey } = ws.data;
+        tunnelRelay.registerAgent(tunnelId, ws as any, signingKey, accountId);
+        heartbeatManager.register(tunnelId);
+
+        notifyTunnelEvent(accountId, 'tunnel_connected', { tunnelId });
+
+        import('drizzle-orm').then(({ eq, and: andOp }) =>
+          import('@kortix/db').then(({ tunnelConnections, tunnelPermissions }) =>
+            import('./shared/db').then(async ({ db }) => {
+              db.update(tunnelConnections)
+                .set({ status: 'online', lastHeartbeatAt: new Date(), updatedAt: new Date() })
+                .where(eq(tunnelConnections.tunnelId, tunnelId))
+                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err));
+
+              try {
+                const activePerms = await db
+                  .select({
+                    permissionId: tunnelPermissions.permissionId,
+                    capability: tunnelPermissions.capability,
+                    scope: tunnelPermissions.scope,
+                    expiresAt: tunnelPermissions.expiresAt,
+                  })
+                  .from(tunnelPermissions)
+                  .where(
+                    andOp(
+                      eq(tunnelPermissions.tunnelId, tunnelId),
+                      eq(tunnelPermissions.status, 'active'),
+                    ),
+                  );
+
+                tunnelRelay.sendNotification(tunnelId, 'tunnel.permissions.sync', {
+                  permissions: activePerms.map((p) => ({
+                    permissionId: p.permissionId,
+                    capability: p.capability,
+                    scope: p.scope,
+                    expiresAt: p.expiresAt?.toISOString() ?? undefined,
+                  })),
+                });
+              } catch (err) {
+                console.warn(`[tunnel-ws] Permission sync failed:`, err);
+              }
+            })
+          )
+        );
+        return;
+      }
+
       activeWsConnections++;
       resetIdleTimer(ws);
 
@@ -714,7 +900,40 @@ export default {
       }
     },
 
-    message(ws: { data: WsProxyData; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
+    message(ws: { data: any; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId } = ws.data;
+
+        const msgSize = typeof message === 'string' ? message.length : (message as Buffer).byteLength;
+        if (msgSize > config.TUNNEL_MAX_WS_MESSAGE_SIZE) {
+          console.warn(`[tunnel-ws] Oversized message from ${tunnelId}: ${msgSize} bytes (limit: ${config.TUNNEL_MAX_WS_MESSAGE_SIZE})`);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(typeof message === 'string' ? message : message.toString('utf-8'));
+          if (parsed.method === 'tunnel.pong') {
+            heartbeatManager.recordPong(tunnelId);
+            const mi = parsed.params?.machineInfo;
+            if (mi && typeof mi === 'object' && mi.hostname) {
+              import('drizzle-orm').then(({ eq }) =>
+                import('@kortix/db').then(({ tunnelConnections }) =>
+                  import('./shared/db').then(({ db }) =>
+                    db.update(tunnelConnections)
+                      .set({ machineInfo: mi, updatedAt: new Date() })
+                      .where(eq(tunnelConnections.tunnelId, tunnelId))
+                      .catch(() => {})
+                  )
+                )
+              );
+            }
+            return;
+          }
+        } catch {}
+
+        tunnelRelay.handleAgentMessage(tunnelId, message);
+        return;
+      }
+
       resetIdleTimer(ws);
       const upstream = ws.data.upstream;
       if (upstream && upstream.readyState === WebSocket.OPEN) {
@@ -731,7 +950,29 @@ export default {
       }
     },
 
-    close(ws: { data: WsProxyData }) {
+    close(ws: { data: any }) {
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId, accountId } = ws.data;
+        tunnelRelay.unregisterAgent(tunnelId);
+        heartbeatManager.unregister(tunnelId);
+
+        if (accountId) {
+          notifyTunnelEvent(accountId, 'tunnel_disconnected', { tunnelId });
+        }
+
+        import('drizzle-orm').then(({ eq }) =>
+          import('@kortix/db').then(({ tunnelConnections }) =>
+            import('./shared/db').then(({ db }) =>
+              db.update(tunnelConnections)
+                .set({ status: 'offline', updatedAt: new Date() })
+                .where(eq(tunnelConnections.tunnelId, tunnelId))
+                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err))
+            )
+          )
+        );
+        return;
+      }
+
       activeWsConnections--;
       ws.data.closed = true;
       clearWsTimers(ws.data);

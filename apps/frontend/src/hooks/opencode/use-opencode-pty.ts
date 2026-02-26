@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
 import { getActiveOpenCodeUrl } from '@/stores/server-store';
+import { getAuthToken } from '@/lib/auth-token';
 import type { Pty } from '@opencode-ai/sdk/v2/client';
 
 export type { Pty };
@@ -113,8 +114,16 @@ export function useUpdatePty() {
 // WebSocket URL helper
 // ============================================================================
 
-export function getPtyWebSocketUrl(ptyId: string, serverUrl?: string): string {
+export async function getPtyWebSocketUrl(ptyId: string, serverUrl?: string): Promise<string> {
   const baseUrl = serverUrl || getActiveOpenCodeUrl();
   const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-  return `${wsUrl}/pty/${ptyId}/connect`;
+  const url = `${wsUrl}/pty/${ptyId}/connect`;
+  // Browser WebSocket API doesn't support custom headers, so inject the
+  // auth token as a query parameter for the backend proxy to authenticate.
+  const token = await getAuthToken();
+  if (token) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}token=${encodeURIComponent(token)}`;
+  }
+  return url;
 }

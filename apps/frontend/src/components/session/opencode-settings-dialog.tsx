@@ -48,7 +48,6 @@ import {
   useOpenCodeProviders,
   useOpenCodeToolIds,
 } from '@/hooks/opencode/use-opencode-sessions';
-import { ModelProviderIcon } from '@/lib/model-provider-icons';
 import { getClient } from '@/lib/opencode-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
@@ -250,7 +249,7 @@ function ProvidersSection({
 
   if (connectView) {
     return (
-      <div className="overflow-y-auto pr-1">
+      <div className="overflow-y-auto">
         <ConnectProviderContent
           providers={providers}
           onClose={() => setConnectView(false)}
@@ -264,18 +263,18 @@ function ProvidersSection({
   }
 
   return (
-    <div className="space-y-4 overflow-y-auto pr-1">
+    <div className="space-y-3 overflow-y-auto">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">
           Connected ({connectedProviders.length})
         </span>
         <Button
           variant="outline"
           size="sm"
-          className="h-7 px-2.5 text-xs gap-1.5"
+          className="h-7 px-2.5 text-xs gap-1.5 rounded-lg"
           onClick={() => setConnectView(true)}
         >
-          <Zap className="h-3 w-3" />
+          <Plus className="h-3 w-3" />
           Connect
         </Button>
       </div>
@@ -289,30 +288,27 @@ function ProvidersSection({
             return (
               <div
                 key={p.id}
-                className="rounded-xl border border-border/50 bg-card overflow-hidden"
+                className="rounded-lg border border-border/40 bg-card/50 overflow-hidden"
               >
-                <div className="flex items-center gap-3 px-3 py-2.5">
-                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted/50 flex-shrink-0">
-                    <ModelProviderIcon modelId={p.id} size={16} />
-                  </div>
+                <div className="flex items-center gap-3 px-3 py-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground">
                         {PROVIDER_LABELS[p.id] || p.name || p.id}
                       </span>
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <span className="w-1 h-1 rounded-full bg-emerald-500" />
                         connected
                       </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground/60">
                       {modelCount} model{modelCount !== 1 ? 's' : ''}
                     </span>
                   </div>
                   <button
                     onClick={() => handleDisconnect(p.id)}
                     disabled={isDisc}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                     title="Disconnect"
                   >
                     {isDisc ? (
@@ -323,24 +319,26 @@ function ProvidersSection({
                   </button>
                 </div>
 
-                <button
-                  onClick={() => setExpanded(isExp ? null : p.id)}
-                  className="flex items-center gap-1 px-3 pb-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {isExp ? (
-                    <ChevronDown className="h-3 w-3" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3" />
-                  )}
-                  {isExp ? 'Hide models' : 'Show models'}
-                </button>
+                {modelCount > 0 && (
+                  <button
+                    onClick={() => setExpanded(isExp ? null : p.id)}
+                    className="flex items-center gap-1 px-3 pb-2 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  >
+                    {isExp ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                    {isExp ? 'Hide models' : 'Show models'}
+                  </button>
+                )}
 
                 {isExp && (
-                  <div className="border-t border-border/30">
+                  <div className="border-t border-border/20">
                     {Object.values(p.models).map((m: any) => (
                       <div
                         key={m.id}
-                        className="flex items-center gap-2 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted/30"
+                        className="flex items-center gap-2 px-3 py-1 text-[11px] text-foreground/60 hover:bg-muted/20"
                       >
                         <span className="truncate">{m.name || m.id}</span>
                       </div>
@@ -352,10 +350,9 @@ function ProvidersSection({
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <Zap className="h-6 w-6 text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">No providers connected</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <p className="text-xs text-muted-foreground/60">No providers connected</p>
+          <p className="text-[11px] text-muted-foreground/40 mt-1">
             Connect a provider to use AI models
           </p>
         </div>

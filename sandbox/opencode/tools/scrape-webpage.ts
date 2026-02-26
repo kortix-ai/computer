@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
 import FirecrawlApp from "@mendable/firecrawl-js";
+import { getEnv } from "./lib/get-env";
 
 interface ScrapeResult {
   url: string;
@@ -77,12 +78,12 @@ export default tool({
       .describe("Include raw HTML alongside markdown. Default: false"),
   },
   async execute(args, _context) {
-    const apiKey = process.env.FIRECRAWL_API_KEY;
+    const apiKey = getEnv("FIRECRAWL_API_KEY");
     if (!apiKey) return "Error: FIRECRAWL_API_KEY not set.";
 
     const client = new FirecrawlApp({
       apiKey,
-      apiUrl: process.env.FIRECRAWL_URL ?? "https://api.firecrawl.dev",
+      apiUrl: getEnv("FIRECRAWL_URL") ?? "https://api.firecrawl.dev",
     });
     const includeHtml = args.include_html ?? false;
 

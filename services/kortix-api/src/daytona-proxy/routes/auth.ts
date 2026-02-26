@@ -10,7 +10,8 @@
  */
 
 import { Hono } from 'hono';
-import { validateSandboxToken } from '../../repositories/sandboxes';
+import { validateSecretKey } from '../../repositories/api-keys';
+import { isKortixToken } from '../../shared/crypto';
 import { getSupabase } from '../../shared/supabase';
 
 const PREVIEW_SESSION_COOKIE = '__preview_session';
@@ -31,10 +32,10 @@ getAuthToken.post('/', async (c) => {
   }
 
   // Validate token
-  if (token.startsWith('sbt_')) {
-    const result = await validateSandboxToken(token);
+  if (isKortixToken(token)) {
+    const result = await validateSecretKey(token);
     if (!result.isValid) {
-      return c.json({ error: result.error || 'Invalid sandbox token' }, 401);
+      return c.json({ error: result.error || 'Invalid Kortix token' }, 401);
     }
   } else {
     try {

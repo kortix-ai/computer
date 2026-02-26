@@ -13,15 +13,64 @@ export function randomAlphanumeric(length: number): string {
 }
 
 /**
- * Generate a public/secret key pair.
- * Public key: pk_<32 chars>  (safe to store/display)
- * Secret key: sk_<32 chars>  (shown once, only hash stored)
+ * Kortix API key prefixes.
+ *
+ *   kortix_      — user-created API key (for external programmatic access)
+ *   kortix_sb_   — sandbox-managed key (auto-created per sandbox, used by agents)
+ *   pk_          — public key identifier (safe to store/display)
+ *
+ * Both secret key variants validate through the same path — only the hash is stored.
+ */
+export const KEY_PREFIX = 'kortix_';
+export const KEY_PREFIX_SANDBOX = 'kortix_sb_';
+export const KEY_PREFIX_TUNNEL = 'kortix_tnl_';
+export const KEY_PREFIX_PUBLIC = 'pk_';
+
+const SECRET_RANDOM_LENGTH = 32;
+
+/**
+ * Check if a token is a Kortix-issued key (user or sandbox).
+ * Single check for the router — no branching on multiple prefixes.
+ */
+export function isKortixToken(token: string): boolean {
+  return token.startsWith(KEY_PREFIX);
+}
+
+/**
+ * Generate a public/secret key pair for a user-created API key.
+ * Secret key: kortix_<32 chars>  (shown once, only hash stored)
+ * Public key:  pk_<32 chars>     (safe to store/display)
  */
 export function generateApiKeyPair(): { publicKey: string; secretKey: string } {
   return {
-    publicKey: `pk_${randomAlphanumeric(32)}`,
-    secretKey: `sk_${randomAlphanumeric(32)}`,
+    publicKey: `${KEY_PREFIX_PUBLIC}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
+    secretKey: `${KEY_PREFIX}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
   };
+}
+
+/**
+ * Generate a public/secret key pair for a sandbox-managed key.
+ * Secret key: kortix_sb_<32 chars>  (injected as KORTIX_TOKEN into sandbox)
+ * Public key: pk_<32 chars>          (safe to store/display)
+ */
+export function generateSandboxKeyPair(): { publicKey: string; secretKey: string } {
+  return {
+    publicKey: `${KEY_PREFIX_PUBLIC}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
+    secretKey: `${KEY_PREFIX_SANDBOX}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`,
+  };
+}
+
+/**
+ * Generate a tunnel-specific setup token.
+ * Token: kortix_tnl_<32 chars> (shown once during tunnel creation, only hash stored)
+ */
+export function generateTunnelToken(): string {
+  return `${KEY_PREFIX_TUNNEL}${randomAlphanumeric(SECRET_RANDOM_LENGTH)}`;
+}
+
+/** Check if a token is a tunnel setup token. */
+export function isTunnelToken(token: string): boolean {
+  return token.startsWith(KEY_PREFIX_TUNNEL);
 }
 
 export function hashSecretKey(secretKey: string): string {
@@ -66,4 +115,35 @@ export function timingSafeStringEqual(a: string, b: string): boolean {
   const hashA = createHash('sha256').update(a).digest();
   const hashB = createHash('sha256').update(b).digest();
   return timingSafeEqual(hashA, hashB);
+}
+
+const SIGNING_KEY_CONTEXT = 'kortix-tunnel-signing-v1';
+
+export function deriveSigningKey(token: string): string {
+  return createHmac('sha256', SIGNING_KEY_CONTEXT)
+    .update(token)
+    .digest('hex');
+}
+
+export function signMessage(signingKey: string, payload: string, nonce: number): string {
+  return createHmac('sha256', signingKey)
+    .update(`${nonce}:${payload}`)
+    .digest('hex');
+}
+
+export function verifyMessageSignature(
+  signingKey: string,
+  payload: string,
+  nonce: number,
+  signature: string,
+): boolean {
+  try {
+    const expected = signMessage(signingKey, payload, nonce);
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    if (sigBuffer.length !== expectedBuffer.length) return false;
+    return timingSafeEqual(sigBuffer, expectedBuffer);
+  } catch {
+    return false;
+  }
 }

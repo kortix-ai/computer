@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { proxyToOpenCode } from './services/proxy'
 import { SecretStore } from './services/secret-store'
+import { syncAuthToSecrets, startWatcher as startAuthWatcher } from './services/auth-sync'
 import envRouter from './routes/env'
 import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
@@ -41,6 +42,14 @@ const app = new Hono()
 // Initialize secret store and load ENV variables
 const secretStore = new SecretStore()
 await secretStore.loadIntoProcessEnv()
+
+// Two-way sync: OpenCode auth.json ↔ SecretStore (provider API keys)
+// Boot sync: pull any keys from auth.json into SecretStore + s6 env
+await syncAuthToSecrets(secretStore).catch(err =>
+  console.error('[Kortix Master] auth-sync boot error:', err)
+)
+// File watcher: auto-sync when auth.json changes at runtime
+startAuthWatcher(secretStore)
 
 // Global middleware
 app.use('*', logger())

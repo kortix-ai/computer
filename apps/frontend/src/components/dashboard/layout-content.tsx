@@ -103,11 +103,7 @@ const MaintenanceCountdownBanner = lazy(() =>
 	),
 );
 
-const UpdateBanner = lazy(() =>
-	import("@/components/announcements/update-banner").then((mod) => ({
-		default: mod.UpdateBanner,
-	})),
-);
+
 
 const CommandPalette = lazy(() =>
 	import("@/components/command-palette").then((mod) => ({
@@ -392,7 +388,7 @@ export default function DashboardLayoutContent({
 		// Fast path: if we've already confirmed onboarding is complete this browser
 		// session, skip the network call entirely. This eliminates ~50 requests to
 		// /env/ONBOARDING_COMPLETE per session. The cache is cleared on tab close
-		// (sessionStorage), so a reinstall (wipe ~/.kortix) + new tab works fine.
+		// (sessionStorage), so a reinstall + new tab works fine.
 		const cached = sessionStorage.getItem("onboarding_complete");
 		if (cached === "true") {
 			setOnboardingChecked(true);
@@ -511,9 +507,7 @@ export default function DashboardLayoutContent({
 					<Suspense fallback={null}>
 						<CommandPalette />
 					</Suspense>
-					<Suspense fallback={null}>
-						<UpdateBanner />
-					</Suspense>
+					{/* UpdateBanner removed — update indicator lives in the sidebar footer */}
 					<Suspense fallback={null}>
 						<OnboardingProvider>
 							<TabBar />

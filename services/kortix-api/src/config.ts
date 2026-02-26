@@ -1,7 +1,7 @@
 export type SandboxProviderName = 'daytona' | 'local_docker';
 
 /** Single source of truth for the sandbox version. Update on each release. */
-export const SANDBOX_VERSION = '0.6.3';
+export const SANDBOX_VERSION = '0.7.2';
 
 /** Parse comma-separated provider list (e.g. "daytona,local_docker") */
 function parseAllowedProviders(raw: string): SandboxProviderName[] {
@@ -115,7 +115,7 @@ export const config = {
   SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
   /**
    * Base host port used for local Docker sandbox fixed port mappings.
-   * The sandbox uses 7 contiguous ports starting at this base.
+   * The sandbox uses 8 contiguous ports starting at this base.
    */
   SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
 
@@ -148,6 +148,26 @@ export const config = {
   PIPEDREAM_CLIENT_SECRET: process.env.PIPEDREAM_CLIENT_SECRET || '',
   PIPEDREAM_PROJECT_ID: process.env.PIPEDREAM_PROJECT_ID || '',
   PIPEDREAM_ENVIRONMENT: process.env.PIPEDREAM_ENVIRONMENT || 'development',
+
+  // ─── Tunnel (Reverse-Tunnel to Local Machine) ──────────────────────────────
+  TUNNEL_ENABLED: process.env.TUNNEL_ENABLED !== 'false',
+  /** Heartbeat interval for tunnel agents (ms). Agent sends ping, server expects pong. */
+  TUNNEL_HEARTBEAT_INTERVAL_MS: parseInt(process.env.TUNNEL_HEARTBEAT_INTERVAL_MS || '30000', 10),
+  /** Max missed heartbeats before marking tunnel offline. */
+  TUNNEL_HEARTBEAT_MAX_MISSED: parseInt(process.env.TUNNEL_HEARTBEAT_MAX_MISSED || '3', 10),
+  /** Default timeout for RPC calls relayed to local agent (ms). */
+  TUNNEL_RPC_TIMEOUT_MS: parseInt(process.env.TUNNEL_RPC_TIMEOUT_MS || '30000', 10),
+  /** Max file size for tunnel filesystem operations (bytes). */
+  TUNNEL_MAX_FILE_SIZE: parseInt(process.env.TUNNEL_MAX_FILE_SIZE || String(10 * 1024 * 1024), 10),
+  /** TTL for tunnel permission requests before auto-expiring (ms). */
+  TUNNEL_PERMISSION_REQUEST_TTL_MS: parseInt(process.env.TUNNEL_PERMISSION_REQUEST_TTL_MS || '300000', 10),
+  /** Rate limits for tunnel endpoints (requests per 60s window). */
+  TUNNEL_RATE_LIMIT_RPC: parseInt(process.env.TUNNEL_RATE_LIMIT_RPC || '100', 10),
+  TUNNEL_RATE_LIMIT_PERM_REQUEST: parseInt(process.env.TUNNEL_RATE_LIMIT_PERM_REQUEST || '20', 10),
+  TUNNEL_RATE_LIMIT_WS_CONNECT: parseInt(process.env.TUNNEL_RATE_LIMIT_WS_CONNECT || '5', 10),
+  TUNNEL_RATE_LIMIT_PERM_GRANT: parseInt(process.env.TUNNEL_RATE_LIMIT_PERM_GRANT || '30', 10),
+  /** Max WebSocket message size for tunnel agents (bytes). Default 5MB. */
+  TUNNEL_MAX_WS_MESSAGE_SIZE: parseInt(process.env.TUNNEL_MAX_WS_MESSAGE_SIZE || String(5 * 1024 * 1024), 10),
 
   // ─── Slack (Platform App) ─────────────────────────────────────────────────
   SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID || '',

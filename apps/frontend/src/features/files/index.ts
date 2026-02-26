@@ -89,8 +89,16 @@ export {
 export {
   FileBrowser,
   FileViewer,
+  FileContentRenderer,
   FileSearch,
   FileBreadcrumbs,
   FileTreeItem,
   FileHistoryPanel,
+  FileTree,
+  FileExplorerPage,
+  FileExplorerToolbar,
+  FileExplorerStatusBar,
+  getFileCategory,
+  getLanguageFromExt,
 } from './components';
+export type { FileContentRendererProps } from './components';

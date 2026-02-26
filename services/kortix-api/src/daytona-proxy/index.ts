@@ -15,7 +15,7 @@ const daytonaProxyApp = new Hono();
 daytonaProxyApp.route('/auth', getAuthToken);
 
 // ── Path-based proxy ────────────────────────────────────────────────────────
-// Auth middleware for both modes (Supabase JWT, sbt_ tokens, cookies).
+// Auth middleware for both modes (Supabase JWT, kortix_ tokens, cookies).
 daytonaProxyApp.use('/:sandboxId/:port/*', previewProxyAuth);
 daytonaProxyApp.use('/:sandboxId/:port', previewProxyAuth);
 

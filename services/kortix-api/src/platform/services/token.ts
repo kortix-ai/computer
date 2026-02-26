@@ -1,13 +1,8 @@
 /**
- * Generate a cryptographically secure sandbox-scoped auth token.
- * Format: sbt_<48 random chars> (sandbox token)
+ * @deprecated Sandbox tokens (sbt_) have been replaced by kortix_sb_ keys
+ * stored in the api_keys table. Use generateSandboxKeyPair() from shared/crypto.ts instead.
+ *
+ * This file is kept temporarily for any lingering imports — it re-exports
+ * the new function so callers don't break.
  */
-export function generateSandboxToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = crypto.getRandomValues(new Uint8Array(48));
-  let result = '';
-  for (let i = 0; i < bytes.length; i++) {
-    result += chars[bytes[i] % chars.length];
-  }
-  return `sbt_${result}`;
-}
+export { generateSandboxKeyPair as generateSandboxToken } from '../../shared/crypto';

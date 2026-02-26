@@ -67,18 +67,38 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
     setImgError(true);
   };
 
-  // Functions for zooming
+  // Functions for zooming — adaptive step: 0.25 up to 2x, 0.5 up to 5x, 1.0 above
+  const getZoomStep = (currentZoom: number) => {
+    if (currentZoom < 2) return 0.25;
+    if (currentZoom < 5) return 0.5;
+    return 1;
+  };
+
   const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 0.25, 3));
+    setZoom((prev) => Math.min(prev + getZoomStep(prev), 10));
     setIsFitToScreen(false);
   };
 
   const handleZoomOut = () => {
-    const newZoom = Math.max(zoom - 0.25, 0.5);
-    setZoom(newZoom);
-    if (newZoom === 0.5) {
-      setIsFitToScreen(true);
-    }
+    setZoom((prev) => {
+      const step = getZoomStep(prev - 0.01); // step based on where we're going
+      const newZoom = Math.max(prev - step, 0.25);
+      if (newZoom <= 0.5) setIsFitToScreen(true);
+      return newZoom;
+    });
+  };
+
+  // Scroll wheel zoom
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -1 : 1;
+    setZoom((prev) => {
+      const step = getZoomStep(prev) * 0.5;
+      const next = Math.max(0.25, Math.min(prev + delta * step, 10));
+      if (next <= 0.5) setIsFitToScreen(true);
+      else setIsFitToScreen(false);
+      return next;
+    });
   };
 
   // Function for rotation
@@ -92,7 +112,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
       setZoom(1);
       setIsFitToScreen(false);
     } else {
-      setZoom(0.5);
+      setZoom(1);
       setPosition({ x: 0, y: 0 });
       setIsFitToScreen(true);
     }
@@ -100,7 +120,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
 
   // Pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom > 0.5) {
+    if (!isFitToScreen) {
       setIsPanning(true);
       setStartPanPosition({
         x: e.clientX - position.x,
@@ -110,7 +130,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning && zoom > 0.5) {
+    if (isPanning && !isFitToScreen) {
       setPosition({
         x: e.clientX - startPanPosition.x,
         y: e.clientY - startPanPosition.y,
@@ -240,8 +260,9 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onWheel={handleWheel}
         style={{
-          cursor: isPanning ? 'grabbing' : zoom > 0.5 ? 'grab' : 'default',
+          cursor: isPanning ? 'grabbing' : !isFitToScreen ? 'grab' : 'default',
         }}
       >
         {imgError ? (

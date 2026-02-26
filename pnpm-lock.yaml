@@ -12,6 +12,9 @@ importers:
 
   .:
     devDependencies:
+      kortix-tunnel:
+        specifier: workspace:*
+        version: link:packages/kortix-tunnel
       nx:
         specifier: ^22.4.5
         version: 22.5.0
@@ -736,6 +739,34 @@ importers:
         version: 1.3.9
       typescript:
         specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/kortix-sys-oc-plugin:
+    dependencies:
+      '@opencode-ai/plugin':
+        specifier: ^1.2.11
+        version: 1.2.15
+      '@opencode-ai/sdk':
+        specifier: ^1.2.11
+        version: 1.2.15
+    devDependencies:
+      '@types/bun':
+        specifier: latest
+        version: 1.3.9
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/kortix-tunnel:
+    devDependencies:
+      '@types/bun':
+        specifier: latest
+        version: 1.3.9
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.1
+      typescript:
+        specifier: ^5.7.0
         version: 5.9.3
 
   packages/shared:
@@ -2354,8 +2385,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@opencode-ai/plugin@1.2.15':
+    resolution: {integrity: sha512-mh9S05W+CZZmo6q3uIEBubS66QVgiev7fRafX7vemrCfz+3pEIkSwipLjU/sxIewC9yLiDWLqS73DH/iEQzVDw==}
+
   '@opencode-ai/sdk@1.2.10':
     resolution: {integrity: sha512-SyXcVqry2hitPVvQtvXOhqsWyFhSycG/+LTLYXrcq8AFmd9FR7dyBSDB3f5Ol6IPkYOegk8P2Eg2kKPNSNiKGw==}
+
+  '@opencode-ai/sdk@1.2.15':
+    resolution: {integrity: sha512-NUJNlyBCdZ4R0EBLjJziEQOp2XbRPJosaMcTcWSWO5XJPKGUpz0u8ql+5cR8K+v2RJ+hp2NobtNwpjEYfe6BRQ==}
 
   '@opentelemetry/api-logs@0.207.0':
     resolution: {integrity: sha512-lAb0jQRVyleQQGiuuvCOTDVspc14nx6XJjP4FspJ1sNARo3Regq4ZZbrc3rN4b1TYSuUCvgH+UXUPug4SLOqEQ==}
@@ -4811,6 +4848,9 @@ packages:
 
   '@types/node@20.19.33':
     resolution: {integrity: sha512-Rs1bVAIdBs5gbTIKza/tgpMuG1k3U/UMJLWecIMxNdJFDMzcM5LOiLVRYh3PilWEYDIeUDv7bpiHPLPsbydGcw==}
+
+  '@types/node@25.3.1':
+    resolution: {integrity: sha512-hj9YIJimBCipHVfHKRMnvmHg+wfhKc0o4mTtXh9pKBjC8TLJzz0nzGmLi5UJsYAUgSvXFHgb0V2oY10DUFtImw==}
 
   '@types/pako@2.0.4':
     resolution: {integrity: sha512-VWDCbrLeVXJM9fihYodcLiIv0ku+AlOa/TQ1SvYOaBuyrSKgEcro95LJyIsJ4vSo6BXIxOKxiJAat04CmST9Fw==}
@@ -8961,6 +9001,9 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
+  undici-types@7.18.2:
+    resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
+
   unicode-properties@1.4.1:
     resolution: {integrity: sha512-CLjCCLQ6UuMxWnbIylkisbRj31qxHPAurvena/0iwSVbQ2G1VY5/HjV0IRabOEbDHlzZlRdCrD4NhB0JtU40Pg==}
 
@@ -9267,6 +9310,9 @@ packages:
 
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zod@4.1.8:
+    resolution: {integrity: sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ==}
 
   zustand@5.0.11:
     resolution: {integrity: sha512-fdZY+dk7zn/vbWNCYmzZULHRrss0jx5pPFiOuMZ/5HJN6Yv3u+1Wswy/4MpZEkEGhtNH+pwxZB8OKgUBPzYAGg==}
@@ -11304,7 +11350,14 @@ snapshots:
   '@nx/nx-win32-x64-msvc@22.5.0':
     optional: true
 
+  '@opencode-ai/plugin@1.2.15':
+    dependencies:
+      '@opencode-ai/sdk': 1.2.15
+      zod: 4.1.8
+
   '@opencode-ai/sdk@1.2.10': {}
+
+  '@opencode-ai/sdk@1.2.15': {}
 
   '@opentelemetry/api-logs@0.207.0':
     dependencies:
@@ -14139,6 +14192,10 @@ snapshots:
   '@types/node@20.19.33':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/node@25.3.1':
+    dependencies:
+      undici-types: 7.18.2
 
   '@types/pako@2.0.4': {}
 
@@ -18984,6 +19041,8 @@ snapshots:
 
   undici-types@6.21.0: {}
 
+  undici-types@7.18.2: {}
+
   unicode-properties@1.4.1:
     dependencies:
       base64-js: 1.5.1
@@ -19333,6 +19392,8 @@ snapshots:
   yoga-layout@3.2.1: {}
 
   zod@3.25.76: {}
+
+  zod@4.1.8: {}
 
   zustand@5.0.11(@types/react@18.3.28)(immer@11.1.4)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1)):
     optionalDependencies:

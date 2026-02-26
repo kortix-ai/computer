@@ -2,11 +2,14 @@
 set -euo pipefail
 
 # kortix-master runs as user abc (via s6-setuidgid).
-# Ensure both /app/secrets and /run/s6/container_environment are writable by abc.
+# Ensure secrets dir and /run/s6/container_environment are writable by abc.
 
-SECRETS_DIR="${SECRET_DIR_PATH:-/app/secrets}"
+# Derive secrets directory from SECRET_FILE_PATH (set in docker-compose.yml).
+# Falls back to /workspace/.secrets/.secrets.json if not set.
+_SECRET_FILE="${SECRET_FILE_PATH:-/workspace/.secrets/.secrets.json}"
+SECRETS_DIR="$(dirname "$_SECRET_FILE")"
 S6_ENV_DIR="/run/s6/container_environment"
-SECRETS_FILE="${SECRETS_DIR}/.secrets.json"
+SECRETS_FILE="$_SECRET_FILE"
 SEED_FILE="/opt/kortix-master/seed-env.json"
 
 # Secrets directory (Docker volume, default owner is root).

@@ -21,10 +21,6 @@ export { OcTaskToolView } from './OcTaskToolView';
 export { OcTodoToolView } from './OcTodoToolView';
 export { OcGenericToolView } from './OcGenericToolView';
 export { OcQuestionToolView } from './OcQuestionToolView';
-export { OcMemSearchToolView } from './OcMemSearchToolView';
-export { OcMemGetToolView } from './OcMemGetToolView';
-export { OcMemSaveToolView } from './OcMemSaveToolView';
-export { OcMemTimelineToolView } from './OcMemTimelineToolView';
 export { OcSessionContextToolView } from './OcSessionContextToolView';
 export { OcSkillToolView } from './OcSkillToolView';
 export { OcCodesearchToolView } from './OcCodesearchToolView';
@@ -49,10 +45,6 @@ import { OcTaskToolView } from './OcTaskToolView';
 import { OcTodoToolView } from './OcTodoToolView';
 import { OcGenericToolView } from './OcGenericToolView';
 import { OcQuestionToolView } from './OcQuestionToolView';
-import { OcMemSearchToolView } from './OcMemSearchToolView';
-import { OcMemGetToolView } from './OcMemGetToolView';
-import { OcMemSaveToolView } from './OcMemSaveToolView';
-import { OcMemTimelineToolView } from './OcMemTimelineToolView';
 import { OcSessionContextToolView } from './OcSessionContextToolView';
 import { OcSkillToolView } from './OcSkillToolView';
 import { OcCodesearchToolView } from './OcCodesearchToolView';
@@ -117,8 +109,9 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   // Presentation generation (create slide, preview, export, etc.)
   'oc-presentation-gen': OcPresentationGenToolView,
 
-  // Show user (output display)
-  'oc-show-user': OcShowUserToolView,
+  // Show (output to user — files, images, URLs, text, errors)
+  'oc-show': OcShowUserToolView,
+  'oc-show-user': OcShowUserToolView, // backward compat
 
   // Apply patch (multi-file diffs)
   'oc-apply-patch': OcApplyPatchToolView,
@@ -152,32 +145,6 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-plan-exit': OcPlanToolView,
   'oc-plan_enter': OcPlanToolView,
   'oc-plan-enter': OcPlanToolView,
-
-  // Memory search (observations)
-  'oc-mem-search': OcMemSearchToolView,
-  'oc-mem_search': OcMemSearchToolView,
-  'oc-memory-search': OcMemSearchToolView,
-  'oc-memory_search': OcMemSearchToolView,
-  'oc-memory-read': OcMemSearchToolView,
-  'oc-memory_read': OcMemSearchToolView,
-
-  // Memory get (full observation details)
-  'oc-mem-get': OcMemGetToolView,
-  'oc-mem_get': OcMemGetToolView,
-  'oc-memory-get': OcMemGetToolView,
-  'oc-memory_get': OcMemGetToolView,
-
-  // Memory save (create observation)
-  'oc-mem-save': OcMemSaveToolView,
-  'oc-mem_save': OcMemSaveToolView,
-  'oc-memory-save': OcMemSaveToolView,
-  'oc-memory_save': OcMemSaveToolView,
-
-  // Memory timeline (chronological context)
-  'oc-mem-timeline': OcMemTimelineToolView,
-  'oc-mem_timeline': OcMemTimelineToolView,
-  'oc-memory-timeline': OcMemTimelineToolView,
-  'oc-memory_timeline': OcMemTimelineToolView,
 
   // MCP tools and other unknown tools will fall through to the
   // registry's default (GenericToolView). The OcGenericToolView

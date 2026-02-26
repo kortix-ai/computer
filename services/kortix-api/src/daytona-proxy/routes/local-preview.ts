@@ -86,6 +86,30 @@ export async function proxyToSandbox(
     redirect: 'manual',
   });
 
+  // Log upstream 5xx errors so they're visible (not silently proxied through)
+  if (response.status >= 500 && !acceptsSSE) {
+    // Clone the response to peek at the body without consuming it
+    try {
+      const cloned = response.clone();
+      const text = await cloned.text();
+      const snippet = text.slice(0, 300);
+      // Try JSON first
+      try {
+        const parsed = JSON.parse(snippet);
+        const errMsg = parsed?.data?.message || parsed?.message || parsed?.error || snippet.slice(0, 150);
+        console.error(`[PREVIEW] Sandbox ${response.status} on ${method} ${path} (port ${port}): ${errMsg}`);
+      } catch {
+        if (snippet.includes('__bunfallback') || snippet.includes('BunError')) {
+          console.error(`[PREVIEW] Sandbox ${response.status} on ${method} ${path} (port ${port}): Bun crash/module error (check sandbox logs)`);
+        } else {
+          console.error(`[PREVIEW] Sandbox ${response.status} on ${method} ${path} (port ${port}): ${snippet || '(empty)'}`);
+        }
+      }
+    } catch {
+      console.error(`[PREVIEW] Sandbox ${response.status} on ${method} ${path} (port ${port})`);
+    }
+  }
+
   // Stream response 1:1, only add CORS + fix redirects
   const respHeaders = new Headers(response.headers);
   if (origin) {

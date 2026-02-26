@@ -119,9 +119,9 @@ function SessionItem({
           isActive
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
-          'pr-3',
+          'pr-2.5',
         )}
-        style={{ paddingLeft: `${16 + depth * 14}px` }}
+        style={{ paddingLeft: `${14 + depth * 12}px` }}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
@@ -803,13 +803,6 @@ export function SessionList({ projectId }: SessionListProps = {}) {
               />
             ))}
 
-            {/* Divider between pending and other sessions */}
-            {rootSessions.some((s) => getPendingCount(s.id) > 0) &&
-              rootSessions.some((s) => getPendingCount(s.id) === 0) && (
-              <div className="flex items-center gap-2 px-3 py-1.5">
-                <div className="flex-1 h-px bg-border/20" />
-              </div>
-            )}
 
             {/* Remaining sessions */}
             {rootSessions.filter((s) => getPendingCount(s.id) === 0).map((session) => (

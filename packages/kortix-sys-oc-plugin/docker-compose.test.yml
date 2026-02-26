@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  # Run unit tests
+  unit-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "test", "test/db.test.ts", "test/extract.test.ts", "test/context.test.ts", "test/consolidate.test.ts", "test/lss.test.ts", "--verbose"]
+    environment:
+      - HOME=/root
+    tmpfs:
+      - /tmp
+
+  # Run E2E integration tests
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "test", "test/e2e.test.ts", "--verbose", "--timeout", "30000"]
+    environment:
+      - HOME=/root
+    tmpfs:
+      - /tmp
+
+  # Run ALL tests together
+  all-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "test", "--verbose", "--timeout", "30000"]
+    environment:
+      - HOME=/root
+    tmpfs:
+      - /tmp
+
+  # TypeScript type check
+  typecheck:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "x", "tsc", "--noEmit"]
+    environment:
+      - HOME=/root

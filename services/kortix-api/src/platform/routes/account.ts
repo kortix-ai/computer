@@ -13,7 +13,7 @@ import { Hono } from 'hono';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { sandboxes, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
-import { generateSandboxToken } from '../services/token';
+import { createApiKey } from '../../repositories/api-keys';
 import { supabaseAuth as authMiddleware } from '../../middleware/auth';
 import {
   getProvider as defaultGetProvider,
@@ -166,30 +166,51 @@ export function createAccountRouter(
 
       // 3. No sandbox at all — provision a new one
       const provider = getProvider(providerName);
-      const authToken = generateSandboxToken();
 
-      const result = await provider.create({
-        accountId,
-        userId,
-        name: `sandbox-${accountId.slice(0, 8)}`,
-        envVars: {
-          KORTIX_TOKEN: authToken,
-        },
-      });
-
+      // Create sandbox row first (we need the sandboxId for the API key)
       const [sandbox] = await db
         .insert(sandboxes)
         .values({
           accountId,
           name: `sandbox-${accountId.slice(0, 8)}`,
           provider: providerName,
+          externalId: '',
+          status: 'provisioning',
+          baseUrl: '',
+          config: {},
+          metadata: {},
+        })
+        .returning();
+
+      // Create a sandbox-managed API key (kortix_sb_)
+      const sandboxKey = await createApiKey({
+        sandboxId: sandbox.sandboxId,
+        accountId,
+        title: 'Sandbox Token',
+        type: 'sandbox',
+      });
+
+      // Provision the sandbox with the secret key as KORTIX_TOKEN
+      const result = await provider.create({
+        accountId,
+        userId,
+        name: `sandbox-${accountId.slice(0, 8)}`,
+        envVars: {
+          KORTIX_TOKEN: sandboxKey.secretKey,
+        },
+      });
+
+      // Update sandbox row with provider details
+      const [updated] = await db
+        .update(sandboxes)
+        .set({
           externalId: result.externalId,
           status: 'active',
           baseUrl: result.baseUrl,
-          authToken,
-          config: {},
           metadata: result.metadata,
+          updatedAt: new Date(),
         })
+        .where(eq(sandboxes.sandboxId, sandbox.sandboxId))
         .returning();
 
       console.log(
@@ -198,7 +219,7 @@ export function createAccountRouter(
       );
 
       return c.json(
-        { success: true, data: serializeSandbox(sandbox), created: true },
+        { success: true, data: serializeSandbox(updated), created: true },
         201,
       );
     } catch (err) {
@@ -273,36 +294,53 @@ export function createAccountRouter(
       const hasImage = await provider.hasImage();
 
       if (hasImage) {
-        // Image exists — create synchronously (fast, ~2s)
-        const authToken = generateSandboxToken();
-        const result = await provider.create({
-          accountId,
-          userId,
-          name: `sandbox-${accountId.slice(0, 8)}`,
-          envVars: { KORTIX_TOKEN: authToken },
-        });
-
+        // Image exists — create sandbox row first, then provision
         const [sandbox] = await db
           .insert(sandboxes)
           .values({
             accountId,
             name: `sandbox-${accountId.slice(0, 8)}`,
             provider: 'local_docker',
-            externalId: result.externalId,
-            status: 'active',
-            baseUrl: result.baseUrl,
-            authToken,
+            externalId: '',
+            status: 'provisioning',
+            baseUrl: '',
             config: {},
-            metadata: result.metadata,
+            metadata: {},
           })
           .returning();
 
+        // Create sandbox-managed API key
+        const sandboxKey = await createApiKey({
+          sandboxId: sandbox.sandboxId,
+          accountId,
+          title: 'Sandbox Token',
+          type: 'sandbox',
+        });
+
+        const result = await provider.create({
+          accountId,
+          userId,
+          name: `sandbox-${accountId.slice(0, 8)}`,
+          envVars: { KORTIX_TOKEN: sandboxKey.secretKey },
+        });
+
+        const [updated] = await db
+          .update(sandboxes)
+          .set({
+            externalId: result.externalId,
+            status: 'active',
+            baseUrl: result.baseUrl,
+            metadata: result.metadata,
+            updatedAt: new Date(),
+          })
+          .where(eq(sandboxes.sandboxId, sandbox.sandboxId))
+          .returning();
+
         console.log(`[PLATFORM] Local sandbox ${sandbox.sandboxId} created for account ${accountId}`);
-        return c.json({ success: true, data: serializeSandbox(sandbox), status: 'ready' }, 201);
+        return c.json({ success: true, data: serializeSandbox(updated), status: 'ready' }, 201);
       }
 
       // Image missing — insert provisioning row and pull in background
-      const authToken = generateSandboxToken();
       const [placeholder] = await db
         .insert(sandboxes)
         .values({
@@ -312,11 +350,18 @@ export function createAccountRouter(
           externalId: '',
           status: 'provisioning',
           baseUrl: '',
-          authToken,
           config: {},
           metadata: {},
         })
         .returning();
+
+      // Create sandbox-managed API key (before background pull so it's ready)
+      const sandboxKey = await createApiKey({
+        sandboxId: placeholder.sandboxId,
+        accountId,
+        title: 'Sandbox Token',
+        type: 'sandbox',
+      });
 
       console.log(`[PLATFORM] Starting image pull for account ${accountId}...`);
 
@@ -329,7 +374,7 @@ export function createAccountRouter(
             accountId,
             userId,
             name: `sandbox-${accountId.slice(0, 8)}`,
-            envVars: { KORTIX_TOKEN: authToken },
+            envVars: { KORTIX_TOKEN: sandboxKey.secretKey },
           });
 
           await db

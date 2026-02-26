@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 
@@ -21,21 +23,47 @@ import 'react-pdf/dist/Page/TextLayer.css';
 // Falls back to unpkg CDN if the local file is unavailable.
 pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
 
+// ── Zoom presets ──────────────────────────────────────────────────────────
+
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3] as const;
+const DEFAULT_ZOOM_INDEX = 2; // 1x = fit-to-width
+
 interface PdfRendererProps {
-  url: string;
+  /** URL to load the PDF from (can be a blob URL or http URL) */
+  url?: string;
+  /** Raw PDF blob — preferred over url to avoid pdfjs header issues with blob URLs */
+  blob?: Blob | null;
   className?: string;
   /** Compact mode for inline previews - shows first page only, no controls */
   compact?: boolean;
 }
 
-export function PdfRenderer({ url, className, compact = false }: PdfRendererProps) {
+export function PdfRenderer({ url, blob, className, compact = false }: PdfRendererProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [zoomIndex, setZoomIndex] = useState<number>(DEFAULT_ZOOM_INDEX);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Create a blob URL from the raw blob.
+  // We pass this URL to pdfjs with disableRange + disableStream so it does
+  // a simple GET fetch — no range-request headers (which fail on blob URLs)
+  // and no ArrayBuffer transfer (which causes "detached ArrayBuffer" on re-render).
+  useEffect(() => {
+    if (!blob) {
+      setBlobUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    setBlobUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [blob]);
+
+  const zoomLevel = ZOOM_LEVELS[zoomIndex];
 
   // Track container width for responsive scaling - always fit to width
   useEffect(() => {
@@ -98,6 +126,24 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
     goToPage(pageNumber + 1);
   }, [pageNumber, goToPage]);
 
+  // ── Zoom controls ────────────────────────────────────────────────────────
+
+  const canZoomIn = zoomIndex < ZOOM_LEVELS.length - 1;
+  const canZoomOut = zoomIndex > 0;
+  const isDefaultZoom = zoomIndex === DEFAULT_ZOOM_INDEX;
+
+  const zoomIn = useCallback(() => {
+    setZoomIndex((i) => Math.min(i + 1, ZOOM_LEVELS.length - 1));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoomIndex((i) => Math.max(i - 1, 0));
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setZoomIndex(DEFAULT_ZOOM_INDEX);
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     if (compact) return;
@@ -116,21 +162,53 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
           e.preventDefault();
           nextPage();
           break;
+        case '=':
+        case '+':
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            zoomIn();
+          }
+          break;
+        case '-':
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            zoomOut();
+          }
+          break;
+        case '0':
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            resetZoom();
+          }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [compact, previousPage, nextPage]);
+  }, [compact, previousPage, nextPage, zoomIn, zoomOut, resetZoom]);
 
-  // Calculate page width - always fit to container with padding
-  const pageWidth = containerWidth > 0 ? Math.max(containerWidth - 48, 100) : undefined;
+  // Calculate page width — base width fit to container, then scaled by zoom
+  const baseWidth = containerWidth > 0 ? Math.max(containerWidth - 48, 100) : undefined;
+  const pageWidth = baseWidth ? Math.round(baseWidth * zoomLevel) : undefined;
 
-  // Handle missing URL
-  if (!url) {
+  // Determine the file source for <Document>.
+  // Use blob URL (from blob prop) with range/stream disabled — pdfjs does a
+  // simple GET fetch. This avoids:
+  //  1. "Failed to construct Headers" (range request headers on blob URLs)
+  //  2. "Cannot perform Construct on detached ArrayBuffer" (ArrayBuffer transfer)
+  // Memoized to prevent react-pdf "file prop changed but is equal" warnings.
+  const resolvedUrl = blobUrl || url || null;
+  const pdfFile = useMemo(
+    () => resolvedUrl ? { url: resolvedUrl, disableRange: true, disableStream: true } : null,
+    [resolvedUrl],
+  );
+
+  // Handle missing source
+  if (!pdfFile) {
     return (
       <div className={cn('w-full h-full flex items-center justify-center bg-muted/20', className)}>
-        <div className="text-sm text-muted-foreground">No PDF URL provided</div>
+        <div className="text-sm text-muted-foreground">No PDF source provided</div>
       </div>
     );
   }
@@ -145,7 +223,7 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
       >
         <div className="flex items-center justify-center p-2 overflow-auto h-full">
           <Document 
-            file={url} 
+            file={pdfFile} 
             loading={
               <div className="flex items-center justify-center h-40">
                 <KortixLoader size="medium" />
@@ -159,7 +237,7 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
           >
             <Page
               pageNumber={1}
-              width={pageWidth}
+              width={baseWidth}
               renderTextLayer={false}
               renderAnnotationLayer={false}
               className="shadow-sm rounded-lg overflow-hidden"
@@ -170,14 +248,14 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
     );
   }
 
-  // Full mode: PDF centered with pagination at bottom
+  // Full mode: PDF centered with zoom + pagination at bottom
   return (
     <div 
       ref={containerRef} 
       className={cn('flex flex-col w-full h-full bg-muted/20 overflow-hidden', className)}
       style={{ contain: 'strict' }}
     >
-      {/* PDF content - centered */}
+      {/* PDF content - centered, scrollable when zoomed */}
       <div 
         ref={scrollContainerRef}
         className="flex-1 overflow-auto min-h-0"
@@ -193,9 +271,9 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center min-h-full p-4">
+          <div className="flex items-start justify-center min-h-full p-4">
             <Document
-              file={url}
+              file={pdfFile}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               loading={
@@ -216,49 +294,94 @@ export function PdfRenderer({ url, className, compact = false }: PdfRendererProp
                     <KortixLoader size="medium" />
                   </div>
                 }
-                className="shadow-lg rounded-lg overflow-hidden bg-white max-w-full"
+                className="shadow-lg rounded-lg overflow-hidden bg-white"
               />
             </Document>
           </div>
         )}
       </div>
 
-      {/* Page navigation - bottom */}
-      {numPages && numPages > 1 && (
-        <div className="flex items-center justify-center px-3 py-2 bg-background border-t flex-shrink-0">
-          <div className="flex items-center gap-1">
+      {/* Bottom toolbar: zoom + page navigation */}
+      {!isLoading && !error && numPages && (
+        <div className="flex items-center justify-between px-3 py-1.5 bg-background border-t flex-shrink-0">
+          {/* Zoom controls — left */}
+          <div className="flex items-center gap-0.5">
             <Button
               variant="ghost"
               size="sm"
-              onClick={previousPage}
-              disabled={pageNumber <= 1}
-              className="h-8 w-8 p-0"
-              title="Previous page (←)"
+              onClick={zoomOut}
+              disabled={!canZoomOut}
+              className="h-7 w-7 p-0"
+              title="Zoom out (Cmd+-)"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ZoomOut className="h-3.5 w-3.5" />
             </Button>
-            
-            <div className="flex items-center gap-1.5 px-3">
-              <span className="text-sm font-medium tabular-nums">
-                {pageNumber}
-              </span>
-              <span className="text-sm text-muted-foreground">/</span>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {numPages}
-              </span>
-            </div>
-            
+
+            <button
+              type="button"
+              onClick={resetZoom}
+              disabled={isDefaultZoom}
+              className={cn(
+                'h-7 px-1.5 rounded text-[11px] tabular-nums font-medium transition-colors',
+                isDefaultZoom
+                  ? 'text-muted-foreground/50 cursor-default'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer',
+              )}
+              title="Reset zoom (Cmd+0)"
+            >
+              {Math.round(zoomLevel * 100)}%
+            </button>
+
             <Button
               variant="ghost"
               size="sm"
-              onClick={nextPage}
-              disabled={pageNumber >= numPages}
-              className="h-8 w-8 p-0"
-              title="Next page (→)"
+              onClick={zoomIn}
+              disabled={!canZoomIn}
+              className="h-7 w-7 p-0"
+              title="Zoom in (Cmd++)"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ZoomIn className="h-3.5 w-3.5" />
             </Button>
           </div>
+
+          {/* Page navigation — center/right */}
+          {numPages > 1 ? (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={previousPage}
+                disabled={pageNumber <= 1}
+                className="h-7 w-7 p-0"
+                title="Previous page (←)"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              
+              <div className="flex items-center gap-1 px-2">
+                <span className="text-[11px] font-medium tabular-nums">
+                  {pageNumber}
+                </span>
+                <span className="text-[11px] text-muted-foreground">/</span>
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {numPages}
+                </span>
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={nextPage}
+                disabled={pageNumber >= numPages}
+                className="h-7 w-7 p-0"
+                title="Next page (→)"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <div /> /* spacer for single-page PDFs */
+          )}
         </div>
       )}
     </div>

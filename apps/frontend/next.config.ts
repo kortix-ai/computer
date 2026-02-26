@@ -95,6 +95,11 @@ const nextConfig = (): NextConfig => ({
 
   async rewrites() {
     return [
+      // Proxy API calls to backend to avoid CORS in local dev
+      {
+        source: '/v1/:path*',
+        destination: 'http://localhost:8008/v1/:path*',
+      },
       {
         source: '/ingest/static/:path*',
         destination: 'https://eu-assets.i.posthog.com/static/:path*',

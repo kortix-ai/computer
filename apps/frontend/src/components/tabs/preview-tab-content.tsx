@@ -76,7 +76,9 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     }
   }, [activeServer?.provider, activeServer?.sandboxId, serverUrl]);
 
-  // Inject auth token for cloud preview proxy URLs
+  // Inject auth token for cloud preview proxy URLs.
+  // Returns null while auth is in progress — the existing `if (!previewUrl)` guard
+  // below will show a landing state until the token is ready.
   const previewUrl = useAuthenticatedPreviewUrl(rawPreviewUrl);
 
   // Sync address bar when tab metadata changes externally
