@@ -193,43 +193,78 @@ function ServiceCard({ service }: { service: RunningService }) {
       {(fwStyle || service.sourcePath || service.startedAt || service.pid || service.managed !== undefined) && (
         <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3 pt-0.5">
           {fwStyle && (
-            <span className={cn(
-              'inline-flex items-center text-[10px] font-semibold px-2 py-[3px] rounded-md leading-none',
-              fwStyle.bg, fwStyle.text,
-            )}>
-              {fwStyle.label}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={cn(
+                  'inline-flex items-center text-[10px] font-semibold px-2 py-[3px] rounded-md leading-none',
+                  fwStyle.bg, fwStyle.text,
+                )}>
+                  {fwStyle.label}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Detected framework
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {service.managed !== undefined && (
-            <span className={cn(
-              'inline-flex items-center text-[10px] font-medium px-2 py-[3px] rounded-md leading-none',
-              service.managed
-                ? 'bg-primary/10 text-primary/70'
-                : 'bg-muted/60 text-muted-foreground/60',
-            )}>
-              {service.managed ? 'deployed' : 'manual'}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={cn(
+                  'inline-flex items-center text-[10px] font-medium px-2 py-[3px] rounded-md leading-none',
+                  service.managed
+                    ? 'bg-primary/10 text-primary/70'
+                    : 'bg-muted/60 text-muted-foreground/60',
+                )}>
+                  {service.managed ? 'deployed' : 'manual'}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {service.managed ? 'Started via the deploy system' : 'Started manually (e.g. from a terminal)'}
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {service.sourcePath && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 bg-muted/50 px-2 py-[3px] rounded-md leading-none">
-              <FolderOpen className="h-2.5 w-2.5 flex-shrink-0" />
-              <span className="font-mono truncate max-w-[160px]">{shortenPath(service.sourcePath)}</span>
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 bg-muted/50 px-2 py-[3px] rounded-md leading-none">
+                  <FolderOpen className="h-2.5 w-2.5 flex-shrink-0" />
+                  <span className="font-mono truncate max-w-[160px]">{shortenPath(service.sourcePath)}</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Working directory: {service.sourcePath}
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {service.startedAt && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 bg-muted/50 px-2 py-[3px] rounded-md leading-none">
-              <Clock className="h-2.5 w-2.5 flex-shrink-0" />
-              <span className="tabular-nums">{formatTimeAgo(service.startedAt)}</span>
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 bg-muted/50 px-2 py-[3px] rounded-md leading-none">
+                  <Clock className="h-2.5 w-2.5 flex-shrink-0" />
+                  <span className="tabular-nums">{formatTimeAgo(service.startedAt)}</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Started {new Date(service.startedAt).toLocaleString()}
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {service.pid != null && service.pid > 0 && (
-            <span className="inline-flex items-center text-[10px] text-muted-foreground/40 bg-muted/40 px-2 py-[3px] rounded-md font-mono tabular-nums leading-none">
-              PID {service.pid}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center text-[10px] text-muted-foreground/40 bg-muted/40 px-2 py-[3px] rounded-md font-mono tabular-nums leading-none">
+                  PID {service.pid}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Process ID inside the sandbox
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
       )}
