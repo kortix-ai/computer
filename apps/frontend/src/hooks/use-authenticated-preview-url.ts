@@ -22,7 +22,7 @@ import { getAuthToken } from '@/lib/auth-token';
  * @returns The URL with `?token=<jwt>` appended
  */
 export function useAuthenticatedPreviewUrl(previewUrl: string): string {
-  const [authenticatedUrl, setAuthenticatedUrl] = useState(previewUrl);
+  const [authenticatedUrl, setAuthenticatedUrl] = useState('');
 
   useEffect(() => {
     if (!previewUrl) {
