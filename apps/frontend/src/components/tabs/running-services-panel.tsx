@@ -3,13 +3,20 @@
 import React, { useCallback, useMemo } from 'react';
 import {
   Activity,
+  Braces,
   Clock,
+  Code2,
   ExternalLink,
+  FileCode2,
   FolderOpen,
+  Gem,
   Globe,
+  Hexagon,
   Loader2,
   Server,
   TerminalSquare,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -67,17 +74,17 @@ function formatTimeAgo(dateStr: string | undefined): string {
   }
 }
 
-const FRAMEWORK_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  nextjs:  { bg: 'bg-zinc-800 dark:bg-zinc-200', text: 'text-white dark:text-zinc-900', label: 'Next.js' },
-  vite:    { bg: 'bg-purple-500/15', text: 'text-purple-600 dark:text-purple-300', label: 'Vite' },
-  cra:     { bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-300', label: 'CRA' },
-  node:    { bg: 'bg-green-500/15', text: 'text-green-600 dark:text-green-300', label: 'Node.js' },
-  python:  { bg: 'bg-yellow-500/15', text: 'text-yellow-600 dark:text-yellow-300', label: 'Python' },
-  static:  { bg: 'bg-blue-500/15', text: 'text-blue-600 dark:text-blue-300', label: 'Static' },
-  go:      { bg: 'bg-sky-500/15', text: 'text-sky-600 dark:text-sky-300', label: 'Go' },
-  ruby:    { bg: 'bg-red-500/15', text: 'text-red-600 dark:text-red-300', label: 'Ruby' },
-  java:    { bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-300', label: 'Java' },
-  rust:    { bg: 'bg-amber-500/15', text: 'text-amber-600 dark:text-amber-300', label: 'Rust' },
+const FRAMEWORK_STYLES: Record<string, { bg: string; text: string; label: string; icon: LucideIcon; iconBg: string; iconText: string }> = {
+  nextjs:  { bg: 'bg-zinc-800 dark:bg-zinc-200', text: 'text-white dark:text-zinc-900', label: 'Next.js', icon: Hexagon, iconBg: 'bg-zinc-500/10', iconText: 'text-zinc-600 dark:text-zinc-300' },
+  vite:    { bg: 'bg-purple-500/15', text: 'text-purple-600 dark:text-purple-300', label: 'Vite', icon: Zap, iconBg: 'bg-purple-500/10', iconText: 'text-purple-600 dark:text-purple-400' },
+  cra:     { bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-300', label: 'CRA', icon: Globe, iconBg: 'bg-cyan-500/10', iconText: 'text-cyan-600 dark:text-cyan-400' },
+  node:    { bg: 'bg-green-500/15', text: 'text-green-600 dark:text-green-300', label: 'Node.js', icon: Hexagon, iconBg: 'bg-green-500/10', iconText: 'text-green-600 dark:text-green-400' },
+  python:  { bg: 'bg-yellow-500/15', text: 'text-yellow-600 dark:text-yellow-300', label: 'Python', icon: Code2, iconBg: 'bg-yellow-500/10', iconText: 'text-yellow-600 dark:text-yellow-400' },
+  static:  { bg: 'bg-blue-500/15', text: 'text-blue-600 dark:text-blue-300', label: 'Static', icon: FileCode2, iconBg: 'bg-blue-500/10', iconText: 'text-blue-600 dark:text-blue-400' },
+  go:      { bg: 'bg-sky-500/15', text: 'text-sky-600 dark:text-sky-300', label: 'Go', icon: Braces, iconBg: 'bg-sky-500/10', iconText: 'text-sky-600 dark:text-sky-400' },
+  ruby:    { bg: 'bg-red-500/15', text: 'text-red-600 dark:text-red-300', label: 'Ruby', icon: Gem, iconBg: 'bg-red-500/10', iconText: 'text-red-600 dark:text-red-400' },
+  java:    { bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-300', label: 'Java', icon: Code2, iconBg: 'bg-orange-500/10', iconText: 'text-orange-600 dark:text-orange-400' },
+  rust:    { bg: 'bg-amber-500/15', text: 'text-amber-600 dark:text-amber-300', label: 'Rust', icon: Braces, iconBg: 'bg-amber-500/10', iconText: 'text-amber-600 dark:text-amber-400' },
 };
 
 function getFrameworkStyle(fw: string) {
@@ -122,10 +129,24 @@ function ServiceCard({ service }: { service: RunningService }) {
 
   const isDeployment = service.kind === 'deployment' || !!service.deploymentId;
   const isTerminal = service.kind === 'terminal';
-  const Icon = isTerminal ? TerminalSquare : isDeployment ? Server : Globe;
   const fwStyle = service.framework && service.framework !== 'unknown' ? getFrameworkStyle(service.framework) : null;
   // If status is unknown but it has an open tab, treat as running
   const isRunning = service.status === 'running' || (service.status === 'unknown' && !!service.hasTab);
+
+  // Pick icon & color based on framework, falling back to generic icons
+  const Icon = isTerminal
+    ? TerminalSquare
+    : fwStyle?.icon ?? (isDeployment ? Server : Globe);
+  const iconBg = isTerminal
+    ? undefined
+    : (isRunning && fwStyle)
+      ? fwStyle.iconBg
+      : undefined;
+  const iconText = isTerminal
+    ? undefined
+    : (isRunning && fwStyle)
+      ? fwStyle.iconText
+      : undefined;
 
   return (
     <button
@@ -143,8 +164,9 @@ function ServiceCard({ service }: { service: RunningService }) {
         <div className={cn(
           'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
           isRunning
-            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+            ? (iconBg || 'bg-emerald-500/10')
             : 'bg-muted text-muted-foreground',
+          isRunning && (iconText || 'text-emerald-600 dark:text-emerald-400'),
         )}>
           <Icon className="w-[18px] h-[18px]" />
         </div>
