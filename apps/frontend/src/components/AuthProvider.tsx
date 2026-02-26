@@ -54,6 +54,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+
+        // Track user ID for cross-account localStorage cleanup
+        if (currentSession?.user?.id) {
+          const prevUserId = localStorage.getItem('kortix-last-user-id');
+          if (prevUserId && prevUserId !== currentSession.user.id) {
+            console.log('[Auth] Initial session: user changed, clearing stale local storage');
+            clearUserLocalStorage();
+          }
+          localStorage.setItem('kortix-last-user-id', currentSession.user.id);
+        }
       } catch (error) {
       } finally {
         setIsLoading(false);
@@ -69,11 +79,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (isLoading) setIsLoading(false);
         switch (event) {
-          case 'SIGNED_IN':
-            // Auth tracking handled by AuthEventTracker component via URL params
+          case 'SIGNED_IN': {
+            // Clear stale sandbox/server state if a different user signs in
+            // (e.g. signup in same browser without explicit logout first)
+            const prevUserId = localStorage.getItem('kortix-last-user-id');
+            const newUserId = newSession?.user?.id;
+            if (newUserId && prevUserId && prevUserId !== newUserId) {
+              console.log('[Auth] User changed, clearing stale local storage');
+              clearUserLocalStorage();
+            }
+            if (newUserId) {
+              localStorage.setItem('kortix-last-user-id', newUserId);
+            }
             break;
+          }
           case 'SIGNED_OUT':
             clearUserLocalStorage();
+            localStorage.removeItem('kortix-last-user-id');
             break;
           case 'TOKEN_REFRESHED':
             break;
