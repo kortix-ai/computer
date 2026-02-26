@@ -11,6 +11,7 @@ import {
 	Check,
 	CheckCircle,
 	CheckSquare,
+	Clock,
 	ChevronDown,
 	ChevronRight,
 	CircleAlert,
