@@ -303,6 +303,7 @@ export async function middleware(request: NextRequest) {
 
       const accountId = accounts.id;
       const { data: creditAccount } = await supabase
+        .schema('kortix')
         .from('credit_accounts')
         .select('tier, trial_status, trial_ends_at')
         .eq('account_id', accountId)

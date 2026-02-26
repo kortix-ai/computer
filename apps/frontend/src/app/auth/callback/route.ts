@@ -159,6 +159,7 @@ export async function GET(request: NextRequest) {
 
         if (accountData) {
           const { data: creditAccount } = await supabase
+            .schema('kortix')
             .from('credit_accounts')
             .select('tier, stripe_subscription_id')
             .eq('account_id', accountData.id)
