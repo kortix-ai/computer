@@ -249,12 +249,12 @@ app.use('/v1/tunnel/*', combinedAuth);
 app.route('/v1/tunnel', tunnelApp);          // /v1/tunnel/connections, /v1/tunnel/permissions, /v1/tunnel/rpc, /v1/tunnel/audit
 
 // Preview Proxy — unified route for both cloud (Daytona) and local mode.
-// Pattern: /v1/preview/{sandboxId}/{port}/* for ALL modes.
+// Pattern: /v1/p/{sandboxId}/{port}/* for ALL modes.
 // Cloud:  sandboxId = Daytona external ID → proxied via Daytona SDK
 // Local:  sandboxId = container name (e.g. 'kortix-sandbox') → Docker DNS resolution
 // Auth: unified previewProxyAuth (accepts Supabase JWT and kortix_ tokens).
 // MUST be after all explicit routes (wildcard catch-all).
-app.route('/v1/preview', daytonaProxyApp);
+app.route('/v1/p', daytonaProxyApp);
 
 // === Error Handling ===
 
@@ -386,7 +386,7 @@ console.log(`
 ║    /v1/setup      (setup & env management)                 ║
 ║    /v1/queue      (persistent message queue)               ║
 ║    /v1/tunnel     (reverse-tunnel to local machines)         ║
-║    /v1/preview    (sandbox proxy — local + cloud)           ║
+║    /v1/p         (sandbox proxy — local + cloud)            ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
 ║  Supabase:   ${config.SUPABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
@@ -449,7 +449,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 // ─── WebSocket proxy for sandbox PTY ─────────────────────────────────────────
 // The Bun server needs to handle WebSocket upgrades at the top level.
-// We intercept WS upgrade requests for /v1/preview/{sandboxId}/* and proxy them
+// We intercept WS upgrade requests for /v1/p/{sandboxId}/* and proxy them
 // to the sandbox's Kortix Master (which further proxies to OpenCode).
 
 const WS_CONNECT_TIMEOUT_MS = 10_000;
@@ -474,7 +474,7 @@ function clearWsTimers(data: WsProxyData) {
 function resetIdleTimer(ws: { data: WsProxyData; close: (code?: number, reason?: string) => void }) {
   if (ws.data.idleTimer) clearTimeout(ws.data.idleTimer);
   ws.data.idleTimer = setTimeout(() => {
-    console.warn(`[preview-proxy] WS idle timeout`);
+    console.warn(`[sandbox-proxy] WS idle timeout`);
     try { ws.close(1000, 'idle timeout'); } catch {}
   }, WS_IDLE_TIMEOUT_MS);
 }
@@ -517,8 +517,8 @@ async function validatePreviewToken(token: string): Promise<boolean> {
 }
 
 // ── Local-mode session tracking ─────────────────────────────────────────────
-// Once a subdomain is authenticated via ?token= on the first request, all
-// subsequent requests to that subdomain pass through without auth.
+// Once a subdomain is authenticated via Bearer header on the first request,
+// all subsequent requests to that subdomain pass through without auth.
 // This avoids third-party cookie issues in iframes (Chrome blocks them).
 // Like ngrok free tier — auth on first load, then open access.
 // Map key: "p{port}-{sandboxId}" → timestamp when authenticated.
@@ -584,15 +584,14 @@ export default {
       const { port, sandboxId } = subdomain;
 
       // ── Auth: first request validates, then the subdomain is "open" ──
-      // Like ngrok free tier — ?token= on first load proves you're legit,
+      // Bearer header or cookie on first load proves you're legit,
       // then all subsequent requests (sub-resources, WS, etc.) pass through.
       // This avoids third-party cookie issues in iframes.
       if (!isSubdomainAuthenticated(sandboxId, port)) {
-        const queryToken = url.searchParams.get('token');
         const authHeader = req.headers.get('Authorization');
         const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
         const cookieToken = extractCookieToken(req);
-        const token = queryToken || bearerToken || cookieToken;
+        const token = bearerToken || cookieToken;
 
         if (!token || !(await validatePreviewToken(token))) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -648,13 +647,8 @@ export default {
       }
 
       try {
-        // Strip ?token= from query string before forwarding to sandbox
-        const forwardParams = new URLSearchParams(url.searchParams);
-        forwardParams.delete('token');
-        const forwardSearch = forwardParams.toString() ? `?${forwardParams.toString()}` : '';
-
         return await proxyToSandbox(
-          sandboxId, port, req.method, url.pathname, forwardSearch,
+          sandboxId, port, req.method, url.pathname, url.search,
           req.headers, body, acceptsSSE, origin,
         );
       } catch (error) {
@@ -668,7 +662,9 @@ export default {
 
     // ── Tunnel Agent WebSocket ──────────────────────────────────────────
     // Matches: ws://host/v1/tunnel/ws?token=kortix_...&tunnelId=...
-    // Local agent connects here to receive RPC requests from sandbox tools.
+    // Local agent (programmatic WS client) connects here to receive RPC requests.
+    // NOTE: Query params are intentional here — the tunnel agent binary can't
+    // set cookies, and WS upgrade doesn't support custom headers in all runtimes.
     if (isWsUpgrade && url.pathname === '/v1/tunnel/ws') {
       const queryToken = url.searchParams.get('token');
       const tunnelId = url.searchParams.get('tunnelId');
@@ -770,11 +766,11 @@ export default {
     }
 
     // ── Path-based WebSocket proxy (local mode) ──────────────────────────
-    // Matches: ws://localhost:8008/v1/preview/{sandboxId}/{port}/*
+    // Matches: ws://localhost:8008/v1/p/{sandboxId}/{port}/*
     // Used for OpenCode PTY terminals, SSE-over-WS, etc.
     // Must be handled HERE (at Bun server level) because Hono can't do WS upgrades.
     if (isWsUpgrade && !config.isDaytonaEnabled()) {
-      const wsPathMatch = url.pathname.match(/^\/v1\/preview\/([^/]+)\/(\d+)(\/.*)?$/);
+      const wsPathMatch = url.pathname.match(/^\/v1\/p\/([^/]+)\/(\d+)(\/.*)?$/);
       if (wsPathMatch) {
         const wsSandboxId = wsPathMatch[1];
         const wsPort = parseInt(wsPathMatch[2], 10);
@@ -782,9 +778,8 @@ export default {
 
         const wsAuthHeader = req.headers.get('Authorization');
         const wsBearerToken = wsAuthHeader?.startsWith('Bearer ') ? wsAuthHeader.slice(7) : null;
-        const wsQueryToken = url.searchParams.get('token');
         const wsCookieToken = extractCookieToken(req);
-        const wsToken = wsBearerToken || wsQueryToken || wsCookieToken;
+        const wsToken = wsBearerToken || wsCookieToken;
 
         if (wsToken && (await validatePreviewToken(wsToken))) {
           const targetUrl = buildWsTargetUrl(wsSandboxId, wsPort, wsRemainingPath, url.searchParams);

@@ -62,7 +62,7 @@ interface ShareData {
 // Data fetching — uses the standard OpenCode session & message APIs
 // ============================================================================
 
-const OPENCODE_BASE_URL = `${(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '')}/preview/kortix-sandbox/8000`;
+const OPENCODE_BASE_URL = `${(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '')}/p/kortix-sandbox/8000`;
 
 async function fetchShareData(shareId: string): Promise<ShareData> {
   const sessionsRes = await fetch(`${OPENCODE_BASE_URL}/session`, {

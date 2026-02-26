@@ -216,7 +216,7 @@ function InlineServicePreview({
 			id: `preview:${proxy.port}`,
 			title: `localhost:${proxy.port}`,
 			type: "preview",
-			href: `/preview/${proxy.port}`,
+			href: `/p/${proxy.port}`,
 			metadata: {
 				url: proxy.proxyUrl,
 				port: proxy.port,
@@ -3404,7 +3404,7 @@ function useShowOpenInTab(props: { type: string; url: string; path: string; titl
 				id: `preview:${proxy.port}`,
 				title: title || `localhost:${proxy.port}`,
 				type: "preview",
-				href: `/preview/${proxy.port}`,
+				href: `/p/${proxy.port}`,
 				metadata: enrichPreviewMetadata({
 					url: proxy.proxyUrl,
 					port: proxy.port,

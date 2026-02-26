@@ -201,7 +201,7 @@ export async function buildMergedSpec(
         'OpenCode endpoints are transparently proxied.\n\n' +
         '---\n\n' +
         '## Authentication\n\n' +
-        'In production, all requests go through the **platform proxy** (`/v1/preview/{sandboxId}/{port}/...`) ' +
+        'In production, all requests go through the **platform proxy** (`/v1/p/{sandboxId}/{port}/...`) ' +
         'which authenticates callers before forwarding to the sandbox. ' +
         'The sandbox itself has **no built-in auth** — it relies entirely on the proxy layer and (optionally) an `INTERNAL_SERVICE_KEY` for service-to-service trust.\n\n' +
         '### Kortix API Key (programmatic access)\n\n' +
