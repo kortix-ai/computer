@@ -48,6 +48,7 @@ export interface LTMEntry {
 	id: number
 	type: LTMType
 	content: string
+	caption: string | null
 	context: string | null
 	sourceSessionId: string | null
 	sourceObservationIds: number[]
@@ -61,6 +62,7 @@ export interface LTMEntry {
 export interface CreateLTMInput {
 	type: LTMType
 	content: string
+	caption?: string | null
 	context?: string | null
 	sourceSessionId?: string | null
 	sourceObservationIds?: number[]

@@ -114,6 +114,13 @@ export function initDb(dbPath?: string): Database {
 		)
 	`)
 
+	// Migration: add caption column if missing (existing DBs won't have it)
+	try {
+		db.exec(`ALTER TABLE long_term_memories ADD COLUMN caption TEXT`)
+	} catch {
+		// Column already exists — ignore
+	}
+
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_ltm_type ON long_term_memories(type)`)
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_ltm_confidence ON long_term_memories(confidence DESC)`)
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_ltm_created ON long_term_memories(created_at DESC)`)
@@ -303,11 +310,12 @@ function searchObservationsLike(
 
 export function insertLTM(db: Database, input: CreateLTMInput): number {
 	const result = db.run(
-		`INSERT INTO long_term_memories (type, content, context, source_session_id, source_observation_ids, confidence, tags, files)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO long_term_memories (type, content, caption, context, source_session_id, source_observation_ids, confidence, tags, files)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			input.type,
 			input.content,
+			input.caption ?? null,
 			input.context ?? null,
 			input.sourceSessionId ?? null,
 			JSON.stringify(input.sourceObservationIds ?? []),
@@ -482,6 +490,40 @@ export function unifiedSearch(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// OBSERVATION ENRICHMENT UPDATE
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Update observation fields after AI enrichment.
+ * FTS5 triggers handle automatic re-indexing on UPDATE.
+ */
+export function updateObservationEnrichment(
+	db: Database,
+	id: number,
+	fields: {
+		type?: string
+		title?: string
+		narrative?: string
+		facts?: string[]
+		concepts?: string[]
+	},
+): void {
+	const sets: string[] = []
+	const params: unknown[] = []
+
+	if (fields.type) { sets.push("type = ?"); params.push(fields.type) }
+	if (fields.title) { sets.push("title = ?"); params.push(fields.title) }
+	if (fields.narrative) { sets.push("narrative = ?"); params.push(fields.narrative) }
+	if (fields.facts) { sets.push("facts = ?"); params.push(JSON.stringify(fields.facts)) }
+	if (fields.concepts) { sets.push("concepts = ?"); params.push(JSON.stringify(fields.concepts)) }
+
+	if (sets.length === 0) return
+
+	params.push(id)
+	db.run(`UPDATE observations SET ${sets.join(", ")} WHERE id = ?`, params)
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // SESSION META
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -553,6 +595,7 @@ function rowToLTM(row: Record<string, unknown>): LTMEntry {
 		id: row.id as number,
 		type: row.type as LTMEntry["type"],
 		content: row.content as string,
+		caption: (row.caption as string) ?? null,
 		context: (row.context as string) ?? null,
 		sourceSessionId: (row.source_session_id as string) ?? null,
 		sourceObservationIds: safeJsonArray(row.source_observation_ids).map(Number),

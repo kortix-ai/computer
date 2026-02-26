@@ -25,7 +25,9 @@ import { initDb, insertObservation, ensureSession, incrementPromptCount, complet
 import { extractObservation } from "./extract"
 import { generateLTMBlock } from "./context"
 import { consolidateMemories } from "./consolidate"
+import { initEnrichment, enqueueEnrichment, updateEnrichmentOpts } from "./enrich"
 import { ensureMemDir, writeObservationFile, writeLTMFile } from "./lss"
+import { existsSync, writeFileSync, mkdirSync } from "node:fs"
 import { getEnv, shortTs, changeSummary, formatMessages, ttcCompress, STORAGE_BASE, DB_PATH } from "./session"
 import type { LogFn, CreateLTMInput, LTMType } from "./types"
 
@@ -51,6 +53,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		console.error(`[kortix-memory] LSS dir init failed (non-fatal): ${err}`)
 	}
 	let currentSessionId: string | null = null
+	let currentModel: string | null = null
 	let promptCount = 0
 	const pendingArgs = new Map<string, Record<string, unknown>>()
 
@@ -76,8 +79,34 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		}
 	}
 
+	// Ensure USER.md exists for personalization
+	const KORTIX_DIR = "/workspace/.kortix"
+	const USER_MD_PATH = `${KORTIX_DIR}/USER.md`
+	try {
+		if (!existsSync(KORTIX_DIR)) mkdirSync(KORTIX_DIR, { recursive: true })
+		if (!existsSync(USER_MD_PATH)) {
+			writeFileSync(USER_MD_PATH, [
+				"# User Profile",
+				"",
+				"<!-- Auto-created by kortix-sys-oc-plugin. The agent enriches this file as it learns about you. -->",
+				"",
+				"## Preferences",
+				"",
+				"## Work Style",
+				"",
+				"## Context",
+				"",
+			].join("\n"), "utf-8")
+		}
+	} catch (err) {
+		console.error(`[kortix-memory] USER.md init failed (non-fatal): ${err}`)
+	}
+
 	// Generate initial cache
 	refreshLTMCache()
+
+	// Initialize AI enrichment module
+	initEnrichment(db, log)
 
 	// ── Return hooks ──────────────────────────────────────────────────
 	return {
@@ -99,7 +128,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				const args = pendingArgs.get(input.callID) ?? {}
 				pendingArgs.delete(input.callID)
 
-				const obs = extractObservation(
+				const result = extractObservation(
 					{
 						tool: input.tool,
 						args: args as Record<string, unknown>,
@@ -110,11 +139,12 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					promptCount,
 				)
 
-				if (obs) {
+				if (result) {
+					const { observation: obs, rawOutput } = result
 					const id = insertObservation(db, obs)
 
-				// Write LSS companion file (fire-and-forget)
-				if (memDir) try {
+					// Write LSS companion file (fire-and-forget)
+					if (memDir) try {
 						writeObservationFile(memDir, id, {
 							title: obs.title,
 							narrative: obs.narrative,
@@ -125,6 +155,14 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 							filesModified: obs.filesModified,
 						})
 					} catch { /* non-fatal */ }
+
+					// Fire-and-forget AI enrichment
+					enqueueEnrichment({
+						obsId: id,
+						toolName: input.tool,
+						args: args as Record<string, unknown>,
+						rawOutput,
+					})
 				}
 			} catch (err) {
 				log("warn", `[memory] Observation extraction failed: ${err}`)
@@ -142,6 +180,12 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				if (currentSessionId) {
 					promptCount = incrementPromptCount(db, currentSessionId)
 				}
+				// Capture the user's selected model for LLM consolidation + enrichment
+				if (input.model?.modelID) {
+					currentModel = input.model.modelID
+					updateEnrichmentOpts({ model: currentModel })
+					log("info", `[memory] Model updated: ${currentModel}`)
+				}
 			} catch (err) {
 				log("warn", `[memory] chat.message hook failed: ${err}`)
 			}
@@ -151,7 +195,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		event: async ({ event }) => {
 			try {
 				if (event.type === "session.created") {
-					const sessionId = (event as any).properties?.id
+					const sessionId = (event as any).properties?.info?.id
 					if (sessionId) {
 						currentSessionId = sessionId
 						ensureSession(db, sessionId)
@@ -161,7 +205,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				}
 
 				if (event.type === "session.deleted") {
-					const sessionId = (event as any).properties?.id
+					const sessionId = (event as any).properties?.info?.id
 					if (sessionId) {
 						completeSession(db, sessionId)
 					}
@@ -218,7 +262,9 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				if (!sessionId) return
 
 				// 1. Run LLM consolidation (observations → LTM)
-				const result = await consolidateMemories(db, sessionId, log)
+				const result = await consolidateMemories(db, sessionId, log,
+					currentModel ? { model: currentModel } : undefined,
+				)
 
 				// 2. Write LSS files for new LTM entries
 				for (const mem of result.newMemories) {
@@ -299,6 +345,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					const input: CreateLTMInput = {
 						type,
 						content: args.text,
+						caption: args.text.slice(0, 80),
 						sourceSessionId: context.sessionID,
 						tags,
 						confidence: 1.0,
