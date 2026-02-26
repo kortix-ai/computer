@@ -29,7 +29,7 @@ import type { Deployment, DeploymentStatus, DeploymentSource } from '@/hooks/dep
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const statusConfig: Record<DeploymentStatus, {
+export const statusConfig: Record<DeploymentStatus, {
   label: string;
   variant: 'highlight' | 'secondary' | 'destructive' | 'outline' | 'beta';
   dotColor: string;
@@ -61,7 +61,7 @@ function isFreestyleKeyError(error: string): boolean {
   return lower.includes('freestyle') && (lower.includes('key') || lower.includes('configured'));
 }
 
-function formatRelativeTime(dateStr: string): string {
+export function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -93,6 +93,8 @@ interface DeploymentCardProps {
   isStopPending?: boolean;
   isRedeployPending?: boolean;
   isDeletePending?: boolean;
+  /** Compact mode for version sub-rows inside a domain group */
+  compact?: boolean;
 }
 
 export function DeploymentCard({
@@ -106,6 +108,7 @@ export function DeploymentCard({
   isStopPending,
   isRedeployPending,
   isDeletePending,
+  compact = false,
 }: DeploymentCardProps) {
   const status = statusConfig[deployment.status] || statusConfig.pending;
   const SourceIcon = sourceIcons[deployment.sourceType] || FileCode2;
@@ -113,6 +116,100 @@ export function DeploymentCard({
   const isInProgress = deployment.status === 'pending' || deployment.status === 'building' || deployment.status === 'deploying';
   const canRedeploy = deployment.status === 'active' || deployment.status === 'failed' || deployment.status === 'stopped';
 
+  // ─── Compact version row (used inside domain groups) ────────────────────
+  if (compact) {
+    return (
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl hover:bg-muted/30 transition-colors group/version">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Badge variant="secondary" className="text-xs shrink-0 tabular-nums">
+            v{deployment.version}
+          </Badge>
+          <Badge variant={status.variant} className="text-xs shrink-0">
+            <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', status.dotColor)} />
+            {status.label}
+          </Badge>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+            <span className="flex items-center gap-1 shrink-0">
+              <SourceIcon className="h-3 w-3" />
+              {sourceLabels[deployment.sourceType]}
+            </span>
+            {deployment.framework && (
+              <>
+                <span className="text-border">·</span>
+                <span className="shrink-0">{deployment.framework}</span>
+              </>
+            )}
+            <span className="text-border">·</span>
+            <span className="shrink-0">{formatRelativeTime(deployment.createdAt)}</span>
+          </div>
+        </div>
+
+        {/* Compact action buttons */}
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/version:opacity-100 transition-opacity">
+          {deployment.liveUrl && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href={deployment.liveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Open live URL</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onViewLogs(deployment)}
+                className="p-1.5 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <ScrollText className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">View logs</TooltipContent>
+          </Tooltip>
+          {canRedeploy && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onRedeploy(deployment)}
+                  disabled={isRedeployPending}
+                  className={cn(
+                    'p-1.5 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
+                    isRedeployPending && 'opacity-50 !cursor-not-allowed',
+                  )}
+                >
+                  <RotateCcw className={cn('h-3.5 w-3.5', isRedeployPending && 'animate-spin')} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Redeploy</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onDelete(deployment)}
+                disabled={isDeletePending}
+                className={cn(
+                  'p-1.5 rounded-lg cursor-pointer text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors',
+                  isDeletePending && 'opacity-50 !cursor-not-allowed',
+                )}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Delete</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Full card (standalone, used when not grouped) ──────────────────────
   return (
     <SpotlightCard className="bg-card transition-colors group">
       <div className="p-5">

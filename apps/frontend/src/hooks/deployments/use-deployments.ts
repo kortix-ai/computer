@@ -163,6 +163,65 @@ const fetchDeploymentLogs = async (id: string): Promise<ApiLogsResponse['data']>
   return response.data!.data;
 };
 
+// ─── Grouping ───────────────────────────────────────────────────────────────
+
+export interface DeploymentGroup {
+  /** Primary domain used as the group key, or deploymentId for ungrouped */
+  domain: string;
+  /** The most recent deployment in this group (highest version / latest createdAt) */
+  latestDeployment: Deployment;
+  /** All deployments in this group, sorted by version DESC then createdAt DESC */
+  allVersions: Deployment[];
+  /** Total number of versions */
+  versionCount: number;
+}
+
+/**
+ * Groups a flat list of deployments by their primary domain (domains[0]).
+ * Deployments without a domain are treated as standalone groups keyed by deploymentId.
+ * Within each group, deployments are sorted by version DESC, then createdAt DESC.
+ * Groups themselves are sorted by the latest deployment's createdAt DESC.
+ */
+export function groupDeploymentsByDomain(deployments: Deployment[]): DeploymentGroup[] {
+  const groupMap = new Map<string, Deployment[]>();
+
+  for (const d of deployments) {
+    const key = d.domains?.[0] || d.deploymentId;
+    const existing = groupMap.get(key);
+    if (existing) {
+      existing.push(d);
+    } else {
+      groupMap.set(key, [d]);
+    }
+  }
+
+  const groups: DeploymentGroup[] = [];
+
+  for (const [domain, versions] of groupMap) {
+    // Sort by version DESC, then createdAt DESC
+    versions.sort((a, b) => {
+      if (b.version !== a.version) return b.version - a.version;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    groups.push({
+      domain,
+      latestDeployment: versions[0],
+      allVersions: versions,
+      versionCount: versions.length,
+    });
+  }
+
+  // Sort groups by latest deployment's createdAt DESC
+  groups.sort(
+    (a, b) =>
+      new Date(b.latestDeployment.createdAt).getTime() -
+      new Date(a.latestDeployment.createdAt).getTime(),
+  );
+
+  return groups;
+}
+
 // ─── Query Keys ─────────────────────────────────────────────────────────────
 
 export const deploymentKeys = {

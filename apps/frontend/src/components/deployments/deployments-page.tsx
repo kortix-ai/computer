@@ -6,6 +6,7 @@ import {
   useStopDeployment,
   useRedeployDeployment,
   useDeleteDeployment,
+  groupDeploymentsByDomain,
   type Deployment,
   type DeploymentStatus,
 } from '@/hooks/deployments/use-deployments';
@@ -14,14 +15,25 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   AlertCircle,
   Rocket,
   Plus,
   Search,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/page-header';
-import { DeploymentCard } from './deployment-card';
+import { DeploymentGroup } from './deployment-group';
 import { DeploymentLogsDialog } from './deployment-logs-dialog';
 import { CreateDeploymentDialog } from './create-deployment-dialog';
 import { FreestyleApiKeyDialog } from './freestyle-api-key-dialog';
@@ -81,6 +93,7 @@ export function DeploymentsPage() {
   const [editDeployment, setEditDeployment] = useState<Deployment | null>(null);
   const [logsDeployment, setLogsDeployment] = useState<Deployment | null>(null);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Deployment | null>(null);
 
   const { data, isLoading, error } = useDeployments(statusFilter);
   const { data: secrets } = useSecrets();
@@ -121,6 +134,11 @@ export function DeploymentsPage() {
     );
   }, [deployments, searchQuery]);
 
+  const groupedDeployments = useMemo(
+    () => groupDeploymentsByDomain(filteredDeployments),
+    [filteredDeployments],
+  );
+
   const handleStop = async (deployment: Deployment) => {
     try {
       await stopMutation.mutateAsync(deployment.deploymentId);
@@ -149,12 +167,16 @@ export function DeploymentsPage() {
     }
   };
 
-  const handleDelete = async (deployment: Deployment) => {
-    const domain = deployment.domains?.[0] || deployment.deploymentId.slice(0, 8);
-    if (!confirm(`Delete deployment "${domain}"? This cannot be undone.`)) return;
+  const handleDelete = useCallback((deployment: Deployment) => {
+    setDeleteTarget(deployment);
+  }, []);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteMutation.mutateAsync(deployment.deploymentId);
+      await deleteMutation.mutateAsync(deleteTarget.deploymentId);
       toast.success('Deployment deleted');
+      setDeleteTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete deployment');
     }
@@ -244,7 +266,7 @@ export function DeploymentsPage() {
         <div className="pb-8">
           {isLoading ? (
             <LoadingSkeleton />
-          ) : filteredDeployments.length === 0 ? (
+          ) : groupedDeployments.length === 0 ? (
             deployments.length === 0 && !statusFilter ? (
               <EmptyState onCreateClick={handleNewDeployment} />
             ) : (
@@ -258,10 +280,10 @@ export function DeploymentsPage() {
             )
           ) : (
             <div className="space-y-4">
-              {filteredDeployments.map((deployment) => (
-                <DeploymentCard
-                  key={deployment.deploymentId}
-                  deployment={deployment}
+              {groupedDeployments.map((group) => (
+                <DeploymentGroup
+                  key={group.domain}
+                  group={group}
                   onViewLogs={setLogsDeployment}
                   onStop={handleStop}
                   onRedeploy={handleRedeploy}
@@ -304,6 +326,42 @@ export function DeploymentsPage() {
           setShowCreateDialog(true);
         }}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete deployment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold">
+                &quot;{deleteTarget?.domains?.[0] || deleteTarget?.deploymentId.slice(0, 8)}&quot;
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
