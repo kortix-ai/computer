@@ -17,7 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTabStore, openTabAndNavigate, type Tab } from '@/stores/tab-store';
 import { useOpenCodePtyList } from '@/hooks/opencode/use-opencode-pty';
-import { useSandboxDeployments, type SandboxDeployment } from '@/hooks/use-sandbox-deployments';
+import { useSandboxServices, type SandboxService } from '@/hooks/use-sandbox-services';
 import { useOpenCodeSessions, type Session } from '@/hooks/opencode/use-opencode-sessions';
 import { useServerStore, getActiveOpenCodeUrl, getSubdomainOpts } from '@/stores/server-store';
 import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
@@ -43,6 +43,8 @@ interface RunningService {
   sourcePath?: string;
   pid?: number;
   hasTab?: boolean;
+  /** Whether this service is managed by the deployer */
+  managed?: boolean;
 }
 
 // ============================================================================
@@ -72,9 +74,14 @@ const FRAMEWORK_STYLES: Record<string, { bg: string; text: string; label: string
   node:    { bg: 'bg-green-500/15', text: 'text-green-600 dark:text-green-300', label: 'Node.js' },
   python:  { bg: 'bg-yellow-500/15', text: 'text-yellow-600 dark:text-yellow-300', label: 'Python' },
   static:  { bg: 'bg-blue-500/15', text: 'text-blue-600 dark:text-blue-300', label: 'Static' },
+  go:      { bg: 'bg-sky-500/15', text: 'text-sky-600 dark:text-sky-300', label: 'Go' },
+  ruby:    { bg: 'bg-red-500/15', text: 'text-red-600 dark:text-red-300', label: 'Ruby' },
+  java:    { bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-300', label: 'Java' },
+  rust:    { bg: 'bg-amber-500/15', text: 'text-amber-600 dark:text-amber-300', label: 'Rust' },
 };
 
 function getFrameworkStyle(fw: string) {
+  if (!fw || fw === 'unknown') return null;
   return FRAMEWORK_STYLES[fw] || { bg: 'bg-muted', text: 'text-muted-foreground', label: fw };
 }
 
@@ -116,8 +123,9 @@ function ServiceCard({ service }: { service: RunningService }) {
   const isDeployment = service.kind === 'deployment' || !!service.deploymentId;
   const isTerminal = service.kind === 'terminal';
   const Icon = isTerminal ? TerminalSquare : isDeployment ? Server : Globe;
-  const fwStyle = service.framework ? getFrameworkStyle(service.framework) : null;
-  const isRunning = service.status === 'running';
+  const fwStyle = service.framework && service.framework !== 'unknown' ? getFrameworkStyle(service.framework) : null;
+  // If status is unknown but it has an open tab, treat as running
+  const isRunning = service.status === 'running' || (service.status === 'unknown' && !!service.hasTab);
 
   return (
     <button
@@ -182,7 +190,7 @@ function ServiceCard({ service }: { service: RunningService }) {
       </div>
 
       {/* Metadata pills */}
-      {(fwStyle || service.sourcePath || service.startedAt || service.pid) && (
+      {(fwStyle || service.sourcePath || service.startedAt || service.pid || service.managed !== undefined) && (
         <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3 pt-0.5">
           {fwStyle && (
             <span className={cn(
@@ -190,6 +198,17 @@ function ServiceCard({ service }: { service: RunningService }) {
               fwStyle.bg, fwStyle.text,
             )}>
               {fwStyle.label}
+            </span>
+          )}
+
+          {service.managed !== undefined && (
+            <span className={cn(
+              'inline-flex items-center text-[10px] font-medium px-2 py-[3px] rounded-md leading-none',
+              service.managed
+                ? 'bg-primary/10 text-primary/70'
+                : 'bg-muted/60 text-muted-foreground/60',
+            )}>
+              {service.managed ? 'deployed' : 'manual'}
             </span>
           )}
 
@@ -259,7 +278,7 @@ function SectionHeader({
 // ============================================================================
 
 export function RunningServicesPanel() {
-  const { data: deployments, isLoading: deploymentsLoading } = useSandboxDeployments();
+  const { data: services, isLoading: servicesLoading } = useSandboxServices();
   const { data: ptys, isLoading: ptysLoading } = useOpenCodePtyList();
   const { data: sessions } = useOpenCodeSessions();
   const tabs = useTabStore((s) => s.tabs);
@@ -278,30 +297,85 @@ export function RunningServicesPanel() {
     return map;
   }, [sessions]);
 
-  const deploymentByPort = useMemo(() => {
-    const map = new Map<number, SandboxDeployment>();
-    if (deployments) {
-      for (const dep of deployments) map.set(dep.port, dep);
+  // Build preview tab lookup by port
+  const previewTabByPort = useMemo(() => {
+    const map = new Map<number, Tab>();
+    for (const id of tabOrder) {
+      const tab = tabs[id];
+      if (tab?.type === 'preview') {
+        const port = (tab.metadata?.port as number) || 0;
+        if (port > 0) map.set(port, tab);
+      }
     }
     return map;
-  }, [deployments]);
+  }, [tabs, tabOrder]);
 
   const { appServices, terminalServices } = useMemo(() => {
     const apps: RunningService[] = [];
     const terminals: RunningService[] = [];
     const seenPorts = new Set<number>();
 
-    // Preview tabs — merge with deployment data
-    const previewTabs = tabOrder
-      .map((id) => tabs[id])
-      .filter((t): t is Tab => !!t && t.type === 'preview');
+    // ── 1. Start from backend services (the source of truth) ──
+    if (services) {
+      for (const svc of services) {
+        seenPorts.add(svc.port);
 
-    for (const tab of previewTabs) {
-      const port = (tab.metadata?.port as number) || 0;
-      if (!port) continue;
-      seenPorts.add(port);
+        // Check if there's a preview tab open for this port
+        const tab = previewTabByPort.get(svc.port);
 
-      const dep = deploymentByPort.get(port);
+        // Session context from the tab
+        let sessionTitle: string | undefined;
+        if (tab) {
+          const sourceSessionId = tab.metadata?.sourceSessionId as string | undefined;
+          const sourceSessionTitle = tab.metadata?.sourceSessionTitle as string | undefined;
+          sessionTitle = sourceSessionTitle;
+          if (!sessionTitle && sourceSessionId) {
+            sessionTitle = sessionMap.get(sourceSessionId)?.title;
+          }
+        }
+
+        // Build proxy URL for services without a tab
+        let proxyUrl = tab ? ((tab.metadata?.url as string) || '') : '';
+        if (!proxyUrl) {
+          const subdomainOpts = getSubdomainOpts();
+          proxyUrl = subdomainOpts
+            ? getProxyBaseUrl(svc.port, serverUrl, subdomainOpts)
+            : (activeServer ? getDirectPortUrl(activeServer, String(svc.port)) : null)
+              || getProxyBaseUrl(svc.port, serverUrl, subdomainOpts);
+        }
+
+        // Name: prefer backend service name, fallback to tab title
+        const svcNameIsGeneric = !svc.name || svc.name === `service:${svc.port}` || svc.name === `port-${svc.port}`;
+        const name = svcNameIsGeneric
+          ? (tab?.title || svc.name || `localhost:${svc.port}`)
+          : svc.name;
+
+        apps.push({
+          id: `app:${svc.port}`,
+          kind: 'deployment',
+          name,
+          port: svc.port,
+          framework: svc.framework,
+          status: svc.status,
+          sessionId: tab ? (tab.metadata?.sourceSessionId as string | undefined) : undefined,
+          sessionTitle,
+          tabId: tab?.id,
+          deploymentId: svc.id,
+          proxyUrl,
+          startedAt: svc.startedAt || undefined,
+          sourcePath: svc.sourcePath || undefined,
+          pid: svc.pid,
+          hasTab: !!tab,
+          managed: svc.managed,
+        });
+      }
+    }
+
+    // ── 2. Preview tabs that have no matching backend service ──
+    //    (e.g. manually typed localhost URL, or service stopped but tab stayed)
+    for (const [port, tab] of previewTabByPort) {
+      if (seenPorts.has(port)) continue;
+
       const sourceSessionId = tab.metadata?.sourceSessionId as string | undefined;
       const sourceSessionTitle = tab.metadata?.sourceSessionTitle as string | undefined;
       let sessionTitle = sourceSessionTitle;
@@ -311,50 +385,19 @@ export function RunningServicesPanel() {
 
       apps.push({
         id: `app:${port}`,
-        kind: dep ? 'deployment' : 'preview',
-        name: dep?.deploymentId || tab.title || `localhost:${port}`,
+        kind: 'preview',
+        name: tab.title || `localhost:${port}`,
         port,
-        framework: dep?.framework,
-        status: dep?.status || 'running',
+        status: 'unknown',
         sessionId: sourceSessionId,
         sessionTitle,
         tabId: tab.id,
-        deploymentId: dep?.deploymentId,
         proxyUrl: (tab.metadata?.url as string) || '',
-        startedAt: dep?.startedAt,
-        sourcePath: dep?.sourcePath,
-        pid: dep?.pid,
         hasTab: true,
       });
     }
 
-    // Deployments not yet opened as tabs
-    if (deployments) {
-      for (const dep of deployments) {
-        if (seenPorts.has(dep.port)) continue;
-        const subdomainOpts = getSubdomainOpts();
-        const proxyUrl = activeServer
-          ? (getDirectPortUrl(activeServer, String(dep.port)) || getProxyBaseUrl(dep.port, serverUrl, subdomainOpts))
-          : getProxyBaseUrl(dep.port, serverUrl, subdomainOpts);
-
-        apps.push({
-          id: `app:${dep.port}`,
-          kind: 'deployment',
-          name: dep.deploymentId,
-          port: dep.port,
-          framework: dep.framework,
-          status: dep.status,
-          deploymentId: dep.deploymentId,
-          proxyUrl,
-          startedAt: dep.startedAt,
-          sourcePath: dep.sourcePath,
-          pid: dep.pid,
-          hasTab: false,
-        });
-      }
-    }
-
-    // Terminal tabs
+    // ── 3. Terminal tabs ──
     const terminalTabs = tabOrder
       .map((id) => tabs[id])
       .filter((t): t is Tab => !!t && t.type === 'terminal');
@@ -371,9 +414,9 @@ export function RunningServicesPanel() {
     }
 
     return { appServices: apps, terminalServices: terminals };
-  }, [tabs, tabOrder, deployments, deploymentByPort, activeServer, serverUrl, sessionMap]);
+  }, [tabs, tabOrder, services, previewTabByPort, activeServer, serverUrl, sessionMap]);
 
-  const isLoading = deploymentsLoading || ptysLoading;
+  const isLoading = servicesLoading || ptysLoading;
   const totalCount = appServices.length + terminalServices.length;
 
   return (
