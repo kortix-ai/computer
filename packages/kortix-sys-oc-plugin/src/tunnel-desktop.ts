@@ -356,3 +356,194 @@ export const tunnelScreenInfoTool = tool({
 		return `Screen: ${data.width}x${data.height} @ ${data.scaleFactor}x scale`
 	},
 })
+
+// ─── Accessibility Tree Tools ─────────────────────────────────────────────────
+
+interface AXElement {
+	id: string
+	role: string
+	title: string
+	value: string
+	description: string
+	bounds: { x: number; y: number; width: number; height: number }
+	children: AXElement[]
+	actions: string[]
+	enabled: boolean
+	focused: boolean
+}
+
+function formatAXTree(el: AXElement, indent: number = 0): string {
+	const pad = "  ".repeat(indent)
+	const parts: string[] = []
+
+	const label = el.title || el.value || el.description || "(unnamed)"
+	const flags: string[] = []
+	if (!el.enabled) flags.push("disabled")
+	if (el.focused) flags.push("focused")
+	if (el.actions.length > 0) flags.push(`actions: ${el.actions.join(",")}`)
+	const flagStr = flags.length > 0 ? ` [${flags.join(", ")}]` : ""
+
+	parts.push(`${pad}[${el.role}] ${label} (id: ${el.id})${flagStr}`)
+
+	for (const child of el.children) {
+		parts.push(formatAXTree(child, indent + 1))
+	}
+
+	return parts.join("\n")
+}
+
+export const tunnelAxTreeTool = tool({
+	description: `Get the accessibility tree of an application on the user's machine via Kortix Tunnel. Returns a structured tree of UI elements with roles, labels, states, and available actions. Much faster and cheaper than screenshots for understanding UI state. Use pid to target a specific application.`,
+	args: {
+		tunnel_id: tunnelIdArg,
+		pid: tool.schema.number().optional().describe("Process ID of the target application (omit for all apps)"),
+		maxDepth: tool.schema.number().optional().describe("Maximum tree depth (default: 8)"),
+		roles: tool.schema.array(tool.schema.string()).optional().describe("Filter by element roles (e.g., ['button', 'textfield'])"),
+	},
+	async execute(args) {
+		const tunnelId = await resolveTunnelId(args)
+		const params: Record<string, unknown> = {}
+		if (args.pid !== undefined) params.pid = args.pid
+		if (args.maxDepth !== undefined) params.maxDepth = args.maxDepth
+		if (args.roles !== undefined) params.roles = args.roles
+
+		const result = await tunnelRpc(tunnelId, "desktop.ax.tree", params)
+		if (typeof result === "string") return result
+
+		const data = result as { root: AXElement; elementCount: number }
+		if (!data.root) return "No accessibility tree available"
+
+		const tree = formatAXTree(data.root)
+		return `=== Accessibility Tree (${data.elementCount} elements) ===\n${tree}`
+	},
+})
+
+export const tunnelAxActionTool = tool({
+	description: `Perform an accessibility action on a UI element via Kortix Tunnel. Returns before/after state to verify the action actually worked. Use tunnel_ax_tree first to discover element IDs and available actions. Common actions: AXPress, AXConfirm, AXCancel, AXRaise, AXShowMenu. Check stateChanged in the response to verify success.`,
+	args: {
+		tunnel_id: tunnelIdArg,
+		elementId: tool.schema.string().describe("Element ID from the accessibility tree (e.g., '0.3.1')"),
+		action: tool.schema.string().describe("Action to perform: AXPress, AXConfirm, AXCancel, AXRaise, AXShowMenu"),
+		pid: tool.schema.number().optional().describe("Process ID of the target application"),
+	},
+	async execute(args) {
+		const tunnelId = await resolveTunnelId(args)
+		const result = await tunnelRpc(tunnelId, "desktop.ax.action", {
+			elementId: args.elementId,
+			action: args.action,
+			pid: args.pid,
+		})
+		if (typeof result === "string") return result
+
+		const data = result as {
+			ok: boolean; action: string; elementId: string;
+			before: { focused: boolean; value: string };
+			after: { focused: boolean; value: string };
+			stateChanged: boolean; role: string; title: string;
+		}
+
+		const lines = [`Action "${data.action}" on [${data.role}] "${data.title}" (${data.elementId})`]
+		lines.push(`State changed: ${data.stateChanged ? "YES" : "NO"}`)
+		lines.push(`Before: focused=${data.before.focused}, value="${data.before.value}"`)
+		lines.push(`After:  focused=${data.after.focused}, value="${data.after.value}"`)
+		if (!data.stateChanged) {
+			lines.push(`WARNING: No state change detected. The action may not have had any effect.`)
+		}
+		return lines.join("\n")
+	},
+})
+
+export const tunnelAxSetValueTool = tool({
+	description: `Directly set the value of a UI element (text field, search box, etc.) via the accessibility API. Much more reliable than clicking and typing. Verifies the value was actually set by reading it back. Use tunnel_ax_tree to find element IDs.`,
+	args: {
+		tunnel_id: tunnelIdArg,
+		elementId: tool.schema.string().describe("Element ID from the accessibility tree (e.g., '0.3.1')"),
+		value: tool.schema.string().describe("The value to set (e.g., text to put in a search field)"),
+		pid: tool.schema.number().optional().describe("Process ID of the target application"),
+	},
+	async execute(args) {
+		const tunnelId = await resolveTunnelId(args)
+		const result = await tunnelRpc(tunnelId, "desktop.ax.set_value", {
+			elementId: args.elementId,
+			value: args.value,
+			pid: args.pid,
+		})
+		if (typeof result === "string") return result
+
+		const data = result as {
+			ok: boolean; elementId: string;
+			requestedValue: string; actualValue: string; error?: string;
+		}
+
+		if (data.ok) {
+			return `Value set successfully on ${data.elementId}\nRequested: "${data.requestedValue}"\nVerified:  "${data.actualValue}"`
+		} else {
+			return `FAILED to set value on ${data.elementId}\nRequested: "${data.requestedValue}"\nActual:    "${data.actualValue}"\nError: ${data.error || "unknown"}`
+		}
+	},
+})
+
+export const tunnelAxFocusTool = tool({
+	description: `Focus a UI element directly via the accessibility API. More reliable than clicking to focus. Verifies focus was actually set. Use tunnel_ax_tree to find element IDs.`,
+	args: {
+		tunnel_id: tunnelIdArg,
+		elementId: tool.schema.string().describe("Element ID from the accessibility tree (e.g., '0.3.1')"),
+		pid: tool.schema.number().optional().describe("Process ID of the target application"),
+	},
+	async execute(args) {
+		const tunnelId = await resolveTunnelId(args)
+		const result = await tunnelRpc(tunnelId, "desktop.ax.focus", {
+			elementId: args.elementId,
+			pid: args.pid,
+		})
+		if (typeof result === "string") return result
+
+		const data = result as {
+			ok: boolean; elementId: string; role: string; title: string;
+			before: { focused: boolean }; after: { focused: boolean }; error?: string;
+		}
+
+		if (data.ok) {
+			return `Focused [${data.role}] "${data.title}" (${data.elementId})\nBefore: focused=${data.before.focused}\nAfter:  focused=${data.after.focused}`
+		} else {
+			return `FAILED to focus [${data.role}] "${data.title}" (${data.elementId})\nError: ${data.error || "unknown"}\nBefore: focused=${data.before.focused}\nAfter:  focused=${data.after.focused}`
+		}
+	},
+})
+
+export const tunnelAxSearchTool = tool({
+	description: `Search the accessibility tree for UI elements matching a query via Kortix Tunnel. Performs case-insensitive substring match on element titles, values, and descriptions. Faster than walking the full tree when you know what you're looking for.`,
+	args: {
+		tunnel_id: tunnelIdArg,
+		query: tool.schema.string().describe("Search text (matches against title, value, description)"),
+		role: tool.schema.string().optional().describe("Filter by element role (e.g., 'button', 'textfield')"),
+		pid: tool.schema.number().optional().describe("Process ID of the target application"),
+		maxResults: tool.schema.number().optional().describe("Maximum results to return (default: 20)"),
+	},
+	async execute(args) {
+		const tunnelId = await resolveTunnelId(args)
+		const params: Record<string, unknown> = { query: args.query }
+		if (args.role !== undefined) params.role = args.role
+		if (args.pid !== undefined) params.pid = args.pid
+		if (args.maxResults !== undefined) params.maxResults = args.maxResults
+
+		const result = await tunnelRpc(tunnelId, "desktop.ax.search", params)
+		if (typeof result === "string") return result
+
+		const data = result as { elements: AXElement[] }
+		if (!data.elements || data.elements.length === 0) return `No elements found matching "${args.query}"`
+
+		const lines = [`=== AX Search: "${args.query}" (${data.elements.length} results) ===`]
+		for (const el of data.elements) {
+			const label = el.title || el.value || el.description || "(unnamed)"
+			const flags: string[] = []
+			if (!el.enabled) flags.push("disabled")
+			if (el.focused) flags.push("focused")
+			if (el.actions.length > 0) flags.push(`actions: ${el.actions.join(",")}`)
+			const flagStr = flags.length > 0 ? ` [${flags.join(", ")}]` : ""
+			const b = el.bounds
+			lines.push(`  [${el.role}] ${label} (id: ${el.id}) @ ${b.x},${b.y} ${b.width}x${b.height}${flagStr}`)
+		}
+		return lines.join("\n")
+	},
+})

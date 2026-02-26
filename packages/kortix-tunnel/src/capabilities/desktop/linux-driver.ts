@@ -3,6 +3,7 @@ import { readFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
+import { execAtspiHelper } from './atspi-helper';
 import type {
   DesktopDriver,
   ScreenshotOptions,
@@ -18,6 +19,16 @@ import type {
   WindowBounds,
   AppInfo,
   ScreenInfo,
+  AXTreeOptions,
+  AXTreeResult,
+  AXActionOptions,
+  AXActionResult,
+  AXSetValueOptions,
+  AXSetValueResult,
+  AXFocusOptions,
+  AXFocusResult,
+  AXSearchOptions,
+  AXSearchResult,
 } from './types';
 
 function tmpPath(): string {
@@ -300,5 +311,58 @@ export class LinuxDriver implements DesktopDriver {
     const size = radius * 2;
 
     return this.screenshot({ region: { x, y, width: size, height: size } });
+  }
+
+  async axTree(options: AXTreeOptions): Promise<AXTreeResult> {
+    const res = await execAtspiHelper({
+      action: 'ax_tree',
+      pid: options.pid,
+      maxDepth: options.maxDepth ?? 8,
+      roles: options.roles,
+    });
+    return {
+      root: res.root,
+      elementCount: res.elementCount!,
+    };
+  }
+
+  async axAction(options: AXActionOptions): Promise<AXActionResult> {
+    const res = await execAtspiHelper({
+      action: 'ax_action',
+      elementId: options.elementId,
+      action_name: options.action,
+      pid: options.pid,
+    });
+    return res as unknown as AXActionResult;
+  }
+
+  async axSetValue(options: AXSetValueOptions): Promise<AXSetValueResult> {
+    const res = await execAtspiHelper({
+      action: 'ax_set_value',
+      elementId: options.elementId,
+      value: options.value,
+      pid: options.pid,
+    });
+    return res as unknown as AXSetValueResult;
+  }
+
+  async axFocus(options: AXFocusOptions): Promise<AXFocusResult> {
+    const res = await execAtspiHelper({
+      action: 'ax_focus',
+      elementId: options.elementId,
+      pid: options.pid,
+    });
+    return res as unknown as AXFocusResult;
+  }
+
+  async axSearch(options: AXSearchOptions): Promise<AXSearchResult> {
+    const res = await execAtspiHelper({
+      action: 'ax_search',
+      query: options.query,
+      role: options.role,
+      pid: options.pid,
+      maxResults: options.maxResults ?? 20,
+    });
+    return { elements: res.elements || [] };
   }
 }

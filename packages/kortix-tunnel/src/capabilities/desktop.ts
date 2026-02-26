@@ -3,12 +3,20 @@ import type { Capability, RpcHandler } from './index';
 import type { DesktopDriver } from './desktop/types';
 
 function createDriver(): DesktopDriver {
-  if (platform() === 'darwin') {
-    const { MacOSDriver } = require('./desktop/macos-driver');
-    return new MacOSDriver();
+  switch (platform()) {
+    case 'darwin': {
+      const { MacOSDriver } = require('./desktop/macos-driver');
+      return new MacOSDriver();
+    }
+    case 'win32': {
+      const { WindowsDriver } = require('./desktop/windows-driver');
+      return new WindowsDriver();
+    }
+    default: {
+      const { LinuxDriver } = require('./desktop/linux-driver');
+      return new LinuxDriver();
+    }
   }
-  const { LinuxDriver } = require('./desktop/linux-driver');
-  return new LinuxDriver();
 }
 
 export function createDesktopCapability(): Capability {
@@ -139,6 +147,46 @@ export function createDesktopCapability(): Capability {
 
   methods.set('desktop.cursor.image', async (params) => {
     return driver.cursorImage(params.radius as number | undefined);
+  });
+
+  methods.set('desktop.ax.tree', async (params) => {
+    return driver.axTree({
+      pid: params.pid as number | undefined,
+      maxDepth: params.maxDepth as number | undefined,
+      roles: params.roles as string[] | undefined,
+    });
+  });
+
+  methods.set('desktop.ax.action', async (params) => {
+    return driver.axAction({
+      elementId: params.elementId as string,
+      action: params.action as string,
+      pid: params.pid as number | undefined,
+    });
+  });
+
+  methods.set('desktop.ax.set_value', async (params) => {
+    return driver.axSetValue({
+      elementId: params.elementId as string,
+      value: params.value as string,
+      pid: params.pid as number | undefined,
+    });
+  });
+
+  methods.set('desktop.ax.focus', async (params) => {
+    return driver.axFocus({
+      elementId: params.elementId as string,
+      pid: params.pid as number | undefined,
+    });
+  });
+
+  methods.set('desktop.ax.search', async (params) => {
+    return driver.axSearch({
+      query: params.query as string,
+      role: params.role as string | undefined,
+      pid: params.pid as number | undefined,
+      maxResults: params.maxResults as number | undefined,
+    });
   });
 
   return {

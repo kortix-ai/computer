@@ -203,6 +203,11 @@ const DESKTOP_METHOD_FEATURES: Record<string, string> = {
   'desktop.app.list': 'apps',
   'desktop.clipboard.read': 'clipboard',
   'desktop.clipboard.write': 'clipboard',
+  'desktop.ax.tree': 'accessibility',
+  'desktop.ax.action': 'accessibility',
+  'desktop.ax.set_value': 'accessibility',
+  'desktop.ax.focus': 'accessibility',
+  'desktop.ax.search': 'accessibility',
 };
 
 function validateDesktopScope(

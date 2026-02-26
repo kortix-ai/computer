@@ -19,7 +19,7 @@ const VALID_CAPABILITIES = new Set<string>([
 
 const VALID_FS_OPERATIONS = new Set(['read', 'write', 'list', 'delete']);
 const VALID_NET_PROTOCOLS = new Set(['http', 'tcp']);
-const VALID_DESKTOP_FEATURES = new Set(['screenshot', 'mouse', 'keyboard', 'windows', 'apps', 'clipboard']);
+const VALID_DESKTOP_FEATURES = new Set(['screenshot', 'mouse', 'keyboard', 'windows', 'apps', 'clipboard', 'accessibility']);
 
 export interface ScopeValidationResult {
   valid: boolean;

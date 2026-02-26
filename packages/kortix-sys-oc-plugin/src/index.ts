@@ -45,6 +45,11 @@ import {
 	tunnelMouseDragTool,
 	tunnelMouseScrollTool,
 	tunnelScreenInfoTool,
+	tunnelAxTreeTool,
+	tunnelAxActionTool,
+	tunnelAxSetValueTool,
+	tunnelAxFocusTool,
+	tunnelAxSearchTool,
 } from "./tunnel-desktop"
 
 // ─── Plugin Entry ────────────────────────────────────────────────────────────
@@ -481,6 +486,11 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 			tunnel_mouse_drag: tunnelMouseDragTool,
 			tunnel_mouse_scroll: tunnelMouseScrollTool,
 			tunnel_screen_info: tunnelScreenInfoTool,
+			tunnel_ax_tree: tunnelAxTreeTool,
+			tunnel_ax_action: tunnelAxActionTool,
+			tunnel_ax_set_value: tunnelAxSetValueTool,
+			tunnel_ax_focus: tunnelAxFocusTool,
+			tunnel_ax_search: tunnelAxSearchTool,
 		},
 	}
 }

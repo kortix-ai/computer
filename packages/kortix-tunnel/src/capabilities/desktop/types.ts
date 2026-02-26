@@ -7,7 +7,7 @@ export interface ScreenshotResult {
   image: string;
   width: number;
   height: number;
-  format: 'png';
+  format: 'png' | 'jpeg';
 }
 
 export interface MouseClickOptions {
@@ -79,6 +79,91 @@ export interface ScreenInfo {
   scaleFactor: number;
 }
 
+export interface AXElement {
+  id: string;
+  role: string;
+  subrole?: string;
+  title: string;
+  value: string;
+  description: string;
+  label?: string;
+  placeholder?: string;
+  identifier?: string;
+  bounds: { x: number; y: number; width: number; height: number };
+  children: AXElement[];
+  actions: string[];
+  enabled: boolean;
+  focused: boolean;
+}
+
+export interface AXTreeOptions {
+  pid?: number;
+  maxDepth?: number;
+  roles?: string[];
+}
+
+export interface AXTreeResult {
+  root: AXElement;
+  elementCount: number;
+}
+
+export interface AXActionOptions {
+  elementId: string;
+  action: string;
+  pid?: number;
+}
+
+export interface AXActionResult {
+  ok: boolean;
+  action: string;
+  elementId: string;
+  before: { focused: boolean; value: string };
+  after: { focused: boolean; value: string };
+  stateChanged: boolean;
+  role: string;
+  title: string;
+}
+
+export interface AXSetValueOptions {
+  elementId: string;
+  value: string;
+  pid?: number;
+}
+
+export interface AXSetValueResult {
+  ok: boolean;
+  elementId: string;
+  requestedValue: string;
+  actualValue: string;
+  error?: string;
+}
+
+export interface AXFocusOptions {
+  elementId: string;
+  pid?: number;
+}
+
+export interface AXFocusResult {
+  ok: boolean;
+  elementId: string;
+  role: string;
+  title: string;
+  before: { focused: boolean };
+  after: { focused: boolean };
+  error?: string;
+}
+
+export interface AXSearchOptions {
+  query: string;
+  role?: string;
+  pid?: number;
+  maxResults?: number;
+}
+
+export interface AXSearchResult {
+  elements: AXElement[];
+}
+
 export interface DesktopDriver {
   screenshot(options: ScreenshotOptions): Promise<ScreenshotResult>;
 
@@ -107,4 +192,10 @@ export interface DesktopDriver {
   screenInfo(): Promise<ScreenInfo>;
 
   cursorImage(radius?: number): Promise<ScreenshotResult>;
+
+  axTree(options: AXTreeOptions): Promise<AXTreeResult>;
+  axAction(options: AXActionOptions): Promise<AXActionResult>;
+  axSetValue(options: AXSetValueOptions): Promise<AXSetValueResult>;
+  axFocus(options: AXFocusOptions): Promise<AXFocusResult>;
+  axSearch(options: AXSearchOptions): Promise<AXSearchResult>;
 }
