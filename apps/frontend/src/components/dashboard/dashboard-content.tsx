@@ -16,7 +16,8 @@ import { getClient } from '@/lib/opencode-sdk';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { SessionChatInput } from '@/components/session/session-chat-input';
-import { SessionWelcome } from '@/components/session/session-welcome';
+import { WallpaperBackground } from '@/components/ui/wallpaper-background';
+import { PersonalisedSuggestions } from '@/components/dashboard/personalised-suggestions';
 import { useOpenCodeLocal } from '@/hooks/opencode/use-opencode-local';
 import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { Menu } from 'lucide-react';
@@ -149,8 +150,11 @@ export function DashboardContent() {
         </div>
       )}
 
-      {/* Welcome hero — identical to session empty state */}
-      <SessionWelcome />
+      {/* Wallpaper + personalised suggestions (dashboard only) */}
+      <div className="flex-1 relative overflow-hidden">
+        <WallpaperBackground />
+        <PersonalisedSuggestions onSuggestionClick={handleSend} />
+      </div>
 
       {/* Chat Input — identical to session empty state */}
       <SessionChatInput
