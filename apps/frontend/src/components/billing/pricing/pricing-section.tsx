@@ -1037,9 +1037,9 @@ export function PricingSection({
   // Add currency detection at top level
   const { currency, symbol } = useUserCurrency();
 
-  const { data: accountState, isLoading: isFetchingPlan, error: subscriptionQueryError, refetch: refetchSubscription } = useAccountState({ enabled: isUserAuthenticated });
+  const { data: accountState, isLoading: isFetchingPlan, refetch: refetchSubscription } = useAccountState({ enabled: isUserAuthenticated });
 
-  const isAuthenticated = isUserAuthenticated && !!accountState && subscriptionQueryError === null;
+  const isAuthenticated = isUserAuthenticated;
 
   // Get scheduled change and commitment from account state
   const hasScheduledChange = accountState?.subscription.has_scheduled_change && accountState?.subscription.scheduled_change;
