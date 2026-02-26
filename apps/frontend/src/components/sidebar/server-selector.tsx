@@ -29,6 +29,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/auth-token';
 import { createSandbox, getSandboxUrl, extractMappedPorts, removeSandbox, setupSSH, type SandboxProviderName, type ChangelogEntry, type SSHSetupResult } from '@/lib/platform-client';
 import { toast } from '@/lib/toast';
+import { isBillingEnabled } from '@/lib/config';
 
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
 import { useProviders } from '@/hooks/platform/use-sandbox';
@@ -702,21 +703,33 @@ export function InstanceManagerDialog({
               <>
                 <div className="flex items-center gap-2">
                   {hasDaytona && (
-                    <button
-                      type="button"
-                      onClick={() => handleCreateSandbox('daytona')}
-                      disabled={isCreatingSandbox}
-                      className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isCreatingSandbox ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Cloud className="h-3.5 w-3.5" />
-                          Cloud
-                        </>
-                      )}
-                    </button>
+                    isBillingEnabled() ? (
+                      <button
+                        type="button"
+                        disabled
+                        title="Sandbox is auto-provisioned in cloud mode"
+                        className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-muted-foreground/50 bg-muted/30 border border-border/30 rounded-lg cursor-not-allowed"
+                      >
+                        <Cloud className="h-3.5 w-3.5" />
+                        Coming soon
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleCreateSandbox('daytona')}
+                        disabled={isCreatingSandbox}
+                        className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isCreatingSandbox ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Cloud className="h-3.5 w-3.5" />
+                            Cloud
+                          </>
+                        )}
+                      </button>
+                    )
                   )}
                   {hasLocalDocker && (
                     <button

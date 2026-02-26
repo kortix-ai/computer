@@ -26,7 +26,7 @@ import { isBillingEnabled } from '@/lib/config';
 import { useServerStore } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
 import { useAuth } from '@/components/AuthProvider';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 /**
  * Register the sandbox as a server entry in the server store on boot.
@@ -66,18 +66,43 @@ function registerSandboxServer(sandbox: SandboxInfo) {
   }
 }
 
+// Module-level guard: ensures only one auto-create runs across all instances/re-renders.
+let _autoCreatePromise: Promise<void> | null = null;
+
 export function useSandbox() {
   const { user } = useAuth();
-  const autoCreating = useRef(false);
 
   const query = useQuery({
     queryKey: ['platform', 'sandbox'],
     queryFn: async () => {
-      // Read-only check — returns null if no sandbox exists.
+      // In cloud mode, auto-create if no sandbox exists (idempotent via backend).
+      // Uses module-level promise dedup so concurrent hook instances share one call.
+      if (isBillingEnabled()) {
+        const existing = await getSandbox();
+        if (existing) return existing;
+
+        // No sandbox — auto-create via ensureSandbox (POST /platform/init, idempotent)
+        if (!_autoCreatePromise) {
+          _autoCreatePromise = ensureSandbox()
+            .then(({ sandbox }) => {
+              console.log('[useSandbox] Sandbox auto-created:', sandbox.external_id);
+            })
+            .catch((err) => {
+              console.error('[useSandbox] Auto-create failed:', err);
+            })
+            .finally(() => {
+              _autoCreatePromise = null;
+            });
+        }
+        await _autoCreatePromise;
+        // Re-fetch after creation
+        return await getSandbox();
+      }
+
       return await getSandbox();
     },
     enabled: !!user,
-    staleTime: 0, // Never cache — sandboxes are created/deleted frequently.
+    staleTime: 0,
     retry: 2,
     refetchOnWindowFocus: false,
   });
@@ -88,35 +113,6 @@ export function useSandbox() {
       registerSandboxServer(query.data);
     }
   }, [query.data]);
-
-  // Auto-create sandbox in cloud mode if none exists.
-  // In cloud mode (billing enabled), users shouldn't have to manually
-  // provision a sandbox — it should just be there after signup.
-  useEffect(() => {
-    if (
-      !query.isLoading &&
-      !query.data &&
-      !query.isError &&
-      user &&
-      isBillingEnabled() &&
-      !autoCreating.current
-    ) {
-      autoCreating.current = true;
-      console.log('[useSandbox] No sandbox found in cloud mode — auto-creating...');
-      ensureSandbox()
-        .then(({ sandbox }) => {
-          console.log('[useSandbox] Sandbox auto-created:', sandbox.external_id);
-          registerSandboxServer(sandbox);
-          query.refetch();
-        })
-        .catch((err) => {
-          console.error('[useSandbox] Auto-create failed:', err);
-        })
-        .finally(() => {
-          autoCreating.current = false;
-        });
-    }
-  }, [query.isLoading, query.data, query.isError, user]);
 
   return {
     sandbox: query.data ?? null,
