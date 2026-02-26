@@ -10,6 +10,7 @@
  */
 
 import { create } from 'zustand';
+import { createSSEStream, type SSEStream } from '@/lib/utils/sse-stream';
 import type { TunnelPermissionRequest } from '@/hooks/tunnel/use-tunnel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ interface TunnelStoreState {
 
 // ─── Internal SSE State ──────────────────────────────────────────────────────
 
-let eventSource: EventSource | null = null;
+let sseStream: SSEStream | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -86,42 +87,49 @@ export const useTunnelStore = create<TunnelStoreState>()((set, get) => ({
     // Close existing connection
     get().stopSseStream();
 
-    const url = `${apiUrl}/tunnel/permission-requests/stream?token=${encodeURIComponent(token)}`;
+    const url = `${apiUrl}/tunnel/permission-requests/stream`;
 
     try {
-      eventSource = new EventSource(url);
+      sseStream = createSSEStream({
+        url,
+        token,
+        onOpen: () => {
+          set({ sseConnected: true });
+        },
+        onError: () => {
+          set({ sseConnected: false });
 
-      eventSource.addEventListener('connected', () => {
+          // Auto-reconnect after 5 seconds
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(() => {
+            get().startSseStream(token, apiUrl);
+          }, 5_000);
+        },
+      });
+
+      sseStream.addEventListener('connected', () => {
         set({ sseConnected: true });
       });
 
-      eventSource.addEventListener('permission_request', (event) => {
+      sseStream.addEventListener('permission_request', (data) => {
         try {
-          const request = JSON.parse(event.data) as TunnelPermissionRequest;
+          const request = JSON.parse(data) as TunnelPermissionRequest;
           get().addPendingRequest(request);
         } catch {
           console.warn('[tunnel-store] Failed to parse SSE event');
         }
       });
 
-      eventSource.addEventListener('error', () => {
-        set({ sseConnected: false });
-
-        // Auto-reconnect after 5 seconds
-        if (reconnectTimer) clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(() => {
-          get().startSseStream(token, apiUrl);
-        }, 5_000);
-      });
+      sseStream.connect();
     } catch {
       set({ sseConnected: false });
     }
   },
 
   stopSseStream: () => {
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
+    if (sseStream) {
+      sseStream.close();
+      sseStream = null;
     }
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);

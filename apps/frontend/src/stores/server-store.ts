@@ -116,10 +116,10 @@ interface ServerStore {
  * The default sandbox URL routes through the backend's unified preview proxy.
  * Uses the container name ('kortix-sandbox') as the sandbox ID — the backend
  * resolves this via Docker DNS on the shared network.
- * Same URL pattern for all providers: /v1/preview/{sandboxId}/{port}/*
+ * Same URL pattern for all providers: /v1/p/{sandboxId}/{port}/*
  */
 const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '');
-const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/preview/kortix-sandbox/8000`;
+const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/p/kortix-sandbox/8000`;
 const SERVERS_API = `${BACKEND_URL}/servers`;
 
 const DEFAULT_SERVER_ID = 'default';
@@ -436,7 +436,7 @@ export const useServerStore = create<ServerStore>()(
 
     }),
     {
-      name: 'opencode-servers-v4', // v4: dynamic sandbox ID (e.g. /preview/kortix-sandbox/{port}) replaces hardcoded /preview/local/
+      name: 'opencode-servers-v5', // v5: /v1/preview/ → /v1/p/ route rename + token-out-of-query-params
       partialize: (state) => ({
         servers: state.servers,
         activeServerId: state.activeServerId,
@@ -444,6 +444,13 @@ export const useServerStore = create<ServerStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+
+        // Migrate persisted /v1/preview/ URLs to /v1/p/ (v4 → v5 migration)
+        for (const server of state.servers) {
+          if (server.url?.includes('/v1/preview/')) {
+            server.url = server.url.replace('/v1/preview/', '/v1/p/');
+          }
+        }
 
         // Remove stale legacy entries (default, cloud-sandbox) from
         // localStorage — sandboxes are loaded via useSandbox hook.

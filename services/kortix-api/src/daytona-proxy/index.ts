@@ -11,7 +11,7 @@ import { db } from '../shared/db';
 const daytonaProxyApp = new Hono();
 
 // ── Cookie auth endpoint ────────────────────────────────────────────────────
-// POST /v1/preview/auth — validates JWT and sets __preview_session cookie.
+// POST /v1/p/auth — validates JWT and sets __preview_session cookie.
 daytonaProxyApp.route('/auth', getAuthToken);
 
 // ── Path-based proxy ────────────────────────────────────────────────────────
@@ -82,9 +82,7 @@ if (config.isDaytonaEnabled() && !config.isLocalDockerEnabled()) {
     const idx = fullPath.indexOf(prefix);
     const remainingPath = idx !== -1 ? fullPath.slice(idx + prefix.length) || '/' : '/';
 
-    const urlObj = new URL(c.req.url);
-    urlObj.searchParams.delete('token');
-    const queryString = urlObj.search;
+    const queryString = new URL(c.req.url).search;
 
     const method = c.req.method;
     let body: ArrayBuffer | undefined;
@@ -129,9 +127,7 @@ if (config.isDaytonaEnabled() && !config.isLocalDockerEnabled()) {
     const idx = fullPath.indexOf(prefix);
     const remainingPath = idx !== -1 ? fullPath.slice(idx + prefix.length) || '/' : '/';
 
-    const urlObj = new URL(c.req.url);
-    urlObj.searchParams.delete('token');
-    const queryString = urlObj.search;
+    const queryString = new URL(c.req.url).search;
 
     const method = c.req.method;
     let body: ArrayBuffer | undefined;

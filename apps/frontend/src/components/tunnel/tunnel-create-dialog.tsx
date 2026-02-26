@@ -293,7 +293,7 @@ function ConnectStep({
   const [copied, setCopied] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const { refetch, isRefetching } = useTunnelConnection(result.tunnelId);
-  const esRef = useRef<EventSource | null>(null);
+  const sseRef = useRef<ReturnType<typeof import('@/lib/utils/sse-stream').createSSEStream> | null>(null);
 
   useEffect(() => {
     if (isConnected) return;
@@ -301,34 +301,40 @@ function ConnectStep({
 
     async function listen() {
       const { createClient } = await import('@/lib/supabase/client');
+      const { createSSEStream } = await import('@/lib/utils/sse-stream');
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token || cancelled) return;
 
       const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || '';
-      const url = `${apiBase}/tunnel/permission-requests/stream?token=${encodeURIComponent(session.access_token)}`;
-      const es = new EventSource(url);
-      esRef.current = es;
+      const url = `${apiBase}/tunnel/permission-requests/stream`;
+      const stream = createSSEStream({
+        url,
+        token: session.access_token,
+      });
 
-      es.addEventListener('tunnel_connected', (event) => {
+      stream.addEventListener('tunnel_connected', (data) => {
         try {
-          const data = JSON.parse(event.data);
-          if (data.tunnelId === result.tunnelId) {
+          const parsed = JSON.parse(data);
+          if (parsed.tunnelId === result.tunnelId) {
             setIsConnected(true);
-            es.close();
-            esRef.current = null;
+            stream.close();
+            sseRef.current = null;
           }
         } catch {}
       });
+
+      sseRef.current = stream;
+      stream.connect();
     }
 
     listen();
 
     return () => {
       cancelled = true;
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
       }
     };
   }, [isConnected, result.tunnelId]);
@@ -337,9 +343,9 @@ function ConnectStep({
     const { data } = await refetch();
     if (data?.isLive) {
       setIsConnected(true);
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
       }
     }
   };
@@ -349,7 +355,7 @@ function ConnectStep({
       ? `${window.location.protocol}//${window.location.hostname}:8008`
       : 'http://localhost:8008';
 
-  const connectCommand = `npx kortix-tunnel connect --tunnel-id ${result.tunnelId} --token ${result.setupToken} --api-url ${apiUrl}`;
+  const connectCommand = `npx @kortix/tunnel connect --tunnel-id ${result.tunnelId} --token ${result.setupToken} --api-url ${apiUrl}`;
 
   const copyCommand = useCallback(() => {
     navigator.clipboard.writeText(connectCommand).then(() => {

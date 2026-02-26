@@ -1,10 +1,10 @@
 /**
- * Preview Auth Endpoint — POST /v1/preview/auth
+ * Preview Auth Endpoint — POST /v1/p/auth
  *
  * Validates the user's JWT (from Authorization header) and sets a session
  * cookie (__preview_session) as a host-only cookie (no Domain= attribute).
  * This scopes the cookie to the exact origin that served the response,
- * enabling subdomain-based preview routing without ?token= on every request.
+ * enabling subdomain-based routing without ?token= on every request.
  *
  * Called by the frontend once on mount before loading a preview iframe.
  */

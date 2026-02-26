@@ -90,7 +90,7 @@ export function SidebarRight() {
         : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts);
 
       const tabId = `preview:${containerPort}`;
-      const tabHref = `/preview/${containerPort}`;
+      const tabHref = `/p/${containerPort}`;
 
       openTabAndNavigate({
         id: tabId,
@@ -128,7 +128,7 @@ export function SidebarRight() {
       id: 'preview:browser',
       title: 'Browser',
       type: 'preview',
-      href: '/preview/browser',
+      href: '/p/browser',
       metadata: { url: '', port: 0, originalUrl: '', path: '/' },
     });
   }, []);
