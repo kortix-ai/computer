@@ -20,6 +20,7 @@ import { useServerStore } from "@/stores/server-store";
 import { useTabStore } from "@/stores/tab-store";
 import { AnnouncementDialog } from "../announcements/announcement-dialog";
 import { NovuInboxProvider } from "../notifications/novu-inbox-provider";
+import { FilePreviewDialog } from "../common/file-preview-dialog";
 
 /** Monitors session status transitions and fires browser notifications. Renders nothing. */
 function WebNotificationProvider() {
@@ -498,6 +499,8 @@ export default function DashboardLayoutContent({
 					<Suspense fallback={null}>
 						<AnnouncementDialog />
 					</Suspense>
+
+					<FilePreviewDialog />
 
 					<Suspense fallback={null}>
 						<CommandPalette />
