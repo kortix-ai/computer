@@ -444,7 +444,11 @@ function TokenProgress({ messages, sessionId, models, selectedModel, onContextCl
         sessionID: sessionId,
         system: 'Session nearing compaction. Store durable memories now.',
         parts: [{ type: 'text', text: 'Write any lasting notes to memory/YYYY-MM-DD.md; reply with NO_REPLY if nothing to store.' }],
-      }).catch((err) => console.error('[flush] pre-compaction memory flush failed:', err));
+      } as any)
+        .then((res: any) => {
+          if (res?.error) console.error('[flush] pre-compaction memory flush failed:', res.error);
+        })
+        .catch((err: unknown) => console.error('[flush] pre-compaction memory flush failed:', err));
     }
   }, [contextTokens, flushThreshold, isCompacting, sessionId]);
 

@@ -564,6 +564,24 @@ export function useOpenCodeEventStream() {
 							}
 							return old;
 						});
+
+						// Fetch real messages from the server to bring in
+						// authoritative data. In error paths the server may never
+						// send message.updated for the user message, leaving the
+						// optimistic duplicate. After hydrating server data,
+						// clear any optimistic messages (now superseded by real
+						// ones) to prevent double user bubbles.
+						const sid = props.sessionID;
+						client.session
+							.messages({ sessionID: sid })
+							.then((res) => {
+								if (!res.data) return;
+								useSyncStore.getState().hydrate(sid, res.data as any);
+								// Remove optimistic messages — real ones from the
+								// server are now in the store via hydrate.
+								useSyncStore.getState().clearOptimisticMessages(sid);
+							})
+							.catch(() => {});
 					}
 					break;
 				}

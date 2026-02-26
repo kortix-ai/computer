@@ -106,6 +106,7 @@ interface SyncState {
 		messageParts: Part[],
 	) => void;
 	optimisticRemove: (sessionID: string, messageID: string) => void;
+	clearOptimisticMessages: (sessionID: string) => void;
 	hydrate: (
 		sessionID: string,
 		msgs: Array<{ info: Message; parts: Part[] }>,
@@ -350,6 +351,25 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 		});
 	},
 
+	clearOptimisticMessages: (sessionID) => {
+		set((s) => {
+			const list = s.messages[sessionID];
+			if (!list) return s;
+			const optIds = list
+				.filter((m) => optimisticIds.has(m.id))
+				.map((m) => m.id);
+			if (optIds.length === 0) return s;
+			for (const id of optIds) optimisticIds.delete(id);
+			const filtered = list.filter((m) => !optIds.includes(m.id));
+			const newParts = { ...s.parts };
+			for (const id of optIds) delete newParts[id];
+			return {
+				messages: { ...s.messages, [sessionID]: filtered },
+				parts: newParts,
+			};
+		});
+	},
+
 	hydrate: (sessionID, msgs) =>
 		set((s) => {
 			const cmp = (a: string, b: string) =>
@@ -585,33 +605,17 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 			const sid = props.sessionID;
 
 			// Mark session idle — errors terminate the response.
-			// The server will also send session.status idle, but patching here
-			// ensures the UI unblocks immediately (stops showing busy spinner).
 			store.setStatus(sid, { type: "idle" });
 
 			// Patch the error onto the last assistant message in the sync store.
-			// This is critical because:
-			// 1. session.error can arrive before message.updated with .error
-			// 2. Some error paths never emit message.updated with .error at all
-			//    (e.g. API key missing — the server errors before creating messages)
-			// 3. getTurnError() reads from sync store messages, not React Query
+			// If no assistant message exists yet, create a temporary one so the
+			// error is visible immediately. The event handler in
+			// use-opencode-events.ts will also fetch real messages from the
+			// server which will bring in the authoritative data via hydrate().
 			set((s) => {
-				const msgs = s.messages[sid];
-				if (!msgs || msgs.length === 0) {
-					// No messages at all yet — create a stub assistant message
-					// so the error is visible in the turn.
-					const stubId = ascendingId("msg");
-					const stubMsg: Message = {
-						id: stubId,
-						sessionID: sid,
-						role: "assistant",
-						error: props.error,
-					} as any;
-					return {
-						messages: { ...s.messages, [sid]: [...(msgs ?? []), stubMsg] },
-					};
-				}
-				// Find the last assistant message and patch .error onto it
+				const msgs = s.messages[sid] ?? [];
+
+				// Find last assistant message and patch .error onto it
 				for (let i = msgs.length - 1; i >= 0; i--) {
 					if (msgs[i].role === "assistant") {
 						if ((msgs[i] as any).error) return s; // already has error
@@ -620,7 +624,9 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 						return { messages: { ...s.messages, [sid]: next } };
 					}
 				}
-				// No assistant message yet — create a stub so the error is visible
+
+				// No assistant message yet — create a stub so the error shows.
+				// Mark it as a client-side stub so hydrate can replace it.
 				const stubId = ascendingId("msg");
 				const stubMsg: Message = {
 					id: stubId,
