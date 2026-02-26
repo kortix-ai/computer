@@ -23,6 +23,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { DeploymentCard } from './deployment-card';
 import { DeploymentLogsDialog } from './deployment-logs-dialog';
 import { CreateDeploymentDialog } from './create-deployment-dialog';
+import { FreestyleApiKeyDialog } from './freestyle-api-key-dialog';
 import { toast } from 'sonner';
 
 // ─── Filter Tabs ────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ export function DeploymentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [logsDeployment, setLogsDeployment] = useState<Deployment | null>(null);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
 
   const { data, isLoading, error } = useDeployments(statusFilter);
   const stopMutation = useStopDeployment();
@@ -243,6 +245,7 @@ export function DeploymentsPage() {
                   onStop={handleStop}
                   onRedeploy={handleRedeploy}
                   onDelete={handleDelete}
+                  onConfigureApiKey={() => setShowApiKeyDialog(true)}
                   isStopPending={stopMutation.isPending}
                   isRedeployPending={redeployMutation.isPending}
                   isDeletePending={deleteMutation.isPending}
@@ -265,6 +268,11 @@ export function DeploymentsPage() {
         onOpenChange={(open) => {
           if (!open) setLogsDeployment(null);
         }}
+      />
+
+      <FreestyleApiKeyDialog
+        open={showApiKeyDialog}
+        onOpenChange={setShowApiKeyDialog}
       />
     </div>
   );

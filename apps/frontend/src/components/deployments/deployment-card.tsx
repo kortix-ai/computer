@@ -13,10 +13,17 @@ import {
   Archive,
   Globe,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { Deployment, DeploymentStatus, DeploymentSource } from '@/hooks/deployments/use-deployments';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -48,6 +55,11 @@ const sourceLabels: Record<DeploymentSource, string> = {
   tar: 'Tar',
 };
 
+function isFreestyleKeyError(error: string): boolean {
+  const lower = error.toLowerCase();
+  return lower.includes('freestyle') && (lower.includes('key') || lower.includes('configured'));
+}
+
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -75,6 +87,7 @@ interface DeploymentCardProps {
   onStop: (deployment: Deployment) => void;
   onRedeploy: (deployment: Deployment) => void;
   onDelete: (deployment: Deployment) => void;
+  onConfigureApiKey?: () => void;
   isStopPending?: boolean;
   isRedeployPending?: boolean;
   isDeletePending?: boolean;
@@ -86,6 +99,7 @@ export function DeploymentCard({
   onStop,
   onRedeploy,
   onDelete,
+  onConfigureApiKey,
   isStopPending,
   isRedeployPending,
   isDeletePending,
@@ -94,6 +108,7 @@ export function DeploymentCard({
   const SourceIcon = sourceIcons[deployment.sourceType] || FileCode2;
   const domain = deployment.domains?.[0] || null;
   const isInProgress = deployment.status === 'pending' || deployment.status === 'building' || deployment.status === 'deploying';
+  const canRedeploy = deployment.status === 'active' || deployment.status === 'failed' || deployment.status === 'stopped';
 
   return (
     <SpotlightCard className="bg-card transition-colors group">
@@ -145,60 +160,80 @@ export function DeploymentCard({
           {/* Action buttons */}
           <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             {deployment.liveUrl && (
-              <a
-                href={deployment.liveUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                title="Open live URL"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href={deployment.liveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Open live URL</TooltipContent>
+              </Tooltip>
             )}
-            <button
-              onClick={() => onViewLogs(deployment)}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="View logs"
-            >
-              <ScrollText className="h-4 w-4" />
-            </button>
-            {(deployment.status === 'active' || deployment.status === 'failed' || deployment.status === 'stopped') && (
-              <button
-                onClick={() => onRedeploy(deployment)}
-                disabled={isRedeployPending}
-                className={cn(
-                  'p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
-                  isRedeployPending && 'opacity-50 cursor-not-allowed',
-                )}
-                title="Redeploy"
-              >
-                <RotateCcw className={cn('h-4 w-4', isRedeployPending && 'animate-spin')} />
-              </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onViewLogs(deployment)}
+                  className="p-2 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <ScrollText className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">View logs</TooltipContent>
+            </Tooltip>
+            {canRedeploy && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onRedeploy(deployment)}
+                    disabled={isRedeployPending}
+                    className={cn(
+                      'p-2 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
+                      isRedeployPending && 'opacity-50 !cursor-not-allowed',
+                    )}
+                  >
+                    <RotateCcw className={cn('h-4 w-4', isRedeployPending && 'animate-spin')} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Redeploy</TooltipContent>
+              </Tooltip>
             )}
             {(deployment.status === 'active' || isInProgress) && (
-              <button
-                onClick={() => onStop(deployment)}
-                disabled={isStopPending}
-                className={cn(
-                  'p-2 rounded-lg text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors',
-                  isStopPending && 'opacity-50 cursor-not-allowed',
-                )}
-                title="Stop deployment"
-              >
-                <Square className="h-4 w-4" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onStop(deployment)}
+                    disabled={isStopPending}
+                    className={cn(
+                      'p-2 rounded-lg cursor-pointer text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors',
+                      isStopPending && 'opacity-50 !cursor-not-allowed',
+                    )}
+                  >
+                    <Square className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Stop</TooltipContent>
+              </Tooltip>
             )}
-            <button
-              onClick={() => onDelete(deployment)}
-              disabled={isDeletePending}
-              className={cn(
-                'p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors',
-                isDeletePending && 'opacity-50 cursor-not-allowed',
-              )}
-              title="Delete deployment"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onDelete(deployment)}
+                  disabled={isDeletePending}
+                  className={cn(
+                    'p-2 rounded-lg cursor-pointer text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors',
+                    isDeletePending && 'opacity-50 !cursor-not-allowed',
+                  )}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Delete</TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
@@ -209,7 +244,7 @@ export function DeploymentCard({
               href={deployment.liveUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline cursor-pointer"
             >
               <ExternalLink className="h-3 w-3" />
               {deployment.liveUrl}
@@ -217,13 +252,32 @@ export function DeploymentCard({
           </div>
         )}
 
-        {/* Error message */}
+        {/* Error message + actions */}
         {deployment.status === 'failed' && deployment.error && (
-          <div className="mt-3 pl-16">
-            <div className="flex items-start gap-2 text-sm text-red-500 dark:text-red-400 bg-red-500/5 rounded-lg px-3 py-2">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span className="line-clamp-2">{deployment.error}</span>
+          <div className="mt-3 pl-16 space-y-2.5">
+            <div className="flex items-center gap-2 text-sm text-red-500 dark:text-red-400 bg-red-500/5 rounded-lg px-3 py-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="flex-1 line-clamp-2">{deployment.error}</span>
+              {isFreestyleKeyError(deployment.error) && onConfigureApiKey && (
+                <button
+                  onClick={onConfigureApiKey}
+                  className="inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 transition-colors"
+                >
+                  <Settings className="h-3 w-3" />
+                  Configure
+                </button>
+              )}
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onRedeploy(deployment)}
+              disabled={isRedeployPending}
+              className="h-8 gap-1.5 text-xs cursor-pointer"
+            >
+              <RotateCcw className={cn('h-3.5 w-3.5', isRedeployPending && 'animate-spin')} />
+              {isRedeployPending ? 'Redeploying...' : 'Redeploy'}
+            </Button>
           </div>
         )}
       </div>
