@@ -2,34 +2,110 @@
   {
     "version": "0.7.2",
     "date": "2026-02-26",
-    "title": "Tunnel system — real-time sync, scoped permissions & UI overhaul",
-    "description": "Kortix tunnels v1. Kortix can now connect to your local machine and grant permissions to access local files, shell commands, and more.",
-      "changes": [
-        { 
-          "type": "feature", 
-          "text": "Tunnel system v1 — Kortix can now connect to your local machine and grant permissions to access local files, shell commands, and more." 
-        },
-        { 
-          "type": "feature", 
-          "text": "Slack-style scoped permissions — flat toggles like files:read, shell:exec, desktop:screenshot replace the old capability-toggle system" 
-        },
-        { 
-          "type": "feature", 
-          "text": "Live permission sync — tunnel agent receives WebSocket notifications instantly when permissions are granted (not just revoked)" 
-        },
-        { 
-          "type": "feature", 
-          "text": "Real-time connection sync via SSE — tunnel connect/disconnect reflects in UI instantly instead of 30s polling" 
-        },
-        { 
-          "type": "feature", 
-          "text": "Create dialog redesign — scope selection during creation, SSE-based live connection verification" 
-        },
-        { 
-          "type": "feature", 
-          "text": "Machine info from tunnel agent — hostname, platform, arch sent in pong and persisted to DB" 
-        }
-      ],
+    "title": "Tunnel system, long-term memory, and full-stack resilience",
+    "description": "Introduces Kortix Tunnel for connecting to your local machine with scoped permissions, a long-term memory system for agents, clickable file paths, running services panel, and dozens of stability and UX improvements across the frontend, API, and sandbox.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Kortix Tunnel v1 — connect your local machine with scoped permissions (files, shell, desktop, clipboard), real-time SSE connection sync, and live WebSocket permission notifications"
+      },
+      {
+        "type": "feature",
+        "text": "Long-term memory plugin — agents can save and search memories across sessions, with a dedicated Memory page in the frontend and kortix-master API endpoints"
+      },
+      {
+        "type": "feature",
+        "text": "Clickable file paths across the entire frontend — detected in chat, tool output, and markdown with a file preview modal"
+      },
+      {
+        "type": "feature",
+        "text": "Running services panel — port scanner detects running dev servers, shows them with icons and tooltips, replaces old deployment-based panel"
+      },
+      {
+        "type": "feature",
+        "text": "CMD+K command palette expanded — all sidebar items, settings pages, and account actions searchable"
+      },
+      {
+        "type": "feature",
+        "text": "Select & reply — text selection in chat messages sets reply context with XML rendering"
+      },
+      {
+        "type": "feature",
+        "text": "Fine-grained tool-input streaming — tool arguments stream in real-time during generation, with expanded card content streaming"
+      },
+      {
+        "type": "feature",
+        "text": "VS Code-like tab focus history — closing a tab returns to the previously focused tab instead of the nearest neighbor"
+      },
+      {
+        "type": "improvement",
+        "text": "Preview URL consolidation — renamed /v1/preview to /v1/p, eliminated ?token= query params, consolidated auth middleware, replaced EventSource with fetch+ReadableStream"
+      },
+      {
+        "type": "improvement",
+        "text": "Sidebar reorganization — nav pages moved to right sidebar, SSH key dialog added, tunnel panel added"
+      },
+      {
+        "type": "improvement",
+        "text": "Files page UX overhaul — larger fonts, icons, and hit targets across tree, toolbar, status bar, viewer, and history panel"
+      },
+      {
+        "type": "improvement",
+        "text": "Replaced browser skill with upstream agent-browser from vercel-labs — better session management, authentication, and video recording support"
+      },
+      {
+        "type": "improvement",
+        "text": "Onboarding now asks for full name and company for research context instead of attempting LinkedIn scraping"
+      },
+      {
+        "type": "improvement",
+        "text": "Tunnel extracted into standalone plugin with dedicated RPC layer, replacing monolithic tunnel-plugin.ts"
+      },
+      {
+        "type": "fix",
+        "text": "Eliminated SSE reconnection storm and overfetching cascade that caused excessive API calls"
+      },
+      {
+        "type": "fix",
+        "text": "3-layer ECONNRESET resilience — proxy, deployer, and Node.js process guard prevent dev server crashes"
+      },
+      {
+        "type": "fix",
+        "text": "Replaced Supabase PostgREST direct queries with backend API calls in auth callback, middleware, and setting-up page"
+      },
+      {
+        "type": "fix",
+        "text": "kortix-api now sets correct KORTIX_API_URL (host.docker.internal) for sandbox and syncs all 3 core env vars"
+      },
+      {
+        "type": "fix",
+        "text": "Clear stale sandbox and server state from localStorage when a different user signs in"
+      },
+      {
+        "type": "fix",
+        "text": "Enforce 1 sandbox per account in cloud mode, disable manual creation when billing is enabled"
+      },
+      {
+        "type": "fix",
+        "text": "Auto-create sandbox in cloud mode when none exists, redirect uninitialized users to /setting-up"
+      },
+      {
+        "type": "fix",
+        "text": "Added /terminal/[id] route to handle hard reload of terminal tabs"
+      },
+      {
+        "type": "fix",
+        "text": "Secrets manager used for env sync, sandbox URLs derived at runtime instead of hardcoded"
+      },
+      {
+        "type": "security",
+        "text": "Hardened sandbox auth — timing-safe key comparison, CORS restrictions, self-healing key sync with E2E test suite"
+      },
+      {
+        "type": "fix",
+        "text": "Schema grants, atomic DB functions, and auto-migration pipeline for Supabase deployments"
+      }
+    ],
     "artifacts": [
       {
         "name": "@kortix/sandbox@0.7.2",
@@ -40,12 +116,8 @@
         "target": "github-release"
       },
       {
-        "name": "kortix/sandbox:0.7.2",
+        "name": "kortix/computer:0.7.2",
         "target": "docker-hub"
-      },
-      {
-        "name": "kortix-sandbox-v0.7.2",
-        "target": "daytona"
       },
       {
         "name": "kortix/kortix-api:0.7.2",

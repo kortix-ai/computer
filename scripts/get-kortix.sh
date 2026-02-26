@@ -28,9 +28,10 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-FRONTEND_IMAGE="kortix/kortix-frontend:0.6.2"
-API_IMAGE="kortix/kortix-api:0.6.2"
-SANDBOX_IMAGE="kortix/sandbox:0.6.2"
+KORTIX_VERSION="0.7.2"
+FRONTEND_IMAGE="kortix/kortix-frontend:${KORTIX_VERSION}"
+API_IMAGE="kortix/kortix-api:${KORTIX_VERSION}"
+SANDBOX_IMAGE="kortix/computer:${KORTIX_VERSION}"
 SUPABASE_POSTGRES_IMAGE="supabase/postgres:15.8.1.085"
 SUPABASE_GOTRUE_IMAGE="supabase/gotrue:v2.186.0"
 SUPABASE_KONG_IMAGE="kong:2.8.1"

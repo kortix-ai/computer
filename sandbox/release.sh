@@ -260,11 +260,13 @@ if ! step_done "bump"; then
     "
     ok "sandbox/package.json → $VERSION"
 
-    # get-kortix.sh — embedded CLI version
+    # get-kortix.sh — installer image version + embedded CLI version
     if [ -f "$GET_KORTIX" ]; then
+      sed -i.bak "s/^KORTIX_VERSION=\"[^\"]*\"/KORTIX_VERSION=\"$VERSION\"/" "$GET_KORTIX"
+      rm -f "${GET_KORTIX}.bak"
       sed -i.bak "s/^VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$GET_KORTIX"
       rm -f "${GET_KORTIX}.bak"
-      ok "get-kortix.sh VERSION → $VERSION"
+      ok "get-kortix.sh KORTIX_VERSION + VERSION → $VERSION"
     else
       warn "get-kortix.sh not found, skipping stamp"
     fi

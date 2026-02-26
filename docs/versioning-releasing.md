@@ -177,7 +177,7 @@ Docker is built **inline** in `release.sh` (not delegated to `push.sh`) so artif
 
 | Image | Dockerfile | Tags |
 |---|---|---|
-| `kortix/sandbox` | `sandbox/Dockerfile` | `:{version}` + `:latest` |
+| `kortix/computer` | `sandbox/Dockerfile` | `:{version}` + `:latest` |
 | `kortix/kortix-api` | `services/Dockerfile` | `:{version}` + `:latest` |
 | `kortix/kortix-frontend` | `apps/frontend/Dockerfile` | `:{version}` + `:latest` |
 
@@ -186,7 +186,7 @@ auto-builds it with `NEXT_OUTPUT=standalone pnpm build` before creating the Dock
 With `--sandbox-only`, API and frontend images are skipped entirely.
 
 **Daytona snapshot:** After pushing the sandbox image to Docker Hub, creates a Daytona
-snapshot using `daytona snapshot create --image kortix/sandbox:{version}`. This pulls
+snapshot using `daytona snapshot create --image kortix/computer:{version}`. This pulls
 from Docker Hub directly — no local image upload. Uses `--cpu 4 --memory 8 --disk 20`.
 
 **Important:** Daytona rejects `:latest` tags. Always use the versioned tag.
@@ -259,7 +259,8 @@ The release script auto-stamps these files:
 | File | What changes |
 |---|---|
 | `sandbox/package.json` | `version` field |
-| `scripts/get-kortix.sh` | `VERSION="X.Y.Z"` embedded version |
+| `scripts/get-kortix.sh` | `KORTIX_VERSION="X.Y.Z"` (installer image tags) + `VERSION="X.Y.Z"` (embedded CLI) |
+| `services/kortix-api/src/config.ts` | `SANDBOX_VERSION` constant |
 | `sandbox/CHANGELOG.json` | `artifacts[]` array added to the version's entry |
 
 You do NOT need to manually edit versions in these files.
@@ -352,7 +353,7 @@ Example after a full release with Docker:
   "artifacts": [
     { "name": "@kortix/sandbox@0.7.0", "target": "npm" },
     { "name": "v0.7.0", "target": "github-release" },
-    { "name": "kortix/sandbox:0.7.0", "target": "docker-hub" },
+    { "name": "kortix/computer:0.7.0", "target": "docker-hub" },
     { "name": "kortix/kortix-api:0.7.0", "target": "docker-hub" },
     { "name": "kortix/kortix-frontend:0.7.0", "target": "docker-hub" },
     { "name": "kortix-sandbox-v0.7.0", "target": "daytona" }
