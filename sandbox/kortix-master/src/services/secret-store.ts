@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import { dirname } from 'path'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto'
@@ -15,8 +15,8 @@ export class SecretStore {
   private salt: Buffer | null = null
 
   constructor() {
-    this.secretsPath = process.env.SECRET_FILE_PATH || '/app/secrets/.secrets.json'
-    this.saltPath = process.env.SALT_FILE_PATH || '/app/secrets/.salt'
+    this.secretsPath = process.env.SECRET_FILE_PATH || '/workspace/.secrets/.secrets.json'
+    this.saltPath = process.env.SALT_FILE_PATH || '/workspace/.secrets/.salt'
   }
 
   private async ensureDirectories() {
@@ -85,8 +85,9 @@ export class SecretStore {
     if (!encrypted) return null
     try {
       return await this.decrypt(encrypted)
-    } catch (err) {
-      console.error(`[SecretStore] Failed to decrypt key "${key}":`, err)
+    } catch {
+      // Stale key encrypted with old master key — silently skip.
+      // Callers (loadIntoProcessEnv, getAll) aggregate the count.
       return null
     }
   }
@@ -108,32 +109,48 @@ export class SecretStore {
     return Object.keys(data.secrets)
   }
 
-  /** Load all secrets into process.env. Skips keys that fail to decrypt. */
+  /** Load all secrets into process.env. Auto-purges stale keys that can't be decrypted. */
   async loadIntoProcessEnv(): Promise<void> {
-    const keys = await this.listKeys()
+    const data = await this.loadSecrets()
+    const keys = Object.keys(data.secrets)
     let loaded = 0
-    let failed = 0
+    const staleKeys: string[] = []
     for (const key of keys) {
-      const value = await this.get(key)
-      if (value !== null) {
+      try {
+        const value = await this.decrypt(data.secrets[key])
         process.env[key] = value
         loaded++
-      } else {
-        failed++
+      } catch {
+        staleKeys.push(key)
       }
     }
-    console.log(`[SecretStore] Loaded ${loaded} env vars${failed > 0 ? ` (${failed} failed to decrypt)` : ''}`)
+    // Auto-purge stale keys (encrypted with old master key)
+    if (staleKeys.length > 0) {
+      for (const key of staleKeys) delete data.secrets[key]
+      await this.saveSecrets(data)
+      console.warn(`[SecretStore] Purged ${staleKeys.length} stale secret(s) (old encryption key)`)
+    }
+    if (loaded > 0) {
+      console.log(`[SecretStore] Loaded ${loaded} env var(s)`)
+    }
   }
 
-  /** Get all secrets decrypted. Skips keys that fail to decrypt. */
+  /** Get all secrets decrypted. Auto-purges stale keys that can't be decrypted. */
   async getAll(): Promise<Record<string, string>> {
-    const keys = await this.listKeys()
+    const data = await this.loadSecrets()
     const result: Record<string, string> = {}
-    for (const key of keys) {
-      const value = await this.get(key)
-      if (value !== null) {
-        result[key] = value
+    const staleKeys: string[] = []
+    for (const key of Object.keys(data.secrets)) {
+      try {
+        result[key] = await this.decrypt(data.secrets[key])
+      } catch {
+        staleKeys.push(key)
       }
+    }
+    if (staleKeys.length > 0) {
+      for (const key of staleKeys) delete data.secrets[key]
+      await this.saveSecrets(data)
+      console.warn(`[SecretStore] Purged ${staleKeys.length} stale secret(s) (old encryption key)`)
     }
     return result
   }
@@ -146,5 +163,32 @@ export class SecretStore {
   async deleteEnv(key: string): Promise<void> {
     await this.delete(key)
     delete process.env[key]
+  }
+
+  /**
+   * Rotate the KORTIX_TOKEN used as the encryption key.
+   * Atomically: decrypt everything with old key → update token → re-encrypt with new key.
+   */
+  async rotateToken(newToken: string): Promise<{ rotated: number }> {
+    // 1. Decrypt all secrets using the current key (derived from current KORTIX_TOKEN)
+    const allSecrets = await this.getAll()
+
+    // 2. Wipe the salt so a fresh one is generated for the new key
+    this.salt = null
+    try { await rm(this.saltPath) } catch {}
+
+    // 3. Switch to the new token — getKey() now derives from the new value
+    process.env.KORTIX_TOKEN = newToken
+
+    // 4. Re-encrypt and save all secrets (including KORTIX_TOKEN itself if present)
+    //    Remove KORTIX_TOKEN from the set — we don't store the token in its own encrypted store
+    delete allSecrets['KORTIX_TOKEN']
+    const data: SecretsData = { secrets: {}, version: 1 }
+    for (const [key, value] of Object.entries(allSecrets)) {
+      data.secrets[key] = await this.encrypt(value)
+    }
+    await this.saveSecrets(data)
+
+    return { rotated: Object.keys(data.secrets).length }
   }
 }

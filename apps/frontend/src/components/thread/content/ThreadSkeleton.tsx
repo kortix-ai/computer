@@ -227,7 +227,7 @@ export function ThreadSkeleton({
 
             {/* Side Panel - Elegant floating skeleton matching actual design */}
             <div className="hidden sm:block fixed top-2 right-2 bottom-4 w-[calc(50vw-1rem)] pointer-events-none z-30">
-                <div className="h-full border rounded-3xl bg-card pointer-events-auto flex flex-col overflow-hidden">
+                <div className="h-full border rounded-[24px] bg-card pointer-events-auto flex flex-col overflow-hidden">
                     {/* Header */}
                     <div className="pt-4 pl-4 pr-4">
                         <div className="flex items-center justify-between">

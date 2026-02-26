@@ -75,7 +75,6 @@ export interface ChannelCapabilities {
 export interface SandboxTarget {
   sandboxId: string;
   baseUrl: string;
-  authToken: string | null;
   provider: string;
   externalId: string | null;
 }

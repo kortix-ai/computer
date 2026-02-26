@@ -97,7 +97,7 @@ export function getPageContext(pathname: string): ContainerLoadData {
   }
   
   // Projects/Threads - NOT tracked for routeChange (internal navigation)
-  if (pathname.startsWith('/projects') || pathname.startsWith('/thread')) {
+  if (pathname.startsWith('/projects') || pathname.startsWith('/workspace') || pathname.startsWith('/thread')) {
     return {
       master_group: 'Platform',
       content_group: 'Dashboard',

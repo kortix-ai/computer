@@ -1,8 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerStore } from '@/stores/server-store';
 import { listFiles } from '../api/opencode-files';
+import { useFilesStore } from '../store/files-store';
 import type { FileNode } from '../types';
 
 export const fileListKeys = {
@@ -15,6 +17,7 @@ export const fileListKeys = {
  * Fetch the directory listing for a path on the active OpenCode server.
  *
  * Uses GET /file?path=<path> which returns FileNode[].
+ * Hidden (dot) files are filtered out unless showHidden is enabled in the store.
  */
 export function useFileList(
   dirPath: string,
@@ -22,8 +25,9 @@ export function useFileList(
 ) {
   const serverUrl = useServerStore((s) => s.getActiveServerUrl());
   const urlVersion = useServerStore((s) => s.urlVersion);
+  const showHidden = useFilesStore((s) => s.showHidden);
 
-  return useQuery<FileNode[]>({
+  const query = useQuery<FileNode[]>({
     queryKey: fileListKeys.dir(serverUrl, dirPath),
     queryFn: () => listFiles(dirPath),
     enabled: !!dirPath && options?.enabled !== false,
@@ -37,6 +41,15 @@ export function useFileList(
     },
     retryDelay: (attempt) => Math.min(1000 * Math.pow(2, attempt), 5000),
   });
+
+  // Filter hidden files client-side so the cache stays complete
+  const data = useMemo(() => {
+    if (!query.data) return query.data;
+    if (showHidden) return query.data;
+    return query.data.filter((node) => !node.name.startsWith('.'));
+  }, [query.data, showHidden]);
+
+  return { ...query, data };
 }
 
 /**

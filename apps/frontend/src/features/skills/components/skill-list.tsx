@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { Sparkles, Search, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -18,15 +17,12 @@ import {
   type Skill,
   type SkillFilterTab,
 } from '../types';
-import { openTabAndNavigate } from '@/stores/tab-store';
-
 // ---------------------------------------------------------------------------
 // Skills List (main content component for the skills page)
 // ---------------------------------------------------------------------------
 
 export function SkillList() {
   const { data: skills, isLoading, error } = useSkills();
-  const router = useRouter();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<SkillFilterTab>('all');
 
@@ -72,17 +68,8 @@ export function SkillList() {
 
   const handleEdit = (skill: Skill) => openEditEditor(skill);
   const handleDelete = (skill: Skill) => openDeleteDialog(skill);
-  const handleNavigate = (skill: Skill) => {
-    openTabAndNavigate(
-      {
-        id: `page:/skills/${encodeURIComponent(skill.name)}`,
-        title: skill.name,
-        type: 'page',
-        href: `/skills/${encodeURIComponent(skill.name)}`,
-      },
-      router,
-    );
-  };
+  // Detail page removed – handleNavigate is now a no-op
+  const handleNavigate = (_skill: Skill) => {};
 
   return (
     <>

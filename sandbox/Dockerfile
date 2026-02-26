@@ -38,6 +38,7 @@ RUN apk update \
         gcc g++ musl-dev linux-headers \
         libffi-dev libxml2-dev libxslt-dev \
         gcompat \
+        openssh-server openssh-sftp-server \
     && rm -rf /var/cache/apk/*
 
 # Install bun to /opt/bun (NOT /workspace which is a volume mount at runtime)
@@ -130,7 +131,16 @@ RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');con
 # Use --chown on COPY to avoid a separate chown layer (saves ~320MB duplication).
 # UID 1000 matches PUID=1000 set in docker-compose (init-adduser remaps abc to this).
 COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
+# The local dev symlink plugin/kortix-sys → ../../../packages/kortix-sys-oc-plugin
+# becomes dangling inside Docker. Replace it with the actual package source.
+RUN rm -f /opt/opencode/plugin/kortix-sys
+COPY --chown=1000:1000 packages/kortix-sys-oc-plugin/ /opt/opencode/plugin/kortix-sys/
 RUN cd /opt/opencode && bun install
+
+# ── OpenCode binary patches ─────────────────────────────────────────────────
+# Apply patches to the compiled Bun binary (tool-input streaming, etc.).
+# Also runs via postinstall, but explicit step ensures it runs during build.
+RUN node /opt/opencode/patches/patch-opencode-streaming.js
 
 # Replace glibc-linked bun-pty .so with musl-compiled version from builder stage.
 # bun-pty ships .so files compiled against glibc, but Alpine uses musl.
@@ -177,15 +187,17 @@ RUN mkdir -p /opt/kortix \
     && rm /tmp/sandbox-pkg.json \
     && chown -R 1000:1000 /opt/kortix
 
-# Create secrets directory (init-adduser will chown /app to abc at runtime)
+# Legacy /app/secrets path (kept for backward compatibility with older volumes)
 RUN mkdir -p /app/secrets && chmod 700 /app/secrets
 
 # ── Workspace ───────────────────────────────────────────────────────────────
-RUN mkdir -p /workspace/.kortix /workspace/.kortix/mem /workspace/.agent-browser /workspace/.browser-profile \
+RUN mkdir -p /workspace/.agent-browser /workspace/.browser-profile \
     /workspace/.lss /workspace/.cache/opencode /workspace/presentations \
     /workspace/.local/share/opencode /workspace/.local/share/opencode/log \
     /workspace/.local/share/opencode/storage /workspace/.local/share/opencode/snapshot \
     /workspace/.XDG /workspace/.config /workspace/ssl \
+    /workspace/.secrets \
+    && chmod 700 /workspace/.secrets \
     && chown -R 1000:1000 /workspace \
     && rm -rf /config \
     && ln -s /workspace /config \
@@ -198,13 +210,30 @@ ENV KORTIX_WORKSPACE=/workspace
 # Each service is a directory with: run, type (longrun), dependencies.d/init-services
 COPY sandbox/s6-services/ /etc/s6-overlay/s6-rc.d/
 # Register all custom services in the user bundle so s6 starts them
-RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-lss-sync svc-agent-browser-viewer svc-presentation-viewer; do \
+RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-lss-sync svc-agent-browser-viewer svc-presentation-viewer svc-sshd; do \
         touch "/etc/s6-overlay/s6-rc.d/user/contents.d/${svc}"; \
     done \
     && chmod +x /etc/s6-overlay/s6-rc.d/svc-*/run
 
+# ── Silence spammy base-image desktop finish script ──────────────────────────
+# The webtop base image's svc-de service crashes in a loop because its run
+# script uses `exec ... &` (backgrounding after exec). On each restart the
+# finish script prints "No desktop processes found to terminate." endlessly.
+# Replace the finish script with a silent cleanup that does the same job
+# without the noisy echo when there are no processes to kill.
+RUN printf '#!/bin/bash\nPID_FILE="/de-pid"\n\
+if [ ! -r "$PID_FILE" ]; then exit 0; fi\n\
+PARENT_PID=$(cat "$PID_FILE")\n\
+if [ -z "$PARENT_PID" ]; then rm -f "$PID_FILE"; exit 0; fi\n\
+PIDS=$(pstree -p "$PARENT_PID" 2>/dev/null | grep -o "([0-9]\\+)" | grep -o "[0-9]\\+" | grep -v "^${PARENT_PID}$")\n\
+[ -n "$PIDS" ] && echo "$PIDS" | xargs kill -TERM -- 2>/dev/null && sleep 1\n\
+rm -f "$PID_FILE"\nexit 0\n' > /etc/s6-overlay/s6-rc.d/svc-de/finish \
+    && chmod +x /etc/s6-overlay/s6-rc.d/svc-de/finish
+
 # ── Container init scripts (s6 cont-init.d) ─────────────────────────────────
 RUN mkdir -p /custom-cont-init.d
+COPY sandbox/config/95-setup-sshd.sh /custom-cont-init.d/95-setup-sshd
+RUN chmod +x /custom-cont-init.d/95-setup-sshd
 COPY sandbox/config/96-fix-bun-pty.sh /custom-cont-init.d/96-fix-bun-pty
 RUN chmod +x /custom-cont-init.d/96-fix-bun-pty
 COPY sandbox/config/97-secrets-to-s6-env.sh /custom-cont-init.d/97-secrets-to-s6-env
@@ -213,9 +242,6 @@ COPY sandbox/config/kortix-env-setup.sh /custom-cont-init.d/98-kortix-env
 RUN chmod +x /custom-cont-init.d/98-kortix-env
 COPY sandbox/config/customize.sh /custom-cont-init.d/99-customize
 RUN chmod +x /custom-cont-init.d/99-customize
-COPY sandbox/config/memory-init.sh /custom-cont-init.d/99-memory-init
-RUN chmod +x /custom-cont-init.d/99-memory-init
-
 # ── Daytona entrypoint ───────────────────────────────────────────────────────
 COPY sandbox/startup.sh /opt/startup.sh
 RUN chmod +x /opt/startup.sh
@@ -229,6 +255,6 @@ ENV SELKIES_MANUAL_HEIGHT=1080
 ENV SELKIES_USE_CSS_SCALING=true
 ENV TITLE="Kortix Computer"
 
-EXPOSE 6080 6081 3111 3210 8000 9223 9224
+EXPOSE 22 6080 6081 3111 3210 8000 9223 9224
 
 ENTRYPOINT ["/opt/startup.sh"]

@@ -1,5 +1,29 @@
 #!/usr/bin/with-contenv bash
-# lss-sync — File-watcher daemon for semantic search indexing
+# lss-sync — File-watcher daemon for semantic search indexing.
+#
+# OPENAI_API_KEY is synced into s6 env by auth-sync (kortix-master) at boot.
+# Wait briefly for it since kortix-master may still be starting up.
+
+# Wait up to 60s for OPENAI_API_KEY to appear in s6 env
+for i in $(seq 1 12); do
+    [ -f /run/s6/container_environment/OPENAI_API_KEY ] && \
+        OPENAI_API_KEY="$(cat /run/s6/container_environment/OPENAI_API_KEY)" && \
+        [ -n "$OPENAI_API_KEY" ] && break
+    echo "[lss-sync] Waiting for OPENAI_API_KEY... (${i}/12)"
+    sleep 5
+done
+
+if [ -z "${OPENAI_API_KEY:-}" ]; then
+    echo "[lss-sync] OPENAI_API_KEY not available — sleeping until set"
+    # Check every 30s; auth-sync will write the s6 env file when the user sets a key
+    while true; do
+        [ -f /run/s6/container_environment/OPENAI_API_KEY ] && \
+            OPENAI_API_KEY="$(cat /run/s6/container_environment/OPENAI_API_KEY)" && \
+            [ -n "$OPENAI_API_KEY" ] && break
+        sleep 30
+    done
+    echo "[lss-sync] OPENAI_API_KEY now available — starting"
+fi
 
 exec s6-setuidgid abc \
   env HOME=/workspace \

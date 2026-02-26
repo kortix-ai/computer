@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
 import Replicate from "replicate";
+import { getEnv } from "./lib/get-env";
 
 const SERPER_IMAGES_URL = "https://google.serper.dev/images";
 const MOONDREAM_MODEL =
@@ -81,7 +82,7 @@ async function describeImage(
 }
 
 async function enrichImages(images: EnrichedImage[]): Promise<EnrichedImage[]> {
-  const replicateToken = process.env.REPLICATE_API_TOKEN;
+  const replicateToken = getEnv("REPLICATE_API_TOKEN");
   if (!replicateToken || images.length === 0) return images;
 
   const replicate = new Replicate({ auth: replicateToken });
@@ -123,7 +124,7 @@ export default tool({
       ),
   },
   async execute(args, _context) {
-    const apiKey = process.env.SERPER_API_KEY;
+    const apiKey = getEnv("SERPER_API_KEY");
     if (!apiKey) return "Error: SERPER_API_KEY not set.";
 
     const numResults = Math.max(1, Math.min(args.num_results ?? 12, 100));

@@ -1,15 +1,24 @@
 import { eq, and } from 'drizzle-orm';
 import { kortixApiKeys } from '@kortix/db';
 import { db } from '../shared/db';
-import { hashSecretKey, generateApiKeyPair, isApiKeySecretConfigured } from '../shared/crypto';
+import {
+  hashSecretKey,
+  generateApiKeyPair,
+  generateSandboxKeyPair,
+  isApiKeySecretConfigured,
+  isKortixToken,
+} from '../shared/crypto';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+export type ApiKeyType = 'user' | 'sandbox';
 
 export interface ApiKeyValidationResult {
   isValid: boolean;
   accountId?: string;
   sandboxId?: string;
   keyId?: string;
+  type?: ApiKeyType;
   error?: string;
 }
 
@@ -19,6 +28,7 @@ export interface CreateApiKeyParams {
   title: string;
   description?: string;
   expiresAt?: Date;
+  type?: ApiKeyType;
 }
 
 export interface CreateApiKeyResult {
@@ -28,6 +38,7 @@ export interface CreateApiKeyResult {
   title: string;
   description: string | null;
   status: string;
+  type: ApiKeyType;
   sandboxId: string;
   expiresAt: Date | null;
   createdAt: Date;
@@ -43,13 +54,19 @@ const lastUsedCache = new Map<string, number>();
 /**
  * Create a new API key scoped to a sandbox.
  * Returns the secret key in plaintext ONCE — only the hash is stored.
+ *
+ * type='user'    → kortix_<32> secret key (user-created, external access)
+ * type='sandbox' → kortix_sb_<32> secret key (auto-managed, injected into sandbox)
  */
 export async function createApiKey(params: CreateApiKeyParams): Promise<CreateApiKeyResult> {
   if (!isApiKeySecretConfigured()) {
     throw new Error('API_KEY_SECRET not configured');
   }
 
-  const { publicKey, secretKey } = generateApiKeyPair();
+  const keyType = params.type ?? 'user';
+  const { publicKey, secretKey } = keyType === 'sandbox'
+    ? generateSandboxKeyPair()
+    : generateApiKeyPair();
   const secretKeyHash = hashSecretKey(secretKey);
 
   const [row] = await db
@@ -61,6 +78,7 @@ export async function createApiKey(params: CreateApiKeyParams): Promise<CreateAp
       secretKeyHash,
       title: params.title,
       description: params.description ?? null,
+      type: keyType,
       expiresAt: params.expiresAt ?? null,
     })
     .returning();
@@ -76,6 +94,7 @@ export async function createApiKey(params: CreateApiKeyParams): Promise<CreateAp
     title: row.title,
     description: row.description,
     status: row.status,
+    type: row.type as ApiKeyType,
     sandboxId: row.sandboxId,
     expiresAt: row.expiresAt,
     createdAt: row.createdAt,
@@ -92,6 +111,7 @@ export async function listApiKeys(sandboxId: string) {
       publicKey: kortixApiKeys.publicKey,
       title: kortixApiKeys.title,
       description: kortixApiKeys.description,
+      type: kortixApiKeys.type,
       status: kortixApiKeys.status,
       sandboxId: kortixApiKeys.sandboxId,
       expiresAt: kortixApiKeys.expiresAt,
@@ -141,16 +161,16 @@ export async function deleteApiKey(keyId: string, accountId: string): Promise<bo
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 /**
- * Validate a secret API key (sk_xxx format).
- * Returns the account_id and sandbox_id if valid.
+ * Validate a Kortix API key (kortix_ or kortix_sb_ prefix).
+ * Single validation path for all key types — returns account_id, sandbox_id, and key type.
  */
 export async function validateSecretKey(secretKey: string): Promise<ApiKeyValidationResult> {
   if (!isApiKeySecretConfigured()) {
     return { isValid: false, error: 'API_KEY_SECRET not configured' };
   }
 
-  if (!secretKey.startsWith('sk_') || secretKey.length !== 35) {
-    return { isValid: false, error: 'Invalid API key format' };
+  if (!isKortixToken(secretKey)) {
+    return { isValid: false, error: 'Invalid API key format — expected kortix_ prefix' };
   }
 
   try {
@@ -161,6 +181,7 @@ export async function validateSecretKey(secretKey: string): Promise<ApiKeyValida
         keyId: kortixApiKeys.keyId,
         accountId: kortixApiKeys.accountId,
         sandboxId: kortixApiKeys.sandboxId,
+        type: kortixApiKeys.type,
         status: kortixApiKeys.status,
         expiresAt: kortixApiKeys.expiresAt,
       })
@@ -189,6 +210,7 @@ export async function validateSecretKey(secretKey: string): Promise<ApiKeyValida
       accountId: row.accountId,
       sandboxId: row.sandboxId,
       keyId: row.keyId,
+      type: row.type as ApiKeyType,
     };
   } catch (err) {
     console.error('API key validation error:', err);

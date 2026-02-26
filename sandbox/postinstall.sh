@@ -50,6 +50,12 @@ rsync -a --delete \
 # Install deps (runs opencode patches via its own postinstall)
 cd /opt/opencode && bun install 2>/dev/null || true
 
+# Re-apply binary patches explicitly (in case postinstall didn't trigger)
+if [ -f "$PKG_DIR/opencode/patches/patch-opencode-streaming.js" ]; then
+  echo "[sandbox-postinstall] Applying opencode binary patches..."
+  node "$PKG_DIR/opencode/patches/patch-opencode-streaming.js" 2>/dev/null || true
+fi
+
 # ── s6 service scripts ──────────────────────────────────────────────────────
 # s6-overlay v3 uses s6-rc.d (not services.d)
 if [ -d "$PKG_DIR/services" ] && [ -d "/etc/s6-overlay/s6-rc.d" ]; then

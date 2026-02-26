@@ -111,7 +111,7 @@ export function createMockProvider(
     metadata: {
       provisionedBy: 'test',
       provider: name,
-      authToken: 'sbt_mock_token_12345',
+      testNote: 'sandbox tokens now stored in api_keys table',
     },
   };
 

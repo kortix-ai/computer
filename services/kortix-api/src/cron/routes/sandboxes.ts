@@ -14,7 +14,6 @@ const app = new Hono<AppEnv>();
 const createSandboxSchema = z.object({
   name: z.string().min(1).max(255),
   base_url: z.string().url(),
-  auth_token: z.string().optional(),
   external_id: z.string().optional(),
   status: z.enum(['provisioning', 'active', 'stopped', 'archived', 'pooled', 'error']).default('active'),
   config: z.record(z.unknown()).optional(),
@@ -24,7 +23,6 @@ const createSandboxSchema = z.object({
 const updateSandboxSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   base_url: z.string().url().optional(),
-  auth_token: z.string().nullable().optional(),
   external_id: z.string().nullable().optional(),
   status: z.enum(['provisioning', 'active', 'stopped', 'archived', 'pooled', 'error']).optional(),
   config: z.record(z.unknown()).optional(),
@@ -49,7 +47,6 @@ app.post('/', async (c) => {
       accountId: userId,
       name: parsed.data.name,
       baseUrl: parsed.data.base_url,
-      authToken: parsed.data.auth_token ?? null,
       externalId: parsed.data.external_id ?? null,
       status: parsed.data.status,
       config: parsed.data.config ?? {},
@@ -103,7 +100,6 @@ app.patch('/:id', async (c) => {
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
   if (parsed.data.base_url !== undefined) updateData.baseUrl = parsed.data.base_url;
-  if (parsed.data.auth_token !== undefined) updateData.authToken = parsed.data.auth_token;
   if (parsed.data.external_id !== undefined) updateData.externalId = parsed.data.external_id;
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
   if (parsed.data.config !== undefined) updateData.config = parsed.data.config;

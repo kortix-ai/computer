@@ -16,7 +16,7 @@ import { Hono } from 'hono';
 import { eq, and, desc } from 'drizzle-orm';
 import { sandboxes, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
-import { generateSandboxToken } from '../services/token';
+import { createApiKey } from '../../repositories/api-keys';
 import { supabaseAuth as authMiddleware } from '../../middleware/auth';
 import {
   getProvider as defaultGetProvider,
@@ -133,39 +133,59 @@ export function createCloudSandboxRouter(
       const sandboxName = customName || `sandbox-${accountId.slice(0, 8)}${existingCount > 0 ? `-${existingCount + 1}` : ''}`;
 
       const provider = getProvider(providerName);
-      const authToken = generateSandboxToken();
 
-      const result = await provider.create({
-        accountId,
-        userId,
-        name: sandboxName,
-        envVars: {
-          KORTIX_TOKEN: authToken,
-        },
-      });
-
+      // Create sandbox row first (we need the sandboxId for the API key)
       const [sandbox] = await db
         .insert(sandboxes)
         .values({
           accountId,
           name: sandboxName,
           provider: providerName,
-          externalId: result.externalId,
-          status: 'active',
-          baseUrl: result.baseUrl,
-          authToken,
+          externalId: '',
+          status: 'provisioning',
+          baseUrl: '',
           config: {},
-          metadata: result.metadata,
+          metadata: {},
         })
         .returning();
 
+      // Create a sandbox-managed API key (kortix_sb_)
+      const sandboxKey = await createApiKey({
+        sandboxId: sandbox.sandboxId,
+        accountId,
+        title: 'Sandbox Token',
+        type: 'sandbox',
+      });
+
+      const result = await provider.create({
+        accountId,
+        userId,
+        name: sandboxName,
+        envVars: {
+          KORTIX_TOKEN: sandboxKey.secretKey,
+        },
+      });
+
+      // Update sandbox row with provider details
+      const [updated] = await db
+        .update(sandboxes)
+        .set({
+          externalId: result.externalId,
+          status: 'active',
+          baseUrl: result.baseUrl,
+          metadata: result.metadata,
+          updatedAt: new Date(),
+        })
+        .where(eq(sandboxes.sandboxId, sandbox.sandboxId))
+        .returning();
+
       console.log(
-        `[PLATFORM] Provisioned sandbox ${sandbox.sandboxId} via ${providerName} ` +
+        `[PLATFORM] Provisioned sandbox ${updated.sandboxId} via ${providerName} ` +
         `(external: ${result.externalId}) for account ${accountId}`,
       );
 
       return c.json(
-        { success: true, data: serializeSandbox(sandbox), created: true },
+        { success: true, data: serializeSandbox(updated), created: true },
         201,
       );
     } catch (err) {

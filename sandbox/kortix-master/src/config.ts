@@ -23,11 +23,11 @@ export const config = {
 
   // Kortix backend
   KORTIX_API_URL: process.env.KORTIX_API_URL || 'http://localhost:8008/v1/router',
-  KORTIX_TOKEN: process.env.KORTIX_TOKEN || '',
+  get KORTIX_TOKEN() { return process.env.KORTIX_TOKEN || '' },
 
   // Secret storage
-  SECRET_FILE_PATH: process.env.SECRET_FILE_PATH || '/app/secrets/.secrets.json',
-  SALT_FILE_PATH: process.env.SALT_FILE_PATH || '/app/secrets/.salt',
+  SECRET_FILE_PATH: process.env.SECRET_FILE_PATH || '/workspace/.secrets/.secrets.json',
+  SALT_FILE_PATH: process.env.SALT_FILE_PATH || '/workspace/.secrets/.salt',
 
   // Sandbox metadata
   SANDBOX_ID: process.env.SANDBOX_ID || '',

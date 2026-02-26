@@ -455,6 +455,7 @@ export function computeStatusFromPart(part: Part | undefined): string | undefine
         return 'Generating video...';
       case 'presentation-gen':
         return 'Creating presentation...';
+      case 'show':
       case 'show-user':
         return 'Showing output...';
       case 'edit':
@@ -639,6 +640,7 @@ export function getToolInfo(tool: string, input: Record<string, any> = {}): Tool
         subtitle: input.slide_title || input.presentation_name,
       };
     }
+    case 'show':
     case 'show-user':
       return { icon: 'globe', title: 'Output', subtitle: input.title || input.description };
     case 'task':

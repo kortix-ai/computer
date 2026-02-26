@@ -1,7 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": "allow",
-  "plugin": ["opencode-pty", "./plugin/worktree.ts", "./plugin/memory.ts"],
+  "plugin": ["opencode-pty", "./plugin/worktree.ts", "./plugin/kortix-sys/src/index.ts", "./plugin/tunnel-plugin.ts"],
+  "skills": {
+    "paths": ["./plugin/kortix-sys/skills"]
+  },
   "autoupdate": true,
   "default_agent": "kortix",
   "agent": {

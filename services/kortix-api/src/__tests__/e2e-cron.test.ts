@@ -53,7 +53,6 @@ describe.skipIf(!HAS_DB)('Cron — Sandbox Targets, Triggers, Executions', () =>
       const res = await jsonPost(app, '/v1/cron/sandboxes', {
         name: 'test-sandbox',
         base_url: 'http://localhost:8080',
-        auth_token: 'test-token',
         external_id: 'ext-123',
         status: 'active',
         metadata: { env: 'test' },

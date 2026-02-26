@@ -1,4 +1,4 @@
-import { sandboxes, triggers, executions, deployments, channelConfigs, channelPlatformCredentials, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers, creditAccounts } from './schema/kortix';
+import { sandboxes, triggers, executions, deployments, channelConfigs, channelPlatformCredentials, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers, creditAccounts, tunnelConnections, tunnelPermissions, tunnelPermissionRequests, tunnelAuditLogs } from './schema/kortix';
 import { apiKeys, accountUser } from './schema/public';
 
 // Select types (what you get back from queries)
@@ -39,6 +39,16 @@ export type SandboxIntegration = typeof sandboxIntegrations.$inferSelect;
 export type NewSandboxIntegration = typeof sandboxIntegrations.$inferInsert;
 export type ServerEntry = typeof serverEntries.$inferSelect;
 export type NewServerEntry = typeof serverEntries.$inferInsert;
+
+// Tunnel
+export type TunnelConnection = typeof tunnelConnections.$inferSelect;
+export type NewTunnelConnection = typeof tunnelConnections.$inferInsert;
+export type TunnelPermission = typeof tunnelPermissions.$inferSelect;
+export type NewTunnelPermission = typeof tunnelPermissions.$inferInsert;
+export type TunnelPermissionRequest = typeof tunnelPermissionRequests.$inferSelect;
+export type NewTunnelPermissionRequest = typeof tunnelPermissionRequests.$inferInsert;
+export type TunnelAuditLog = typeof tunnelAuditLogs.$inferSelect;
+export type NewTunnelAuditLog = typeof tunnelAuditLogs.$inferInsert;
 
 // Aliases
 export type SandboxSelect = Sandbox;

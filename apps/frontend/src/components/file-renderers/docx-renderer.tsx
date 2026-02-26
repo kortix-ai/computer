@@ -23,35 +23,19 @@ export function DocxRenderer({ url, blob, className }: DocxRendererProps) {
     // Store the blob data to avoid re-fetching
     const blobRef = useRef<Blob | null>(null);
 
-    // Debug logging
-    useEffect(() => {
-        console.log('[DocxRenderer] Props:', {
-            url,
-            hasBlob: blob instanceof Blob,
-            blobSize: blob instanceof Blob ? blob.size : null,
-            isRendering,
-            isRendered,
-            error,
-            containerReady: !!containerRef.current,
-        });
-    }, [url, blob, isRendering, isRendered, error]);
-
     const renderDocx = useCallback(async () => {
         // Skip if already rendering or rendered
         if (isRendering || isRendered) {
-            console.log('[DocxRenderer] Skipping render - already rendering or rendered');
             return;
         }
 
         const container = containerRef.current;
         if (!container) {
-            console.log('[DocxRenderer] Container ref not ready, will retry');
             return;
         }
 
         // Need either url or blob
         if (!url && !blob) {
-            console.log('[DocxRenderer] No url or blob provided yet');
             return;
         }
 
@@ -62,32 +46,25 @@ export function DocxRenderer({ url, blob, className }: DocxRendererProps) {
             let docxBlob: Blob;
 
             if (blob) {
-                console.log('[DocxRenderer] Using provided blob, size:', blob.size);
                 docxBlob = blob;
             } else if (blobRef.current) {
-                console.log('[DocxRenderer] Using cached blob, size:', blobRef.current.size);
                 docxBlob = blobRef.current;
             } else if (url) {
-                console.log('[DocxRenderer] Fetching from URL:', url);
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error('Failed to fetch document');
                 }
                 docxBlob = await response.blob();
                 blobRef.current = docxBlob;
-                console.log('[DocxRenderer] Fetched blob, size:', docxBlob.size);
             } else {
                 throw new Error('No document source provided');
             }
 
-            console.log('[DocxRenderer] Importing docx-preview library...');
             // Dynamically import docx-preview to avoid SSR issues
             const { renderAsync } = await import('docx-preview');
-            console.log('[DocxRenderer] Library imported, rendering...');
 
             // Check container is still mounted
             if (!containerRef.current) {
-                console.log('[DocxRenderer] Container unmounted during fetch, aborting');
                 setIsRendering(false);
                 return;
             }
@@ -117,7 +94,6 @@ export function DocxRenderer({ url, blob, className }: DocxRendererProps) {
                 renderEndnotes: true,
             });
 
-            console.log('[DocxRenderer] Rendered successfully');
             setIsRendered(true);
         } catch (err) {
             console.error('[DocxRenderer] Error:', err);

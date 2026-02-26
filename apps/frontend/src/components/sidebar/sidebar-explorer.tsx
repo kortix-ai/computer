@@ -11,6 +11,8 @@ import {
   MessageSquare,
   FolderTree,
   Clipboard,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -166,6 +168,8 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
   const openFileWithList = useFilesStore((s) => s.openFileWithList);
   const isSearchOpen = useFilesStore((s) => s.isSearchOpen);
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
+  const showHidden = useFilesStore((s) => s.showHidden);
+  const toggleHidden = useFilesStore((s) => s.toggleHidden);
 
   // Clipboard
   const clipboard = useFilesStore((s) => s.clipboard);
@@ -572,6 +576,15 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
               <Clipboard className="h-3 w-3" />
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-6 w-6 ${showHidden ? 'text-primary' : ''}`}
+            onClick={toggleHidden}
+            title={showHidden ? 'Hide dotfiles' : 'Show dotfiles'}
+          >
+            {showHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+          </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={toggleSearch} title="Search files">
             <Search className="h-3 w-3" />
           </Button>

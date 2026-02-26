@@ -11,11 +11,15 @@ import {
   X,
   ChevronRight,
   Plug,
+  FolderOpen,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { Input } from '@/components/ui/input';
-import { useOpenCodeAgents, useOpenCodeCommands, useOpenCodeToolIds, useOpenCodeMcpStatus } from '@/hooks/opencode/use-opencode-sessions';
+import { Button } from '@/components/ui/button';
+import { OpenCodeSettingsDialog } from '@/components/session/opencode-settings-dialog';
+import { useOpenCodeAgents, useOpenCodeCommands, useOpenCodeToolIds, useOpenCodeMcpStatus, useOpenCodeProjects } from '@/hooks/opencode/use-opencode-sessions';
 import { useSkills } from '@/features/skills/hooks';
 import { getSkillSource } from '@/features/skills/types';
 import { openTabAndNavigate } from '@/stores/tab-store';
@@ -24,7 +28,7 @@ import { openTabAndNavigate } from '@/stores/tab-store';
 // Types
 // ---------------------------------------------------------------------------
 
-type ItemKind = 'agent' | 'skill' | 'command' | 'tool' | 'mcp';
+type ItemKind = 'project' | 'agent' | 'skill' | 'command' | 'tool' | 'mcp';
 type ItemScope = 'project' | 'global' | 'external' | 'built-in';
 type KindFilter = 'all' | ItemKind;
 type ScopeFilter = 'all' | ItemScope;
@@ -66,11 +70,12 @@ function getToolServerName(id: string): string | undefined {
 // ---------------------------------------------------------------------------
 
 const KIND_CONFIG: Record<ItemKind, { icon: typeof Bot; color: string; label: string }> = {
-  agent:   { icon: Bot,      color: 'text-blue-500 bg-blue-500/10',    label: 'Agent' },
-  skill:   { icon: Sparkles,  color: 'text-amber-500 bg-amber-500/10',  label: 'Skill' },
-  command: { icon: Terminal,   color: 'text-green-500 bg-green-500/10',  label: 'Command' },
-  tool:    { icon: Wrench,     color: 'text-violet-500 bg-violet-500/10', label: 'Tool' },
-  mcp:     { icon: Plug,       color: 'text-cyan-500 bg-cyan-500/10',    label: 'MCP' },
+  project: { icon: FolderOpen, color: 'text-sky-500 bg-sky-500/10',      label: 'Project' },
+  agent:   { icon: Bot,        color: 'text-blue-500 bg-blue-500/10',    label: 'Agent' },
+  skill:   { icon: Sparkles,   color: 'text-amber-500 bg-amber-500/10',  label: 'Skill' },
+  command: { icon: Terminal,    color: 'text-green-500 bg-green-500/10',  label: 'Command' },
+  tool:    { icon: Wrench,      color: 'text-violet-500 bg-violet-500/10', label: 'Tool' },
+  mcp:     { icon: Plug,        color: 'text-cyan-500 bg-cyan-500/10',    label: 'MCP' },
 };
 
 const SCOPE_CONFIG: Record<ItemScope, { label: string; color: string }> = {
@@ -89,19 +94,42 @@ export default function WorkspacePage() {
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Data
+  const { data: projects, isLoading: projectsLoading } = useOpenCodeProjects();
   const { data: agents, isLoading: agentsLoading } = useOpenCodeAgents();
   const { data: skills, isLoading: skillsLoading } = useSkills();
   const { data: commands, isLoading: commandsLoading } = useOpenCodeCommands();
   const { data: toolIds, isLoading: toolsLoading } = useOpenCodeToolIds();
   const { data: mcpStatus, isLoading: mcpLoading } = useOpenCodeMcpStatus();
 
-  const isLoading = agentsLoading || skillsLoading || commandsLoading || toolsLoading || mcpLoading;
+  const isLoading = projectsLoading || agentsLoading || skillsLoading || commandsLoading || toolsLoading || mcpLoading;
 
   // Normalize all items into a flat list
   const allItems = useMemo<WorkspaceItem[]>(() => {
     const items: WorkspaceItem[] = [];
+
+    // Projects
+    if (projects && Array.isArray(projects)) {
+      const sorted = [...projects].sort((a: any, b: any) => {
+        const aIsGlobal = a.id === 'global' || a.worktree === '/';
+        const bIsGlobal = b.id === 'global' || b.worktree === '/';
+        if (aIsGlobal && !bIsGlobal) return -1;
+        if (!aIsGlobal && bIsGlobal) return 1;
+        return (b.time?.updated ?? 0) - (a.time?.updated ?? 0);
+      });
+      for (const p of sorted) {
+        const name = p.name || (p.worktree === '/' || p.id === 'global' ? 'Global' : p.worktree.split('/').pop() || p.worktree);
+        items.push({
+          id: `project:${p.id}`,
+          name,
+          description: p.worktree && p.worktree !== '/' ? p.worktree : undefined,
+          kind: 'project',
+          scope: p.id === 'global' || p.worktree === '/' ? 'global' : 'project',
+        });
+      }
+    }
 
     // Agents
     if (agents) {
@@ -112,7 +140,6 @@ export default function WorkspacePage() {
           description: a.description,
           kind: 'agent',
           scope: 'project',
-          href: `/configuration`,
           meta: a.model?.modelID,
         });
       }
@@ -129,7 +156,7 @@ export default function WorkspacePage() {
           description: s.description,
           kind: 'skill',
           scope,
-          href: `/skills/${encodeURIComponent(s.name)}`,
+          // Detail page removed – no href for skills
         });
       }
     }
@@ -143,7 +170,7 @@ export default function WorkspacePage() {
           description: c.description,
           kind: 'command',
           scope: getCommandScope(c.source),
-          href: `/commands/${encodeURIComponent(c.name)}`,
+          // Detail page removed – no href for commands
           meta: c.agent,
         });
       }
@@ -183,11 +210,11 @@ export default function WorkspacePage() {
     }
 
     return items;
-  }, [agents, skills, commands, toolIds, mcpStatus]);
+  }, [projects, agents, skills, commands, toolIds, mcpStatus]);
 
   // Counts for filter badges
   const kindCounts = useMemo(() => {
-    const counts: Record<KindFilter, number> = { all: allItems.length, agent: 0, skill: 0, command: 0, tool: 0, mcp: 0 };
+    const counts: Record<KindFilter, number> = { all: allItems.length, project: 0, agent: 0, skill: 0, command: 0, tool: 0, mcp: 0 };
     for (const item of allItems) counts[item.kind]++;
     return counts;
   }, [allItems]);
@@ -245,12 +272,25 @@ export default function WorkspacePage() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            All agents, skills, commands, tools, and MCP servers in your environment.
-          </p>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              All agents, skills, commands, tools, and MCP servers in your environment.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            className="shrink-0 gap-2 h-9 px-3 mt-0.5"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
         </div>
+
+        <OpenCodeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -291,6 +331,7 @@ export default function WorkspacePage() {
             <div className="flex items-center gap-1 mb-2">
               {([
                 { value: 'all' as KindFilter, label: 'All' },
+                { value: 'project' as KindFilter, label: 'Projects' },
                 { value: 'agent' as KindFilter, label: 'Agents' },
                 { value: 'skill' as KindFilter, label: 'Skills' },
                 { value: 'command' as KindFilter, label: 'Commands' },

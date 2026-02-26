@@ -113,23 +113,22 @@ export async function buildAccountState(accountId: string): Promise<AccountState
 }
 
 /**
- * Returns a mock account state for local mode (no database).
- * Presents the user as an "ultra" tier with unlimited credits so
- * no billing UI or limits block the local experience.
+ * Returns account state when there is no database (no-DB local mode).
+ * No fake numbers — just `can_run: true` so nothing blocks the user.
  */
 export function buildLocalAccountState(): AccountStateResponse {
   return {
     credits: {
-      total: 999999,
-      daily: 999999,
-      monthly: 999999,
+      total: 0,
+      daily: 0,
+      monthly: 0,
       extra: 0,
       can_run: true,
       daily_refresh: null,
     },
     subscription: {
-      tier_key: 'ultra',
-      tier_display_name: 'Local (Unlimited)',
+      tier_key: 'free',
+      tier_display_name: 'Free',
       status: 'active',
       billing_period: null,
       provider: 'stripe',
@@ -148,9 +147,9 @@ export function buildLocalAccountState(): AccountStateResponse {
     },
     models: getModelsForTier('ultra'),
     tier: {
-      name: 'ultra',
-      display_name: 'Local (Unlimited)',
-      monthly_credits: 999999,
+      name: 'free',
+      display_name: 'Free',
+      monthly_credits: 0,
       can_purchase_credits: false,
     },
   };

@@ -115,13 +115,15 @@ export function VideoRenderer({
   const handleError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const videoElement = e.currentTarget;
     const error = videoElement.error;
-    console.error('[VideoRenderer] Video error:', {
-      code: error?.code,
-      message: error?.message,
-      url: videoElement.src,
-      networkState: videoElement.networkState,
-      readyState: videoElement.readyState,
-    });
+    // Only log meaningful errors — skip aborted loads (e.g. blob URL revoked on file switch)
+    if (error && error.code !== MediaError.MEDIA_ERR_ABORTED) {
+      console.warn('[VideoRenderer] Video error:', {
+        code: error.code,
+        message: error.message,
+        url: videoElement.src?.slice(0, 100),
+        networkState: videoElement.networkState,
+      });
+    }
     setHasError(true);
     setIsLoading(false);
   };

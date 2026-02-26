@@ -1,5 +1,133 @@
 [
   {
+    "version": "0.7.2",
+    "date": "2026-02-26",
+    "title": "Tunnel system — real-time sync, scoped permissions & UI overhaul",
+    "description": "Kortix tunnels v1. Kortix can now connect to your local machine and grant permissions to access local files, shell commands, and more.",
+      "changes": [
+        { 
+          "type": "feature", 
+          "text": "Tunnel system v1 — Kortix can now connect to your local machine and grant permissions to access local files, shell commands, and more." 
+        },
+        { 
+          "type": "feature", 
+          "text": "Slack-style scoped permissions — flat toggles like files:read, shell:exec, desktop:screenshot replace the old capability-toggle system" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Live permission sync — tunnel agent receives WebSocket notifications instantly when permissions are granted (not just revoked)" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Real-time connection sync via SSE — tunnel connect/disconnect reflects in UI instantly instead of 30s polling" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Create dialog redesign — scope selection during creation, SSE-based live connection verification" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Machine info from tunnel agent — hostname, platform, arch sent in pong and persisted to DB" 
+        }
+      ],
+    "artifacts": [
+      {
+        "name": "@kortix/sandbox@0.7.2",
+        "target": "npm"
+      },
+      {
+        "name": "v0.7.2",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.7.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.2",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.2",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
+    "version": "0.7.1",
+    "date": "2026-02-24",
+    "title": "Unified API key auth & live sandbox token rotation",
+    "description": "Merges the two separate auth systems (sbt_ sandbox tokens and sk_ user API keys) into one unified table with kortix_ prefixes. Sandbox tokens (kortix_sb_) and user API keys (kortix_) share a single validation path. Token regeneration atomically pushes the new key to the running sandbox, re-encrypts all stored secrets, and restarts services — no manual intervention needed. Works for both local Docker and Daytona cloud providers.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Unified API key system — single kortix.api_keys table with type column (user/sandbox) replaces separate auth_token and api_keys systems"
+      },
+      {
+        "type": "feature",
+        "text": "Live sandbox token rotation — regenerating a sandbox token atomically pushes it to the running sandbox, re-encrypts all secrets with the new key, and restarts services"
+      },
+      {
+        "type": "feature",
+        "text": "Atomic token rotation endpoint (POST /env/rotate-token) in kortix-master — decrypts all secrets with old key, switches encryption key, re-encrypts, restarts OpenCode"
+      },
+      {
+        "type": "improvement",
+        "text": "New key prefixes: kortix_ for user keys, kortix_sb_ for sandbox keys, pk_ for public identifiers — single isKortixToken() check in auth middleware"
+      },
+      {
+        "type": "improvement",
+        "text": "KORTIX_TOKEN in kortix-master config is now a live getter from process.env — no stale cached values after token rotation"
+      },
+      {
+        "type": "improvement",
+        "text": "Sandbox connector uses INTERNAL_SERVICE_KEY with Bearer auth instead of sandbox authToken with Basic auth"
+      },
+      {
+        "type": "improvement",
+        "text": "API keys settings page: compact sandbox token row with sandbox name, proper badge variants, full CRUD for user keys"
+      },
+      {
+        "type": "security",
+        "text": "Dropped plaintext auth_token column from sandboxes table — all tokens stored as HMAC-SHA256 hashes only"
+      },
+      {
+        "type": "security",
+        "text": "SecretStore rotation wipes old salt and generates fresh salt for new encryption key derivation"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/sandbox@0.7.1",
+        "target": "npm"
+      },
+      {
+        "name": "v0.7.1",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.7.1",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.1",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.1",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.1",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.7.0",
     "date": "2026-02-24",
     "title": "Dual-markup LLM billing, live model pricing & schema migration",
