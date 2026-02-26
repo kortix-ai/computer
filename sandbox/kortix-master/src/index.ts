@@ -326,7 +326,20 @@ function parseProxyPath(pathname: string): { port: number; path: string } | null
 export default {
   port: config.PORT,
 
+  // Raise Bun's idle timeout from the default 10s. SSE connections
+  // (e.g. /global/event) can be long-lived with no data flowing —
+  // the default kills them, causing the frontend to reconnect in a loop.
+  // Per-request override (server.timeout(req, 0)) is also applied for SSE
+  // in the proxy, but this global value covers any other long-lived connections.
+  idleTimeout: 255, // seconds; per-request SSE override disables it entirely
+
   fetch(req: Request, server: any): Response | Promise<Response> | undefined {
+    // ── Per-request timeout for SSE ─────────────────────────────────────
+    // Disable idle timeout entirely for SSE requests so Bun doesn't kill
+    // long-lived event streams after the global idleTimeout.
+    if ((req.headers.get('accept') || '').includes('text/event-stream')) {
+      server.timeout(req, 0)
+    }
     // ── WebSocket upgrade for /proxy/:port/* ────────────────────────────
     if (req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
       const url = new URL(req.url)
