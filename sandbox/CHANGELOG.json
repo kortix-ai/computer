@@ -1,5 +1,63 @@
 [
   {
+    "version": "0.7.2",
+    "date": "2026-02-26",
+    "title": "Tunnel system — real-time sync, scoped permissions & UI overhaul",
+    "description": "Kortix tunnels v1. Kortix can now connect to your local machine and grant permissions to access local files, shell commands, and more.",
+      "changes": [
+        { 
+          "type": "feature", 
+          "text": "Tunnel system v1 — Kortix can now connect to your local machine and grant permissions to access local files, shell commands, and more." 
+        },
+        { 
+          "type": "feature", 
+          "text": "Slack-style scoped permissions — flat toggles like files:read, shell:exec, desktop:screenshot replace the old capability-toggle system" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Live permission sync — tunnel agent receives WebSocket notifications instantly when permissions are granted (not just revoked)" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Real-time connection sync via SSE — tunnel connect/disconnect reflects in UI instantly instead of 30s polling" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Create dialog redesign — scope selection during creation, SSE-based live connection verification" 
+        },
+        { 
+          "type": "feature", 
+          "text": "Machine info from tunnel agent — hostname, platform, arch sent in pong and persisted to DB" 
+        }
+      ],
+    "artifacts": [
+      {
+        "name": "@kortix/sandbox@0.7.2",
+        "target": "npm"
+      },
+      {
+        "name": "v0.7.2",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.7.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.2",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.2",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.2",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.7.1",
     "date": "2026-02-24",
     "title": "Unified API key auth & live sandbox token rotation",
