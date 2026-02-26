@@ -120,8 +120,15 @@ export const config = {
   SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
 
   /**
-   * Internal service key for kortix-api → sandbox communication.
-   * Injected into proxied requests so the sandbox can validate the caller.
+   * INTERNAL_SERVICE_KEY — direction: kortix-api → sandbox.
+   *
+   * This is how kortix-api authenticates itself TO the sandbox. Every request
+   * from kortix-api to the sandbox (proxy, cron, health, queue drain, etc.)
+   * includes `Authorization: Bearer <INTERNAL_SERVICE_KEY>`. The sandbox's
+   * kortix-master middleware validates it.
+   *
+   * Counterpart: KORTIX_TOKEN goes the other direction (sandbox → kortix-api).
+   *
    * Auto-generated at startup if not provided — always present.
    * Persisted to .env so the same key survives process restarts.
    */

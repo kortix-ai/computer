@@ -135,7 +135,8 @@ async function checkSandboxHealth(): Promise<void> {
 }
 
 /**
- * Attempt to sync INTERNAL_SERVICE_KEY to the sandbox container.
+ * Attempt to sync all 3 core env vars to the sandbox container.
+ * Syncs KORTIX_API_URL, KORTIX_TOKEN (if set), and INTERNAL_SERVICE_KEY.
  * Uses docker exec CLI with progressive backoff.
  */
 async function attemptKeySync(baseUrl: string): Promise<boolean> {
@@ -149,6 +150,20 @@ async function attemptKeySync(baseUrl: string): Promise<boolean> {
   const ourKey = config.INTERNAL_SERVICE_KEY;
   if (!ourKey) return false;
 
+  // Compute the correct internal API URL for the sandbox (same logic as local-docker.ts)
+  let internalApiUrl = `http://host.docker.internal:${config.PORT}`;
+  if (config.KORTIX_URL) {
+    try {
+      const parsed = new URL(config.KORTIX_URL);
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+        parsed.hostname = 'host.docker.internal';
+        internalApiUrl = parsed.toString().replace(/\/$/, '');
+      } else {
+        internalApiUrl = config.KORTIX_URL.replace(/\/$/, '');
+      }
+    } catch {}
+  }
+
   const env: Record<string, string> = { ...process.env as Record<string, string> };
   if (config.DOCKER_HOST && !config.DOCKER_HOST.includes('://')) {
     env.DOCKER_HOST = `unix://${config.DOCKER_HOST}`;
@@ -157,11 +172,17 @@ async function attemptKeySync(baseUrl: string): Promise<boolean> {
   for (let attempt = 0; attempt < MAX_SYNC_RETRIES; attempt++) {
     try {
       state.syncAttempts++;
-      console.log(`[sandbox-health] Key sync attempt ${attempt + 1}/${MAX_SYNC_RETRIES}...`);
+      console.log(`[sandbox-health] Core env sync attempt ${attempt + 1}/${MAX_SYNC_RETRIES}...`);
+
+      // Sync all 3 core vars at once
+      const writes = [
+        `printf '%s' '${ourKey}' > /run/s6/container_environment/INTERNAL_SERVICE_KEY`,
+        `printf '%s' '${internalApiUrl}' > /run/s6/container_environment/KORTIX_API_URL`,
+      ].join(' && ');
 
       execSync(
         `docker exec kortix-sandbox bash -c "mkdir -p /run/s6/container_environment && ` +
-        `printf '%s' '${ourKey}' > /run/s6/container_environment/INTERNAL_SERVICE_KEY && ` +
+        `${writes} && ` +
         `sudo s6-svc -r /run/service/svc-kortix-master"`,
         { timeout: 15_000, stdio: 'pipe', env },
       );
@@ -177,13 +198,13 @@ async function attemptKeySync(baseUrl: string): Promise<boolean> {
       });
 
       if (verifyRes.ok) {
-        console.log(`[sandbox-health] Key sync successful (attempt ${attempt + 1})`);
+        console.log(`[sandbox-health] Core env sync successful (attempt ${attempt + 1})`);
         return true;
       }
 
-      console.warn(`[sandbox-health] Key sync attempt ${attempt + 1} — verify returned ${verifyRes.status}`);
+      console.warn(`[sandbox-health] Core env sync attempt ${attempt + 1} — verify returned ${verifyRes.status}`);
     } catch (err: any) {
-      console.error(`[sandbox-health] Key sync attempt ${attempt + 1} failed:`, err.message || err);
+      console.error(`[sandbox-health] Core env sync attempt ${attempt + 1} failed:`, err.message || err);
     }
   }
 

@@ -21,8 +21,17 @@ export const config = {
   OPENCODE_HOST: process.env.OPENCODE_HOST || 'localhost',
   OPENCODE_PORT: parseInt(process.env.OPENCODE_PORT || '4096'),
 
-  // Kortix backend
-  KORTIX_API_URL: process.env.KORTIX_API_URL || 'http://localhost:8008/v1/router',
+  // ─── Kortix Backend ─────────────────────────────────────────────────────────
+  // KORTIX_API_URL: base URL of kortix-api. Set by kortix-api at container creation.
+  //   Inside Docker: http://host.docker.internal:8008 (or Docker DNS name).
+  //   Fallback for native dev only.
+  KORTIX_API_URL: process.env.KORTIX_API_URL || 'http://localhost:8008',
+
+  // KORTIX_TOKEN — direction: sandbox → kortix-api.
+  // This is how the sandbox authenticates itself TO kortix-api. Sent as
+  // `Authorization: Bearer <KORTIX_TOKEN>` on outbound requests (cron, tunnel,
+  // integrations, LLM proxy). Also used as the encryption key for SecretStore.
+  // Created by kortix-api at sandbox provisioning time. Injected as Docker env var.
   get KORTIX_TOKEN() { return process.env.KORTIX_TOKEN || '' },
 
   // Secret storage
@@ -33,10 +42,13 @@ export const config = {
   SANDBOX_ID: process.env.SANDBOX_ID || '',
   PROJECT_ID: process.env.PROJECT_ID || '',
 
-  // Security: internal service-to-service auth.
-  // Auto-generates a key if none provided — the sandbox is ALWAYS auth-protected.
-  // In normal operation, kortix-api injects the key as an env var during container creation.
-  // Auto-generation is a safety net for manual/standalone runs (key is logged once at boot).
+  // INTERNAL_SERVICE_KEY — direction: kortix-api → sandbox.
+  // This is how kortix-api authenticates itself TO the sandbox. Every inbound
+  // request from kortix-api (proxy, cron, health, queue drain) includes this
+  // as a Bearer token. Validated by the global auth middleware in index.ts.
+  // Counterpart: KORTIX_TOKEN goes the other direction (sandbox → kortix-api).
+  // Auto-generates if not provided — sandbox is ALWAYS auth-protected.
+  // In normal operation, kortix-api injects the key as a Docker env var.
   get INTERNAL_SERVICE_KEY(): string {
     if (!process.env.INTERNAL_SERVICE_KEY) {
       const { randomBytes } = require('crypto')
