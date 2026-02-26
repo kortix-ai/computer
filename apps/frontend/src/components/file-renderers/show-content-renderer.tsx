@@ -44,6 +44,7 @@ import { useFileContent } from '@/features/files/hooks/use-file-content';
 import { useBinaryBlob } from '@/features/files/hooks/use-binary-blob';
 import { CodeHighlight, UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import { parseLocalhostUrl } from '@/lib/utils/sandbox-url';
+import { TextWithPaths } from '@/components/common/clickable-path';
 import { ImageRenderer } from './image-renderer';
 import { VideoRenderer } from './video-renderer';
 import { FileContentRenderer } from '@/features/files/components/file-content-renderer';
@@ -530,7 +531,7 @@ export function ShowContentRenderer({
       <div className="px-5 py-4">
         <div className="flex items-start gap-3">
           <AlertTriangle className="size-4 flex-shrink-0 mt-0.5 text-red-500" />
-          <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap"><TextWithPaths text={content} /></p>
         </div>
       </div>
     );

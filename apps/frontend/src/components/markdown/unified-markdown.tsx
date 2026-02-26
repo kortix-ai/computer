@@ -14,9 +14,11 @@ import 'katex/dist/katex.min.css';
 import { MermaidRenderer } from '@/components/ui/mermaid-renderer';
 import { isMermaidCode } from '@/lib/mermaid-utils';
 import { autoLinkUrls } from '@kortix/shared';
-import { useOcFileOpen } from '@/components/thread/tool-views/opencode/useOcFileOpen';
 import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from '@/stores/server-store';
+import { useFilePreviewStore } from '@/stores/file-preview-store';
 import { proxyLocalhostUrl } from '@/lib/utils/sandbox-url';
+import { wrapChildrenWithPaths } from '@/components/common/clickable-path';
+import { looksLikeFilePath as sharedLooksLikeFilePath } from '@/lib/utils/path-detection';
 
 // ---------------------------------------------------------------------------
 // LaTeX / KaTeX support: custom remark + rehype plugin overrides
@@ -476,12 +478,14 @@ function looksLikeFilePath(text: string): boolean {
   if (COMMON_NON_FILES.has(text.toLowerCase())) return false;
   // Must contain at least one slash and have a file extension
   if (!text.includes('/')) return false;
-  return FILE_EXTENSION_RE.test(text);
+  if (FILE_EXTENSION_RE.test(text)) return true;
+  // Also use the shared utility for broader detection
+  return sharedLooksLikeFilePath(text);
 }
 
-/** Inline code that opens file in computer panel when it looks like a file path */
+/** Inline code that opens file preview modal when it looks like a file path */
 function ClickableInlineCode({ children }: { children: React.ReactNode }) {
-  const { openFile } = useOcFileOpen();
+  const openPreview = useFilePreviewStore((s) => s.openPreview);
   const text = String(children);
   const isFile = looksLikeFilePath(text);
 
@@ -489,8 +493,8 @@ function ClickableInlineCode({ children }: { children: React.ReactNode }) {
     return (
       <code
         className="px-1.5 py-0.5 rounded-md text-[13px] font-mono bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/50 text-foreground cursor-pointer hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:border-blue-700/50 dark:hover:text-blue-400 transition-colors"
-        onClick={() => openFile(text)}
-        title={`Open ${text}`}
+        onClick={() => openPreview(text)}
+        title={`Click to preview ${text}`}
         role="button"
       >
         {children}
@@ -625,7 +629,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
     // ═══════════════════════════════════════════════════════════════
     p: ({ children }: { children?: React.ReactNode }) => (
       <div className="text-sm text-foreground leading-relaxed my-4 first:mt-0 last:mb-0 [&:has(img)]:my-0">
-        {children}
+        {wrapChildrenWithPaths(children)}
       </div>
     ),
 
@@ -644,7 +648,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
     ),
     li: ({ children }: { children?: React.ReactNode }) => (
       <li className="text-sm text-foreground leading-relaxed pl-1">
-        {children}
+        {wrapChildrenWithPaths(children)}
       </li>
     ),
 
@@ -762,7 +766,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
         "text-muted-foreground",
         "[&>p]:my-2"
       )}>
-        {children}
+        {wrapChildrenWithPaths(children)}
       </blockquote>
     ),
 
@@ -805,7 +809,7 @@ export const UnifiedMarkdown = React.memo<UnifiedMarkdownProps>(({
     ),
     td: ({ children }: { children?: React.ReactNode }) => (
       <td className="px-4 py-3 text-foreground">
-        {children}
+        {wrapChildrenWithPaths(children)}
       </td>
     ),
 

@@ -20,6 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
+import { PreWithPaths } from '@/components/common/clickable-path';
 
 function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
@@ -373,9 +374,10 @@ export function OcPtyReadToolView({
 
             {parsed.content && (
               <div className="rounded-lg border border-border overflow-hidden bg-zinc-950 dark:bg-zinc-950">
-                <pre className="p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words">
-                  {parsed.content}
-                </pre>
+                <PreWithPaths
+                  text={parsed.content}
+                  className="p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words"
+                />
                 {parsed.bufferInfo && (
                   <div className="px-3 pb-2 text-[10px] text-muted-foreground italic border-t border-border">
                     <span className="pt-1.5 inline-block">{parsed.bufferInfo}</span>
@@ -587,9 +589,10 @@ export function OcPtyKillToolView({
 
             {cleanOutput && (
               <div className="rounded-lg border border-border overflow-hidden bg-zinc-950 dark:bg-zinc-950">
-                <pre className="p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words">
-                  {cleanOutput}
-                </pre>
+                <PreWithPaths
+                  text={cleanOutput}
+                  className="p-3 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words"
+                />
               </div>
             )}
 
