@@ -39,6 +39,7 @@ RUN apk update \
         libffi-dev libxml2-dev libxslt-dev \
         gcompat \
         openssh-server openssh-sftp-server \
+        bash-completion \
     && rm -rf /var/cache/apk/*
 
 # Install bun to /opt/bun (NOT /workspace which is a volume mount at runtime)

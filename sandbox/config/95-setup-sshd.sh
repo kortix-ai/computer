@@ -186,6 +186,15 @@ _fix_cursor_node
 cat > /config/.profile <<'PROFILE'
 export PATH="$HOME/.local/bin:$PATH"
 
+# ── Source .bashrc for login shells ──
+# Login shells (bash -l) only read .profile, not .bashrc. Source it
+# explicitly so aliases, completions, and readline config are available
+# in both login and non-login shells (PTY terminals, SSH sessions, etc.)
+if [ -n "$BASH" ] && [ -f "$HOME/.bashrc" ] && [ -z "$_BASHRC_SOURCED" ]; then
+  export _BASHRC_SOURCED=1
+  . "$HOME/.bashrc"
+fi
+
 # ── Ensure background processes survive SSH disconnect ──
 # When SSH drops, the kernel sends SIGHUP to the session. This trap
 # disowns all background jobs (Cursor's code server) before bash exits,
@@ -194,14 +203,65 @@ trap 'disown -a 2>/dev/null' HUP
 PROFILE
 chown abc:abc /config/.profile
 
-# Also source .profile from .bashrc for non-login shells
+# ── Readline config (case-insensitive tab completion, etc.) ─────────────────
+# Only write if not already customized by the user.
+if [ ! -f /config/.inputrc ]; then
+  cat > /config/.inputrc <<'INPUTRC'
+# Case-insensitive tab completion (cd desk<TAB> → cd Desktop/)
+set completion-ignore-case on
+
+# Treat hyphens and underscores as equivalent during completion
+set completion-map-case on
+
+# Show all completions on first TAB if ambiguous (instead of requiring two TABs)
+set show-all-if-ambiguous on
+
+# Append a slash to completed directory names
+set mark-directories on
+set mark-symlinked-directories on
+
+# Color the common prefix in completion lists for readability
+set colored-completion-prefix on
+set colored-stats on
+INPUTRC
+  chown abc:abc /config/.inputrc
+fi
+
+# ── Shell aliases and config in .bashrc ─────────────────────────────────────
+# Also source .profile from .bashrc for non-login shells (SSH)
 if ! grep -q '\.profile' /config/.bashrc 2>/dev/null; then
   cat >> /config/.bashrc <<'BASHRC'
 
-# Source .profile for SSH sessions
-[ -f "$HOME/.profile" ] && . "$HOME/.profile"
-BASHRC
-  chown abc:abc /config/.bashrc
+# Source .profile for SSH sessions (guard prevents infinite loop with .profile sourcing .bashrc)
+if [ -f "$HOME/.profile" ] && [ -z "$_BASHRC_SOURCED" ]; then
+  . "$HOME/.profile"
 fi
+BASHRC
+fi
+
+# Add common aliases and shell improvements if not already present
+if ! grep -q 'kortix-shell-defaults' /config/.bashrc 2>/dev/null; then
+  cat >> /config/.bashrc <<'BASHRC'
+
+# ── kortix-shell-defaults ──
+# Common aliases
+alias ll='ls -lAh --color=auto'
+alias la='ls -A --color=auto'
+alias l='ls -CF --color=auto'
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias ..='cd ..'
+alias ...='cd ../..'
+
+# Load readline config (case-insensitive completion, etc.)
+[ -f "$HOME/.inputrc" ] && export INPUTRC="$HOME/.inputrc"
+
+# Enable bash-completion if available
+[ -f /usr/share/bash-completion/bash_completion ] && . /usr/share/bash-completion/bash_completion
+[ -f /etc/bash_completion ] && . /etc/bash_completion
+BASHRC
+fi
+
+chown abc:abc /config/.bashrc
 
 echo "[init] SSH ready."
