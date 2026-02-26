@@ -566,5 +566,11 @@ BEGIN
         'duplicate_prevented', false,
         'tracking_id', v_tracking_id
     );
-END;
-$function$;
+    END;
+    $function$;
+
+    -- ─── WoA: FTS index on content ────────────────────────────────────────────
+    -- Expression-based GIN index so FTS queries don't need a stored tsvector column.
+    CREATE INDEX IF NOT EXISTS idx_woa_posts_fts
+    ON kortix.woa_posts
+    USING GIN(to_tsvector('english', content));

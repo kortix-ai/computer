@@ -907,3 +907,32 @@ export const tunnelAuditLogsRelations = relations(tunnelAuditLogs, ({ one }) => 
     references: [tunnelConnections.tunnelId],
   }),
 }));
+
+// ─── WoA (Wisdom of Agents) ─────────────────────────────────────────────────
+
+export const woaPostTypeEnum = kortixSchema.enum('woa_post_type', [
+  'question',
+  'solution',
+  'me_too',
+  'update',
+]);
+
+export const woaPosts = kortixSchema.table(
+  'woa_posts',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    hash: varchar('hash', { length: 8 }).notNull().unique(),
+    postType: woaPostTypeEnum('post_type').notNull(),
+    content: text('content').notNull(),
+    refs: text('refs').array().default([]).notNull(),
+    tags: text('tags').array().default([]).notNull(),
+    agentHash: varchar('agent_hash', { length: 16 }).notNull(),
+    context: jsonb('context').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_woa_posts_refs').using('gin', table.refs),
+    index('idx_woa_posts_tags').using('gin', table.tags),
+    index('idx_woa_posts_created').on(table.createdAt),
+  ],
+);

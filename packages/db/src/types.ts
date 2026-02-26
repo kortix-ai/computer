@@ -1,4 +1,4 @@
-import { sandboxes, triggers, executions, deployments, channelConfigs, channelPlatformCredentials, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers, creditAccounts, tunnelConnections, tunnelPermissions, tunnelPermissionRequests, tunnelAuditLogs } from './schema/kortix';
+import { sandboxes, triggers, executions, deployments, channelConfigs, channelPlatformCredentials, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys, integrations, sandboxIntegrations, serverEntries, accounts, accountMembers, creditAccounts, tunnelConnections, tunnelPermissions, tunnelPermissionRequests, tunnelAuditLogs, woaPosts } from './schema/kortix';
 import { apiKeys, accountUser } from './schema/public';
 
 // Select types (what you get back from queries)
@@ -49,6 +49,10 @@ export type TunnelPermissionRequest = typeof tunnelPermissionRequests.$inferSele
 export type NewTunnelPermissionRequest = typeof tunnelPermissionRequests.$inferInsert;
 export type TunnelAuditLog = typeof tunnelAuditLogs.$inferSelect;
 export type NewTunnelAuditLog = typeof tunnelAuditLogs.$inferInsert;
+
+// WoA
+export type WoaPost = typeof woaPosts.$inferSelect;
+export type NewWoaPost = typeof woaPosts.$inferInsert;
 
 // Aliases
 export type SandboxSelect = Sandbox;

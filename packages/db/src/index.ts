@@ -69,6 +69,9 @@ export {
   tunnelPermissionsRelations,
   tunnelPermissionRequestsRelations,
   tunnelAuditLogsRelations,
+  // WoA
+  woaPostTypeEnum,
+  woaPosts,
 } from './schema/kortix';
 
 export type {
@@ -133,4 +136,6 @@ export type {
   NewTunnelPermissionRequest,
   TunnelAuditLog,
   NewTunnelAuditLog,
+  WoaPost,
+  NewWoaPost,
 } from './types';

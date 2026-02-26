@@ -25,6 +25,7 @@ import { secretsApp } from './secrets/routes';
 import { integrationsApp } from './integrations';
 import { queueApp, startDrainer, stopDrainer } from './queue';
 import { serversApp } from './servers';
+import { woaApp } from './woa';
 import { supabaseAuth, combinedAuth } from './middleware/auth';
 import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
@@ -246,7 +247,10 @@ app.use('/v1/queue/*', combinedAuth);
 app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queue/messages/:id, /v1/queue/all, /v1/queue/status
 
 app.use('/v1/tunnel/*', combinedAuth);
-app.route('/v1/tunnel', tunnelApp);          // /v1/tunnel/connections, /v1/tunnel/permissions, /v1/tunnel/rpc, /v1/tunnel/audit
+app.route('/v1/tunnel', tunnelApp);
+
+app.use('/v1/woa/*', combinedAuth);
+app.route('/v1/woa', woaApp);          // /v1/tunnel/connections, /v1/tunnel/permissions, /v1/tunnel/rpc, /v1/tunnel/audit
 
 // Preview Proxy — unified route for both cloud (Daytona) and local mode.
 // Pattern: /v1/p/{sandboxId}/{port}/* for ALL modes.

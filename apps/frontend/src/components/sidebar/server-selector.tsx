@@ -424,7 +424,7 @@ export function InstanceManagerDialog({
 
   // Available providers from the backend
   const { data: providersInfo } = useProviders();
-  const availableProviders = providersInfo?.providers ?? ['daytona'];
+  const availableProviders = providersInfo?.providers ?? ['local_docker'];
   const hasDaytona = availableProviders.includes('daytona');
   const hasLocalDocker = availableProviders.includes('local_docker');
 
