@@ -78,6 +78,7 @@ export function DeploymentsPage() {
   const [statusFilter, setStatusFilter] = useState<DeploymentStatus | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editDeployment, setEditDeployment] = useState<Deployment | null>(null);
   const [logsDeployment, setLogsDeployment] = useState<Deployment | null>(null);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
 
@@ -91,12 +92,19 @@ export function DeploymentsPage() {
 
   // Open create dialog if API key is set, otherwise show API key dialog first
   const handleNewDeployment = useCallback(() => {
+    setEditDeployment(null); // Clear any edit state
     if (hasApiKey) {
       setShowCreateDialog(true);
     } else {
       setShowApiKeyDialog(true);
     }
   }, [hasApiKey]);
+
+  // Open create dialog pre-filled with existing deployment data
+  const handleEditRedeploy = useCallback((deployment: Deployment) => {
+    setEditDeployment(deployment);
+    setShowCreateDialog(true);
+  }, []);
 
   const deployments = useMemo(() => data?.deployments ?? [], [data?.deployments]);
 
@@ -257,6 +265,7 @@ export function DeploymentsPage() {
                   onViewLogs={setLogsDeployment}
                   onStop={handleStop}
                   onRedeploy={handleRedeploy}
+                  onEditRedeploy={handleEditRedeploy}
                   onDelete={handleDelete}
                   onConfigureApiKey={() => setShowApiKeyDialog(true)}
                   isStopPending={stopMutation.isPending}
@@ -272,7 +281,11 @@ export function DeploymentsPage() {
       {/* Dialogs */}
       <CreateDeploymentDialog
         open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open);
+          if (!open) setEditDeployment(null);
+        }}
+        prefillFrom={editDeployment}
       />
 
       <DeploymentLogsDialog

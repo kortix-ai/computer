@@ -14,6 +14,7 @@ import {
   Globe,
   AlertCircle,
   Settings,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -86,6 +87,7 @@ interface DeploymentCardProps {
   onViewLogs: (deployment: Deployment) => void;
   onStop: (deployment: Deployment) => void;
   onRedeploy: (deployment: Deployment) => void;
+  onEditRedeploy: (deployment: Deployment) => void;
   onDelete: (deployment: Deployment) => void;
   onConfigureApiKey?: () => void;
   isStopPending?: boolean;
@@ -98,6 +100,7 @@ export function DeploymentCard({
   onViewLogs,
   onStop,
   onRedeploy,
+  onEditRedeploy,
   onDelete,
   onConfigureApiKey,
   isStopPending,
@@ -189,6 +192,19 @@ export function DeploymentCard({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    onClick={() => onEditRedeploy(deployment)}
+                    className="p-2 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Edit &amp; Redeploy</TooltipContent>
+              </Tooltip>
+            )}
+            {canRedeploy && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
                     onClick={() => onRedeploy(deployment)}
                     disabled={isRedeployPending}
                     className={cn(
@@ -268,16 +284,27 @@ export function DeploymentCard({
                 </button>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onRedeploy(deployment)}
-              disabled={isRedeployPending}
-              className="h-8 gap-1.5 text-xs cursor-pointer"
-            >
-              <RotateCcw className={cn('h-3.5 w-3.5', isRedeployPending && 'animate-spin')} />
-              {isRedeployPending ? 'Redeploying...' : 'Redeploy'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEditRedeploy(deployment)}
+                className="h-8 gap-1.5 text-xs cursor-pointer"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit &amp; Redeploy
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRedeploy(deployment)}
+                disabled={isRedeployPending}
+                className="h-8 gap-1.5 text-xs cursor-pointer"
+              >
+                <RotateCcw className={cn('h-3.5 w-3.5', isRedeployPending && 'animate-spin')} />
+                {isRedeployPending ? 'Redeploying...' : 'Redeploy'}
+              </Button>
+            </div>
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,9 +22,10 @@ import {
   Loader2,
   Rocket,
   Wand2,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCreateDeployment, type DeploymentSource, type CreateDeploymentData } from '@/hooks/deployments/use-deployments';
+import { useCreateDeployment, type Deployment, type DeploymentSource, type CreateDeploymentData } from '@/hooks/deployments/use-deployments';
 import { toast } from 'sonner';
 
 function generateSubdomain(): string {
@@ -56,12 +57,15 @@ interface CreateDeploymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  /** Pre-fill the form from an existing deployment for "Edit & Redeploy" */
+  prefillFrom?: Deployment | null;
 }
 
 export function CreateDeploymentDialog({
   open,
   onOpenChange,
   onCreated,
+  prefillFrom,
 }: CreateDeploymentDialogProps) {
   const createMutation = useCreateDeployment();
 
@@ -112,6 +116,53 @@ export function CreateDeploymentDialog({
     setStaticOnly(false);
     setShowAdvanced(false);
   }, []);
+
+  // Pre-fill form from an existing deployment (Edit & Redeploy)
+  useEffect(() => {
+    if (!prefillFrom || !open) return;
+    const d = prefillFrom;
+
+    setSourceType(d.sourceType);
+    setDomains(d.domains?.join(', ') || generateSubdomain());
+    setEntrypoint(d.entrypoint || '');
+    setFramework(d.framework || '');
+
+    // Source-specific fields
+    if (d.sourceType === 'git') {
+      setSourceRef(d.sourceRef || '');
+      // Extract branch/rootPath from metadata if available
+      const src = (d.metadata as Record<string, unknown>)?.freestyleSource as Record<string, unknown> | undefined;
+      setBranch((src?.branch as string) || '');
+      setRootPath((src?.dir as string) || '');
+    } else if (d.sourceType === 'code') {
+      // Extract code from metadata.freestyleSource.files['index.ts'].content
+      const src = (d.metadata as Record<string, unknown>)?.freestyleSource as Record<string, unknown> | undefined;
+      const filesObj = src?.files as Record<string, { content?: string }> | undefined;
+      const codeContent = filesObj?.['index.ts']?.content || '';
+      setCode(codeContent);
+    } else if (d.sourceType === 'files') {
+      const src = (d.metadata as Record<string, unknown>)?.freestyleSource as Record<string, unknown> | undefined;
+      const filesObj = src?.files as Record<string, { content?: string }> | undefined;
+      if (filesObj) {
+        setFiles(Object.entries(filesObj).map(([path, f]) => ({ path, content: f?.content || '' })));
+      }
+    } else if (d.sourceType === 'tar') {
+      const src = (d.metadata as Record<string, unknown>)?.freestyleSource as Record<string, unknown> | undefined;
+      setTarUrl((src?.url as string) || d.sourceRef || '');
+    }
+
+    // Advanced config
+    if (d.envVars && Object.keys(d.envVars).length > 0) {
+      setEnvVars(Object.entries(d.envVars).map(([key, value]) => ({ key, value })));
+      setShowAdvanced(true);
+    }
+    if (d.buildConfig) {
+      const bc = d.buildConfig as Record<string, unknown>;
+      setBuildCommand((bc.command as string) || '');
+      setBuildOutDir((bc.outDir as string) || '');
+      if (bc.command || bc.outDir) setShowAdvanced(true);
+    }
+  }, [prefillFrom, open]);
 
   const handleSubmit = async () => {
     // Validate domains
@@ -223,11 +274,13 @@ export function CreateDeploymentDialog({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby="create-deployment-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Rocket className="h-5 w-5" />
-            New Deployment
+            {prefillFrom ? <Pencil className="h-5 w-5" /> : <Rocket className="h-5 w-5" />}
+            {prefillFrom ? 'Edit & Redeploy' : 'New Deployment'}
           </DialogTitle>
           <DialogDescription id="create-deployment-description">
-            Deploy your application to production via Freestyle.
+            {prefillFrom
+              ? 'Modify the configuration and deploy a new version.'
+              : 'Deploy your application to production via Freestyle.'}
           </DialogDescription>
         </DialogHeader>
 
