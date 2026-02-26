@@ -222,7 +222,7 @@ export function DeploymentsPage() {
                 key={tab.label}
                 onClick={() => setStatusFilter(tab.value)}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer',
                   statusFilter === tab.value
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',

@@ -297,7 +297,7 @@ export function CreateDeploymentDialog({
                     type="button"
                     onClick={() => setSourceType(st.value)}
                     className={cn(
-                      'flex flex-col items-center gap-1.5 p-3 rounded-xl border text-sm transition-colors',
+                      'flex flex-col items-center gap-1.5 p-3 rounded-xl border text-sm transition-colors cursor-pointer',
                       sourceType === st.value
                         ? 'border-primary bg-primary/5 text-primary'
                         : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -419,7 +419,7 @@ export function CreateDeploymentDialog({
                         <button
                           type="button"
                           onClick={() => removeFile(i)}
-                          className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                          className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -458,7 +458,7 @@ export function CreateDeploymentDialog({
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               <ChevronDown
                 className={cn(
@@ -561,7 +561,7 @@ export function CreateDeploymentDialog({
                           <button
                             type="button"
                             onClick={() => removeEnvVar(i)}
-                            className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
