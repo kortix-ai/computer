@@ -1,14 +1,5 @@
 'use client';
 
-/**
- * TunnelCreateDialog — multi-step dialog for creating a new tunnel connection.
- *
- * Steps:
- *  1. Name — enter a friendly name for the machine
- *  2. Permissions — Slack-style scope toggles
- *  3. Connect — copy CLI command + live connection verification
- */
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ArrowRight,
@@ -43,16 +34,12 @@ import {
 import { SCOPE_REGISTRY, type ScopeInfo } from './types';
 import { toast } from 'sonner';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type Step = 'name' | 'permissions' | 'connect';
 
 interface TunnelCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-// ─── Step Indicator ──────────────────────────────────────────────────────────
 
 const STEPS: { key: Step; label: string }[] = [
   { key: 'name', label: 'Name' },
@@ -107,8 +94,6 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
     </div>
   );
 }
-
-// ─── Step 1: Name ────────────────────────────────────────────────────────────
 
 function NameStep({
   name,
@@ -298,8 +283,6 @@ function PermissionsStep({
   );
 }
 
-// ─── Step 3: Connect + Live Verification ─────────────────────────────────────
-
 function ConnectStep({
   result,
   onDone,
@@ -312,7 +295,6 @@ function ConnectStep({
   const { refetch, isRefetching } = useTunnelConnection(result.tunnelId);
   const esRef = useRef<EventSource | null>(null);
 
-  // SSE-based: listen for tunnel_connected event — instant, no polling
   useEffect(() => {
     if (isConnected) return;
     let cancelled = false;
@@ -351,7 +333,6 @@ function ConnectStep({
     };
   }, [isConnected, result.tunnelId]);
 
-  // Manual check fallback
   const handleManualCheck = async () => {
     const { data } = await refetch();
     if (data?.isLive) {
@@ -613,8 +594,6 @@ export function TunnelCreateDialog({ open, onOpenChange }: TunnelCreateDialogPro
     </Dialog>
   );
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getDefaultMachineName(): string {
   if (typeof navigator === 'undefined') return 'My Machine';
