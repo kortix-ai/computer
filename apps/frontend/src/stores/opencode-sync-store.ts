@@ -574,11 +574,66 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 					store.setStatus(props.sessionID, props.status);
 				return;
 			}
-			case "session.idle": {
-				const sessionID = (event.properties as { sessionID: string }).sessionID;
-				if (sessionID) store.setStatus(sessionID, { type: "idle" });
-				return;
-			}
+		case "session.idle": {
+			const sessionID = (event.properties as { sessionID: string }).sessionID;
+			if (sessionID) store.setStatus(sessionID, { type: "idle" });
+			return;
+		}
+		case "session.error": {
+			const props = event.properties as { sessionID?: string; error?: unknown };
+			if (!props.sessionID || !props.error) return;
+			const sid = props.sessionID;
+
+			// Mark session idle — errors terminate the response.
+			// The server will also send session.status idle, but patching here
+			// ensures the UI unblocks immediately (stops showing busy spinner).
+			store.setStatus(sid, { type: "idle" });
+
+			// Patch the error onto the last assistant message in the sync store.
+			// This is critical because:
+			// 1. session.error can arrive before message.updated with .error
+			// 2. Some error paths never emit message.updated with .error at all
+			//    (e.g. API key missing — the server errors before creating messages)
+			// 3. getTurnError() reads from sync store messages, not React Query
+			set((s) => {
+				const msgs = s.messages[sid];
+				if (!msgs || msgs.length === 0) {
+					// No messages at all yet — create a stub assistant message
+					// so the error is visible in the turn.
+					const stubId = ascendingId("msg");
+					const stubMsg: Message = {
+						id: stubId,
+						sessionID: sid,
+						role: "assistant",
+						error: props.error,
+					} as any;
+					return {
+						messages: { ...s.messages, [sid]: [...(msgs ?? []), stubMsg] },
+					};
+				}
+				// Find the last assistant message and patch .error onto it
+				for (let i = msgs.length - 1; i >= 0; i--) {
+					if (msgs[i].role === "assistant") {
+						if ((msgs[i] as any).error) return s; // already has error
+						const next = [...msgs];
+						next[i] = { ...msgs[i], error: props.error } as any;
+						return { messages: { ...s.messages, [sid]: next } };
+					}
+				}
+				// No assistant message yet — create a stub so the error is visible
+				const stubId = ascendingId("msg");
+				const stubMsg: Message = {
+					id: stubId,
+					sessionID: sid,
+					role: "assistant",
+					error: props.error,
+				} as any;
+				return {
+					messages: { ...s.messages, [sid]: [...msgs, stubMsg] },
+				};
+			});
+			return;
+		}
 			case "session.diff": {
 				const props = event.properties as {
 					sessionID: string;

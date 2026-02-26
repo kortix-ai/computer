@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,10 +21,20 @@ import {
   ChevronDown,
   Loader2,
   Rocket,
+  Wand2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCreateDeployment, type DeploymentSource, type CreateDeploymentData } from '@/hooks/deployments/use-deployments';
 import { toast } from 'sonner';
+
+function generateSubdomain(): string {
+  const adjectives = ['swift', 'bright', 'cool', 'fast', 'neat', 'bold', 'calm', 'keen', 'warm', 'wise'];
+  const nouns = ['app', 'site', 'hub', 'lab', 'box', 'dev', 'web', 'api', 'run', 'kit'];
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const id = Math.random().toString(36).slice(2, 6);
+  return `${adj}-${noun}-${id}.style.dev`;
+}
 
 // ─── Source type config ─────────────────────────────────────────────────────
 
@@ -56,8 +66,9 @@ export function CreateDeploymentDialog({
   const createMutation = useCreateDeployment();
 
   // Form state
-  const [sourceType, setSourceType] = useState<DeploymentSource>('git');
-  const [domains, setDomains] = useState('');
+  const defaultDomain = useMemo(() => generateSubdomain(), []);
+  const [sourceType, setSourceType] = useState<DeploymentSource>('code');
+  const [domains, setDomains] = useState(defaultDomain);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Git fields
@@ -85,8 +96,8 @@ export function CreateDeploymentDialog({
   const [staticOnly, setStaticOnly] = useState(false);
 
   const resetForm = useCallback(() => {
-    setSourceType('git');
-    setDomains('');
+    setSourceType('code');
+    setDomains(generateSubdomain());
     setSourceRef('');
     setBranch('');
     setRootPath('');
@@ -250,17 +261,27 @@ export function CreateDeploymentDialog({
           {/* Domain */}
           <div>
             <label className={labelClass}>
-              Domain(s) <span className="text-red-500">*</span>
+              Domain <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={domains}
-              onChange={(e) => setDomains(e.target.value)}
-              placeholder="my-app.style.dev"
-              className={inputClass}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={domains}
+                onChange={(e) => setDomains(e.target.value)}
+                placeholder="my-app.style.dev"
+                className={cn(inputClass, 'flex-1')}
+              />
+              <button
+                type="button"
+                onClick={() => setDomains(generateSubdomain())}
+                className="h-9 px-2.5 rounded-xl border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer shrink-0"
+                title="Generate random subdomain"
+              >
+                <Wand2 className="h-4 w-4" />
+              </button>
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Comma-separated list of domains. At least one is required.
+              Free subdomains available under <span className="font-medium text-foreground/70">*.style.dev</span>. Use your own verified domain for production.
             </p>
           </div>
 

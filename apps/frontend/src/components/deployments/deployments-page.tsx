@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   useDeployments,
   useStopDeployment,
@@ -9,6 +9,7 @@ import {
   type Deployment,
   type DeploymentStatus,
 } from '@/hooks/deployments/use-deployments';
+import { useSecrets } from '@/hooks/secrets/use-secrets';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -81,9 +82,21 @@ export function DeploymentsPage() {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
 
   const { data, isLoading, error } = useDeployments(statusFilter);
+  const { data: secrets } = useSecrets();
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
   const deleteMutation = useDeleteDeployment();
+
+  const hasApiKey = !!secrets?.FREESTYLE_API_KEY;
+
+  // Open create dialog if API key is set, otherwise show API key dialog first
+  const handleNewDeployment = useCallback(() => {
+    if (hasApiKey) {
+      setShowCreateDialog(true);
+    } else {
+      setShowApiKeyDialog(true);
+    }
+  }, [hasApiKey]);
 
   const deployments = useMemo(() => data?.deployments ?? [], [data?.deployments]);
 
@@ -210,7 +223,7 @@ export function DeploymentsPage() {
               variant="default"
               size="sm"
               className="h-9 sm:h-10 px-3 sm:px-4 rounded-xl gap-1.5 sm:gap-2 text-sm shrink-0"
-              onClick={() => setShowCreateDialog(true)}
+              onClick={handleNewDeployment}
             >
               <Plus className="h-4 w-4" />
               <span className="hidden xs:inline">New Deployment</span>
@@ -225,7 +238,7 @@ export function DeploymentsPage() {
             <LoadingSkeleton />
           ) : filteredDeployments.length === 0 ? (
             deployments.length === 0 && !statusFilter ? (
-              <EmptyState onCreateClick={() => setShowCreateDialog(true)} />
+              <EmptyState onCreateClick={handleNewDeployment} />
             ) : (
               <div className="bg-muted/20 rounded-3xl border flex flex-col items-center justify-center py-12 px-4">
                 <p className="text-sm text-muted-foreground">
@@ -273,6 +286,10 @@ export function DeploymentsPage() {
       <FreestyleApiKeyDialog
         open={showApiKeyDialog}
         onOpenChange={setShowApiKeyDialog}
+        onSaved={() => {
+          // After saving the API key, open the create dialog
+          setShowCreateDialog(true);
+        }}
       />
     </div>
   );

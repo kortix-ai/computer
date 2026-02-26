@@ -233,6 +233,22 @@ export function useOpenCodeEventStream() {
 								}
 							})
 							.catch(() => {});
+
+						// Re-hydrate messages for sessions that are currently
+						// loaded in the sync store. During the SSE gap, message
+						// and part events may have been lost — this ensures the
+						// streaming response catches up after reconnection.
+						const syncState = useSyncStore.getState();
+						const loadedSessionIds = Object.keys(syncState.messages);
+						for (const sid of loadedSessionIds) {
+							client.session
+								.messages({ sessionID: sid })
+								.then((res) => {
+									if (res.data)
+										useSyncStore.getState().hydrate(sid, res.data as any);
+								})
+								.catch(() => {});
+						}
 					}
 				}
 					// Only reset backoff if connection was stable (>10s).
