@@ -2723,6 +2723,15 @@ export function SessionChat({
 			// Fire-and-forget via promptAsync. Don't send messageID — let the
 			// server generate it with its own clock to avoid clock-skew issues.
 			const client = getClient();
+			const handlePromptError = () => {
+				removeOptimisticUserMessage(messageID);
+				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+				setIsRetrying(false);
+				setPendingSendInFlight(false);
+				setPendingSendMessageId(null);
+				setOptimisticPrompt(null);
+				setPollingActive(false);
+			};
 			void client.session
 				.promptAsync({
 					sessionID: sessionId,
@@ -2731,15 +2740,13 @@ export function SessionChat({
 					...(sendOpts?.model && { model: sendOpts.model }),
 					...(sendOpts?.variant && { variant: sendOpts.variant }),
 				} as any)
-				.catch(() => {
-					removeOptimisticUserMessage(messageID);
-					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-					setIsRetrying(false);
-					setPendingSendInFlight(false);
-					setPendingSendMessageId(null);
-					setOptimisticPrompt(null);
-					setPollingActive(false);
-				});
+				.then((res: any) => {
+					// The SDK resolves (not rejects) on HTTP errors, returning
+					// { error: ... } instead of throwing. Handle this case so
+					// the UI doesn't stay stuck on "busy" forever.
+					if (res?.error) handlePromptError();
+				})
+				.catch(handlePromptError);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [sessionId, addOptimisticUserMessage, removeOptimisticUserMessage]);
@@ -3080,6 +3087,49 @@ export function SessionChat({
 			clearInterval(interval);
 		};
 	}, [isServerBusy, sessionId]);
+
+	// Stale content watchdog: when the session is busy and the last message
+	// is still a user message (no assistant response has appeared), poll
+	// messages from the server. This catches the case where SSE message/part
+	// events were lost during an internal SDK reconnection (the SSE client
+	// has its own retry loop with 3-30s backoff where events are silently
+	// dropped). On success the sync store is hydrated and the missing
+	// assistant content appears without requiring a page reload.
+	// First check after 3s, then every 5s while stuck.
+	useEffect(() => {
+		if (!isServerBusy || !messages || messages.length === 0) return;
+		// Only act when the last message is a user message — if an assistant
+		// message already exists, SSE events are flowing fine.
+		const lastMsg = messages[messages.length - 1];
+		if (lastMsg?.info.role !== "user") return;
+
+		const fetchMessages = async () => {
+			// Re-check conditions: still busy and still no assistant response
+			const currentMsgs = useSyncStore.getState().getMessages(sessionId);
+			if (currentMsgs.length === 0) return;
+			const currentLast = currentMsgs[currentMsgs.length - 1];
+			if (currentLast?.info.role !== "user") return;
+			const currentStatus = useSyncStore.getState().sessionStatus[sessionId];
+			if (currentStatus?.type === "idle") return;
+
+			try {
+				const client = getClient();
+				const res = await client.session.messages({ sessionID: sessionId });
+				if (res.data) {
+					useSyncStore.getState().hydrate(sessionId, res.data as any);
+				}
+			} catch {
+				// ignore — next interval will retry
+			}
+		};
+
+		const initialTimer = setTimeout(fetchMessages, 3_000);
+		const interval = setInterval(fetchMessages, 5_000);
+		return () => {
+			clearTimeout(initialTimer);
+			clearInterval(interval);
+		};
+	}, [isServerBusy, messages, sessionId]);
 
 	// Message-based idle detection: if the last assistant message has
 	// time.completed set, the server marked the message as completed but we never got the
@@ -3582,8 +3632,18 @@ export function SessionChat({
 					...(sendOpts?.model && { model: sendOpts.model }),
 					...(sendOpts?.variant && { variant: sendOpts.variant }),
 				} as any)
+				.then((res: any) => {
+					// The SDK resolves (not rejects) on HTTP errors, returning
+					// { error: ... } instead of throwing. Without this check the
+					// catch handler never fires and the UI stays stuck on "busy"
+					// with the optimistic user bubble forever.
+					if (res?.error) {
+						useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+						removeOptimisticUserMessage(messageID);
+					}
+				})
 				.catch(() => {
-					// On failure, set status to idle and remove optimistic message
+					// On network-level failure, set status to idle and remove optimistic message
 					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
 					removeOptimisticUserMessage(messageID);
 				});
