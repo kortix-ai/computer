@@ -13,7 +13,8 @@ import Docker from 'dockerode';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { config } from '../../config';
-import { generateSandboxKeyPair } from '../../shared/crypto';
+import { generateSandboxKeyPair, isApiKeySecretConfigured } from '../../shared/crypto';
+import { createApiKey } from '../../repositories/api-keys';
 import type {
   SandboxProvider,
   ProviderName,
@@ -332,7 +333,20 @@ export class LocalDockerProvider implements SandboxProvider {
       await this.pullImage();
     }
 
-    const authToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN || generateSandboxKeyPair().secretKey;
+    let authToken = this._lastCreateOpts?.envVars?.KORTIX_TOKEN || '';
+    if (!authToken && isApiKeySecretConfigured()) {
+      const accountId = this._lastCreateOpts?.accountId || 'local';
+      const key = await createApiKey({
+        sandboxId: CONTAINER_NAME,
+        accountId,
+        title: 'Sandbox Token',
+        type: 'sandbox',
+      });
+      authToken = key.secretKey;
+    }
+    if (!authToken) {
+      authToken = generateSandboxKeyPair().secretKey;
+    }
     const sandboxEnvVars = readSandboxEnv();
 
     // INTERNAL_SERVICE_KEY: used for proxy/cron → sandbox auth

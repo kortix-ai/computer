@@ -1,0 +1,35 @@
+{
+  "name": "kortix-tunnel",
+  "version": "0.1.0",
+  "description": "Kortix Tunnel — local agent CLI that bridges your machine to Kortix cloud sandboxes via secure reverse-tunnel",
+  "main": "dist/cli.js",
+  "types": "src/cli.ts",
+  "bin": {
+    "kortix-tunnel": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist/",
+    "src/"
+  ],
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target node",
+    "dev": "bun run src/cli.ts",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.0"
+  },
+  "keywords": [
+    "kortix",
+    "tunnel",
+    "reverse-tunnel",
+    "cli",
+    "local-agent"
+  ],
+  "license": "MIT"
+}

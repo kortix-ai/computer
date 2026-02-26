@@ -25,6 +25,7 @@ import {
   X,
   Loader2,
   FolderOpen,
+  Cable,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -739,6 +740,18 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               }, router);
             }}
           />
+          <CollapsedIconButton
+            icon={<Cable className="h-4 w-4" />}
+            label="Tunnel"
+            onClick={() => {
+              openTabAndNavigate({
+                id: 'page:/tunnel',
+                title: 'Tunnel',
+                type: 'page',
+                href: '/tunnel',
+              }, router);
+            }}
+          />
         </div>
 
         {/* --- Expanded layout --- */}
@@ -891,6 +904,26 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             >
               <Calendar className="h-4 w-4 flex-shrink-0" />
               <span>Scheduled Tasks</span>
+            </button>
+            <button
+              onClick={() => {
+                openTabAndNavigate({
+                  id: 'page:/tunnel',
+                  title: 'Tunnel',
+                  type: 'page',
+                  href: '/tunnel',
+                }, router);
+                if (isMobile) setOpenMobile(false);
+              }}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                pathname === '/tunnel'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+              )}
+            >
+              <Cable className="h-4 w-4 flex-shrink-0" />
+              <span>Tunnel</span>
             </button>
           </nav>
 

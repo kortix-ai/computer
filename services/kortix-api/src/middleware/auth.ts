@@ -250,13 +250,15 @@ function setPreviewSessionCookie(c: Context, token: string) {
  */
 export async function combinedAuth(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    throw new HTTPException(401, { message: 'Missing or invalid Authorization header' });
-  }
 
-  const token = authHeader.slice(7);
+  // EventSource/SSE can't set headers — accept token via query param as fallback
+  // (same pattern as the WebSocket endpoint which takes token via query params)
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : new URL(c.req.url).searchParams.get('token') ?? undefined;
+
   if (!token) {
-    throw new HTTPException(401, { message: 'Missing token' });
+    throw new HTTPException(401, { message: 'Missing or invalid Authorization header' });
   }
 
   // Kortix token — used by agents inside the sandbox
@@ -272,6 +274,20 @@ export async function combinedAuth(c: Context, next: Next) {
     return;
   }
 
-  // Otherwise, fall through to Supabase JWT auth
-  await supabaseAuth(c, next);
+  // Supabase JWT — validate directly with the extracted token
+  // (can't delegate to supabaseAuth because it re-reads the Authorization header,
+  // which is absent when the token came from a query param)
+  try {
+    const supabase = getSupabase();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) {
+      throw new HTTPException(401, { message: 'Invalid or expired token' });
+    }
+    c.set('userId', user.id);
+    c.set('userEmail', user.email || '');
+    await next();
+  } catch (err) {
+    if (err instanceof HTTPException) throw err;
+    throw new HTTPException(401, { message: 'Authentication failed' });
+  }
 }

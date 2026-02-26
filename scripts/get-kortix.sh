@@ -1051,7 +1051,7 @@ cd "$DIR"
 
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-VERSION="0.7.1"
+VERSION="0.7.2"
 
 _open() {
   if command -v open &>/dev/null; then open "$1" 2>/dev/null
