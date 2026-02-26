@@ -66,9 +66,9 @@ export async function checkCredits(
   accountId: string,
   minimumRequired: number = 0.01
 ): Promise<CreditCheckResult> {
-  // Billing disabled: unlimited credits
+  // Billing disabled: no credit gating
   if (!config.KORTIX_BILLING_INTERNAL_ENABLED) {
-    return { hasCredits: true, balance: 999999, message: 'OK (billing disabled — unlimited)' };
+    return { hasCredits: true, balance: 0, message: 'OK' };
   }
 
   const balance = await getCreditBalance(accountId);
@@ -108,7 +108,7 @@ export async function deductCredits(
 ): Promise<CreditDeductResult> {
   // Billing disabled: no deduction
   if (!config.KORTIX_BILLING_INTERNAL_ENABLED) {
-    return { success: true, amountDeducted: 0, newBalance: 999999 };
+    return { success: true, amountDeducted: 0, newBalance: 0 };
   }
 
   try {
