@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Key, Plus, Trash2, Copy, Shield, RefreshCw, Bot } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Key, Plus, Trash2, Copy, Check, Shield, RefreshCw, Bot, AlertCircle, ExternalLink, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/lib/toast';
 
@@ -50,7 +50,8 @@ import {
   APIKeyCreateResponse,
   APIKeyRegenerateResponse,
 } from '@/lib/api/api-keys';
-import { getActiveSandboxId, getActiveServer } from '@/stores/server-store';
+import { getActiveSandboxId, getActiveServer, getActiveOpenCodeUrl } from '@/stores/server-store';
+import { getAuthToken } from '@/lib/auth-token';
 import { useServerStore } from '@/stores/server-store';
 
 interface NewAPIKeyData {
@@ -58,6 +59,144 @@ interface NewAPIKeyData {
   description: string;
   expiresInDays: string;
 }
+
+// ── Inline copy button with check feedback ─────────────────────────────────
+
+function CopyButton({ value, label, size = 'sm' }: { value: string; label?: string; size?: 'sm' | 'icon' }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.warning('Failed to copy to clipboard');
+    }
+  }, [value]);
+
+  if (size === 'icon') {
+    return (
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        title="Copy"
+      >
+        {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+      </button>
+    );
+  }
+
+  return (
+    <Button size="sm" variant="outline" onClick={handleCopy}>
+      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+      {label && <span className="ml-1.5">{label}</span>}
+    </Button>
+  );
+}
+
+// ── Auth guide ─────────────────────────────────────────────────────────────
+
+function AuthGuide() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="rounded-lg border">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Info className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium">How Authentication Works</span>
+        </div>
+        {open
+          ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        }
+      </button>
+
+      {open && (
+        <div className="border-t px-4 py-4 space-y-4 text-sm">
+          {/* API Key Auth */}
+          <div className="space-y-2">
+            <h4 className="font-medium">API Key Authentication</h4>
+            <p className="text-muted-foreground">
+              API keys created here can be used for programmatic access to the Kortix API.
+              Each key is a public/secret pair:
+            </p>
+            <div className="bg-muted rounded-lg p-3 space-y-1 font-mono text-xs">
+              <div><span className="text-muted-foreground">Secret key:</span> kortix_{'<32 alphanumeric chars>'} <span className="text-muted-foreground">(39 chars)</span></div>
+              <div><span className="text-muted-foreground">Public key:</span> pk_{'<32 alphanumeric chars>'} <span className="text-muted-foreground">(35 chars, safe to share)</span></div>
+            </div>
+            <p className="text-muted-foreground">
+              The secret key is shown <strong>once</strong> at creation. Only an HMAC-SHA256 hash is stored server-side.
+            </p>
+          </div>
+
+          {/* Usage */}
+          <div className="space-y-2">
+            <h4 className="font-medium">Usage</h4>
+            <p className="text-muted-foreground">
+              Pass the secret key as a Bearer token in the Authorization header:
+            </p>
+            <pre className="bg-muted rounded-lg p-3 text-xs font-mono overflow-x-auto">
+{`Authorization: Bearer kortix_<your-secret-key>`}
+            </pre>
+          </div>
+
+          {/* E2E Flow */}
+          <div className="space-y-2">
+            <h4 className="font-medium">End-to-End Flow</h4>
+            <div className="text-muted-foreground space-y-1.5">
+              <div className="flex gap-2">
+                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">1</span>
+                <span>Client sends <code className="text-xs bg-muted px-1 rounded">Authorization: Bearer kortix_...</code> to the platform proxy</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">2</span>
+                <span>Proxy validates: hashes the key with HMAC-SHA256, looks up the hash in the database</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">3</span>
+                <span>Proxy strips client auth, injects <code className="text-xs bg-muted px-1 rounded">INTERNAL_SERVICE_KEY</code> as Bearer token</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">4</span>
+                <span>Sandbox receives the request with the internal key — response streams back</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 italic">
+              Your API key is never forwarded to the sandbox. The sandbox only sees the internal service key.
+            </p>
+          </div>
+
+          {/* Other auth methods */}
+          <div className="space-y-2">
+            <h4 className="font-medium text-muted-foreground">Other Token Types</h4>
+            <div className="text-muted-foreground space-y-1.5 text-xs">
+              <p>
+                <strong>Supabase JWT</strong> — Used by the dashboard frontend (ES256, ~900 chars).
+                Passed as <code className="bg-muted px-1 rounded">Authorization: Bearer eyJhbGci...</code>. Handled automatically by the UI.
+              </p>
+              <p>
+                <strong>Sandbox token</strong> — Auto-generated per sandbox (<code className="bg-muted px-1 rounded">kortix_sb_</code> prefix, 42 chars).
+                Injected as the <code className="bg-muted px-1 rounded">KORTIX_TOKEN</code> env var. Used by AI agents running inside the sandbox to call back to the platform API.
+              </p>
+              <p>
+                <strong>Supabase service/anon keys</strong> — These are <em>not</em> valid auth tokens. They are rejected by all endpoints.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────
 
 export default function APIKeysPage() {
   // Re-render when active server changes (sandboxId may change)
@@ -79,19 +218,20 @@ export default function APIKeysPage() {
     data: apiKeysResponse,
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['api-keys', activeSandboxId],
     queryFn: () => apiKeysApi.list(activeSandboxId!),
     enabled: !!activeSandboxId,
   });
 
-  const allKeys = apiKeysResponse?.data?.data || [];
-
   // Split into sandbox-managed and user-created keys
+  const apiKeysData = apiKeysResponse?.data?.data;
   const { sandboxKeys, userKeys } = useMemo(() => {
+    const all = apiKeysData || [];
     const sandbox: APIKeyResponse[] = [];
     const user: APIKeyResponse[] = [];
-    for (const key of allKeys) {
+    for (const key of all) {
       if (key.type === 'sandbox') {
         sandbox.push(key);
       } else {
@@ -99,7 +239,7 @@ export default function APIKeysPage() {
       }
     }
     return { sandboxKeys: sandbox, userKeys: user };
-  }, [allKeys]);
+  }, [apiKeysData]);
 
   // Create API key mutation
   const createMutation = useMutation({
@@ -110,14 +250,13 @@ export default function APIKeysPage() {
         setShowCreatedKey(true);
         setIsCreateDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: ['api-keys'] });
-        toast.success('API key created successfully');
         setNewKeyData({ title: '', description: '', expiresInDays: 'never' });
       } else {
-        toast.error(response.error?.message || 'Failed to create API key');
+        toast.warning(response.error?.message || 'Failed to create API key');
       }
     },
     onError: () => {
-      toast.error('Failed to create API key');
+      toast.warning('Failed to create API key');
     },
   });
 
@@ -126,10 +265,10 @@ export default function APIKeysPage() {
     mutationFn: (keyId: string) => apiKeysApi.revoke(keyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
-      toast.success('API key revoked successfully');
+      toast.info('API key revoked');
     },
     onError: () => {
-      toast.error('Failed to revoke API key');
+      toast.warning('Failed to revoke API key');
     },
   });
 
@@ -138,10 +277,10 @@ export default function APIKeysPage() {
     mutationFn: (keyId: string) => apiKeysApi.delete(keyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
-      toast.success('API key deleted successfully');
+      toast.info('API key deleted');
     },
     onError: () => {
-      toast.error('Failed to delete API key');
+      toast.warning('Failed to delete API key');
     },
   });
 
@@ -154,23 +293,23 @@ export default function APIKeysPage() {
         setShowCreatedKey(true);
         queryClient.invalidateQueries({ queryKey: ['api-keys'] });
         const sandboxUpdated = (response.data as any)?.sandbox_updated;
-        toast.success(
+        toast.info(
           sandboxUpdated
             ? 'Token regenerated and applied to sandbox'
             : 'Token regenerated — restart sandbox to apply',
         );
       } else {
-        toast.error(response.error?.message || 'Failed to regenerate key');
+        toast.warning(response.error?.message || 'Failed to regenerate key');
       }
     },
     onError: () => {
-      toast.error('Failed to regenerate sandbox key');
+      toast.warning('Failed to regenerate sandbox key');
     },
   });
 
   const handleCreateAPIKey = () => {
     if (!activeSandboxId) {
-      toast.error('No active sandbox — start a sandbox first');
+      toast.warning('No active sandbox — start a sandbox first');
       return;
     }
 
@@ -185,25 +324,6 @@ export default function APIKeysPage() {
     };
 
     createMutation.mutate(request);
-  };
-
-  const handleCopyKey = async (key: string) => {
-    try {
-      await navigator.clipboard.writeText(key);
-      toast.success('Copied to clipboard');
-    } catch {
-      toast.error('Failed to copy');
-    }
-  };
-
-  const handleCopyFullKey = async (publicKey: string, secretKey: string) => {
-    try {
-      const fullKey = `${publicKey}:${secretKey}`;
-      await navigator.clipboard.writeText(fullKey);
-      toast.success('Full API key copied to clipboard');
-    } catch {
-      toast.error('Failed to copy full API key');
-    }
   };
 
   const formatDate = (dateString: string) => {
@@ -237,12 +357,39 @@ export default function APIKeysPage() {
   // Find the active sandbox key (there should be exactly one active)
   const activeSandboxKey = sandboxKeys.find((k) => k.status === 'active');
 
+  // Build the display value for the created key
+  const createdKeyDisplayValue = createdApiKey && 'secret_key' in createdApiKey
+    ? createdApiKey.secret_key
+    : '';
+
   return (
     <div className="container mx-auto max-w-6xl px-3 sm:px-6 py-4 sm:py-6">
       <div className="space-y-4 sm:space-y-6">
         <div className="space-y-1 sm:space-y-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-medium">API Keys</h1>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl sm:text-2xl font-medium">API Keys</h1>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const base = getActiveOpenCodeUrl().replace(/\/+$/, '');
+                const docsUrl = `${base}/docs`;
+                // Inject auth token so the preview proxy sets a session cookie
+                const token = await getAuthToken();
+                if (token) {
+                  const url = new URL(docsUrl);
+                  url.searchParams.set('token', token);
+                  window.open(url.toString(), '_blank');
+                } else {
+                  window.open(docsUrl, '_blank');
+                }
+              }}
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+              API Docs
+            </Button>
           </div>
           <p className="text-sm sm:text-base text-muted-foreground">
             Manage your API keys for programmatic access to Kortix
@@ -321,7 +468,7 @@ export default function APIKeysPage() {
                 <DialogHeader>
                   <DialogTitle>Create API Key</DialogTitle>
                   <DialogDescription>
-                    Create a new API key for programmatic access to your account.
+                    Create a new API key for programmatic access to your sandbox.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -340,6 +487,11 @@ export default function APIKeysPage() {
                           title: e.target.value,
                         }))
                       }
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newKeyData.title.trim()) {
+                          handleCreateAPIKey();
+                        }
+                      }}
                     />
                   </div>
 
@@ -419,12 +571,16 @@ export default function APIKeysPage() {
                 </Card>
               ))}
             </div>
-          ) : error ? (
+          ) : error || (apiKeysResponse && !apiKeysResponse.success) ? (
             <Card>
-              <CardContent className="p-6 text-center">
-                <p className="text-muted-foreground">
-                  Failed to load API keys. Please try again.
+              <CardContent className="p-6 text-center space-y-3">
+                <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto" />
+                <p className="text-muted-foreground text-sm">
+                  {apiKeysResponse?.error?.message || 'Failed to load API keys.'}
                 </p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  Try Again
+                </Button>
               </CardContent>
             </Card>
           ) : userKeys.length === 0 ? (
@@ -447,7 +603,7 @@ export default function APIKeysPage() {
                 <Card
                   key={apiKey.key_id}
                   className={
-                    isKeyExpired(apiKey.expires_at) ? 'border-yellow-200' : ''
+                    isKeyExpired(apiKey.expires_at) ? 'border-yellow-500/30' : ''
                   }
                 >
                   <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
@@ -467,6 +623,15 @@ export default function APIKeysPage() {
                   </CardHeader>
                   <CardContent className="pt-0 px-3 sm:px-6 pb-3 sm:pb-4">
                     <div className="space-y-3">
+                      {/* Public key identifier */}
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Key:</span>
+                        <code className="font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {apiKey.public_key}
+                        </code>
+                        <CopyButton value={apiKey.public_key} size="icon" />
+                      </div>
+
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
                         <div>
                           <p className="text-muted-foreground mb-0.5">Created</p>
@@ -478,7 +643,7 @@ export default function APIKeysPage() {
                           <div>
                             <p className="text-muted-foreground mb-0.5">Expires</p>
                             <p
-                              className={`font-medium truncate ${isKeyExpired(apiKey.expires_at) ? 'text-yellow-600' : ''}`}
+                              className={`font-medium truncate ${isKeyExpired(apiKey.expires_at) ? 'text-yellow-600 dark:text-yellow-400' : ''}`}
                             >
                               {formatDate(apiKey.expires_at)}
                             </p>
@@ -571,9 +736,12 @@ export default function APIKeysPage() {
           )}
         </div>
 
+        {/* ── Authentication Guide ─────────────────────────────────────── */}
+        <AuthGuide />
+
         {/* Show Created API Key Dialog */}
         <Dialog open={showCreatedKey} onOpenChange={setShowCreatedKey}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Shield className="w-5 h-5" />
@@ -586,58 +754,75 @@ export default function APIKeysPage() {
               <DialogDescription>
                 {createdApiKey?.type === 'sandbox'
                   ? 'Your sandbox token has been regenerated and applied to the running sandbox.'
-                  : 'Your API key has been created successfully.'}
+                  : 'Your new API key is ready. Copy the secret key now — it won\'t be shown again.'}
               </DialogDescription>
             </DialogHeader>
 
             {createdApiKey && 'secret_key' in createdApiKey && (
               <div className="space-y-4">
+                {/* Secret key */}
                 <div>
                   <Label className="m-1">
-                    {createdApiKey.type === 'sandbox' ? 'New Sandbox Token' : 'API Key'}
+                    {createdApiKey.type === 'sandbox' ? 'New Sandbox Token' : 'Secret Key'}
                   </Label>
                   <div className="flex gap-2">
                     <Input
-                      value={
-                        createdApiKey.type === 'sandbox'
-                          ? createdApiKey.secret_key
-                          : `${createdApiKey.public_key}:${createdApiKey.secret_key}`
-                      }
+                      value={createdKeyDisplayValue}
                       readOnly
                       className="font-mono text-sm"
                     />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        if (createdApiKey.type === 'sandbox') {
-                          handleCopyKey(createdApiKey.secret_key);
-                        } else {
-                          handleCopyFullKey(
-                            createdApiKey.public_key,
-                            createdApiKey.secret_key,
-                          );
-                        }
-                      }}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
+                    <CopyButton value={createdKeyDisplayValue} />
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800">
-                      <strong>Important:</strong> Store this key securely.
-                      For security reasons, we cannot show it again.
-                    </p>
+                {/* Public key (for user keys) */}
+                {createdApiKey.type !== 'sandbox' && (
+                  <div>
+                    <Label className="m-1">Public Key</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={createdApiKey.public_key}
+                        readOnly
+                        className="font-mono text-sm text-muted-foreground"
+                      />
+                      <CopyButton value={createdApiKey.public_key} />
+                    </div>
                   </div>
+                )}
+
+                {/* Usage example for user API keys */}
+                {createdApiKey.type !== 'sandbox' && (
+                  <div>
+                    <Label className="m-1">Usage</Label>
+                    <div className="relative">
+                      <pre className="bg-muted rounded-lg p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">
+{`curl https://api.kortix.ai/v1/chat/completions \\
+  -H "Authorization: Bearer ${createdApiKey.secret_key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"anthropic/claude-sonnet-4-20250514","messages":[{"role":"user","content":"Hello"}]}'`}
+                      </pre>
+                      <div className="absolute top-2 right-2">
+                        <CopyButton
+                          value={`curl https://api.kortix.ai/v1/chat/completions \\\n  -H "Authorization: Bearer ${createdApiKey.secret_key}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"anthropic/claude-sonnet-4-20250514","messages":[{"role":"user","content":"Hello"}]}'`}
+                          size="icon"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Warning */}
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    <strong>Important:</strong> Store this key securely.
+                    For security reasons, we cannot show it again.
+                  </p>
                 </div>
               </div>
             )}
 
             <div className="flex justify-end">
-              <Button onClick={() => setShowCreatedKey(false)}>Close</Button>
+              <Button onClick={() => setShowCreatedKey(false)}>Done</Button>
             </div>
           </DialogContent>
         </Dialog>

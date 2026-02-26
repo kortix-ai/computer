@@ -1,3 +1,4 @@
+import { timingSafeEqual, createHash } from 'crypto'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
@@ -58,12 +59,29 @@ startAuthWatcher(secretStore)
 // Global middleware
 app.use('*', logger())
 
-// CORS: restrict to allowed origins when CORS_ALLOWED_ORIGINS is set (VPS mode),
-// otherwise allow all (local mode, backwards compatible).
-const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
-  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(s => s.trim())
-  : undefined
-app.use('*', cors(corsOrigins ? { origin: corsOrigins } : undefined))
+// CORS: restrict to allowed origins. Defaults to localhost-only for security.
+// CORS_ALLOWED_ORIGINS can add extra origins (comma-separated).
+const defaultCorsOrigins = [
+  'http://localhost:3000', 'http://127.0.0.1:3000',   // Frontend (local)
+  'http://localhost:8008', 'http://127.0.0.1:8008',   // kortix-api (local)
+  'http://localhost:14000', 'http://127.0.0.1:14000', // Direct sandbox (dev)
+]
+const extraCorsOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+  : []
+const corsOrigins = [...new Set([...defaultCorsOrigins, ...extraCorsOrigins])]
+app.use('*', cors({ origin: corsOrigins }))
+
+// ─── Timing-safe token comparison ─────────────────────────────────────────────
+// Hash both values so timingSafeEqual always compares equal-length buffers,
+// regardless of token length. Prevents timing side-channel attacks.
+function verifyServiceKey(candidate: string): boolean {
+  const expected = config.INTERNAL_SERVICE_KEY
+  if (!candidate || !expected) return false
+  const a = createHash('sha256').update(candidate).digest()
+  const b = createHash('sha256').update(expected).digest()
+  return timingSafeEqual(a, b)
+}
 
 // ─── Global auth ─────────────────────────────────────────────────────────────
 // Protects ALL routes (except health and docs) with bearer token or ?token= query param.
@@ -86,7 +104,7 @@ app.use('*', async (c, next) => {
     token = c.req.query('token') || null
   }
 
-  if (!token || token !== config.INTERNAL_SERVICE_KEY) {
+  if (!token || !verifyServiceKey(token)) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
@@ -287,7 +305,7 @@ export default {
       let wsToken: string | null = null
       if (authHeader?.startsWith('Bearer ')) wsToken = authHeader.slice(7)
       if (!wsToken) wsToken = url.searchParams.get('token')
-      if (!wsToken || wsToken !== config.INTERNAL_SERVICE_KEY) {
+      if (!wsToken || !verifyServiceKey(wsToken)) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 401,
           headers: { 'Content-Type': 'application/json' },

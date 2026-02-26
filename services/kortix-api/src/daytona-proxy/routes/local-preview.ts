@@ -13,9 +13,53 @@
  */
 
 import { config } from '../../config';
+import { execSync } from 'child_process';
 
 const KORTIX_MASTER_PORT = 8000;
 const FETCH_TIMEOUT_MS = 30_000;
+
+// ─── Service Key Sync ────────────────────────────────────────────────────────
+// Ensures the running sandbox container has the same INTERNAL_SERVICE_KEY as us.
+// Triggered on first 401 from the sandbox (key mismatch after startup).
+// Retries up to MAX_SYNC_ATTEMPTS on failure before giving up.
+const MAX_SYNC_ATTEMPTS = 3;
+let _syncAttempts = 0;
+let _serviceKeySynced = false;
+
+function trySyncServiceKey(): boolean {
+  if (_serviceKeySynced) return false;
+  if (_syncAttempts >= MAX_SYNC_ATTEMPTS) {
+    console.error(`[LOCAL-PREVIEW] INTERNAL_SERVICE_KEY sync failed after ${MAX_SYNC_ATTEMPTS} attempts, giving up`);
+    return false;
+  }
+  _syncAttempts++;
+  try {
+    const ourKey = config.INTERNAL_SERVICE_KEY;
+    if (!ourKey) return false;
+
+    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    if (config.DOCKER_HOST && !config.DOCKER_HOST.includes('://')) {
+      env.DOCKER_HOST = `unix://${config.DOCKER_HOST}`;
+    }
+
+    console.log(`[LOCAL-PREVIEW] Syncing INTERNAL_SERVICE_KEY to sandbox container (attempt ${_syncAttempts}/${MAX_SYNC_ATTEMPTS})...`);
+    execSync(
+      `docker exec kortix-sandbox bash -c "mkdir -p /run/s6/container_environment && ` +
+      `printf '%s' '${ourKey}' > /run/s6/container_environment/INTERNAL_SERVICE_KEY && ` +
+      `sudo s6-svc -r /run/service/svc-kortix-master"`,
+      { timeout: 15_000, stdio: 'pipe', env },
+    );
+    _serviceKeySynced = true;
+    console.log('[LOCAL-PREVIEW] INTERNAL_SERVICE_KEY synced, waiting for restart...');
+    // Give kortix-master a moment to restart
+    execSync('sleep 2', { stdio: 'pipe' });
+    return true;
+  } catch (err: any) {
+    console.error(`[LOCAL-PREVIEW] Failed to sync INTERNAL_SERVICE_KEY (attempt ${_syncAttempts}/${MAX_SYNC_ATTEMPTS}):`, err.message || err);
+    // Don't set _serviceKeySynced — allow retry on next 401
+    return false;
+  }
+}
 
 const STRIP_REQUEST_HEADERS = new Set([
   'host',
@@ -85,6 +129,33 @@ export async function proxyToSandbox(
     decompress: false,
     redirect: 'manual',
   });
+
+  // On 401 from sandbox: service key mismatch. Sync our key and retry once.
+  if (response.status === 401 && !_serviceKeySynced) {
+    const synced = trySyncServiceKey();
+    if (synced) {
+      // Retry the request with the same key (now the sandbox should accept it)
+      const retryResponse = await fetch(targetUrl, {
+        method,
+        headers,
+        body: incomingBody,
+        signal: acceptsSSE ? undefined : AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        // @ts-ignore
+        decompress: false,
+        redirect: 'manual',
+      });
+      const retryHeaders = new Headers(retryResponse.headers);
+      if (origin) {
+        retryHeaders.set('Access-Control-Allow-Origin', origin);
+        retryHeaders.set('Access-Control-Allow-Credentials', 'true');
+      }
+      return new Response(retryResponse.body, {
+        status: retryResponse.status,
+        statusText: retryResponse.statusText,
+        headers: retryHeaders,
+      });
+    }
+  }
 
   // Log upstream 5xx errors so they're visible (not silently proxied through)
   if (response.status >= 500 && !acceptsSSE) {

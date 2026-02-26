@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
+import { getEnv } from "./lib/get-env";
 
 /**
  * List connected integrations available in this sandbox.
@@ -15,7 +16,10 @@ export default tool({
 
     try {
       const res = await fetch(`${masterUrl}/api/integrations/list`, {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(getEnv('INTERNAL_SERVICE_KEY') ? { Authorization: `Bearer ${getEnv('INTERNAL_SERVICE_KEY')}` } : {}),
+        },
       });
 
       if (!res.ok) {

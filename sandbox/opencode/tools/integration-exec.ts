@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
+import { getEnv } from "./lib/get-env";
 import { writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { spawnSync } from "child_process";
@@ -36,7 +37,10 @@ globalThis.proxyFetch = async function proxyFetch(url, init = {}) {
 
   const proxyRes = await fetch(__PROXY_URL__, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getEnv('INTERNAL_SERVICE_KEY') ? { Authorization: 'Bearer ' + getEnv('INTERNAL_SERVICE_KEY') } : {}),
+    },
     body: JSON.stringify({
       app: __APP_SLUG__,
       method,

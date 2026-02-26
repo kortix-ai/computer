@@ -11,6 +11,7 @@
 
 import Docker from 'dockerode';
 import { randomBytes } from 'crypto';
+import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { config } from '../../config';
@@ -126,6 +127,7 @@ export function getImagePullStatus(): ImagePullStatus {
 export class LocalDockerProvider implements SandboxProvider {
   readonly name: ProviderName = 'local_docker';
   private docker: Docker;
+  private _serviceKeySynced = false;
 
   constructor() {
     this.docker = getDocker();
@@ -138,11 +140,13 @@ export class LocalDockerProvider implements SandboxProvider {
 
     if (existing) {
       if (existing.status === 'running') {
+        await this.syncServiceKey();
         return existing;
       }
       console.log(`[LOCAL-DOCKER] Starting stopped sandbox...`);
       const container = this.docker.getContainer(existing.containerId);
       await container.start();
+      await this.syncServiceKey();
       return this.getSandboxInfo();
     }
 
@@ -249,15 +253,63 @@ export class LocalDockerProvider implements SandboxProvider {
 
   async ensureRunning(_externalId: string): Promise<void> {
     const info = await this.find();
-    if (info && info.status === 'running') return;
+    if (info && info.status === 'running') {
+      await this.syncServiceKey();
+      return;
+    }
     if (info) {
       console.log('[LOCAL-DOCKER] Container stopped, starting for cron execution...');
       const container = this.docker.getContainer(CONTAINER_NAME);
       await container.start();
+      await this.syncServiceKey();
       return;
     }
     console.log('[LOCAL-DOCKER] No container found, creating for cron execution...');
     await this.ensure();
+  }
+
+  /**
+   * Ensure the running container's INTERNAL_SERVICE_KEY matches ours.
+   * If missing or different, inject via s6 env dir and restart kortix-master.
+   * Uses `docker exec` CLI (more reliable than dockerode exec across Docker setups).
+   */
+  async syncServiceKey(): Promise<void> {
+    if (this._serviceKeySynced) return;
+
+    const info = await this.find();
+    if (!info || info.status !== 'running') {
+      console.log('[LOCAL-DOCKER] syncServiceKey: no running container found, skipping');
+      return;
+    }
+
+    const ourKey = config.INTERNAL_SERVICE_KEY; // triggers auto-generation if empty
+    const containerEnv = await this.getContainerEnv();
+    const containerKey = containerEnv['INTERNAL_SERVICE_KEY'] || '';
+    console.log(`[LOCAL-DOCKER] syncServiceKey: container has key=${containerKey ? 'yes' : 'no'}, ours=${ourKey ? 'yes' : 'no'}, match=${containerKey === ourKey}`);
+
+    if (containerKey === ourKey) {
+      this._serviceKeySynced = true;
+      return; // already in sync
+    }
+
+    console.log('[LOCAL-DOCKER] Syncing INTERNAL_SERVICE_KEY to sandbox container...');
+    try {
+      // Ensure DOCKER_HOST has the unix:// prefix for the docker CLI
+      const env = { ...process.env };
+      if (config.DOCKER_HOST && !config.DOCKER_HOST.includes('://')) {
+        env.DOCKER_HOST = `unix://${config.DOCKER_HOST}`;
+      }
+      const cmd =
+        `docker exec ${CONTAINER_NAME} bash -c ` +
+        `"mkdir -p /run/s6/container_environment && ` +
+        `printf '%s' '${ourKey}' > /run/s6/container_environment/INTERNAL_SERVICE_KEY && ` +
+        `sudo s6-svc -r /run/service/svc-kortix-master"`;
+      execSync(cmd, { timeout: 15_000, stdio: 'pipe', env });
+      this._serviceKeySynced = true;
+      console.log('[LOCAL-DOCKER] INTERNAL_SERVICE_KEY synced and kortix-master restarted');
+    } catch (err: any) {
+      console.error('[LOCAL-DOCKER] Failed to sync INTERNAL_SERVICE_KEY:', err.message || err);
+    }
   }
 
   // ── Private ─────────────────────────────────────────────────────────────
@@ -366,6 +418,7 @@ export class LocalDockerProvider implements SandboxProvider {
       'INTERNAL_SERVICE_KEY',
       'PROJECT_ID',
       'ENV_MODE',
+      'CORS_ALLOWED_ORIGINS',
     ]);
 
     // Filter sandbox/.env: drop any var we manage ourselves
@@ -397,6 +450,8 @@ export class LocalDockerProvider implements SandboxProvider {
       `ENV_MODE=${config.KORTIX_BILLING_INTERNAL_ENABLED ? 'cloud' : 'local'}`,
       // INTERNAL_SERVICE_KEY: proxy/cron → sandbox auth (always present)
       `INTERNAL_SERVICE_KEY=${serviceKey}`,
+      // CORS: tell the sandbox which origins to allow (includes frontend URL)
+      `CORS_ALLOWED_ORIGINS=${[config.FRONTEND_URL, config.KORTIX_URL].filter(Boolean).join(',')}`,
       // Extra env from sandbox/.env (API keys, etc.) — managed vars already filtered out
       ...filteredSandboxEnv,
     ];

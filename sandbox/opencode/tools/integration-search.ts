@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
+import { getEnv } from "./lib/get-env";
 
 /**
  * Search available apps that can be connected via OAuth.
@@ -27,7 +28,10 @@ export default tool({
       const res = await fetch(
         `${masterUrl}/api/integrations/search-apps?${params.toString()}`,
         {
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(getEnv('INTERNAL_SERVICE_KEY') ? { Authorization: `Bearer ${getEnv('INTERNAL_SERVICE_KEY')}` } : {}),
+          },
         },
       );
 

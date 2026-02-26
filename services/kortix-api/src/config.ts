@@ -122,12 +122,40 @@ export const config = {
   /**
    * Internal service key for kortix-api → sandbox communication.
    * Injected into proxied requests so the sandbox can validate the caller.
-   * Auto-generated at startup if not provided. Always present.
-   *
-   * Uses a getter so that runtime generation (by local-docker provider)
-   * is visible to all call sites that read config.INTERNAL_SERVICE_KEY.
+   * Auto-generated at startup if not provided — always present.
+   * Persisted to .env so the same key survives process restarts.
    */
-  get INTERNAL_SERVICE_KEY() { return process.env.INTERNAL_SERVICE_KEY || ''; },
+  get INTERNAL_SERVICE_KEY(): string {
+    if (!process.env.INTERNAL_SERVICE_KEY) {
+      const { randomBytes } = require('crypto');
+      const generated = randomBytes(32).toString('hex');
+      process.env.INTERNAL_SERVICE_KEY = generated;
+      console.log('[config] Auto-generated INTERNAL_SERVICE_KEY for sandbox auth');
+      // Persist to .env so the key survives process restarts (avoids re-sync on every restart)
+      try {
+        const { appendFileSync, readFileSync, existsSync } = require('fs');
+        const { resolve } = require('path');
+        const candidates = [
+          resolve(__dirname, '../../.env'),       // from src/config.ts → ../../.env
+          resolve(process.cwd(), '.env'),          // cwd/.env
+        ];
+        for (const envPath of candidates) {
+          if (existsSync(envPath)) {
+            const content = readFileSync(envPath, 'utf-8');
+            if (!content.includes('INTERNAL_SERVICE_KEY=')) {
+              appendFileSync(envPath, `\n# Auto-generated service key for sandbox auth (do not remove)\nINTERNAL_SERVICE_KEY=${generated}\n`);
+              console.log(`[config] Persisted INTERNAL_SERVICE_KEY to ${envPath}`);
+            }
+            break;
+          }
+        }
+      } catch (err: any) {
+        // Non-fatal — key still works in-memory for this process lifetime
+        console.warn('[config] Could not persist INTERNAL_SERVICE_KEY to .env:', err.message);
+      }
+    }
+    return process.env.INTERNAL_SERVICE_KEY;
+  },
 
   // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
   SCHEDULER_ENABLED: process.env.SCHEDULER_ENABLED !== 'false',

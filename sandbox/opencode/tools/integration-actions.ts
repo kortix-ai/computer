@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
+import { getEnv } from "./lib/get-env";
 
 /**
  * List available Pipedream actions for a connected app.
@@ -34,7 +35,10 @@ export default tool({
       const res = await fetch(
         `${masterUrl}/api/integrations/actions?${params.toString()}`,
         {
-          headers: { "Content-Type": "application/json" },
+           headers: {
+            "Content-Type": "application/json",
+            ...(getEnv('INTERNAL_SERVICE_KEY') ? { Authorization: `Bearer ${getEnv('INTERNAL_SERVICE_KEY')}` } : {}),
+          },
         },
       );
 
