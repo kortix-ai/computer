@@ -1,0 +1,271 @@
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import {
+  useDeployments,
+  useStopDeployment,
+  useRedeployDeployment,
+  useDeleteDeployment,
+  type Deployment,
+  type DeploymentStatus,
+} from '@/hooks/deployments/use-deployments';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertCircle,
+  Rocket,
+  Plus,
+  Search,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/ui/page-header';
+import { DeploymentCard } from './deployment-card';
+import { DeploymentLogsDialog } from './deployment-logs-dialog';
+import { CreateDeploymentDialog } from './create-deployment-dialog';
+import { toast } from 'sonner';
+
+// ─── Filter Tabs ────────────────────────────────────────────────────────────
+
+const filterTabs: Array<{ label: string; value: DeploymentStatus | undefined }> = [
+  { label: 'All', value: undefined },
+  { label: 'Active', value: 'active' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Failed', value: 'failed' },
+  { label: 'Stopped', value: 'stopped' },
+];
+
+// ─── Sub-components ─────────────────────────────────────────────────────────
+
+const EmptyState = ({ onCreateClick }: { onCreateClick: () => void }) => (
+  <div className="bg-muted/20 rounded-3xl border flex flex-col items-center justify-center py-16 px-4">
+    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
+      <Rocket className="h-6 w-6 text-muted-foreground" />
+    </div>
+    <h3 className="text-base font-semibold text-foreground mb-2">Deploy your first app</h3>
+    <p className="text-sm text-muted-foreground text-center max-w-sm mb-6">
+      Deploy applications to production with a single click. Supports Git repos, inline code, file uploads, and tarballs.
+    </p>
+    <Button onClick={onCreateClick} size="sm">
+      <Plus className="h-4 w-4 mr-2" />
+      New Deployment
+    </Button>
+  </div>
+);
+
+const LoadingSkeleton = () => (
+  <div className="space-y-4">
+    {[1, 2, 3].map((i) => (
+      <div key={i} className="rounded-xl border dark:bg-card px-5 py-4">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-64" />
+          </div>
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
+
+export function DeploymentsPage() {
+  const [statusFilter, setStatusFilter] = useState<DeploymentStatus | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [logsDeployment, setLogsDeployment] = useState<Deployment | null>(null);
+
+  const { data, isLoading, error } = useDeployments(statusFilter);
+  const stopMutation = useStopDeployment();
+  const redeployMutation = useRedeployDeployment();
+  const deleteMutation = useDeleteDeployment();
+
+  const deployments = useMemo(() => data?.deployments ?? [], [data?.deployments]);
+
+  const filteredDeployments = useMemo(() => {
+    if (!searchQuery) return deployments;
+    const q = searchQuery.toLowerCase();
+    return deployments.filter(
+      (d) =>
+        d.domains?.some((domain) => domain.toLowerCase().includes(q)) ||
+        d.liveUrl?.toLowerCase().includes(q) ||
+        d.sourceRef?.toLowerCase().includes(q) ||
+        d.framework?.toLowerCase().includes(q) ||
+        d.deploymentId.toLowerCase().includes(q),
+    );
+  }, [deployments, searchQuery]);
+
+  const handleStop = async (deployment: Deployment) => {
+    try {
+      await stopMutation.mutateAsync(deployment.deploymentId);
+      toast.success('Deployment stopped');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to stop deployment');
+    }
+  };
+
+  const handleRedeploy = async (deployment: Deployment) => {
+    try {
+      const result = await redeployMutation.mutateAsync(deployment.deploymentId);
+      if (result.status === 'active') {
+        toast.success('Redeployment successful!', {
+          description: result.liveUrl || undefined,
+        });
+      } else if (result.status === 'failed') {
+        toast.error('Redeployment failed', {
+          description: result.error || undefined,
+        });
+      } else {
+        toast.success('Redeployment started');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to redeploy');
+    }
+  };
+
+  const handleDelete = async (deployment: Deployment) => {
+    const domain = deployment.domains?.[0] || deployment.deploymentId.slice(0, 8);
+    if (!confirm(`Delete deployment "${domain}"? This cannot be undone.`)) return;
+    try {
+      await deleteMutation.mutateAsync(deployment.deploymentId);
+      toast.success('Deployment deleted');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete deployment');
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="h-screen flex flex-col">
+        <div className="max-w-4xl mx-auto w-full py-8 px-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Failed to load deployments. Please try refreshing the page.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[100dvh]">
+      {/* Hero / PageHeader */}
+      <div className="py-4 sm:py-8">
+        <div className="container mx-auto max-w-7xl px-3 sm:px-4">
+          <PageHeader icon={Rocket}>
+            <div className="space-y-2 sm:space-y-4">
+              <div className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">
+                <span className="text-primary">Deployments</span>
+              </div>
+            </div>
+          </PageHeader>
+        </div>
+      </div>
+
+      <div className="container mx-auto max-w-7xl px-3 sm:px-4">
+        {/* Filter tabs + Search + Create */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4">
+          {/* Filter tabs */}
+          <div className="flex items-center gap-1 bg-muted/30 rounded-xl p-1">
+            {filterTabs.map((tab) => (
+              <button
+                key={tab.label}
+                onClick={() => setStatusFilter(tab.value)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                  statusFilter === tab.value
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Search */}
+            <div className="relative flex-1 sm:flex-initial sm:w-64">
+              <input
+                type="text"
+                placeholder="Search deployments..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 sm:h-10 w-full rounded-xl border border-input bg-background px-8 sm:px-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+              <div className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <Search className="h-4 w-4" />
+              </div>
+            </div>
+
+            {/* Create button */}
+            <Button
+              variant="default"
+              size="sm"
+              className="h-9 sm:h-10 px-3 sm:px-4 rounded-xl gap-1.5 sm:gap-2 text-sm shrink-0"
+              onClick={() => setShowCreateDialog(true)}
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden xs:inline">New Deployment</span>
+              <span className="xs:hidden">New</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Deployment List */}
+        <div className="pb-8">
+          {isLoading ? (
+            <LoadingSkeleton />
+          ) : filteredDeployments.length === 0 ? (
+            deployments.length === 0 && !statusFilter ? (
+              <EmptyState onCreateClick={() => setShowCreateDialog(true)} />
+            ) : (
+              <div className="bg-muted/20 rounded-3xl border flex flex-col items-center justify-center py-12 px-4">
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery
+                    ? `No deployments match "${searchQuery}"`
+                    : `No ${statusFilter || ''} deployments found`}
+                </p>
+              </div>
+            )
+          ) : (
+            <div className="space-y-4">
+              {filteredDeployments.map((deployment) => (
+                <DeploymentCard
+                  key={deployment.deploymentId}
+                  deployment={deployment}
+                  onViewLogs={setLogsDeployment}
+                  onStop={handleStop}
+                  onRedeploy={handleRedeploy}
+                  onDelete={handleDelete}
+                  isStopPending={stopMutation.isPending}
+                  isRedeployPending={redeployMutation.isPending}
+                  isDeletePending={deleteMutation.isPending}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      <CreateDeploymentDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+      />
+
+      <DeploymentLogsDialog
+        deployment={logsDeployment}
+        open={!!logsDeployment}
+        onOpenChange={(open) => {
+          if (!open) setLogsDeployment(null);
+        }}
+      />
+    </div>
+  );
+}

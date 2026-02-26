@@ -70,6 +70,12 @@ const MemoryPage = lazy(() =>
 	})),
 );
 
+const DeploymentsPage = lazy(() =>
+	import('@/components/deployments/deployments-page').then((m) => ({
+		default: m.DeploymentsPage,
+	})),
+);
+
 // Admin pages
 const AdminAnalyticsPage = lazy(() =>
 	import('@/app/(dashboard)/admin/analytics/page'),
@@ -118,6 +124,7 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/files': FilesPage,
 	'/tunnel': TunnelOverviewPage,
 	'/memory': MemoryPage,
+	'/deployments': DeploymentsPage,
 	// Admin
 	'/admin/analytics': AdminAnalyticsPage,
 	'/admin/feedback': AdminFeedbackPage,

@@ -90,6 +90,7 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     '/admin/stateless': { title: 'Stateless', type: 'page' },
     '/admin/stress-test': { title: 'Stress Test', type: 'page' },
     '/changelog': { title: 'Changelog', type: 'page' },
+    '/deployments': { title: 'Deployments', type: 'page' },
   };
 
   const staticMatch = ROUTE_MAP[pathname];

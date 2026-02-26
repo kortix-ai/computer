@@ -39,6 +39,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Rocket,
 } from 'lucide-react';
 
 import {
@@ -897,6 +898,10 @@ export function CommandPalette() {
                 <CommandItem onSelect={() => handleNavigate('/scheduled-tasks', 'Scheduled Tasks')}>
                   <Calendar className="mr-2 h-4 w-4" />
                   <span>Scheduled Tasks</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/deployments', 'Deployments')}>
+                  <Rocket className="mr-2 h-4 w-4" />
+                  <span>Deployments</span>
                 </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/changelog', 'Changelog')}>
                   <ScrollText className="mr-2 h-4 w-4" />

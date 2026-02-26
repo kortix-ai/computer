@@ -19,6 +19,7 @@ import {
   MessageSquare,
   Calendar,
   Cable,
+  Rocket,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -391,6 +392,25 @@ export function SidebarRight() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    onClick={() => openTabAndNavigate({ id: 'page:/deployments', title: 'Deployments', type: 'page', href: '/deployments' }, router)}
+                    className={cn(
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                      pathname === '/deployments'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    )}
+                  >
+                    <Rocket className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Deployments
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
                     onClick={handleOpenAgentBrowser}
                     className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                   >
@@ -552,6 +572,19 @@ export function SidebarRight() {
                 >
                   <Cable className="h-4 w-4 flex-shrink-0" />
                   <span>Tunnel</span>
+                </button>
+
+                <button
+                  onClick={() => openTabAndNavigate({ id: 'page:/deployments', title: 'Deployments', type: 'page', href: '/deployments' }, router)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                    pathname === '/deployments'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                  )}
+                >
+                  <Rocket className="h-4 w-4 flex-shrink-0" />
+                  <span>Deployments</span>
                 </button>
 
                 <button
