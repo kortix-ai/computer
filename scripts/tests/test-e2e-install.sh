@@ -259,9 +259,9 @@ fi
 
 section "API → Sandbox Proxy"
 
-proxy_status=$(http_status "$API_URL/v1/preview/kortix-sandbox/8000/health")
+proxy_status=$(http_status "$API_URL/v1/p/kortix-sandbox/8000/health")
 if [[ "$proxy_status" == "200" ]]; then
-  pass "API proxies to sandbox — /v1/preview/kortix-sandbox/8000/health → 200"
+  pass "API proxies to sandbox — /v1/p/kortix-sandbox/8000/health → 200"
 else
   fail "API → Sandbox proxy failed" "Expected 200, got $proxy_status"
 fi
@@ -326,7 +326,7 @@ fi
 sync_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$CURL_TIMEOUT" \
   -X PUT \
   -H "Content-Type: application/json" \
-  -d '{"servers":[{"id":"test-e2e","label":"E2E Test","url":"http://localhost:13738/v1/preview/test/8000","isDefault":false}]}' \
+  -d '{"servers":[{"id":"test-e2e","label":"E2E Test","url":"http://localhost:13738/v1/p/test/8000","isDefault":false}]}' \
   "$API_URL/v1/servers/sync" 2>/dev/null || echo "000")
 if [[ "$sync_status" == "200" ]]; then
   pass "PUT /v1/servers/sync → 200 (DB write works)"
@@ -357,9 +357,9 @@ fi
 section "Onboarding Status"
 
 # Should always return 200 — null value when not yet onboarded, "true" when done
-onboarding_status=$(http_status "$API_URL/v1/preview/kortix-sandbox/8000/env/ONBOARDING_COMPLETE")
+onboarding_status=$(http_status "$API_URL/v1/p/kortix-sandbox/8000/env/ONBOARDING_COMPLETE")
 if [[ "$onboarding_status" == "200" ]]; then
-  onboarding_body=$(http_body "$API_URL/v1/preview/kortix-sandbox/8000/env/ONBOARDING_COMPLETE")
+  onboarding_body=$(http_body "$API_URL/v1/p/kortix-sandbox/8000/env/ONBOARDING_COMPLETE")
   pass "Onboarding check → 200 ($onboarding_body)"
 else
   fail "Onboarding check failed" "Expected 200, got $onboarding_status"
