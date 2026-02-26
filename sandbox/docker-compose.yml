@@ -65,14 +65,14 @@ services:
       - sandbox_data:/workspace
       - sandbox_data:/config
     ports:
-      - "14000:8000"  # Kortix Master (proxy entry point)
-      - "14001:3111"  # OpenCode Web UI
-      - "14002:6080"  # Desktop (noVNC)
-      - "14003:6081"  # Desktop (HTTPS)
-      - "14004:3210"  # Presentation Viewer
-      - "14005:9223"  # Agent Browser Stream (WS)
-      - "14006:9224"  # Agent Browser Viewer
-      - "14007:22"    # SSH
+      - "127.0.0.1:14000:8000"  # Kortix Master (proxy entry point)
+      - "127.0.0.1:14001:3111"  # OpenCode Web UI
+      - "127.0.0.1:14002:6080"  # Desktop (noVNC)
+      - "127.0.0.1:14003:6081"  # Desktop (HTTPS)
+      - "127.0.0.1:14004:3210"  # Presentation Viewer
+      - "127.0.0.1:14005:9223"  # Agent Browser Stream (WS)
+      - "127.0.0.1:14006:9224"  # Agent Browser Viewer
+      - "127.0.0.1:14007:22"    # SSH
     shm_size: "2gb"
     restart: unless-stopped
     healthcheck:

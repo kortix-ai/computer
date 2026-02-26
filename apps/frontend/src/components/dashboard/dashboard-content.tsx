@@ -11,8 +11,8 @@ import {
   useOpenCodeAgents,
   useOpenCodeProviders,
   useOpenCodeCommands,
-  useExecuteOpenCodeCommand,
 } from '@/hooks/opencode/use-opencode-sessions';
+import { getClient } from '@/lib/opencode-sdk';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { SessionChatInput } from '@/components/session/session-chat-input';
@@ -35,7 +35,6 @@ export function DashboardContent() {
   const { setOpen: setSidebarOpenState, setOpenMobile } = useSidebar();
   const createSession = useCreateOpenCodeSession();
   const sendMessage = useSendOpenCodeMessage();
-  const executeCommand = useExecuteOpenCodeCommand();
 
   // Data
   const { data: agents } = useOpenCodeAgents();
@@ -111,12 +110,25 @@ export function DashboardContent() {
           href: `/sessions/${session.id}`,
           serverId: useServerStore.getState().activeServerId,
         });
-        executeCommand.mutate({ sessionId: session.id, command: cmd.name, args });
+        // Fire command directly via SDK — no TanStack Query, no retry.
+        // Matches SolidJS reference (submit.ts:265-287).
+        const client = getClient();
+        void client.session.command({
+          sessionID: session.id,
+          command: cmd.name,
+          arguments: args || '',
+          ...(local.agent.current && { agent: local.agent.current.name }),
+          ...(local.model.currentKey && { model: local.model.currentKey }),
+          ...(local.model.variant.current && { variant: local.model.variant.current }),
+        }).catch(() => {
+          toast.warning('Failed to execute command');
+        });
       } catch {
-        toast.warning('Failed to execute command');
+        toast.warning('Failed to create session');
       }
     },
-    [createSession, executeCommand],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [createSession, local.agent.current, local.model.currentKey, local.model.variant.current],
   );
 
   return (

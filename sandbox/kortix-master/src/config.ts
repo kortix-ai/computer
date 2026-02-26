@@ -33,8 +33,24 @@ export const config = {
   SANDBOX_ID: process.env.SANDBOX_ID || '',
   PROJECT_ID: process.env.PROJECT_ID || '',
 
-  // Security: internal service-to-service auth (VPS mode)
-  INTERNAL_SERVICE_KEY: process.env.INTERNAL_SERVICE_KEY || '',
+  // Security: internal service-to-service auth.
+  // Auto-generates a key if none provided — the sandbox is ALWAYS auth-protected.
+  // In normal operation, kortix-api injects the key as an env var during container creation.
+  // Auto-generation is a safety net for manual/standalone runs (key is logged once at boot).
+  get INTERNAL_SERVICE_KEY(): string {
+    if (!process.env.INTERNAL_SERVICE_KEY) {
+      const { randomBytes } = require('crypto')
+      const generated = randomBytes(32).toString('hex')
+      process.env.INTERNAL_SERVICE_KEY = generated
+      console.warn(
+        '[Kortix Master] WARNING: No INTERNAL_SERVICE_KEY provided, auto-generated one.\n' +
+        '  This sandbox is auth-protected. External callers must use this key:\n' +
+        `  ${generated}\n` +
+        '  Set INTERNAL_SERVICE_KEY env var to avoid this warning.'
+      )
+    }
+    return process.env.INTERNAL_SERVICE_KEY
+  },
 
   // Container-port → host-port mappings (set by docker-compose)
   PORT_MAP: parsePortMap(),

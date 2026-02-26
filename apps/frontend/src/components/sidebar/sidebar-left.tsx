@@ -25,7 +25,7 @@ import {
   X,
   Loader2,
   FolderOpen,
-  Cable,
+  Brain,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -680,78 +680,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
           />
-          <CollapsedIconButton
-            icon={<Blocks className="h-4 w-4" />}
-            label="Workspace"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/workspace',
-                title: 'Workspace',
-                type: 'page',
-                href: '/workspace',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<FolderOpen className="h-4 w-4" />}
-            label="Files"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/files',
-                title: 'Files',
-                type: 'page',
-                href: '/files',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<Plug className="h-4 w-4" />}
-            label="Integrations"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/integrations',
-                title: 'Integrations',
-                type: 'page',
-                href: '/integrations',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<MessageSquare className="h-4 w-4" />}
-            label="Channels"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/channels',
-                title: 'Channels',
-                type: 'page',
-                href: '/channels',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<Calendar className="h-4 w-4" />}
-            label="Scheduled Tasks"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/scheduled-tasks',
-                title: 'Scheduled Tasks',
-                type: 'page',
-                href: '/scheduled-tasks',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<Cable className="h-4 w-4" />}
-            label="Tunnel"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/tunnel',
-                title: 'Tunnel',
-                type: 'page',
-                href: '/tunnel',
-              }, router);
-            }}
-          />
+
+
         </div>
 
         {/* --- Expanded layout --- */}
@@ -803,129 +733,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             {/* Sessions — expandable, default open */}
           </nav>
 
-          {/* Workspace link */}
-          <nav className="flex-shrink-0 px-3 space-y-0.5">
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/workspace',
-                  title: 'Workspace',
-                  type: 'page',
-                  href: '/workspace',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                (pathname === '/workspace' || pathname?.startsWith('/projects') || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <Blocks className="h-4 w-4 flex-shrink-0" />
-              <span>Workspace</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/files',
-                  title: 'Files',
-                  type: 'page',
-                  href: '/files',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/files'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <FolderOpen className="h-4 w-4 flex-shrink-0" />
-              <span>Files</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/integrations',
-                  title: 'Integrations',
-                  type: 'page',
-                  href: '/integrations',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/integrations'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <Plug className="h-4 w-4 flex-shrink-0" />
-              <span>Integrations</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/channels',
-                  title: 'Channels',
-                  type: 'page',
-                  href: '/channels',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/channels'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <MessageSquare className="h-4 w-4 flex-shrink-0" />
-              <span>Channels</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/scheduled-tasks',
-                  title: 'Scheduled Tasks',
-                  type: 'page',
-                  href: '/scheduled-tasks',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/scheduled-tasks'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <Calendar className="h-4 w-4 flex-shrink-0" />
-              <span>Scheduled Tasks</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/tunnel',
-                  title: 'Tunnel',
-                  type: 'page',
-                  href: '/tunnel',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/tunnel'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <Cable className="h-4 w-4 flex-shrink-0" />
-              <span>Tunnel</span>
-            </button>
-          </nav>
 
           <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
             <div className="px-3 flex-shrink-0">

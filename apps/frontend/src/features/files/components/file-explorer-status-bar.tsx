@@ -53,12 +53,12 @@ export function FileExplorerStatusBar() {
   const languageLabel = fileName ? getLanguageLabel(fileName) : '';
 
   return (
-    <div className="flex items-center justify-between gap-4 px-2 border-t border-border/50 bg-background text-[10px] text-muted-foreground/70 shrink-0 h-6 select-none">
+    <div className="flex items-center justify-between gap-4 px-3 border-t border-border/50 bg-background text-xs text-muted-foreground/70 shrink-0 h-8 select-none">
       {/* Left side */}
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex items-center gap-3 min-w-0">
         {project?.vcs === 'git' && (
           <span className="flex items-center gap-1 shrink-0">
-            <GitBranch className="h-2.5 w-2.5" />
+            <GitBranch className="h-3 w-3" />
             <span>main</span>
             {totalChanges > 0 && (
               <span className="text-yellow-500/80">+{totalChanges}</span>
@@ -67,16 +67,16 @@ export function FileExplorerStatusBar() {
         )}
 
         {(totalErrors > 0 || totalWarnings > 0) && (
-          <span className="flex items-center gap-1.5 shrink-0">
+          <span className="flex items-center gap-2 shrink-0">
             {totalErrors > 0 && (
               <span className="flex items-center gap-0.5 text-red-500/80">
-                <CircleAlert className="h-2.5 w-2.5" />
+                <CircleAlert className="h-3 w-3" />
                 {totalErrors}
               </span>
             )}
             {totalWarnings > 0 && (
               <span className="flex items-center gap-0.5 text-yellow-500/80">
-                <AlertTriangle className="h-2.5 w-2.5" />
+                <AlertTriangle className="h-3 w-3" />
                 {totalWarnings}
               </span>
             )}
@@ -85,7 +85,7 @@ export function FileExplorerStatusBar() {
       </div>
 
       {/* Right side */}
-      <div className="flex items-center gap-2.5 shrink-0">
+      <div className="flex items-center gap-3 shrink-0">
         {languageLabel && (
           <span>{languageLabel}</span>
         )}

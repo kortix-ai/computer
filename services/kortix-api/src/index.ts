@@ -32,6 +32,7 @@ import { tunnelApp, startTunnelService, stopTunnelService, getTunnelServiceStatu
 import { tunnelRelay } from './tunnel/core/relay';
 import { heartbeatManager } from './tunnel/core/heartbeat';
 import { notifyTunnelEvent } from './tunnel/routes/permission-requests';
+import { startSandboxHealthMonitor, stopSandboxHealthMonitor } from './platform/services/sandbox-health';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -422,10 +423,13 @@ ensureSchema()
   });
 
 // If local_docker is enabled and we have a DB, ensure the sandbox is registered
+// and start the health monitor for self-healing connectivity.
 if (config.isLocalDockerEnabled() && config.DATABASE_URL) {
   ensureLocalSandboxRegistered().catch((err) =>
     console.error('[startup] Failed to register local sandbox:', err),
   );
+  // Start health monitor — proactively syncs keys and detects connectivity issues
+  startSandboxHealthMonitor();
 }
 
 // Graceful shutdown
@@ -436,6 +440,7 @@ function shutdown(signal: string) {
   stopDrainer();
   stopModelPricing();
   stopTunnelService();
+  stopSandboxHealthMonitor();
   process.exit(0);
 }
 

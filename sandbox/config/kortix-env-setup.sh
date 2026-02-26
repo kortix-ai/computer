@@ -42,3 +42,26 @@ if [ "$ENV_MODE" = "cloud" ]; then
 else
     echo "[Kortix] Local mode — proxy routing disabled"
 fi
+
+# ── Dev server crash protection (all modes) ──────────────────────────────────
+# Inject ECONNRESET guard into NODE_OPTIONS so all Node.js processes (dev servers,
+# npm scripts, npx tools) are protected from socket errors that occur when clients
+# disconnect through the Kortix reverse proxy.
+#
+# This prevents Vite 7, Astro, Next.js, and other dev servers from crashing on
+# ECONNRESET/EPIPE errors during browser tab closes, page reloads, and proxy timeouts.
+#
+# Safe for all Node.js processes: the guard only swallows socket-level errors.
+# Does NOT affect Bun, Go, or other runtimes (they ignore NODE_OPTIONS).
+GUARD_PATH="/opt/kortix-master/econnreset-guard.cjs"
+if [ -f "$GUARD_PATH" ]; then
+    EXISTING_NODE_OPTIONS="${NODE_OPTIONS:-}"
+    if echo "$EXISTING_NODE_OPTIONS" | grep -q "$GUARD_PATH" 2>/dev/null; then
+        echo "[Kortix] NODE_OPTIONS ECONNRESET guard already present"
+    else
+        printf '%s' "${EXISTING_NODE_OPTIONS:+$EXISTING_NODE_OPTIONS }--require=$GUARD_PATH" > /run/s6/container_environment/NODE_OPTIONS
+        echo "[Kortix] NODE_OPTIONS ECONNRESET guard enabled — dev servers protected"
+    fi
+else
+    echo "[Kortix] WARN: ECONNRESET guard not found at $GUARD_PATH — dev servers unprotected"
+fi

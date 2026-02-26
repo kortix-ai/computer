@@ -106,7 +106,6 @@ export function initDb(dbPath?: string): Database {
 			context TEXT,
 			source_session_id TEXT,
 			source_observation_ids TEXT NOT NULL DEFAULT '[]',
-			confidence REAL NOT NULL DEFAULT 1.0,
 			tags TEXT NOT NULL DEFAULT '[]',
 			files TEXT NOT NULL DEFAULT '[]',
 			created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -115,7 +114,6 @@ export function initDb(dbPath?: string): Database {
 	`)
 
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_ltm_type ON long_term_memories(type)`)
-	db.exec(`CREATE INDEX IF NOT EXISTS idx_ltm_confidence ON long_term_memories(confidence DESC)`)
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_ltm_created ON long_term_memories(created_at DESC)`)
 
 	// LTM FTS5
@@ -303,15 +301,14 @@ function searchObservationsLike(
 
 export function insertLTM(db: Database, input: CreateLTMInput): number {
 	const result = db.run(
-		`INSERT INTO long_term_memories (type, content, context, source_session_id, source_observation_ids, confidence, tags, files)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO long_term_memories (type, content, context, source_session_id, source_observation_ids, tags, files)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		[
 			input.type,
 			input.content,
 			input.context ?? null,
 			input.sourceSessionId ?? null,
 			JSON.stringify(input.sourceObservationIds ?? []),
-			input.confidence ?? 1.0,
 			JSON.stringify(input.tags ?? []),
 			JSON.stringify(input.files ?? []),
 		],
@@ -328,26 +325,16 @@ export function getRecentLTM(db: Database, limit = 30): LTMEntry[] {
 
 export function getLTMByType(db: Database, type: string, limit = 20): LTMEntry[] {
 	const rows = db.query(
-		`SELECT * FROM long_term_memories WHERE type = ? ORDER BY confidence DESC, updated_at DESC LIMIT ?`,
+		`SELECT * FROM long_term_memories WHERE type = ? ORDER BY updated_at DESC, id DESC LIMIT ?`,
 	).all(type, limit) as Record<string, unknown>[]
 	return rows.map(rowToLTM)
 }
 
 export function getAllLTM(db: Database): LTMEntry[] {
 	const rows = db.query(
-		`SELECT * FROM long_term_memories ORDER BY type, confidence DESC, updated_at DESC`,
+		`SELECT * FROM long_term_memories ORDER BY type, updated_at DESC, id DESC`,
 	).all() as Record<string, unknown>[]
 	return rows.map(rowToLTM)
-}
-
-export function reinforceLTM(db: Database, id: number): void {
-	db.run(
-		`UPDATE long_term_memories
-		 SET confidence = MIN(1.0, confidence + 0.05),
-		     updated_at = datetime('now')
-		 WHERE id = ?`,
-		[id],
-	)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -414,7 +401,7 @@ function searchLTMLike(
 		sql += ` AND type = ?`
 		params.push(opts.type)
 	}
-	sql += ` ORDER BY confidence DESC, updated_at DESC LIMIT ?`
+	sql += ` ORDER BY updated_at DESC LIMIT ?`
 	params.push(limit)
 
 	const rows = db.query(sql).all(...params) as Record<string, unknown>[]
@@ -451,7 +438,6 @@ export function unifiedSearch(
 				tags: entry.tags,
 				files: entry.files,
 				createdAt: entry.createdAt,
-				confidence: entry.confidence,
 			})
 		}
 	}
@@ -556,7 +542,6 @@ function rowToLTM(row: Record<string, unknown>): LTMEntry {
 		context: (row.context as string) ?? null,
 		sourceSessionId: (row.source_session_id as string) ?? null,
 		sourceObservationIds: safeJsonArray(row.source_observation_ids).map(Number),
-		confidence: row.confidence as number,
 		tags: safeJsonArray(row.tags),
 		files: safeJsonArray(row.files),
 		createdAt: row.created_at as string,

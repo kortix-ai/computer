@@ -222,7 +222,7 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, on
           )}
         />
         {nameConflict && (
-          <p className="text-[11px] text-red-400">
+          <p className="text-xs text-red-400">
             A file or folder with that name already exists
           </p>
         )}
@@ -261,17 +261,17 @@ export function FileTreeItem({ node, onClick, onDownload, onRename, onDelete, on
           {diagnosticCounts && diagnosticCounts.errors > 0 && (
             <span className="inline-flex items-center gap-0.5 text-red-500">
               <CircleAlert className="h-3 w-3" />
-              <span className="text-[10px] font-semibold leading-none">{diagnosticCounts.errors}</span>
+              <span className="text-xs font-semibold leading-none">{diagnosticCounts.errors}</span>
             </span>
           )}
           {diagnosticCounts && diagnosticCounts.warnings > 0 && (
             <span className="inline-flex items-center gap-0.5 text-yellow-500">
               <AlertTriangle className="h-3 w-3" />
-              <span className="text-[10px] font-semibold leading-none">{diagnosticCounts.warnings}</span>
+              <span className="text-xs font-semibold leading-none">{diagnosticCounts.warnings}</span>
             </span>
           )}
           {gitStatus && (
-            <span className={cn('text-[10px] font-semibold leading-none', gitStatusBadgeColor[gitStatus])}>
+            <span className={cn('text-xs font-semibold leading-none', gitStatusBadgeColor[gitStatus])}>
               {gitStatusLabel[gitStatus]}
             </span>
           )}

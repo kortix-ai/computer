@@ -27,6 +27,10 @@ export { OcCodesearchToolView } from './OcCodesearchToolView';
 export { OcBatchToolView } from './OcBatchToolView';
 export { OcPlanToolView } from './OcPlanToolView';
 export { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
+export { OcMemSearchToolView } from './OcMemSearchToolView';
+export { OcMemSaveToolView } from './OcMemSaveToolView';
+export { OcSessionListToolView } from './OcSessionListToolView';
+export { OcSessionGetToolView } from './OcSessionGetToolView';
 
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
 import { OcBashToolView } from './OcBashToolView';
@@ -51,6 +55,10 @@ import { OcCodesearchToolView } from './OcCodesearchToolView';
 import { OcBatchToolView } from './OcBatchToolView';
 import { OcPlanToolView } from './OcPlanToolView';
 import { OcPtySpawnToolView, OcPtyReadToolView, OcPtyWriteToolView, OcPtyKillToolView } from './OcPtyToolViews';
+import { OcMemSearchToolView } from './OcMemSearchToolView';
+import { OcMemSaveToolView } from './OcMemSaveToolView';
+import { OcSessionListToolView } from './OcSessionListToolView';
+import { OcSessionGetToolView } from './OcSessionGetToolView';
 
 /**
  * Registry entries for OpenCode tools.
@@ -145,6 +153,18 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-plan-exit': OcPlanToolView,
   'oc-plan_enter': OcPlanToolView,
   'oc-plan-enter': OcPlanToolView,
+
+  // Memory tools (kortix-sys-oc-plugin)
+  'oc-mem_search': OcMemSearchToolView,
+  'oc-mem-search': OcMemSearchToolView,
+  'oc-mem_save': OcMemSaveToolView,
+  'oc-mem-save': OcMemSaveToolView,
+
+  // Session tools (kortix-sys-oc-plugin)
+  'oc-session_list': OcSessionListToolView,
+  'oc-session-list': OcSessionListToolView,
+  'oc-session_get': OcSessionGetToolView,
+  'oc-session-get': OcSessionGetToolView,
 
   // MCP tools and other unknown tools will fall through to the
   // registry's default (GenericToolView). The OcGenericToolView

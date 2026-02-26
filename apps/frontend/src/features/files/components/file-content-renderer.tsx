@@ -270,30 +270,30 @@ export function FileContentRenderer({
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header */}
       {showHeader && (
-        <div className="flex items-center gap-1.5 px-2 py-1 border-b border-border/50 shrink-0 h-8">
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            {getFileIcon(fileName, { className: 'h-3.5 w-3.5 shrink-0' })}
-            <span className="text-[11px] truncate">{fileName}</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 shrink-0 h-10">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {getFileIcon(fileName, { className: 'h-4 w-4 shrink-0' })}
+            <span className="text-sm truncate">{fileName}</span>
             {hasUnsavedChanges && (
-              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 shrink-0" title="Unsaved changes" />
+              <span className="h-2 w-2 rounded-full bg-yellow-500 shrink-0" title="Unsaved changes" />
             )}
           </div>
 
-          <div className="flex items-center gap-0 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             {/* Save button */}
             {hasUnsavedChanges && fileContent?.type === 'text' && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-yellow-500 hover:text-yellow-600"
+                className="h-7 w-7 text-yellow-500 hover:text-yellow-600"
                 onClick={() => handleSave(latestContentRef.current)}
                 disabled={isSaving}
                 title="Save"
               >
                 {isSaving ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Save className="h-3 w-3" />
+                  <Save className="h-4 w-4" />
                 )}
               </Button>
             )}
@@ -303,11 +303,11 @@ export function FileContentRenderer({
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn('h-6 w-6', isJsonTreeView && 'text-primary')}
+                className={cn('h-7 w-7', isJsonTreeView && 'text-primary')}
                 onClick={() => setIsJsonTreeView((v) => !v)}
                 title={isJsonTreeView ? 'View source' : 'Tree view'}
               >
-                <Braces className="h-3 w-3" />
+                <Braces className="h-4 w-4" />
               </Button>
             )}
 
@@ -316,14 +316,14 @@ export function FileContentRenderer({
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn('h-6 w-6', isMarkdownPreview && 'text-primary')}
+                className={cn('h-7 w-7', isMarkdownPreview && 'text-primary')}
                 onClick={() => setIsMarkdownPreview((v) => !v)}
                 title={isMarkdownPreview ? 'View source' : 'Preview'}
               >
                 {isMarkdownPreview ? (
-                  <Code className="h-3 w-3" />
+                  <Code className="h-4 w-4" />
                 ) : (
-                  <Eye className="h-3 w-3" />
+                  <Eye className="h-4 w-4" />
                 )}
               </Button>
             )}
@@ -334,12 +334,12 @@ export function FileContentRenderer({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
               onClick={handleDownload}
               disabled={!fileContent && !blobUrl && !rawBlob}
               title="Download"
             >
-              <Download className="h-3 w-3" />
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -357,9 +357,9 @@ export function FileContentRenderer({
         {/* Error */}
         {contentError && !showLoadingState && (
           errorFallback ? errorFallback(contentError, filePath) : (
-            <div className="flex flex-col items-center justify-center h-full gap-2 p-8 text-center">
-              <FileWarning className="h-6 w-6 text-muted-foreground/30" />
-              <p className="text-xs text-muted-foreground/60 max-w-sm">
+            <div className="flex flex-col items-center justify-center h-full gap-3 p-8 text-center">
+              <FileWarning className="h-8 w-8 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground/60 max-w-sm">
                 {contentError}
               </p>
             </div>
@@ -420,7 +420,7 @@ export function FileContentRenderer({
                 <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
               </svg>
             </div>
-            <p className="text-[11px] text-muted-foreground/60">{fileName}</p>
+            <p className="text-sm text-muted-foreground/60">{fileName}</p>
             <audio controls src={blobUrl} className="w-full max-w-sm" />
           </div>
         )}
@@ -447,14 +447,14 @@ export function FileContentRenderer({
           !imageDataUrl &&
           !['pdf', 'docx', 'pptx', 'xlsx', 'video', 'audio'].includes(fileCategory) && (
             <div className="flex flex-col items-center justify-center h-full gap-3 p-8 text-center">
-              <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center">
-                <FileWarning className="h-5 w-5 text-muted-foreground/30" />
+              <div className="h-12 w-12 rounded-xl bg-muted/50 flex items-center justify-center">
+                <FileWarning className="h-6 w-6 text-muted-foreground/30" />
               </div>
-              <p className="text-[11px] text-muted-foreground/50">
+              <p className="text-sm text-muted-foreground/50">
                 Binary file
               </p>
-              <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={handleDownload}>
-                <Download className="h-3 w-3 mr-1" />
+              <Button variant="outline" size="sm" className="h-8 text-sm" onClick={handleDownload}>
+                <Download className="h-3.5 w-3.5 mr-1.5" />
                 Download
               </Button>
             </div>
@@ -470,8 +470,8 @@ export function FileContentRenderer({
             <div className="relative h-full flex flex-col">
               {/* Diff indicator */}
               {fileContent.patch && fileContent.patch.hunks.length > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-500/5 border-b border-yellow-500/15 text-[10px] text-yellow-600 dark:text-yellow-400/80 shrink-0">
-                  <GitBranch className="h-2.5 w-2.5" />
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/5 border-b border-yellow-500/15 text-xs text-yellow-600 dark:text-yellow-400/80 shrink-0">
+                  <GitBranch className="h-3 w-3" />
                   Uncommitted changes
                 </div>
               )}
@@ -492,7 +492,7 @@ export function FileContentRenderer({
                   onChange={handleEditorChange}
                   onUnsavedChange={setHasUnsavedChanges}
                   showHeader={false}
-                  fontSize="text-xs"
+                  fontSize="text-sm"
                   className="h-full"
                 />
               )}
@@ -518,14 +518,14 @@ function JsonTreeView({ content }: { content: string }) {
 
   if (parsed === null) {
     return (
-      <div className="p-4 text-xs text-red-500/70 font-mono">
+      <div className="p-4 text-sm text-red-500/70 font-mono">
         Invalid JSON
       </div>
     );
   }
 
   return (
-    <div className="p-3 font-mono text-[11px] leading-relaxed">
+    <div className="p-4 font-mono text-sm leading-relaxed">
       <JsonNode value={parsed} keyName={null} depth={0} />
     </div>
   );
@@ -536,7 +536,7 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
 
   if (value === null) {
     return (
-      <div style={{ paddingLeft: depth * 16 }}>
+      <div style={{ paddingLeft: depth * 20 }}>
         {keyName !== null && <span className="text-primary/70">{`"${keyName}"`}: </span>}
         <span className="text-muted-foreground/50 italic">null</span>
       </div>
@@ -545,7 +545,7 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
 
   if (typeof value === 'boolean') {
     return (
-      <div style={{ paddingLeft: depth * 16 }}>
+      <div style={{ paddingLeft: depth * 20 }}>
         {keyName !== null && <span className="text-primary/70">{`"${keyName}"`}: </span>}
         <span className="text-yellow-500/80">{String(value)}</span>
       </div>
@@ -554,7 +554,7 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
 
   if (typeof value === 'number') {
     return (
-      <div style={{ paddingLeft: depth * 16 }}>
+      <div style={{ paddingLeft: depth * 20 }}>
         {keyName !== null && <span className="text-primary/70">{`"${keyName}"`}: </span>}
         <span className="text-cyan-500/80">{String(value)}</span>
       </div>
@@ -564,13 +564,13 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
   if (typeof value === 'string') {
     const isUrl = /^https?:\/\//.test(value);
     return (
-      <div style={{ paddingLeft: depth * 16 }} className="break-all">
+      <div style={{ paddingLeft: depth * 20 }} className="break-all">
         {keyName !== null && <span className="text-primary/70">{`"${keyName}"`}: </span>}
         <span className="text-green-500/80">
           &quot;{value.length > 200 ? value.slice(0, 200) + '...' : value}&quot;
         </span>
         {isUrl && (
-          <a href={value} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400/60 hover:text-blue-400 text-[9px]">
+          <a href={value} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400/60 hover:text-blue-400 text-xs">
             open
           </a>
         )}
@@ -583,11 +583,11 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
     return (
       <div>
         <div
-          style={{ paddingLeft: depth * 16 }}
+          style={{ paddingLeft: depth * 20 }}
           className="cursor-pointer hover:bg-muted/30 rounded-sm transition-colors inline-flex items-center gap-1"
           onClick={() => setIsCollapsed((v) => !v)}
         >
-          <span className="text-muted-foreground/40 text-[9px] w-3 text-center select-none">
+          <span className="text-muted-foreground/40 text-xs w-3.5 text-center select-none">
             {isCollapsed ? '\u25B6' : '\u25BC'}
           </span>
           {keyName !== null && <span className="text-primary/70">{`"${keyName}"`}: </span>}
@@ -602,7 +602,7 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
             {value.map((item, idx) => (
               <JsonNode key={idx} value={item} keyName={null} depth={depth + 1} />
             ))}
-            <div style={{ paddingLeft: depth * 16 }} className="text-muted-foreground/30">]</div>
+            <div style={{ paddingLeft: depth * 20 }} className="text-muted-foreground/30">]</div>
           </>
         )}
       </div>
@@ -615,11 +615,11 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
     return (
       <div>
         <div
-          style={{ paddingLeft: depth * 16 }}
+          style={{ paddingLeft: depth * 20 }}
           className="cursor-pointer hover:bg-muted/30 rounded-sm transition-colors inline-flex items-center gap-1"
           onClick={() => setIsCollapsed((v) => !v)}
         >
-          <span className="text-muted-foreground/40 text-[9px] w-3 text-center select-none">
+          <span className="text-muted-foreground/40 text-xs w-3.5 text-center select-none">
             {isCollapsed ? '\u25B6' : '\u25BC'}
           </span>
           {keyName !== null && <span className="text-primary/70">{`"${keyName}"`}: </span>}
@@ -634,7 +634,7 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
             {entries.map(([k, v]) => (
               <JsonNode key={k} value={v} keyName={k} depth={depth + 1} />
             ))}
-            <div style={{ paddingLeft: depth * 16 }} className="text-muted-foreground/30">{'}'}</div>
+            <div style={{ paddingLeft: depth * 20 }} className="text-muted-foreground/30">{'}'}</div>
           </>
         )}
       </div>

@@ -123,7 +123,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
   const highlighted = useDiffHighlight(codeLines, filename);
 
   return (
-    <pre className="p-3 font-mono text-[11px] leading-[1.6] overflow-x-auto select-text">
+    <pre className="p-3 font-mono text-xs leading-[1.6] overflow-x-auto select-text">
       {diffLines.map((line, i) => {
         const isAdd = line.startsWith('+') && !line.startsWith('+++');
         const isDel = line.startsWith('-') && !line.startsWith('---');
@@ -133,7 +133,7 @@ function DiffLines({ patch, filename }: { patch: string; filename: string }) {
         let cls = 'text-muted-foreground/60';
         if (isAdd) cls = 'bg-emerald-500/5';
         else if (isDel) cls = 'bg-red-500/5';
-        else if (isHunk) cls = 'text-blue-500/60 text-[10px]';
+        else if (isHunk) cls = 'text-blue-500/60 text-xs';
 
         if (isHunk || isHeader || line === '') {
           return (
@@ -239,10 +239,10 @@ function CommitDiffDetail({
       {/* Diff stats bar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
         {statusIcon}
-        <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded capitalize', statusColor)}>
+        <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded capitalize', statusColor)}>
           {diff.status}
         </span>
-        <div className="flex items-center gap-1.5 ml-auto text-[10px]">
+        <div className="flex items-center gap-1.5 ml-auto text-xs">
           {diff.additions > 0 && (
             <span className="text-emerald-500 font-medium">+{diff.additions}</span>
           )}
@@ -258,7 +258,7 @@ function CommitDiffDetail({
           <DiffLines patch={patchContent} filename={filePath} />
         </div>
       ) : (
-        <div className="p-4 text-xs text-muted-foreground text-center">
+        <div className="p-4 text-sm text-muted-foreground text-center">
           No diff content available
         </div>
       )}
@@ -316,28 +316,28 @@ function CommitCard({
         {/* Timeline dot + expand icon */}
         <div className="flex items-center gap-1 mt-0.5 shrink-0">
           {expanded ? (
-            <ChevronDown className="size-3 text-muted-foreground/50" />
+            <ChevronDown className="size-3.5 text-muted-foreground/50" />
           ) : (
-            <ChevronRight className="size-3 text-muted-foreground/50" />
+            <ChevronRight className="size-3.5 text-muted-foreground/50" />
           )}
-          <GitCommitHorizontal className="size-3.5 text-primary/70" />
+          <GitCommitHorizontal className="size-4 text-primary/70" />
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-1">
           {/* Subject line */}
-          <p className="text-xs font-medium text-foreground leading-snug line-clamp-2">
+          <p className="text-sm font-medium text-foreground leading-snug line-clamp-2">
             {commit.subject}
           </p>
 
           {/* Meta row */}
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <User className="size-2.5" />
+              <User className="size-3" />
               {commit.author}
             </span>
             <span className="flex items-center gap-1" title={formatFullDate(commit.timestamp)}>
-              <Clock className="size-2.5" />
+              <Clock className="size-3" />
               {formatRelativeDate(commit.timestamp)}
             </span>
           </div>
@@ -347,15 +347,15 @@ function CommitCard({
         <button
           onClick={handleCopyHash}
           className={cn(
-            'flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0',
+            'flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded shrink-0',
             'bg-muted/50 hover:bg-muted text-muted-foreground transition-colors',
           )}
           title="Copy commit hash"
         >
           {copied ? (
-            <Check className="size-2.5 text-emerald-500" />
+            <Check className="size-3 text-emerald-500" />
           ) : (
-            <Copy className="size-2.5" />
+            <Copy className="size-3" />
           )}
           {commit.shortHash}
         </button>
@@ -392,11 +392,11 @@ export function FileHistoryPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7"
+          className="h-8 w-8"
           onClick={closeHistory}
           title="Back"
         >
@@ -468,11 +468,11 @@ export function FileHistoryPanel() {
                 <div key={group.label}>
                   {/* Date group header */}
                   <div className="flex items-center gap-2 mb-2 px-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
                       {group.label}
                     </span>
                     <div className="flex-1 h-px bg-border/40" />
-                    <span className="text-[10px] text-muted-foreground/40 tabular-nums">
+                    <span className="text-xs text-muted-foreground/40 tabular-nums">
                       {group.commits.length}
                     </span>
                   </div>
@@ -498,7 +498,7 @@ export function FileHistoryPanel() {
               {/* Load more hint */}
               {history?.hasMore && (
                 <div className="text-center py-2">
-                  <span className="text-[10px] text-muted-foreground/50">
+                  <span className="text-xs text-muted-foreground/50">
                     Showing first {totalCommits} commits — more available
                   </span>
                 </div>

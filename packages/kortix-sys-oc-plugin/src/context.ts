@@ -5,7 +5,7 @@
  * the latest user message (cache-safe — system prompt untouched).
  *
  * Groups memories by type: Episodic → Semantic → Procedural.
- * Orders by confidence (highest first) within each group.
+ * Orders by most recently updated within each group.
  */
 
 import type { Database } from "bun:sqlite"

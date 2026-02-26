@@ -28,7 +28,7 @@ export function FileViewer() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
+            className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
             onClick={() => {
               openTabAndNavigate({
                 id: `file:${selectedFilePath}`,
@@ -39,16 +39,16 @@ export function FileViewer() {
             }}
             title="Open in new tab"
           >
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
+            className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
             onClick={() => openHistory(selectedFilePath)}
             title="History"
           >
-            <History className="h-3 w-3" />
+            <History className="h-4 w-4" />
           </Button>
         </>
       }

@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
+import { ErrorResponse, UpdateResponse } from '../schemas/common';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -116,46 +118,59 @@ const updateRouter = new Hono();
  *
  * Body: { "version": "0.4.3" }
  */
-updateRouter.post('/', async (c) => {
-  if (updateInProgress) {
-    return c.json({ error: 'Update already in progress' }, 409);
-  }
-
-  const body = await c.req.json().catch(() => ({}));
-  const targetVersion = body.version;
-
-  if (!targetVersion || typeof targetVersion !== 'string') {
-    return c.json({ error: 'Missing "version" in request body' }, 400);
-  }
-
-  updateInProgress = true;
-  try {
-    const currentVersion = await readLocalVersion();
-
-    if (currentVersion === targetVersion) {
-      return c.json({
-        upToDate: true,
-        currentVersion,
-      });
+updateRouter.post('/',
+  describeRoute({
+    tags: ['System'],
+    summary: 'Trigger sandbox update',
+    description: 'User-triggered sandbox update. Installs the specified @kortix/sandbox version, restarts all services, and self-restarts kortix-master (deferred 2s so the response completes).',
+    responses: {
+      200: { description: 'Update result', content: { 'application/json': { schema: resolver(UpdateResponse) } } },
+      400: { description: 'Missing version', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+      409: { description: 'Update already in progress', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+      500: { description: 'Update failed', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    if (updateInProgress) {
+      return c.json({ error: 'Update already in progress' }, 409);
     }
 
-    console.log(`[Update] User triggered: ${currentVersion} -> ${targetVersion}`);
-    const update = await performUpdate(targetVersion);
+    const body = await c.req.json().catch(() => ({}));
+    const targetVersion = body.version;
 
-    const changelog = update.success ? await getChangelog(targetVersion) : null;
-    return c.json({
-      success: update.success,
-      previousVersion: currentVersion,
-      currentVersion: update.success ? targetVersion : currentVersion,
-      changelog,
-      output: update.output,
-    });
-  } catch (e) {
-    console.error('[Update] Error:', e);
-    return c.json({ error: 'Update failed', details: String(e) }, 500);
-  } finally {
-    updateInProgress = false;
-  }
-});
+    if (!targetVersion || typeof targetVersion !== 'string') {
+      return c.json({ error: 'Missing "version" in request body' }, 400);
+    }
+
+    updateInProgress = true;
+    try {
+      const currentVersion = await readLocalVersion();
+
+      if (currentVersion === targetVersion) {
+        return c.json({
+          upToDate: true,
+          currentVersion,
+        });
+      }
+
+      console.log(`[Update] User triggered: ${currentVersion} -> ${targetVersion}`);
+      const update = await performUpdate(targetVersion);
+
+      const changelog = update.success ? await getChangelog(targetVersion) : null;
+      return c.json({
+        success: update.success,
+        previousVersion: currentVersion,
+        currentVersion: update.success ? targetVersion : currentVersion,
+        changelog,
+        output: update.output,
+      });
+    } catch (e) {
+      console.error('[Update] Error:', e);
+      return c.json({ error: 'Update failed', details: String(e) }, 500);
+    } finally {
+      updateInProgress = false;
+    }
+  },
+);
 
 export default updateRouter;

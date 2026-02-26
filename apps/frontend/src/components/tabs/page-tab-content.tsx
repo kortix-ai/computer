@@ -64,6 +64,12 @@ const FilesPage = lazy(() =>
 	})),
 );
 
+const MemoryPage = lazy(() =>
+	import('@/components/memory/memory-page').then((m) => ({
+		default: m.MemoryPage,
+	})),
+);
+
 // Admin pages
 const AdminAnalyticsPage = lazy(() =>
 	import('@/app/(dashboard)/admin/analytics/page'),
@@ -111,6 +117,7 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/integrations': IntegrationsPage,
 	'/files': FilesPage,
 	'/tunnel': TunnelOverviewPage,
+	'/memory': MemoryPage,
 	// Admin
 	'/admin/analytics': AdminAnalyticsPage,
 	'/admin/feedback': AdminFeedbackPage,

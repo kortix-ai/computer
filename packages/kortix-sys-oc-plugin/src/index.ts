@@ -259,7 +259,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					output.context.push(cachedLTMBlock)
 				}
 
-				log("info", `[memory] Compaction consolidation complete: ${result.newMemories.length} new, ${result.reinforcedIds.length} reinforced`)
+				log("info", `[memory] Compaction consolidation complete: ${result.newMemories.length} new memories`)
 			} catch (err) {
 				log("warn", `[memory] Compaction consolidation failed: ${err}`)
 			}
@@ -293,9 +293,8 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 
 					for (const hit of results) {
 						const sourceTag = hit.source === "ltm" ? `[LTM/${hit.type}]` : `[obs/${hit.type}]`
-						const confidence = hit.confidence != null ? ` (confidence: ${hit.confidence.toFixed(2)})` : ""
 						const files = hit.files.length > 0 ? `\n    Files: ${hit.files.slice(0, 3).join(", ")}` : ""
-						lines.push(`  ${sourceTag} #${hit.id}${confidence}`)
+						lines.push(`  ${sourceTag} #${hit.id}`)
 						lines.push(`    ${hit.content.slice(0, 200)}${files}`)
 						lines.push("")
 					}
@@ -324,7 +323,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 						content: args.text,
 						sourceSessionId: context.sessionID,
 						tags,
-						confidence: 1.0,
 					}
 
 					const id = insertLTM(db, input)

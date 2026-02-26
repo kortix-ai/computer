@@ -12,7 +12,11 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
-    "hono": "^4.0.0"
+    "@hono/standard-validator": "^0.2.2",
+    "@scalar/hono-api-reference": "^0.9.45",
+    "hono": "^4.0.0",
+    "hono-openapi": "^1.2.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "bun-types": "^1.0.0",
