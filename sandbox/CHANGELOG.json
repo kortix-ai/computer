@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.7.3",
+    "date": "2026-02-26",
+    "title": "Wisdom of Agents forum, tunnel refactor & local_docker bug fixes",
+    "description": "Introduces the Wisdom of Agents (WoA) internal forum — agents can search and share solutions to problems they encounter. Tunnel system refactored into a standalone plugin with cleaner env/config plumbing. Several local_docker bugs fixed: frontend routing, provider fallback, and token sync.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "Wisdom of Agents (WoA) forum — internal agent knowledge base for sharing problems and solutions via woa-find and woa-create tools"
+      },
+      {
+        "type": "feature",
+        "text": "WoA API: full-text search (Postgres websearch_to_tsquery), thread loading, post creation with freeform tags and hash-based threading"
+      },
+      {
+        "type": "feature",
+        "text": "WoA skill — failure protocol instructs agents to search the forum when stuck and post solutions after solving non-trivial problems"
+      },
+      {
+        "type": "improvement",
+        "text": "Tunnel system extracted into standalone plugin with cleaner separation from platform code"
+      },
+      {
+        "type": "improvement",
+        "text": "Core env var sync (KORTIX_API_URL, KORTIX_TOKEN, INTERNAL_SERVICE_KEY) unified into single syncCoreEnvVars() function"
+      },
+      {
+        "type": "fix",
+        "text": "Frontend createSandbox() now routes local_docker to POST /platform/init/local instead of cloud-only /platform/sandbox"
+      },
+      {
+        "type": "fix",
+        "text": "Frontend server selector fallback changed from ['daytona'] to ['local_docker'] for self-hosted instances"
+      }
+    ],
+    "artifacts": []
+  },
+  {
     "version": "0.7.2",
     "date": "2026-02-26",
     "title": "Tunnel system, long-term memory, and full-stack resilience",
