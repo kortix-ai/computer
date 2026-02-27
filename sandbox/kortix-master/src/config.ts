@@ -42,12 +42,13 @@ export const config = {
   SANDBOX_ID: process.env.SANDBOX_ID || '',
   PROJECT_ID: process.env.PROJECT_ID || '',
 
-  // INTERNAL_SERVICE_KEY — direction: kortix-api → sandbox.
-  // This is how kortix-api authenticates itself TO the sandbox. Every inbound
-  // request from kortix-api (proxy, cron, health, queue drain) includes this
-  // as a Bearer token. Validated by the global auth middleware in index.ts.
+  // INTERNAL_SERVICE_KEY — direction: external → sandbox.
+  // This is how kortix-api (and other external callers) authenticates TO the sandbox.
+  // Every inbound request from outside the container must include this as a Bearer token.
+  // Validated by the global auth middleware in index.ts.
+  // Localhost requests (from inside the sandbox) bypass auth entirely — no token needed.
   // Counterpart: KORTIX_TOKEN goes the other direction (sandbox → kortix-api).
-  // Auto-generates if not provided — sandbox is ALWAYS auth-protected.
+  // Auto-generates if not provided — external access is ALWAYS auth-protected.
   // In normal operation, kortix-api injects the key as a Docker env var.
   get INTERNAL_SERVICE_KEY(): string {
     if (!process.env.INTERNAL_SERVICE_KEY) {

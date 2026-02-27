@@ -3,6 +3,7 @@ import { existsSync, mkdirSync } from 'fs'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+
 import { describeRoute, resolver, generateSpecs } from 'hono-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
 import { buildMergedSpec } from './services/spec-merger'
@@ -111,15 +112,31 @@ function verifyServiceKey(candidate: string): boolean {
   return timingSafeEqual(a, b)
 }
 
+// ─── Localhost detection ─────────────────────────────────────────────────────
+// Requests originating from inside the container (localhost/loopback) skip auth.
+// This allows tools, scripts, and curl inside the sandbox to call the master
+// without needing INTERNAL_SERVICE_KEY. External callers (kortix-api, frontend
+// proxy) still must provide the key.
+const LOOPBACK_ADDRS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost'])
+
+function isLocalRequest(c: any): boolean {
+  const addr = c.env?.remoteAddr
+  return !!addr && LOOPBACK_ADDRS.has(addr)
+}
+
 // ─── Global auth ─────────────────────────────────────────────────────────────
-// Protects ALL routes (except health and docs) with bearer token or ?token= query param.
+// Protects ALL routes with bearer token or ?token= query param.
 // INTERNAL_SERVICE_KEY is always present (auto-generated if not provided).
+// Localhost requests (from inside the sandbox) bypass auth entirely.
 app.use('*', async (c, next) => {
   // Skip health endpoint — Docker health probes need unauthenticated access
   const pathname = new URL(c.req.url).pathname
   if (pathname === '/kortix/health') return next()
   // Skip docs endpoints — API docs should be accessible without auth
   if (pathname === '/docs' || pathname === '/docs/openapi.json') return next()
+
+  // Skip auth for requests from inside the sandbox (localhost/loopback)
+  if (isLocalRequest(c)) return next()
 
   const authHeader = c.req.header('Authorization')
   let token: string | null = null
@@ -344,16 +361,22 @@ export default {
     if (req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
       const url = new URL(req.url)
 
-      // Validate INTERNAL_SERVICE_KEY for WS upgrades (header or ?token= query param)
-      const authHeader = req.headers.get('Authorization')
-      let wsToken: string | null = null
-      if (authHeader?.startsWith('Bearer ')) wsToken = authHeader.slice(7)
-      if (!wsToken) wsToken = url.searchParams.get('token')
-      if (!wsToken || !verifyServiceKey(wsToken)) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        })
+      // Skip auth for localhost (same-container) WS connections
+      const wsRemoteAddr = server.requestIP(req)?.address
+      const wsIsLocal = !!wsRemoteAddr && LOOPBACK_ADDRS.has(wsRemoteAddr)
+
+      if (!wsIsLocal) {
+        // Validate INTERNAL_SERVICE_KEY for external WS upgrades (header or ?token= query param)
+        const authHeader = req.headers.get('Authorization')
+        let wsToken: string | null = null
+        if (authHeader?.startsWith('Bearer ')) wsToken = authHeader.slice(7)
+        if (!wsToken) wsToken = url.searchParams.get('token')
+        if (!wsToken || !verifyServiceKey(wsToken)) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
       }
 
       const parsed = parseProxyPath(url.pathname)
@@ -393,7 +416,9 @@ export default {
     }
 
     // ── HTTP / SSE — delegate to Hono ──────────────────────────────────
-    return app.fetch(req)
+    // Pass the client IP via env so the auth middleware can detect localhost
+    const remoteAddr = server.requestIP(req)?.address
+    return app.fetch(req, { remoteAddr })
   },
 
   websocket: {

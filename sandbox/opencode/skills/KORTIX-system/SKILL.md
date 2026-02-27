@@ -116,6 +116,28 @@ Kortix Master (`/opt/kortix-master/src/index.ts`, runs via Bun on port 8000) is 
 
 The dynamic port proxy (`/proxy/:port/*`) injects a Service Worker into HTML responses to rewrite all subsequent requests through the proxy prefix. It also handles WebSocket upgrades for proxied services.
 
+### Kortix Master Authentication
+
+The master uses a **localhost-bypass** auth model:
+
+- **From inside the sandbox** (localhost/loopback): **No auth required.** Curl, tools, scripts running inside the container can call `localhost:8000` freely — no tokens, no headers.
+- **From outside the sandbox** (kortix-api, frontend proxy, host machine): Must provide `INTERNAL_SERVICE_KEY` as a Bearer token or `?token=` query param.
+
+Two tokens exist with **opposite directions**:
+
+| Token | Direction | Purpose |
+|---|---|---|
+| `INTERNAL_SERVICE_KEY` | external → sandbox | How kortix-api authenticates TO the sandbox. Required for external requests to port 8000 (mapped to host port 14000). |
+| `KORTIX_TOKEN` | sandbox → external | How the sandbox authenticates TO kortix-api. Used for outbound requests (cron, integrations, LLM proxy, deployments). Also used as the SecretStore encryption key. |
+
+**Unauthenticated routes** (always open, even externally): `/kortix/health`, `/docs`, `/docs/openapi.json`.
+
+**External access example** (from host machine or another container):
+```bash
+curl http://127.0.0.1:14000/env \
+  -H "Authorization: Bearer $INTERNAL_SERVICE_KEY"
+```
+
 ## Environment Variables
 
 ### Core Config
@@ -150,7 +172,8 @@ The dynamic port proxy (`/proxy/:port/*`) injects a Service Worker into HTML res
 |---|---|
 | `ENV_MODE` | `local` (Docker) or `cloud` (Kortix platform) |
 | `KORTIX_API_URL` | Base URL of the Kortix API (e.g. `http://localhost:8008`). Consumers append service paths (`/v1/router`, `/v1/cron`, etc.) |
-| `KORTIX_TOKEN` | Auth token for Kortix API |
+| `KORTIX_TOKEN` | Auth token for **outbound** requests (sandbox → kortix-api). Used for cron, integrations, deployments, LLM proxy. |
+| `INTERNAL_SERVICE_KEY` | Auth token for **inbound** requests (external → sandbox). Required by external callers to port 8000. Not needed from localhost. |
 | `SANDBOX_ID` | Sandbox identifier |
 | `PROJECT_ID` | Project identifier |
 
@@ -171,7 +194,7 @@ The sandbox has a unified secret/env management system. Secrets are AES-256-GCM 
 
 ### API Reference
 
-All endpoints served by Kortix Master at `localhost:8000`.
+All endpoints served by Kortix Master at `localhost:8000`. **No auth needed from inside the sandbox** (localhost bypass). External callers must use `Authorization: Bearer $INTERNAL_SERVICE_KEY`.
 
 #### Set a single env var (with restart so OpenCode picks it up)
 
@@ -263,7 +286,7 @@ Agent Tool (integration-*.ts)
     Pipedream (OAuth token management + action execution)
 ```
 
-All tools communicate with Kortix Master at `localhost:8000/api/integrations/*`, which proxies to the Kortix API with `KORTIX_TOKEN` auth.
+All tools communicate with Kortix Master at `localhost:8000/api/integrations/*` (no auth needed — localhost bypass), which then proxies outbound to the Kortix API with `KORTIX_TOKEN` auth.
 
 ### Tool Reference
 
@@ -418,7 +441,7 @@ In local mode (or for preview), the Kortix Master has a built-in deployer at `/k
 - **Random ports** — each deployment gets an available port
 - **Accessible via** `http://localhost:8000/proxy/{port}/`
 
-#### Local Deploy API
+#### Local Deploy API (no auth needed from inside sandbox)
 
 ```bash
 MASTER_URL="http://localhost:8000"
@@ -577,7 +600,7 @@ lss index /workspace/important-file.md
 lss status
 ```
 
-### HTTP API (via Kortix Master)
+### HTTP API (via Kortix Master — no auth needed from inside sandbox)
 
 ```bash
 # Semantic search via HTTP
