@@ -1,7 +1,200 @@
+import { z } from 'zod';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
 export type SandboxProviderName = 'daytona' | 'local_docker';
+export type InternalKortixEnv = 'dev' | 'staging' | 'prod';
 
 /** Single source of truth for the sandbox version. Update on each release. */
-export const SANDBOX_VERSION = '0.7.3';
+export const SANDBOX_VERSION = '0.7.4';
+
+// ─── Zod Helpers ────────────────────────────────────────────────────────────
+
+/** Optional string — defaults to empty string when missing or empty. */
+const optStr = z.string().optional().default('');
+
+/** Optional string with a custom default value. */
+const optStrDefault = (def: string) => z.string().optional().default(def);
+
+/** Optional URL string with a custom default. Not required, just validated if present. */
+const optUrl = (def: string) =>
+  z.string().optional().default(def).refine(
+    (v) => v === '' || /^https?:\/\//.test(v),
+    { message: 'Must be a valid HTTP(S) URL' },
+  );
+
+/** Optional int with a default. */
+const optInt = (def: number) =>
+  z.string().optional().default(String(def)).transform((v) => {
+    const n = parseInt(v, 10);
+    return Number.isNaN(n) ? def : n;
+  });
+
+/** Optional float with a default. */
+const optFloat = (def: number) =>
+  z.string().optional().default(String(def)).transform((v) => {
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? def : n;
+  });
+
+/** Optional boolean — 'true' → true, anything else → false. */
+const optBoolTrue = z.string().optional().default('true').transform((v) => v !== 'false');
+const optBoolFalse = z.string().optional().default('false').transform((v) => v === 'true');
+
+// ─── Env Schema ─────────────────────────────────────────────────────────────
+//
+// Every env var that kortix-api reads is declared here.
+// Categories:
+//   - REQUIRED:    server will not start without these
+//   - CONDITIONAL: required when a related feature is enabled
+//   - OPTIONAL:    graceful degradation or sane default if missing
+
+const envSchema = z.object({
+
+  // ── Core (required) ──────────────────────────────────────────────────────
+  PORT:                        optInt(8008),
+  ENV_MODE:                    z.enum(['local', 'cloud']).optional().default('local'),
+
+  // ── Database (REQUIRED) ──────────────────────────────────────────────────
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required — cannot start without a database'),
+
+  // ── Supabase (REQUIRED) ──────────────────────────────────────────────────
+  SUPABASE_URL: z.string().min(1, 'SUPABASE_URL is required').refine(
+    (v) => /^https?:\/\//.test(v),
+    { message: 'SUPABASE_URL must be a valid HTTP(S) URL' },
+  ),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
+
+  // ── API Key Hashing (REQUIRED) ───────────────────────────────────────────
+  API_KEY_SECRET: z.string().min(1, 'API_KEY_SECRET is required — API key hashing will fail'),
+
+  // ── Internal Deployment Controls (optional, safe defaults for self-hosted) ─
+  INTERNAL_KORTIX_ENV:              z.enum(['dev', 'staging', 'prod']).optional().default('dev'),
+  KORTIX_ROUTER_INTERNAL_ENABLED:   optBoolFalse,  // NOTE: currently unused in codebase
+  KORTIX_BILLING_INTERNAL_ENABLED:  optBoolFalse,
+
+  // ── Search Providers (optional — features degrade gracefully) ────────────
+  TAVILY_API_URL:              optUrl('https://api.tavily.com'),
+  TAVILY_API_KEY:              optStr,
+  SERPER_API_URL:              optUrl('https://google.serper.dev'),
+  SERPER_API_KEY:              optStr,
+
+  // ── Proxy Providers (optional) ───────────────────────────────────────────
+  FIRECRAWL_API_URL:           optUrl('https://api.firecrawl.dev'),
+  FIRECRAWL_API_KEY:           optStr,
+  REPLICATE_API_URL:           optUrl('https://api.replicate.com'),
+  REPLICATE_API_TOKEN:         optStr,
+  CONTEXT7_API_URL:            optUrl('https://context7.com'),
+  CONTEXT7_API_KEY:            optStr,
+
+  // ── Freestyle / Deployments (optional) ───────────────────────────────────
+  FREESTYLE_API_URL:           optUrl('https://api.freestyle.sh'),
+  FREESTYLE_API_KEY:           optStr,
+
+  // ── LLM Providers (optional — only needed in cloud mode) ─────────────────
+  OPENROUTER_API_URL:          optUrl('https://openrouter.ai/api/v1'),
+  OPENROUTER_API_KEY:          optStr,
+  ANTHROPIC_API_URL:           optUrl('https://api.anthropic.com/v1'),
+  ANTHROPIC_API_KEY:           optStr,
+  OPENAI_API_URL:              optUrl('https://api.openai.com/v1'),
+  OPENAI_API_KEY:              optStr,
+  XAI_API_URL:                 optUrl('https://api.x.ai/v1'),
+  XAI_API_KEY:                 optStr,
+  GEMINI_API_URL:              optUrl('https://generativelanguage.googleapis.com/v1beta'),
+  GEMINI_API_KEY:              optStr,
+  GROQ_API_URL:                optUrl('https://api.groq.com/openai/v1'),
+  GROQ_API_KEY:                optStr,
+  AWS_BEARER_TOKEN_BEDROCK:    optStr,  // NOTE: currently unused outside config.ts
+
+  // ── Billing — Stripe (optional, only for cloud billing) ──────────────────
+  STRIPE_SECRET_KEY:           optStr,
+  STRIPE_WEBHOOK_SECRET:       optStr,
+
+  // ── Billing — RevenueCat (optional) ──────────────────────────────────────
+  REVENUECAT_API_KEY:          optStr,
+  REVENUECAT_WEBHOOK_SECRET:   optStr,
+
+  // ── Daytona — Sandbox provisioning (conditional: required if daytona provider enabled) ──
+  DAYTONA_API_KEY:             optStr,
+  DAYTONA_SERVER_URL:          optStr,
+  DAYTONA_TARGET:              optStr,
+
+  // ── Sandbox Platform (optional) ──────────────────────────────────────────
+  KORTIX_URL:                  optStr,
+  ALLOWED_SANDBOX_PROVIDERS:   optStrDefault('local_docker'),
+  SANDBOX_IMAGE:               optStr,  // overridden below if empty
+  DOCKER_HOST:                 optStr,
+  SANDBOX_NETWORK:             optStr,
+  SANDBOX_PORT_BASE:           optInt(14000),
+
+  // ── Internal Service Key (auto-generated if missing — never fails) ───────
+  INTERNAL_SERVICE_KEY:        optStr,
+
+  // ── Scheduler / Cron (optional) ──────────────────────────────────────────
+  SCHEDULER_ENABLED:           optBoolTrue,
+  CRON_TICK_SECRET:            optStr,
+  CRON_API_URL:                optStr,
+
+  // ── Channels (optional) ──────────────────────────────────────────────────
+  CHANNELS_ENABLED:            optBoolTrue,
+  CHANNELS_PUBLIC_URL:         optStr,
+  CHANNELS_CREDENTIAL_KEY:     optStr,
+
+  // ── Session Pruning (optional, all have sane defaults) ───────────────────
+  SESSION_PRUNING_ENABLED:     optBoolTrue,
+  SESSION_PRUNING_TTL_MS:      optInt(5 * 60 * 1000),
+  SESSION_PRUNING_KEEP_LAST:   optInt(3),
+  SESSION_PRUNING_SOFT_RATIO:  optFloat(0.3),
+  SESSION_PRUNING_HARD_RATIO:  optFloat(0.5),
+  SESSION_PRUNING_MIN_CHARS:   optInt(50_000),
+  SESSION_PRUNING_SOFT_MAX:    optInt(4_000),
+  SESSION_PRUNING_SOFT_HEAD:   optInt(1_500),
+  SESSION_PRUNING_SOFT_TAIL:   optInt(1_500),
+  SESSION_PRUNING_HARD_ENABLED: optBoolTrue,
+  SESSION_PRUNING_HARD_PLACEHOLDER: optStrDefault('[Old tool result content cleared]'),
+
+  // ── Frontend (optional) ──────────────────────────────────────────────────
+  FRONTEND_URL:                optUrl('http://localhost:3000'),
+
+  // ── Integrations / Pipedream (conditional: required if pipedream is the provider) ──
+  INTEGRATION_AUTH_PROVIDER:   optStrDefault('pipedream'),
+  PIPEDREAM_CLIENT_ID:         optStr,
+  PIPEDREAM_CLIENT_SECRET:     optStr,
+  PIPEDREAM_PROJECT_ID:        optStr,
+  PIPEDREAM_ENVIRONMENT:       optStrDefault('development'),
+
+  // ── Tunnel (optional, all have sane defaults) ────────────────────────────
+  TUNNEL_ENABLED:                    optBoolTrue,
+  TUNNEL_HEARTBEAT_INTERVAL_MS:      optInt(30_000),
+  TUNNEL_HEARTBEAT_MAX_MISSED:       optInt(3),
+  TUNNEL_RPC_TIMEOUT_MS:             optInt(30_000),
+  TUNNEL_MAX_FILE_SIZE:              optInt(10 * 1024 * 1024),
+  TUNNEL_PERMISSION_REQUEST_TTL_MS:  optInt(300_000),
+  TUNNEL_RATE_LIMIT_RPC:             optInt(100),
+  TUNNEL_RATE_LIMIT_PERM_REQUEST:    optInt(20),
+  TUNNEL_RATE_LIMIT_WS_CONNECT:      optInt(5),
+  TUNNEL_RATE_LIMIT_PERM_GRANT:      optInt(30),
+  TUNNEL_MAX_WS_MESSAGE_SIZE:        optInt(5 * 1024 * 1024),
+
+  // ── Slack (optional) ─────────────────────────────────────────────────────
+  SLACK_CLIENT_ID:             optStr,
+  SLACK_CLIENT_SECRET:         optStr,
+  SLACK_SIGNING_SECRET:        optStr,
+
+  // ── Version / GitHub (optional) ───────────────────────────────────────────
+  SANDBOX_VERSION:             optStr,  // dev override: skip npm registry lookup for latest version
+  GITHUB_TOKEN:                optStr,  // optional: authenticated GitHub API calls for changelog
+
+  // ── Stray env vars used directly in other files (centralized here) ───────
+  CORS_ALLOWED_ORIGINS:        optStr,
+  KORTIX_MASTER_URL:           optStr,
+  OPENCODE_URL:                optStr,
+  KORTIX_DATA_DIR:             optStr,
+});
+
+// ─── Validation + Conditional Checks ────────────────────────────────────────
+
+type EnvIssue = { var: string; message: string; level: 'error' | 'warn' };
 
 /** Parse comma-separated provider list (e.g. "daytona,local_docker") */
 function parseAllowedProviders(raw: string): SandboxProviderName[] {
@@ -12,124 +205,198 @@ function parseAllowedProviders(raw: string): SandboxProviderName[] {
     if (n === 'daytona' || n === 'local_docker') {
       if (!valid.includes(n)) valid.push(n);
     } else {
-      console.warn(`[config] Unknown sandbox provider "${n}" in ALLOWED_SANDBOX_PROVIDERS — ignored`);
+      console.warn(`[config] Unknown sandbox provider "${n}" in ALLOWED_SANDBOX_PROVIDERS - ignored`);
     }
   }
   return valid.length > 0 ? valid : ['local_docker'];
 }
 
-export type InternalKortixEnv = 'dev' | 'staging' | 'prod';
+function validateEnv(): z.infer<typeof envSchema> {
+  const result = envSchema.safeParse(process.env);
+
+  const issues: EnvIssue[] = [];
+
+  // ── Collect Zod schema errors ──────────────────────────────────────────
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const varName = issue.path.join('.');
+      issues.push({ var: varName, message: issue.message, level: 'error' });
+    }
+  }
+
+  // Use raw values for conditional checks (schema may have failed)
+  const raw = result.success ? result.data : (process.env as Record<string, string | undefined>);
+
+  // ── Conditional: Daytona provider enabled → need Daytona keys ──────────
+  const providers = parseAllowedProviders((raw as any).ALLOWED_SANDBOX_PROVIDERS || '');
+  if (providers.includes('daytona')) {
+    if (!raw.DAYTONA_API_KEY)    issues.push({ var: 'DAYTONA_API_KEY',    message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "daytona"', level: 'error' });
+    if (!raw.DAYTONA_SERVER_URL) issues.push({ var: 'DAYTONA_SERVER_URL', message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "daytona"', level: 'error' });
+    if (!raw.DAYTONA_TARGET)     issues.push({ var: 'DAYTONA_TARGET',     message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "daytona"', level: 'error' });
+  }
+
+  // ── Conditional: local_docker → need DOCKER_HOST ───────────────────────
+  if (providers.includes('local_docker')) {
+    if (!raw.DOCKER_HOST) issues.push({ var: 'DOCKER_HOST', message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "local_docker"', level: 'error' });
+  }
+
+  // ── Conditional: Pipedream integration → need credentials ──────────────
+  const integrationProvider = (raw as any).INTEGRATION_AUTH_PROVIDER || 'pipedream';
+  if (integrationProvider === 'pipedream') {
+    if (!raw.PIPEDREAM_CLIENT_ID)     issues.push({ var: 'PIPEDREAM_CLIENT_ID',     message: 'Required when INTEGRATION_AUTH_PROVIDER is "pipedream"', level: 'error' });
+    if (!raw.PIPEDREAM_CLIENT_SECRET) issues.push({ var: 'PIPEDREAM_CLIENT_SECRET', message: 'Required when INTEGRATION_AUTH_PROVIDER is "pipedream"', level: 'error' });
+    if (!raw.PIPEDREAM_PROJECT_ID)    issues.push({ var: 'PIPEDREAM_PROJECT_ID',    message: 'Required when INTEGRATION_AUTH_PROVIDER is "pipedream"', level: 'error' });
+  }
+
+  // ── Conditional: Billing enabled → need Stripe keys ────────────────────
+  if ((raw as any).KORTIX_BILLING_INTERNAL_ENABLED === 'true' || (raw as any).KORTIX_BILLING_INTERNAL_ENABLED === true) {
+    if (!raw.STRIPE_SECRET_KEY)    issues.push({ var: 'STRIPE_SECRET_KEY',    message: 'Required when KORTIX_BILLING_INTERNAL_ENABLED is true', level: 'error' });
+    if (!raw.STRIPE_WEBHOOK_SECRET) issues.push({ var: 'STRIPE_WEBHOOK_SECRET', message: 'Required when KORTIX_BILLING_INTERNAL_ENABLED is true', level: 'error' });
+  }
+
+  // CRON_API_URL is auto-derived from PORT + DOCKER_HOST — no validation needed
+
+  // ── Warnings (non-fatal but worth knowing) ─────────────────────────────
+  if (!raw.OPENROUTER_API_KEY) {
+    issues.push({ var: 'OPENROUTER_API_KEY', message: 'Not set — primary LLM route will fail with silent 401 errors', level: 'warn' });
+  }
+
+  // ── Print results ─────────────────────────────────────────────────────
+  const errors = issues.filter((i) => i.level === 'error');
+  const warnings = issues.filter((i) => i.level === 'warn');
+
+  if (warnings.length > 0) {
+    console.warn('');
+    console.warn('\x1b[33m' + '='.repeat(70) + '\x1b[0m');
+    console.warn('\x1b[33m  kortix-api: Environment warnings\x1b[0m');
+    console.warn('\x1b[33m' + '='.repeat(70) + '\x1b[0m');
+    for (const w of warnings) {
+      console.warn(`\x1b[33m  ${w.var.padEnd(40)} ${w.message}\x1b[0m`);
+    }
+    console.warn('\x1b[33m' + '='.repeat(70) + '\x1b[0m');
+    console.warn('');
+  }
+
+  if (errors.length > 0) {
+    console.error('');
+    console.error('\x1b[31m' + '='.repeat(70) + '\x1b[0m');
+    console.error('\x1b[31m  kortix-api: Environment validation FAILED — server cannot start\x1b[0m');
+    console.error('\x1b[31m' + '='.repeat(70) + '\x1b[0m');
+    for (const e of errors) {
+      console.error(`\x1b[31m  ${e.var.padEnd(40)} ${e.message}\x1b[0m`);
+    }
+    console.error('\x1b[31m' + '='.repeat(70) + '\x1b[0m');
+    console.error('');
+    console.error('\x1b[31m  Fix the above in your .env file and restart.\x1b[0m');
+    console.error('');
+    process.exit(1);
+  }
+
+  if (!result.success) {
+    // Should not be reachable (errors already handled above) but safety net
+    console.error('[config] Unexpected validation failure:', result.error.format());
+    process.exit(1);
+  }
+
+  console.log(`[config] Environment validated (${Object.keys(envSchema.shape).length} vars, ${warnings.length} warnings)`);
+  return result.data;
+}
+
+// ─── Run Validation at Module Load ──────────────────────────────────────────
+
+const env = validateEnv();
+
+// ─── Parse Providers ────────────────────────────────────────────────────────
+
+const allowedProviders = parseAllowedProviders(env.ALLOWED_SANDBOX_PROVIDERS);
+
+// ─── Config Object (typed, validated) ───────────────────────────────────────
 
 export const config = {
-  PORT: parseInt(process.env.PORT || '8008', 10),
-  // local | cloud — matches frontend's EnvMode
-  ENV_MODE: process.env.ENV_MODE || 'local',
+  PORT: env.PORT,
+  ENV_MODE: env.ENV_MODE,
 
   // ─── Internal Deployment Controls ─────────────────────────────────────────
-  // dev | staging | prod — controls Stripe price IDs, analytics, log levels.
-  // Does NOT affect auth or routing. Replaces the old STRIPE_ENV.
-  INTERNAL_KORTIX_ENV: (process.env.INTERNAL_KORTIX_ENV || 'dev') as InternalKortixEnv,
-  // Enables Kortix Cloud internal router features (model routing, usage tracking, cost allocation).
-  // Default false — safe for self-hosted.
-  KORTIX_ROUTER_INTERNAL_ENABLED: process.env.KORTIX_ROUTER_INTERNAL_ENABLED === 'true',
-  // Enables billing features (Stripe integration, credit system, usage metering).
-  // Default false — safe for self-hosted.
-  KORTIX_BILLING_INTERNAL_ENABLED: process.env.KORTIX_BILLING_INTERNAL_ENABLED === 'true',
+  INTERNAL_KORTIX_ENV: env.INTERNAL_KORTIX_ENV as InternalKortixEnv,
+  KORTIX_ROUTER_INTERNAL_ENABLED: env.KORTIX_ROUTER_INTERNAL_ENABLED,
+  KORTIX_BILLING_INTERNAL_ENABLED: env.KORTIX_BILLING_INTERNAL_ENABLED,
 
   // ─── Database ──────────────────────────────────────────────────────────────
-  DATABASE_URL: process.env.DATABASE_URL || '',
+  DATABASE_URL: env.DATABASE_URL,
 
   // ─── Supabase ──────────────────────────────────────────────────────────────
-  SUPABASE_URL: process.env.SUPABASE_URL || '',
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  SUPABASE_URL: env.SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
 
   // ─── API Key Hashing ──────────────────────────────────────────────────────
-  API_KEY_SECRET: process.env.API_KEY_SECRET || '',
+  API_KEY_SECRET: env.API_KEY_SECRET,
 
   // ─── Search Providers ──────────────────────────────────────────────────────
-  TAVILY_API_URL: process.env.TAVILY_API_URL || 'https://api.tavily.com',
-  TAVILY_API_KEY: process.env.TAVILY_API_KEY || '',
-
-  SERPER_API_URL: process.env.SERPER_API_URL || 'https://google.serper.dev',
-  SERPER_API_KEY: process.env.SERPER_API_KEY || '',
+  TAVILY_API_URL: env.TAVILY_API_URL,
+  TAVILY_API_KEY: env.TAVILY_API_KEY,
+  SERPER_API_URL: env.SERPER_API_URL,
+  SERPER_API_KEY: env.SERPER_API_KEY,
 
   // ─── Proxy Providers ──────────────────────────────────────────────────────
-  FIRECRAWL_API_URL: process.env.FIRECRAWL_API_URL || 'https://api.firecrawl.dev',
-  FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || '',
-
-  REPLICATE_API_URL: process.env.REPLICATE_API_URL || 'https://api.replicate.com',
-  REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || '',
-
-  CONTEXT7_API_URL: process.env.CONTEXT7_API_URL || 'https://context7.com',
-  CONTEXT7_API_KEY: process.env.CONTEXT7_API_KEY || '',
+  FIRECRAWL_API_URL: env.FIRECRAWL_API_URL,
+  FIRECRAWL_API_KEY: env.FIRECRAWL_API_KEY,
+  REPLICATE_API_URL: env.REPLICATE_API_URL,
+  REPLICATE_API_TOKEN: env.REPLICATE_API_TOKEN,
+  CONTEXT7_API_URL: env.CONTEXT7_API_URL,
+  CONTEXT7_API_KEY: env.CONTEXT7_API_KEY,
 
   // ─── Freestyle (Deployments) ──────────────────────────────────────────────
-  FREESTYLE_API_URL: process.env.FREESTYLE_API_URL || 'https://api.freestyle.sh',
-  FREESTYLE_API_KEY: process.env.FREESTYLE_API_KEY || '',
+  FREESTYLE_API_URL: env.FREESTYLE_API_URL,
+  FREESTYLE_API_KEY: env.FREESTYLE_API_KEY,
 
   // ─── LLM Providers ────────────────────────────────────────────────────────
-  OPENROUTER_API_URL: process.env.OPENROUTER_API_URL || 'https://openrouter.ai/api/v1',
-  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
-
-  ANTHROPIC_API_URL: process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com/v1',
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
-
-  OPENAI_API_URL: process.env.OPENAI_API_URL || 'https://api.openai.com/v1',
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-
-  XAI_API_URL: process.env.XAI_API_URL || 'https://api.x.ai/v1',
-  XAI_API_KEY: process.env.XAI_API_KEY || '',
-
-  GEMINI_API_URL: process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta',
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
-
-  GROQ_API_URL: process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1',
-  GROQ_API_KEY: process.env.GROQ_API_KEY || '',
-
-  AWS_BEARER_TOKEN_BEDROCK: process.env.AWS_BEARER_TOKEN_BEDROCK || '',
+  OPENROUTER_API_URL: env.OPENROUTER_API_URL,
+  OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
+  ANTHROPIC_API_URL: env.ANTHROPIC_API_URL,
+  ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+  OPENAI_API_URL: env.OPENAI_API_URL,
+  OPENAI_API_KEY: env.OPENAI_API_KEY,
+  XAI_API_URL: env.XAI_API_URL,
+  XAI_API_KEY: env.XAI_API_KEY,
+  GEMINI_API_URL: env.GEMINI_API_URL,
+  GEMINI_API_KEY: env.GEMINI_API_KEY,
+  GROQ_API_URL: env.GROQ_API_URL,
+  GROQ_API_KEY: env.GROQ_API_KEY,
+  AWS_BEARER_TOKEN_BEDROCK: env.AWS_BEARER_TOKEN_BEDROCK,
 
   // ─── Stripe (Billing) ─────────────────────────────────────────────────────
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+  STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: env.STRIPE_WEBHOOK_SECRET,
 
   // ─── RevenueCat (Billing) ─────────────────────────────────────────────────
-  REVENUECAT_API_KEY: process.env.REVENUECAT_API_KEY || '',
-  REVENUECAT_WEBHOOK_SECRET: process.env.REVENUECAT_WEBHOOK_SECRET || '',
+  REVENUECAT_API_KEY: env.REVENUECAT_API_KEY,
+  REVENUECAT_WEBHOOK_SECRET: env.REVENUECAT_WEBHOOK_SECRET,
 
   // ─── Daytona (Sandbox provisioning + preview proxy) ───────────────────────
-  DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || '',
-  DAYTONA_SERVER_URL: process.env.DAYTONA_SERVER_URL || '',
-  DAYTONA_TARGET: process.env.DAYTONA_TARGET || '',
+  DAYTONA_API_KEY: env.DAYTONA_API_KEY,
+  DAYTONA_SERVER_URL: env.DAYTONA_SERVER_URL,
+  DAYTONA_TARGET: env.DAYTONA_TARGET,
   DAYTONA_SNAPSHOT: `kortix-sandbox-v${SANDBOX_VERSION}`,
 
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
-  KORTIX_URL: process.env.KORTIX_URL || '',
-  /**
-   * Comma-separated list of allowed sandbox providers.
-   * e.g. "daytona,local_docker" or just "local_docker"
-   * First entry is the default provider for new sandboxes.
-   */
-  ALLOWED_SANDBOX_PROVIDERS: parseAllowedProviders(process.env.ALLOWED_SANDBOX_PROVIDERS || ''),
+  KORTIX_URL: env.KORTIX_URL,
+  ALLOWED_SANDBOX_PROVIDERS: allowedProviders,
   SANDBOX_IMAGE: `kortix/sandbox:${SANDBOX_VERSION}`,
-  DOCKER_HOST: process.env.DOCKER_HOST || '',
-  SANDBOX_NETWORK: process.env.SANDBOX_NETWORK || '',
-  /**
-   * Base host port used for local Docker sandbox fixed port mappings.
-   * The sandbox uses 8 contiguous ports starting at this base.
-   */
-  SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
+  DOCKER_HOST: env.DOCKER_HOST,
+  SANDBOX_NETWORK: env.SANDBOX_NETWORK,
+  SANDBOX_PORT_BASE: env.SANDBOX_PORT_BASE,
 
   /**
-   * INTERNAL_SERVICE_KEY — direction: kortix-api → sandbox.
+   * INTERNAL_SERVICE_KEY -- direction: kortix-api -> sandbox.
    *
    * This is how kortix-api authenticates itself TO the sandbox. Every request
    * from kortix-api to the sandbox (proxy, cron, health, queue drain, etc.)
    * includes `Authorization: Bearer <INTERNAL_SERVICE_KEY>`. The sandbox's
    * kortix-master middleware validates it.
    *
-   * Counterpart: KORTIX_TOKEN goes the other direction (sandbox → kortix-api).
+   * Counterpart: KORTIX_TOKEN goes the other direction (sandbox -> kortix-api).
    *
-   * Auto-generated at startup if not provided — always present.
+   * Auto-generated at startup if not provided -- always present.
    * Persisted to .env so the same key survives process restarts.
    */
   get INTERNAL_SERVICE_KEY(): string {
@@ -143,7 +410,7 @@ export const config = {
         const { appendFileSync, readFileSync, existsSync } = require('fs');
         const { resolve } = require('path');
         const candidates = [
-          resolve(__dirname, '../../.env'),       // from src/config.ts → ../../.env
+          resolve(__dirname, '../../.env'),       // from src/config.ts -> ../../.env
           resolve(process.cwd(), '.env'),          // cwd/.env
         ];
         for (const envPath of candidates) {
@@ -157,84 +424,83 @@ export const config = {
           }
         }
       } catch (err: any) {
-        // Non-fatal — key still works in-memory for this process lifetime
+        // Non-fatal -- key still works in-memory for this process lifetime
         console.warn('[config] Could not persist INTERNAL_SERVICE_KEY to .env:', err.message);
       }
     }
-    return process.env.INTERNAL_SERVICE_KEY;
+    return process.env.INTERNAL_SERVICE_KEY!;
   },
 
   // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
-  SCHEDULER_ENABLED: process.env.SCHEDULER_ENABLED !== 'false',
-  /** If set, enables pg_cron mode: external ticks via POST /v1/cron/tick with this secret */
-  CRON_TICK_SECRET: process.env.CRON_TICK_SECRET || '',
-  /** URL pg_cron uses to call the tick endpoint */
-  CRON_API_URL: process.env.CRON_API_URL || '',
+  SCHEDULER_ENABLED: env.SCHEDULER_ENABLED,
+  CRON_TICK_SECRET: env.CRON_TICK_SECRET,
+  /**
+   * URL that pg_cron uses to call back into the API for trigger execution.
+   * Auto-derived from PORT if not explicitly set:
+   *   - If DOCKER_HOST is set (DB likely in Docker) → http://host.docker.internal:<PORT>
+   *   - Otherwise → http://localhost:<PORT>
+   */
+  CRON_API_URL: env.CRON_API_URL
+    || (env.DOCKER_HOST
+      ? `http://host.docker.internal:${env.PORT}`
+      : `http://localhost:${env.PORT}`),
 
   // ─── Channels ───────────────────────────────────────────────────────────────
-  CHANNELS_ENABLED: process.env.CHANNELS_ENABLED !== 'false',
-  CHANNELS_PUBLIC_URL: process.env.CHANNELS_PUBLIC_URL || '',
-  /** 64-char hex string (32 bytes) for AES-256-GCM credential encryption. Omit to disable. */
-  CHANNELS_CREDENTIAL_KEY: process.env.CHANNELS_CREDENTIAL_KEY || '',
+  CHANNELS_ENABLED: env.CHANNELS_ENABLED,
+  CHANNELS_PUBLIC_URL: env.CHANNELS_PUBLIC_URL,
+  CHANNELS_CREDENTIAL_KEY: env.CHANNELS_CREDENTIAL_KEY,
 
   // ─── Session Pruning (LLM Context) ───────────────────────────────────────
-  /** Master switch — set to 'false' to disable pruning entirely. */
-  SESSION_PRUNING_ENABLED: process.env.SESSION_PRUNING_ENABLED !== 'false',
-  /** Idle TTL in ms before pruning activates (default 5 min). */
-  SESSION_PRUNING_TTL_MS: parseInt(process.env.SESSION_PRUNING_TTL_MS || '', 10) || 5 * 60 * 1000,
-  /** Number of trailing assistant turns whose tool results are protected. */
-  SESSION_PRUNING_KEEP_LAST: parseInt(process.env.SESSION_PRUNING_KEEP_LAST || '', 10) || 3,
-  /** Context fill ratio that triggers soft-trim (0-1). */
-  SESSION_PRUNING_SOFT_RATIO: parseFloat(process.env.SESSION_PRUNING_SOFT_RATIO || '') || 0.3,
-  /** Context fill ratio that triggers hard-clear (0-1). */
-  SESSION_PRUNING_HARD_RATIO: parseFloat(process.env.SESSION_PRUNING_HARD_RATIO || '') || 0.5,
-  /** Min total prunable chars before hard-clear kicks in. */
-  SESSION_PRUNING_MIN_CHARS: parseInt(process.env.SESSION_PRUNING_MIN_CHARS || '', 10) || 50_000,
-  /** Individual tool result size threshold for soft-trim (chars). */
-  SESSION_PRUNING_SOFT_MAX: parseInt(process.env.SESSION_PRUNING_SOFT_MAX || '', 10) || 4_000,
-  /** Chars kept from the start during soft-trim. */
-  SESSION_PRUNING_SOFT_HEAD: parseInt(process.env.SESSION_PRUNING_SOFT_HEAD || '', 10) || 1_500,
-  /** Chars kept from the end during soft-trim. */
-  SESSION_PRUNING_SOFT_TAIL: parseInt(process.env.SESSION_PRUNING_SOFT_TAIL || '', 10) || 1_500,
-  /** Enable/disable the hard-clear phase. */
-  SESSION_PRUNING_HARD_ENABLED: process.env.SESSION_PRUNING_HARD_ENABLED !== 'false',
-  /** Placeholder text for hard-cleared tool results. */
-  SESSION_PRUNING_HARD_PLACEHOLDER: process.env.SESSION_PRUNING_HARD_PLACEHOLDER || '[Old tool result content cleared]',
+  SESSION_PRUNING_ENABLED: env.SESSION_PRUNING_ENABLED,
+  SESSION_PRUNING_TTL_MS: env.SESSION_PRUNING_TTL_MS,
+  SESSION_PRUNING_KEEP_LAST: env.SESSION_PRUNING_KEEP_LAST,
+  SESSION_PRUNING_SOFT_RATIO: env.SESSION_PRUNING_SOFT_RATIO,
+  SESSION_PRUNING_HARD_RATIO: env.SESSION_PRUNING_HARD_RATIO,
+  SESSION_PRUNING_MIN_CHARS: env.SESSION_PRUNING_MIN_CHARS,
+  SESSION_PRUNING_SOFT_MAX: env.SESSION_PRUNING_SOFT_MAX,
+  SESSION_PRUNING_SOFT_HEAD: env.SESSION_PRUNING_SOFT_HEAD,
+  SESSION_PRUNING_SOFT_TAIL: env.SESSION_PRUNING_SOFT_TAIL,
+  SESSION_PRUNING_HARD_ENABLED: env.SESSION_PRUNING_HARD_ENABLED,
+  SESSION_PRUNING_HARD_PLACEHOLDER: env.SESSION_PRUNING_HARD_PLACEHOLDER,
 
   // ─── Frontend ────────────────────────────────────────────────────────────
-  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  FRONTEND_URL: env.FRONTEND_URL,
 
   // ─── Integrations (OAuth Provider) ───────────────────────────────────────
-  INTEGRATION_AUTH_PROVIDER: process.env.INTEGRATION_AUTH_PROVIDER || 'pipedream',
-  PIPEDREAM_CLIENT_ID: process.env.PIPEDREAM_CLIENT_ID || '',
-  PIPEDREAM_CLIENT_SECRET: process.env.PIPEDREAM_CLIENT_SECRET || '',
-  PIPEDREAM_PROJECT_ID: process.env.PIPEDREAM_PROJECT_ID || '',
-  PIPEDREAM_ENVIRONMENT: process.env.PIPEDREAM_ENVIRONMENT || 'development',
+  INTEGRATION_AUTH_PROVIDER: env.INTEGRATION_AUTH_PROVIDER,
+  PIPEDREAM_CLIENT_ID: env.PIPEDREAM_CLIENT_ID,
+  PIPEDREAM_CLIENT_SECRET: env.PIPEDREAM_CLIENT_SECRET,
+  PIPEDREAM_PROJECT_ID: env.PIPEDREAM_PROJECT_ID,
+  PIPEDREAM_ENVIRONMENT: env.PIPEDREAM_ENVIRONMENT,
 
   // ─── Tunnel (Reverse-Tunnel to Local Machine) ──────────────────────────────
-  TUNNEL_ENABLED: process.env.TUNNEL_ENABLED !== 'false',
-  /** Heartbeat interval for tunnel agents (ms). Agent sends ping, server expects pong. */
-  TUNNEL_HEARTBEAT_INTERVAL_MS: parseInt(process.env.TUNNEL_HEARTBEAT_INTERVAL_MS || '30000', 10),
-  /** Max missed heartbeats before marking tunnel offline. */
-  TUNNEL_HEARTBEAT_MAX_MISSED: parseInt(process.env.TUNNEL_HEARTBEAT_MAX_MISSED || '3', 10),
-  /** Default timeout for RPC calls relayed to local agent (ms). */
-  TUNNEL_RPC_TIMEOUT_MS: parseInt(process.env.TUNNEL_RPC_TIMEOUT_MS || '30000', 10),
-  /** Max file size for tunnel filesystem operations (bytes). */
-  TUNNEL_MAX_FILE_SIZE: parseInt(process.env.TUNNEL_MAX_FILE_SIZE || String(10 * 1024 * 1024), 10),
-  /** TTL for tunnel permission requests before auto-expiring (ms). */
-  TUNNEL_PERMISSION_REQUEST_TTL_MS: parseInt(process.env.TUNNEL_PERMISSION_REQUEST_TTL_MS || '300000', 10),
-  /** Rate limits for tunnel endpoints (requests per 60s window). */
-  TUNNEL_RATE_LIMIT_RPC: parseInt(process.env.TUNNEL_RATE_LIMIT_RPC || '100', 10),
-  TUNNEL_RATE_LIMIT_PERM_REQUEST: parseInt(process.env.TUNNEL_RATE_LIMIT_PERM_REQUEST || '20', 10),
-  TUNNEL_RATE_LIMIT_WS_CONNECT: parseInt(process.env.TUNNEL_RATE_LIMIT_WS_CONNECT || '5', 10),
-  TUNNEL_RATE_LIMIT_PERM_GRANT: parseInt(process.env.TUNNEL_RATE_LIMIT_PERM_GRANT || '30', 10),
-  /** Max WebSocket message size for tunnel agents (bytes). Default 5MB. */
-  TUNNEL_MAX_WS_MESSAGE_SIZE: parseInt(process.env.TUNNEL_MAX_WS_MESSAGE_SIZE || String(5 * 1024 * 1024), 10),
+  TUNNEL_ENABLED: env.TUNNEL_ENABLED,
+  TUNNEL_HEARTBEAT_INTERVAL_MS: env.TUNNEL_HEARTBEAT_INTERVAL_MS,
+  TUNNEL_HEARTBEAT_MAX_MISSED: env.TUNNEL_HEARTBEAT_MAX_MISSED,
+  TUNNEL_RPC_TIMEOUT_MS: env.TUNNEL_RPC_TIMEOUT_MS,
+  TUNNEL_MAX_FILE_SIZE: env.TUNNEL_MAX_FILE_SIZE,
+  TUNNEL_PERMISSION_REQUEST_TTL_MS: env.TUNNEL_PERMISSION_REQUEST_TTL_MS,
+  TUNNEL_RATE_LIMIT_RPC: env.TUNNEL_RATE_LIMIT_RPC,
+  TUNNEL_RATE_LIMIT_PERM_REQUEST: env.TUNNEL_RATE_LIMIT_PERM_REQUEST,
+  TUNNEL_RATE_LIMIT_WS_CONNECT: env.TUNNEL_RATE_LIMIT_WS_CONNECT,
+  TUNNEL_RATE_LIMIT_PERM_GRANT: env.TUNNEL_RATE_LIMIT_PERM_GRANT,
+  TUNNEL_MAX_WS_MESSAGE_SIZE: env.TUNNEL_MAX_WS_MESSAGE_SIZE,
 
   // ─── Slack (Platform App) ─────────────────────────────────────────────────
-  SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID || '',
-  SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET || '',
-  SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET || '',
+  SLACK_CLIENT_ID: env.SLACK_CLIENT_ID,
+  SLACK_CLIENT_SECRET: env.SLACK_CLIENT_SECRET,
+  SLACK_SIGNING_SECRET: env.SLACK_SIGNING_SECRET,
+
+  // ─── Version / GitHub ──────────────────────────────────────────────────────
+  /** Dev override: if set, skip npm registry lookup for latest sandbox version. */
+  SANDBOX_VERSION_OVERRIDE: env.SANDBOX_VERSION,
+  GITHUB_TOKEN: env.GITHUB_TOKEN,
+
+  // ─── Stray env vars (centralized from other files) ────────────────────────
+  CORS_ALLOWED_ORIGINS: env.CORS_ALLOWED_ORIGINS,
+  KORTIX_MASTER_URL: env.KORTIX_MASTER_URL,
+  OPENCODE_URL: env.OPENCODE_URL,
+  KORTIX_DATA_DIR: env.KORTIX_DATA_DIR,
 
   // ─── Helper Methods ────────────────────────────────────────────────────────
 
@@ -264,8 +530,8 @@ export const config = {
 // ─── Billing Markup Constants ────────────────────────────────────────────────
 //
 // Two pricing modes based on whose API key is used:
-//   • Kortix keys (user uses our keys):  1.2x provider cost (20% markup)
-//   • User's own keys (passthrough):     0.1x provider cost (10% platform fee)
+//   * Kortix keys (user uses our keys):  1.2x provider cost (20% markup)
+//   * User's own keys (passthrough):     0.1x provider cost (10% platform fee)
 
 /** Markup when Kortix provides the API key. */
 export const KORTIX_MARKUP = 1.2;

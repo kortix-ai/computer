@@ -10,7 +10,10 @@ import {
   Globe,
   Pencil,
   ChevronRight,
+  AlertCircle,
+  Settings,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
@@ -21,7 +24,7 @@ import {
 } from '@/components/ui/tooltip';
 import type { Deployment } from '@/hooks/deployments/use-deployments';
 import type { DeploymentGroup as DeploymentGroupType } from '@/hooks/deployments/use-deployments';
-import { DeploymentCard, statusConfig, formatRelativeTime } from './deployment-card';
+import { DeploymentCard, statusConfig, formatRelativeTime, isFreestyleKeyError } from './deployment-card';
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
@@ -229,6 +232,46 @@ export function DeploymentGroup({
               <ExternalLink className="h-3 w-3" />
               {latestDeployment.liveUrl}
             </a>
+          </div>
+        )}
+
+        {/* Error message for latest deployment */}
+        {latestDeployment.status === 'failed' && latestDeployment.error && (
+          <div className="mt-3 pl-16 space-y-2.5">
+            <div className="flex items-center gap-2 text-sm text-red-500 dark:text-red-400 bg-red-500/5 rounded-lg px-3 py-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="flex-1 line-clamp-2">{latestDeployment.error}</span>
+              {isFreestyleKeyError(latestDeployment.error) && onConfigureApiKey && (
+                <button
+                  onClick={onConfigureApiKey}
+                  className="inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 transition-colors"
+                >
+                  <Settings className="h-3 w-3" />
+                  Configure
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEditRedeploy(latestDeployment)}
+                className="h-8 gap-1.5 text-xs cursor-pointer"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit &amp; Redeploy
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRedeploy(latestDeployment)}
+                disabled={isRedeployPending}
+                className="h-8 gap-1.5 text-xs cursor-pointer"
+              >
+                <RotateCcw className={cn('h-3.5 w-3.5', isRedeployPending && 'animate-spin')} />
+                {isRedeployPending ? 'Redeploying...' : 'Redeploy'}
+              </Button>
+            </div>
           </div>
         )}
 

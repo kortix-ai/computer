@@ -5,6 +5,7 @@ import { webSearch } from './routes/search-web';
 import { imageSearch } from './routes/search-image';
 import { llm } from './routes/llm';
 import { proxy } from './routes/proxy';
+import { woaApp } from '../woa';
 
 const router = new Hono();
 
@@ -29,6 +30,10 @@ router.use('/chat/*', apiKeyAuth);
 router.use('/models', apiKeyAuth);
 router.use('/models/*', apiKeyAuth);
 router.route('/', llm);
+
+// WoA — Wisdom of Agents forum (apiKeyAuth, 0-cost)
+router.use('/woa/*', apiKeyAuth);
+router.route('/woa', woaApp);
 
 // Proxy routes (auth handled internally — dual mode)
 router.route('/', proxy);

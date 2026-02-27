@@ -234,7 +234,7 @@ export async function buildMergedSpec(
         'The `INTERNAL_SERVICE_KEY` env var adds a second layer: when set, the sandbox gateway rejects requests without a matching Bearer token. ' +
         'In local development, both the firewall and service key are typically absent — all sandbox ports are open on localhost.',
     },
-    servers: [{ url: '/', description: 'Current sandbox' }],
+    servers: [{ url: 'https://YOUR_KORTIX_API/v1/p/{sandboxId}/8000', description: 'Replace with your Kortix API base URL' }],
     tags: [],
     paths: {},
     components: {

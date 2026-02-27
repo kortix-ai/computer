@@ -13,7 +13,7 @@ import {
   uniqueIndex,
   unique,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 export const kortixSchema = pgSchema('kortix');
 
@@ -663,9 +663,14 @@ export const creditLedger = kortixSchema.table(
     isExpiring: boolean('is_expiring').default(true),
     expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }),
     stripeEventId: varchar('stripe_event_id', { length: 255 }),
+    idempotencyKey: text('idempotency_key'),
+    processingSource: text('processing_source'),
   },
   (table) => [
     unique('kortix_unique_stripe_event').on(table.stripeEventId),
+    index('idx_kortix_credit_ledger_idempotency')
+      .on(table.idempotencyKey)
+      .where(sql`${table.idempotencyKey} IS NOT NULL`),
   ],
 );
 
@@ -934,5 +939,6 @@ export const woaPosts = kortixSchema.table(
     index('idx_woa_posts_refs').using('gin', table.refs),
     index('idx_woa_posts_tags').using('gin', table.tags),
     index('idx_woa_posts_created').on(table.createdAt),
+    index('idx_woa_posts_fts').using('gin', sql`to_tsvector('english', ${table.content})`),
   ],
 );

@@ -43,7 +43,7 @@ function parseMemSearchOutput(output: string): { query: string; hits: MemoryHit[
 
   const hits: MemoryHit[] = [];
   // Match blocks:   [LTM/semantic] #42 (confidence: 0.85)\n    content text\n    Files: a, b
-  const blockRe = /\[(LTM|obs)\/(\w+)\]\s*#(\d+)(?:\s*\(confidence:\s*([\d.]+)\))?\s*\n\s{4}(.+?)(?:\n\s{4}Files:\s*(.+?))?(?=\n\s{2}\[|\n*$)/gs;
+  const blockRe = /\[(LTM|obs)\/(\w+)\]\s*#(\d+)(?:\s*\(confidence:\s*([\d.]+)\))?\s*\n\s{4}(.+?)(?:\n\s{4}Files:\s*(.+?))?(?=\n\s{2}\[|\n*$)/g;  // removed /s flag for ES target compat
 
   let m;
   while ((m = blockRe.exec(output)) !== null) {

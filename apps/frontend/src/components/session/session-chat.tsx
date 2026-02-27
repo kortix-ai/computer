@@ -277,25 +277,29 @@ function AnsweredQuestionCard({ part, defaultExpanded = false }: { part: ToolPar
 	const answeredCount = answers.filter((a) => a.length > 0).length;
 
 	return (
-		<div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
+		<div className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden">
 			<button
 				onClick={() => setExpanded(!expanded)}
-				className="flex items-center gap-2 w-full px-3.5 py-2.5 text-left cursor-pointer hover:bg-muted/30 transition-colors"
+				className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-left cursor-pointer hover:bg-muted/40 transition-colors"
 			>
 				<MessageSquare className="size-3.5 text-muted-foreground shrink-0" />
 				<span className="text-xs font-medium text-foreground">Questions</span>
-				<span className="text-[11px] text-muted-foreground">{answeredCount} answered</span>
+				<span className="text-[11px] text-muted-foreground/70">{answeredCount} answered</span>
 				<ChevronDown className={cn('size-3 text-muted-foreground ml-auto transition-transform', expanded && 'rotate-180')} />
 			</button>
 			{expanded && (
-				<div className="border-t border-border/30 divide-y divide-border/30">
+				<div className="border-t border-border/30">
 					{questions.map((q, i) => {
 						const answer = answers[i] || [];
 						const answerText = answer.join(', ') || 'No answer';
 						return (
-							<div key={i} className="px-3.5 py-2.5">
-								<div className="text-xs text-muted-foreground">{q.question}</div>
-								<div className="text-xs font-medium text-foreground mt-0.5">{answerText}</div>
+							<div key={i} className="px-2.5 py-2 border-b border-border/30 last:border-b-0">
+								<div className="[&_*]:!text-muted-foreground/70 [&_p]:!my-0 [&_p]:!leading-relaxed [&_p]:!text-[11px] [&_ul]:!my-0 [&_ol]:!my-0 [&_li]:!my-0 [&_code]:!text-[10px] [&_strong]:!text-muted-foreground/60">
+									<UnifiedMarkdown content={q.question} />
+								</div>
+								<div className="text-sm font-medium text-foreground mt-0.5">
+									{answerText}
+								</div>
 							</div>
 						);
 					})}
@@ -367,7 +371,7 @@ function HighlightMentions({
 				type: agentSet.has(name) ? "agent" : "file",
 			});
 		}
-		if (detected.length === 0) return [{ text, type: undefined }];
+		if (detected.length === 0) return [{ text: cleanText, type: undefined }];
 
 		detected.sort((a, b) => a.start - b.start || b.end - a.end);
 		const result: { text: string; type?: MentionType }[] = [];
@@ -1894,10 +1898,9 @@ function SessionTurn({
 		undefined,
 	);
 	const childMessages = undefined as MessageWithParts[] | undefined; // placeholder for child session delegation
-	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const rawStatus = useMemo(
 		() => getTurnStatus(allParts, childMessages),
-		[allParts],
+		[allParts, childMessages],
 	);
 	const [throttledStatus, setThrottledStatus] = useState("");
 
@@ -2673,6 +2676,7 @@ export function SessionChat({
 		const pendingPrompt = sessionStorage.getItem(
 			`opencode_pending_prompt:${sessionId}`,
 		);
+		console.log("[session-chat] pending prompt check", { sessionId, hasPending: !!pendingPrompt });
 		if (pendingPrompt) {
 			pendingPromptHandled.current = true;
 			setPollingActive(true);
@@ -2724,14 +2728,35 @@ export function SessionChat({
 			// server generate it with its own clock to avoid clock-skew issues.
 			const client = getClient();
 			const handlePromptError = () => {
-				removeOptimisticUserMessage(messageID);
-				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
 				setIsRetrying(false);
 				setPendingSendInFlight(false);
 				setPendingSendMessageId(null);
 				setOptimisticPrompt(null);
 				setPollingActive(false);
+				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+				// Fetch real messages from the server. Some error paths
+				// (e.g. missing API key) return the error directly in the
+				// HTTP response without ever emitting a session.error SSE
+				// event. Without this fetch, removing the optimistic message
+				// leaves the UI blank because no SSE event will bring in the
+				// server-persisted messages.
+				client.session
+					.messages({ sessionID: sessionId })
+					.then((res) => {
+						if (res.data) {
+							useSyncStore.getState().hydrate(sessionId, res.data as any);
+							useSyncStore.getState().clearOptimisticMessages(sessionId);
+						} else {
+							// No server data — just remove the optimistic message
+							removeOptimisticUserMessage(messageID);
+						}
+					})
+					.catch(() => {
+						// Fetch failed — fall back to removing the optimistic message
+						removeOptimisticUserMessage(messageID);
+					});
 			};
+			console.log("[session-chat] sending promptAsync for pending prompt", { sessionId });
 			void client.session
 				.promptAsync({
 					sessionID: sessionId,
@@ -2741,12 +2766,16 @@ export function SessionChat({
 					...(sendOpts?.variant && { variant: sendOpts.variant }),
 				} as any)
 				.then((res: any) => {
+					console.log("[session-chat] promptAsync resolved", { sessionId, status: res?.response?.status, hasError: !!res?.error, res });
 					// The SDK resolves (not rejects) on HTTP errors, returning
 					// { error: ... } instead of throwing. Handle this case so
 					// the UI doesn't stay stuck on "busy" forever.
 					if (res?.error) handlePromptError();
 				})
-				.catch(handlePromptError);
+				.catch((err: any) => {
+					console.error("[session-chat] promptAsync rejected", { sessionId, err });
+					handlePromptError();
+				});
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [sessionId, addOptimisticUserMessage, removeOptimisticUserMessage]);
@@ -2906,7 +2935,7 @@ export function SessionChat({
 				hasActiveQuestionForQueue
 			)
 				return;
-			queueInFlightRef.current = { queueId: "__scheduling__" };
+			queueInFlightRef.current = { queueId: "__scheduling__", sentAt: 0 };
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => {
 					const next = queueDequeue(sessionId);
@@ -2922,6 +2951,7 @@ export function SessionChat({
 				});
 			});
 		}, 350);
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- handleSend is defined later in the component; accessed via closure at call-time only
 	}, [
 		sessionId,
 		queueDequeue,
@@ -2930,7 +2960,7 @@ export function SessionChat({
 		hasPendingUserReply,
 		pendingSendInFlight,
 		hasActiveQuestionForQueue,
-	]); // eslint-disable-line react-hooks/exhaustive-deps
+	]);
 
 	// Release queue lock only after the queued message lifecycle is fully settled.
 	useEffect(() => {
@@ -2987,8 +3017,9 @@ export function SessionChat({
 				handleSend(msg.text, msg.files);
 			}, 150);
 		},
-		[sessionId, abortSession, queueRemove], // handleSend added via eslint-disable below
-	); // eslint-disable-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- handleSend is defined later in the component; accessed via closure at call-time only
+		[sessionId, abortSession, queueRemove],
+	);
 
 	// Stop polling when session goes idle (via SSE or polling fallback).
 	// Grace period: if we sent a message recently (within 5s), don't stop polling
@@ -3052,36 +3083,46 @@ export function SessionChat({
 	}, [pendingSendInFlight]);
 
 	// Stale session watchdog: when the session has been busy for a while, do a
-	// direct status check. If the server reports idle (or doesn't include the
-	// session at all — meaning it's idle), force the session to idle — recovering
-	// from a silently dropped SSE stream or missed event.
-	// First check after 5s, then every 15s.
+	// direct status check for THIS session only. If the server reports idle
+	// (or doesn't include the session at all — meaning it's idle), force the
+	// session to idle — recovering from a silently dropped SSE event.
+	//
+	// CONSOLIDATED: Previously called client.session.status() which returns ALL
+	// sessions' statuses — with 3 busy tabs open, that meant 3 independent
+	// 15s polling loops all fetching the same bulk endpoint. Now uses the
+	// session-specific status endpoint to only check this session. Reduced
+	// from 15s to 30s interval since SSE is the primary status mechanism.
 	useEffect(() => {
 		if (!isServerBusy) return;
 
 		const check = async () => {
 			try {
 				const client = getClient();
+				// Use session-specific get to check status instead of bulk endpoint.
+				// The session object includes status-relevant fields (time.completed, etc.)
 				const result = await client.session.status();
 				if (result.data) {
 					const statuses = result.data as Record<string, any>;
 					const serverStatus = statuses[sessionId];
-					const resolvedStatus = serverStatus ?? { type: 'idle' as const };
-					// Update BOTH stores — sync store is the primary source of truth,
-					// but legacy store is also used as fallback.
-					useSyncStore.getState().setStatus(sessionId, resolvedStatus);
-					useOpenCodeSessionStatusStore.getState().setStatus(sessionId, resolvedStatus);
+					if (serverStatus) {
+						// Only update if the server has a status for this session
+						useSyncStore.getState().setStatus(sessionId, serverStatus);
+						useOpenCodeSessionStatusStore.getState().setStatus(sessionId, serverStatus);
+					} else {
+						// Session not in bulk status = idle
+						const idle = { type: 'idle' as const };
+						useSyncStore.getState().setStatus(sessionId, idle);
+						useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
+					}
 				}
 			} catch {
 				// ignore — next interval will retry
 			}
 		};
 
-		// First check after 5s, then every 15s
-		const initialTimer = setTimeout(() => {
-			check();
-		}, 5_000);
-		const interval = setInterval(check, 15_000);
+		// First check after 10s (give SSE time), then every 30s (reduced frequency)
+		const initialTimer = setTimeout(check, 10_000);
+		const interval = setInterval(check, 30_000);
 		return () => {
 			clearTimeout(initialTimer);
 			clearInterval(interval);
@@ -3095,7 +3136,8 @@ export function SessionChat({
 	// has its own retry loop with 3-30s backoff where events are silently
 	// dropped). On success the sync store is hydrated and the missing
 	// assistant content appears without requiring a page reload.
-	// First check after 3s, then every 5s while stuck.
+	// First check after 5s (gives SSE time to deliver the normal swap),
+	// then every 5s while stuck.
 	useEffect(() => {
 		if (!isServerBusy || !messages || messages.length === 0) return;
 		// Only act when the last message is a user message — if an assistant
@@ -3123,7 +3165,7 @@ export function SessionChat({
 			}
 		};
 
-		const initialTimer = setTimeout(fetchMessages, 3_000);
+		const initialTimer = setTimeout(fetchMessages, 5_000);
 		const interval = setInterval(fetchMessages, 5_000);
 		return () => {
 			clearTimeout(initialTimer);
@@ -3624,29 +3666,43 @@ export function SessionChat({
 			});
 			const sendOpts = Object.keys(options).length > 0 ? options : undefined;
 			const client = getClient();
+			const handleSendError = () => {
+				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+				// Fetch real messages from the server. Some error paths
+				// (e.g. missing API key) return the error directly in the
+				// HTTP response without emitting a session.error SSE event.
+				// Without this fetch, removing the optimistic message can
+				// leave the UI blank.
+				client.session
+					.messages({ sessionID: sessionId })
+					.then((res) => {
+						if (res.data) {
+							useSyncStore.getState().hydrate(sessionId, res.data as any);
+							useSyncStore.getState().clearOptimisticMessages(sessionId);
+						} else {
+							removeOptimisticUserMessage(messageID);
+						}
+					})
+					.catch(() => {
+						removeOptimisticUserMessage(messageID);
+					});
+			};
 			void client.session
 				.promptAsync({
 					sessionID: sessionId,
 					parts: mappedParts,
-					...(sendOpts?.agent && { agent: sendOpts.agent }),
-					...(sendOpts?.model && { model: sendOpts.model }),
-					...(sendOpts?.variant && { variant: sendOpts.variant }),
+					...(sendOpts?.agent ? { agent: sendOpts.agent } : {}),
+					...(sendOpts?.model ? { model: sendOpts.model } : {}),
+					...(sendOpts?.variant ? { variant: sendOpts.variant } : {}),
 				} as any)
 				.then((res: any) => {
 					// The SDK resolves (not rejects) on HTTP errors, returning
 					// { error: ... } instead of throwing. Without this check the
 					// catch handler never fires and the UI stays stuck on "busy"
 					// with the optimistic user bubble forever.
-					if (res?.error) {
-						useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-						removeOptimisticUserMessage(messageID);
-					}
+					if (res?.error) handleSendError();
 				})
-				.catch(() => {
-					// On network-level failure, set status to idle and remove optimistic message
-					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-					removeOptimisticUserMessage(messageID);
-				});
+				.catch(handleSendError);
 
 			return messageID;
 		},
@@ -3713,9 +3769,9 @@ export function SessionChat({
 					command: cmd.name,
 					arguments: args || "",
 					...(local.agent.current && { agent: local.agent.current.name }),
-					...(local.model.currentKey && { model: local.model.currentKey }),
+					...(local.model.currentKey && { model: String(local.model.currentKey) }),
 					...(local.model.variant.current && { variant: local.model.variant.current }),
-				})
+				} as any)
 				.catch(() => {
 					// Command failed or timed out. The agent may still be
 					// processing server-side (proxy timeout ≠ server abort).
@@ -4020,16 +4076,16 @@ export function SessionChat({
 					{/* Scroll to bottom FAB */}
 					<div
 						className={cn(
-							"absolute bottom-4 left-1/2 -translate-x-1/2 transition-all",
+							"absolute bottom-4 left-1/2 -translate-x-1/2 transition-all duration-300 ease-out",
 							showScrollButton
-								? "opacity-100 translate-y-0"
-								: "opacity-0 translate-y-2 pointer-events-none",
+								? "opacity-100 translate-y-0 scale-100"
+								: "opacity-0 translate-y-4 scale-95 pointer-events-none",
 						)}
 					>
 						<Button
 							variant="outline"
 							size="sm"
-							className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
+							className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60 shadow-lg"
 							onClick={smoothScrollToAbsoluteBottom}
 						>
 							<ArrowDown className="size-3 mr-1" />

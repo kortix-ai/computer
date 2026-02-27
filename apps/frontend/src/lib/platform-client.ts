@@ -82,6 +82,7 @@ export interface SandboxInfo {
   provider: SandboxProviderName;
   base_url: string;
   status: string;
+  version?: string | null;
   metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;

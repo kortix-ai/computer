@@ -113,6 +113,15 @@ export async function proxyToSandbox(
     headers.set('Authorization', `Bearer ${config.INTERNAL_SERVICE_KEY}`);
   }
 
+  // Tell the sandbox what the public proxy base URL is so it can set the
+  // OpenAPI server URL correctly. Reconstruct from the original Host header
+  // (before we overwrite it) + the known proxy path prefix.
+  const originalHost = incomingHeaders.get('host');
+  if (originalHost) {
+    const proto = incomingHeaders.get('x-forwarded-proto') || 'http';
+    headers.set('X-Forwarded-Prefix', `${proto}://${originalHost}/v1/p/${sandboxId}/${port}`);
+  }
+
   // Abort handling
   const controller = new AbortController();
   if (!acceptsSSE) {

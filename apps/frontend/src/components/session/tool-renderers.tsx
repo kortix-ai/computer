@@ -243,10 +243,10 @@ function InlineServicePreview({
 						<button
 							type="button"
 							onClick={handleRefresh}
-							className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+						 className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
 						>
 							<RefreshCw
-								className={cn("h-3 w-3", isLoading && "animate-spin")}
+							 className={cn("h-3 w-3", isLoading && "animate-spin")}
 							/>
 						</button>
 					</TooltipTrigger>
@@ -256,8 +256,8 @@ function InlineServicePreview({
 					<TooltipTrigger asChild>
 						<button
 							type="button"
-							onClick={() => window.open(authenticatedUrl, "_blank", "noopener,noreferrer")}
-							className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+							onClick={() => window.open(authenticatedUrl ?? undefined, "_blank", "noopener,noreferrer")}
+						 className="p-1 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
 						>
 							<ExternalLink className="h-3 w-3" />
 						</button>
@@ -270,7 +270,7 @@ function InlineServicePreview({
 							<button
 								type="button"
 								onClick={navigateToPreviewTab}
-								className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
+							 className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
 							>
 								<MonitorPlay className="h-3 w-3" />
 								Preview
@@ -302,7 +302,7 @@ function InlineServicePreview({
 							<button
 								type="button"
 								onClick={handleRefresh}
-								className="text-xs text-primary hover:underline mt-1"
+							 className="text-xs text-primary hover:underline mt-1"
 							>
 								Retry
 							</button>
@@ -312,10 +312,10 @@ function InlineServicePreview({
 				{viewportScale > 0 && (
 					<iframe
 						key={refreshKey}
-						src={authenticatedUrl}
+						src={authenticatedUrl ?? undefined}
 						title={displayLabel}
-						className="border-0 bg-white"
-						style={{
+					 className="border-0 bg-white"
+					 style={{
 							width: "1920px",
 							height: "1080px",
 							transform: `scale(${viewportScale})`,
@@ -685,7 +685,7 @@ export function BasicTool({
 										) : trigger.subtitle}
 									</span>
 								)
-							)}
+						)}
 								{trigger.args &&
 									trigger.args.length > 0 &&
 									trigger.args.map((arg, i) => (
@@ -715,7 +715,7 @@ export function BasicTool({
 					)}
 					{children && !locked && (
 						<ChevronRight
-							className={cn(
+						 className={cn(
 								"size-3 transition-transform flex-shrink-0 text-muted-foreground/50",
 								open && "rotate-90",
 							)}
@@ -930,10 +930,10 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 							<div key={i}>
 								<button
 									onClick={() => setShowTrace((v) => !v)}
-									className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
+								 className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
 								>
 									<ChevronRight
-										className={cn(
+									 className={cn(
 											"size-3 transition-transform flex-shrink-0",
 											showTrace && "rotate-90",
 										)}
@@ -997,7 +997,7 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 						return (
 							<pre
 								key={i}
-								className="px-2.5 py-1 font-mono text-[11px] leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
+							 className="px-2.5 py-1 font-mono text-[11px] leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
 							>
 								{section.text}
 							</pre>
@@ -1113,7 +1113,8 @@ function parseSessionMetadataOutput(
 		}
 	}
 
-	return sessions.length > 0 ? sessions : null;
+	if (sessions.length === 0) return null;
+	return sessions;
 }
 
 function formatSessionTime(timestamp: number): string {
@@ -1148,12 +1149,12 @@ function SessionMetadataList({ sessions }: { sessions: ParsedSessionMeta[] }) {
 							serverId: useServerStore.getState().activeServerId,
 						})
 					}
-					className={cn(
+				 className={cn(
 						"flex items-start gap-2.5 px-2.5 py-2 rounded-md text-left w-full",
 						"hover:bg-muted/60 transition-colors group cursor-pointer",
 					)}
 				>
-					<MessageCircle className="size-3.5 flex-shrink-0 mt-0.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+					<MessageCircle className="size-3.5 flex-shrink-0 mt-0.5 text-muted-foreground group-hover:text-foreground/60 transition-colors" />
 					<div className="flex flex-col gap-0.5 min-w-0 flex-1">
 						<div className="flex items-center gap-2">
 							<span className="text-xs font-medium text-foreground truncate">
@@ -1601,7 +1602,7 @@ function PtyReadTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 				<div data-scrollable className="max-h-96 overflow-auto">
 					<PreWithPaths
 						text={parsed.content}
-						className="p-2.5 font-mono text-[11px] leading-relaxed text-foreground/80 whitespace-pre-wrap"
+					 className="p-2.5 font-mono text-[11px] leading-relaxed text-foreground/80 whitespace-pre-wrap"
 					/>
 					{parsed.bufferInfo && (
 						<div className="px-2.5 pb-2 text-[10px] text-muted-foreground/50 italic">
@@ -2032,7 +2033,7 @@ function InlineGrepResults({
 							onClick={() => setExpandedIndex(isExpanded ? null : i)}
 						>
 							<ChevronRight
-								className={cn(
+							 className={cn(
 									"size-3 text-muted-foreground flex-shrink-0 transition-transform",
 									isExpanded && "rotate-90",
 								)}
@@ -2040,12 +2041,12 @@ function InlineGrepResults({
 							<FileText className="size-3 text-muted-foreground/50 flex-shrink-0" />
 							<span className="text-[11px] min-w-0 flex items-baseline gap-1.5 overflow-hidden flex-1">
 								<span
-									className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-blue-500 transition-colors"
-									onClick={(e) => {
+								 className="text-foreground font-medium font-mono whitespace-nowrap flex-shrink-0 cursor-pointer hover:text-blue-500 transition-colors"
+								 onClick={(e) => {
 										e.stopPropagation();
 										onFileClick(group.filePath);
 									}}
-									title={group.filePath}
+								 title={group.filePath}
 								>
 									{name}
 								</span>
@@ -2235,7 +2236,7 @@ function WebFetchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 							{arg}
 						</span>
 					))}
-					<ExternalLink className="size-3 text-muted-foreground/60 flex-shrink-0 ml-auto" />
+					<ExternalLink className="size-3 text-muted-foreground/60 flex-shrink-0" />
 				</div>
 			}
 			defaultOpen={defaultOpen}
@@ -2424,9 +2425,9 @@ function parseWebSearchOutput(output: string | any): WebSearchQueryResult[] {
 				sources.push({
 					title: titleMatch[1].trim(),
 					url: urlMatch[1].trim(),
+					snippet: textMatch?.[1]?.trim() || undefined,
 					author: authorMatch?.[1]?.trim() || undefined,
 					publishedDate: dateMatch?.[1]?.trim() || undefined,
-					snippet: textMatch?.[1]?.trim() || undefined,
 				});
 			}
 		}
@@ -2530,7 +2531,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 											</span>
 										)}
 										<ChevronRight
-											className={cn(
+										 className={cn(
 												"size-3 text-muted-foreground/40 flex-shrink-0 transition-transform",
 												(isExpanded || !isMulti) && "rotate-90",
 											)}
@@ -2548,7 +2549,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 													{qr.answer}
 												</p>
 											</div>
-										)}
+									 )}
 
 										{/* Sources */}
 										{qr.sources.length > 0 && (
@@ -2561,13 +2562,13 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 												{qr.sources.map((src, si) => {
 													const favicon = wsFavicon(src.url);
 													const domain = wsDomain(src.url);
-													return (
+												 return (
 														<a
 															key={si}
 															href={src.url}
 															target="_blank"
 															rel="noopener noreferrer"
-															className="group flex items-start gap-2 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
+														 className="group flex items-start gap-2 p-2 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
 														>
 															{/* Favicon */}
 															<div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
@@ -2576,8 +2577,8 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 																	<img
 																		src={favicon}
 																		alt=""
-																		className="size-4 rounded"
-																		onError={(e) => {
+																	 className="size-4 rounded"
+																	 onError={(e) => {
 																			(
 																				e.target as HTMLImageElement
 																			).style.display = "none";
@@ -2612,7 +2613,7 @@ function WebSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 													);
 												})}
 											</div>
-										)}
+									 )}
 									</div>
 								)}
 							</div>
@@ -2663,14 +2664,7 @@ function parseScrapeOutput(output: string | any): ParsedScrapeOutput | null {
 			}
 			parsed = typeof result === "object" ? result : null;
 		} catch {
-			const trimmed = output.trim().replace(/^\uFEFF/, "");
-			if (trimmed !== output) {
-				try {
-					parsed = JSON.parse(trimmed);
-				} catch {
-					/* not JSON */
-				}
-			}
+			// Not JSON — return empty
 		}
 	}
 	if (!parsed) return null;
@@ -2768,7 +2762,7 @@ function ScrapeWebpageTool({
 									href={result.url}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="group flex items-start gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors"
+								 className="group flex items-start gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors"
 								>
 									{/* Favicon */}
 									<div className="size-5 rounded bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
@@ -2777,8 +2771,8 @@ function ScrapeWebpageTool({
 											<img
 												src={favicon}
 												alt=""
-												className="size-4 rounded"
-												onError={(e) => {
+											 className="size-4 rounded"
+											 onError={(e) => {
 													(e.target as HTMLImageElement).style.display = "none";
 												}}
 											/>
@@ -2933,7 +2927,7 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 			locked={locked}
 		>
 			{imageResults.length > 0 ? (
-				<div data-scrollable className="p-2 max-h-80 overflow-auto">
+				<div data-scrollable className="p-2 max-h-80 overflow-auto scrollbar-hide">
 					<div className="grid grid-cols-3 gap-1.5">
 						{imageResults.slice(0, 9).map((img: any, i: number) => {
 							const imgUrl = img.url || img.imageUrl || img.image_url || "";
@@ -2945,15 +2939,15 @@ function ImageSearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 									href={imgUrl}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="relative group overflow-hidden rounded border border-border/30 bg-muted/20 aspect-square"
+								 className="relative group overflow-hidden rounded border border-border/30 bg-muted/20 aspect-square"
 									title={title}
 								>
 									{/* eslint-disable-next-line @next/next/no-img-element */}
 									<img
 										src={imgUrl}
 										alt={title}
-										className="object-cover w-full h-full group-hover:opacity-80 transition-opacity"
-										onError={(e) => {
+									 className="object-cover w-full h-full group-hover:opacity-80 transition-opacity"
+									 onError={(e) => {
 											(e.target as HTMLImageElement).style.display = "none";
 										}}
 									/>
@@ -2980,8 +2974,8 @@ function ImageGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
 	const output = partOutput(part);
 	const status = partStatus(part);
-	const prompt = input.prompt;
-	const action = input.action;
+	const prompt = input.prompt as string | undefined;
+	const action = input.action as string | undefined;
 
 
 
@@ -3059,7 +3053,7 @@ function ImageGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 		<BasicTool
 			icon={<ImageIcon className="size-3.5 flex-shrink-0" />}
 			trigger={{
-				title: titleMap[action] || "Image Gen",
+				title: titleMap[action ?? ""] || "Image Gen",
 				subtitle: prompt?.slice(0, 60),
 			}}
 			defaultOpen={defaultOpen}
@@ -3073,7 +3067,7 @@ function ImageGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 						<img
 							src={displayImageSrc}
 							alt={String(prompt || 'Generated image')}
-							className="rounded border border-border/30 max-h-64 object-contain"
+						 className="rounded border border-border/30 max-h-64 object-contain"
 						/>
 					) : isImageLoading ? (
 						<div className="rounded border border-border/30 bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
@@ -3102,7 +3096,7 @@ function VideoGenTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const input = partInput(part);
 	const output = partOutput(part);
 	const status = partStatus(part);
-	const prompt = input.prompt;
+	const prompt = input.prompt as string | undefined;
 
 	return (
 		<BasicTool
@@ -3167,10 +3161,10 @@ function PresentationGenTool({
 	const output = partOutput(part);
 	const status = partStatus(part);
 	const running = useContext(ToolRunningContext);
-	const action = input.action;
-	const presentationName = input.presentation_name;
-	const slideTitle = input.slide_title;
-	const slideNumber = input.slide_number;
+	const action = input.action as string | undefined;
+	const presentationName = input.presentation_name as string | undefined;
+	const slideTitle = input.slide_title as string | undefined;
+	const slideNumber = input.slide_number as number | string | undefined;
 
 	const parsed = useMemo(() => parsePresentationOutput(output), [output]);
 	const isError = parsed ? !parsed.success : false;
@@ -3215,7 +3209,7 @@ function PresentationGenTool({
 			export_pptx: "Export PPTX",
 			preview: "Preview",
 		};
-		return labels[action] || action;
+		return labels[action ?? ""] || action;
 	}, [action]);
 
 	return (
@@ -3250,8 +3244,8 @@ function PresentationGenTool({
 							href={viewerProxyUrl}
 							target="_blank"
 							rel="noopener noreferrer"
-							className="ml-auto flex-shrink-0"
-							onClick={(e) => e.stopPropagation()}
+						 className="ml-auto flex-shrink-0"
+						 onClick={(e) => e.stopPropagation()}
 						>
 							<ExternalLink className="size-3 text-muted-foreground/60 hover:text-foreground transition-colors" />
 						</a>
@@ -3331,7 +3325,7 @@ function PresentationGenTool({
 						"preview",
 						"export_pdf",
 						"export_pptx",
-					].includes(action) && (
+					].includes(action as string) && (
 						<div className="flex items-center gap-2 text-xs">
 							<Check className="size-3 text-emerald-500 flex-shrink-0" />
 							<span className="text-foreground/80">
@@ -3511,7 +3505,7 @@ function ShowTool({ part }: ToolProps) {
 					<button
 						type="button"
 						onClick={openInTab}
-						className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex-shrink-0 bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+					 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex-shrink-0 bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
 					>
 						{hasLocalhostUrl ? <MonitorPlay className="size-3.5" /> : <Maximize2 className="size-3.5" />}
 						{openInTabLabel}
@@ -3548,993 +3542,6 @@ function ShowTool({ part }: ToolProps) {
 ToolRegistry.register("show", ShowTool);
 ToolRegistry.register("show-user", ShowTool); // backward compat
 
-// --- Task (sub-agent) — matches TUI: BasicTool with child tool list ---
-function TaskTool({
-	part,
-	sessionId,
-	defaultOpen,
-	forceOpen,
-	locked,
-	onPermissionReply,
-}: ToolProps) {
-	const input = partInput(part);
-	const status = partStatus(part);
-	const childSessionId = getChildSessionId(part);
-	const subagentType = (input.subagent_type as string) || "task";
-	const description = (input.description as string) || "";
-
-	// Sub-session modal state
-	const [modalOpen, setModalOpen] = useState(false);
-
-	// Fetch child session messages
-	const { data: childMessages } = useOpenCodeMessages(childSessionId || "");
-
-	// Get child session permissions from pending store
-	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
-	const childPermission = useMemo(() => {
-		if (!childSessionId) return undefined;
-		return Object.values(allPermissions).find(
-			(p) => p.sessionID === childSessionId,
-		);
-	}, [allPermissions, childSessionId]);
-
-	// Extract child tool parts
-	const childToolParts = useMemo(() => {
-		if (!childMessages) return [];
-		return getChildSessionToolParts(childMessages);
-	}, [childMessages]);
-
-	// Find the child tool part matching the permission
-	const childPermissionToolPart = useMemo(() => {
-		if (!childPermission?.tool || !childMessages) return undefined;
-		for (const msg of childMessages) {
-			if (msg.info.role !== "assistant") continue;
-			for (const p of msg.parts) {
-				if (isToolPart(p) && p.callID === childPermission.tool.callID) {
-					return p;
-				}
-			}
-		}
-		return undefined;
-	}, [childPermission, childMessages]);
-
-	// Click subtitle → open inline modal (instead of navigating away)
-	const handleSubtitleClick = useCallback(() => {
-		if (childSessionId) {
-			setModalOpen(true);
-		}
-	}, [childSessionId]);
-
-	const scrollRef = useRef<HTMLDivElement>(null);
-	const userScrolledRef = useRef(false);
-	const stepCount = childToolParts.length;
-
-	useEffect(() => {
-		const el = scrollRef.current;
-		if (!el) return;
-		const handleScroll = () => {
-			const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
-			userScrolledRef.current = !atBottom;
-		};
-		el.addEventListener("scroll", handleScroll, { passive: true });
-		return () => el.removeEventListener("scroll", handleScroll);
-	}, []);
-
-	useEffect(() => {
-		const el = scrollRef.current;
-		if (el && !userScrolledRef.current) {
-			el.scrollTop = el.scrollHeight;
-		}
-	}, [stepCount]);
-
-	// Trigger content — agent type + clickable description (matches TUI)
-	const trigger = useMemo(
-		() => ({
-			title: `${subagentType.charAt(0).toUpperCase() + subagentType.slice(1)} Agent`,
-			subtitle: description || undefined,
-		}),
-		[subagentType, description],
-	);
-
-	// Sub-session modal (rendered always so open/close is instant)
-	const modal = childSessionId ? (
-		<SubSessionModal
-			open={modalOpen}
-			onOpenChange={setModalOpen}
-			sessionId={childSessionId}
-			parentSessionId={sessionId}
-			title={description || `${subagentType} agent`}
-		/>
-	) : null;
-
-	// Permission mode — render the child tool that needs attention inline
-	if (childPermission) {
-		return (
-			<div className="space-y-1.5">
-				{childPermissionToolPart ? (
-					(() => {
-						const Comp = ToolRegistry.get(childPermissionToolPart.tool);
-						return Comp ? (
-							<Comp
-								part={childPermissionToolPart}
-								sessionId={childSessionId}
-								defaultOpen
-								forceOpen
-								locked
-							/>
-						) : (
-							<GenericTool part={childPermissionToolPart} />
-						);
-					})()
-				) : (
-					<BasicTool
-						icon={<SquareKanban className="size-3.5 flex-shrink-0" />}
-						trigger={trigger}
-						defaultOpen
-						locked
-						onSubtitleClick={childSessionId ? handleSubtitleClick : undefined}
-					/>
-				)}
-				<PermissionPromptInline
-					permission={childPermission}
-					onReply={onPermissionReply}
-				/>
-				{modal}
-			</div>
-		);
-	}
-
-	// Normal mode — BasicTool with child tool list (matches TUI exactly)
-	return (
-		<>
-			<BasicTool
-				icon={<SquareKanban className="size-3.5 flex-shrink-0" />}
-				trigger={trigger}
-				defaultOpen={defaultOpen}
-				forceOpen={forceOpen}
-				locked={locked}
-				onSubtitleClick={childSessionId ? handleSubtitleClick : undefined}
-			>
-				{childToolParts.length > 0 && (
-					<div
-						ref={scrollRef}
-						data-scrollable
-						className="max-h-48 overflow-y-auto"
-					>
-						{childToolParts.map((childPart, i) => {
-							const info = getToolInfo(
-								childPart.tool,
-								childPart.state.input ?? {},
-							);
-							return (
-								<div
-									key={childPart.id}
-									className={cn(
-										"flex items-center gap-1.5 px-3 py-1.5 text-xs",
-										i > 0 && "border-t border-border/20",
-									)}
-								>
-									<ToolIconForName name={info.icon} />
-									<span className="font-medium text-foreground/80 whitespace-nowrap">
-										{info.title}
-									</span>
-									{info.subtitle && (
-										<span className="truncate text-muted-foreground font-mono text-[10px]">
-											{info.subtitle}
-										</span>
-									)}
-								</div>
-							);
-						})}
-					</div>
-				)}
-			</BasicTool>
-			{modal}
-		</>
-	);
-}
-ToolRegistry.register("task", TaskTool);
-
-// --- ToolIconForName: maps icon string to Lucide icon ---
-function ToolIconForName({ name }: { name: string }) {
-	const cls = "size-3 flex-shrink-0";
-	switch (name) {
-		case "terminal":
-		case "console":
-			return <Terminal className={cls} />;
-		case "file-pen":
-		case "code-lines":
-			return <FileCode2 className={cls} />;
-		case "glasses":
-			return <Glasses className={cls} />;
-		case "search":
-		case "magnifying-glass-menu":
-			return <Search className={cls} />;
-		case "globe":
-		case "window-cursor":
-			return <Globe className={cls} />;
-		case "list":
-		case "bullet-list":
-			return <ListTree className={cls} />;
-		case "check-square":
-		case "checklist":
-			return <CheckSquare className={cls} />;
-		case "message-circle":
-		case "bubble-5":
-			return <MessageCircle className={cls} />;
-		case "square-kanban":
-		case "task":
-			return <SquareKanban className={cls} />;
-		case "presentation":
-			return <Presentation className={cls} />;
-		case "image":
-			return <ImageIcon className={cls} />;
-		default:
-			return <Cpu className={cls} />;
-	}
-}
-
-// --- TodoWrite ---
-function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
-	const input = partInput(part);
-	const metadata = partMetadata(part);
-
-	const todos = useMemo(() => {
-		const meta = metadata.todos;
-		if (Array.isArray(meta)) return meta;
-		const inp = input.todos;
-		if (Array.isArray(inp)) return inp;
-		return [];
-	}, [metadata.todos, input.todos]);
-
-	const completed = useMemo(
-		() =>
-			todos.filter((t: Record<string, unknown>) => t.status === "completed")
-				.length,
-		[todos],
-	);
-
-	const subtitle = todos.length > 0 ? `${completed}/${todos.length}` : "";
-
-	return (
-		<BasicTool
-			icon={<CheckSquare className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Todos", subtitle }}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{todos.length > 0 && (
-				<div className="px-3 py-1.5 space-y-px max-h-[200px] overflow-y-auto scrollbar-hide">
-					{todos.map((todo: Record<string, unknown>, i: number) => (
-						<div
-							key={i}
-							className={cn(
-								"flex items-center gap-2 py-0.5 text-[11px] cursor-default",
-								todo.status === "completed" && "opacity-40",
-							)}
-						>
-							<span
-								className={cn(
-									"size-3 rounded-sm flex-shrink-0 flex items-center justify-center border border-border/60",
-									todo.status === "completed" && "bg-muted",
-								)}
-							>
-								{todo.status === "completed" && (
-									<Check className="size-2 text-muted-foreground" />
-								)}
-								{todo.status === "in_progress" && (
-									<Loader2 className="size-2 text-muted-foreground animate-spin" />
-								)}
-							</span>
-							<span
-								className={cn(
-									"leading-tight truncate",
-									todo.status === "completed" &&
-										"line-through text-muted-foreground",
-								)}
-							>
-								{String(todo.content || "")}
-							</span>
-						</div>
-					))}
-				</div>
-			)}
-		</BasicTool>
-	);
-}
-ToolRegistry.register("todowrite", TodoWriteTool);
-
-// --- Session Context ---
-
-/** Strip <session_context ...>...</session_context> wrapper */
-function extractSessionContent(raw: string): string {
-	const match = raw.match(/<session_context[^>]*>([\s\S]*)<\/session_context>/);
-	return match ? match[1].trim() : raw;
-}
-
-/** Extract attributes from the <session_context> opening tag */
-function extractSessionAttrs(raw: string): Record<string, string> {
-	const tagMatch = raw.match(/<session_context([^>]*)>/);
-	if (!tagMatch) return {};
-	const attrs: Record<string, string> = {};
-	const attrRegex = /(\w+)="([^"]*)"/g;
-	let m: RegExpExecArray | null;
-	while ((m = attrRegex.exec(tagMatch[1])) !== null) {
-		attrs[m[1]] = m[2];
-	}
-	return attrs;
-}
-
-/** Parse session summary header: title, dates, file changes */
-function parseSessionSummary(content: string) {
-	const titleMatch = content.match(/^# Session:\s*(.+)/m);
-	const createdMatch = content.match(/Created:\s*(.+)/m);
-	const updatedMatch = content.match(/Updated:\s*(.+)/m);
-	const filesChangedMatch = content.match(/Files changed:\s*(\d+)/m);
-	const additionsMatch = content.match(/Additions:\s*\+(\d+)/m);
-	const deletionsMatch = content.match(/Deletions:\s*-(\d+)/m);
-
-	return {
-		title: titleMatch?.[1]?.trim() || null,
-		created: createdMatch?.[1]?.trim() || null,
-		updated: updatedMatch?.[1]?.trim() || null,
-		filesChanged: filesChangedMatch ? parseInt(filesChangedMatch[1], 10) : null,
-		additions: additionsMatch ? parseInt(additionsMatch[1], 10) : null,
-		deletions: deletionsMatch ? parseInt(deletionsMatch[1], 10) : null,
-	};
-}
-
-/** Parse conversation lines into structured messages */
-function parseSessionMessages(content: string) {
-	const lines = content.split("\n");
-	const msgs: { role: "user" | "assistant"; content: string }[] = [];
-	let current: { role: "user" | "assistant"; content: string } | null = null;
-
-	for (const line of lines) {
-		const match = line.match(/^\[(user|assistant)\](?:\s*\(.*?\))?:\s*(.*)/);
-		if (match) {
-			if (current) msgs.push(current);
-			current = { role: match[1] as "user" | "assistant", content: match[2] };
-		} else if (current && line.trim()) {
-			current.content += "\n" + line;
-		}
-	}
-	if (current) msgs.push(current);
-	return msgs;
-}
-
-/** Format an ISO timestamp to a short readable form */
-function formatSessionISOTime(iso: string | null): string | null {
-	if (!iso) return null;
-	try {
-		const d = new Date(iso);
-		return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-	} catch {
-		return iso;
-	}
-}
-
-function SessionContextTool({
-	part,
-	defaultOpen,
-	forceOpen,
-	locked,
-}: ToolProps) {
-	const input = partInput(part);
-	const metadata = partMetadata(part);
-	const status = partStatus(part);
-	const output = partOutput(part);
-
-	const mode = String(metadata.mode || input.mode || "summary");
-	const sessionTitle = String(metadata.sessionTitle || "");
-	const modeLabels: Record<string, string> = {
-		summary: "Summary",
-		messages: "Messages",
-		diffs: "Diffs",
-		todo: "Todos",
-	};
-
-	const parsed = useMemo(() => {
-		if (!output) return null;
-		const content = extractSessionContent(output);
-		const attrs = extractSessionAttrs(output);
-		const summary = parseSessionSummary(content);
-		const conversationStart = content.indexOf("## Recent Conversation");
-		const conversationBlock =
-			conversationStart >= 0 ? content.slice(conversationStart) : "";
-		const messages = parseSessionMessages(conversationBlock);
-
-		return { content, attrs, summary, messages };
-	}, [output]);
-
-	const displayTitle = parsed?.summary?.title || sessionTitle || "Session";
-	const subtitle = modeLabels[mode] || mode;
-
-	return (
-		<BasicTool
-			icon={<BookOpen className="size-3.5 flex-shrink-0" />}
-			trigger={
-				<div className="flex items-center gap-1.5 min-w-0 flex-1">
-					<span className="font-medium text-xs text-foreground whitespace-nowrap">
-						Session Context
-					</span>
-					<span className="text-muted-foreground text-xs truncate">
-						{displayTitle}
-					</span>
-					<span
-						className="text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0 bg-primary/10 text-primary"
-					>
-						{subtitle}
-					</span>
-				</div>
-			}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{status === "completed" && parsed ? (
-				<div data-scrollable className="max-h-[420px] overflow-auto">
-					<div className="px-3 pb-2.5">
-						{/* Session info header */}
-						{(parsed.summary.created || parsed.summary.filesChanged !== null) && (
-							<div className="flex items-center gap-3 py-2 mb-1.5 border-b border-border/20">
-								{parsed.summary.created && (
-									<div className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
-										<Clock className="size-3" />
-										<span>{formatSessionISOTime(parsed.summary.created)}</span>
-										{parsed.summary.updated && parsed.summary.updated !== parsed.summary.created && (
-											<>
-												<span className="text-muted-foreground/30 mx-0.5">-</span>
-												<span>{formatSessionISOTime(parsed.summary.updated)}</span>
-											</>
-										)}
-									</div>
-								)}
-								{parsed.summary.filesChanged !== null && (
-									<div className="flex items-center gap-1.5 text-[10px] ml-auto">
-										<FileCode2 className="size-3 text-muted-foreground/50" />
-										<span className="text-muted-foreground/60">
-											{parsed.summary.filesChanged} file{parsed.summary.filesChanged !== 1 ? "s" : ""}
-										</span>
-										{(parsed.summary.additions !== null && parsed.summary.additions > 0) && (
-											<span className="text-emerald-500 font-medium">
-												+{parsed.summary.additions}
-											</span>
-										)}
-										{(parsed.summary.deletions !== null && parsed.summary.deletions > 0) && (
-											<span className="text-red-400 font-medium">
-												-{parsed.summary.deletions}
-											</span>
-										)}
-									</div>
-								)}
-							</div>
-						)}
-
-						{/* Mode-specific content */}
-						{mode === "todo" ? (
-							<SessionContextTodoInline content={parsed.content} />
-						) : mode === "diffs" ? (
-							<SessionContextDiffsInline content={parsed.content} />
-						) : (
-							/* summary / messages — show conversation */
-							<>
-								{parsed.messages.length > 0 ? (
-									<div className="space-y-1">
-										<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5 mt-1">
-											Conversation
-										</div>
-										{parsed.messages.map((msg, i) => (
-											<div
-												key={i}
-												className={cn(
-													"rounded-lg px-2.5 py-1.5 text-[11px] leading-relaxed",
-													msg.role === "user"
-														? "bg-muted/50 border border-border/40"
-														: "bg-transparent border border-border/20",
-												)}
-											>
-												<span
-													className={cn(
-														"text-[9px] font-semibold uppercase tracking-wide mr-1.5",
-														msg.role === "user"
-															? "text-primary/60"
-															: "text-muted-foreground/50",
-													)}
-												>
-													{msg.role}
-												</span>
-												<span className="text-foreground/80 whitespace-pre-wrap break-words">
-													{msg.content.trim().slice(0, 500)}
-													{msg.content.trim().length > 500 && (
-														<span className="text-muted-foreground/40">...</span>
-													)}
-												</span>
-											</div>
-										))}
-									</div>
-								) : (
-									<div className="text-xs text-muted-foreground/50 py-2 italic">
-										No conversation found.
-									</div>
-								)}
-							</>
-						)}
-					</div>
-				</div>
-			) : status === "completed" && output ? (
-				<div data-scrollable className="p-2 max-h-72 overflow-auto">
-					<pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">
-						{output.slice(0, 2000)}
-					</pre>
-				</div>
-			) : null}
-		</BasicTool>
-	);
-}
-
-/** Inline todo list rendering inside session context */
-function SessionContextTodoInline({ content }: { content: string }) {
-	const lines = content.split("\n").filter((l) => l.startsWith("- "));
-	if (lines.length === 0) {
-		return (
-			<div className="text-xs text-muted-foreground/50 py-2 italic">
-				No todos found.
-			</div>
-		);
-	}
-	return (
-		<div className="space-y-0.5 mt-1">
-			<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5">
-				Todos
-			</div>
-			{lines.map((line, i) => {
-				const isCompleted = line.includes("[x]");
-				const isInProgress = line.includes("[~]");
-				const isCancelled = line.includes("[-]");
-				const text = line.replace(/^- \[.\]\s*/, "");
-				return (
-					<div key={i} className="flex items-start gap-2 py-0.5">
-						<div
-							className={cn(
-								"size-3.5 rounded border flex items-center justify-center mt-0.5 flex-shrink-0",
-								isCompleted
-									? "bg-emerald-500/20 border-emerald-500/40"
-									: isCancelled
-										? "bg-muted border-border/30"
-										: isInProgress
-											? "bg-primary/10 border-primary/30"
-											: "border-border/40",
-							)}
-						>
-							{isCompleted && <Check className="size-2.5 text-emerald-500" />}
-							{isInProgress && (
-								<div className="size-1.5 rounded-full bg-primary" />
-							)}
-						</div>
-						<span
-							className={cn(
-								"text-[11px] leading-relaxed",
-								isCompleted && "line-through text-muted-foreground/50",
-								isCancelled && "line-through text-muted-foreground/40",
-								isInProgress && "text-foreground font-medium",
-								!isCompleted && !isCancelled && !isInProgress && "text-foreground/80",
-							)}
-						>
-							{text}
-						</span>
-					</div>
-				);
-			})}
-		</div>
-	);
-}
-
-/** Inline diffs rendering inside session context */
-function SessionContextDiffsInline({ content }: { content: string }) {
-	const sections = useMemo(() => {
-		const parts = content.split(/^## /m).filter(Boolean);
-		return parts.map((section) => {
-			const lines = section.split("\n");
-			const header = lines[0] || "";
-			const match = header.match(/^(.+?)\s*\((\w+)\)\s*\+(\d+)\s*-(\d+)/);
-			return {
-				path: match?.[1]?.trim() || header.trim(),
-				status: match?.[2] || "modified",
-				additions: match?.[3] || "0",
-				deletions: match?.[4] || "0",
-			};
-		});
-	}, [content]);
-
-	if (sections.length === 0) {
-		return (
-			<div className="text-xs text-muted-foreground/50 py-2 italic">
-				No file changes.
-			</div>
-		);
-	}
-
-	return (
-		<div className="space-y-0.5 mt-1">
-			<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5">
-				Changed Files
-			</div>
-			{sections.map((file, i) => (
-				<div
-					key={i}
-					className="flex items-center gap-2 py-1 px-1.5 -mx-0.5 rounded hover:bg-muted/30 transition-colors"
-				>
-					<FileCode2 className="size-3 text-muted-foreground/40 flex-shrink-0" />
-					<span className="text-[11px] font-mono truncate flex-1 text-foreground/70">
-						{file.path}
-					</span>
-					<span
-						className={cn(
-							"text-[9px] px-1 py-0.5 rounded font-medium flex-shrink-0",
-							file.status === "added"
-								? "text-emerald-500 bg-emerald-500/10"
-								: file.status === "deleted"
-									? "text-red-400 bg-red-400/10"
-									: "text-muted-foreground/50 bg-muted/40",
-						)}
-					>
-						{file.status}
-					</span>
-					<span className="text-[10px] text-emerald-500 flex-shrink-0">+{file.additions}</span>
-					<span className="text-[10px] text-red-400 flex-shrink-0">-{file.deletions}</span>
-				</div>
-			))}
-		</div>
-	);
-}
-
-ToolRegistry.register("session_context", SessionContextTool);
-
-// --- Skill ---
-function SkillToolRenderer({
-	part,
-	defaultOpen,
-	forceOpen,
-	locked,
-}: ToolProps) {
-	const input = partInput(part);
-	const metadata = partMetadata(part);
-	const output = partOutput(part);
-
-	const skillName = String(metadata.name || input.name || "Skill");
-	const skillDir = String(metadata.dir || "");
-	const subtitle = skillDir || undefined;
-
-	return (
-		<BasicTool
-			icon={<BookOpen className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Skill", subtitle: skillName }}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{output && (
-				<div
-					data-scrollable
-					className={`p-2 max-h-48 overflow-auto ${MD_FLUSH_CLASSES}`}
-				>
-					<UnifiedMarkdown
-						content={output.slice(0, 2000)}
-						isStreaming={false}
-					/>
-				</div>
-			)}
-		</BasicTool>
-	);
-}
-ToolRegistry.register("skill", SkillToolRenderer);
-
-// --- Code Search ---
-function CodesearchToolRenderer({
-	part,
-	defaultOpen,
-	forceOpen,
-	locked,
-}: ToolProps) {
-	const input = partInput(part);
-	const output = partOutput(part);
-
-	const query = String(input.query || "");
-
-	return (
-		<BasicTool
-			icon={<Globe className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Code Search", subtitle: query || undefined }}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{output && (
-				<div
-					data-scrollable
-					className={`p-2 max-h-72 overflow-auto ${MD_FLUSH_CLASSES}`}
-				>
-					<UnifiedMarkdown
-						content={output.slice(0, 3000)}
-						isStreaming={false}
-					/>
-				</div>
-			)}
-		</BasicTool>
-	);
-}
-ToolRegistry.register("codesearch", CodesearchToolRenderer);
-
-// --- Batch ---
-function BatchToolRenderer({
-	part,
-	defaultOpen,
-	forceOpen,
-	locked,
-}: ToolProps) {
-	const input = partInput(part);
-	const metadata = partMetadata(part);
-	const status = partStatus(part);
-	const running = useContext(ToolRunningContext);
-
-	const totalCalls = (metadata.totalCalls as number) || 0;
-	const successful = (metadata.successful as number) || 0;
-	const failed = (metadata.failed as number) || 0;
-	const details = (
-		Array.isArray(metadata.details) ? metadata.details : []
-	) as Array<{ tool: string; success: boolean }>;
-
-	const toolCalls =
-		details.length > 0
-			? details
-			: (Array.isArray(input.tool_calls)
-					? (input.tool_calls as Array<{ tool: string }>)
-					: [])
-				.map((c) => ({ tool: c.tool, success: true }));
-
-	const subtitle =
-		totalCalls > 0
-			? `${successful}/${totalCalls} passed`
-			: `${toolCalls.length} tool${toolCalls.length !== 1 ? "s" : ""}`;
-
-	return (
-		<BasicTool
-			icon={<Layers className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Batch", subtitle }}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{toolCalls.length > 0 && (
-				<div className="px-3 py-2 space-y-1">
-					{toolCalls.map(
-						(call: { tool: string; success?: boolean }, i: number) => (
-							<div key={i} className="flex items-center gap-2 text-xs">
-							{running ? (
-								<Loader2 className="size-2.5 text-muted-foreground animate-spin shrink-0" />
-							) : call.success !== false ? (
-									<Check className="size-2.5 text-emerald-500 shrink-0" />
-								) : (
-									<CircleAlert className="size-2.5 text-muted-foreground shrink-0" />
-								)}
-								<span className="font-mono truncate">{call.tool}</span>
-							</div>
-						),
-					)}
-				</div>
-			)}
-		</BasicTool>
-	);
-}
-ToolRegistry.register("batch", BatchToolRenderer);
-
-// --- Plan (Enter/Exit) ---
-function PlanToolRenderer({ part, defaultOpen, forceOpen, locked }: ToolProps) {
-	const input = partInput(part);
-	const status = partStatus(part);
-
-	const toolName = (part as any).tool || "";
-	const isExit = toolName === "plan_exit";
-	const subtitle = isExit ? "Plan -> Build" : "Build -> Plan";
-
-	return (
-		<BasicTool
-			icon={<SquareKanban className="size-3.5 flex-shrink-0" />}
-			trigger={{
-				title: isExit ? "Switch to Build" : "Switch to Plan",
-				subtitle,
-			}}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{status === "completed" && (
-				<div className="px-3 py-2 text-xs text-muted-foreground">
-					{isExit ? "Switched to build agent." : "Switched to plan agent."}
-				</div>
-			)}
-			{status === "error" && (
-				<div className="px-3 py-2 text-xs text-muted-foreground">
-					User declined the switch.
-				</div>
-			)}
-		</BasicTool>
-	);
-}
-ToolRegistry.register("plan_exit", PlanToolRenderer);
-ToolRegistry.register("plan_enter", PlanToolRenderer);
-
-// --- Question ---
-function QuestionToolRenderer({
-	part,
-	defaultOpen,
-	forceOpen,
-	locked,
-	hasActiveQuestion,
-}: ToolProps) {
-	const input = partInput(part);
-	const metadata = partMetadata(part);
-	const status = partStatus(part);
-	const running = useContext(ToolRunningContext);
-
-	const questions = useMemo(
-		() =>
-			(Array.isArray(input.questions) ? input.questions : []) as Array<{
-				question: string;
-				options?: { label: string; description?: string }[];
-			}>,
-		[input.questions],
-	);
-
-	const answers = useMemo(
-		() =>
-			(Array.isArray(metadata.answers) ? metadata.answers : []) as string[][],
-		[metadata.answers],
-	);
-
-	const isAnswered = answers.length > 0;
-	const isWaiting = running && questions.length > 0 && !hasActiveQuestion;
-	const subtitle =
-		questions.length > 0
-			? isAnswered
-				? `${answers.length} answered`
-				: `${questions.length} ${questions.length > 1 ? "questions" : "question"}`
-			: running
-				? "Preparing..."
-				: "";
-
-	return (
-		<BasicTool
-			icon={<MessageCircle className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Questions", subtitle }}
-			defaultOpen={defaultOpen ?? isAnswered}
-			forceOpen={forceOpen || isAnswered}
-			locked={locked}
-		>
-			{isAnswered ? (
-				<div className="px-3 py-2 space-y-1.5">
-					{questions.map((q, i) => {
-						const answer = answers[i] || [];
-						return (
-							<div key={i} className="flex items-baseline gap-1.5 text-xs">
-								<span className="font-medium text-foreground shrink-0">
-									{q.question}
-								</span>
-								<span className="text-muted-foreground truncate">
-									{answer.join(", ") || "No answer"}
-								</span>
-							</div>
-						);
-					})}
-				</div>
-			) : isWaiting ? (
-				<div className="px-3 py-2 space-y-1.5">
-					{questions.map((q, i) => (
-						<div key={i} className="text-xs text-muted-foreground">
-							{q.question}
-						</div>
-					))}
-				</div>
-			) : null}
-		</BasicTool>
-	);
-}
-ToolRegistry.register("question", QuestionToolRenderer);
-
-// --- Apply Patch ---
-function ApplyPatchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
-	const metadata = partMetadata(part);
-
-	const files = useMemo(
-		() =>
-			(Array.isArray(metadata.files) ? metadata.files : []) as ApplyPatchFile[],
-		[metadata.files],
-	);
-
-	const subtitle =
-		files.length > 0
-			? `${files.length} ${files.length > 1 ? "files" : "file"}`
-			: "";
-
-	return (
-		<BasicTool
-			icon={<FileCode2 className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Patch", subtitle }}
-			defaultOpen={defaultOpen}
-			forceOpen={forceOpen}
-			locked={locked}
-		>
-			{files.length > 0 && (
-				<div className="p-2 space-y-2">
-					{files.map((file, i) => (
-						<div key={i} className="space-y-1">
-							{/* File header */}
-							<div className="flex items-center gap-2 text-xs">
-								<span
-									className={cn(
-										"px-1.5 py-0.5 rounded text-[9px] font-bold uppercase",
-										file.type === "add" && "bg-emerald-500/15 text-emerald-500",
-										file.type === "update" && "bg-amber-500/15 text-amber-500",
-										file.type === "delete" && "bg-red-500/15 text-red-500",
-										file.type === "move" && "bg-blue-500/15 text-blue-500",
-									)}
-								>
-									{file.type === "add"
-										? "Created"
-										: file.type === "update"
-											? "Patched"
-											: file.type === "delete"
-												? "Deleted"
-												: "Moved"}
-								</span>
-								<span className="font-mono text-[11px] text-foreground truncate">
-									{file.relativePath}
-								</span>
-								{file.type !== "delete" && (
-									<DiffChanges
-										additions={file.additions}
-										deletions={file.deletions}
-									/>
-								)}
-								{file.type === "delete" && file.deletions > 0 && (
-									<span className="ml-auto text-[10px] text-red-500">
-										-{file.deletions}
-									</span>
-								)}
-							</div>
-
-							{/* File diff */}
-							{file.type !== "delete" && (file.before || file.after) && (
-								<div
-									data-scrollable
-									className="max-h-72 overflow-auto rounded-md bg-muted/10"
-								>
-									<InlineDiffView
-										oldValue={file.before}
-										newValue={file.after}
-										filename={file.relativePath}
-									/>
-								</div>
-							)}
-						</div>
-					))}
-				</div>
-			)}
-		</BasicTool>
-	);
-}
-ToolRegistry.register("apply_patch", ApplyPatchTool);
-
-
-
-
-
-
-
-
-
 // ============================================================================
 // DCP Tools (distill, compress, prune, context_info)
 // ============================================================================
@@ -4543,8 +3550,8 @@ function DCPPruneTool({ part }: ToolProps) {
 	const input = partInput(part);
 	const output = partOutput(part);
 	const isRunning = useContext(ToolRunningContext);
-	const ids = input.ids;
-	const reason = input.reason;
+	const ids = input.ids as string[] | undefined;
+	const reason = input.reason as string | undefined;
 
 	return (
 		<BasicTool
@@ -4589,7 +3596,7 @@ function DCPDistillTool({ part }: ToolProps) {
 	const input = partInput(part);
 	const output = partOutput(part);
 	const isRunning = useContext(ToolRunningContext);
-	const ids = input.ids;
+	const ids = input.ids as string[] | undefined;
 
 	return (
 		<BasicTool
@@ -4629,7 +3636,7 @@ function DCPCompressTool({ part }: ToolProps) {
 	const input = partInput(part);
 	const output = partOutput(part);
 	const isRunning = useContext(ToolRunningContext);
-	const topic = input.topic;
+	const topic = input.topic as string | undefined;
 
 	return (
 		<BasicTool
@@ -4686,7 +3693,7 @@ function ContextInfoTool({ part }: ToolProps) {
 				</div>
 			}
 		>
-			<div data-scrollable className="p-2 max-h-32 overflow-auto">
+			<div data-scrollable className="p-2 max-h-32 overflow-auto scrollbar-hide">
 				<pre className="font-mono text-[10px] whitespace-pre-wrap text-muted-foreground/60">
 					{output}
 				</pre>
@@ -4896,7 +3903,7 @@ export function ToolError({
 									<div className="flex flex-wrap gap-1">
 										{issue.values.map((val, vi) => (
 											<span
-											 key={vi}
+												key={vi}
 											 className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/40 text-muted-foreground/70 font-mono"
 											>
 												{val}
@@ -5015,7 +4022,7 @@ export function GenericTool({ part }: ToolProps) {
 			)}
 			{genericStructuredSections && (
 				<span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap">
-					{genericStructuredSections.type}
+					{genericStructuredSections[0]?.type}
 				</span>
 			)}
 			{running && (
@@ -5026,7 +4033,7 @@ export function GenericTool({ part }: ToolProps) {
 
 	const bodyContent = genericStructuredSections ? (
 		<div className="p-2.5 max-h-72 overflow-auto">
-			<StructuredOutput sections={genericStructuredSections.sections} />
+			<StructuredOutput sections={genericStructuredSections} />
 		</div>
 	) : output ? (
 		<ToolOutputFallback output={output} toolName={part.tool} />
@@ -5086,21 +4093,21 @@ function PermissionPromptInline({
 				<button
 					disabled={replying}
 					onClick={() => handleReply("reject")}
-					className="px-2 py-1 text-[11px] rounded-md text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+				 className="px-2 py-1 text-[11px] rounded-md text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
 				>
 					Deny
 				</button>
 				<button
 					disabled={replying}
 					onClick={() => handleReply("always")}
-					className="px-2 py-1 text-[11px] rounded-md text-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50"
+				 className="px-2 py-1 text-[11px] rounded-md text-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50"
 				>
 					Allow always
 				</button>
 				<button
 					disabled={replying}
 					onClick={() => handleReply("once")}
-					className="px-2 py-1 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+				 className="px-2 py-1 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
 				>
 					Allow once
 				</button>
@@ -5170,7 +4177,7 @@ export function ToolPartRenderer({
 						<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground font-medium ml-auto flex-shrink-0">
 						Error
 					</span>
-				</div>
+					</div>
 			}
 		>
 				<div className="p-0">

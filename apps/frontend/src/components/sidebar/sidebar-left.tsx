@@ -14,8 +14,7 @@ import {
   Search,
   Blocks,
   ArrowDownToLine,
-  PanelLeftClose,
-  PanelLeftOpen,
+
   Plug,
   MessageSquare,
   Calendar,
@@ -519,21 +518,12 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     }
   }, [state]);
 
-  // Cmd+J shortcut for new session
+  // Cmd+J shortcut for new session (works globally, even when typing)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isDocumentModalOpen) return;
 
-      const el = document.activeElement;
-      const isEditing = el && (
-        el.tagName.toLowerCase() === 'input' ||
-        el.tagName.toLowerCase() === 'textarea' ||
-        el.getAttribute('contenteditable') === 'true' ||
-        el.closest('.cm-editor') ||
-        el.closest('.ProseMirror')
-      );
-
-      if ((event.metaKey || event.ctrlKey) && event.key === 'j' && !isEditing) {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'j') {
         event.preventDefault();
         handleNewSession();
       }
@@ -579,7 +569,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                   className="flex-shrink-0"
                 />
               </Link>
-              <PanelLeftOpen className="h-5 w-5 text-sidebar-foreground hidden group-hover/collapsed:block" />
+              <ChevronRight className="h-3.5 w-3.5 text-sidebar-foreground hidden group-hover/collapsed:block" />
             </div>
           )}
           <div className={cn(
@@ -613,7 +603,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             onClick={() => isMobile ? setOpenMobile(false) : setOpen(false)}
             aria-label="Collapse sidebar"
           >
-            <PanelLeftClose className="h-5 w-5" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
         </div>
       </SidebarHeader>
@@ -676,7 +666,10 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               )}
             >
               <SquarePen className="h-4 w-4 flex-shrink-0" />
-              <span>{createSession.isPending ? 'Creating...' : 'New session'}</span>
+              <span className="flex-1 text-left">{createSession.isPending ? 'Creating...' : 'New session'}</span>
+              <kbd className="text-[10px] text-muted-foreground">
+                {typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '\u2318J' : 'Ctrl J'}
+              </kbd>
             </button>
 
             {/* Search */}

@@ -238,16 +238,6 @@ export function UserMenu({ user }: UserMenuProps) {
                 </>
               )}
 
-              {/* Appearance + theme toggle (from registry) */}
-              {generalItems.find((i) => i.settingsTab === 'appearance') && (
-                <DropdownMenuItem
-                  onClick={() => openSettings('appearance')}
-                  className="gap-2 p-2"
-                >
-                  {(() => { const item = generalItems.find((i) => i.settingsTab === 'appearance'); const Icon = item!.icon; return <Icon className="h-4 w-4" />; })()}
-                  <span className="flex-1">Appearance</span>
-                </DropdownMenuItem>
-              )}
               <div className="px-2 py-1.5">
                 <div className="flex gap-0.5 p-0.5 bg-muted/50 rounded-md w-fit">
                   {themeOptions.map((mode) => {

@@ -63,20 +63,33 @@ function DropdownMenuItem({
   className,
   inset,
   variant = 'default',
+  style,
+  onFocus,
+  onBlur,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
   inset?: boolean;
   variant?: 'default' | 'destructive';
 }) {
+  const [highlighted, setHighlighted] = React.useState(false)
+  const highlightStyle: React.CSSProperties | undefined = highlighted
+    ? variant === 'destructive'
+      ? { backgroundColor: 'color-mix(in oklab, var(--destructive) 10%, transparent)', color: 'var(--destructive)' }
+      : { backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }
+    : undefined
+
   return (
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "data-[variant=destructive]:text-destructive data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
+      style={{ ...style, ...highlightStyle }}
+      onFocus={(e) => { setHighlighted(true); onFocus?.(e) }}
+      onBlur={(e) => { setHighlighted(false); onBlur?.(e) }}
       {...props}
     />
   );
@@ -86,15 +99,26 @@ function DropdownMenuCheckboxItem({
   className,
   children,
   checked,
+  style,
+  onFocus,
+  onBlur,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  const [highlighted, setHighlighted] = React.useState(false)
+  const highlightStyle: React.CSSProperties | undefined = highlighted
+    ? { backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }
+    : undefined
+
   return (
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-2xl py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex cursor-default items-center gap-2 rounded-2xl py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
+      style={{ ...style, ...highlightStyle }}
+      onFocus={(e) => { setHighlighted(true); onFocus?.(e) }}
+      onBlur={(e) => { setHighlighted(false); onBlur?.(e) }}
       checked={checked}
       {...props}
     >
@@ -122,15 +146,26 @@ function DropdownMenuRadioGroup({
 function DropdownMenuRadioItem({
   className,
   children,
+  style,
+  onFocus,
+  onBlur,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+  const [highlighted, setHighlighted] = React.useState(false)
+  const highlightStyle: React.CSSProperties | undefined = highlighted
+    ? { backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }
+    : undefined
+
   return (
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-2xl py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex cursor-default items-center gap-2 rounded-2xl py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
+      style={{ ...style, ...highlightStyle }}
+      onFocus={(e) => { setHighlighted(true); onFocus?.(e) }}
+      onBlur={(e) => { setHighlighted(false); onBlur?.(e) }}
       {...props}
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
@@ -202,18 +237,29 @@ function DropdownMenuSubTrigger({
   className,
   inset,
   children,
+  style,
+  onFocus,
+  onBlur,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger> & {
   inset?: boolean;
 }) {
+  const [highlighted, setHighlighted] = React.useState(false)
+  const highlightStyle: React.CSSProperties | undefined = highlighted
+    ? { backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }
+    : undefined
+
   return (
     <DropdownMenuPrimitive.SubTrigger
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        'focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground flex cursor-default items-center rounded-2xl px-2 py-1.5 text-sm outline-hidden select-none data-[inset]:pl-8',
+        'data-[state=open]:bg-accent data-[state=open]:text-accent-foreground flex cursor-default items-center rounded-2xl px-2 py-1.5 text-sm outline-hidden select-none data-[inset]:pl-8',
         className,
       )}
+      style={{ ...style, ...highlightStyle }}
+      onFocus={(e) => { setHighlighted(true); onFocus?.(e) }}
+      onBlur={(e) => { setHighlighted(false); onBlur?.(e) }}
       {...props}
     >
       {children}

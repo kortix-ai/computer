@@ -6,6 +6,7 @@ import {
 	incrementSandboxFail,
 	markInitialCheckDone,
 	resetSandboxFail,
+	setOpenCodeHealth,
 	setSandboxStatus,
 	setSandboxVersion,
 	useSandboxConnectionStore,
@@ -104,6 +105,19 @@ export function useSandboxConnection() {
 
 				resetSandboxFail();
 				setSandboxStatus("connected");
+
+				// Parse health response — extract healthy/version for consumers
+				// that previously relied on the duplicate useServerHealth hook.
+				try {
+					const healthData = await res.json();
+					setOpenCodeHealth(
+						healthData?.healthy === true,
+						healthData?.version,
+					);
+				} catch {
+					// Body already consumed or not JSON — treat as healthy since status was ok
+					setOpenCodeHealth(true);
+				}
 
 				// Fetch port mappings once on first successful connection.
 				if (!portsFetchedRef.current) {

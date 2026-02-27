@@ -41,28 +41,45 @@ function registerSandboxServer(sandbox: SandboxInfo) {
   }
 
   const store = useServerStore.getState();
-  const previousActiveId = store.activeServerId;
+  const isLocal = sandbox.provider === 'local_docker';
 
-  // Add (or deduplicate) by sandboxId — URL is derived at runtime by the store.
-  const entry = store.addSandboxServer({
-    label: sandbox.name || 'Sandbox',
-    provider: sandbox.provider,
-    sandboxId: sandbox.external_id,
-    mappedPorts: extractMappedPorts(sandbox),
-  });
+  // Use the centralized registerOrUpdateSandbox which uses stable IDs
+  // ('default' for local, 'cloud-sandbox' for cloud) — no random IDs,
+  // no duplicates across refreshes.
+  const serverId = store.registerOrUpdateSandbox(
+    {
+      label: sandbox.name || (isLocal ? 'Local Sandbox' : 'Cloud Sandbox'),
+      provider: sandbox.provider,
+      sandboxId: sandbox.external_id,
+      mappedPorts: extractMappedPorts(sandbox),
+    },
+    { autoSwitch: true, isLocal },
+  );
 
   // Auto-switch if the user hasn't manually selected a server, or if there's
   // no active server (e.g. after rehydration cleared stale managed entries).
+  const previousActiveId = store.activeServerId;
   const shouldAutoSwitch = !store.userSelected || !previousActiveId ||
     !store.servers.some((s: any) => s.id === previousActiveId);
-  if (shouldAutoSwitch) {
-    store.setActiveServer(entry.id, { auto: true });
-    useTabStore.getState().swapForServer(entry.id, previousActiveId);
+  if (shouldAutoSwitch && store.activeServerId !== serverId) {
+    store.setActiveServer(serverId, { auto: true });
+    useTabStore.getState().swapForServer(serverId, previousActiveId);
   }
 }
 
 // Module-level guard: ensures only one auto-create runs across all instances/re-renders.
 let _autoCreatePromise: Promise<void> | null = null;
+
+/**
+ * Module-level flag: suppresses auto-create after user explicitly deletes a sandbox.
+ * Reset on next successful sandbox fetch (i.e. user created a new one manually).
+ */
+let _userDeletedSandbox = false;
+
+/** Call this when the user explicitly removes their sandbox to prevent auto-recreate. */
+export function markSandboxDeleted(): void {
+  _userDeletedSandbox = true;
+}
 
 export function useSandbox() {
   const { user } = useAuth();
@@ -74,9 +91,21 @@ export function useSandbox() {
       // Uses module-level promise dedup so concurrent hook instances share one call.
       if (isBillingEnabled()) {
         const existing = await getSandbox();
-        if (existing) return existing;
+        if (existing) {
+          // User has a sandbox — clear the deletion flag (they created a new one).
+          _userDeletedSandbox = false;
+          return existing;
+        }
 
-        // No sandbox — auto-create via ensureSandbox (POST /platform/init, idempotent)
+        // No sandbox — but if the user just deleted it, DON'T auto-create.
+        // They'll create a new one manually via the Instance Manager.
+        if (_userDeletedSandbox) {
+          return null;
+        }
+
+        // No sandbox and no intentional deletion — auto-create via ensureSandbox
+        // (POST /platform/init, idempotent). Module-level promise dedup so
+        // concurrent hook instances share one call.
         if (!_autoCreatePromise) {
           _autoCreatePromise = ensureSandbox()
             .then(({ sandbox }) => {

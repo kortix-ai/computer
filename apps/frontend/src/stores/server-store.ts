@@ -128,6 +128,16 @@ function getSandboxServerUrl(sandboxId: string): string {
   return `${BACKEND_URL}/p/${sandboxId}/8000`;
 }
 
+/**
+ * Resolve the effective URL for any server entry.
+ * Sandbox entries store url='' — their URL is derived from sandboxId.
+ * Custom entries use the user-provided URL directly.
+ */
+export function resolveServerUrl(server: ServerEntry): string {
+  if (server.sandboxId) return getSandboxServerUrl(server.sandboxId);
+  return server.url || DEFAULT_SANDBOX_URL;
+}
+
 const DEFAULT_SERVER_ID = 'default';
 const CLOUD_SANDBOX_SERVER_ID = 'cloud-sandbox';
 
@@ -344,11 +354,23 @@ export const useServerStore = create<ServerStore>()(
 
         const wasActive = state.activeServerId === id;
         const newServers = state.servers.filter((s) => s.id !== id);
+
+        // Find a valid fallback — prefer 'default', then first remaining, then empty.
+        const fallbackId = wasActive
+          ? (newServers.find((s) => s.id === DEFAULT_SERVER_ID)?.id
+            ?? newServers[0]?.id
+            ?? '')
+          : state.activeServerId;
+
         set({
           servers: newServers,
-          activeServerId: wasActive ? DEFAULT_SERVER_ID : state.activeServerId,
-          // If we removed the active server, bump version
-          ...(wasActive ? { serverVersion: state.serverVersion + 1 } : {}),
+          activeServerId: fallbackId,
+          // If we removed the active server, bump version and reset userSelected
+          // so the next sandbox creation can auto-switch.
+          ...(wasActive ? {
+            serverVersion: state.serverVersion + 1,
+            userSelected: false,
+          } : {}),
         });
         deleteServerFromApi(id);
       },
@@ -434,9 +456,15 @@ export const useServerStore = create<ServerStore>()(
           // they come from the sandboxes table via useSandbox hook.
         }
 
-        // Auto-switch to the sandbox if the user hasn't manually picked a server
-        if (autoSwitch && !state.userSelected && state.activeServerId === DEFAULT_SERVER_ID) {
-          get().setActiveServer(targetId, { auto: true });
+        // Auto-switch to the sandbox if the user hasn't manually picked a server.
+        // Covers: empty activeServerId (after rehydration stripped managed entries),
+        // DEFAULT_SERVER_ID (local mode), or the same targetId (no-op in setActiveServer).
+        if (autoSwitch && !state.userSelected) {
+          const currentId = state.activeServerId;
+          const noActiveServer = !currentId || !state.servers.some((s) => s.id === currentId);
+          if (noActiveServer || currentId === DEFAULT_SERVER_ID) {
+            get().setActiveServer(isLocal ? DEFAULT_SERVER_ID : targetId, { auto: true });
+          }
         }
 
         return targetId;
@@ -453,10 +481,14 @@ export const useServerStore = create<ServerStore>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
 
-        // Remove stale legacy entries (default, cloud-sandbox) from
-        // localStorage — sandboxes are loaded via useSandbox hook.
+        // Remove ALL managed sandbox entries from localStorage — sandboxes
+        // are loaded fresh via useSandbox hook on every page load. This strips:
+        //   - Well-known IDs (default, cloud-sandbox)
+        //   - Stale random-ID entries (srv_xxx) that have a provider set
+        //     (leaked from addSandboxServer calls in older code)
+        // Only custom user-added entries (no provider) survive rehydration.
         state.servers = state.servers.filter(
-          (s) => s.id !== DEFAULT_SERVER_ID && s.id !== CLOUD_SANDBOX_SERVER_ID,
+          (s) => !isManagedEntry(s) && !s.provider,
         );
 
         // Active server will be set by useSandbox hook once it loads.

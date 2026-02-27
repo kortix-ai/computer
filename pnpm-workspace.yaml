@@ -2,7 +2,6 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'services/*'
-  - '!services/opencode'
 
 catalog:
   '@tsconfig/bun': ^1.0.7

@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { Plug } from 'lucide-react';
 
 export const AppLogo = ({
@@ -22,10 +23,13 @@ export const AppLogo = ({
   return (
     <div className={`${sizeClasses[size]} bg-muted/50 border border-border/40 flex items-center justify-center shrink-0 overflow-hidden`}>
       {app.imgSrc ? (
-        <img
+        <Image
           src={app.imgSrc}
           alt={app.name}
+          width={size === 'lg' ? 24 : size === 'md' ? 20 : 14}
+          height={size === 'lg' ? 24 : size === 'md' ? 20 : 14}
           className={`${iconSizes[size]} object-contain`}
+          unoptimized
         />
       ) : (
         <Plug className={`${iconSizes[size]} text-muted-foreground`} />

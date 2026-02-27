@@ -194,6 +194,19 @@ app.get('/docs/openapi.json',
     const kortixSpec = await generateSpecs(app)
     // Merge with OpenCode's spec (fetched from localhost, cached 30s)
     const merged = await buildMergedSpec(kortixSpec as any)
+
+    // Use the X-Forwarded-Prefix header injected by the platform proxy to set
+    // the correct server URL for Scalar "Try It". This header contains the full
+    // public base URL (e.g. "http://localhost:8008/v1/p/kortix-sandbox/8000").
+    // Without it, fall back to the placeholder from spec-merger.
+    const forwardedPrefix = c.req.header('x-forwarded-prefix')
+    if (forwardedPrefix) {
+      return c.json({
+        ...merged,
+        servers: [{ url: forwardedPrefix, description: 'Current sandbox' }],
+      })
+    }
+
     return c.json(merged)
   },
 )
@@ -208,13 +221,17 @@ app.get('/docs',
 )
 
 // Health check — includes current sandbox version
+// Returns 200 when OpenCode is reachable, 503 when it's still starting up.
+// This ensures Docker/orchestrators treat the container as unhealthy until
+// the core API backend (OpenCode) is ready to serve requests.
 app.get('/kortix/health',
   describeRoute({
     tags: ['System'],
     summary: 'Health check',
-    description: 'Returns sandbox health status, current version, active WebSocket connections, and OpenCode readiness.',
+    description: 'Returns sandbox health status, current version, active WebSocket connections, and OpenCode readiness. Returns 200 when OpenCode is reachable, 503 when still starting.',
     responses: {
-      200: { description: 'Health status', content: { 'application/json': { schema: resolver(HealthResponse) } } },
+      200: { description: 'Healthy — OpenCode is reachable', content: { 'application/json': { schema: resolver(HealthResponse) } } },
+      503: { description: 'Starting — OpenCode is not yet reachable', content: { 'application/json': { schema: resolver(HealthResponse) } } },
     },
   }),
   async (c) => {
@@ -228,7 +245,9 @@ app.get('/kortix/health',
     } catch {}
     await checkOpenCodeReady()
     const changelog = await getChangelog(version)
-    return c.json({ status: 'ok', version, changelog, activeWs: activeConnections, opencode: openCodeReady })
+    const status = openCodeReady ? 'ok' : 'starting'
+    const httpStatus = openCodeReady ? 200 : 503
+    return c.json({ status, version, changelog, activeWs: activeConnections, opencode: openCodeReady }, httpStatus)
   },
 )
 

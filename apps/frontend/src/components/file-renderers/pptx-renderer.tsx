@@ -15,11 +15,11 @@ import { downloadFile } from '@/features/files/api/opencode-files';
 const DocViewerLazy = lazy(async () => {
   try {
     const mod = await import('@cyntler/react-doc-viewer');
-    return { default: mod.default };
+    return { default: mod.default } as any;
   } catch {
-    return { default: (() => null) as React.FC<any> };
+    return { default: (() => null) as React.FC<any> } as any;
   }
-});
+}) as React.LazyExoticComponent<React.ComponentType<any>>;
 
 let _docViewerRenderers: any[] | null = null;
 async function getDocViewerRenderers() {

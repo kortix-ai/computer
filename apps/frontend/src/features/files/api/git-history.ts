@@ -57,7 +57,7 @@ async function runGitCommand(command: string): Promise<string> {
   const connectUrl = `${wsUrl}/pty/${ptyId}/connect`;
 
   const output = await new Promise<string>((resolve, reject) => {
-    let chunks: string[] = [];
+    const chunks: string[] = [];
     let resolved = false;
 
     const ws = new WebSocket(connectUrl);

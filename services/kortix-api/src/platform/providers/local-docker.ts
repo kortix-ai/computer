@@ -413,7 +413,7 @@ export class LocalDockerProvider implements SandboxProvider {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${config.INTERNAL_SERVICE_KEY}`,
       },
-      body: JSON.stringify({ keys, restart: false }),
+      body: JSON.stringify({ keys }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) throw new Error(`POST /env returned ${res.status}`);

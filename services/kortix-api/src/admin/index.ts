@@ -140,7 +140,9 @@ async function fetchMasterJson<T>(path: string, init: RequestInit = {}, timeoutM
     const url = `${base}${path}`;
     try {
       const res = await fetchWithTimeout(url, init, timeoutMs);
-      if (!res.ok) { lastErr = new Error(`Master ${url} returned ${res.status}`); continue; }
+      // 503 from /kortix/health means "starting" — still return the JSON body
+      // so callers can inspect the status/opencode fields.
+      if (!res.ok && res.status !== 503) { lastErr = new Error(`Master ${url} returned ${res.status}`); continue; }
       return (await res.json()) as T;
     } catch (e) { lastErr = e; continue; }
   }
@@ -152,11 +154,11 @@ async function getSandboxEnv(): Promise<Record<string, string>> {
   catch { return {}; }
 }
 
-async function setSandboxEnv(keys: Record<string, string>, restart = true): Promise<void> {
+async function setSandboxEnv(keys: Record<string, string>): Promise<void> {
   await fetchMasterJson('/env', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keys, restart }),
+    body: JSON.stringify({ keys }),
   }, 15000);
 }
 
@@ -309,7 +311,7 @@ adminApp.post('/api/env', async (c) => {
       clean[k] = trimmed;
     }
     try {
-      await setSandboxEnv(clean, true);
+      await setSandboxEnv(clean);
       return c.json({ ok: true });
     } catch (e: any) {
       return c.json({ ok: false, error: 'Failed to save', details: e?.message || String(e) }, 500);
@@ -402,9 +404,13 @@ adminApp.get('/api/health', async (c) => {
 
   if (!repoRoot) {
     try {
-      await fetchMasterJson('/kortix/health', {}, 5000);
+      const health = await fetchMasterJson<{ status: string; opencode?: boolean }>('/kortix/health', {}, 5000);
       checks.sandbox = { ok: true };
       checks.docker = { ok: true };
+      // If OpenCode isn't ready, sandbox is reachable but not fully operational
+      if (health.status === 'starting' || health.opencode === false) {
+        checks.sandbox = { ok: false, error: 'Sandbox reachable but OpenCode is still starting' };
+      }
     } catch (e: any) {
       checks.sandbox = { ok: false, error: e?.message || String(e) };
       checks.docker = { ok: false, error: e?.message || String(e) };

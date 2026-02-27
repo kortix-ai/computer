@@ -48,6 +48,7 @@ const defaultDeps: SandboxCloudRouterDeps = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function serializeSandbox(row: typeof sandboxes.$inferSelect) {
+  const metadata = row.metadata as Record<string, unknown> | null;
   return {
     sandbox_id: row.sandboxId,
     external_id: row.externalId,
@@ -55,6 +56,7 @@ function serializeSandbox(row: typeof sandboxes.$inferSelect) {
     provider: row.provider,
     base_url: row.baseUrl,
     status: row.status,
+    version: metadata?.version ?? null,
     metadata: row.metadata,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
@@ -185,7 +187,9 @@ export function createCloudSandboxRouter(
         },
       });
 
-      // Update sandbox row with provider details
+      // Update sandbox row with provider details.
+      // Store the raw KORTIX_TOKEN in config.serviceKey (private, never serialized
+      // to API responses) so the preview proxy can authenticate to the sandbox.
       const [updated] = await db
         .update(sandboxes)
         .set({
@@ -193,6 +197,7 @@ export function createCloudSandboxRouter(
           status: 'active',
           baseUrl: result.baseUrl,
           metadata: result.metadata,
+          config: { serviceKey: sandboxKey.secretKey },
           updatedAt: new Date(),
         })
         .where(eq(sandboxes.sandboxId, sandbox.sandboxId))

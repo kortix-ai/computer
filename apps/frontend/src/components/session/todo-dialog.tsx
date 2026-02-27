@@ -96,7 +96,7 @@ export function TodoDialog({ sessionId, open, onOpenChange }: TodoDialogProps) {
               </div>
             )}
 
-            {todos?.map((todo) => {
+            {todos?.map((todo, idx) => {
               const status = statusConfig[todo.status] || statusConfig.pending;
               const priority = priorityConfig[todo.priority];
               const StatusIcon = status.icon;
@@ -105,7 +105,7 @@ export function TodoDialog({ sessionId, open, onOpenChange }: TodoDialogProps) {
 
               return (
                 <div
-                  key={todo.id}
+                  key={(todo as any).id ?? idx}
                   className={cn(
                     'flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors',
                     isCompleted && 'opacity-40',

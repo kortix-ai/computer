@@ -660,7 +660,11 @@ export function TabBar() {
     }
   }, [sessions, sessionsLoading, activeServerId]);
 
-  // Prefetch session + messages data for all open tabs so switching is instant
+  // Prefetch session metadata for all open tabs so switching is instant.
+  // NOTE: Message prefetching was removed — messages are now served from
+  // the Zustand sync store (populated by useSessionSync on mount and kept
+  // live by SSE events). The old message prefetch caused duplicate
+  // /session/{id}/message requests every time tabs changed.
   useEffect(() => {
     for (const id of tabOrder) {
       const tab = tabs[id];
@@ -674,16 +678,6 @@ export function TabBar() {
           return result.data;
         },
         staleTime: 30 * 1000,
-      });
-      queryClient.prefetchQuery({
-        queryKey: opencodeKeys.messages(id),
-        queryFn: async () => {
-          const client = getClient();
-          const result = await client.session.messages({ sessionID: id });
-          if (result.error) throw new Error('prefetch failed');
-          return result.data;
-        },
-        staleTime: 5 * 1000,
       });
     }
   }, [tabOrder, tabs, activeTabId, queryClient]);

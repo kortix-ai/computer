@@ -119,9 +119,9 @@ export function DashboardContent() {
           command: cmd.name,
           arguments: args || '',
           ...(local.agent.current && { agent: local.agent.current.name }),
-          ...(local.model.currentKey && { model: local.model.currentKey }),
+          ...(local.model.currentKey && { model: String(local.model.currentKey) }),
           ...(local.model.variant.current && { variant: local.model.variant.current }),
-        }).catch(() => {
+        } as any).catch(() => {
           toast.warning('Failed to execute command');
         });
       } catch {

@@ -77,10 +77,14 @@ services:
     shm_size: "2gb"
     restart: unless-stopped
     healthcheck:
+      # Returns 200 only when OpenCode is reachable; 503 while starting.
+      # curl -f treats 503 as failure, so Docker marks the container as
+      # "starting" until OpenCode is ready — exactly what we want.
       test: ["CMD", "curl", "-f", "http://localhost:8000/kortix/health"]
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 30s
 
 volumes:
   sandbox_data:

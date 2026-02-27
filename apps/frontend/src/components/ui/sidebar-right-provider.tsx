@@ -55,24 +55,10 @@ export function RightSidebarProvider({
     setOpen(!open);
   }, [open, setOpen]);
 
-  // Keyboard shortcut: Cmd+Shift+B
+  // Keyboard shortcut: Cmd+Shift+B (works globally, even when typing)
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isDocumentModalOpen) return;
-
-      const el = document.activeElement;
-      if (el) {
-        const tagName = el.tagName.toLowerCase();
-        if (
-          tagName === 'input' ||
-          tagName === 'textarea' ||
-          el.getAttribute('contenteditable') === 'true' ||
-          el.closest('.cm-editor') ||
-          el.closest('.ProseMirror')
-        ) {
-          return;
-        }
-      }
 
       if (
         event.key === 'b' &&

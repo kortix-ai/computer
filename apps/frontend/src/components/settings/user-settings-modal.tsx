@@ -94,7 +94,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Keyboard, CheckCircle2, HelpCircle, ShieldCheck, Volume2, EyeOff, Globe } from 'lucide-react';
 import { useUserPreferencesStore, type TabSwitchModifier } from '@/stores/user-preferences-store';
 import CreditTransactions from '@/components/billing/credit-transactions';
-import { AppearanceTab } from '@/components/settings/appearance-tab';
 import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
@@ -219,7 +218,6 @@ export function UserSettingsModal({
                         <div className="flex-1 overflow-x-hidden overflow-y-auto">
                             <div className="w-full max-w-full">
                                 {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
-                                {activeTab === 'appearance' && <div className="p-6"><AppearanceTab /></div>}
                                 {activeTab === 'sounds' && <SoundsTab />}
                                 {activeTab === 'notifications' && <NotificationsTab />}
                                 {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
@@ -283,7 +281,6 @@ export function UserSettingsModal({
                         {/* Desktop Content */}
                         <div className="flex-1 overflow-y-auto min-h-0 w-full max-w-full">
                             {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
-                            {activeTab === 'appearance' && <div className="p-6 h-full"><AppearanceTab /></div>}
                             {activeTab === 'sounds' && <SoundsTab />}
                             {activeTab === 'notifications' && <NotificationsTab />}
                             {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}

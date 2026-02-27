@@ -53,8 +53,10 @@ llm.post('/chat/completions', async (c) => {
   // Get model config for billing
   const modelConfig = getModel(modelId);
 
-  // Session pruning: trim stale tool results to reduce context size
-  applySessionPruning(body, sessionId, modelConfig.contextWindow);
+  // Session pruning: trim stale tool results to reduce context size (Anthropic only — optimizes cache-write costs)
+  if (modelConfig.cachingStrategy === 'manual') {
+    applySessionPruning(body, sessionId, modelConfig.contextWindow);
+  }
 
   // Prompt caching: inject cache_control breakpoints for manual-caching providers (Anthropic)
   injectCacheControl(body, modelConfig);

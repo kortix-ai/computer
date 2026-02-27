@@ -94,7 +94,9 @@ async function fetchMasterJson<T>(path: string, init: RequestInit = {}, timeoutM
     const url = `${base}${path}`;
     try {
       const res = await fetchWithTimeout(url, init, timeoutMs);
-      if (!res.ok) {
+      // 503 from /kortix/health means "starting" — still return the JSON body
+      // so callers can inspect the status/opencode fields.
+      if (!res.ok && res.status !== 503) {
         lastErr = new Error(`Master ${url} returned ${res.status}`);
         continue;
       }
@@ -116,11 +118,11 @@ async function getSandboxEnv(): Promise<Record<string, string>> {
   }
 }
 
-async function setSandboxEnv(keys: Record<string, string>, restart = true): Promise<void> {
+async function setSandboxEnv(keys: Record<string, string>): Promise<void> {
   await fetchMasterJson('/env', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keys, restart }),
+    body: JSON.stringify({ keys }),
   }, 15000);
 }
 
@@ -352,8 +354,8 @@ setupApp.post('/env', async (c) => {
 
   const repoRoot = findRepoRoot();
 
-  // Installed/local Docker mode: persist keys in the sandbox secret store and
-  // restart OpenCode services so they pick up the new ENV vars.
+  // Installed/local Docker mode: persist keys in the sandbox secret store.
+    // Tools pick up new values instantly via s6 env dir (no restart needed).
   if (!repoRoot) {
     const clean: Record<string, string> = {};
     for (const [k, v] of Object.entries(keys)) {
@@ -364,7 +366,7 @@ setupApp.post('/env', async (c) => {
     }
 
     try {
-      await setSandboxEnv(clean, true);
+      await setSandboxEnv(clean);
       return c.json({ ok: true });
     } catch (e: any) {
       return c.json(
@@ -442,9 +444,12 @@ setupApp.get('/health', async (c) => {
   // Installed/local Docker mode: check sandbox by HTTP (no docker CLI in image)
   if (!repoRoot) {
     try {
-      await fetchMasterJson('/kortix/health', {}, 5000);
+      const health = await fetchMasterJson<{ status: string; opencode?: boolean }>('/kortix/health', {}, 5000);
       checks.sandbox = { ok: true };
       checks.docker = { ok: true };
+      if (health.status === 'starting' || health.opencode === false) {
+        checks.sandbox = { ok: false, error: 'Sandbox reachable but OpenCode is still starting' };
+      }
     } catch (e: any) {
       const msg = e?.message || String(e);
       checks.sandbox = { ok: false, error: msg };
@@ -513,7 +518,7 @@ async function setOnboardingEnv(entries: Record<string, string>): Promise<boolea
     return true;
   }
   try {
-    await setSandboxEnv(entries, false);
+    await setSandboxEnv(entries);
     return true;
   } catch {
     return false;

@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Streamdown, defaultRemarkPlugins, defaultRehypePlugins } from 'streamdown';
-import type { PluggableList } from 'unified';
+type PluggableList = any[];
 import { defaultSchema } from 'rehype-sanitize';
 import { Check, Copy } from 'lucide-react';
 import { codeToHtml } from 'shiki';

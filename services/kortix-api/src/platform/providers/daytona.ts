@@ -5,8 +5,11 @@
  * Extracted from the original account.ts provisioning logic.
  */
 
+import { eq } from 'drizzle-orm';
+import { sandboxes } from '@kortix/db';
 import { getDaytona } from '../../shared/daytona';
-import { config } from '../../config';
+import { db } from '../../shared/db';
+import { config, SANDBOX_VERSION } from '../../config';
 import type {
   SandboxProvider,
   ProviderName,
@@ -27,12 +30,21 @@ export class DaytonaProvider implements SandboxProvider {
 
     const daytona = getDaytona();
 
+    // Use KORTIX_TOKEN as INTERNAL_SERVICE_KEY — one key for both directions.
+    // KORTIX_TOKEN (sandbox → api) is already in opts.envVars.
+    // INTERNAL_SERVICE_KEY (api → sandbox) is the same value so the proxy can auth.
+    const serviceKey = opts.envVars?.KORTIX_TOKEN || '';
+
     const daytonaSandbox = await daytona.create(
       {
         snapshot,
         envVars: {
-          KORTIX_API_URL: config.KORTIX_URL,
+          // Strip /v1/router suffix — opencode.jsonc appends it already.
+          // KORTIX_URL may be "https://new-api.kortix.com/v1/router" but the
+          // sandbox expects the base: "https://new-api.kortix.com".
+          KORTIX_API_URL: config.KORTIX_URL.replace(/\/v1\/router\/?$/, ''),
           ENV_MODE: 'cloud',
+          INTERNAL_SERVICE_KEY: serviceKey,
           ...opts.envVars,
         },
         autoStopInterval: 15,
@@ -52,6 +64,7 @@ export class DaytonaProvider implements SandboxProvider {
         provisionedBy: opts.userId,
         daytonaSandboxId: externalId,
         snapshot,
+        version: SANDBOX_VERSION,
       },
     };
   }
@@ -102,6 +115,22 @@ export class DaytonaProvider implements SandboxProvider {
     if (token) {
       headers['X-Daytona-Preview-Token'] = token;
     }
+
+    // Look up the service key from config.serviceKey so we can authenticate to the sandbox.
+    try {
+      const [row] = await db
+        .select({ config: sandboxes.config })
+        .from(sandboxes)
+        .where(eq(sandboxes.externalId, externalId))
+        .limit(1);
+      const serviceKey = (row?.config as Record<string, unknown>)?.serviceKey as string | undefined;
+      if (serviceKey) {
+        headers['Authorization'] = `Bearer ${serviceKey}`;
+      }
+    } catch (err) {
+      console.warn(`[DAYTONA] Failed to look up service key for ${externalId}:`, err);
+    }
+
     return { url, headers };
   }
 

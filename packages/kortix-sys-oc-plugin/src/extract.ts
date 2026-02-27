@@ -36,6 +36,7 @@ export const SKIP_TOOLS = new Set([
 	"ltm_search",
 	"observation_search",
 	"get_mem",
+	"get_tool_output",
 	"TodoWrite",
 	"TodoRead",
 	"todowrite",
