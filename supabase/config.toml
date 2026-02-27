@@ -17,14 +17,14 @@ project_id = "kortix-local"
 # ─── API (PostgREST) ─────────────────────────────────────────────────────────
 [api]
 enabled = true
-port = 54321
+port = 64321
 schemas = ["public", "kortix"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 [db]
-port = 54322
+port = 64322
 major_version = 17
 
 [db.pooler]
@@ -55,12 +55,12 @@ enabled = false
 # ─── Studio (Dashboard UI) ───────────────────────────────────────────────────
 [studio]
 enabled = true
-port = 54323
+port = 64323
 
 # ─── Inbucket (Email testing) ────────────────────────────────────────────────
 [inbucket]
 enabled = true
-port = 54324
+port = 64324
 
 # ─── Analytics ────────────────────────────────────────────────────────────────
 [analytics]
