@@ -55,8 +55,8 @@ function getInnerNsPid(procPid: number): number | null {
   }
 }
 
-async function restartServices(): Promise<void> {
-  // Restart OpenCode so it picks up new env vars via s6 with-contenv.
+async function restartServices(services?: string[]): Promise<void> {
+  // Kill supervised processes directly so s6 auto-restarts them with fresh env.
   //
   // The opencode CLI is a Node wrapper → native binary chain. s6-svc -r
   // only SIGTERMs the supervised PID and doesn't propagate to grandchildren.
@@ -65,6 +65,12 @@ async function restartServices(): Promise<void> {
   // namespace. `pgrep`/`kill`/`killall` all fail because they resolve PIDs
   // in the outer namespace but kill() operates in the inner namespace.
   // We read NSpid from /proc/{pid}/status to get the inner namespace PID.
+  //
+  // NOTE: opencode-channels is NOT restarted here — it uses hot-reload via
+  // POST /channels/reload instead. Only OpenCode itself needs process restart.
+  const restartAll = !services || services.length === 0
+  const restartOpencode = restartAll || services?.includes('opencode')
+
   try {
     const killed: number[] = []
 
@@ -74,7 +80,7 @@ async function restartServices(): Promise<void> {
       try {
         const comm = readFileSync(`/proc/${pid}/comm`, 'utf-8').trim()
         // Kill native opencode binaries (comm="opencode")
-        if (comm === 'opencode') {
+        if (restartOpencode && comm === 'opencode') {
           const innerPid = getInnerNsPid(pid)
           if (innerPid) {
             process.kill(innerPid, 9)
@@ -82,10 +88,10 @@ async function restartServices(): Promise<void> {
           }
           continue
         }
-        // Kill node wrappers (comm="node", cmdline contains opencode)
-        if (comm === 'node' || comm === 'MainThread') {
+        // Kill node/bun wrappers by cmdline
+        if (comm === 'node' || comm === 'MainThread' || comm === 'bun') {
           const cmdline = readFileSync(`/proc/${pid}/cmdline`, 'utf-8')
-          if (cmdline.includes('/usr/local/bin/opencode')) {
+          if (restartOpencode && cmdline.includes('/usr/local/bin/opencode')) {
             const innerPid = getInnerNsPid(pid)
             if (innerPid) {
               process.kill(innerPid, 9)
@@ -96,10 +102,10 @@ async function restartServices(): Promise<void> {
       } catch {}
     }
 
-    console.log(`[ENV API] restart opencode: killed inner pids=${killed.join(',')}`)
+    console.log(`[ENV API] restart services: killed inner pids=${killed.join(',') || 'none'}`)
     // s6 detects longrun died → auto-restarts with fresh env via with-contenv.
   } catch (e) {
-    console.error(`[ENV API] restart opencode: error=${e}`)
+    console.error(`[ENV API] restart services: error=${e}`)
   }
 }
 

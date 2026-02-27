@@ -42,7 +42,7 @@ import { useServerStore } from '@/stores/server-store';
 import { ensureSandbox } from '@/lib/platform-client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { SlackPlatformCredentialsForm } from './slack-platform-credentials-form';
+import { SlackSetupWizard } from './slack-setup-wizard';
 
 interface ChannelConfigDialogProps {
   open: boolean;
@@ -51,8 +51,8 @@ interface ChannelConfigDialogProps {
 }
 
 const CHANNEL_OPTIONS: { type: ChannelType; label: string; icon: React.ComponentType<{ className?: string }>; available: boolean }[] = [
-  { type: 'telegram', label: 'Telegram', icon: TelegramIcon, available: true },
   { type: 'slack', label: 'Slack', icon: SlackIcon, available: true },
+  { type: 'telegram', label: 'Telegram', icon: TelegramIcon, available: false },
   { type: 'discord', label: 'Discord', icon: DiscordIcon, available: false },
   { type: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon, available: false },
   { type: 'teams', label: 'Teams', icon: Users, available: false },
@@ -90,7 +90,7 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
     onOpenChange(false);
   };
 
-  const proceedToSlackOAuth = async () => {
+  const proceedToSlackOAuth = async (publicUrl?: string) => {
     const sandboxId = await resolveSandboxId();
     const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/v1\/?$/, '');
     const params = new URLSearchParams();
@@ -99,6 +99,9 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
     } else {
       toast.error('Please create an instance first, then connect Slack.');
       return;
+    }
+    if (publicUrl) {
+      params.set('publicUrl', publicUrl);
     }
     const installUrl = `${backendUrl}/webhooks/slack/install?${params.toString()}`;
     handleClose();
@@ -198,23 +201,24 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
   if (step === 'slack-creds') {
     return (
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
           <div className="bg-muted/30 border-b px-6 pt-6 pb-5">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2.5">
                 <div className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-muted border border-border/50">
                   <SlackIcon className="h-4.5 w-4.5" />
                 </div>
-                Configure Slack App
+                Set Up Slack Integration
               </DialogTitle>
               <DialogDescription className="mt-1.5">
-                Enter your Slack App credentials to enable the integration
+                We'll guide you through creating and configuring your Slack app
               </DialogDescription>
             </DialogHeader>
           </div>
-          <SlackPlatformCredentialsForm
-            onSaved={() => proceedToSlackOAuth()}
+          <SlackSetupWizard
+            onSaved={(publicUrl) => proceedToSlackOAuth(publicUrl)}
             onBack={() => setStep('type')}
+            sandboxId={sandbox?.sandbox_id}
           />
         </DialogContent>
       </Dialog>

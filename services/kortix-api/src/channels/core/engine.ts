@@ -10,8 +10,8 @@ import type { ChannelConfig } from '@kortix/db';
 
 import type { ChannelAdapter, FileOutput } from '../adapters/adapter';
 import type { ChannelType, NormalizedMessage, AgentResponse, SandboxTarget, SessionStrategy } from '../types';
-import { SandboxConnector } from './sandbox-connector';
-import type { StreamEvent } from './sandbox-connector';
+import { OpenCodeClient, type StreamEvent } from 'opencode-channels';
+import { createClientForSandbox, downloadFile } from './opencode-connector';
 import { SessionManager } from './session-manager';
 import { MessageQueue } from './queue';
 import { RateLimiter } from './rate-limiter';
@@ -103,7 +103,7 @@ export class ChannelEngineImpl {
       return;
     }
 
-    const connector = new SandboxConnector(target);
+    const client = await createClientForSandbox(target);
 
     await this.logMessage(config, message, 'inbound');
 
@@ -122,11 +122,11 @@ export class ChannelEngineImpl {
     };
 
     try {
-      const ready = await connector.isReady();
+      const ready = await client.isReady();
       if (!ready) {
         console.log(`[CHANNELS] Sandbox ${sandboxId} offline, queuing message`);
         try {
-          await this.queue.enqueue(sandboxId, message, config, connector);
+          await this.queue.enqueue(sandboxId, message, config, client, target);
         } catch (err) {
           console.error(`[CHANNELS] Queue processing failed:`, err);
         }
@@ -134,7 +134,7 @@ export class ChannelEngineImpl {
       }
 
       const agentName = message.overrides?.agentName ?? config.agentName ?? undefined;
-      const sessionId = await this.sessionManager.resolve(config, message, connector);
+      const sessionId = await this.sessionManager.resolve(config, message, client);
       const prompt = this.buildPrompt(config, message);
       const model = message.overrides?.model ?? this.resolveModel(config);
 
@@ -143,7 +143,7 @@ export class ChannelEngineImpl {
       const startTime = Date.now();
 
       const filesBefore = new Set(
-        (await connector.getModifiedFiles().catch(() => [])).map((f) => f.path),
+        (await client.getModifiedFiles().catch(() => [])).map((f) => f.path),
       );
 
       const fileParts = message.attachments
@@ -151,9 +151,9 @@ export class ChannelEngineImpl {
         .map((a) => ({ type: 'file' as const, mime: a.mimeType || 'application/octet-stream', url: a.url!, filename: a.name }));
 
       try {
-        for await (const event of connector.promptStreaming(sessionId, prompt, agentName, model, fileParts)) {
+        for await (const event of client.promptStreamEvents(sessionId, prompt, { agentName, model, files: fileParts })) {
           responseText = await this.handleStreamEvent(
-            event, responseText, collectedFiles, connector, adapter, config, message,
+            event, responseText, collectedFiles, client, adapter, config, message,
           );
         }
       } catch (err) {
@@ -178,13 +178,13 @@ export class ChannelEngineImpl {
         for (const file of collectedFiles) {
           if (!file.content) {
             console.log(`[CHANNELS] Downloading SSE file: name=${file.name} url=${file.url}`);
-            const buffer = await connector.downloadFile(file.url);
+            const buffer = await downloadFile(client, file.url);
             if (buffer) {
               console.log(`[CHANNELS] Downloaded: ${file.name} (${buffer.length} bytes)`);
               file.content = buffer;
             } else {
               console.warn(`[CHANNELS] Download failed for ${file.url}, trying by name...`);
-              const fallback = await connector.downloadFileByPath(file.name);
+              const fallback = await client.downloadFileByPath(file.name);
               if (fallback) {
                 console.log(`[CHANNELS] Fallback download succeeded: ${file.name} (${fallback.length} bytes)`);
                 file.content = fallback;
@@ -214,7 +214,7 @@ export class ChannelEngineImpl {
 
       if (adapter.sendFiles) {
         try {
-          const filesAfter = await connector.getModifiedFiles().catch(() => []);
+          const filesAfter = await client.getModifiedFiles().catch(() => []);
           const newFiles: FileOutput[] = [];
 
           console.log(`[CHANNELS] Strategy 2: git status before=${filesBefore.size} after=${filesAfter.length} already_uploaded=${uploadedFileNames.size}`);
@@ -224,7 +224,7 @@ export class ChannelEngineImpl {
             if (uploadedFileNames.has(f.name)) continue;
 
             console.log(`[CHANNELS] New file from git status: ${f.path}`);
-            const buffer = await connector.downloadFileByPath(f.path);
+            const buffer = await client.downloadFileByPath(f.path);
             if (buffer) {
               console.log(`[CHANNELS] Downloaded: ${f.name} (${buffer.length} bytes)`);
               const publicUrl = await this.uploadToSupabaseStorage(f.name, buffer);
@@ -255,7 +255,7 @@ export class ChannelEngineImpl {
     event: StreamEvent,
     responseText: string,
     collectedFiles: FileOutput[],
-    connector: SandboxConnector,
+    client: OpenCodeClient,
     adapter: ChannelAdapter,
     config: ChannelConfig,
     message: NormalizedMessage,
@@ -266,7 +266,7 @@ export class ChannelEngineImpl {
 
       case 'permission':
         if (event.permission && adapter.sendPermissionRequest) {
-          await this.handlePermissionEvent(event, connector, adapter, config, message);
+          await this.handlePermissionEvent(event, client, adapter, config, message);
         }
         return responseText;
 
@@ -291,7 +291,7 @@ export class ChannelEngineImpl {
 
   private async handlePermissionEvent(
     event: StreamEvent,
-    connector: SandboxConnector,
+    client: OpenCodeClient,
     adapter: ChannelAdapter,
     config: ChannelConfig,
     message: NormalizedMessage,
@@ -300,7 +300,7 @@ export class ChannelEngineImpl {
 
     await adapter.sendPermissionRequest!(config, message, perm);
     const approved = await createPermissionRequest(perm.id);
-    await connector.replyPermission(perm.id, approved);
+    await client.replyPermission(perm.id, approved);
   }
 
   private resolveModel(config: ChannelConfig): { providerID: string; modelID: string } | undefined {

@@ -178,6 +178,11 @@ COPY sandbox/kortix-master/package.json /opt/kortix-master/package.json
 RUN cd /opt/kortix-master && bun install
 COPY sandbox/kortix-master/ /opt/kortix-master/
 
+# ── opencode-channels (Chat SDK Slack/Telegram bot) ──────────────────────────
+COPY packages/opencode-channels/package.json /opt/opencode-channels/package.json
+RUN cd /opt/opencode-channels && bun install
+COPY packages/opencode-channels/ /opt/opencode-channels/
+
 # ── Version & Changelog (for live update system) ────────────────────────────
 # Read version from sandbox/package.json (single source of truth) and write .version
 COPY sandbox/package.json /tmp/sandbox-pkg.json
@@ -211,7 +216,7 @@ ENV KORTIX_WORKSPACE=/workspace
 # Each service is a directory with: run, type (longrun), dependencies.d/init-services
 COPY sandbox/s6-services/ /etc/s6-overlay/s6-rc.d/
 # Register all custom services in the user bundle so s6 starts them
-RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-lss-sync svc-agent-browser-viewer svc-presentation-viewer svc-sshd; do \
+RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-opencode-channels svc-lss-sync svc-agent-browser-viewer svc-presentation-viewer svc-sshd; do \
         touch "/etc/s6-overlay/s6-rc.d/user/contents.d/${svc}"; \
     done \
     && chmod +x /etc/s6-overlay/s6-rc.d/svc-*/run
@@ -256,6 +261,6 @@ ENV SELKIES_MANUAL_HEIGHT=1080
 ENV SELKIES_USE_CSS_SCALING=true
 ENV TITLE="Kortix Computer"
 
-EXPOSE 22 6080 6081 3111 3210 8000 9223 9224
+EXPOSE 22 3456 6080 6081 3111 3210 8000 9223 9224
 
 ENTRYPOINT ["/opt/startup.sh"]

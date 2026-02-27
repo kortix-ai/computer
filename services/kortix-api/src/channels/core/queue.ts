@@ -1,6 +1,7 @@
-import type { NormalizedMessage } from '../types';
+import type { NormalizedMessage, SandboxTarget } from '../types';
 import type { ChannelConfig } from '@kortix/db';
-import { SandboxConnector } from './sandbox-connector';
+import { OpenCodeClient } from 'opencode-channels';
+import { wakeUpSandbox } from './opencode-connector';
 
 interface QueuedMessage {
   message: NormalizedMessage;
@@ -26,7 +27,8 @@ export class MessageQueue {
     sandboxId: string,
     message: NormalizedMessage,
     config: ChannelConfig,
-    connector: SandboxConnector,
+    client: OpenCodeClient,
+    target: SandboxTarget,
   ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       let queue = this.queues.get(sandboxId);
@@ -38,19 +40,19 @@ export class MessageQueue {
       queue.messages.push({ message, config, resolve, reject });
 
       if (!queue.draining) {
-        this.startWakeAndDrain(sandboxId, connector);
+        this.startWakeAndDrain(sandboxId, client, target);
       }
     });
   }
 
-  private async startWakeAndDrain(sandboxId: string, connector: SandboxConnector): Promise<void> {
+  private async startWakeAndDrain(sandboxId: string, client: OpenCodeClient, target: SandboxTarget): Promise<void> {
     const queue = this.queues.get(sandboxId);
     if (!queue) return;
 
     queue.draining = true;
 
     try {
-      await connector.wakeUp();
+      await wakeUpSandbox(target);
 
       const maxWait = 90_000;
       const pollInterval = 3_000;
@@ -58,7 +60,7 @@ export class MessageQueue {
       let ready = false;
 
       while (Date.now() - start < maxWait) {
-        if (await connector.isReady()) {
+        if (await client.isReady()) {
           ready = true;
           break;
         }
