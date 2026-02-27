@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppContext } from '../../types';
 import { proxyToOpenRouter, extractUsage, calculateCost, getModel, getAllModels } from '../services/llm';
+import { applySessionPruning } from '../services/session-pruning';
+import { injectCacheControl } from '../services/prompt-caching';
 import { checkCredits, deductLLMCredits } from '../services/billing';
 
 const llm = new Hono<{ Variables: AppContext }>();
@@ -46,6 +48,12 @@ llm.post('/chat/completions', async (c) => {
   // Get model config for billing
   const modelConfig = getModel(modelId);
 
+  // Session pruning: trim stale tool results to reduce context size
+  applySessionPruning(body, sessionId, modelConfig.contextWindow);
+
+  // Prompt caching: inject cache_control breakpoints for manual-caching providers (Anthropic)
+  injectCacheControl(body, modelConfig);
+
   // Proxy to OpenRouter
   const response = await proxyToOpenRouter(body, isStreaming);
 
@@ -86,10 +94,10 @@ llm.post('/chat/completions', async (c) => {
   // Non-streaming: read the response, extract usage for billing, then return
   const responseBody = await response.json();
 
-  // Deduct credits based on usage
+  // Deduct credits based on usage (with cache-aware pricing when available)
   const usage = extractUsage(responseBody);
   if (usage) {
-    const cost = calculateCost(modelConfig, usage.promptTokens, usage.completionTokens);
+    const cost = calculateCost(modelConfig, usage.promptTokens, usage.completionTokens, usage.cachedTokens, usage.cacheWriteTokens);
     deductLLMCredits(
       accountId,
       modelId,
@@ -98,7 +106,10 @@ llm.post('/chat/completions', async (c) => {
       cost,
       sessionId,
     ).catch((err) => console.error(`[LLM] Failed to deduct credits for ${modelId}:`, err));
-    console.log(`[LLM] ${modelId}: ${usage.promptTokens}/${usage.completionTokens} tokens, cost=$${cost.toFixed(6)}`);
+    const cacheInfo = usage.cachedTokens || usage.cacheWriteTokens
+      ? ` (cache: ${usage.cachedTokens}read/${usage.cacheWriteTokens}write)`
+      : '';
+    console.log(`[LLM] ${modelId}: ${usage.promptTokens}/${usage.completionTokens} tokens${cacheInfo}, cost=$${cost.toFixed(6)}`);
   }
 
   return c.json(responseBody);
@@ -170,7 +181,7 @@ async function extractUsageFromStream(
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let lastUsage: { promptTokens: number; completionTokens: number } | null = null;
+    let lastUsage: { promptTokens: number; completionTokens: number; cachedTokens: number; cacheWriteTokens: number } | null = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -187,9 +198,12 @@ async function extractUsageFromStream(
         try {
           const chunk = JSON.parse(line.slice(6));
           if (chunk.usage) {
+            const details = chunk.usage.prompt_tokens_details;
             lastUsage = {
               promptTokens: chunk.usage.prompt_tokens ?? 0,
               completionTokens: chunk.usage.completion_tokens ?? 0,
+              cachedTokens: details?.cached_tokens ?? 0,
+              cacheWriteTokens: details?.cache_write_tokens ?? 0,
             };
           }
         } catch {
@@ -199,7 +213,7 @@ async function extractUsageFromStream(
     }
 
     if (lastUsage) {
-      const cost = calculateCost(modelConfig, lastUsage.promptTokens, lastUsage.completionTokens);
+      const cost = calculateCost(modelConfig, lastUsage.promptTokens, lastUsage.completionTokens, lastUsage.cachedTokens, lastUsage.cacheWriteTokens);
       await deductLLMCredits(
         accountId,
         modelId,
@@ -208,7 +222,10 @@ async function extractUsageFromStream(
         cost,
         sessionId,
       );
-      console.log(`[LLM] Stream ${modelId}: ${lastUsage.promptTokens}/${lastUsage.completionTokens} tokens, cost=$${cost.toFixed(6)}`);
+      const cacheInfo = lastUsage.cachedTokens || lastUsage.cacheWriteTokens
+        ? ` (cache: ${lastUsage.cachedTokens}read/${lastUsage.cacheWriteTokens}write)`
+        : '';
+      console.log(`[LLM] Stream ${modelId}: ${lastUsage.promptTokens}/${lastUsage.completionTokens} tokens${cacheInfo}, cost=$${cost.toFixed(6)}`);
     } else {
       console.warn(`[LLM] Stream ${modelId}: no usage data found in stream — billing skipped`);
     }

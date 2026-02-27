@@ -177,6 +177,30 @@ export const config = {
   /** 64-char hex string (32 bytes) for AES-256-GCM credential encryption. Omit to disable. */
   CHANNELS_CREDENTIAL_KEY: process.env.CHANNELS_CREDENTIAL_KEY || '',
 
+  // ─── Session Pruning (LLM Context) ───────────────────────────────────────
+  /** Master switch — set to 'false' to disable pruning entirely. */
+  SESSION_PRUNING_ENABLED: process.env.SESSION_PRUNING_ENABLED !== 'false',
+  /** Idle TTL in ms before pruning activates (default 5 min). */
+  SESSION_PRUNING_TTL_MS: parseInt(process.env.SESSION_PRUNING_TTL_MS || '', 10) || 5 * 60 * 1000,
+  /** Number of trailing assistant turns whose tool results are protected. */
+  SESSION_PRUNING_KEEP_LAST: parseInt(process.env.SESSION_PRUNING_KEEP_LAST || '', 10) || 3,
+  /** Context fill ratio that triggers soft-trim (0-1). */
+  SESSION_PRUNING_SOFT_RATIO: parseFloat(process.env.SESSION_PRUNING_SOFT_RATIO || '') || 0.3,
+  /** Context fill ratio that triggers hard-clear (0-1). */
+  SESSION_PRUNING_HARD_RATIO: parseFloat(process.env.SESSION_PRUNING_HARD_RATIO || '') || 0.5,
+  /** Min total prunable chars before hard-clear kicks in. */
+  SESSION_PRUNING_MIN_CHARS: parseInt(process.env.SESSION_PRUNING_MIN_CHARS || '', 10) || 50_000,
+  /** Individual tool result size threshold for soft-trim (chars). */
+  SESSION_PRUNING_SOFT_MAX: parseInt(process.env.SESSION_PRUNING_SOFT_MAX || '', 10) || 4_000,
+  /** Chars kept from the start during soft-trim. */
+  SESSION_PRUNING_SOFT_HEAD: parseInt(process.env.SESSION_PRUNING_SOFT_HEAD || '', 10) || 1_500,
+  /** Chars kept from the end during soft-trim. */
+  SESSION_PRUNING_SOFT_TAIL: parseInt(process.env.SESSION_PRUNING_SOFT_TAIL || '', 10) || 1_500,
+  /** Enable/disable the hard-clear phase. */
+  SESSION_PRUNING_HARD_ENABLED: process.env.SESSION_PRUNING_HARD_ENABLED !== 'false',
+  /** Placeholder text for hard-cleared tool results. */
+  SESSION_PRUNING_HARD_PLACEHOLDER: process.env.SESSION_PRUNING_HARD_PLACEHOLDER || '[Old tool result content cleared]',
+
   // ─── Frontend ────────────────────────────────────────────────────────────
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
 

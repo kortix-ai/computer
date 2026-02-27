@@ -3,6 +3,7 @@ import { getModel, getAllModels, resolveOpenRouterId, type ModelConfig } from '.
 
 /**
  * Calculate cost based on token usage and model pricing.
+ * When cache metrics are available, uses differential pricing for cached/written tokens.
  *
  * @param markup - Multiplier applied to the raw provider cost.
  *   Defaults to KORTIX_MARKUP (1.2× = 20% markup) when Kortix provides the key.
@@ -12,8 +13,21 @@ export function calculateCost(
   modelConfig: ModelConfig,
   promptTokens: number,
   completionTokens: number,
+  cachedTokens: number = 0,
+  cacheWriteTokens: number = 0,
   markup: number = KORTIX_MARKUP,
 ): number {
+  // When we have cache metrics and the model has cache pricing, compute differential cost
+  if ((cachedTokens > 0 || cacheWriteTokens > 0) && modelConfig.cacheReadPer1M != null) {
+    const regularInputTokens = Math.max(0, promptTokens - cachedTokens - cacheWriteTokens);
+    const regularInputCost = (regularInputTokens / 1_000_000) * modelConfig.inputPer1M;
+    const cacheReadCost = (cachedTokens / 1_000_000) * modelConfig.cacheReadPer1M;
+    const cacheWriteCost = (cacheWriteTokens / 1_000_000) * (modelConfig.cacheWritePer1M ?? modelConfig.inputPer1M);
+    const outputCost = (completionTokens / 1_000_000) * modelConfig.outputPer1M;
+    return (regularInputCost + cacheReadCost + cacheWriteCost + outputCost) * markup;
+  }
+
+  // Fallback: flat input pricing (no cache breakdown)
   const inputCost = (promptTokens / 1_000_000) * modelConfig.inputPer1M;
   const outputCost = (completionTokens / 1_000_000) * modelConfig.outputPer1M;
   return (inputCost + outputCost) * markup;
@@ -53,14 +67,25 @@ export async function proxyToOpenRouter(
   return response;
 }
 
+export interface UsageInfo {
+  promptTokens: number;
+  completionTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+}
+
 /**
  * Extract usage from a non-streaming OpenAI-compatible response body.
+ * Includes cache metrics from prompt_tokens_details when available.
  */
-export function extractUsage(responseBody: any): { promptTokens: number; completionTokens: number } | null {
+export function extractUsage(responseBody: any): UsageInfo | null {
   if (!responseBody?.usage) return null;
+  const details = responseBody.usage.prompt_tokens_details;
   return {
     promptTokens: responseBody.usage.prompt_tokens ?? 0,
     completionTokens: responseBody.usage.completion_tokens ?? 0,
+    cachedTokens: details?.cached_tokens ?? 0,
+    cacheWriteTokens: details?.cache_write_tokens ?? 0,
   };
 }
 

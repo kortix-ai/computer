@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { validateSecretKey } from '../repositories/api-keys';
 import { isKortixToken } from '../shared/crypto';
 import { getSupabase } from '../shared/supabase';
+import { config } from '../config';
 
 // ─── Cookie name for preview session auth ────────────────────────────────────
 const PREVIEW_SESSION_COOKIE = '__preview_session';
@@ -21,8 +22,9 @@ const PREVIEW_SESSION_COOKIE = '__preview_session';
 /**
  * API key auth for search, LLM, and router routes.
  *
- * Single validation path — all Kortix tokens (kortix_, kortix_sb_) go through
- * the same validateSecretKey() against the api_keys table.
+ * In local mode: any bearer token is accepted (no DB validation).
+ * In cloud mode: all Kortix tokens (kortix_, kortix_sb_) go through
+ * validateSecretKey() against the api_keys table.
  */
 export async function apiKeyAuth(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');
@@ -39,6 +41,12 @@ export async function apiKeyAuth(c: Context, next: Next) {
     throw new HTTPException(401, {
       message: 'Missing token in Authorization header',
     });
+  }
+
+  // Local mode: skip token format/DB validation — accept any bearer token
+  if (config.isLocal()) {
+    await next();
+    return;
   }
 
   if (!isKortixToken(token)) {

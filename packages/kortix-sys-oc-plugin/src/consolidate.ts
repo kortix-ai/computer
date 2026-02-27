@@ -7,9 +7,7 @@
  *   - Semantic: what is known (facts, architecture, patterns)
  *   - Procedural: how to do things (workflows, recipes, commands)
  *
- * LLM routing:
- *   1. Kortix router (OpenAI-compatible) — KORTIX_API_URL + KORTIX_TOKEN
- *   2. Anthropic Messages API — ANTHROPIC_API_KEY (fallback)
+ * LLM routing delegated to shared llm.ts module.
  */
 
 import type { Database } from "bun:sqlite"
@@ -20,6 +18,7 @@ import {
 	insertLTM,
 	markConsolidated,
 } from "./db"
+import { resolveLLMConfig, callLLM, extractJson, type LLMOptions } from "./llm"
 import type {
 	Observation,
 	LTMEntry,
@@ -30,51 +29,51 @@ import type {
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-export interface ConsolidateOptions {
-	kortixUrl?: string
-	kortixToken?: string
-	anthropicKey?: string
-	anthropicBaseUrl?: string
-	model?: string
-	maxTokens?: number
-}
-
-const KORTIX_MODEL = "kortix/basic"
-const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"
-const MAX_TOKENS = 2000
-const ANTHROPIC_VERSION = "2023-06-01"
+export interface ConsolidateOptions extends LLMOptions {}
 
 // ─── Prompts ─────────────────────────────────────────────────────────────────
 
-const CONSOLIDATION_SYSTEM = `You are a memory consolidation agent. Given a session's tool observations, extract durable long-term memories.
+const CONSOLIDATION_SYSTEM = `You are the memory consolidation layer for an autonomous coding agent. You process raw session observations (tool calls, file edits, bash outputs) and distill them into durable long-term memories that will be useful in future sessions — potentially weeks later, with zero surrounding context.
 
-Categorize into three types:
+## Memory Categories
 
-EPISODIC — What happened: events, tasks completed, failures, decisions made.
-  Example: "Built JWT authentication system for the Express API"
+EPISODIC — What happened this session. Decisions made, tasks completed, bugs fixed, failures encountered, approaches tried.
+  Good: "Migrated auth from JWT to session cookies — JWT refresh was unreliable on mobile (see /workspace/auth_plan.md)"
+  Bad: "Read some files about auth"
 
-SEMANTIC — What is known: facts about the codebase, architecture, patterns, config.
-  Example: "The frontend uses SolidJS with Tailwind at apps/frontend/"
+SEMANTIC — Stable facts about the codebase, architecture, environment, or domain. Things that remain true across sessions.
+  Good: "Frontend uses Next.js App Router at apps/frontend/; API is Bun/Hono at services/kortix-api/ (port 8008)"
+  Bad: "There is a frontend"
 
-PROCEDURAL — How to do things: workflows, commands, debugging steps, recipes.
-  Example: "Deploy: run bun build, then docker compose up -d"
+PROCEDURAL — How to do things. Concrete workflows, commands, debugging recipes, deploy steps. Must be actionable.
+  Good: "To run DB migrations: cd packages/db && DATABASE_URL=... bunx drizzle-kit migrate"
+  Bad: "Use drizzle for migrations"
 
-Rules:
-- Focus on DURABLE knowledge — things useful in future sessions
-- Do NOT include trivial file reads or generic tool usage
-- Each memory should be a complete, self-contained statement
-- Deduplicate against EXISTING_LTM — skip facts that already exist
-- Be specific (include paths, commands, names) not vague
-- Output ONLY valid JSON, no markdown fences
+## Rules
 
-Output format:
+1. **Future-self test.** Would this memory help the agent in a fresh session with no context? If not, skip it.
+2. **Specificity required.** Include file paths, command flags, error messages, version numbers. Vague memories are useless.
+3. **Self-contained.** Each entry must make sense on its own — no "as mentioned above" or implicit references.
+4. **Deduplicate strictly.** If EXISTING_LTM already captures a fact, add its ID to reinforced_ids. Only create new entries for genuinely new knowledge.
+5. **Skip noise.** Ignore trivial file reads, generic glob/grep with no insight, routine tool usage that taught nothing.
+6. **Capture failures and corrections.** What went wrong and why is often more valuable than what went right.
+7. **Capture user preferences.** Communication style, tech choices, workflow habits — these are high-value memories.
+8. **Concise but complete.** One clear sentence per memory. Add context field only when the sentence alone would be ambiguous.
+
+## Output
+
+Output ONLY valid JSON. No markdown fences, no commentary.
+
 {
   "episodic": [
-    { "content": "...", "context": "optional detail", "tags": ["tag1"], "files": ["/path"], "source_observation_ids": [1,2] }
+    { "content": "...", "caption": "10-15 word summary for quick scanning", "context": "optional clarifying detail", "tags": ["tag1"], "files": ["/path"], "source_observation_ids": [1,2] }
   ],
   "semantic": [ ... ],
-  "procedural": [ ... ]
-}`
+  "procedural": [ ... ],
+  "reinforced_ids": [5, 12]
+}
+
+Each entry MUST include a "caption" field: a 10-15 word summary suitable for a compact index. The caption should capture the essence of the memory without needing to read the full content.`
 
 // ─── Main Entry ──────────────────────────────────────────────────────────────
 
@@ -174,128 +173,6 @@ function buildUserMessage(observations: Observation[], existingLTM: LTMEntry[]):
 	return parts.join("\n").slice(0, 12000)
 }
 
-// ─── LLM Call ────────────────────────────────────────────────────────────────
-
-interface LLMConfig {
-	type: "kortix" | "anthropic"
-	baseURL: string
-	apiKey: string
-	model: string
-}
-
-function resolveLLMConfig(opts?: ConsolidateOptions): LLMConfig | null {
-	// Priority 1: Kortix router
-	const kortixUrl = opts?.kortixUrl ?? getEnv("KORTIX_API_URL")
-	const kortixToken = opts?.kortixToken ?? getEnv("KORTIX_TOKEN")
-	if (kortixUrl && kortixToken) {
-		return {
-			type: "kortix",
-			baseURL: `${kortixUrl.replace(/\/+$/, "")}/v1/router`,
-			apiKey: kortixToken,
-			model: opts?.model ?? KORTIX_MODEL,
-		}
-	}
-
-	// Priority 2: Anthropic API
-	const anthropicKey = opts?.anthropicKey ?? process.env.ANTHROPIC_API_KEY
-	if (anthropicKey) {
-		const baseURL = (opts?.anthropicBaseUrl ?? process.env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com").replace(/\/+$/, "")
-		return {
-			type: "anthropic",
-			baseURL,
-			apiKey: anthropicKey,
-			model: opts?.model ?? ANTHROPIC_MODEL,
-		}
-	}
-
-	return null
-}
-
-async function callLLM(
-	config: LLMConfig,
-	system: string,
-	userMessage: string,
-	log: LogFn,
-): Promise<string | null> {
-	try {
-		if (config.type === "kortix") {
-			return await callOpenAICompatible(config, system, userMessage, log)
-		} else {
-			return await callAnthropicAPI(config, system, userMessage, log)
-		}
-	} catch (err) {
-		log("warn", `[memory:consolidate] LLM call failed: ${err}`)
-		return null
-	}
-}
-
-async function callOpenAICompatible(
-	config: LLMConfig,
-	system: string,
-	userMessage: string,
-	log: LogFn,
-): Promise<string | null> {
-	const url = `${config.baseURL}/chat/completions`
-	const response = await fetch(url, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			"Authorization": `Bearer ${config.apiKey}`,
-		},
-		body: JSON.stringify({
-			model: config.model,
-			max_tokens: MAX_TOKENS,
-			messages: [
-				{ role: "system", content: system },
-				{ role: "user", content: userMessage },
-			],
-		}),
-	})
-
-	if (!response.ok) {
-		const text = await response.text().catch(() => "")
-		log("warn", `[memory:consolidate] Kortix API error ${response.status}: ${text.slice(0, 200)}`)
-		return null
-	}
-
-	const data = await response.json() as any
-	const text = data?.choices?.[0]?.message?.content
-	return text?.trim() ?? null
-}
-
-async function callAnthropicAPI(
-	config: LLMConfig,
-	system: string,
-	userMessage: string,
-	log: LogFn,
-): Promise<string | null> {
-	const url = `${config.baseURL}/v1/messages`
-	const response = await fetch(url, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			"x-api-key": config.apiKey,
-			"anthropic-version": ANTHROPIC_VERSION,
-		},
-		body: JSON.stringify({
-			model: config.model,
-			max_tokens: MAX_TOKENS,
-			system,
-			messages: [{ role: "user", content: userMessage }],
-		}),
-	})
-
-	if (!response.ok) {
-		const text = await response.text().catch(() => "")
-		log("warn", `[memory:consolidate] Anthropic API error ${response.status}: ${text.slice(0, 200)}`)
-		return null
-	}
-
-	const data = await response.json() as any
-	const text = data?.content?.[0]?.text
-	return text?.trim() ?? null
-}
-
 // ─── Response Parser ─────────────────────────────────────────────────────────
 
 interface RawConsolidation {
@@ -306,6 +183,7 @@ interface RawConsolidation {
 
 interface RawMemoryEntry {
 	content: string
+	caption?: string
 	context?: string
 	tags?: string[]
 	files?: string[]
@@ -334,14 +212,6 @@ function validEntry(entry: unknown): entry is RawMemoryEntry {
 	return typeof e.content === "string" && e.content.length > 0
 }
 
-function extractJson(text: string): string {
-	const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
-	if (fenceMatch?.[1]) return fenceMatch[1].trim()
-	const objMatch = text.match(/\{[\s\S]*\}/)
-	if (objMatch) return objMatch[0]
-	return text
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toLTMInput(
@@ -352,6 +222,7 @@ function toLTMInput(
 	return {
 		type,
 		content: entry.content,
+		caption: entry.caption ?? entry.content.slice(0, 80),
 		context: entry.context ?? null,
 		sourceSessionId: sessionId,
 		sourceObservationIds: entry.source_observation_ids ?? [],

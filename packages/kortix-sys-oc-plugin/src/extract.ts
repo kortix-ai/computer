@@ -4,6 +4,9 @@
  * Converts raw tool execution data into structured observations.
  * No AI calls — pure heuristic classification.
  * Runs on every tool.execute.after hook.
+ *
+ * Returns both the observation and the truncated tool output
+ * (rawOutput) for downstream AI enrichment.
  */
 
 import type { CreateObservationInput, ObservationType } from "./types"
@@ -17,12 +20,22 @@ export interface RawToolData {
 	title?: string
 }
 
+/** Result of deterministic extraction: observation + raw output for AI enrichment */
+export interface ExtractionResult {
+	observation: CreateObservationInput
+	/** Truncated tool output (head+tail) for AI enrichment — NOT stored in SQLite */
+	rawOutput: string
+}
+
 // ─── Skip list ───────────────────────────────────────────────────────────────
 
 /** Tools that should NOT generate observations (our own tools, noisy tools) */
 export const SKIP_TOOLS = new Set([
 	"mem_search",
 	"mem_save",
+	"ltm_search",
+	"observation_search",
+	"get_mem",
 	"TodoWrite",
 	"TodoRead",
 	"todowrite",
@@ -32,6 +45,27 @@ export const SKIP_TOOLS = new Set([
 	"pty_kill",
 	"question",
 ])
+
+// ─── Output Budgets ──────────────────────────────────────────────────────────
+
+/** Per-tool character budget for rawOutput (passed to AI enrichment) */
+const OUTPUT_BUDGETS: Record<string, number> = {
+	Read: 4000,
+	read: 4000,
+	Write: 2000,
+	write: 2000,
+	Edit: 3000,
+	edit: 3000,
+	Bash: 4000,
+	bash: 4000,
+	Grep: 3000,
+	grep: 3000,
+	Glob: 2000,
+	glob: 2000,
+	web_search: 4000,
+	"web-search": 4000,
+}
+const DEFAULT_OUTPUT_BUDGET = 2000
 
 // ─── Privacy ─────────────────────────────────────────────────────────────────
 
@@ -46,39 +80,55 @@ export function extractObservation(
 	raw: RawToolData,
 	sessionId: string,
 	promptNumber: number | null,
-): CreateObservationInput | null {
+): ExtractionResult | null {
 	if (SKIP_TOOLS.has(raw.tool)) return null
 
 	// Sanitize
 	const args = sanitizeArgs(raw.args)
-	const output = stripPrivate(truncate(raw.output, 3000))
-	const clean = { ...raw, args, output }
+	const cleanOutput = stripPrivate(raw.output)
+	const clean = { ...raw, args, output: cleanOutput }
+
+	// Prepare truncated output for AI enrichment (head+tail)
+	const budget = OUTPUT_BUDGETS[raw.tool] ?? DEFAULT_OUTPUT_BUDGET
+	const rawOutput = truncate(cleanOutput, budget)
+
+	let observation: CreateObservationInput
 
 	switch (raw.tool) {
 		case "read":
 		case "Read":
-			return extractRead(clean, sessionId, promptNumber)
+			observation = extractRead(clean, sessionId, promptNumber)
+			break
 		case "write":
 		case "Write":
-			return extractWrite(clean, sessionId, promptNumber)
+			observation = extractWrite(clean, sessionId, promptNumber)
+			break
 		case "edit":
 		case "Edit":
-			return extractEdit(clean, sessionId, promptNumber)
+			observation = extractEdit(clean, sessionId, promptNumber)
+			break
 		case "bash":
 		case "Bash":
-			return extractBash(clean, sessionId, promptNumber)
+			observation = extractBash(clean, sessionId, promptNumber)
+			break
 		case "grep":
 		case "Grep":
-			return extractGrep(clean, sessionId, promptNumber)
+			observation = extractGrep(clean, sessionId, promptNumber)
+			break
 		case "glob":
 		case "Glob":
-			return extractGlob(clean, sessionId, promptNumber)
+			observation = extractGlob(clean, sessionId, promptNumber)
+			break
 		case "web_search":
 		case "web-search":
-			return extractWebSearch(clean, sessionId, promptNumber)
+			observation = extractWebSearch(clean, sessionId, promptNumber)
+			break
 		default:
-			return extractGeneric(clean, sessionId, promptNumber)
+			observation = extractGeneric(clean, sessionId, promptNumber)
+			break
 	}
+
+	return { observation, rawOutput }
 }
 
 // ─── Per-tool extractors ─────────────────────────────────────────────────────
@@ -275,8 +325,13 @@ function str(val: unknown): string {
 	return stripPrivate(String(val))
 }
 
+/** Truncate keeping head + tail with an omission marker (60/40 split) */
 function truncate(s: string, max: number): string {
-	return s.length <= max ? s : `${s.slice(0, max)}...`
+	if (s.length <= max) return s
+	const head = Math.ceil(max * 0.6)
+	const tail = Math.floor(max * 0.4)
+	const omitted = s.length - head - tail
+	return `${s.slice(0, head)}\n...[${omitted} chars omitted]...\n${s.slice(-tail)}`
 }
 
 function basename(p: string): string {
