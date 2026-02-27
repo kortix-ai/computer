@@ -595,6 +595,24 @@ export default {
     if (subdomain) {
       const { port, sandboxId } = subdomain;
 
+      // ── CORS preflight must be handled BEFORE auth ──────────────────
+      // Browsers send OPTIONS without Authorization headers. If we block
+      // the preflight with 401, the browser can never send the actual
+      // request that carries the Bearer token to authenticate the subdomain.
+      if (req.method === 'OPTIONS') {
+        const origin = req.headers.get('Origin') || '';
+        return new Response(null, {
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': origin || '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers': req.headers.get('Access-Control-Request-Headers') || '*',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400',
+          },
+        });
+      }
+
       // ── Auth: first request validates, then the subdomain is "open" ──
       // Bearer header or cookie on first load proves you're legit,
       // then all subsequent requests (sub-resources, WS, etc.) pass through.
@@ -644,19 +662,7 @@ export default {
         body = await req.arrayBuffer();
       }
 
-      // Handle CORS preflight
-      if (req.method === 'OPTIONS') {
-        return new Response(null, {
-          status: 204,
-          headers: {
-            'Access-Control-Allow-Origin': origin || '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-            'Access-Control-Allow-Headers': req.headers.get('Access-Control-Request-Headers') || '*',
-            'Access-Control-Allow-Credentials': 'true',
-            'Access-Control-Max-Age': '86400',
-          },
-        });
-      }
+      // NOTE: CORS preflight (OPTIONS) is handled above, before the auth check.
 
       try {
         return await proxyToSandbox(
