@@ -25,7 +25,7 @@ import { secretsApp } from './secrets/routes';
 import { integrationsApp } from './integrations';
 import { queueApp, startDrainer, stopDrainer } from './queue';
 import { serversApp } from './servers';
-import { woaApp } from './woa';
+// WoA is now mounted under the router at /v1/router/woa (see router/index.ts)
 import { supabaseAuth, combinedAuth } from './middleware/auth';
 import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
@@ -249,8 +249,7 @@ app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queu
 app.use('/v1/tunnel/*', combinedAuth);
 app.route('/v1/tunnel', tunnelApp);
 
-app.use('/v1/woa/*', combinedAuth);
-app.route('/v1/woa', woaApp);          // /v1/tunnel/connections, /v1/tunnel/permissions, /v1/tunnel/rpc, /v1/tunnel/audit
+// WoA moved to /v1/router/woa — see router/index.ts
 
 // Preview Proxy — unified route for both cloud (Daytona) and local mode.
 // Pattern: /v1/p/{sandboxId}/{port}/* for ALL modes.

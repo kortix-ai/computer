@@ -30,11 +30,20 @@ import { consolidateMemories } from "./consolidate"
 import { initEnrichment, enqueueEnrichment, updateEnrichmentOpts } from "./enrich"
 import { initSearch, hybridSearchLTM, hybridSearchObservations } from "./search"
 import { ensureMemDir, writeObservationFile, writeLTMFile } from "./lss"
-import { existsSync, writeFileSync, mkdirSync } from "node:fs"
+import { existsSync, writeFileSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs"
 import { getEnv, shortTs, changeSummary, formatMessages, ttcCompress, STORAGE_BASE, DB_PATH } from "./session"
 import type { LogFn, CreateLTMInput, LTMType } from "./types"
 
 // ─── Plugin Entry ────────────────────────────────────────────────────────────
+
+const TOOL_OUTPUTS_DIR = "/workspace/.kortix/tool-outputs"
+
+/** Session pruning only applies to Anthropic models (prompt cache cost optimization) */
+function isAnthropicModel(modelId: string | null): boolean {
+	if (!modelId) return false
+	const lower = modelId.toLowerCase()
+	return lower.includes("anthropic") || lower.includes("claude")
+}
 
 export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 	// ── State ──────────────────────────────────────────────────────────
@@ -172,6 +181,17 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 						args: args as Record<string, unknown>,
 						rawOutput,
 					})
+
+					// Store full raw output for get_tool_output retrieval (Anthropic only — pruning is Anthropic-specific)
+					if (isAnthropicModel(currentModel)) {
+						try {
+							const fullOutput = output.output ?? ""
+							if (fullOutput.length > 200) {
+								if (!existsSync(TOOL_OUTPUTS_DIR)) mkdirSync(TOOL_OUTPUTS_DIR, { recursive: true })
+								writeFileSync(`${TOOL_OUTPUTS_DIR}/${id}.txt`, fullOutput.slice(0, 512_000), "utf-8")
+							}
+						} catch { /* non-fatal */ }
+					}
 				}
 			} catch (err) {
 				log("warn", `[memory] Observation extraction failed: ${err}`)
@@ -210,6 +230,18 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 						ensureSession(db, sessionId)
 						promptCount = 0
 						refreshContextCache()
+
+						// Cleanup stale tool output files (>24h old)
+						try {
+							if (existsSync(TOOL_OUTPUTS_DIR)) {
+								const cutoff = Date.now() - 24 * 60 * 60 * 1000
+								for (const file of readdirSync(TOOL_OUTPUTS_DIR)) {
+									const fp = `${TOOL_OUTPUTS_DIR}/${file}`
+									const st = statSync(fp)
+									if (st.mtimeMs < cutoff) unlinkSync(fp)
+								}
+							}
+						} catch { /* non-fatal */ }
 					}
 				}
 
@@ -237,6 +269,19 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 
 				if (cachedContextBlock) {
 					parts.push(cachedContextBlock)
+				}
+
+				// Inject pruning awareness only for Anthropic models (pruning is Anthropic-specific)
+				if (isAnthropicModel(currentModel)) {
+					parts.push([
+						`<context_pruning_awareness>`,
+						`Long conversations get server-side context pruning. You'll see these markers in older tool results:`,
+						`- Soft-trimmed: "[Tool result trimmed: kept first X and last Y of Z chars.]" — head + tail preserved, middle removed`,
+						`- Hard-cleared: "[Old tool result content cleared]" — entire output replaced`,
+						`When you need the full output: use observation_search to find the observation, then call get_tool_output(observation_id).`,
+						`If a trimmed result has important info, save it via mem_save before it gets hard-cleared.`,
+						`</context_pruning_awareness>`,
+					].join("\n"))
 				}
 
 				if (parts.length === 0) return
@@ -431,6 +476,35 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 							facts, concepts, filesR, filesM,
 						].filter(Boolean).join("\n")
 					}
+				},
+			}),
+
+			// Retrieve full raw output of a tool execution (for pruned/trimmed results)
+			get_tool_output: tool({
+				description: `Retrieve the full original output of a tool execution that may have been trimmed or cleared by context pruning. Use this when you see "[Tool result trimmed: ...]" or "[Old tool result content cleared]" in the conversation and need the complete output (e.g., before saving important details to memory, or to review full file contents). Find the observation ID via observation_search first.`,
+				args: {
+					observation_id: tool.schema.number().describe("Observation ID from observation_search results (e.g., the #123 from search output)"),
+				},
+				async execute(args) {
+					const filePath = `${TOOL_OUTPUTS_DIR}/${args.observation_id}.txt`
+
+					if (!existsSync(filePath)) {
+						const obs = getObservationById(db, args.observation_id)
+						if (!obs) return `Observation #${args.observation_id} not found.`
+						return `Full output for observation #${args.observation_id} is not available. Output was either too small to store (<200 chars) or has been cleaned up (>24h old).`
+					}
+
+					const content = readFileSync(filePath, "utf-8")
+					const obs = getObservationById(db, args.observation_id)
+					const header = obs
+						? `=== Full Output: Observation #${obs.id} [${obs.type}] — ${obs.title} ===
+Tool: ${obs.toolName} | Session: ${obs.sessionId} | Prompt #${obs.promptNumber ?? "?"}
+`
+						: `=== Full Output: Observation #${args.observation_id} ===
+`
+
+					return `${header}
+${content}`
 				},
 			}),
 
