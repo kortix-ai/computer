@@ -33,7 +33,7 @@ import { toast } from '@/lib/toast';
 import { isBillingEnabled } from '@/lib/config';
 
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
-import { useProviders } from '@/hooks/platform/use-sandbox';
+import { useProviders, markSandboxDeleted } from '@/hooks/platform/use-sandbox';
 
 import {
   Dialog,
@@ -553,22 +553,25 @@ export function InstanceManagerDialog({
         setIsRemovingSandbox(false);
       }
 
+      // Tell useSandbox NOT to auto-recreate — user intentionally deleted.
+      markSandboxDeleted();
+
       // Invalidate the sandbox query so useSandbox() knows the sandbox is gone.
-      // This lets the hook refetch — in cloud mode it will auto-create a new one
-      // when the user navigates or refreshes (or they can click "New Instance").
+      // It will refetch, find nothing, and respect the deletion flag (no auto-create).
       queryClient.invalidateQueries({ queryKey: ['platform', 'sandbox'] });
     }
 
-    // Remove from local store (manual/localhost entries just get this)
+    // Remove from local store — removeServer handles fallback to the best
+    // remaining entry and resets userSelected so the next sandbox creation
+    // can auto-switch.
+    const wasActive = id === activeServerId;
     removeServer(id);
 
-    // If we just deleted the active server, switch to the first remaining one
-    if (id === activeServerId) {
-      const remaining = useServerStore.getState().servers;
-      if (remaining.length > 0) {
-        const fallback = remaining[0];
-        useTabStore.getState().swapForServer(fallback.id, id);
-        setActiveServer(fallback.id);
+    // Swap tabs if we just deleted the active server.
+    if (wasActive) {
+      const newActiveId = useServerStore.getState().activeServerId;
+      if (newActiveId) {
+        useTabStore.getState().swapForServer(newActiveId, id);
       }
     }
   }
