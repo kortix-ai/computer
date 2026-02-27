@@ -14,6 +14,10 @@ import {
   FileText,
   PanelLeftClose,
   PanelLeftIcon,
+  ArrowUp,
+  ArrowDown,
+  CornerDownLeft,
+  Command as CommandIcon,
 } from 'lucide-react';
 
 import {
@@ -31,19 +35,13 @@ import {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
+  CommandFooter,
 } from '@/components/ui/command';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSidebar } from '@/components/ui/sidebar';
 import {
   useOpenCodeSessions,
 } from '@/hooks/opencode/use-opencode-sessions';
-// Worktree hooks — disabled for now, will be re-enabled later
-// import {
-//   useWorktreeList,
-//   useCreateWorktree,
-//   useRemoveWorktree,
-//   useResetWorktree,
-// } from '@/hooks/opencode/use-opencode-worktree';
 import { useFileSearch, useTextSearch, useLssSearch } from '@/features/files';
 import type { FindMatch } from '@/features/files';
 import { toast } from '@/lib/toast';
@@ -76,13 +74,6 @@ function formatRelativeTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
-function formatRelativeTimeFromISO(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const timestamp = new Date(dateStr).getTime();
-  if (isNaN(timestamp)) return '';
-  return formatRelativeTime(timestamp);
-}
-
 function getFileIcon(filePath: string) {
   const ext = filePath.split('.').pop()?.toLowerCase();
   if (filePath.endsWith('/')) return Folder;
@@ -107,25 +98,16 @@ function getFileIcon(filePath: string) {
   }
 }
 
-/**
- * Strip the /workspace prefix from an absolute file path returned by LSS.
- */
 function stripWorkspacePrefix(filePath: string): string {
   return filePath.replace(/^\/workspace\/?/, '');
 }
 
-/**
- * Format a relevance score as a human-readable percentage.
- */
 function formatRelevance(score: number): string {
   const pct = Math.min(Math.round(score * 100), 100);
   if (pct > 0) return `${pct}%`;
   return score.toFixed(3);
 }
 
-/**
- * Clean a snippet from LSS for display in the palette.
- */
 function cleanSnippet(snippet: string): string {
   return snippet
     .replace(/\n+/g, ' ')
@@ -138,37 +120,21 @@ function cleanSnippet(snippet: string): string {
 // Skeleton components for loading states
 // ============================================================================
 
-/** Skeleton row mimicking a semantic search result. */
 function ContentResultSkeleton() {
   return (
-    <div className="flex items-start gap-2 px-2 py-2.5">
+    <div className="flex items-start gap-2.5 px-3 py-2">
       <Skeleton className="h-4 w-4 rounded flex-shrink-0 mt-0.5" />
       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <Skeleton className="h-3.5 w-24 rounded" />
+          <Skeleton className="h-3.5 w-28 rounded" />
           <Skeleton className="h-3 w-8 rounded" />
         </div>
-        <Skeleton className="h-3 w-full rounded" />
-        <Skeleton className="h-3 w-32 rounded" />
+        <Skeleton className="h-3 w-3/4 rounded" />
       </div>
     </div>
   );
 }
 
-/** Skeleton row mimicking a conversation search result. */
-function ConversationResultSkeleton() {
-  return (
-    <div className="flex items-start gap-2 px-2 py-2.5">
-      <Skeleton className="h-4 w-4 rounded flex-shrink-0 mt-0.5" />
-      <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-        <Skeleton className="h-3.5 w-36 rounded" />
-        <Skeleton className="h-3 w-full rounded" />
-      </div>
-    </div>
-  );
-}
-
-/** Multiple skeleton rows for a loading group. */
 function SearchSkeletons({
   count = 3,
   variant = 'content',
@@ -176,16 +142,21 @@ function SearchSkeletons({
   count?: number;
   variant?: 'content' | 'conversation';
 }) {
-  const Row =
-    variant === 'conversation'
-      ? ConversationResultSkeleton
-      : ContentResultSkeleton;
   return (
     <div className="space-y-0.5">
       {Array.from({ length: count }).map((_, i) => (
-        <Row key={i} />
+        <ContentResultSkeleton key={i} />
       ))}
     </div>
+  );
+}
+
+/** Inline keyboard hint */
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded bg-foreground/[0.06] border border-border/50 text-[10px] font-medium text-muted-foreground/70 leading-none">
+      {children}
+    </kbd>
   );
 }
 
@@ -207,6 +178,10 @@ export function CommandPalette() {
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const currentSessionId = useMemo(() => {
+    const match = pathname?.match(/^\/sessions\/([^/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const createSession = useCreateOpenCodeSession();
   const createPty = useCreatePty();
@@ -214,14 +189,12 @@ export function CommandPalette() {
   const billingEnabled = isBillingEnabled();
   const { user: authUser } = useAuth();
 
-  // Derive user's first name for personalized greeting
   const firstName = useMemo(() => {
     if (!authUser) return '';
     const fullName = authUser.user_metadata?.name || authUser.email?.split('@')[0] || '';
     return fullName.split(' ')[0] || '';
   }, [authUser]);
 
-  // Personalized greeting based on time of day
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     const name = firstName ? `, ${firstName}` : '';
@@ -230,22 +203,10 @@ export function CommandPalette() {
     return `Good evening${name}`;
   }, [firstName]);
 
-  // Worktree management — disabled for now
-  // const [worktreeBrowsePath, setWorktreeBrowsePath] = useState<string | null>(null);
-  // const { data: worktrees = [] } = useWorktreeList();
-  // const { data: browseFiles } = useFileList(worktreeBrowsePath || '', { enabled: !!worktreeBrowsePath });
-  // const createWorktree = useCreateWorktree();
-  // const removeWorktree = useRemoveWorktree();
-  // const resetWorktree = useResetWorktree();
-  // const browseDirs = useMemo(
-  //   () => (browseFiles || []).filter((f: FileNode) => f.type === 'directory' && !f.ignored),
-  //   [browseFiles],
-  // );
-
   // Fetch all sessions (for client-side title filter)
   const { data: sessions } = useOpenCodeSessions();
 
-  // Debounce the query for file search API calls (300ms — fast)
+  // Debounce the query for file search API calls (300ms)
   useEffect(() => {
     if (query.length < 2) {
       setDebouncedQuery('');
@@ -255,7 +216,7 @@ export function CommandPalette() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Separate debounce for LSS search (500ms — heavier operation)
+  // Separate debounce for LSS search (500ms)
   useEffect(() => {
     if (query.length < 2) {
       setLssDebouncedQuery('');
@@ -265,7 +226,7 @@ export function CommandPalette() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Debounce for text search (600ms — ripgrep over workspace)
+  // Debounce for text search (600ms)
   useEffect(() => {
     if (query.length < 3) {
       setTextSearchDebouncedQuery('');
@@ -284,7 +245,7 @@ export function CommandPalette() {
     enabled: debouncedQuery.length >= 2,
   });
 
-  // Semantic search (LSS — BM25 + embeddings over workspace files)
+  // Semantic search (LSS)
   const {
     data: lssResults = [],
     isFetching: isLssSearching,
@@ -293,7 +254,7 @@ export function CommandPalette() {
     enabled: lssDebouncedQuery.length >= 2,
   });
 
-  // Text content search (ripgrep across workspace files)
+  // Text content search (ripgrep)
   const {
     data: textSearchResults = [],
     isFetching: isTextSearching,
@@ -327,7 +288,6 @@ export function CommandPalette() {
         e.preventDefault();
         setOpen((prev) => !prev);
       }
-      // Cmd+J is handled by sidebar-left.tsx — no duplicate handler here.
       if (e.key === '`' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         handleOpenTerminal();
@@ -337,7 +297,7 @@ export function CommandPalette() {
     return () => document.removeEventListener('keydown', down);
   }, [handleOpenTerminal]);
 
-  // Reset query and sub-views when dialog closes
+  // Reset query when dialog closes
   useEffect(() => {
     if (!open) {
       setQuery('');
@@ -347,36 +307,33 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  // ------------------------------------------------------------------
-  // Fuzzy match helper — checks if all query words appear in the text
-  // ------------------------------------------------------------------
+  // Fuzzy match helper
   const fuzzyMatch = useCallback((text: string, q: string): boolean => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
     const haystack = text.toLowerCase();
     return words.every((w) => haystack.includes(w));
   }, []);
 
-  // Filter sessions by query (client-side fuzzy match on title/slug/id)
+  // Filter sessions by query
   const filteredSessions = useMemo(() => {
     if (!sessions || !query.trim()) return [];
     const q = query.trim();
     return sessions
       .filter((s) => {
         if (s.parentID || s.time.archived) return false;
-        // Search across title, slug, and ID for maximum findability
         const searchable = [s.title, s.slug, s.id].filter(Boolean).join(' ');
         return fuzzyMatch(searchable, q);
       })
       .slice(0, 20);
   }, [sessions, query, fuzzyMatch]);
 
-  // Non-archived, non-child sessions for "Recent Sessions" section
+  // Recent sessions for idle state
   const recentSessions = useMemo(() => {
     if (!sessions) return [];
-    return sessions.filter((s) => !s.parentID && !s.time.archived).slice(0, 10);
+    return sessions.filter((s) => !s.parentID && !s.time.archived).slice(0, 5);
   }, [sessions]);
 
-  // Deduplicate LSS results against file results (prefer file results for name matches)
+  // Deduplicate LSS results against file results
   const filteredLssResults = useMemo(() => {
     if (lssResults.length === 0) return [];
     const filePathSet = new Set(fileResults);
@@ -385,10 +342,9 @@ export function CommandPalette() {
     );
   }, [lssResults, fileResults]);
 
-  // Deduplicate, filter noise, and limit text search results
+  // Filter and limit text search results
   const filteredTextResults = useMemo(() => {
     if (textSearchResults.length === 0) return [];
-    // Filter out .git internals, node_modules, lock files, and other noise
     const ignoredPaths = ['.git/', 'node_modules/', '.next/', '.cache/', '__pycache__/'];
     const ignoredFiles = ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
     const filtered = textSearchResults.filter((match) => {
@@ -398,7 +354,6 @@ export function CommandPalette() {
       if (ignoredFiles.includes(fileName)) return false;
       return true;
     });
-    // Group by file path and take the top matches
     const byFile = new Map<string, FindMatch[]>();
     for (const match of filtered) {
       const existing = byFile.get(match.path) || [];
@@ -407,7 +362,6 @@ export function CommandPalette() {
         byFile.set(match.path, existing);
       }
     }
-    // Flatten, limit to 10 results
     const results: FindMatch[] = [];
     for (const matches of byFile.values()) {
       results.push(...matches);
@@ -420,15 +374,11 @@ export function CommandPalette() {
   const queryLongEnough = query.trim().length >= 2;
   const textQueryLongEnough = query.trim().length >= 3;
 
-  // LSS pending state (includes debounce wait)
+  // Pending states
   const isLssDebouncing = queryLongEnough && query !== lssDebouncedQuery;
   const isLssPending = isLssDebouncing || isLssSearching;
-
-  // File search pending state
   const isFileDebouncing = queryLongEnough && query !== debouncedQuery;
   const isFilePending = isFileDebouncing || isFileSearching;
-
-  // Text search pending state
   const isTextDebouncing = textQueryLongEnough && query !== textSearchDebouncedQuery;
   const isTextPending = isTextDebouncing || isTextSearching;
 
@@ -436,20 +386,42 @@ export function CommandPalette() {
   const hasFileResults = fileResults.length > 0;
   const hasLssResults = filteredLssResults.length > 0;
   const hasTextResults = filteredTextResults.length > 0;
-  const hasAnyResults =
-    hasSessionResults || hasFileResults || hasLssResults || hasTextResults;
 
-  // Show semantic search section (results or skeletons)
+  // ── Palette items (must be before hasAnyResults) ──
+  const allPaletteItems = useMemo(() => {
+    return getItemsForSurface('commandPalette').filter((item) => {
+      if (item.requiresBilling && !billingEnabled) return false;
+      if (item.requiresSession && !currentSessionId) return false;
+      return true;
+    });
+  }, [billingEnabled, currentSessionId]);
+
+  // Filter navigation items client-side so we control the match logic
+  const filteredNavItems = useMemo(() => {
+    if (!hasQuery) return allPaletteItems;
+    const q = query.trim().toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+    return allPaletteItems.filter((item) => {
+      const haystack = [
+        item.label,
+        item.id,
+        item.group,
+        item.keywords || '',
+      ].join(' ').toLowerCase();
+      return words.every((w) => haystack.includes(w));
+    });
+  }, [allPaletteItems, hasQuery, query]);
+
+  const hasNavResults = filteredNavItems.length > 0;
+
+  const hasAnyResults =
+    hasNavResults || hasSessionResults || hasFileResults || hasLssResults || hasTextResults;
+
   const showLssSection = hasQuery && queryLongEnough;
   const showLssSkeletons = showLssSection && isLssPending && !hasLssResults;
-
-  // Show text search section
   const showTextSection = hasQuery && textQueryLongEnough;
   const showTextSkeletons = showTextSection && isTextPending && !hasTextResults;
 
-  // Overall pending state
-  const isAnyPending = isLssPending || isFilePending || isTextPending;
-  // "Hard" pending = an actual network fetch is in flight (not just debounce timer)
   const isAnyFetching = isFileSearching || isLssSearching || isTextSearching;
   const showGlobalLoading =
     hasQuery &&
@@ -458,13 +430,13 @@ export function CommandPalette() {
     !hasAnyResults &&
     !showLssSkeletons &&
     !showTextSkeletons;
-  // Show "no results" when nothing found and no active fetches
-  // (debounce timers alone don't block showing the empty state)
   const showNoResults =
     hasQuery &&
     queryLongEnough &&
     !isAnyFetching &&
     !hasAnyResults;
+
+  // ── Handlers ──
 
   const handleNewSession = useCallback(async () => {
     if (isCreating) return;
@@ -577,12 +549,6 @@ export function CommandPalette() {
     close();
   }, [setTheme, close]);
 
-  // Detect if we're on a session page and extract session ID
-  const currentSessionId = useMemo(() => {
-    const match = pathname?.match(/^\/sessions\/([^/]+)/);
-    return match ? match[1] : null;
-  }, [pathname]);
-
   const handleCompactSession = useCallback(() => {
     if (!currentSessionId) return;
     close();
@@ -594,8 +560,6 @@ export function CommandPalette() {
     close();
     setDiffOpen(true);
   }, [currentSessionId, close]);
-
-  // View tasks is now shown in the chat input todo panel — no modal needed
 
   // ── Registry action dispatcher ──
   const actionHandlers: Record<string, () => void> = useMemo(() => ({
@@ -627,60 +591,36 @@ export function CommandPalette() {
     }
   }, [handleNavigate, handleOpenSettings, handleSetTheme, actionHandlers]);
 
-  // ── All registry items visible in the palette (filtered by runtime conditions) ──
-  const allPaletteItems = useMemo(() => {
-    return getItemsForSurface('commandPalette').filter((item) => {
-      if (item.requiresBilling && !billingEnabled) return false;
-      if (item.requiresSession && !currentSessionId) return false;
-      return true;
-    });
-  }, [billingEnabled, currentSessionId]);
-
-  // Group headings
-  const lssHeading = (
-    <span className="inline-flex items-center gap-1.5">
-      <Sparkles className="h-3 w-3" />
-      Semantic Search
-      {isLssPending && hasLssResults && (
-        <Loader2 className="h-3 w-3 animate-spin ml-0.5 text-muted-foreground" />
-      )}
-    </span>
-  );
-
-  const textSearchHeading = (
-    <span className="inline-flex items-center gap-1.5">
-      <TextSearch className="h-3 w-3" />
-      Text Search
-      {isTextPending && hasTextResults && (
-        <Loader2 className="h-3 w-3 animate-spin ml-0.5 text-muted-foreground" />
-      )}
-    </span>
-  );
+  // Count how many search results are active (for footer context)
+  const totalSearchResults = useMemo(() => {
+    if (!hasQuery) return 0;
+    return filteredNavItems.length + filteredSessions.length + fileResults.length + filteredTextResults.length + filteredLssResults.length;
+  }, [hasQuery, filteredNavItems.length, filteredSessions.length, fileResults.length, filteredTextResults.length, filteredLssResults.length]);
 
   return (
     <>
-      <CommandDialog open={open} onOpenChange={setOpen} className="sm:max-w-2xl">
+      <CommandDialog open={open} onOpenChange={setOpen} className="sm:max-w-[640px]">
         <CommandInput
-          placeholder={hasQuery ? 'Search files, sessions, commands...' : 'What would you like to do?'}
+          placeholder={hasQuery ? 'Search files, sessions, commands...' : 'Type a command or search...'}
           value={query}
           onValueChange={setQuery}
         />
 
-        {/* ── IDLE STATE: Personalized home ── */}
+        {/* ── IDLE STATE ── */}
         {!hasQuery && (
-          <div className="px-5 pb-5 pt-2">
-            {/* Personalized greeting */}
-            <div className="text-center mb-5">
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+          <div className="px-4 pb-4 pt-3">
+            {/* Greeting */}
+            <div className="mb-4">
+              <h2 className="text-base font-semibold tracking-tight text-foreground">
                 {greeting}
               </h2>
-              <p className="text-[13px] text-muted-foreground mt-1">
-                Search anything or pick a shortcut below
+              <p className="text-[12px] text-muted-foreground/60 mt-0.5">
+                Search anything or pick a quick action
               </p>
             </div>
 
-            {/* Quick nav grid — from registry */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
+            {/* Quick actions grid */}
+            <div className="grid grid-cols-4 gap-1.5 mb-4">
               {allPaletteItems
                 .filter((item) =>
                   item.group === 'actions' ||
@@ -694,19 +634,16 @@ export function CommandPalette() {
                       key={item.id}
                       onClick={() => handleRegistryItem(item)}
                       disabled={item.id === 'new-session' && isCreating}
-                      className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl text-[12px] text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground transition-all duration-150 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-100 cursor-pointer group disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-foreground/[0.05] group-hover:bg-foreground/[0.08] transition-colors duration-150">
+                      <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-foreground/[0.04] group-hover:bg-foreground/[0.07] transition-colors duration-100">
                         {item.id === 'new-session' && isCreating ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                         ) : (
-                          <Icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors duration-150" />
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground/70 group-hover:text-foreground transition-colors duration-100" />
                         )}
                       </div>
-                      <span className="truncate max-w-full">{item.label}</span>
-                      {item.shortcut && (
-                        <span className="text-[10px] text-muted-foreground/60">{item.shortcut}</span>
-                      )}
+                      <span className="truncate max-w-full leading-tight">{item.label}</span>
                     </button>
                   );
                 })}
@@ -715,13 +652,13 @@ export function CommandPalette() {
             {/* Recent sessions */}
             {recentSessions.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 px-1 mb-2">
-                  <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                    Recent sessions
+                <div className="flex items-center gap-2 px-1 mb-1.5">
+                  <span className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest">
+                    Recent
                   </span>
                 </div>
-                <div className="space-y-0.5">
-                  {recentSessions.slice(0, 5).map((session) => (
+                <div className="space-y-px">
+                  {recentSessions.map((session) => (
                     <button
                       key={session.id}
                       onClick={() => {
@@ -730,13 +667,13 @@ export function CommandPalette() {
                           session.title || session.slug || 'Untitled',
                         );
                       }}
-                      className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-foreground/80 hover:bg-foreground/[0.06] hover:text-foreground transition-all duration-150 cursor-pointer group"
+                      className="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[13px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-100 cursor-pointer group"
                     >
-                      <MessageCircle className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
+                      <MessageCircle className="h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0" />
                       <span className="truncate flex-1 text-left">
                         {session.title || session.slug || 'Untitled'}
                       </span>
-                      <span className="text-[11px] text-muted-foreground/40 flex-shrink-0">
+                      <span className="text-[10px] text-muted-foreground/30 flex-shrink-0 tabular-nums">
                         {formatRelativeTime(session.time.updated)}
                       </span>
                     </button>
@@ -745,9 +682,9 @@ export function CommandPalette() {
               </div>
             )}
 
-            {/* Settings & preferences row */}
-            <div className="mt-3 pt-3 border-t border-border/40">
-              <div className="flex flex-wrap gap-1.5">
+            {/* Quick settings row */}
+            <div className="mt-3 pt-3 border-t border-border/30">
+              <div className="flex flex-wrap gap-1">
                 {allPaletteItems
                   .filter((item) =>
                     item.group === 'preferences' ||
@@ -757,7 +694,6 @@ export function CommandPalette() {
                   )
                   .map((item) => {
                     const Icon = item.icon;
-                    // Dynamic sidebar toggle
                     const isToggleSidebar = item.id === 'toggle-sidebar';
                     const displayLabel = isToggleSidebar
                       ? (sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar')
@@ -771,17 +707,14 @@ export function CommandPalette() {
                       <button
                         key={item.id}
                         onClick={() => handleRegistryItem(item)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] transition-all duration-150 cursor-pointer ${
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors duration-100 cursor-pointer ${
                           isActiveTheme
-                            ? 'bg-foreground/[0.1] text-foreground font-medium'
-                            : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground'
+                            ? 'bg-foreground/[0.08] text-foreground font-medium'
+                            : 'text-muted-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground/80'
                         }`}
                       >
                         <DisplayIcon className="h-3 w-3" />
                         <span>{displayLabel}</span>
-                        {item.shortcut && (
-                          <span className="text-[10px] text-muted-foreground/50 ml-0.5">{item.shortcut}</span>
-                        )}
                       </button>
                     );
                   })}
@@ -790,123 +723,131 @@ export function CommandPalette() {
           </div>
         )}
 
-        {/* ── SEARCH STATE: Results ── */}
+        {/* ── SEARCH STATE ── */}
         {hasQuery && (
-          <CommandList>
-            {/* Global loading — only when absolutely nothing else is visible */}
-            {showGlobalLoading && (
-              <CommandEmpty>
-                <div className="flex items-center justify-center gap-2 py-4">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="text-muted-foreground">Searching...</span>
+          <>
+            <CommandList>
+              {/* ── Navigation (always first — we filter ourselves) ── */}
+              {hasNavResults && (
+                <CommandGroup heading="Navigation" forceMount>
+                  {filteredNavItems.map((item) => {
+                    const Icon = item.icon;
+                    const isToggleSidebar = item.id === 'toggle-sidebar';
+                    const SidebarIcon = isToggleSidebar
+                      ? (sidebarOpen ? PanelLeftClose : PanelLeftIcon)
+                      : Icon;
+                    const displayLabel = isToggleSidebar
+                      ? (sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar')
+                      : item.label;
+                    const isActiveTheme = item.kind === 'theme' && theme === item.themeValue;
+
+                    return (
+                      <CommandItem
+                        key={item.id}
+                        value={item.keywords || `${item.group} ${item.label} ${item.id}`}
+                        onSelect={() => handleRegistryItem(item)}
+                        disabled={item.id === 'new-session' && isCreating}
+                      >
+                        {item.id === 'new-session' && isCreating ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <SidebarIcon className="h-4 w-4" />
+                        )}
+                        <span className="flex-1">{displayLabel}</span>
+                        {item.shortcut && (
+                          <CommandShortcut>
+                            {item.shortcut}
+                          </CommandShortcut>
+                        )}
+                        {isActiveTheme && (
+                          <span className="text-[10px] text-primary/60 font-medium">Active</span>
+                        )}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              )}
+
+              {/* Global loading — only when nothing at all is visible */}
+              {showGlobalLoading && (
+                <CommandEmpty>
+                  <div className="flex flex-col items-center justify-center gap-2 py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/50" />
+                    <span className="text-[13px] text-muted-foreground/60">Searching...</span>
+                  </div>
+                </CommandEmpty>
+              )}
+
+              {/* No results — only when truly nothing matches (including nav) */}
+              {showNoResults && (
+                <div className="flex flex-col items-center gap-2 py-10" cmdk-empty="">
+                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted/50">
+                    <Search className="h-4 w-4 text-muted-foreground/40" />
+                  </div>
+                  <div className="text-center">
+                    <span className="text-sm text-muted-foreground/70">
+                      No results for &ldquo;{query.trim()}&rdquo;
+                    </span>
+                    <p className="text-[11px] text-muted-foreground/40 mt-0.5">
+                      Try a different search term
+                    </p>
+                  </div>
                 </div>
-              </CommandEmpty>
-            )}
+              )}
 
-            {/* No results — all fetches done, nothing found */}
-            {showNoResults && (
-              <div className="flex flex-col items-center gap-1.5 py-6" cmdk-empty="">
-                <Search className="h-5 w-5 text-muted-foreground/50" />
-                <span className="text-sm text-muted-foreground">
-                  No results found for &ldquo;{query.trim()}&rdquo;
-                </span>
-              </div>
-            )}
-
-            {/* Session title matches (instant, client-side) */}
-            {hasSessionResults && (
-              <CommandGroup heading="Sessions" forceMount>
-                {filteredSessions.map((session) => (
-                  <CommandItem
-                    key={session.id}
-                    value={`session-${session.id}`}
-                    onSelect={() =>
-                      handleSelectSession(
-                        session.id,
-                        session.title || session.slug || 'Untitled',
-                      )
-                    }
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4 flex-shrink-0" />
-                    <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-                      <span className="truncate">
-                        {session.title || session.slug || 'Untitled'}
-                      </span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {formatRelativeTime(session.time.updated)}
-                        {session.summary && session.summary.files > 0 && (
-                          <span className="ml-1.5">
-                            · {session.summary.files} file
-                            {session.summary.files !== 1 ? 's' : ''} changed
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <ArrowRightLeft className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-
-            {/* File name search results (fastest — 300ms debounce) */}
-            {hasFileResults && (
-              <CommandGroup heading="Files" forceMount>
-                {fileResults.map((filePath) => {
-                  const FileIcon = getFileIcon(filePath);
-                  const fileName = filePath.split('/').pop() || filePath;
-                  const dirPath = filePath.split('/').slice(0, -1).join('/');
-                  return (
+              {/* ── Sessions ── */}
+              {hasSessionResults && (
+                <CommandGroup heading="Sessions" forceMount>
+                  {filteredSessions.map((session) => (
                     <CommandItem
-                      key={filePath}
-                      value={`file-${filePath}`}
-                      onSelect={() => handleSelectFile(filePath)}
+                      key={session.id}
+                      value={`session-${session.id}`}
+                      onSelect={() =>
+                        handleSelectSession(
+                          session.id,
+                          session.title || session.slug || 'Untitled',
+                        )
+                      }
                     >
-                      <FileIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                      <MessageCircle className="h-4 w-4 flex-shrink-0" />
                       <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-                        <span className="truncate">{fileName}</span>
-                        {dirPath && (
-                          <span className="text-xs text-muted-foreground truncate">
-                            {dirPath}
-                          </span>
-                        )}
+                        <span className="truncate text-sm">
+                          {session.title || session.slug || 'Untitled'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground/50 truncate">
+                          {formatRelativeTime(session.time.updated)}
+                          {session.summary && session.summary.files > 0 && (
+                            <span className="ml-1">
+                              · {session.summary.files} file
+                              {session.summary.files !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </span>
                       </div>
+                      <ArrowRightLeft className="h-3 w-3 text-muted-foreground/30 flex-shrink-0" />
                     </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            )}
+                  ))}
+                </CommandGroup>
+              )}
 
-            {/* Text content search (ripgrep — 600ms debounce) */}
-            {showTextSection && (hasTextResults || showTextSkeletons) && (
-              <CommandGroup heading={textSearchHeading} forceMount>
-                {hasTextResults &&
-                  filteredTextResults.map((match, index) => {
-                    const FileIcon = getFileIcon(match.path);
-                    const fileName = match.path.split('/').pop() || match.path;
-                    const dirPath = match.path.split('/').slice(0, -1).join('/');
-                    const linePreview = match.lines.trim().slice(0, 120);
-
+              {/* ── Files ── */}
+              {hasFileResults && (
+                <CommandGroup heading="Files" forceMount>
+                  {fileResults.map((filePath) => {
+                    const FileIcon = getFileIcon(filePath);
+                    const fileName = filePath.split('/').pop() || filePath;
+                    const dirPath = filePath.split('/').slice(0, -1).join('/');
                     return (
                       <CommandItem
-                        key={`text-${match.path}-${match.line_number}-${index}`}
-                        value={`text-${match.path}-${match.line_number}-${index}`}
-                        onSelect={() => handleSelectTextResult(match)}
+                        key={filePath}
+                        value={`file-${filePath}`}
+                        onSelect={() => handleSelectFile(filePath)}
                       >
-                        <FileIcon className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                        <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate font-medium text-sm">
-                              {fileName}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 tabular-nums font-mono">
-                              L{match.line_number}
-                            </span>
-                          </div>
-                          <span className="text-xs text-muted-foreground/80 line-clamp-1 leading-relaxed font-mono">
-                            {linePreview}
-                          </span>
+                        <FileIcon className="h-4 w-4 flex-shrink-0" />
+                        <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                          <span className="truncate text-sm">{fileName}</span>
                           {dirPath && (
-                            <span className="text-[11px] text-muted-foreground/50 truncate">
+                            <span className="text-[11px] text-muted-foreground/40 truncate">
                               {dirPath}
                             </span>
                           )}
@@ -914,100 +855,150 @@ export function CommandPalette() {
                       </CommandItem>
                     );
                   })}
+                </CommandGroup>
+              )}
 
-                {showTextSkeletons && (
-                  <SearchSkeletons count={3} variant="content" />
-                )}
-              </CommandGroup>
-            )}
+              {/* ── Text Search ── */}
+              {showTextSection && (hasTextResults || showTextSkeletons) && (
+                <CommandGroup
+                  heading={
+                    <span className="inline-flex items-center gap-1.5">
+                      Text Search
+                      {isTextPending && hasTextResults && (
+                        <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground/40" />
+                      )}
+                    </span>
+                  }
+                  forceMount
+                >
+                  {hasTextResults &&
+                    filteredTextResults.map((match, index) => {
+                      const FileIcon = getFileIcon(match.path);
+                      const fileName = match.path.split('/').pop() || match.path;
+                      const dirPath = match.path.split('/').slice(0, -1).join('/');
+                      const linePreview = match.lines.trim().slice(0, 120);
 
-            {/* Semantic file search (LSS — BM25 + embeddings, slowest — 500ms debounce) */}
-            {showLssSection && (hasLssResults || showLssSkeletons) && (
-              <CommandGroup heading={lssHeading} forceMount>
-                {hasLssResults &&
-                  filteredLssResults.map((hit) => {
-                    const relativePath = stripWorkspacePrefix(hit.file_path);
-                    const FileIcon = getFileIcon(relativePath);
-                    const fileName =
-                      relativePath.split('/').pop() || relativePath;
-                    const dirPath = relativePath
-                      .split('/')
-                      .slice(0, -1)
-                      .join('/');
-                    const snippet = cleanSnippet(hit.snippet);
-
-                    return (
-                      <CommandItem
-                        key={`lss-${hit.file_path}-${hit.score}`}
-                        value={`lss-${relativePath}-${snippet.slice(0, 30)}`}
-                        onSelect={() => handleSelectLssResult(hit.file_path)}
-                      >
-                        <FileIcon className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                        <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate font-medium text-sm">
-                              {fileName}
+                      return (
+                        <CommandItem
+                          key={`text-${match.path}-${match.line_number}-${index}`}
+                          value={`text-${match.path}-${match.line_number}-${index}`}
+                          onSelect={() => handleSelectTextResult(match)}
+                        >
+                          <FileIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                          <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-medium">
+                                {fileName}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground/40 flex-shrink-0 tabular-nums font-mono">
+                                :{match.line_number}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground/60 line-clamp-1 leading-relaxed font-mono">
+                              {linePreview}
                             </span>
-                            <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 tabular-nums">
-                              {formatRelevance(hit.score)}
-                            </span>
+                            {dirPath && (
+                              <span className="text-[10px] text-muted-foreground/30 truncate">
+                                {dirPath}
+                              </span>
+                            )}
                           </div>
-                          {snippet && (
-                            <span className="text-xs text-muted-foreground/80 line-clamp-1 leading-relaxed">
-                              {snippet}
-                            </span>
-                          )}
-                          {dirPath && (
-                            <span className="text-[11px] text-muted-foreground/50 truncate">
-                              {dirPath}
-                            </span>
-                          )}
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
+                        </CommandItem>
+                      );
+                    })}
 
-                {showLssSkeletons && (
-                  <SearchSkeletons count={3} variant="content" />
-                )}
-              </CommandGroup>
-            )}
+                  {showTextSkeletons && (
+                    <SearchSkeletons count={3} variant="content" />
+                  )}
+                </CommandGroup>
+              )}
 
-            {/* ── All registry commands (filterable by search) ── */}
-            <CommandGroup heading="Commands">
-              {allPaletteItems.map((item) => {
-                const Icon = item.icon;
-                const isToggleSidebar = item.id === 'toggle-sidebar';
-                const SidebarIcon = isToggleSidebar
-                  ? (sidebarOpen ? PanelLeftClose : PanelLeftIcon)
-                  : Icon;
-                const displayLabel = isToggleSidebar
-                  ? (sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar')
-                  : item.label;
-                const isActiveTheme = item.kind === 'theme' && theme === item.themeValue;
+              {/* ── Semantic Search ── */}
+              {showLssSection && (hasLssResults || showLssSkeletons) && (
+                <CommandGroup
+                  heading={
+                    <span className="inline-flex items-center gap-1.5">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      Semantic
+                      {isLssPending && hasLssResults && (
+                        <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground/40" />
+                      )}
+                    </span>
+                  }
+                  forceMount
+                >
+                  {hasLssResults &&
+                    filteredLssResults.map((hit) => {
+                      const relativePath = stripWorkspacePrefix(hit.file_path);
+                      const FileIcon = getFileIcon(relativePath);
+                      const fileName =
+                        relativePath.split('/').pop() || relativePath;
+                      const dirPath = relativePath
+                        .split('/')
+                        .slice(0, -1)
+                        .join('/');
+                      const snippet = cleanSnippet(hit.snippet);
 
-                return (
-                  <CommandItem
-                    key={item.id}
-                    value={item.keywords || `${item.group} ${item.label} ${item.id}`}
-                    onSelect={() => handleRegistryItem(item)}
-                    disabled={item.id === 'new-session' && isCreating}
-                  >
-                    {item.id === 'new-session' && isCreating ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <SidebarIcon className="mr-2 h-4 w-4" />
-                    )}
-                    <span>{displayLabel}</span>
-                    {item.shortcut && <CommandShortcut>{item.shortcut}</CommandShortcut>}
-                    {isActiveTheme && (
-                      <span className="ml-auto text-xs text-muted-foreground">Active</span>
-                    )}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
+                      return (
+                        <CommandItem
+                          key={`lss-${hit.file_path}-${hit.score}`}
+                          value={`lss-${relativePath}-${snippet.slice(0, 30)}`}
+                          onSelect={() => handleSelectLssResult(hit.file_path)}
+                        >
+                          <FileIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                          <div className="flex flex-col overflow-hidden flex-1 min-w-0 gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-medium">
+                                {fileName}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground/40 flex-shrink-0 tabular-nums">
+                                {formatRelevance(hit.score)}
+                              </span>
+                            </div>
+                            {snippet && (
+                              <span className="text-[11px] text-muted-foreground/60 line-clamp-1 leading-relaxed">
+                                {snippet}
+                              </span>
+                            )}
+                            {dirPath && (
+                              <span className="text-[10px] text-muted-foreground/30 truncate">
+                                {dirPath}
+                              </span>
+                            )}
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+
+                  {showLssSkeletons && (
+                    <SearchSkeletons count={3} variant="content" />
+                  )}
+                </CommandGroup>
+              )}
+            </CommandList>
+
+            {/* ── Footer with keyboard hints ── */}
+            <CommandFooter>
+              <div className="flex items-center gap-1">
+                <ArrowUp className="h-3 w-3" />
+                <ArrowDown className="h-3 w-3" />
+                <span>navigate</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <CornerDownLeft className="h-3 w-3" />
+                <span>select</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Kbd>esc</Kbd>
+                <span>close</span>
+              </div>
+              {hasQuery && totalSearchResults > 0 && (
+                <span className="ml-auto tabular-nums">
+                  {totalSearchResults} result{totalSearchResults !== 1 ? 's' : ''}
+                </span>
+              )}
+            </CommandFooter>
+          </>
         )}
       </CommandDialog>
 
