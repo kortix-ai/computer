@@ -1,104 +1,62 @@
 /**
- * LTM Context Formatter
+ * Memory Context Formatter
  *
- * Generates the <long-term-memory> block that gets injected into
- * the latest user message (cache-safe — system prompt untouched).
+ * Generates a compact <memory-context> markdown table injected as a
+ * synthetic user message at position 1 (cache-safe — system prompt untouched).
  *
- * Groups memories by type: Episodic → Semantic → Procedural.
- * Orders by most recently updated within each group.
+ * Shows recent observations as a compact index with ID, session, type, and title.
+ * The agent uses observation_search / ltm_search / get_mem to retrieve full details.
  */
 
 import type { Database } from "bun:sqlite"
-import { getLTMByType } from "./db"
-import type { LTMEntry } from "./types"
+import { getRecentObservations } from "./db"
+import type { ObservationType } from "./types"
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-export interface LTMBlockLimits {
-	episodic?: number
-	semantic?: number
-	procedural?: number
-}
+const DEFAULT_LIMIT = 50
 
-const DEFAULT_LIMITS: Required<LTMBlockLimits> = {
-	episodic: 10,
-	semantic: 15,
-	procedural: 10,
+const TYPE_EMOJI: Record<string, string> = {
+	discovery: "🔵",
+	decision: "⚖️",
+	bugfix: "🔴",
+	feature: "🟣",
+	refactor: "🔄",
+	change: "✅",
 }
 
 // ─── Main Formatter ──────────────────────────────────────────────────────────
 
 /**
- * Generate the full LTM block for injection into a user message.
- * Returns empty string if no memories exist.
+ * Generate the compact observation reference table for injection.
+ * Returns empty string if no observations exist.
+ *
+ * Entries sorted by recency (created_at DESC), displayed as a markdown table.
  */
-export function generateLTMBlock(
+export function generateContextBlock(
 	db: Database,
-	limits?: LTMBlockLimits,
+	limit?: number,
 ): string {
-	const l = { ...DEFAULT_LIMITS, ...limits }
+	const entries = getRecentObservations(db, limit ?? DEFAULT_LIMIT)
+	if (entries.length === 0) return ""
 
-	const episodic = getLTMByType(db, "episodic", l.episodic)
-	const semantic = getLTMByType(db, "semantic", l.semantic)
-	const procedural = getLTMByType(db, "procedural", l.procedural)
+	const lines: string[] = [
+		"<memory-context>",
+		"Recent observations (most recent first). Use observation_search/ltm_search/get_mem for details.",
+		"",
+		"| ID | Session | T | Title |",
+		"|----|---------|---|-------|",
+	]
 
-	if (episodic.length === 0 && semantic.length === 0 && procedural.length === 0) {
-		return ""
+	for (const e of entries) {
+		const title = e.title.replace(/\|/g, "\\|").replace(/\n/g, " ").slice(0, 80)
+		const emoji = TYPE_EMOJI[e.type] ?? "❓"
+		const session = e.sessionId ? e.sessionId.slice(0, 12) : "—"
+		lines.push(`| #${e.id} | ${session} | ${emoji} | ${title} |`)
 	}
 
-	const sections: string[] = ["<long-term-memory>"]
+	lines.push("")
+	lines.push("</memory-context>")
 
-	if (episodic.length > 0) {
-		sections.push("")
-		sections.push("## Episodic (what happened)")
-		for (const e of episodic) {
-			sections.push(formatEntry(e))
-		}
-	}
-
-	if (semantic.length > 0) {
-		sections.push("")
-		sections.push("## Semantic (what I know)")
-		for (const s of semantic) {
-			sections.push(formatEntry(s))
-		}
-	}
-
-	if (procedural.length > 0) {
-		sections.push("")
-		sections.push("## Procedural (how to do things)")
-		for (const p of procedural) {
-			sections.push(formatEntry(p))
-		}
-	}
-
-	sections.push("")
-	sections.push("</long-term-memory>")
-
-	return sections.join("\n")
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatEntry(entry: LTMEntry): string {
-	const date = formatDate(entry.createdAt)
-	const files = entry.files.length > 0
-		? ` [${entry.files.map(basename).slice(0, 2).join(", ")}]`
-		: ""
-	return `- ${entry.content}${files}`
-}
-
-function formatDate(dateStr: string): string {
-	try {
-		const d = new Date(dateStr)
-		if (isNaN(d.getTime())) return ""
-		return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-	} catch {
-		return ""
-	}
-}
-
-function basename(filePath: string): string {
-	const parts = filePath.split("/")
-	return parts[parts.length - 1] || filePath
+	return lines.join("\n")
 }

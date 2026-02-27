@@ -2,18 +2,20 @@
  * Kortix Memory Plugin for OpenCode
  *
  * Long-term memory with episodic/semantic/procedural consolidation,
- * plus cross-session context retrieval.
+ * hybrid BM25+vector search, and cross-session context retrieval.
  *
  * Hooks:
  *   tool.execute.before        — capture tool args by callID
  *   tool.execute.after         — extract observations from tool results
  *   chat.message               — track session + prompt count
  *   event                      — session lifecycle (created, deleted)
- *   messages.transform         — inject session ID + LTM into latest user message (cache-safe)
+ *   messages.transform         — inject LTM index as synthetic message at position 1
  *   session.compacting         — consolidate observations → LTM, inject into compaction context
  *
  * Tools:
- *   mem_search                 — unified search across observations + LTM
+ *   ltm_search                 — hybrid search across long-term memories
+ *   observation_search         — hybrid search across observations
+ *   get_mem                    — fetch full record by ID (LTM or observation)
  *   mem_save                   — manually persist an LTM entry
  *   session_list               — browse past sessions with metadata
  *   session_get                — retrieve a session's conversation (TTC-compressed)
@@ -21,11 +23,14 @@
 
 import { type Plugin, tool } from "@opencode-ai/plugin"
 import type { Session, Todo } from "@opencode-ai/sdk"
-import { initDb, insertObservation, ensureSession, incrementPromptCount, completeSession, unifiedSearch, insertLTM } from "./db"
+import { initDb, insertObservation, ensureSession, incrementPromptCount, completeSession, insertLTM, getObservationById, getLTMById, getLTMByIds, getObservationsByIds } from "./db"
 import { extractObservation } from "./extract"
-import { generateLTMBlock } from "./context"
+import { generateContextBlock } from "./context"
 import { consolidateMemories } from "./consolidate"
+import { initEnrichment, enqueueEnrichment, updateEnrichmentOpts } from "./enrich"
+import { initSearch, hybridSearchLTM, hybridSearchObservations } from "./search"
 import { ensureMemDir, writeObservationFile, writeLTMFile } from "./lss"
+import { existsSync, writeFileSync, mkdirSync } from "node:fs"
 import { getEnv, shortTs, changeSummary, formatMessages, ttcCompress, STORAGE_BASE, DB_PATH } from "./session"
 import type { LogFn, CreateLTMInput, LTMType } from "./types"
 
@@ -51,6 +56,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		console.error(`[kortix-memory] LSS dir init failed (non-fatal): ${err}`)
 	}
 	let currentSessionId: string | null = null
+	let currentModel: string | null = null
 	let promptCount = 0
 	const pendingArgs = new Map<string, Record<string, unknown>>()
 
@@ -66,18 +72,47 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 	}
 
 	// Cache the LTM block — regenerated on session start and after consolidation
-	let cachedLTMBlock = ""
+	let cachedContextBlock = ""
 
-	function refreshLTMCache(): void {
+	function refreshContextCache(): void {
 		try {
-			cachedLTMBlock = generateLTMBlock(db)
+			cachedContextBlock = generateContextBlock(db)
 		} catch (err) {
 			log("warn", `[memory] LTM cache refresh failed: ${err}`)
 		}
 	}
 
+	// Ensure USER.md exists for personalization
+	const KORTIX_DIR = "/workspace/.kortix"
+	const USER_MD_PATH = `${KORTIX_DIR}/USER.md`
+	try {
+		if (!existsSync(KORTIX_DIR)) mkdirSync(KORTIX_DIR, { recursive: true })
+		if (!existsSync(USER_MD_PATH)) {
+			writeFileSync(USER_MD_PATH, [
+				"# User Profile",
+				"",
+				"<!-- Auto-created by kortix-sys-oc-plugin. The agent enriches this file as it learns about you. -->",
+				"",
+				"## Preferences",
+				"",
+				"## Work Style",
+				"",
+				"## Context",
+				"",
+			].join("\n"), "utf-8")
+		}
+	} catch (err) {
+		console.error(`[kortix-memory] USER.md init failed (non-fatal): ${err}`)
+	}
+
 	// Generate initial cache
-	refreshLTMCache()
+	refreshContextCache()
+
+	// Initialize AI enrichment module
+	initEnrichment(db, log)
+
+	// Initialize hybrid search engine
+	initSearch(log)
 
 	// ── Return hooks ──────────────────────────────────────────────────
 	return {
@@ -99,7 +134,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				const args = pendingArgs.get(input.callID) ?? {}
 				pendingArgs.delete(input.callID)
 
-				const obs = extractObservation(
+				const result = extractObservation(
 					{
 						tool: input.tool,
 						args: args as Record<string, unknown>,
@@ -110,11 +145,12 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					promptCount,
 				)
 
-				if (obs) {
+				if (result) {
+					const { observation: obs, rawOutput } = result
 					const id = insertObservation(db, obs)
 
-				// Write LSS companion file (fire-and-forget)
-				if (memDir) try {
+					// Write LSS companion file (fire-and-forget)
+					if (memDir) try {
 						writeObservationFile(memDir, id, {
 							title: obs.title,
 							narrative: obs.narrative,
@@ -125,6 +161,17 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 							filesModified: obs.filesModified,
 						})
 					} catch { /* non-fatal */ }
+
+					// Refresh context cache (observations index)
+					refreshContextCache()
+
+					// Fire-and-forget AI enrichment
+					enqueueEnrichment({
+						obsId: id,
+						toolName: input.tool,
+						args: args as Record<string, unknown>,
+						rawOutput,
+					})
 				}
 			} catch (err) {
 				log("warn", `[memory] Observation extraction failed: ${err}`)
@@ -137,10 +184,16 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				if (input.sessionID && input.sessionID !== currentSessionId) {
 					currentSessionId = input.sessionID
 					ensureSession(db, currentSessionId)
-					refreshLTMCache()
+					refreshContextCache()
 				}
 				if (currentSessionId) {
 					promptCount = incrementPromptCount(db, currentSessionId)
+				}
+				// Capture the user's selected model for LLM consolidation + enrichment
+				if (input.model?.modelID) {
+					currentModel = input.model.modelID
+					updateEnrichmentOpts({ model: currentModel })
+					log("info", `[memory] Model updated: ${currentModel}`)
 				}
 			} catch (err) {
 				log("warn", `[memory] chat.message hook failed: ${err}`)
@@ -151,17 +204,17 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		event: async ({ event }) => {
 			try {
 				if (event.type === "session.created") {
-					const sessionId = (event as any).properties?.id
+					const sessionId = (event as any).properties?.info?.id
 					if (sessionId) {
 						currentSessionId = sessionId
 						ensureSession(db, sessionId)
 						promptCount = 0
-						refreshLTMCache()
+						refreshContextCache()
 					}
 				}
 
 				if (event.type === "session.deleted") {
-					const sessionId = (event as any).properties?.id
+					const sessionId = (event as any).properties?.info?.id
 					if (sessionId) {
 						completeSession(db, sessionId)
 					}
@@ -171,39 +224,54 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 			}
 		},
 
-		// ── HOOK: Inject session context + LTM into latest user message (cache-safe)
-		// System prompt stays untouched → KV cache preserved.
-		// Session ID + LTM ride on the always-new user message.
+		// ── HOOK: Inject LTM index as synthetic user message at position 1
+		// System prompt untouched → KV cache preserved for prefix.
+		// Synthetic message at position 1 is stable across turns (LTM rarely changes).
 		"experimental.chat.messages.transform": async (_input, output) => {
 			try {
-				// Build the injected block: session context + LTM
 				const parts: string[] = []
 
-				// Always inject session ID so the agent knows its session
 				if (currentSessionId) {
 					parts.push(`<session_context>\nSession ID: ${currentSessionId}\n</session_context>`)
 				}
 
-				// Append LTM block if available
-				if (cachedLTMBlock) {
-					parts.push(cachedLTMBlock)
+				if (cachedContextBlock) {
+					parts.push(cachedContextBlock)
 				}
 
 				if (parts.length === 0) return
 
-				const injectedBlock = parts.join("\n\n")
+				const MARKER = "<!-- kortix-mem-context -->"
+				const syntheticText = `${MARKER}\n${parts.join("\n\n")}`
 
 				const messages = output.messages
-				// Find last user message and prepend context block
-				for (let i = messages.length - 1; i >= 0; i--) {
-					if (messages[i].info.role === "user") {
-						// Prepend as a synthetic text part
-						messages[i].parts.unshift({
+
+				// Check if synthetic message already exists (idempotent on repeated hook calls)
+				const existingIdx = messages.findIndex(
+					(m: any) => m.parts?.some((p: any) => p.type === "text" && p.text?.includes(MARKER))
+				)
+
+				if (existingIdx >= 0) {
+					// Update in place
+					const msg = messages[existingIdx] as any
+					const part = msg.parts.find((p: any) => p.type === "text" && p.text?.includes(MARKER))
+					if (part) part.text = syntheticText
+				} else {
+					// Insert synthetic user message at position 1 (after system prompt)
+					const insertIdx = Math.min(1, messages.length)
+					messages.splice(insertIdx, 0, {
+						info: {
+							role: "user",
+							id: "__kortix_mem_context__",
+							sessionID: currentSessionId ?? "",
+							parts: [],
+							createdAt: new Date().toISOString(),
+						} as any,
+						parts: [{
 							type: "text",
-							text: injectedBlock,
-						} as any)
-						break
-					}
+							text: syntheticText,
+						} as any],
+					})
 				}
 			} catch (err) {
 				log("warn", `[memory] messages.transform failed: ${err}`)
@@ -218,7 +286,9 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				if (!sessionId) return
 
 				// 1. Run LLM consolidation (observations → LTM)
-				const result = await consolidateMemories(db, sessionId, log)
+				const result = await consolidateMemories(db, sessionId, log,
+					currentModel ? { model: currentModel } : undefined,
+				)
 
 				// 2. Write LSS files for new LTM entries
 				for (const mem of result.newMemories) {
@@ -229,11 +299,11 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				}
 
 				// 3. Refresh the LTM cache
-				refreshLTMCache()
+				refreshContextCache()
 
 				// 4. Inject LTM block into compaction context
-				if (cachedLTMBlock) {
-					output.context.push(cachedLTMBlock)
+				if (cachedContextBlock) {
+					output.context.push(cachedContextBlock)
 				}
 
 				log("info", `[memory] Compaction consolidation complete: ${result.newMemories.length} new memories`)
@@ -245,38 +315,122 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		// ── TOOLS ─────────────────────────────────────────────────────
 		tool: {
 
-			// Unified search across observations + LTM
-			mem_search: tool({
-				description: `Search across all memory stores — both long-term memories (episodic/semantic/procedural knowledge) and raw observations (tool execution history). LTM results are ranked higher. Use this to recall past knowledge, find facts about the codebase, or look up what happened in previous sessions.`,
+			// Search long-term memories (hybrid BM25 + vector)
+			ltm_search: tool({
+				description: `Search long-term memories (episodic/semantic/procedural knowledge consolidated from past sessions). Returns a compact list of matching entries with IDs and captions. Use get_mem to retrieve full details of a specific entry.`,
 				args: {
 					query: tool.schema.string().describe("Search query (keywords or natural language)"),
-					limit: tool.schema.number().optional().describe("Max results (default 15)"),
-					source: tool.schema
-						.enum(["both", "ltm", "observation"])
+					tags: tool.schema.string().optional().describe("Comma-separated tags to filter by"),
+					type: tool.schema
+						.enum(["episodic", "semantic", "procedural"])
 						.optional()
-						.describe("Filter by source: 'ltm' for long-term memories only, 'observation' for raw tool events only, 'both' (default)"),
+						.describe("Filter by memory type"),
+					limit: tool.schema.number().optional().describe("Max results (default 10)"),
 				},
 				async execute(args) {
-					const results = unifiedSearch(db, args.query, {
-						limit: args.limit ?? 15,
-						source: args.source as any ?? "both",
+					const limit = args.limit ?? 10
+					const ranked = await hybridSearchLTM(db, args.query, {
+						limit,
+						type: args.type,
 					})
 
-					if (results.length === 0) {
-						return `No memories found for "${args.query}".`
+					if (ranked.length === 0) return `No long-term memories found for "${args.query}".`
+
+					const ids = ranked.map(r => r.id)
+					const entries = getLTMByIds(db, ids)
+					const entryMap = new Map(entries.map(e => [e.id, e]))
+
+					const lines: string[] = [`=== LTM Search: "${args.query}" (${ranked.length} results) ===`, ""]
+					for (const r of ranked) {
+						const entry = entryMap.get(r.id)
+						if (!entry) continue
+						const caption = entry.caption || entry.content.slice(0, 80)
+						lines.push(`  #${entry.id} [${entry.type}] — ${caption}`)
 					}
-
-					const lines: string[] = [`=== Memory Search: "${args.query}" (${results.length} results) ===`, ""]
-
-					for (const hit of results) {
-						const sourceTag = hit.source === "ltm" ? `[LTM/${hit.type}]` : `[obs/${hit.type}]`
-						const files = hit.files.length > 0 ? `\n    Files: ${hit.files.slice(0, 3).join(", ")}` : ""
-						lines.push(`  ${sourceTag} #${hit.id}`)
-						lines.push(`    ${hit.content.slice(0, 200)}${files}`)
-						lines.push("")
-					}
-
 					return lines.join("\n")
+				},
+			}),
+
+			// Search observations (hybrid BM25 + vector)
+			observation_search: tool({
+				description: `Search raw observations (tool execution history from current and past sessions). Returns a compact list with IDs and titles. Use get_mem to retrieve full details.`,
+				args: {
+					query: tool.schema.string().describe("Search query (keywords or natural language)"),
+					type: tool.schema
+						.enum(["discovery", "decision", "bugfix", "feature", "refactor", "change"])
+						.optional()
+						.describe("Filter by observation type"),
+					concepts: tool.schema.string().optional().describe("Comma-separated concepts/tags to filter by"),
+					tool_name: tool.schema.string().optional().describe("Filter by tool name (e.g., 'Read', 'Bash', 'Write')"),
+					session_id: tool.schema.string().optional().describe("Filter to a specific session"),
+					limit: tool.schema.number().optional().describe("Max results (default 10)"),
+				},
+				async execute(args) {
+					const limit = args.limit ?? 10
+					const concepts = args.concepts ? args.concepts.split(",").map((c: string) => c.trim()).filter(Boolean) : undefined
+					const ranked = await hybridSearchObservations(db, args.query, {
+						limit,
+						type: args.type,
+						concepts,
+						toolName: args.tool_name,
+						sessionId: args.session_id,
+					})
+
+					if (ranked.length === 0) return `No observations found for "${args.query}".`
+
+					const ids = ranked.map(r => r.id)
+					const observations = getObservationsByIds(db, ids)
+					const obsMap = new Map(observations.map(o => [o.id, o]))
+
+					const lines: string[] = [`=== Observation Search: "${args.query}" (${ranked.length} results) ===`, ""]
+					for (const r of ranked) {
+						const obs = obsMap.get(r.id)
+						if (!obs) continue
+						lines.push(`  #${obs.id} [${obs.type}] — ${obs.title}`)
+					}
+					return lines.join("\n")
+				},
+			}),
+
+			// Fetch full record by ID
+			get_mem: tool({
+				description: `Retrieve the full details of a specific memory entry by ID. Use after ltm_search or observation_search to get complete content.`,
+				args: {
+					source: tool.schema.enum(["ltm", "observation"]).describe("Which store to look up"),
+					id: tool.schema.number().describe("The entry ID (from search results)"),
+				},
+				async execute(args) {
+					if (args.source === "ltm") {
+						const entry = getLTMById(db, args.id)
+						if (!entry) return `LTM #${args.id} not found.`
+						const tags = entry.tags.length > 0 ? `\nTags: ${entry.tags.join(", ")}` : ""
+						const files = entry.files.length > 0 ? `\nFiles: ${entry.files.join(", ")}` : ""
+						const ctx = entry.context ? `\nContext: ${entry.context}` : ""
+						return [
+							`=== LTM #${entry.id} [${entry.type}] ===`,
+							`Caption: ${entry.caption || "(none)"}`,
+							`Content: ${entry.content}`,
+							`Session: ${entry.sourceSessionId || "unknown"}`,
+							`Created: ${entry.createdAt} | Updated: ${entry.updatedAt}`,
+							tags, files, ctx,
+						].filter(Boolean).join("\n")
+					} else {
+						const obs = getObservationById(db, args.id)
+						if (!obs) return `Observation #${args.id} not found.`
+						const facts = obs.facts.length > 0 ? `\nFacts:\n${obs.facts.map((f: string) => `  - ${f}`).join("\n")}` : ""
+						const concepts = obs.concepts.length > 0 ? `\nConcepts: ${obs.concepts.join(", ")}` : ""
+						const filesR = obs.filesRead.length > 0 ? `\nFiles read: ${obs.filesRead.join(", ")}` : ""
+						const filesM = obs.filesModified.length > 0 ? `\nFiles modified: ${obs.filesModified.join(", ")}` : ""
+						return [
+							`=== Observation #${obs.id} [${obs.type}] ===`,
+							`Title: ${obs.title}`,
+							`Narrative: ${obs.narrative}`,
+							`Tool: ${obs.toolName} | Prompt #${obs.promptNumber ?? "?"}`,
+							`Session: ${obs.sessionId}`,
+							`Created: ${obs.createdAt}`,
+							facts, concepts, filesR, filesM,
+						].filter(Boolean).join("\n")
+					}
 				},
 			}),
 
@@ -298,6 +452,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					const input: CreateLTMInput = {
 						type,
 						content: args.text,
+						caption: args.text.slice(0, 80),
 						sourceSessionId: context.sessionID,
 						tags,
 					}
@@ -310,7 +465,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					} catch { /* non-fatal */ }
 
 					// Refresh cache so it appears immediately
-					refreshLTMCache()
+					refreshContextCache()
 
 					return `Saved to long-term memory [${type}] #${id}: "${args.text.slice(0, 80)}${args.text.length > 80 ? "..." : ""}"`
 				},

@@ -16,10 +16,20 @@ export async function checkCredits(
   options?: { skipDevCheck?: boolean }
 ): Promise<BillingCheckResult> {
   if (!config.DATABASE_URL) {
+    // In local mode without a DB, skip credit checks entirely
+    if (config.isLocal()) {
+      return { hasCredits: true, balance: 0, message: 'Credits check skipped (local mode, no DB)' };
+    }
     throw new Error('DATABASE_URL is required for credit checks');
   }
 
   const result = await checkCreditsDb(accountId, minimumRequired);
+
+  // In local mode, allow even when no credit account row exists (e.g. migrations not run)
+  if (!result.hasCredits && config.isLocal()) {
+    return { hasCredits: true, balance: 0, message: 'Credits check skipped (local mode)' };
+  }
+
   return {
     hasCredits: result.hasCredits,
     message: result.message,
@@ -51,6 +61,9 @@ export async function deductToolCredits(
   const deductDescription = sessionId ? `${baseDescription} [session:${sessionId}]` : baseDescription;
 
   if (!config.DATABASE_URL) {
+    if (config.isLocal()) {
+      return { success: true, cost: 0, newBalance: 0 };
+    }
     throw new Error('DATABASE_URL is required for credit deductions');
   }
 
@@ -93,6 +106,9 @@ export async function deductLLMCredits(
   const description = sessionId ? `${baseDescription} [session:${sessionId}]` : baseDescription;
 
   if (!config.DATABASE_URL) {
+    if (config.isLocal()) {
+      return { success: true, cost: 0, newBalance: 0 };
+    }
     throw new Error('DATABASE_URL is required for credit deductions');
   }
 

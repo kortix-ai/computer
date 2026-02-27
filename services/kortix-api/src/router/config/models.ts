@@ -1,6 +1,23 @@
 import { config } from '../../config';
 import { getModelPricing } from './model-pricing';
 
+// =============================================================================
+// Model Registry
+// =============================================================================
+
+export interface ModelConfig {
+  /** The actual model ID to send to OpenRouter */
+  openrouterId: string;
+  inputPer1M: number;   // Cost per 1M input tokens (USD)
+  outputPer1M: number;  // Cost per 1M output tokens (USD)
+  contextWindow: number;
+  tier: 'free' | 'paid';
+  /** How this provider handles prompt caching. 'manual' = needs cache_control breakpoints (Anthropic). */
+  cachingStrategy?: 'manual' | 'automatic';
+  cacheReadPer1M?: number;   // Cost per 1M cached-read tokens (USD)
+  cacheWritePer1M?: number;  // Cost per 1M cache-write tokens (USD)
+}
+
 /**
  * Kortix model aliases → OpenRouter model IDs.
  *
@@ -14,6 +31,9 @@ export const MODELS: Record<string, ModelConfig> = {
     outputPer1M: 15.00,
     contextWindow: 200000,
     tier: 'free',
+    cachingStrategy: 'manual',
+    cacheReadPer1M: 0.30,
+    cacheWritePer1M: 3.75,
   },
   'kortix/power': {
     openrouterId: 'anthropic/claude-opus-4.6',
@@ -21,6 +41,9 @@ export const MODELS: Record<string, ModelConfig> = {
     outputPer1M: 25.00,
     contextWindow: 200000,
     tier: 'paid',
+    cachingStrategy: 'manual',
+    cacheReadPer1M: 0.50,
+    cacheWritePer1M: 6.25,
   },
 };
 
@@ -62,6 +85,7 @@ export function getModel(modelId: string): ModelConfig {
     outputPer1M: 0,
     contextWindow: 128000,
     tier: 'paid',
+    cachingStrategy: openrouterId.startsWith('anthropic/') ? 'manual' : undefined,
   };
 }
 
