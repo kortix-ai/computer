@@ -10,7 +10,7 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import { sandboxes, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
 import { createApiKey } from '../../repositories/api-keys';
@@ -101,6 +101,12 @@ export function createAccountRouter(
 
       const accountId = await resolveAccountId(userId);
 
+      // Acquire an advisory lock for this account to prevent concurrent sandbox creation.
+      // pg_advisory_xact_lock uses the transaction scope — released automatically on commit.
+      // We hash the accountId UUID to an int8 for the lock key.
+      const lockKey = accountId.split('-').join('').slice(0, 15);
+      await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${accountId}))`);
+
       // 1. Check for an existing active sandbox — return it immediately
       const [active] = await db
         .select()
@@ -117,6 +123,27 @@ export function createAccountRouter(
         return c.json({
           success: true,
           data: serializeSandbox(active),
+          created: false,
+        });
+      }
+
+      // Also check for provisioning sandboxes (another request is already creating one)
+      const [provisioning] = await db
+        .select()
+        .from(sandboxes)
+        .where(
+          and(
+            eq(sandboxes.accountId, accountId),
+            eq(sandboxes.status, 'provisioning'),
+          ),
+        )
+        .limit(1);
+
+      if (provisioning) {
+        console.log(`[PLATFORM] Sandbox ${provisioning.sandboxId} already provisioning for account ${accountId}`);
+        return c.json({
+          success: true,
+          data: serializeSandbox(provisioning),
           created: false,
         });
       }
@@ -164,7 +191,7 @@ export function createAccountRouter(
         }
       }
 
-      // 3. No sandbox at all — provision a new one
+      // 3. No sandbox at all — provision a new one (max 1 per account)
       const provider = getProvider(providerName);
 
       // Create sandbox row first (we need the sandboxId for the API key)

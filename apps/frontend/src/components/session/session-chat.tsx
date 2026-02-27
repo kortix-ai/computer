@@ -76,7 +76,6 @@ import {
 	replyToPermission,
 	replyToQuestion,
 	useAbortOpenCodeSession,
-	useExecuteOpenCodeCommand,
 	useForkSession,
 	useOpenCodeAgents,
 	useOpenCodeCommands,
@@ -2345,8 +2344,10 @@ function SessionTurn({
 
 				{/* Answered question parts — shown after the response text only when
 				    there are no steps (no-steps turns). When hasSteps is true,
-				    answered questions render inline within the steps section above. */}
-				{!hasSteps && answeredQuestionParts.length > 0 && (
+				    answered questions render inline within the steps section above.
+				    Skip while working — the steps section (guarded by `working || hasSteps`)
+				    already renders them to avoid duplicates. */}
+				{!hasSteps && !working && answeredQuestionParts.length > 0 && (
 					<div className="space-y-2 mt-3">
 						{answeredQuestionParts.map(({ part }) => (
 							<AnsweredQuestionCard key={part.id} part={part as ToolPart} />
@@ -2577,7 +2578,6 @@ export function SessionChat({
 	const { data: config } = useOpenCodeConfig();
 	const sendMessage = useSendOpenCodeMessage();
 	const abortSession = useAbortOpenCodeSession();
-	const executeCommand = useExecuteOpenCodeCommand();
 	const forkSession = useForkSession();
 	const revertSession = useRevertSession();
 	const unrevertSession = useUnrevertSession();
@@ -3607,15 +3607,25 @@ export function SessionChat({
 	const handleStop = useCallback(() => {
 		// Guard against rapid clicks — ignore if an abort is already in flight
 		if (abortSession.isPending) return;
+		// Optimistically mark the session idle so the UI updates immediately
+		// (stop button hides, input re-enables) without waiting for the SSE
+		// round-trip. Also clear the busy debounce timer to bypass the 2s delay.
+		useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+		clearTimeout(busyTimerRef.current);
+		setIsBusy(false);
 		abortSession.mutate(sessionId);
 	}, [sessionId, abortSession]);
 
+	// Ref-based guard against rapid double-fire of commands (replaces
+	// the old executeCommand.isPending check from the TQ mutation).
+	const commandInFlightRef = useRef(false);
+
 	const handleCommand = useCallback(
 		(cmd: Command, args?: string) => {
+			if (commandInFlightRef.current) return;
+
 			playSound("send");
 			const label = args ? `/${cmd.name} ${args}` : `/${cmd.name}`;
-			const messageID = ascendingId("msg");
-			const textPartId = ascendingId("prt");
 
 			setPendingCommand({
 				name: cmd.name,
@@ -3630,27 +3640,38 @@ export function SessionChat({
 			setPollingActive(true);
 			lastSendTimeRef.current = Date.now();
 
-			// Optimistic: show command message immediately + set busy
-			// (mirrors handleSend behavior)
-			addOptimisticUserMessage(messageID, label, [textPartId]);
-			useSyncStore.getState().setStatus(sessionId, { type: "busy" });
-
-			executeCommand.mutate(
-				{ sessionId, command: cmd.name, args },
-				{
-					onError: () => {
-						setPendingCommand(null);
-						setPendingUserMessage(null);
-						setPendingUserMessageId(null);
-						setPollingActive(false);
-						useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-						removeOptimisticUserMessage(messageID);
-					},
-				},
-			);
+			// Match SolidJS reference (submit.ts:259-289): fire command
+			// directly via SDK — no TanStack Query, no mutation retry, no
+			// optimistic message. The server creates the user message and
+			// SSE delivers it. Commands use the blocking /command endpoint
+			// which can take minutes; using TQ would cause retry on timeout.
+			commandInFlightRef.current = true;
+			const client = getClient();
+			void client.session
+				.command({
+					sessionID: sessionId,
+					command: cmd.name,
+					arguments: args || "",
+					...(local.agent.current && { agent: local.agent.current.name }),
+					...(local.model.currentKey && { model: local.model.currentKey }),
+					...(local.model.variant.current && { variant: local.model.variant.current }),
+				})
+				.catch(() => {
+					// Command failed or timed out. The agent may still be
+					// processing server-side (proxy timeout ≠ server abort).
+					// Clean up UI state; SSE will correct if processing continues.
+					setPendingCommand(null);
+					setPendingUserMessage(null);
+					setPendingUserMessageId(null);
+					setPollingActive(false);
+				})
+				.finally(() => {
+					commandInFlightRef.current = false;
+				});
 			setTimeout(() => scrollToBottom(), 50);
 		},
-		[sessionId, executeCommand, scrollToBottom, addOptimisticUserMessage, removeOptimisticUserMessage],
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[sessionId, scrollToBottom, local.agent.current, local.model.currentKey, local.model.variant.current],
 	);
 
 	const handleFileSearch = useCallback(

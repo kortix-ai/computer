@@ -13,7 +13,7 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { sandboxes, type Database } from '@kortix/db';
 import { db as defaultDb } from '../../shared/db';
 import { createApiKey } from '../../repositories/api-keys';
@@ -110,7 +110,7 @@ export function createCloudSandboxRouter(
   });
 
   // ─── POST / ────────────────────────────────────────────────────────────
-  // Create a new sandbox. Users can have multiple active sandboxes.
+  // Create a new sandbox. Limited to 1 active sandbox per account.
 
   router.post('/', async (c) => {
     const userId = c.get('userId');
@@ -122,6 +122,25 @@ export function createCloudSandboxRouter(
       const customName = body?.name as string | undefined;
 
       const accountId = await resolveAccountId(userId);
+
+      // Enforce 1 active/provisioning sandbox per account
+      const [existing] = await db
+        .select()
+        .from(sandboxes)
+        .where(
+          and(
+            eq(sandboxes.accountId, accountId),
+            sql`${sandboxes.status} IN ('active', 'provisioning')`,
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        return c.json({
+          success: false,
+          error: 'Account already has an active sandbox. Use POST /platform/init to get it.',
+        }, 409);
+      }
 
       // Count existing sandboxes for naming
       const existingCount = await db

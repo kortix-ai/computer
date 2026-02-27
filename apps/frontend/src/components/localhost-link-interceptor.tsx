@@ -25,6 +25,7 @@ import {
   toInternalUrl,
 } from '@/lib/utils/sandbox-url';
 import { openTabAndNavigate } from '@/stores/tab-store';
+import { enrichPreviewMetadata } from '@/lib/utils/session-context';
 
 export function LocalhostLinkInterceptor() {
   useEffect(() => {
@@ -68,15 +69,15 @@ export function LocalhostLinkInterceptor() {
           id: `preview:${port}`,
           title: `localhost:${port}`,
           type: 'preview',
-          href: `/preview/${port}`,
-          metadata: { url: proxyUrl, port, originalUrl: internalUrl, path },
+          href: `/p/${port}`,
+          metadata: enrichPreviewMetadata({ url: proxyUrl, port, originalUrl: internalUrl, path }),
         });
         return;
       }
 
       // ── Case 2: Already-proxied URL (subdomain or path-based) ──
       // The href is something like http://p3210-kortix-sandbox.localhost:8008/
-      // or http://localhost:8008/v1/preview/.../proxy/3210/
+      // or http://localhost:8008/v1/p/.../proxy/3210/
       // which would navigate the browser away from the app. Instead, open as tab.
       if (isPreviewUrl(href)) {
         const internal = proxyUrlToInternal(href, activeServer?.mappedPorts);
@@ -94,8 +95,8 @@ export function LocalhostLinkInterceptor() {
               id: `preview:${port}`,
               title: `localhost:${port}`,
               type: 'preview',
-              href: `/preview/${port}`,
-              metadata: { url: proxyUrl, port, originalUrl: internalUrl, path },
+              href: `/p/${port}`,
+              metadata: enrichPreviewMetadata({ url: proxyUrl, port, originalUrl: internalUrl, path }),
             });
             return;
           }

@@ -17,6 +17,14 @@ CREATE EXTENSION IF NOT EXISTS pg_net;
 CREATE SCHEMA IF NOT EXISTS kortix;
 CREATE SCHEMA IF NOT EXISTS basejump;
 
+-- ─── Schema Permissions ─────────────────────────────────────────────────────
+-- Supabase PostgREST requires USAGE on a schema before it can query tables
+-- in that schema via .schema('kortix'). Without this, queries silently return
+-- null even if table-level SELECT is granted.
+GRANT USAGE ON SCHEMA kortix TO anon;
+GRANT USAGE ON SCHEMA kortix TO authenticated;
+GRANT USAGE ON SCHEMA kortix TO service_role;
+
 -- ─── Scheduler Helper ────────────────────────────────────────────────────────
 -- Called by startScheduler() in kortix-api to register the global safety-net
 -- tick job. Runs every minute, POSTs to /v1/cron/tick via pg_net.

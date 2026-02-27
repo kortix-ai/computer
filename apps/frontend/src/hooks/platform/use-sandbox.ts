@@ -5,23 +5,23 @@
  *   1. Calls GET /platform/sandbox to check for an existing sandbox
  *   2. If one exists, registers it as a server in the server-store
  *      so the OpenCode SDK automatically connects to it
- *   3. If none exists, returns null — the user must explicitly create
- *      one via the Instance Manager dialog
- *
- * NOTE: This hook does NOT auto-create sandboxes. Creation only happens
- * when the user clicks "Cloud" or "Local Docker" in the Instance Manager,
- * which calls ensureSandbox() directly.
+ *   3. If none exists AND billing is enabled (cloud mode), auto-creates
+ *      one via POST /platform/init so the user doesn't have to manually
+ *      provision a sandbox
+ *   4. If none exists AND billing is disabled (self-hosted), returns null
+ *      — the user creates one via the Instance Manager dialog
  */
 
 import { useQuery } from '@tanstack/react-query';
 import {
   getSandbox,
+  ensureSandbox,
   getProviders,
-  getSandboxUrl,
   extractMappedPorts,
   type SandboxInfo,
   type SandboxProviderName,
 } from '@/lib/platform-client';
+import { isBillingEnabled } from '@/lib/config';
 import { useServerStore } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
 import { useAuth } from '@/components/AuthProvider';
@@ -35,21 +35,17 @@ import { useEffect } from 'react';
  * Auto-switches to the sandbox if the user hasn't manually picked a server.
  */
 function registerSandboxServer(sandbox: SandboxInfo) {
-  let url: string;
-  try {
-    url = getSandboxUrl(sandbox);
-  } catch (err) {
-    console.warn('[useSandbox] Cannot build sandbox URL, skipping registration:', err);
+  if (!sandbox.external_id) {
+    console.warn('[useSandbox] Sandbox missing external_id, skipping registration');
     return;
   }
 
   const store = useServerStore.getState();
   const previousActiveId = store.activeServerId;
 
-  // Add (or deduplicate) by sandboxId — provider-agnostic.
+  // Add (or deduplicate) by sandboxId — URL is derived at runtime by the store.
   const entry = store.addSandboxServer({
     label: sandbox.name || 'Sandbox',
-    url,
     provider: sandbox.provider,
     sandboxId: sandbox.external_id,
     mappedPorts: extractMappedPorts(sandbox),
@@ -65,17 +61,43 @@ function registerSandboxServer(sandbox: SandboxInfo) {
   }
 }
 
+// Module-level guard: ensures only one auto-create runs across all instances/re-renders.
+let _autoCreatePromise: Promise<void> | null = null;
+
 export function useSandbox() {
   const { user } = useAuth();
+
   const query = useQuery({
     queryKey: ['platform', 'sandbox'],
     queryFn: async () => {
-      // Read-only check — returns null if no sandbox exists.
-      // Does NOT create one. Creation is explicit via the Instance Manager.
+      // In cloud mode, auto-create if no sandbox exists (idempotent via backend).
+      // Uses module-level promise dedup so concurrent hook instances share one call.
+      if (isBillingEnabled()) {
+        const existing = await getSandbox();
+        if (existing) return existing;
+
+        // No sandbox — auto-create via ensureSandbox (POST /platform/init, idempotent)
+        if (!_autoCreatePromise) {
+          _autoCreatePromise = ensureSandbox()
+            .then(({ sandbox }) => {
+              console.log('[useSandbox] Sandbox auto-created:', sandbox.external_id);
+            })
+            .catch((err) => {
+              console.error('[useSandbox] Auto-create failed:', err);
+            })
+            .finally(() => {
+              _autoCreatePromise = null;
+            });
+        }
+        await _autoCreatePromise;
+        // Re-fetch after creation
+        return await getSandbox();
+      }
+
       return await getSandbox();
     },
     enabled: !!user,
-    staleTime: 0, // Never cache — sandboxes are created/deleted frequently.
+    staleTime: 0,
     retry: 2,
     refetchOnWindowFocus: false,
   });

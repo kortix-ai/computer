@@ -1,25 +1,29 @@
 import { Hono } from 'hono'
+import { describeRoute, resolver } from 'hono-openapi'
 import { mkdir, rm } from 'fs/promises'
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { SecretStore } from '../services/secret-store'
 import { syncSecretToAuth } from '../services/auth-sync'
+import {
+  ErrorResponse,
+  UnauthorizedResponse,
+  SecretsListResponse,
+  SetBulkEnvBody,
+  SetBulkEnvResponse,
+  SetSingleEnvBody,
+  SetSingleEnvResponse,
+  DeleteEnvResponse,
+  RotateTokenBody,
+  RotateTokenResponse,
+} from '../schemas/common'
 
 const envRouter = new Hono()
 const secretStore = new SecretStore()
 
 const S6_ENV_DIR = process.env.S6_ENV_DIR || '/run/s6/container_environment'
-const INTERNAL_SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY || ''
 
-// ─── Auth middleware (VPS mode only) ─────────────────────────────────────────
-envRouter.use('*', async (c, next) => {
-  if (!INTERNAL_SERVICE_KEY) return next()
-  const auth = c.req.header('Authorization')
-  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
-  if (token !== INTERNAL_SERVICE_KEY) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  return next()
-})
+// NOTE: Per-route auth middleware removed — global auth in index.ts now
+// always enforces INTERNAL_SERVICE_KEY on all routes (auto-generated if not set).
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -110,139 +114,230 @@ async function restartServices(): Promise<void> {
 // there is no way to invalidate another process's cache without a restart.
 
 // GET /env — list all secrets (full values).
-envRouter.get('/', async (c) => {
-  try {
-    const envVars = await secretStore.getAll()
-    return c.json({ secrets: envVars })
-  } catch (error) {
-    console.error('[ENV API] Error listing:', error)
-    return c.json({ error: 'Failed to list environment variables' }, 500)
-  }
-})
+envRouter.get('/',
+  describeRoute({
+    tags: ['Secrets'],
+    summary: 'List all secrets',
+    description: 'Returns all stored environment variables / secrets with their full values.',
+    responses: {
+      200: { description: 'Secret list', content: { 'application/json': { schema: resolver(SecretsListResponse) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
+      500: { description: 'Server error', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    try {
+      const envVars = await secretStore.getAll()
+      return c.json({ secrets: envVars })
+    } catch (error) {
+      console.error('[ENV API] Error listing:', error)
+      return c.json({ error: 'Failed to list environment variables' }, 500)
+    }
+  },
+)
 
 // POST /env — set multiple keys at once. { keys: { K: V, ... }, restart?: bool }
 // Default: NO restart. Tools pick up new values via s6 env dir.
-envRouter.post('/', async (c) => {
-  try {
-    const body = await c.req.json()
-    const keys = body?.keys
-    const restart = (body?.restart === true) || c.req.query('restart') === '1'
-    if (!keys || typeof keys !== 'object') {
-      return c.json({ error: 'Request body must contain a "keys" object' }, 400)
+envRouter.post('/',
+  describeRoute({
+    tags: ['Secrets'],
+    summary: 'Set multiple secrets',
+    description: 'Bulk-set environment variables. By default does NOT restart services — tools pick up values via s6 env dir. Pass `restart: true` or `?restart=1` to restart OpenCode.',
+    responses: {
+      200: { description: 'Keys updated', content: { 'application/json': { schema: resolver(SetBulkEnvResponse) } } },
+      400: { description: 'Invalid body', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
+      500: { description: 'Server error', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    try {
+      const body = await c.req.json()
+      const keys = body?.keys
+      const restart = (body?.restart === true) || c.req.query('restart') === '1'
+      if (!keys || typeof keys !== 'object') {
+        return c.json({ error: 'Request body must contain a "keys" object' }, 400)
+      }
+      let updated = 0
+      for (const [key, value] of Object.entries(keys as Record<string, unknown>)) {
+        if (typeof value !== 'string') continue
+        await secretStore.setEnv(key, value)
+        await writeS6Env(key, value)
+        await syncSecretToAuth(key, value)  // sync provider keys → auth.json
+        updated++
+      }
+      if (restart) await restartServices()
+      return c.json({ ok: true, updated, restarted: restart })
+    } catch (error) {
+      console.error('[ENV API] Error setting bulk:', error)
+      return c.json({ error: 'Failed to set environment variables' }, 500)
     }
-    let updated = 0
-    for (const [key, value] of Object.entries(keys as Record<string, unknown>)) {
-      if (typeof value !== 'string') continue
-      await secretStore.setEnv(key, value)
-      await writeS6Env(key, value)
-      await syncSecretToAuth(key, value)  // sync provider keys → auth.json
-      updated++
-    }
-    if (restart) await restartServices()
-    return c.json({ ok: true, updated, restarted: restart })
-  } catch (error) {
-    console.error('[ENV API] Error setting bulk:', error)
-    return c.json({ error: 'Failed to set environment variables' }, 500)
-  }
-})
+  },
+)
 
 // GET /env/:key — get a single key (raw value).
-envRouter.get('/:key', async (c) => {
-  try {
-    const key = c.req.param('key')
-    const value = await secretStore.get(key)
-    // Return 200 with null value when key doesn't exist — avoids 404 retry loops
-    // in the frontend (e.g. ONBOARDING_COMPLETE before first onboarding).
-    return c.json({ [key]: value })
-  } catch (error) {
-    console.error('[ENV API] Error getting key:', error)
-    return c.json({ error: 'Failed to get environment variable' }, 500)
-  }
-})
+envRouter.get('/:key',
+  describeRoute({
+    tags: ['Secrets'],
+    summary: 'Get a single secret',
+    description: 'Returns the value of a single secret by key. Returns 200 with null value when key does not exist.',
+    responses: {
+      200: { description: 'Secret value (key→value object)', content: { 'application/json': { schema: resolver(z.record(z.string(), z.string().nullable())) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
+      500: { description: 'Server error', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    try {
+      const key = c.req.param('key')
+      const value = await secretStore.get(key)
+      // Return 200 with null value when key doesn't exist — avoids 404 retry loops
+      // in the frontend (e.g. ONBOARDING_COMPLETE before first onboarding).
+      return c.json({ [key]: value })
+    } catch (error) {
+      console.error('[ENV API] Error getting key:', error)
+      return c.json({ error: 'Failed to get environment variable' }, 500)
+    }
+  },
+)
 
 // POST /env/rotate-token — atomically rotate KORTIX_TOKEN and re-encrypt all secrets.
 // Called by the platform API after regenerating a sandbox key.
-envRouter.post('/rotate-token', async (c) => {
-  try {
-    const body = await c.req.json()
-    const newToken = body?.token
-    if (!newToken || typeof newToken !== 'string') {
-      return c.json({ error: 'Request body must contain a "token" string' }, 400)
+envRouter.post('/rotate-token',
+  describeRoute({
+    tags: ['Secrets'],
+    summary: 'Rotate encryption token',
+    description: 'Atomically rotates the KORTIX_TOKEN and re-encrypts all secrets with the new key. Always restarts services.',
+    responses: {
+      200: { description: 'Token rotated', content: { 'application/json': { schema: resolver(RotateTokenResponse) } } },
+      400: { description: 'Invalid body', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
+      500: { description: 'Server error', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    try {
+      const body = await c.req.json()
+      const newToken = body?.token
+      if (!newToken || typeof newToken !== 'string') {
+        return c.json({ error: 'Request body must contain a "token" string' }, 400)
+      }
+
+      // Atomic rotation: decrypt all with old key → switch → re-encrypt with new key
+      const result = await secretStore.rotateToken(newToken)
+
+      // Write new token to s6 env dir so restarted services pick it up
+      await writeS6Env('KORTIX_TOKEN', newToken)
+
+      // Restart OpenCode to pick up the new token
+      await restartServices()
+
+      console.log(`[ENV API] Token rotated, re-encrypted ${result.rotated} secrets`)
+      return c.json({ ok: true, ...result })
+    } catch (error) {
+      console.error('[ENV API] Token rotation error:', error)
+      return c.json({ error: 'Failed to rotate token' }, 500)
     }
-
-    // Atomic rotation: decrypt all with old key → switch → re-encrypt with new key
-    const result = await secretStore.rotateToken(newToken)
-
-    // Write new token to s6 env dir so restarted services pick it up
-    await writeS6Env('KORTIX_TOKEN', newToken)
-
-    // Restart OpenCode to pick up the new token
-    await restartServices()
-
-    console.log(`[ENV API] Token rotated, re-encrypted ${result.rotated} secrets`)
-    return c.json({ ok: true, ...result })
-  } catch (error) {
-    console.error('[ENV API] Token rotation error:', error)
-    return c.json({ error: 'Failed to rotate token' }, 500)
-  }
-})
+  },
+)
 
 // POST /env/:key — set a single key. { value: "..." }
 // Default: NO restart. Tools pick up new values via s6 env dir.
-envRouter.post('/:key', async (c) => {
-  try {
-    const key = c.req.param('key')
-    const body = await c.req.json()
-    const restart = (body?.restart === true) || c.req.query('restart') === '1'
-    if (!body || typeof body.value !== 'string') {
-      return c.json({ error: 'Request body must contain a "value" field' }, 400)
+envRouter.post('/:key',
+  describeRoute({
+    tags: ['Secrets'],
+    summary: 'Set a single secret',
+    description: 'Sets a single environment variable. By default does NOT restart services. Pass `restart: true` or `?restart=1` to restart OpenCode.',
+    responses: {
+      200: { description: 'Key set', content: { 'application/json': { schema: resolver(SetSingleEnvResponse) } } },
+      400: { description: 'Invalid body', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
+      500: { description: 'Server error', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    try {
+      const key = c.req.param('key')
+      const body = await c.req.json()
+      const restart = (body?.restart === true) || c.req.query('restart') === '1'
+      if (!body || typeof body.value !== 'string') {
+        return c.json({ error: 'Request body must contain a "value" field' }, 400)
+      }
+      await secretStore.setEnv(key, body.value)
+      await writeS6Env(key, body.value)
+      await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
+      if (restart) await restartServices()
+      return c.json({ ok: true, key, restarted: restart })
+    } catch (error) {
+      console.error('[ENV API] Error setting key:', error)
+      return c.json({ error: 'Failed to set environment variable' }, 500)
     }
-    await secretStore.setEnv(key, body.value)
-    await writeS6Env(key, body.value)
-    await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
-    if (restart) await restartServices()
-    return c.json({ ok: true, key, restarted: restart })
-  } catch (error) {
-    console.error('[ENV API] Error setting key:', error)
-    return c.json({ error: 'Failed to set environment variable' }, 500)
-  }
-})
+  },
+)
 
 // PUT /env/:key — alias for POST (frontend uses PUT for set).
 // Default: NO restart. Tools pick up new values via s6 env dir.
-envRouter.put('/:key', async (c) => {
-  try {
-    const key = c.req.param('key')
-    const body = await c.req.json()
-    const restart = (body?.restart === true) || c.req.query('restart') === '1'
-    if (!body || typeof body.value !== 'string') {
-      return c.json({ error: 'Request body must contain a "value" field' }, 400)
+envRouter.put('/:key',
+  describeRoute({
+    tags: ['Secrets'],
+    summary: 'Set a single secret (PUT)',
+    description: 'Alias for POST /env/:key. Sets a single environment variable.',
+    responses: {
+      200: { description: 'Key set', content: { 'application/json': { schema: resolver(SetSingleEnvResponse) } } },
+      400: { description: 'Invalid body', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
+      500: { description: 'Server error', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    try {
+      const key = c.req.param('key')
+      const body = await c.req.json()
+      const restart = (body?.restart === true) || c.req.query('restart') === '1'
+      if (!body || typeof body.value !== 'string') {
+        return c.json({ error: 'Request body must contain a "value" field' }, 400)
+      }
+      await secretStore.setEnv(key, body.value)
+      await writeS6Env(key, body.value)
+      await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
+      if (restart) await restartServices()
+      return c.json({ ok: true, key, restarted: restart })
+    } catch (error) {
+      console.error('[ENV API] Error setting key:', error)
+      return c.json({ error: 'Failed to set environment variable' }, 500)
     }
-    await secretStore.setEnv(key, body.value)
-    await writeS6Env(key, body.value)
-    await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
-    if (restart) await restartServices()
-    return c.json({ ok: true, key, restarted: restart })
-  } catch (error) {
-    console.error('[ENV API] Error setting key:', error)
-    return c.json({ error: 'Failed to set environment variable' }, 500)
-  }
-})
+  },
+)
 
 // DELETE /env/:key — remove a key. Always restarts because getEnv() caches
 // values in process.env and stale cache can't be invalidated without restart.
-envRouter.delete('/:key', async (c) => {
-  try {
-    const key = c.req.param('key')
-    await secretStore.deleteEnv(key)
-    await deleteS6Env(key)
-    await syncSecretToAuth(key, '')  // clear provider key from auth.json
-    await restartServices()
-    return c.json({ ok: true, key })
-  } catch (error) {
-    console.error('[ENV API] Error deleting key:', error)
-    return c.json({ error: 'Failed to delete environment variable' }, 500)
-  }
-})
+envRouter.delete('/:key',
+  describeRoute({
+    tags: ['Secrets'],
+    summary: 'Delete a secret',
+    description: 'Removes an environment variable and always restarts OpenCode (process.env cache invalidation requires restart).',
+    responses: {
+      200: { description: 'Key deleted', content: { 'application/json': { schema: resolver(DeleteEnvResponse) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
+      500: { description: 'Server error', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
+    },
+  }),
+  async (c) => {
+    try {
+      const key = c.req.param('key')
+      await secretStore.deleteEnv(key)
+      await deleteS6Env(key)
+      await syncSecretToAuth(key, '')  // clear provider key from auth.json
+      await restartServices()
+      return c.json({ ok: true, key })
+    } catch (error) {
+      console.error('[ENV API] Error deleting key:', error)
+      return c.json({ error: 'Failed to delete environment variable' }, 500)
+    }
+  },
+)
 
 export default envRouter
+
+// z import needed for inline resolver usage
+import { z } from 'zod'

@@ -18,6 +18,7 @@ import {
   Plus,
   Globe,
   TerminalSquare,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType, DASHBOARD_TAB_ID } from '@/stores/tab-store';
@@ -49,6 +50,7 @@ const TAB_ICONS: Record<TabType, typeof MessageCircle> = {
   page: PanelTop,
   preview: Globe,
   terminal: TerminalSquare,
+  services: Activity,
 };
 
 /** Map a pathname to a tab config. Returns null for routes that shouldn't auto-open tabs (e.g. /auth). */
@@ -111,11 +113,11 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     };
   }
 
-  // File viewer routes (/files/<path>) are NOT auto-opened here.
-  // They are opened explicitly by the sidebar explorer or the catch-all
-  // route page ([...path]/page.tsx). Auto-opening from the sync effect
-  // would re-create a file tab immediately after closing it, because
-  // pushState doesn't update usePathname() and the old URL lingers.
+  // File viewer routes (/files/<path>) and terminal routes (/terminal/<ptyId>)
+  // are NOT auto-opened here. They are opened explicitly by the sidebar or
+  // their respective catch-all route pages. Auto-opening from the sync effect
+  // would re-create a tab immediately after closing it, because pushState
+  // doesn't update usePathname() and the old URL lingers.
 
   return null;
 }
@@ -702,6 +704,8 @@ export function TabBar() {
         closedHref = id.slice(5);
       } else if (id.startsWith('file:')) {
         closedHref = `/files/${encodeURIComponent(id.slice(5))}`;
+      } else if (id.startsWith('terminal:')) {
+        closedHref = `/terminal/${id.slice(9)}`;
       } else {
         closedHref = `/sessions/${id}`;
       }

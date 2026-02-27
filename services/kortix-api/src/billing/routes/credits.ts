@@ -5,7 +5,6 @@ import { getVisibleTiers } from '../services/tiers';
 import { getCreditBalance } from '../repositories/credit-accounts';
 import { getTransactionsSummary } from '../repositories/transactions';
 import type { TokenUsageRequest } from '../../types';
-import { config } from '../../config';
 
 export const creditsRouter = new Hono<AppEnv>();
 
@@ -16,11 +15,6 @@ creditsRouter.post('/deduct', async (c) => {
   const cost = calculateTokenCost(body.prompt_tokens, body.completion_tokens, body.model);
   if (cost <= 0) {
     return c.json({ success: true, cost: 0, new_balance: 0 });
-  }
-
-  // Billing disabled: skip real deduction, credits are unlimited
-  if (!config.KORTIX_BILLING_INTERNAL_ENABLED) {
-    return c.json({ success: true, cost, new_balance: 999999 });
   }
 
   const result = await deductCredits(
@@ -43,11 +37,6 @@ creditsRouter.post('/deduct-usage', async (c) => {
 
   if (!body.amount || body.amount <= 0) {
     return c.json({ success: true, cost: 0, new_balance: 0 });
-  }
-
-  // Billing disabled: skip real deduction, credits are unlimited
-  if (!config.KORTIX_BILLING_INTERNAL_ENABLED) {
-    return c.json({ success: true, cost: body.amount, new_balance: 999999 });
   }
 
   const result = await deductCredits(

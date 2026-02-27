@@ -176,9 +176,10 @@ export default function WorkspacePage() {
       }
     }
 
-    // Tools
+    // Tools (deduplicate — plugins may register overlapping tool names)
     if (toolIds) {
-      for (const id of toolIds) {
+      const uniqueToolIds = [...new Set(toolIds)];
+      for (const id of uniqueToolIds) {
         const isMcp = id.startsWith('mcp_');
         items.push({
           id: `tool:${id}`,

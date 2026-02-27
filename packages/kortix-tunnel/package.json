@@ -1,0 +1,27 @@
+{
+  "name": "@kortix/tunnel",
+  "version": "0.1.1",
+  "type": "module",
+  "description": "Kortix Tunnel — local agent CLI that bridges your machine to Kortix cloud sandboxes",
+  "bin": {
+    "kortix-tunnel": "dist/cli.js"
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "bun build src/cli.ts --outfile dist/cli.js --target node --minify && node -e \"const f=require('fs');let c=f.readFileSync('dist/cli.js','utf8');c=c.replace('#!/usr/bin/env bun','#!/usr/bin/env node').replace('// @bun\\n','');f.writeFileSync('dist/cli.js',c)\"",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": ["kortix", "tunnel", "cli", "reverse-tunnel", "sandbox"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kortix-ai/computer.git",
+    "directory": "packages/kortix-tunnel"
+  },
+  "author": "Kortix AI",
+  "license": "MIT"
+}

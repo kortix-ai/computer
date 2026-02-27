@@ -52,7 +52,6 @@ export interface LTMEntry {
 	context: string | null
 	sourceSessionId: string | null
 	sourceObservationIds: number[]
-	confidence: number
 	tags: string[]
 	files: string[]
 	createdAt: string
@@ -66,7 +65,6 @@ export interface CreateLTMInput {
 	context?: string | null
 	sourceSessionId?: string | null
 	sourceObservationIds?: number[]
-	confidence?: number
 	tags?: string[]
 	files?: string[]
 }
@@ -82,7 +80,6 @@ export interface SearchHit {
 	tags: string[]
 	files: string[]
 	createdAt: string
-	confidence?: number     // only for LTM
 	rank?: number           // FTS5 rank
 }
 
@@ -109,7 +106,6 @@ export interface SessionMeta {
 
 export interface ConsolidationResult {
 	newMemories: CreateLTMInput[]
-	reinforcedIds: number[]
 }
 
 // ─── Logging ─────────────────────────────────────────────────────────────────

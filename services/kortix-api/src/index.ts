@@ -28,6 +28,11 @@ import { serversApp } from './servers';
 import { supabaseAuth, combinedAuth } from './middleware/auth';
 import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
+import { tunnelApp, startTunnelService, stopTunnelService, getTunnelServiceStatus } from './tunnel';
+import { tunnelRelay } from './tunnel/core/relay';
+import { heartbeatManager } from './tunnel/core/heartbeat';
+import { notifyTunnelEvent } from './tunnel/routes/permission-requests';
+import { startSandboxHealthMonitor, stopSandboxHealthMonitor } from './platform/services/sandbox-health';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -88,6 +93,7 @@ app.get('/health', (c) => {
     env: config.ENV_MODE,
     scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
+    tunnel: getTunnelServiceStatus(),
   });
 });
 
@@ -100,6 +106,7 @@ app.get('/v1/health', (c) => {
     env: config.ENV_MODE,
     scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
+    tunnel: getTunnelServiceStatus(),
   });
 });
 
@@ -238,13 +245,16 @@ app.route('/v1/servers', serversApp);        // /v1/servers, /v1/servers/:id, /v
 app.use('/v1/queue/*', combinedAuth);
 app.route('/v1/queue', queueApp);            // /v1/queue/sessions/:id, /v1/queue/messages/:id, /v1/queue/all, /v1/queue/status
 
+app.use('/v1/tunnel/*', combinedAuth);
+app.route('/v1/tunnel', tunnelApp);          // /v1/tunnel/connections, /v1/tunnel/permissions, /v1/tunnel/rpc, /v1/tunnel/audit
+
 // Preview Proxy — unified route for both cloud (Daytona) and local mode.
-// Pattern: /v1/preview/{sandboxId}/{port}/* for ALL modes.
+// Pattern: /v1/p/{sandboxId}/{port}/* for ALL modes.
 // Cloud:  sandboxId = Daytona external ID → proxied via Daytona SDK
 // Local:  sandboxId = container name (e.g. 'kortix-sandbox') → Docker DNS resolution
 // Auth: unified previewProxyAuth (accepts Supabase JWT and kortix_ tokens).
 // MUST be after all explicit routes (wildcard catch-all).
-app.route('/v1/preview', daytonaProxyApp);
+app.route('/v1/p', daytonaProxyApp);
 
 // === Error Handling ===
 
@@ -375,7 +385,8 @@ console.log(`
 ║    /v1/integrations (OAuth integrations)                    ║
 ║    /v1/setup      (setup & env management)                 ║
 ║    /v1/queue      (persistent message queue)               ║
-║    /v1/preview    (sandbox proxy — local + cloud)           ║
+║    /v1/tunnel     (reverse-tunnel to local machines)         ║
+║    /v1/p         (sandbox proxy — local + cloud)            ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Database:   ${config.DATABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
 ║  Supabase:   ${config.SUPABASE_URL ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
@@ -383,6 +394,7 @@ console.log(`
 ║  Billing:    ${(config.KORTIX_BILLING_INTERNAL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Channels:   ${(config.CHANNELS_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Scheduler:  ${(config.SCHEDULER_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
+║  Tunnel:     ${(config.TUNNEL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Providers:  ${config.ALLOWED_SANDBOX_PROVIDERS.join(', ').padEnd(42)}║
 ╚═══════════════════════════════════════════════════════════╝
 `);
@@ -400,19 +412,24 @@ ensureSchema()
     startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
     startChannelService();
     startDrainer();
+    startTunnelService();
   })
   .catch(async (err) => {
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
     startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
     startChannelService();
     startDrainer();
+    startTunnelService();
   });
 
 // If local_docker is enabled and we have a DB, ensure the sandbox is registered
+// and start the health monitor for self-healing connectivity.
 if (config.isLocalDockerEnabled() && config.DATABASE_URL) {
   ensureLocalSandboxRegistered().catch((err) =>
     console.error('[startup] Failed to register local sandbox:', err),
   );
+  // Start health monitor — proactively syncs keys and detects connectivity issues
+  startSandboxHealthMonitor();
 }
 
 // Graceful shutdown
@@ -422,6 +439,8 @@ function shutdown(signal: string) {
   stopChannelService();
   stopDrainer();
   stopModelPricing();
+  stopTunnelService();
+  stopSandboxHealthMonitor();
   process.exit(0);
 }
 
@@ -430,7 +449,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 // ─── WebSocket proxy for sandbox PTY ─────────────────────────────────────────
 // The Bun server needs to handle WebSocket upgrades at the top level.
-// We intercept WS upgrade requests for /v1/preview/{sandboxId}/* and proxy them
+// We intercept WS upgrade requests for /v1/p/{sandboxId}/* and proxy them
 // to the sandbox's Kortix Master (which further proxies to OpenCode).
 
 const WS_CONNECT_TIMEOUT_MS = 10_000;
@@ -455,7 +474,7 @@ function clearWsTimers(data: WsProxyData) {
 function resetIdleTimer(ws: { data: WsProxyData; close: (code?: number, reason?: string) => void }) {
   if (ws.data.idleTimer) clearTimeout(ws.data.idleTimer);
   ws.data.idleTimer = setTimeout(() => {
-    console.warn(`[preview-proxy] WS idle timeout`);
+    console.warn(`[sandbox-proxy] WS idle timeout`);
     try { ws.close(1000, 'idle timeout'); } catch {}
   }, WS_IDLE_TIMEOUT_MS);
 }
@@ -498,8 +517,8 @@ async function validatePreviewToken(token: string): Promise<boolean> {
 }
 
 // ── Local-mode session tracking ─────────────────────────────────────────────
-// Once a subdomain is authenticated via ?token= on the first request, all
-// subsequent requests to that subdomain pass through without auth.
+// Once a subdomain is authenticated via Bearer header on the first request,
+// all subsequent requests to that subdomain pass through without auth.
 // This avoids third-party cookie issues in iframes (Chrome blocks them).
 // Like ngrok free tier — auth on first load, then open access.
 // Map key: "p{port}-{sandboxId}" → timestamp when authenticated.
@@ -565,15 +584,14 @@ export default {
       const { port, sandboxId } = subdomain;
 
       // ── Auth: first request validates, then the subdomain is "open" ──
-      // Like ngrok free tier — ?token= on first load proves you're legit,
+      // Bearer header or cookie on first load proves you're legit,
       // then all subsequent requests (sub-resources, WS, etc.) pass through.
       // This avoids third-party cookie issues in iframes.
       if (!isSubdomainAuthenticated(sandboxId, port)) {
-        const queryToken = url.searchParams.get('token');
         const authHeader = req.headers.get('Authorization');
         const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
         const cookieToken = extractCookieToken(req);
-        const token = queryToken || bearerToken || cookieToken;
+        const token = bearerToken || cookieToken;
 
         if (!token || !(await validatePreviewToken(token))) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -629,13 +647,8 @@ export default {
       }
 
       try {
-        // Strip ?token= from query string before forwarding to sandbox
-        const forwardParams = new URLSearchParams(url.searchParams);
-        forwardParams.delete('token');
-        const forwardSearch = forwardParams.toString() ? `?${forwardParams.toString()}` : '';
-
         return await proxyToSandbox(
-          sandboxId, port, req.method, url.pathname, forwardSearch,
+          sandboxId, port, req.method, url.pathname, url.search,
           req.headers, body, acceptsSSE, origin,
         );
       } catch (error) {
@@ -647,23 +660,126 @@ export default {
       }
     }
 
+    // ── Tunnel Agent WebSocket ──────────────────────────────────────────
+    // Matches: ws://host/v1/tunnel/ws?token=kortix_...&tunnelId=...
+    // Local agent (programmatic WS client) connects here to receive RPC requests.
+    // NOTE: Query params are intentional here — the tunnel agent binary can't
+    // set cookies, and WS upgrade doesn't support custom headers in all runtimes.
+    if (isWsUpgrade && url.pathname === '/v1/tunnel/ws') {
+      const queryToken = url.searchParams.get('token');
+      const tunnelId = url.searchParams.get('tunnelId');
+
+      if (!queryToken || !tunnelId) {
+        return new Response(JSON.stringify({ error: 'Missing token or tunnelId' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Rate limit WS connections (keyed by tunnelId to prevent connection spam)
+      const { tunnelRateLimiter } = await import('./tunnel/core/rate-limiter');
+      const wsRateCheck = tunnelRateLimiter.check('wsConnect', tunnelId);
+      if (!wsRateCheck.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Too many connection attempts',
+          retryAfterMs: wsRateCheck.retryAfterMs,
+        }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate token — supports kortix_ API keys, kortix_tnl_ tunnel tokens, and Supabase JWTs
+      const { isTunnelToken, hashSecretKey: hashKey, verifySecretKey: verifyKey } = await import('./shared/crypto');
+      const { eq: eqOp, and: andOp } = await import('drizzle-orm');
+      const { tunnelConnections } = await import('@kortix/db');
+      const { db: tunnelDb } = await import('./shared/db');
+
+      let accountId: string | null = null;
+      let tunnel: any = null;
+
+      if (isTunnelToken(queryToken)) {
+        // Tunnel setup token — validate against stored hash on the tunnel row
+        const tokenHash = hashKey(queryToken);
+        const [row] = await tunnelDb
+          .select()
+          .from(tunnelConnections)
+          .where(andOp(
+            eqOp(tunnelConnections.tunnelId, tunnelId),
+            eqOp(tunnelConnections.setupTokenHash, tokenHash),
+          ));
+        if (row) {
+          accountId = row.accountId;
+          tunnel = row;
+        }
+      } else if (isKortixToken(queryToken)) {
+        const result = await validateSecretKey(queryToken);
+        if (result.isValid) accountId = result.accountId!;
+      } else {
+        try {
+          const supabase = getSupabase();
+          const { data: { user }, error } = await supabase.auth.getUser(queryToken);
+          if (!error && user) accountId = user.id;
+        } catch {}
+      }
+
+      if (!accountId) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verify tunnel ownership (skip if already loaded via tunnel token path)
+      if (!tunnel) {
+        const [row] = await tunnelDb
+          .select()
+          .from(tunnelConnections)
+          .where(andOp(
+            eqOp(tunnelConnections.tunnelId, tunnelId),
+            eqOp(tunnelConnections.accountId, accountId),
+          ));
+        tunnel = row;
+      }
+
+      if (!tunnel) {
+        return new Response(JSON.stringify({ error: 'Tunnel not found or unauthorized' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Derive signing key from the raw token (available transiently during handshake)
+      const { deriveSigningKey } = await import('./shared/crypto');
+      const tunnelSigningKey = deriveSigningKey(queryToken);
+
+      const success = server.upgrade(req, {
+        data: {
+          type: 'tunnel-agent',
+          tunnelId,
+          accountId,
+          capabilities: tunnel.capabilities || [],
+          signingKey: tunnelSigningKey,
+        },
+      });
+      if (success) return undefined;
+    }
+
     // ── Path-based WebSocket proxy (local mode) ──────────────────────────
-    // Matches: ws://localhost:8008/v1/preview/{sandboxId}/{port}/*
+    // Matches: ws://localhost:8008/v1/p/{sandboxId}/{port}/*
     // Used for OpenCode PTY terminals, SSE-over-WS, etc.
     // Must be handled HERE (at Bun server level) because Hono can't do WS upgrades.
     if (isWsUpgrade && !config.isDaytonaEnabled()) {
-      const wsPathMatch = url.pathname.match(/^\/v1\/preview\/([^/]+)\/(\d+)(\/.*)?$/);
+      const wsPathMatch = url.pathname.match(/^\/v1\/p\/([^/]+)\/(\d+)(\/.*)?$/);
       if (wsPathMatch) {
         const wsSandboxId = wsPathMatch[1];
         const wsPort = parseInt(wsPathMatch[2], 10);
         const wsRemainingPath = wsPathMatch[3] || '/';
 
-        // Auth: header → query param → cookie (same as subdomain handler)
         const wsAuthHeader = req.headers.get('Authorization');
         const wsBearerToken = wsAuthHeader?.startsWith('Bearer ') ? wsAuthHeader.slice(7) : null;
-        const wsQueryToken = url.searchParams.get('token');
         const wsCookieToken = extractCookieToken(req);
-        const wsToken = wsBearerToken || wsQueryToken || wsCookieToken;
+        const wsToken = wsBearerToken || wsCookieToken;
 
         if (wsToken && (await validatePreviewToken(wsToken))) {
           const targetUrl = buildWsTargetUrl(wsSandboxId, wsPort, wsRemainingPath, url.searchParams);
@@ -683,12 +799,59 @@ export default {
       }
     }
 
-    // ── HTTP / SSE — delegate to Hono ──────────────────────────────────
     return app.fetch(req, server);
   },
 
   websocket: {
-    open(ws: { data: WsProxyData; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
+    open(ws: { data: any; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId, accountId, signingKey } = ws.data;
+        tunnelRelay.registerAgent(tunnelId, ws as any, signingKey, accountId);
+        heartbeatManager.register(tunnelId);
+
+        notifyTunnelEvent(accountId, 'tunnel_connected', { tunnelId });
+
+        import('drizzle-orm').then(({ eq, and: andOp }) =>
+          import('@kortix/db').then(({ tunnelConnections, tunnelPermissions }) =>
+            import('./shared/db').then(async ({ db }) => {
+              db.update(tunnelConnections)
+                .set({ status: 'online', lastHeartbeatAt: new Date(), updatedAt: new Date() })
+                .where(eq(tunnelConnections.tunnelId, tunnelId))
+                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err));
+
+              try {
+                const activePerms = await db
+                  .select({
+                    permissionId: tunnelPermissions.permissionId,
+                    capability: tunnelPermissions.capability,
+                    scope: tunnelPermissions.scope,
+                    expiresAt: tunnelPermissions.expiresAt,
+                  })
+                  .from(tunnelPermissions)
+                  .where(
+                    andOp(
+                      eq(tunnelPermissions.tunnelId, tunnelId),
+                      eq(tunnelPermissions.status, 'active'),
+                    ),
+                  );
+
+                tunnelRelay.sendNotification(tunnelId, 'tunnel.permissions.sync', {
+                  permissions: activePerms.map((p) => ({
+                    permissionId: p.permissionId,
+                    capability: p.capability,
+                    scope: p.scope,
+                    expiresAt: p.expiresAt?.toISOString() ?? undefined,
+                  })),
+                });
+              } catch (err) {
+                console.warn(`[tunnel-ws] Permission sync failed:`, err);
+              }
+            })
+          )
+        );
+        return;
+      }
+
       activeWsConnections++;
       resetIdleTimer(ws);
 
@@ -737,7 +900,40 @@ export default {
       }
     },
 
-    message(ws: { data: WsProxyData; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
+    message(ws: { data: any; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId } = ws.data;
+
+        const msgSize = typeof message === 'string' ? message.length : (message as Buffer).byteLength;
+        if (msgSize > config.TUNNEL_MAX_WS_MESSAGE_SIZE) {
+          console.warn(`[tunnel-ws] Oversized message from ${tunnelId}: ${msgSize} bytes (limit: ${config.TUNNEL_MAX_WS_MESSAGE_SIZE})`);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(typeof message === 'string' ? message : message.toString('utf-8'));
+          if (parsed.method === 'tunnel.pong') {
+            heartbeatManager.recordPong(tunnelId);
+            const mi = parsed.params?.machineInfo;
+            if (mi && typeof mi === 'object' && mi.hostname) {
+              import('drizzle-orm').then(({ eq }) =>
+                import('@kortix/db').then(({ tunnelConnections }) =>
+                  import('./shared/db').then(({ db }) =>
+                    db.update(tunnelConnections)
+                      .set({ machineInfo: mi, updatedAt: new Date() })
+                      .where(eq(tunnelConnections.tunnelId, tunnelId))
+                      .catch(() => {})
+                  )
+                )
+              );
+            }
+            return;
+          }
+        } catch {}
+
+        tunnelRelay.handleAgentMessage(tunnelId, message);
+        return;
+      }
+
       resetIdleTimer(ws);
       const upstream = ws.data.upstream;
       if (upstream && upstream.readyState === WebSocket.OPEN) {
@@ -754,7 +950,29 @@ export default {
       }
     },
 
-    close(ws: { data: WsProxyData }) {
+    close(ws: { data: any }) {
+      if (ws.data?.type === 'tunnel-agent') {
+        const { tunnelId, accountId } = ws.data;
+        tunnelRelay.unregisterAgent(tunnelId);
+        heartbeatManager.unregister(tunnelId);
+
+        if (accountId) {
+          notifyTunnelEvent(accountId, 'tunnel_disconnected', { tunnelId });
+        }
+
+        import('drizzle-orm').then(({ eq }) =>
+          import('@kortix/db').then(({ tunnelConnections }) =>
+            import('./shared/db').then(({ db }) =>
+              db.update(tunnelConnections)
+                .set({ status: 'offline', updatedAt: new Date() })
+                .where(eq(tunnelConnections.tunnelId, tunnelId))
+                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err))
+            )
+          )
+        );
+        return;
+      }
+
       activeWsConnections--;
       ws.data.closed = true;
       clearWsTimers(ws.data);

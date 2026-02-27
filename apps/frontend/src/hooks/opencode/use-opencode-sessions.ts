@@ -542,6 +542,13 @@ export function useExecuteOpenCodeCommand() {
       });
       unwrap(result);
     },
+    // CRITICAL: Disable retry for commands. The /command endpoint blocks until
+    // the agent finishes, which can take minutes (e.g. onboarding). If a proxy
+    // timeout or network error kills the connection, TanStack Query's default
+    // global retry would re-POST the command, causing it to execute twice on
+    // the server. Commands are non-idempotent — each POST creates a new
+    // execution. Never retry them.
+    retry: false,
   });
 }
 
@@ -782,6 +789,9 @@ export function useInitSession() {
     },
     // Suppress global error handler — caller handles errors via onError callback
     onError: () => {},
+    // Same rationale as useExecuteOpenCodeCommand — /command blocks until done,
+    // retrying on timeout would duplicate execution.
+    retry: false,
   });
 }
 

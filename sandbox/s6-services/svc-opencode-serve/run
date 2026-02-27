@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bash
 # OpenCode API Server — headless API on port 4096 (proxied by Kortix Master)
-
-sleep 3
+# Waits for svc-opencode-web (port 3111) to be ready first so that only one
+# process runs the one-time SQLite migration / schema migrations at a time.
 
 cd /workspace
 
@@ -11,7 +11,24 @@ mkdir -p /workspace/.local/share/opencode/log \
          /workspace/.lss
 chown -R abc:abc /workspace/.local/share/opencode /workspace/.lss
 
-echo "[opencode-serve] Starting OpenCode API server on port 4096"
+# Wait for OpenCode Web to finish DB init and start listening on port 3111.
+# This prevents both processes from racing on schema migrations and the
+# one-time JSON-to-SQLite migration (they share the same DB file).
+echo "[opencode-serve] Waiting for OpenCode Web (port 3111) to be ready..."
+attempts=0
+max_attempts=60
+while ! wget -q --spider http://localhost:3111/session 2>/dev/null; do
+  attempts=$((attempts + 1))
+  if [ $attempts -ge $max_attempts ]; then
+    echo "[opencode-serve] WARNING: OpenCode Web not ready after ${max_attempts}s, starting anyway"
+    break
+  fi
+  sleep 1
+done
+
+if [ $attempts -lt $max_attempts ]; then
+  echo "[opencode-serve] OpenCode Web is ready, starting API server on port 4096"
+fi
 
 exec s6-setuidgid abc \
   env HOME=/workspace \

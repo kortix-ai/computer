@@ -20,6 +20,7 @@ import { useServerStore } from "@/stores/server-store";
 import { useTabStore } from "@/stores/tab-store";
 import { AnnouncementDialog } from "../announcements/announcement-dialog";
 import { NovuInboxProvider } from "../notifications/novu-inbox-provider";
+import { FilePreviewDialog } from "../common/file-preview-dialog";
 
 /** Monitors session status transitions and fires browser notifications. Renders nothing. */
 function WebNotificationProvider() {
@@ -41,11 +42,7 @@ function SandboxConnectionProvider() {
 }
 
 // Lazy load heavy components that aren't needed for initial render
-const FloatingMobileMenuButton = lazy(() =>
-	import("@/components/sidebar/sidebar-left").then((mod) => ({
-		default: mod.FloatingMobileMenuButton,
-	})),
-);
+
 const MaintenancePage = lazy(() =>
 	import("@/components/maintenance/maintenance-page").then((mod) => ({
 		default: mod.MaintenancePage,
@@ -147,6 +144,11 @@ const PageTabContent = lazy(() =>
 		default: mod.PageTabContent,
 	})),
 );
+const RunningServicesPanel = lazy(() =>
+	import("@/components/tabs/running-services-panel").then((mod) => ({
+		default: mod.RunningServicesPanel,
+	})),
+);
 
 // Skeleton shell that renders immediately for FCP
 function DashboardSkeleton() {
@@ -190,6 +192,7 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
 	const fileTabIds = tabOrder.filter((id) => tabs[id]?.type === "file");
 	const previewTabIds = tabOrder.filter((id) => tabs[id]?.type === "preview");
 	const terminalTabIds = tabOrder.filter((id) => tabs[id]?.type === "terminal");
+	const servicesTabIds = tabOrder.filter((id) => tabs[id]?.type === "services");
 	const pageTabIds = tabOrder.filter((id) => {
 		const t = tabs[id]?.type;
 		return t === "settings" || t === "page" || t === "project" || t === "dashboard";
@@ -279,6 +282,21 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
 					</div>
 				);
 			})}
+
+			{/* Services tabs — Running Services panel */}
+			{servicesTabIds.map((id) => (
+				<div
+					key={id}
+					className={cn(
+						"absolute inset-0 flex flex-col",
+						id !== activeTabId && "hidden",
+					)}
+				>
+					<Suspense fallback={null}>
+						<RunningServicesPanel />
+					</Suspense>
+				</div>
+			))}
 
 			{/* Page/settings/dashboard tabs — pre-mounted, shown/hidden via CSS */}
 			{pageTabIds.map((id) => {
@@ -461,8 +479,7 @@ export default function DashboardLayoutContent({
 					<Suspense fallback={null}>
 						{/* Status overlay for deletion operations */}
 						<StatusOverlay />
-						{/* Floating mobile menu button */}
-						<FloatingMobileMenuButton />
+
 					</Suspense>
 				}
 			>
@@ -482,6 +499,8 @@ export default function DashboardLayoutContent({
 					<Suspense fallback={null}>
 						<AnnouncementDialog />
 					</Suspense>
+
+					<FilePreviewDialog />
 
 					<Suspense fallback={null}>
 						<CommandPalette />

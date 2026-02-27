@@ -52,7 +52,7 @@ function CheckoutContent() {
 
   useEffect(() => {
     console.log('🔍 Effect running - clientSecret:', clientSecret ? 'YES' : 'NO', 'stripeLoaded:', stripeLoaded);
-    
+
     if (!clientSecret) {
       console.error('❌ No client secret provided');
       setError('No checkout session provided. Please start the checkout process again.');
@@ -70,9 +70,8 @@ function CheckoutContent() {
     // Initialize Stripe checkout
     const initCheckout = async () => {
       try {
-        const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 
-                         "pk_test_51R5BVvG6l1KZGqIrmU0aQRSS8Bgdp2ciuw0YyGhABeK7HgH2GxHvNy8d1inB2dU33lda2uj9JR4Ij46aFVbW8oge008y1RWpDB";
-        
+        const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+
         console.log('🔄 Initializing Stripe checkout...');
         console.log('🔑 Stripe key:', stripeKey?.substring(0, 20) + '...');
         console.log('🎫 Client secret:', clientSecret.substring(0, 20) + '...');
@@ -83,7 +82,7 @@ function CheckoutContent() {
 
         const stripe = window.Stripe(stripeKey);
         console.log('✅ Stripe instance created');
-        
+
         // Initialize embedded checkout
         console.log('🚀 Calling initEmbeddedCheckout...');
         const checkout = await stripe.initEmbeddedCheckout({
@@ -94,16 +93,16 @@ function CheckoutContent() {
         // Stop loading FIRST so the container renders
         console.log('📍 Rendering checkout container...');
         setIsLoading(false);
-        
+
         // Wait for DOM to update, then mount
         setTimeout(() => {
           const container = document.getElementById('checkout-container');
           console.log('🔍 Container exists?', container ? 'YES' : 'NO');
-          
+
           if (!container) {
             throw new Error('Checkout container not found in DOM');
           }
-          
+
           console.log('📍 Mounting to #checkout-container...');
           checkout.mount('#checkout-container');
           console.log('✅ Checkout mounted successfully!');
@@ -121,8 +120,8 @@ function CheckoutContent() {
 
   return (
     <>
-      <Script 
-        src="https://js.stripe.com/v3/" 
+      <Script
+        src="https://js.stripe.com/v3/"
         onLoad={() => {
           console.log('✅ Stripe.js loaded!');
           setStripeLoaded(true);
@@ -137,7 +136,7 @@ function CheckoutContent() {
           setStripeLoaded(true);
         }}
       />
-      
+
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
         {error ? (
           <Card className="w-full max-w-md bg-white">

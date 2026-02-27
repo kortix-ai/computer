@@ -63,7 +63,6 @@ interface ServerStore {
    */
   addSandboxServer: (entry: {
     label: string;
-    url: string;
     provider: SandboxProvider;
     sandboxId: string;
     mappedPorts?: Record<string, string>;
@@ -98,7 +97,6 @@ interface ServerStore {
    * Returns the server ID of the registered entry.
    */
   registerOrUpdateSandbox: (sandbox: {
-    url: string;
     label: string;
     provider: SandboxProvider;
     sandboxId: string;
@@ -116,11 +114,19 @@ interface ServerStore {
  * The default sandbox URL routes through the backend's unified preview proxy.
  * Uses the container name ('kortix-sandbox') as the sandbox ID — the backend
  * resolves this via Docker DNS on the shared network.
- * Same URL pattern for all providers: /v1/preview/{sandboxId}/{port}/*
+ * Same URL pattern for all providers: /v1/p/{sandboxId}/{port}/*
  */
 const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '');
-const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/preview/kortix-sandbox/8000`;
+const DEFAULT_SANDBOX_URL = `${BACKEND_URL}/p/kortix-sandbox/8000`;
 const SERVERS_API = `${BACKEND_URL}/servers`;
+
+/**
+ * Derive the proxy URL for a managed sandbox entry.
+ * Always computed fresh — never persisted — so route renames can't go stale.
+ */
+function getSandboxServerUrl(sandboxId: string): string {
+  return `${BACKEND_URL}/p/${sandboxId}/8000`;
+}
 
 const DEFAULT_SERVER_ID = 'default';
 const CLOUD_SANDBOX_SERVER_ID = 'cloud-sandbox';
@@ -250,11 +256,10 @@ export const useServerStore = create<ServerStore>()(
         const existing = state.servers.find((s) => s.sandboxId === entry.sandboxId);
         if (existing) return existing;
 
-        const normalizedUrl = entry.url.replace(/\/+$/, '');
         const newServer: ServerEntry = {
           id: generateId(),
-          label: entry.label || normalizedUrl.replace(/^https?:\/\//, ''),
-          url: normalizedUrl,
+          label: entry.label || entry.sandboxId,
+          url: '',  // Sandbox URLs are derived at runtime via getSandboxServerUrl()
           provider: entry.provider,
           sandboxId: entry.sandboxId,
           mappedPorts: entry.mappedPorts,
@@ -366,7 +371,11 @@ export const useServerStore = create<ServerStore>()(
       getActiveServerUrl: () => {
         const state = get();
         const active = state.servers.find((s) => s.id === state.activeServerId);
-        return active?.url || DEFAULT_SANDBOX_URL;
+        if (!active) return DEFAULT_SANDBOX_URL;
+        // Sandbox entries: always derive URL fresh (never stale)
+        if (active.sandboxId) return getSandboxServerUrl(active.sandboxId);
+        // Custom entries: use the user-provided URL
+        return active.url || DEFAULT_SANDBOX_URL;
       },
 
       clearStatuses: () => {
@@ -389,7 +398,6 @@ export const useServerStore = create<ServerStore>()(
           const defaultEntry = state.servers.find((s) => s.id === DEFAULT_SERVER_ID);
           if (defaultEntry) {
             get().updateServerSilent(DEFAULT_SERVER_ID, {
-              url: sandbox.url,
               mappedPorts: sandbox.mappedPorts,
               provider: sandbox.provider,
               sandboxId: sandbox.sandboxId,
@@ -405,7 +413,6 @@ export const useServerStore = create<ServerStore>()(
 
         if (existing) {
           get().updateServerSilent(targetId, {
-            url: sandbox.url,
             label: sandbox.label || existing.label,
             mappedPorts: sandbox.mappedPorts,
             provider: sandbox.provider,
@@ -415,7 +422,7 @@ export const useServerStore = create<ServerStore>()(
           const newEntry: ServerEntry = {
             id: targetId,
             label: sandbox.label,
-            url: sandbox.url.replace(/\/+$/, ''),
+            url: '',  // Sandbox URLs are derived at runtime via getSandboxServerUrl()
             provider: sandbox.provider,
             sandboxId: sandbox.sandboxId,
             mappedPorts: sandbox.mappedPorts,
@@ -423,7 +430,8 @@ export const useServerStore = create<ServerStore>()(
           set((state) => ({
             servers: [...state.servers, newEntry],
           }));
-          syncServerToApi(newEntry);
+          // Managed sandbox entries are NOT synced to the servers API —
+          // they come from the sandboxes table via useSandbox hook.
         }
 
         // Auto-switch to the sandbox if the user hasn't manually picked a server
@@ -436,7 +444,7 @@ export const useServerStore = create<ServerStore>()(
 
     }),
     {
-      name: 'opencode-servers-v4', // v4: dynamic sandbox ID (e.g. /preview/kortix-sandbox/{port}) replaces hardcoded /preview/local/
+      name: 'opencode-servers-v6', // v6: sandbox URLs derived at runtime, never persisted
       partialize: (state) => ({
         servers: state.servers,
         activeServerId: state.activeServerId,

@@ -180,7 +180,7 @@ describe('/v1/setup', () => {
 
     it('sandbox/.env has KORTIX_API_URL', async () => {
       const content = readFileSync(resolve(TEST_DIR, 'sandbox/.env'), 'utf-8');
-      expect(content).toContain('KORTIX_API_URL=http://kortix-api:8008/v1/router');
+      expect(content).toContain('KORTIX_API_URL=http://kortix-api:8008');
     });
 
     it('rejects invalid body', async () => {

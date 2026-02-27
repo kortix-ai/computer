@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useInitializeAccount } from '@/hooks/account';
-import { createClient } from '@/lib/supabase/client';
+import { billingApi } from '@/lib/api/billing';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,35 +35,19 @@ export default function SettingUpPage() {
     // Check if account was already initialized via webhook
     const checkSubscription = async () => {
       try {
-        const supabase = createClient();
-        
-        // Get user's account
-        const { data: accountData } = await supabase
-          .schema('basejump')
-          .from('accounts')
-          .select('id')
-          .eq('primary_owner_user_id', user.id)
-          .eq('personal_account', true)
-          .single();
+        // Check subscription via backend API (has direct DB access, no PostgREST schema issues)
+        const accountState = await billingApi.getAccountState(true);
+        const tierKey = accountState?.subscription?.tier_key || accountState?.tier?.name || '';
+        const hasSubscription = tierKey && tierKey !== 'none';
 
-        if (accountData) {
-          // Check if subscription exists
-          const { data: creditAccount } = await supabase
-            .from('credit_accounts')
-            .select('tier, stripe_subscription_id')
-            .eq('account_id', accountData.id)
-            .single();
-
-          // If subscription exists, webhook already succeeded - redirect to dashboard
-          if (creditAccount && creditAccount.tier !== 'none' && creditAccount.stripe_subscription_id) {
-            console.log('✅ Account already initialized via webhook, redirecting to dashboard');
-            isInitializing.current = false;
-            setStatus('success');
-            setTimeout(() => {
-              router.push('/dashboard');
-            }, 500);
-            return;
-          }
+        if (hasSubscription && accountState?.subscription?.subscription_id) {
+          console.log('✅ Account already initialized via webhook, redirecting to dashboard');
+          isInitializing.current = false;
+          setStatus('success');
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 500);
+          return;
         }
 
         // No subscription found - initialize manually (fallback)

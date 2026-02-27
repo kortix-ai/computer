@@ -12,7 +12,6 @@ import { useAuth } from '@/components/AuthProvider';
 import { LightRays } from '@/components/ui/light-rays';
 import {
   useCreateOpenCodeSession,
-  useExecuteOpenCodeCommand,
 } from '@/hooks/opencode/use-opencode-sessions';
 import { SessionChat } from '@/components/session/session-chat';
 import { SidebarContext } from '@/components/ui/sidebar';
@@ -51,7 +50,7 @@ const _sidebarStub = {
   toggleSidebar: _noop,
 };
 
-/** Get the sandbox instance URL (routed through backend at /v1/preview/{sandboxId}/8000) */
+/** Get the sandbox instance URL (routed through backend at /v1/p/{sandboxId}/8000) */
 function getInstanceUrl() {
   return useServerStore.getState().getActiveServerUrl();
 }
@@ -70,6 +69,29 @@ function persistOnboardingSessionId(sessionId: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: sessionId }),
   }).catch(() => {}); // best effort
+}
+
+/** Persist that the onboarding command has been fired (survives page refresh). */
+function persistCommandFired() {
+  const instanceUrl = getInstanceUrl();
+  authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMMAND_FIRED`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: 'true' }),
+  }).catch(() => {}); // best effort
+}
+
+/** Check if the onboarding command was already fired (persisted across refreshes). */
+async function wasCommandFired(): Promise<boolean> {
+  try {
+    const instanceUrl = getInstanceUrl();
+    const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMMAND_FIRED`);
+    if (res.ok) {
+      const data = await res.json();
+      return data.ONBOARDING_COMMAND_FIRED === 'true';
+    }
+  } catch { /* ignore */ }
+  return false;
 }
 
 /* ─── Sub-components ─────────────────────────────────────────── */
@@ -133,7 +155,6 @@ function LoadingDots() {
 export default function OnboardingPage() {
   const router = useRouter();
   const createSession = useCreateOpenCodeSession();
-  const executeCommand = useExecuteOpenCodeCommand();
   const creatingRef = useRef(false);
   const commandFiredRef = useRef(false);
   const retriesRef = useRef(0);
@@ -154,8 +175,6 @@ export default function OnboardingPage() {
 
   const createSessionRef = useRef(createSession);
   createSessionRef.current = createSession;
-  const executeCommandRef = useRef(executeCommand);
-  executeCommandRef.current = executeCommand;
 
   useEffect(() => setMounted(true), []);
   const isDark = !mounted || resolvedTheme !== 'light';
@@ -179,11 +198,21 @@ export default function OnboardingPage() {
     }
 
     if (params.has('redo')) {
-      // Reset onboarding flag so the full flow runs again
+      // Reset onboarding flags so the full flow runs again
       authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: 'false' }),
+      }).catch(() => {});
+      authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMMAND_FIRED`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 'false' }),
+      }).catch(() => {});
+      authenticatedFetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: '' }),
       }).catch(() => {});
       // Strip ?redo from URL so it doesn't loop on refresh
       const clean = new URL(window.location.href);
@@ -244,7 +273,14 @@ export default function OnboardingPage() {
         let finalSessionId: string | null = null;
         let needsCommand = false;
 
-        // 1. Try to resume an existing onboarding session
+        // 1. Check if the command was already fired (persisted flag survives
+        //    page refresh, unlike the in-memory commandFiredRef).
+        const alreadyFired = await wasCommandFired();
+        if (alreadyFired) {
+          commandFiredRef.current = true;
+        }
+
+        // 2. Try to resume an existing onboarding session
         const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_SESSION_ID`).catch(() => null);
         const existingId = res?.ok ? (await res.json()).ONBOARDING_SESSION_ID : null;
 
@@ -254,13 +290,14 @@ export default function OnboardingPage() {
             const result = await client.session.get({ sessionID: existingId });
             if (result.data) {
               finalSessionId = existingId;
-              // Check if the session has any messages — if empty, the
-              // /onboarding command was never sent or was lost (e.g. aborted
-              // before it started). Fire it again so the user isn't stuck on
-              // a blank chat.
-              const msgs = await client.session.messages({ sessionID: existingId });
-              if (!msgs.data || msgs.data.length === 0) {
-                needsCommand = true;
+              // Only check messages if the command was never fired. If the
+              // persisted flag says it was fired, trust that — the messages
+              // might just not have arrived yet (race condition).
+              if (!commandFiredRef.current) {
+                const msgs = await client.session.messages({ sessionID: existingId });
+                if (!msgs.data || msgs.data.length === 0) {
+                  needsCommand = true;
+                }
               }
             }
           } catch {
@@ -272,7 +309,7 @@ export default function OnboardingPage() {
           }
         }
 
-        // 2. No valid session — create + persist
+        // 3. No valid session — create + persist
         if (!finalSessionId) {
           const session = await createSessionRef.current.mutateAsync({ title: 'Kortix Onboarding' });
           persistOnboardingSessionId(session.id);
@@ -280,15 +317,28 @@ export default function OnboardingPage() {
           needsCommand = true;
         }
 
-        // 3. Fire /onboarding command if this is a new session or a resumed
-        //    session with no messages. commandFiredRef guards against
-        //    duplicate fires across re-renders / strict-mode remounts.
+        // 4. Fire /onboarding command if needed.
+        //    - commandFiredRef guards within this component lifecycle
+        //    - wasCommandFired() guards across page refreshes
+        //    - Fire-and-forget via SDK directly (NOT through TanStack Query)
+        //      to avoid mutation retry on proxy timeouts. The /command endpoint
+        //      blocks until the agent finishes, which can take minutes.
         if (needsCommand && !commandFiredRef.current) {
           commandFiredRef.current = true;
-          executeCommandRef.current.mutate({ sessionId: finalSessionId, command: 'onboarding' });
+          persistCommandFired(); // persist to sandbox env — survives refresh
+          const client = getClient();
+          void client.session.command({
+            sessionID: finalSessionId,
+            command: 'onboarding',
+            arguments: '',
+          }).catch(() => {
+            // Command POST failed or timed out — the agent may still be
+            // processing server-side. Do NOT retry; the SSE stream will
+            // deliver updates if processing is underway.
+          });
         }
 
-        // 4. Show the session chat full-page
+        // 5. Show the session chat full-page
         setOnboardingSessionId(finalSessionId);
         setPhase('session');
       } catch {

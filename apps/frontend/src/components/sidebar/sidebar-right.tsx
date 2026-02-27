@@ -1,19 +1,26 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
+  Activity,
   ChevronLeft,
   ChevronRight,
   Compass,
   FolderOpen,
   TerminalSquare,
-  Monitor,
   Globe,
   Search,
   KeyRound,
+  Key,
+  Blocks,
+  Brain,
+  Plug,
+  MessageSquare,
+  Calendar,
+  Cable,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -30,6 +37,7 @@ import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { getProxyBaseUrl } from '@/lib/utils/sandbox-url';
 import { getDirectPortUrl, SANDBOX_PORTS } from '@/lib/platform-client';
+import { SSHKeyDialog } from '@/components/sidebar/ssh-key-dialog';
 
 // ============================================================================
 // Main Right Sidebar — Quick actions (no file explorer — that's /files now)
@@ -45,6 +53,7 @@ export function SidebarRight() {
   } = useRightSidebar();
 
   const router = useRouter();
+  const pathname = usePathname();
 
   const activeServer = useServerStore((s) => {
     return s.servers.find((srv) => srv.id === s.activeServerId) ?? null;
@@ -81,7 +90,7 @@ export function SidebarRight() {
         : getProxyBaseUrl(parseInt(containerPort, 10), serverUrl, subdomainOpts);
 
       const tabId = `preview:${containerPort}`;
-      const tabHref = `/preview/${containerPort}`;
+      const tabHref = `/p/${containerPort}`;
 
       openTabAndNavigate({
         id: tabId,
@@ -110,10 +119,6 @@ export function SidebarRight() {
     );
   }, [router]);
 
-  const handleOpenDesktop = useCallback(() => {
-    openSandboxServiceTab(SANDBOX_PORTS.DESKTOP, 'Desktop');
-  }, [openSandboxServiceTab]);
-
   const handleOpenAgentBrowser = useCallback(() => {
     openSandboxServiceTab(SANDBOX_PORTS.BROWSER_VIEWER, 'Agent Browser');
   }, [openSandboxServiceTab]);
@@ -123,7 +128,7 @@ export function SidebarRight() {
       id: 'preview:browser',
       title: 'Browser',
       type: 'preview',
-      href: '/preview/browser',
+      href: '/p/browser',
       metadata: { url: '', port: 0, originalUrl: '', path: '/' },
     });
   }, []);
@@ -139,6 +144,17 @@ export function SidebarRight() {
       router,
     );
   }, [router]);
+
+  /** Open the Running Services panel as a tab. */
+  const handleOpenRunningServices = useCallback(() => {
+    openTabAndNavigate({
+      id: 'services:running',
+      title: 'Running Services',
+      type: 'services',
+      href: '/services/running',
+    });
+  }, []);
+  const [sshDialogOpen, setSSHDialogOpen] = useState(false);
 
   if (isMobile) return null;
 
@@ -178,7 +194,7 @@ export function SidebarRight() {
             <div className="relative flex h-[32px] items-center px-3 justify-between">
               {state === 'collapsed' && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <button
+                  <button
                     className="flex items-center justify-center h-7 w-7 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
                     onClick={() => setOpen(true)}
                     aria-label="Expand sidebar"
@@ -260,19 +276,118 @@ export function SidebarRight() {
                   Secrets Manager
                 </TooltipContent>
               </Tooltip>
+
+              {/* ── Navigation pages ── */}
+              <div className="w-full border-t border-sidebar-border/40 my-1.5" />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={handleOpenDesktop}
-                    className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    onClick={() => openTabAndNavigate({ id: 'page:/workspace', title: 'Workspace', type: 'page', href: '/workspace' }, router)}
+                    className={cn(
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                      (pathname === '/workspace' || pathname?.startsWith('/projects') || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    )}
                   >
-                    <Monitor className="h-4 w-4" />
+                    <Blocks className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
-                  Desktop
+                  Workspace
                 </TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => openTabAndNavigate({ id: 'page:/memory', title: 'Memory', type: 'page', href: '/memory' }, router)}
+                    className={cn(
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                      pathname === '/memory'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    )}
+                  >
+                    <Brain className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Memory
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => openTabAndNavigate({ id: 'page:/integrations', title: 'Integrations', type: 'page', href: '/integrations' }, router)}
+                    className={cn(
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                      pathname === '/integrations'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    )}
+                  >
+                    <Plug className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Integrations
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => openTabAndNavigate({ id: 'page:/channels', title: 'Channels', type: 'page', href: '/channels' }, router)}
+                    className={cn(
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                      pathname === '/channels'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    )}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Channels
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => openTabAndNavigate({ id: 'page:/scheduled-tasks', title: 'Scheduled Tasks', type: 'page', href: '/scheduled-tasks' }, router)}
+                    className={cn(
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                      pathname === '/scheduled-tasks'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    )}
+                  >
+                    <Calendar className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Scheduled Tasks
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => openTabAndNavigate({ id: 'page:/tunnel', title: 'Tunnel', type: 'page', href: '/tunnel' }, router)}
+                    className={cn(
+                      'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                      pathname === '/tunnel'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    )}
+                  >
+                    <Cable className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Tunnel
+                </TooltipContent>
+              </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -296,9 +411,39 @@ export function SidebarRight() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={12} className="text-xs">
-                  Internal Browser
+                  Browser
                 </TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleOpenRunningServices}
+                    className="flex items-center justify-center w-full py-2 rounded-xl cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                  >
+                    <Activity className="h-[16px] w-[16px]" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={12} className="text-xs">
+                  Running Services
+                </TooltipContent>
+              </Tooltip>
+
+              {/* SSH — pinned to bottom */}
+              <div className="mt-auto pb-3 w-full">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setSSHDialogOpen(true)}
+                      className="flex items-center justify-center w-full py-2 rounded-lg cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150"
+                    >
+                      <Key className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" sideOffset={12} className="text-xs">
+                    Generate SSH Key
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             {/* --- Expanded: action list --- */}
@@ -333,13 +478,82 @@ export function SidebarRight() {
                   <KeyRound className="h-4 w-4 flex-shrink-0" />
                   <span>Secrets Manager</span>
                 </button>
+
+                {/* ── Navigation pages ── */}
+                <div className="w-full border-t border-sidebar-border/40 my-1.5" />
                 <button
-                  onClick={handleOpenDesktop}
-                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                  onClick={() => openTabAndNavigate({ id: 'page:/workspace', title: 'Workspace', type: 'page', href: '/workspace' }, router)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                    (pathname === '/workspace' || pathname?.startsWith('/projects') || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                  )}
                 >
-                  <Monitor className="h-4 w-4 flex-shrink-0" />
-                  <span>Desktop</span>
+                  <Blocks className="h-4 w-4 flex-shrink-0" />
+                  <span>Workspace</span>
                 </button>
+                <button
+                  onClick={() => openTabAndNavigate({ id: 'page:/memory', title: 'Memory', type: 'page', href: '/memory' }, router)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                    pathname === '/memory'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                  )}
+                >
+                  <Brain className="h-4 w-4 flex-shrink-0" />
+                  <span>Memory</span>
+                </button>
+                <button
+                  onClick={() => openTabAndNavigate({ id: 'page:/integrations', title: 'Integrations', type: 'page', href: '/integrations' }, router)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                    pathname === '/integrations'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                  )}
+                >
+                  <Plug className="h-4 w-4 flex-shrink-0" />
+                  <span>Integrations</span>
+                </button>
+                <button
+                  onClick={() => openTabAndNavigate({ id: 'page:/channels', title: 'Channels', type: 'page', href: '/channels' }, router)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                    pathname === '/channels'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                  )}
+                >
+                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                  <span>Channels</span>
+                </button>
+                <button
+                  onClick={() => openTabAndNavigate({ id: 'page:/scheduled-tasks', title: 'Scheduled Tasks', type: 'page', href: '/scheduled-tasks' }, router)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                    pathname === '/scheduled-tasks'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                  )}
+                >
+                  <Calendar className="h-4 w-4 flex-shrink-0" />
+                  <span>Scheduled Tasks</span>
+                </button>
+                <button
+                  onClick={() => openTabAndNavigate({ id: 'page:/tunnel', title: 'Tunnel', type: 'page', href: '/tunnel' }, router)}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                    pathname === '/tunnel'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                  )}
+                >
+                  <Cable className="h-4 w-4 flex-shrink-0" />
+                  <span>Tunnel</span>
+                </button>
+
                 <button
                   onClick={handleOpenAgentBrowser}
                   className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
@@ -352,13 +566,33 @@ export function SidebarRight() {
                   className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
                 >
                   <Compass className="h-4 w-4 flex-shrink-0" />
-                  <span>Internal Browser</span>
+                  <span>Browser</span>
+                </button>
+                <button
+                  onClick={handleOpenRunningServices}
+                  className="flex items-center gap-3.5 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                >
+                  <Activity className="h-[16px] w-[16px] flex-shrink-0" />
+                  <span>Running Services</span>
                 </button>
               </nav>
+
+              {/* SSH — pinned to bottom */}
+              <div className="px-3 pb-3 mt-auto">
+                <button
+                  onClick={() => setSSHDialogOpen(true)}
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+                >
+                  <Key className="h-4 w-4 flex-shrink-0" />
+                  <span>Generate SSH Key</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <SSHKeyDialog open={sshDialogOpen} onOpenChange={setSSHDialogOpen} />
     </>
   );
 }

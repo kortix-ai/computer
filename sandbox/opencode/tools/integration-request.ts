@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
+import { getEnv } from "./lib/get-env";
 
 export default tool({
   description:
@@ -38,7 +39,10 @@ export default tool({
     try {
       const res = await fetch(`${masterUrl}/api/integrations/proxy`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+         headers: {
+          "Content-Type": "application/json",
+          ...(getEnv('INTERNAL_SERVICE_KEY') ? { Authorization: `Bearer ${getEnv('INTERNAL_SERVICE_KEY')}` } : {}),
+        },
         body: JSON.stringify({
           app: args.app,
           method,

@@ -8,13 +8,16 @@ import { useServerStore } from '@/stores/server-store';
 // Types
 // ============================================================================
 
-export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' | 'page' | 'preview' | 'terminal';
+export type TabType = 'session' | 'file' | 'dashboard' | 'settings' | 'project' | 'page' | 'preview' | 'terminal' | 'services';
 
 /** The permanent dashboard/home tab. Always pinned, always first. */
 export const DASHBOARD_TAB_ID = 'page:/dashboard';
 
 /** Maximum number of recently closed tabs to remember for CMD+Shift+T */
 const MAX_RECENTLY_CLOSED = 20;
+
+/** Maximum depth for tab focus history (VS Code-like back-navigation) */
+const MAX_FOCUS_HISTORY = 50;
 export const DASHBOARD_TAB: Omit<Tab, 'openedAt'> & { openedAt: number } = {
   id: DASHBOARD_TAB_ID,
   title: '',
@@ -23,6 +26,23 @@ export const DASHBOARD_TAB: Omit<Tab, 'openedAt'> & { openedAt: number } = {
   pinned: true,
   openedAt: 0,
 };
+
+/**
+ * Push the current active tab onto the focus history stack.
+ * Deduplicates consecutive entries and caps at MAX_FOCUS_HISTORY.
+ */
+function pushFocusHistory(history: string[], tabId: string): string[] {
+  // Don't push duplicates at the top of the stack
+  if (history[0] === tabId) return history;
+  return [tabId, ...history].slice(0, MAX_FOCUS_HISTORY);
+}
+
+/**
+ * Remove all occurrences of given tab IDs from focus history.
+ */
+function cleanFocusHistory(history: string[], removedIds: Set<string>): string[] {
+  return history.filter((id) => !removedIds.has(id));
+}
 
 /** Ensures the dashboard tab exists at position 0 in the given state. */
 function ensureDashboardTab(
@@ -75,6 +95,8 @@ interface TabState {
   activeTabId: string | null;
   /** Stack of recently closed tabs (most recent first) for Mod+Shift+T reopen */
   recentlyClosedTabs: Tab[];
+  /** Focus history stack — most recently focused tab IDs first (VS Code-like back-navigation) */
+  tabFocusHistory: string[];
 
   // --- Actions ---
 
@@ -125,9 +147,15 @@ export const useTabStore = create<TabState>()(
       tabOrder: [],
       activeTabId: null,
       recentlyClosedTabs: [],
+      tabFocusHistory: [],
 
       openTab: (tabInput) => {
-        const { tabs, tabOrder } = get();
+        const { tabs, tabOrder, activeTabId, tabFocusHistory } = get();
+
+        // Record current active tab in focus history before switching
+        const newHistory = activeTabId && activeTabId !== tabInput.id
+          ? pushFocusHistory(tabFocusHistory, activeTabId)
+          : tabFocusHistory;
 
         // If tab already exists, update its metadata (URL may have changed) and activate it.
         // Bump refreshCounter so preview tabs know to reload the iframe.
@@ -143,6 +171,7 @@ export const useTabStore = create<TabState>()(
           set({
             tabs: { ...tabs, [tabInput.id]: merged },
             activeTabId: tabInput.id,
+            tabFocusHistory: newHistory,
           });
           return;
         }
@@ -160,11 +189,12 @@ export const useTabStore = create<TabState>()(
         set({
           ...updated,
           activeTabId: newTab.id,
+          tabFocusHistory: newHistory,
         });
       },
 
       closeTab: (tabId) => {
-        const { tabs, tabOrder, activeTabId, recentlyClosedTabs } = get();
+        const { tabs, tabOrder, activeTabId, recentlyClosedTabs, tabFocusHistory } = get();
         const tab = tabs[tabId];
         // Prevent closing dashboard tab or any pinned tab
         if (!tab || tab.pinned || tabId === DASHBOARD_TAB_ID) return activeTabId;
@@ -175,6 +205,10 @@ export const useTabStore = create<TabState>()(
         const { [tabId]: _, ...remainingTabs } = tabs;
         const newOrder = tabOrder.filter((id) => id !== tabId);
 
+        // Remove the closed tab from focus history
+        const closedSet = new Set([tabId]);
+        let newFocusHistory = cleanFocusHistory(tabFocusHistory, closedSet);
+
         // Determine next active tab
         let nextActiveId: string | null = null;
         if (activeTabId === tabId) {
@@ -182,9 +216,18 @@ export const useTabStore = create<TabState>()(
           if (tab.parentSessionId && remainingTabs[tab.parentSessionId]) {
             nextActiveId = tab.parentSessionId;
           } else {
-            // Fallback: activate the nearest tab (prefer right neighbor, then left)
-            const oldIndex = tabOrder.indexOf(tabId);
-            if (newOrder.length > 0) {
+            // VS Code-like: walk the focus history to find the most recently focused tab that's still open
+            for (const historyId of newFocusHistory) {
+              if (remainingTabs[historyId]) {
+                nextActiveId = historyId;
+                // Remove it from history since it becomes the active tab now
+                newFocusHistory = newFocusHistory.filter((id) => id !== historyId);
+                break;
+              }
+            }
+            // Fallback: if no history available, activate the nearest tab (prefer right neighbor, then left)
+            if (!nextActiveId && newOrder.length > 0) {
+              const oldIndex = tabOrder.indexOf(tabId);
               nextActiveId = newOrder[Math.min(oldIndex, newOrder.length - 1)];
             }
           }
@@ -197,6 +240,7 @@ export const useTabStore = create<TabState>()(
           tabOrder: newOrder,
           activeTabId: nextActiveId,
           recentlyClosedTabs: updatedClosedTabs,
+          tabFocusHistory: newFocusHistory,
         });
 
         return nextActiveId;
@@ -229,9 +273,12 @@ export const useTabStore = create<TabState>()(
       },
 
       setActiveTab: (tabId) => {
-        if (get().tabs[tabId]) {
-          set({ activeTabId: tabId });
-        }
+        const { tabs, activeTabId, tabFocusHistory } = get();
+        if (!tabs[tabId]) return;
+        const newHistory = activeTabId && activeTabId !== tabId
+          ? pushFocusHistory(tabFocusHistory, activeTabId)
+          : tabFocusHistory;
+        set({ activeTabId: tabId, tabFocusHistory: newHistory });
       },
 
       updateTabTitle: (tabId, title) => {
@@ -276,15 +323,18 @@ export const useTabStore = create<TabState>()(
       },
 
       closeOtherTabs: (tabId) => {
-        const { tabs } = get();
+        const { tabs, tabFocusHistory } = get();
         const remainingTabs: Record<string, Tab> = {};
         const newOrder: string[] = [];
+        const removedIds = new Set<string>();
 
         // Keep the target tab, all pinned tabs, and always the dashboard
         for (const id of get().tabOrder) {
           if (id === tabId || tabs[id]?.pinned || id === DASHBOARD_TAB_ID) {
             remainingTabs[id] = tabs[id];
             newOrder.push(id);
+          } else {
+            removedIds.add(id);
           }
         }
 
@@ -292,26 +342,34 @@ export const useTabStore = create<TabState>()(
         set({
           ...ensured,
           activeTabId: tabId,
+          tabFocusHistory: cleanFocusHistory(tabFocusHistory, removedIds),
         });
       },
 
       closeTabsToRight: (tabId) => {
-        const { tabs, tabOrder, activeTabId } = get();
+        const { tabs, tabOrder, activeTabId, tabFocusHistory } = get();
         const index = tabOrder.indexOf(tabId);
         if (index === -1) return;
 
+        const remainingSet = new Set<string>();
         const newOrder = tabOrder.filter(
-          (id, i) => i <= index || tabs[id]?.pinned || id === DASHBOARD_TAB_ID
+          (id, i) => {
+            const keep = i <= index || tabs[id]?.pinned || id === DASHBOARD_TAB_ID;
+            if (keep) remainingSet.add(id);
+            return keep;
+          }
         );
         const remainingTabs: Record<string, Tab> = {};
         for (const id of newOrder) {
           remainingTabs[id] = tabs[id];
         }
 
+        const removedIds = new Set(tabOrder.filter((id) => !remainingSet.has(id)));
         const ensured = ensureDashboardTab(remainingTabs, newOrder);
         set({
           ...ensured,
           activeTabId: remainingTabs[activeTabId!] ? activeTabId : tabId,
+          tabFocusHistory: cleanFocusHistory(tabFocusHistory, removedIds),
         });
       },
 
@@ -319,11 +377,14 @@ export const useTabStore = create<TabState>()(
         const { tabs, tabOrder } = get();
         const remainingTabs: Record<string, Tab> = {};
         const newOrder: string[] = [];
+        const removedIds = new Set<string>();
 
         for (const id of tabOrder) {
           if (tabs[id]?.pinned || id === DASHBOARD_TAB_ID) {
             remainingTabs[id] = tabs[id];
             newOrder.push(id);
+          } else {
+            removedIds.add(id);
           }
         }
 
@@ -331,6 +392,7 @@ export const useTabStore = create<TabState>()(
         set({
           ...ensured,
           activeTabId: ensured.tabOrder[0] || null,
+          tabFocusHistory: [],  // All non-pinned tabs are gone, clear history
         });
       },
 
@@ -340,13 +402,13 @@ export const useTabStore = create<TabState>()(
       },
 
       swapForServer: (newServerId: string, currentServerId?: string) => {
-        const { tabs, tabOrder, activeTabId } = get();
+        const { tabs, tabOrder, activeTabId, tabFocusHistory } = get();
 
         // Save the entire current tab state for the old server
         if (currentServerId) {
           try {
             const cache = JSON.parse(localStorage.getItem('kortix-tabs-per-server') || '{}');
-            cache[currentServerId] = { tabs, tabOrder, activeTabId };
+            cache[currentServerId] = { tabs, tabOrder, activeTabId, tabFocusHistory };
             localStorage.setItem('kortix-tabs-per-server', JSON.stringify(cache));
           } catch {}
         }
@@ -360,6 +422,7 @@ export const useTabStore = create<TabState>()(
             set({
               ...ensured,
               activeTabId: saved.activeTabId || DASHBOARD_TAB_ID,
+              tabFocusHistory: saved.tabFocusHistory || [],
             });
             return;
           }
@@ -367,7 +430,7 @@ export const useTabStore = create<TabState>()(
 
         // No saved state for new server — start with just the dashboard tab
         const ensured = ensureDashboardTab({}, []);
-        set({ ...ensured, activeTabId: DASHBOARD_TAB_ID });
+        set({ ...ensured, activeTabId: DASHBOARD_TAB_ID, tabFocusHistory: [] });
       },
     }),
     {
@@ -377,6 +440,7 @@ export const useTabStore = create<TabState>()(
         tabOrder: state.tabOrder,
         activeTabId: state.activeTabId,
         recentlyClosedTabs: state.recentlyClosedTabs,
+        tabFocusHistory: state.tabFocusHistory,
       }),
       // On rehydration, ensure dashboard tab is always present
       onRehydrateStorage: () => (state) => {
@@ -386,6 +450,10 @@ export const useTabStore = create<TabState>()(
           state.tabOrder = ensured.tabOrder;
           if (!state.activeTabId) {
             state.activeTabId = DASHBOARD_TAB_ID;
+          }
+          // Initialize focus history for existing users upgrading
+          if (!state.tabFocusHistory) {
+            state.tabFocusHistory = [];
           }
         }
       },
@@ -398,7 +466,7 @@ export const useTabStore = create<TabState>()(
 // ============================================================================
 
 /** Tab types rendered via pre-mounted CSS show/hide (use pushState, not router). */
-const PRE_MOUNTED_TAB_TYPES: ReadonlySet<TabType> = new Set(['session', 'file', 'preview', 'terminal', 'settings', 'page', 'project', 'dashboard']);
+const PRE_MOUNTED_TAB_TYPES: ReadonlySet<TabType> = new Set(['session', 'file', 'preview', 'terminal', 'settings', 'page', 'project', 'dashboard', 'services']);
 
 /**
  * Open (or activate) a tab AND navigate the browser to it.
@@ -446,6 +514,7 @@ useTabStore.subscribe((state) => {
         tabs: state.tabs,
         tabOrder: state.tabOrder,
         activeTabId: state.activeTabId,
+        tabFocusHistory: state.tabFocusHistory,
       };
       localStorage.setItem('kortix-tabs-per-server', JSON.stringify(cache));
     } catch {}

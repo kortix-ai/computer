@@ -14,7 +14,7 @@
  */
 
 import { useWebNotificationStore } from '@/stores/web-notification-store';
-import { openTabAndNavigate } from '@/stores/tab-store';
+import { openTabAndNavigate, useTabStore } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { toast as sonnerToast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -143,6 +143,26 @@ export function isTabHidden(): boolean {
 }
 
 /**
+ * Check if the user is currently viewing a specific session.
+ * Checks the tab store (dashboard session tabs) and the current URL
+ * (covers the /onboarding page which doesn't use the tab system).
+ */
+function isViewingSession(sessionId: string): boolean {
+  // Dashboard: the active tab ID is the session ID for session tabs
+  const activeTabId = useTabStore.getState().activeTabId;
+  if (activeTabId === sessionId) return true;
+  // Onboarding page: the user is always viewing the onboarding session.
+  // Since the session ID isn't in the URL, we treat any notification as
+  // "current session" when the user is on /onboarding.
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname;
+    if (path.includes(sessionId)) return true;
+    if (path.startsWith('/onboarding')) return true;
+  }
+  return false;
+}
+
+/**
  * Check if the browser supports the Notification API.
  */
 export function isNotificationSupported(): boolean {
@@ -181,7 +201,14 @@ export function sendWebNotification(
     const prefKey = TYPE_TO_PREF[payload.type];
     if (!preferences[prefKey]) return null;
 
-    // 5. Visibility check — questions and permissions always show since the
+    // 5. Active session check — skip notifications for the session the user
+    //    is currently looking at (they can already see the question/permission
+    //    inline in the chat).
+    if (payload.sessionId && !isTabHidden() && isViewingSession(payload.sessionId)) {
+      return null;
+    }
+
+    // 6. Visibility check — questions and permissions always show since the
     //    agent is blocked waiting for user input
     const isBlocking = payload.type === 'question' || payload.type === 'permission';
     if (!isBlocking && preferences.onlyWhenHidden && !isTabHidden()) return null;

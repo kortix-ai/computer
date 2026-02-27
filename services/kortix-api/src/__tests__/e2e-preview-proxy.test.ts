@@ -34,12 +34,26 @@ let mockFetchCalls: Array<{ url: string; method: string; headers: Record<string,
 
 // ─── Register mocks ──────────────────────────────────────────────────────────
 
-// Auth mock — bypass supabaseAuthWithQueryParam
+// Auth mock — bypass combinedAuth
 mock.module('../middleware/auth', () => ({
-  supabaseAuthWithQueryParam: async (c: any, next: any) => {
+  combinedAuth: async (c: any, next: any) => {
     const authHeader = c.req.header('Authorization');
-    const queryToken = c.req.query('token');
-    if (!authHeader?.startsWith('Bearer ') && !queryToken) {
+    const cookieHeader = c.req.header('Cookie') || '';
+    const cookieMatch = cookieHeader.match(/(?:^|;\s*)__preview_session=([^;]+)/);
+    const hasCookie = !!cookieMatch;
+    if (!authHeader?.startsWith('Bearer ') && !hasCookie) {
+      throw new HTTPException(401, { message: 'Missing authentication token' });
+    }
+    c.set('userId', TEST_USER_ID);
+    c.set('userEmail', 'test@kortix.dev');
+    await next();
+  },
+  previewProxyAuth: async (c: any, next: any) => {
+    const authHeader = c.req.header('Authorization');
+    const cookieHeader = c.req.header('Cookie') || '';
+    const cookieMatch = cookieHeader.match(/(?:^|;\s*)__preview_session=([^;]+)/);
+    const hasCookie = !!cookieMatch;
+    if (!authHeader?.startsWith('Bearer ') && !hasCookie) {
       throw new HTTPException(401, { message: 'Missing authentication token' });
     }
     c.set('userId', TEST_USER_ID);
@@ -49,6 +63,7 @@ mock.module('../middleware/auth', () => ({
   supabaseAuth: async (c: any, next: any) => { await next(); },
   apiKeyAuth: async (c: any, next: any) => { await next(); },
   dualAuth: async (c: any, next: any) => { await next(); },
+  supabaseAuthWithQueryParam: async (c: any, next: any) => { await next(); },
 }));
 
 // DB mock — simulate sandbox + membership queries
@@ -143,7 +158,7 @@ const { daytonaProxyApp } = await import('../daytona-proxy/index');
 
 function createProxyTestApp() {
   const app = new Hono();
-  app.route('/v1/preview', daytonaProxyApp);
+  app.route('/v1/p', daytonaProxyApp);
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
@@ -192,21 +207,23 @@ afterEach(() => {
 describe('Preview proxy: auth', () => {
   test('returns 401 without auth token', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`);
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`);
     expect(res.status).toBe(401);
   });
 
   test('accepts Bearer token in Authorization header', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer valid-token' },
     });
     expect(res.status).toBe(200);
   });
 
-  test('accepts token via query parameter', async () => {
+  test('accepts auth via session cookie', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/?token=valid-token`);
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+      headers: { Cookie: '__preview_session=valid-token' },
+    });
     expect(res.status).toBe(200);
   });
 });
@@ -214,7 +231,7 @@ describe('Preview proxy: auth', () => {
 describe('Preview proxy: port validation', () => {
   test('rejects non-numeric port', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/abc/path`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/abc/path`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(400);
@@ -224,7 +241,7 @@ describe('Preview proxy: port validation', () => {
 
   test('rejects port 0', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/0/path`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/0/path`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(400);
@@ -232,7 +249,7 @@ describe('Preview proxy: port validation', () => {
 
   test('rejects port > 65535', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/65536/path`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/65536/path`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(400);
@@ -240,7 +257,7 @@ describe('Preview proxy: port validation', () => {
 
   test('accepts port 1', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/1/path`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/1/path`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(200);
@@ -248,7 +265,7 @@ describe('Preview proxy: port validation', () => {
 
   test('accepts port 65535', async () => {
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/65535/path`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/65535/path`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(200);
@@ -260,7 +277,7 @@ describe('Preview proxy: ownership', () => {
     mockDbSandbox = null;
     const app = createProxyTestApp();
     // Use unique sandbox ID to avoid cache hits from other tests
-    const res = await app.request(`/v1/preview/sandbox-not-found-001/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/sandbox-not-found-001/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(403);
@@ -272,7 +289,7 @@ describe('Preview proxy: ownership', () => {
     mockDbMembership = null;
     const app = createProxyTestApp();
     // Use unique sandbox ID to avoid cache hits
-    const res = await app.request(`/v1/preview/sandbox-no-member-002/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/sandbox-no-member-002/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(403);
@@ -281,7 +298,7 @@ describe('Preview proxy: ownership', () => {
   test('allows access when user is member', async () => {
     const app = createProxyTestApp();
     // Use unique sandbox ID
-    const res = await app.request(`/v1/preview/sandbox-member-003/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/sandbox-member-003/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(200);
@@ -292,7 +309,7 @@ describe('Preview proxy: forwarding', () => {
   test('proxies GET request and returns upstream response', async () => {
     mockFetchResponses = [{ status: 200, body: '<html>Hello</html>', headers: { 'content-type': 'text/html' } }];
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/page`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/page`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(res.status).toBe(200);
@@ -303,7 +320,7 @@ describe('Preview proxy: forwarding', () => {
   test('proxies POST request with body', async () => {
     mockFetchResponses = [{ status: 201, body: '{"id":"created"}' }];
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/api/data`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/api/data`, {
       method: 'POST',
       headers: {
         Authorization: 'Bearer test',
@@ -317,7 +334,7 @@ describe('Preview proxy: forwarding', () => {
   test('strips Host and Authorization headers from forwarded request', async () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
-    await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+    await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: {
         Authorization: 'Bearer test',
         Host: 'myapp.com',
@@ -333,7 +350,7 @@ describe('Preview proxy: forwarding', () => {
   test('injects Daytona headers', async () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
-    await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+    await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(mockFetchCalls[0].headers['x-daytona-skip-preview-warning']).toBe('true');
@@ -346,7 +363,7 @@ describe('Preview proxy: forwarding', () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
     // Use unique sandbox ID + port to avoid preview link cache hits
-    await app.request(`/v1/preview/sandbox-no-token-010/9999/`, {
+    await app.request(`/v1/p/sandbox-no-token-010/9999/`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(mockFetchCalls[0].headers['x-daytona-preview-token']).toBeUndefined();
@@ -355,7 +372,7 @@ describe('Preview proxy: forwarding', () => {
   test('strips token query param from upstream URL', async () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
-    await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/page?token=secret&other=keep`, {
+    await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/page?token=secret&other=keep`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(mockFetchCalls[0].url).toContain('other=keep');
@@ -365,7 +382,7 @@ describe('Preview proxy: forwarding', () => {
   test('preserves remaining path after sandbox/port prefix', async () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
-    await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/api/v2/data`, {
+    await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/api/v2/data`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect(mockFetchCalls[0].url).toContain('/api/v2/data');
@@ -376,7 +393,7 @@ describe('Preview proxy: CORS', () => {
   test('sets CORS headers when Origin is present', async () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test', Origin: 'https://app.kortix.com' },
     });
     expect(res.headers.get('access-control-allow-origin')).toBe('https://app.kortix.com');
@@ -386,7 +403,7 @@ describe('Preview proxy: CORS', () => {
   test('does NOT set CORS headers when no Origin', async () => {
     mockFetchResponses = [{ status: 200, body: 'OK' }];
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
     // CORS headers should not be present (or be null)
@@ -407,7 +424,7 @@ describe('Preview proxy: auto-wake ("no IP address found")', () => {
     const origSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((fn: any) => fn()) as any;
 
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
 
@@ -432,7 +449,7 @@ describe('Preview proxy: auto-wake ("failed to get runner info")', () => {
     const origSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((fn: any) => fn()) as any;
 
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
 
@@ -451,7 +468,7 @@ describe('Preview proxy: non-sandbox-down 400', () => {
       { status: 400, body: 'Bad request: invalid input' },
     ];
     const app = createProxyTestApp();
-    const res = await app.request(`/v1/preview/${TEST_SANDBOX_ID}/${TEST_PORT}/api`, {
+    const res = await app.request(`/v1/p/${TEST_SANDBOX_ID}/${TEST_PORT}/api`, {
       method: 'POST',
       headers: { Authorization: 'Bearer test', 'Content-Type': 'application/json' },
       body: JSON.stringify({ bad: 'data' }),
@@ -477,7 +494,7 @@ describe('Preview proxy: retry exhaustion', () => {
     const origSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((fn: any) => fn()) as any;
 
-    const res = await app.request(`/v1/preview/sandbox-retry-exhaust-001/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/sandbox-retry-exhaust-001/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
 
@@ -505,7 +522,7 @@ describe('Preview proxy: retry exhaustion', () => {
     const origSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((fn: any) => fn()) as any;
 
-    const res = await app.request(`/v1/preview/sandbox-retry-400-001/${TEST_PORT}/`, {
+    const res = await app.request(`/v1/p/sandbox-retry-400-001/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
 
@@ -524,7 +541,7 @@ describe('Preview proxy: retry exhaustion', () => {
     const origSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((fn: any) => fn()) as any;
 
-    await app.request(`/v1/preview/sandbox-retry-wake-001/${TEST_PORT}/`, {
+    await app.request(`/v1/p/sandbox-retry-wake-001/${TEST_PORT}/`, {
       headers: { Authorization: 'Bearer test' },
     });
 
@@ -541,7 +558,7 @@ describe('Preview proxy: no-trailing-slash', () => {
     const app = createProxyTestApp();
     // In Hono v4, the /:sandboxId/:port/* route may match even without trailing slash.
     // The request either gets proxied (200) or redirected (301) — both are valid.
-    const res = await app.request(`/v1/preview/sandbox-redirect-001/${TEST_PORT}`, {
+    const res = await app.request(`/v1/p/sandbox-redirect-001/${TEST_PORT}`, {
       headers: { Authorization: 'Bearer test' },
     });
     expect([200, 301]).toContain(res.status);

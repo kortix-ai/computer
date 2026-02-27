@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
 import { createClient } from '@/lib/supabase/client';
 import { ProviderSettings } from '@/components/providers/provider-settings';
-import { getSandboxUrl } from '@/lib/platform-client';
 import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import { resetClient } from '@/lib/opencode-sdk';
 import { invalidateTokenCache } from '@/lib/auth-token';
@@ -288,7 +287,6 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
   // ── Helpers (hooks must be before any early return) ──
 
   const registerSandbox = useCallback((sandbox: any) => {
-    const url = getSandboxUrl(sandbox);
     const store = useServerStore.getState();
     const isLocal = sandbox.provider === 'local_docker';
 
@@ -300,7 +298,6 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
 
     const registeredId = store.registerOrUpdateSandbox(
       {
-        url,
         label: sandbox.name || (isLocal ? 'Local Sandbox' : 'Cloud Sandbox'),
         provider: sandbox.provider,
         sandboxId: sandbox.external_id,

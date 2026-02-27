@@ -364,7 +364,7 @@ providersApp.put('/:id/connect', async (c) => {
     sandboxData.ENV_MODE = 'local';
     sandboxData.SANDBOX_ID = 'kortix-sandbox';
     sandboxData.PROJECT_ID = 'local';
-    sandboxData.KORTIX_API_URL = 'http://kortix-api:8008/v1/router';
+    sandboxData.KORTIX_API_URL = 'http://kortix-api:8008';
     writeEnvFile(sandboxEnvPath, sandboxData);
   }
 

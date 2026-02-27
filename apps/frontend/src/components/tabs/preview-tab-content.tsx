@@ -144,7 +144,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
       id: tabId,
       title: `localhost:${newPort}`,
       type: 'preview',
-      href: `/preview/${newPort}`,
+      href: `/p/${newPort}`,
       metadata: { url: newProxyUrl, port: newPort, originalUrl: newInternalUrl, path: newPath },
     });
 
@@ -206,7 +206,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
           id: tabId,
           title: `localhost:${parsed.port}`,
           type: 'preview',
-          href: `/preview/${parsed.port}`,
+          href: `/p/${parsed.port}`,
           metadata: { url: prevUrl, port: parsed.port, originalUrl: internalUrl, path: parsed.path },
         });
         setAddressValue(internalUrl);
@@ -232,7 +232,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
           id: tabId,
           title: `localhost:${parsed.port}`,
           type: 'preview',
-          href: `/preview/${parsed.port}`,
+          href: `/p/${parsed.port}`,
           metadata: { url: nextUrl, port: parsed.port, originalUrl: internalUrl, path: parsed.path },
         });
         setAddressValue(internalUrl);

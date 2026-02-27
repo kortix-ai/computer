@@ -13,6 +13,7 @@ import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown } from '@/components/markdown/unified-markdown';
 import { cn } from '@/lib/utils';
+import { PreWithPaths } from '@/components/common/clickable-path';
 
 function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
@@ -53,13 +54,13 @@ function formatTimeout(ms: number): string {
 /**
  * Try to pretty-print JSON or mixed JSON/text output.
  */
-function formatOutputContent(rawOutput: string): { content: string; lang: string } {
+function formatOutputContent(rawOutput: string): { content: string; lang: string; isJson: boolean } {
   const trimmed = rawOutput.trim();
-  if (!trimmed) return { content: '', lang: 'bash' };
+  if (!trimmed) return { content: '', lang: 'bash', isJson: false };
 
   try {
     const parsed = JSON.parse(trimmed);
-    return { content: JSON.stringify(parsed, null, 2), lang: 'json' };
+    return { content: JSON.stringify(parsed, null, 2), lang: 'json', isJson: true };
   } catch { /* not a single JSON blob */ }
 
   if (trimmed.includes('===') && trimmed.includes('{')) {
@@ -77,10 +78,10 @@ function formatOutputContent(rawOutput: string): { content: string; lang: string
         return st;
       }
     }).filter(Boolean).join('\n\n');
-    if (hasJson) return { content: formatted, lang: 'json' };
+    if (hasJson) return { content: formatted, lang: 'json', isJson: true };
   }
 
-  return { content: trimmed, lang: 'bash' };
+  return { content: trimmed, lang: 'bash', isJson: false };
 }
 
 // --- Session metadata rich rendering ---
@@ -273,10 +274,7 @@ function SessionMetadataList({ sessions }: { sessions: ParsedSessionMeta[] }) {
               serverId: useServerStore.getState().activeServerId,
             })
           }
-          className={cn(
-            'flex items-start gap-2.5 px-3 py-2 rounded-md text-left w-full',
-            'hover:bg-muted/60 transition-colors group cursor-pointer',
-          )}
+          className="flex items-start gap-2.5 px-3 py-2 rounded-md text-left w-full hover:bg-muted/60 transition-colors group cursor-pointer"
         >
           <MessageCircle className="size-3.5 flex-shrink-0 mt-0.5 text-muted-foreground group-hover:text-foreground transition-colors" />
           <div className="flex flex-col gap-0.5 min-w-0 flex-1">
@@ -349,13 +347,17 @@ export function OcBashToolView({
   );
 
   // Format output with proper syntax highlighting
-  const { commandBlock, outputBlock } = useMemo(() => {
+  const { commandBlock, outputContent } = useMemo(() => {
     const cmd = `\`\`\`bash\n$ ${command}\n\`\`\``;
-    if (!cleanOutput || sessionMeta || sessionMessages) return { commandBlock: cmd, outputBlock: '' };
-    const { content, lang } = formatOutputContent(cleanOutput);
-    const out = `\`\`\`${lang}\n${content}\n\`\`\``;
-    return { commandBlock: cmd, outputBlock: out };
-  }, [command, cleanOutput, sessionMeta]);
+    if (!cleanOutput || sessionMeta || sessionMessages) return { commandBlock: cmd, outputContent: null };
+    const { content, lang, isJson } = formatOutputContent(cleanOutput);
+    // For JSON output, use markdown code blocks (syntax highlighting, no path detection needed)
+    // For other output (bash, text), use PreWithPaths for clickable file paths
+    if (isJson) {
+      return { commandBlock: cmd, outputContent: { type: 'markdown' as const, text: `\`\`\`${lang}\n${content}\n\`\`\`` } };
+    }
+    return { commandBlock: cmd, outputContent: { type: 'paths' as const, text: content } };
+  }, [command, cleanOutput, sessionMeta, sessionMessages]);
 
   if (isStreaming && !toolResult) {
     return (
@@ -387,8 +389,15 @@ export function OcBashToolView({
               <SessionMetadataList sessions={sessionMeta} />
             ) : sessionMessages ? (
               <SessionMessagesList messages={sessionMessages} />
-            ) : outputBlock ? (
-              <UnifiedMarkdown content={outputBlock} isStreaming={false} />
+            ) : outputContent?.type === 'markdown' ? (
+              <UnifiedMarkdown content={outputContent.text} isStreaming={false} />
+            ) : outputContent?.type === 'paths' ? (
+              <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900">
+                <PreWithPaths
+                  text={outputContent.text}
+                  className="p-4 font-mono text-[13px] leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap break-words overflow-x-auto"
+                />
+              </div>
             ) : null}
 
             {metadata.map((meta, i) => (

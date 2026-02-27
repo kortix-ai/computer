@@ -12,7 +12,7 @@
 services:
   desktop:
     environment:
-      - KORTIX_API_URL=http://kortix-api:8008/v1/router
+      - KORTIX_API_URL=http://kortix-api:8008
     networks:
       - default
       - kortix

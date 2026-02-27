@@ -25,6 +25,7 @@ import {
   X,
   Loader2,
   FolderOpen,
+  Brain,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -101,33 +102,6 @@ import { createClient } from '@/lib/supabase/client';
 
 // ============================================================================
 // Floating Mobile Menu Button
-// ============================================================================
-
-function FloatingMobileMenuButton() {
-  const { setOpenMobile, openMobile, setOpen } = useSidebar();
-  const isMobile = useIsMobile();
-  const pathname = usePathname();
-
-  const isDashboard = pathname === '/dashboard';
-  const isThreadPage = pathname?.includes('/thread/') || pathname?.match(/^\/agents\/[^/]+\/[^/]+$/);
-  const hasInlineMenu = isDashboard || isThreadPage;
-
-  if (!isMobile || openMobile || hasInlineMenu) return null;
-
-  return (
-    <div className="fixed top-3 left-3 z-50 safe-area-top">
-      <Button
-        onClick={() => { setOpen(true); setOpenMobile(true); }}
-        size="icon"
-        className="h-9 w-9 rounded-full bg-background/80 backdrop-blur-sm text-foreground border border-border shadow-md hover:bg-background transition-all duration-200 active:scale-95 touch-manipulation"
-        aria-label="Open menu"
-      >
-        <Menu className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
 // ============================================================================
 // Collapsed Icon Button with optional hover flyout
 // ============================================================================
@@ -679,66 +653,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             label="Sessions"
             flyoutContent={<SessionsFlyout />}
           />
-          <CollapsedIconButton
-            icon={<Blocks className="h-4 w-4" />}
-            label="Workspace"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/workspace',
-                title: 'Workspace',
-                type: 'page',
-                href: '/workspace',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<FolderOpen className="h-4 w-4" />}
-            label="Files"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/files',
-                title: 'Files',
-                type: 'page',
-                href: '/files',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<Plug className="h-4 w-4" />}
-            label="Integrations"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/integrations',
-                title: 'Integrations',
-                type: 'page',
-                href: '/integrations',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<MessageSquare className="h-4 w-4" />}
-            label="Channels"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/channels',
-                title: 'Channels',
-                type: 'page',
-                href: '/channels',
-              }, router);
-            }}
-          />
-          <CollapsedIconButton
-            icon={<Calendar className="h-4 w-4" />}
-            label="Scheduled Tasks"
-            onClick={() => {
-              openTabAndNavigate({
-                id: 'page:/scheduled-tasks',
-                title: 'Scheduled Tasks',
-                type: 'page',
-                href: '/scheduled-tasks',
-              }, router);
-            }}
-          />
+
+
         </div>
 
         {/* --- Expanded layout --- */}
@@ -790,109 +706,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             {/* Sessions — expandable, default open */}
           </nav>
 
-          {/* Workspace link */}
-          <nav className="flex-shrink-0 px-3 space-y-0.5">
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/workspace',
-                  title: 'Workspace',
-                  type: 'page',
-                  href: '/workspace',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                (pathname === '/workspace' || pathname?.startsWith('/projects') || pathname?.startsWith('/agents') || pathname?.startsWith('/skills') || pathname?.startsWith('/commands') || pathname?.startsWith('/tools'))
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <Blocks className="h-4 w-4 flex-shrink-0" />
-              <span>Workspace</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/files',
-                  title: 'Files',
-                  type: 'page',
-                  href: '/files',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/files'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <FolderOpen className="h-4 w-4 flex-shrink-0" />
-              <span>Files</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/integrations',
-                  title: 'Integrations',
-                  type: 'page',
-                  href: '/integrations',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/integrations'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <Plug className="h-4 w-4 flex-shrink-0" />
-              <span>Integrations</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/channels',
-                  title: 'Channels',
-                  type: 'page',
-                  href: '/channels',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/channels'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <MessageSquare className="h-4 w-4 flex-shrink-0" />
-              <span>Channels</span>
-            </button>
-            <button
-              onClick={() => {
-                openTabAndNavigate({
-                  id: 'page:/scheduled-tasks',
-                  title: 'Scheduled Tasks',
-                  type: 'page',
-                  href: '/scheduled-tasks',
-                }, router);
-                if (isMobile) setOpenMobile(false);
-              }}
-              className={cn(
-                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                pathname === '/scheduled-tasks'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
-              )}
-            >
-              <Calendar className="h-4 w-4 flex-shrink-0" />
-              <span>Scheduled Tasks</span>
-            </button>
-          </nav>
 
           <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
             <div className="px-3 flex-shrink-0">
@@ -922,4 +735,4 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   );
 }
 
-export { FloatingMobileMenuButton };
+

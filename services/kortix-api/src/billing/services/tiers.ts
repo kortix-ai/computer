@@ -170,24 +170,20 @@ const STRIPE_PRICES_PROD: StripePriceConfig = {
 
 const STRIPE_PRICES_STAGING: StripePriceConfig = {
   subscriptions: {
-    free:          { monthly: 'price_1RIGvuG6l1KZGqIrw14abxeL' },
-    tier_2_20:     { monthly: 'price_1RIGvuG6l1KZGqIrCRu0E4Gi', yearly: 'price_1ReGogG6l1KZGqIrEyBTmtPk', yearlyCommitment: 'price_1RqYGaG6l1KZGqIrIzcdPzeQ' },
-    tier_6_50:     { monthly: 'price_1RIGvuG6l1KZGqIrvjlz5p5V', yearly: 'price_1ReGoJG6l1KZGqIr0DJWtoOc', yearlyCommitment: 'price_1RqYH1G6l1KZGqIrWDKh8xIU' },
-    tier_12_100:   { monthly: 'price_1RIGvuG6l1KZGqIrT6UfgblC', yearly: 'price_1ReGnZG6l1KZGqIr0ThLEl5S' },
-    tier_25_200:   { monthly: 'price_1RIGvuG6l1KZGqIrOVLKlOMj', yearly: 'price_1ReGmzG6l1KZGqIre31mqoEJ', yearlyCommitment: 'price_1RqYHbG6l1KZGqIrAUVf8KpG' },
-    tier_50_400:   { monthly: 'price_1RIKNgG6l1KZGqIrvsat5PW7', yearly: 'price_1ReGmgG6l1KZGqIrn5nBc7e5' },
-    tier_125_800:  { monthly: 'price_1RIKNrG6l1KZGqIrjKT0yGvI', yearly: 'price_1ReGmMG6l1KZGqIrvE2ycrAX' },
-    tier_200_1000: { monthly: 'price_1RIKQ2G6l1KZGqIrum9n8SI7', yearly: 'price_1ReGlXG6l1KZGqIrlgurP5GU' },
+    free:          { monthly: 'price_1T56XgG6CaZppiKcTG03LXxn' },
+    tier_2_20:     { monthly: 'price_1T56XhG6CaZppiKcc8F5GXgp', yearly: 'price_1T56XhG6CaZppiKc2Kp1UlY1', yearlyCommitment: 'price_1T56XiG6CaZppiKcdd4v1ebQ' },
+    tier_6_50:     { monthly: 'price_1T56XwG6CaZppiKcvrKuO2Ye', yearly: 'price_1T56XxG6CaZppiKcdVyFiWxG', yearlyCommitment: 'price_1T56XyG6CaZppiKcpqwihCTg' },
+    tier_25_200:   { monthly: 'price_1T56XyG6CaZppiKcYI5GZ01F', yearly: 'price_1T56XzG6CaZppiKc5H9VkyLO', yearlyCommitment: 'price_1T56Y0G6CaZppiKcavvswvQ8' },
   },
   credits: {
-    10:  'price_1RxXOvG6l1KZGqIrMqsiYQvk',
-    25:  'price_1RxXPNG6l1KZGqIrQprPgDme',
-    50:  'price_1RxmNhG6l1KZGqIrTq2zPtgi',
-    100: 'price_1RxmNwG6l1KZGqIrnliwPDM6',
-    250: 'price_1RxmO6G6l1KZGqIrBF8Kx87G',
-    500: 'price_1RxmOFG6l1KZGqIrn4wgORnH',
+    10:  'price_1T56YGG6CaZppiKcSwnwZSoE',
+    25:  'price_1T56YHG6CaZppiKcFhLsjEHI',
+    50:  'price_1T56YIG6CaZppiKc6fdKANgh',
+    100: 'price_1T56YIG6CaZppiKcBsRi2UH0',
+    250: 'price_1T56YKG6CaZppiKcGeILSj6N',
+    500: 'price_1T56YKG6CaZppiKcHDTLQLIM',
   },
-  productId: 'prod_SCgIj3G7yPOAWY',
+  productId: 'prod_U3CxqRenahYVvj',
 };
 
 function getStripePrices(): StripePriceConfig {

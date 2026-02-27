@@ -422,7 +422,7 @@ Main config file. In the Kortix sandbox: `/opt/opencode/opencode.jsonc`
   "provider": {                             // LLM providers
     "kortix": {
       "npm": "@ai-sdk/openai-compatible",
-      "options": { "baseURL": "{env:KORTIX_API_URL}", "apiKey": "{env:KORTIX_TOKEN}" },
+      "options": { "baseURL": "{env:KORTIX_API_URL}/v1/router", "apiKey": "{env:KORTIX_TOKEN}" },
       "models": {
         "kortix/basic": { "name": "Kortix Basic", "cost": { "input": 3, "output": 15 } },
         "kortix/power": { "name": "Kortix Power", "cost": { "input": 5, "output": 25 } }
@@ -446,7 +446,7 @@ OpenCode searches for config in these directories (merged in order):
 
 Config values support `{env:VAR_NAME}` syntax for environment variable interpolation:
 ```json
-{ "baseURL": "{env:KORTIX_API_URL}" }
+{ "baseURL": "{env:KORTIX_API_URL}/v1/router" }
 ```
 
 ### Plugins

@@ -234,7 +234,7 @@ describe('PUT /v1/providers/:id/connect', () => {
       body: JSON.stringify({ keys: { ANTHROPIC_API_KEY: 'sk-ant-check' } }),
     });
     const content = readFileSync(resolve(TEST_DIR, 'sandbox/.env'), 'utf-8');
-    expect(content).toContain('KORTIX_API_URL=http://kortix-api:8008/v1/router');
+    expect(content).toContain('KORTIX_API_URL=http://kortix-api:8008');
   });
 
   it('root .env gets ENV_MODE=local', async () => {

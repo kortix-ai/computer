@@ -65,16 +65,16 @@ export function FileExplorerPage() {
   if (!isHealthLoading && !health?.healthy) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center bg-background">
-        <ServerOff className="h-10 w-10 text-muted-foreground/30" />
+        <ServerOff className="h-12 w-12 text-muted-foreground/30" />
         <div>
-          <h3 className="text-sm font-medium text-foreground">Server not reachable</h3>
-          <p className="text-xs text-muted-foreground mt-1.5">
+          <h3 className="text-base font-medium text-foreground">Server not reachable</h3>
+          <p className="text-sm text-muted-foreground mt-1.5">
             Could not connect to{' '}
-            <code className="text-[10px] bg-muted px-1 py-0.5 rounded">{serverUrl}</code>
+            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{serverUrl}</code>
           </p>
         </div>
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => refetch()}>
-          <RefreshCw className="h-3 w-3 mr-1.5" />
+        <Button variant="outline" size="sm" className="h-8 text-sm" onClick={() => refetch()}>
+          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
           Retry
         </Button>
       </div>
@@ -129,11 +129,11 @@ function WelcomePanel() {
   const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-5 p-8 text-center select-none">
+    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center select-none">
       {/* Subtle file icon */}
-      <div className="h-12 w-12 rounded-xl bg-muted/50 flex items-center justify-center">
+      <div className="h-14 w-14 rounded-xl bg-muted/50 flex items-center justify-center">
         <svg
-          className="h-6 w-6 text-muted-foreground/30"
+          className="h-8 w-8 text-muted-foreground/30"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -147,19 +147,19 @@ function WelcomePanel() {
       </div>
 
       <div className="flex flex-col items-center gap-3">
-        <p className="text-[11px] text-muted-foreground/50">
+        <p className="text-sm text-muted-foreground/50">
           Open a file from the tree or search
         </p>
 
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-[11px] gap-1.5 text-muted-foreground hover:text-foreground"
+          className="h-8 text-sm gap-2 text-muted-foreground hover:text-foreground"
           onClick={toggleSearch}
         >
-          <Search className="h-3 w-3" />
+          <Search className="h-4 w-4" />
           <span>Open File</span>
-          <kbd className="ml-1 px-1 py-0 rounded bg-muted/80 text-[9px] font-mono text-muted-foreground/60">
+          <kbd className="ml-1 px-1.5 py-0.5 rounded bg-muted/80 text-xs font-mono text-muted-foreground/60">
             {isMac ? '\u2318' : 'Ctrl'}P
           </kbd>
         </Button>

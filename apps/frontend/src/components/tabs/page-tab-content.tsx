@@ -52,9 +52,21 @@ const IntegrationsPage = lazy(() =>
 	})),
 );
 
+const TunnelOverviewPage = lazy(() =>
+	import('@/components/tunnel/tunnel-overview').then((m) => ({
+		default: m.TunnelOverview,
+	})),
+);
+
 const FilesPage = lazy(() =>
 	import('@/features/files/components/file-explorer-page').then((m) => ({
 		default: m.FileExplorerPage,
+	})),
+);
+
+const MemoryPage = lazy(() =>
+	import('@/components/memory/memory-page').then((m) => ({
+		default: m.MemoryPage,
 	})),
 );
 
@@ -104,6 +116,8 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/channels': ChannelsPage,
 	'/integrations': IntegrationsPage,
 	'/files': FilesPage,
+	'/tunnel': TunnelOverviewPage,
+	'/memory': MemoryPage,
 	// Admin
 	'/admin/analytics': AdminAnalyticsPage,
 	'/admin/feedback': AdminFeedbackPage,

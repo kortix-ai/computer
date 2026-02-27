@@ -707,3 +707,203 @@ export const creditPurchases = kortixSchema.table('credit_purchases', {
   revenuecatTransactionId: varchar('revenuecat_transaction_id', { length: 255 }),
   revenuecatProductId: varchar('revenuecat_product_id', { length: 255 }),
 });
+
+// ─── Tunnel (Reverse-Tunnel to Local Machine) ──────────────────────────────
+
+export const tunnelStatusEnum = kortixSchema.enum('tunnel_status', [
+  'online',
+  'offline',
+  'connecting',
+]);
+
+export const tunnelCapabilityEnum = kortixSchema.enum('tunnel_capability', [
+  'filesystem',
+  'shell',
+  'network',
+  'apps',
+  'hardware',
+  'desktop',
+  'gpu',
+]);
+
+export const tunnelPermissionStatusEnum = kortixSchema.enum('tunnel_permission_status', [
+  'active',
+  'revoked',
+  'expired',
+]);
+
+export const tunnelPermissionRequestStatusEnum = kortixSchema.enum('tunnel_permission_request_status', [
+  'pending',
+  'approved',
+  'denied',
+  'expired',
+]);
+
+/** Machine info reported by the local agent on connect. */
+export interface TunnelMachineInfo {
+  hostname: string;
+  platform: string;
+  arch: string;
+  osVersion?: string;
+  nodeVersion?: string;
+  agentVersion?: string;
+  [key: string]: unknown;
+}
+
+/** Scope shape for filesystem capability. */
+export interface TunnelFilesystemScope {
+  paths: string[];
+  operations: ('read' | 'write' | 'list' | 'delete')[];
+  maxFileSize?: number;
+  excludePatterns?: string[];
+}
+
+/** Scope shape for shell capability. */
+export interface TunnelShellScope {
+  commands: string[];
+  workingDir?: string;
+  maxTimeout?: number;
+}
+
+/** Scope shape for network capability. */
+export interface TunnelNetworkScope {
+  ports: number[];
+  hosts: string[];
+  protocols: ('http' | 'tcp')[];
+}
+
+/** Union of all capability scopes. */
+export type TunnelPermissionScope =
+  | TunnelFilesystemScope
+  | TunnelShellScope
+  | TunnelNetworkScope
+  | Record<string, unknown>;
+
+export const tunnelConnections = kortixSchema.table(
+  'tunnel_connections',
+  {
+    tunnelId: uuid('tunnel_id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').notNull(),
+    sandboxId: uuid('sandbox_id').references(() => sandboxes.sandboxId, { onDelete: 'set null' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    status: tunnelStatusEnum('status').default('offline').notNull(),
+    capabilities: jsonb('capabilities').default([]).$type<string[]>(),
+    machineInfo: jsonb('machine_info').default({}).$type<TunnelMachineInfo>(),
+    setupTokenHash: varchar('setup_token_hash', { length: 128 }),
+    lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_tunnel_connections_account').on(table.accountId),
+    index('idx_tunnel_connections_sandbox').on(table.sandboxId),
+    index('idx_tunnel_connections_status').on(table.status),
+  ],
+);
+
+export const tunnelPermissions = kortixSchema.table(
+  'tunnel_permissions',
+  {
+    permissionId: uuid('permission_id').defaultRandom().primaryKey(),
+    tunnelId: uuid('tunnel_id')
+      .notNull()
+      .references(() => tunnelConnections.tunnelId, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').notNull(),
+    capability: tunnelCapabilityEnum('capability').notNull(),
+    scope: jsonb('scope').default({}).$type<TunnelPermissionScope>(),
+    status: tunnelPermissionStatusEnum('status').default('active').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_tunnel_permissions_tunnel').on(table.tunnelId),
+    index('idx_tunnel_permissions_account').on(table.accountId),
+    index('idx_tunnel_permissions_capability').on(table.capability),
+    index('idx_tunnel_permissions_status').on(table.status),
+  ],
+);
+
+export const tunnelPermissionRequests = kortixSchema.table(
+  'tunnel_permission_requests',
+  {
+    requestId: uuid('request_id').defaultRandom().primaryKey(),
+    tunnelId: uuid('tunnel_id')
+      .notNull()
+      .references(() => tunnelConnections.tunnelId, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').notNull(),
+    capability: tunnelCapabilityEnum('capability').notNull(),
+    requestedScope: jsonb('requested_scope').default({}).$type<TunnelPermissionScope>(),
+    reason: text('reason'),
+    status: tunnelPermissionRequestStatusEnum('status').default('pending').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_tunnel_perm_requests_tunnel').on(table.tunnelId),
+    index('idx_tunnel_perm_requests_account').on(table.accountId),
+    index('idx_tunnel_perm_requests_status').on(table.status),
+  ],
+);
+
+export const tunnelAuditLogs = kortixSchema.table(
+  'tunnel_audit_logs',
+  {
+    logId: uuid('log_id').defaultRandom().primaryKey(),
+    tunnelId: uuid('tunnel_id')
+      .notNull()
+      .references(() => tunnelConnections.tunnelId, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').notNull(),
+    capability: tunnelCapabilityEnum('capability').notNull(),
+    operation: varchar('operation', { length: 100 }).notNull(),
+    requestSummary: jsonb('request_summary').default({}).$type<Record<string, unknown>>(),
+    success: boolean('success').notNull(),
+    durationMs: integer('duration_ms'),
+    bytesTransferred: integer('bytes_transferred'),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_tunnel_audit_tunnel').on(table.tunnelId),
+    index('idx_tunnel_audit_account').on(table.accountId),
+    index('idx_tunnel_audit_capability').on(table.capability),
+    index('idx_tunnel_audit_created').on(table.createdAt),
+  ],
+);
+
+// ─── Tunnel Relations ────────────────────────────────────────────────────────
+
+export const tunnelConnectionsRelations = relations(tunnelConnections, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [tunnelConnections.accountId],
+    references: [accounts.accountId],
+  }),
+  sandbox: one(sandboxes, {
+    fields: [tunnelConnections.sandboxId],
+    references: [sandboxes.sandboxId],
+  }),
+  permissions: many(tunnelPermissions),
+  permissionRequests: many(tunnelPermissionRequests),
+  auditLogs: many(tunnelAuditLogs),
+}));
+
+export const tunnelPermissionsRelations = relations(tunnelPermissions, ({ one }) => ({
+  tunnel: one(tunnelConnections, {
+    fields: [tunnelPermissions.tunnelId],
+    references: [tunnelConnections.tunnelId],
+  }),
+}));
+
+export const tunnelPermissionRequestsRelations = relations(tunnelPermissionRequests, ({ one }) => ({
+  tunnel: one(tunnelConnections, {
+    fields: [tunnelPermissionRequests.tunnelId],
+    references: [tunnelConnections.tunnelId],
+  }),
+}));
+
+export const tunnelAuditLogsRelations = relations(tunnelAuditLogs, ({ one }) => ({
+  tunnel: one(tunnelConnections, {
+    fields: [tunnelAuditLogs.tunnelId],
+    references: [tunnelConnections.tunnelId],
+  }),
+}));

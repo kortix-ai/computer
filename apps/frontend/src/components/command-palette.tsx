@@ -25,6 +25,20 @@ import {
   Calendar,
   ScrollText,
   FileText,
+  FolderOpen,
+  Plug,
+  LogOut,
+  Palette,
+  Volume2,
+  Bell,
+  Keyboard,
+  Receipt,
+  Zap,
+  CreditCard,
+  Users,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 
 import {
@@ -57,6 +71,12 @@ import { openTabAndNavigate } from '@/stores/tab-store';
 import { useCreatePty } from '@/hooks/opencode/use-opencode-pty';
 import { CompactDialog } from '@/components/session/compact-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
+import { UserSettingsModal } from '@/components/settings/user-settings-modal';
+import { PlanSelectionModal } from '@/components/billing/pricing';
+import { createClient } from '@/lib/supabase/client';
+import { isBillingEnabled } from '@/lib/config';
+import { useTheme } from 'next-themes';
+import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
 
 // ============================================================================
 // Helpers
@@ -200,11 +220,16 @@ export function CommandPalette() {
   const [isCreating, setIsCreating] = useState(false);
   const [compactOpen, setCompactOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'sounds' | 'notifications' | 'shortcuts' | 'billing' | 'transactions' | 'referrals'>('general');
+  const [planModalOpen, setPlanModalOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const createSession = useCreateOpenCodeSession();
   const createPty = useCreatePty();
+  const { theme, setTheme } = useTheme();
+  const billingEnabled = isBillingEnabled();
 
   // Worktree management — disabled for now
   // const [worktreeBrowsePath, setWorktreeBrowsePath] = useState<string | null>(null);
@@ -529,6 +554,30 @@ export function CommandPalette() {
     close();
   }, [toggleSidebar, close]);
 
+  const handleOpenSettings = useCallback((tab: 'general' | 'appearance' | 'sounds' | 'notifications' | 'shortcuts' | 'billing' | 'transactions' | 'referrals') => {
+    close();
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }, [close]);
+
+  const handleOpenPlan = useCallback(() => {
+    close();
+    setPlanModalOpen(true);
+  }, [close]);
+
+  const handleLogout = useCallback(async () => {
+    close();
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    clearUserLocalStorage();
+    router.push('/auth');
+  }, [close, router]);
+
+  const handleSetTheme = useCallback((newTheme: string) => {
+    setTheme(newTheme);
+    close();
+  }, [setTheme, close]);
+
   // Detect if we're on a session page and extract session ID
   const currentSessionId = useMemo(() => {
     const match = pathname?.match(/^\/sessions\/([^/]+)/);
@@ -833,6 +882,14 @@ export function CommandPalette() {
                   <Blocks className="mr-2 h-4 w-4" />
                   <span>Workspace</span>
                 </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/files', 'Files')}>
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  <span>Files</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleNavigate('/integrations', 'Integrations')}>
+                  <Plug className="mr-2 h-4 w-4" />
+                  <span>Integrations</span>
+                </CommandItem>
                 <CommandItem onSelect={() => handleNavigate('/channels', 'Channels')}>
                   <MessageSquare className="mr-2 h-4 w-4" />
                   <span>Channels</span>
@@ -865,6 +922,74 @@ export function CommandPalette() {
 
               <CommandSeparator />
 
+              <CommandGroup heading="Preferences">
+                <CommandItem onSelect={() => handleOpenSettings('general')} value="settings preferences general profile name email language">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>General</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleOpenSettings('appearance')} value="appearance theme colors font size density">
+                  <Palette className="mr-2 h-4 w-4" />
+                  <span>Appearance</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleOpenSettings('sounds')} value="sounds audio volume notification sound effects mute">
+                  <Volume2 className="mr-2 h-4 w-4" />
+                  <span>Sounds</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleOpenSettings('notifications')} value="notifications alerts push web browser desktop">
+                  <Bell className="mr-2 h-4 w-4" />
+                  <span>Notifications</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleOpenSettings('shortcuts')} value="shortcuts keyboard hotkeys keybindings keys">
+                  <Keyboard className="mr-2 h-4 w-4" />
+                  <span>Shortcuts</span>
+                </CommandItem>
+              </CommandGroup>
+
+              <CommandSeparator />
+
+              <CommandGroup heading="Account">
+                <CommandItem onSelect={handleOpenPlan} value="plan subscription upgrade pricing tier free pro">
+                  <Zap className="mr-2 h-4 w-4" />
+                  <span>Plan</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleOpenSettings('billing')} value="billing payment credit card subscription manage">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  <span>Billing</span>
+                </CommandItem>
+                <CommandItem onSelect={() => handleOpenSettings('transactions')} value="transactions credits history purchases receipts">
+                  <Receipt className="mr-2 h-4 w-4" />
+                  <span>Transactions</span>
+                </CommandItem>
+                {billingEnabled && (
+                  <CommandItem onSelect={() => handleOpenSettings('referrals')} value="referrals invite share friends earn">
+                    <Users className="mr-2 h-4 w-4" />
+                    <span>Referrals</span>
+                  </CommandItem>
+                )}
+              </CommandGroup>
+
+              <CommandSeparator />
+
+              <CommandGroup heading="Theme">
+                <CommandItem onSelect={() => handleSetTheme('light')} value="theme light mode bright day">
+                  <Sun className="mr-2 h-4 w-4" />
+                  <span>Light Theme</span>
+                  {theme === 'light' && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
+                </CommandItem>
+                <CommandItem onSelect={() => handleSetTheme('dark')} value="theme dark mode night">
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>Dark Theme</span>
+                  {theme === 'dark' && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
+                </CommandItem>
+                <CommandItem onSelect={() => handleSetTheme('system')} value="theme system auto default os">
+                  <Monitor className="mr-2 h-4 w-4" />
+                  <span>System Theme</span>
+                  {theme === 'system' && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
+                </CommandItem>
+              </CommandGroup>
+
+              <CommandSeparator />
+
               <CommandGroup heading="View">
                 <CommandItem onSelect={() => handleToggleSidebar()}>
                   {sidebarOpen ? (
@@ -876,6 +1001,10 @@ export function CommandPalette() {
                     {sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
                   </span>
                   <CommandShortcut>⌘B</CommandShortcut>
+                </CommandItem>
+                <CommandItem onSelect={handleLogout} value="log out sign out logout signout disconnect">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log Out</span>
                 </CommandItem>
               </CommandGroup>
         </CommandList>
@@ -895,6 +1024,16 @@ export function CommandPalette() {
           />
         </>
       )}
+
+      <UserSettingsModal
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        defaultTab={settingsTab}
+      />
+      <PlanSelectionModal
+        open={planModalOpen}
+        onOpenChange={setPlanModalOpen}
+      />
     </>
   );
 }

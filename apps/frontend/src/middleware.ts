@@ -284,74 +284,67 @@ export async function middleware(request: NextRequest) {
     }
 
     // Only check billing for protected routes that require active subscription
-    // NOTE: Middleware is server-side code, so direct Supabase queries are acceptable here
-    // for performance reasons. Only client-side (browser) code should use backend API.
+    // Calls the backend API (which has direct DB access) instead of querying
+    // Supabase PostgREST — PostgREST only exposes whitelisted schemas.
     if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
-      const { data: accounts } = await supabase
-        .schema('basejump')
-        .from('accounts')
-        .select('id')
-        .eq('personal_account', true)
-        .eq('primary_owner_user_id', user.id)
-        .single();
-
-      if (!accounts) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/activate-trial';
-        return NextResponse.redirect(url);
-      }
-
-      const accountId = accounts.id;
-      const { data: creditAccount } = await supabase
-        .from('credit_accounts')
-        .select('tier, trial_status, trial_ends_at')
-        .eq('account_id', accountId)
-        .single();
-
-      const { data: trialHistory } = await supabase
-        .from('trial_history')
-        .select('id')
-        .eq('account_id', accountId)
-        .single();
-
-      const hasUsedTrial = !!trialHistory;
-
-      if (!creditAccount) {
-        if (hasUsedTrial) {
-          const url = request.nextUrl.clone();
-          url.pathname = '/subscription';
-          return NextResponse.redirect(url);
-        } else {
-          const url = request.nextUrl.clone();
-          url.pathname = '/activate-trial';
-          return NextResponse.redirect(url);
-        }
-      }
-
-      const hasPaidTier = creditAccount.tier && creditAccount.tier !== 'none' && creditAccount.tier !== 'free';
-      const hasFreeTier = creditAccount.tier === 'free';
-      const hasActiveTrial = creditAccount.trial_status === 'active';
-      const trialExpired = creditAccount.trial_status === 'expired' || creditAccount.trial_status === 'cancelled';
-      const trialConverted = creditAccount.trial_status === 'converted';
-      
-      // If user is coming from Stripe checkout with subscription=success, allow access to dashboard
-      // The webhook might not have processed yet, but we should still allow them to see the success page
+      // If user is coming from Stripe checkout with subscription=success, allow access
+      // The webhook might not have processed yet
       const subscriptionSuccess = request.nextUrl.searchParams.get('subscription') === 'success';
       if (subscriptionSuccess && pathname === '/dashboard') {
         return supabaseResponse;
       }
-      
-      if (hasPaidTier || hasFreeTier) {
+
+      // Get the user's session token to authenticate with the backend
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || '';
+      if (!backendUrl || !accessToken) {
+        // Can't reach backend — let the request through, client-side will handle it
         return supabaseResponse;
       }
 
-      if (!hasPaidTier && !hasFreeTier && !hasActiveTrial && !trialConverted) {
+      try {
+        // NEXT_PUBLIC_BACKEND_URL may already include /v1 (e.g. https://api.kortix.com/v1)
+        const apiBase = backendUrl.replace(/\/v1\/?$/, '');
+        const accountStateRes = await fetch(`${apiBase}/v1/billing/account-state`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+
+        if (!accountStateRes.ok) {
+          // Backend error (not network) — redirect to setting-up as fallback
+          const url = request.nextUrl.clone();
+          url.pathname = '/setting-up';
+          return NextResponse.redirect(url);
+        }
+
+        const accountState = await accountStateRes.json() as {
+          subscription?: { tier_key?: string; status?: string };
+          credits?: { can_run?: boolean };
+          tier?: { name?: string };
+        };
+
+        const tierKey = accountState?.subscription?.tier_key || accountState?.tier?.name || '';
+        const hasPaidTier = tierKey && tierKey !== 'none' && tierKey !== 'free';
+        const hasFreeTier = tierKey === 'free';
+        const isActive = accountState?.subscription?.status === 'active' || accountState?.subscription?.status === 'trialing';
+
+        if (hasPaidTier || hasFreeTier || isActive) {
+          return supabaseResponse;
+        }
+
+        // No subscription at all — redirect to setting-up (triggers account initialization)
         const url = request.nextUrl.clone();
-        url.pathname = '/subscription';
+        url.pathname = '/setting-up';
         return NextResponse.redirect(url);
-      } else if ((trialExpired || trialConverted) && !hasPaidTier && !hasFreeTier) {
+      } catch {
+        // Network error / timeout — redirect to setting-up as fallback
         const url = request.nextUrl.clone();
-        url.pathname = '/subscription';
+        url.pathname = '/setting-up';
         return NextResponse.redirect(url);
       }
     }

@@ -24,6 +24,7 @@ import {
   type DetectedLocalhostUrl,
 } from '@/lib/utils/sandbox-url';
 import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-url';
+import { enrichPreviewMetadata } from '@/lib/utils/session-context';
 
 interface SandboxUrlDetectorProps {
   content: string;
@@ -228,7 +229,7 @@ function SandboxPreviewCard({
   const isChecking = reachability === 'checking';
 
   const tabId = `preview:${detected.port}`;
-  const tabHref = `/preview/${detected.port}`;
+  const tabHref = `/p/${detected.port}`;
 
   // The internal URL is what the user sees (the container-side address)
   const internalUrl = toInternalUrl(detected.port, detected.path);
@@ -240,11 +241,11 @@ function SandboxPreviewCard({
       title: `localhost:${detected.port}`,
       type: 'preview',
       href: tabHref,
-      metadata: {
+      metadata: enrichPreviewMetadata({
         url: proxyUrl,
         port: detected.port,
         originalUrl: internalUrl,
-      },
+      }),
     });
   }, [detected, proxyUrl, internalUrl, tabId, tabHref]);
 
@@ -428,7 +429,7 @@ function SandboxUrlChip({
   const [copied, setCopied] = useState(false);
 
   const tabId = `preview:${detected.port}`;
-  const tabHref = `/preview/${detected.port}`;
+  const tabHref = `/p/${detected.port}`;
   const internalUrl = toInternalUrl(detected.port, detected.path);
 
   const navigateToPreviewTab = useCallback(() => {
@@ -437,11 +438,11 @@ function SandboxUrlChip({
       title: `localhost:${detected.port}`,
       type: 'preview',
       href: tabHref,
-      metadata: {
+      metadata: enrichPreviewMetadata({
         url: proxyUrl,
         port: detected.port,
         originalUrl: internalUrl,
-      },
+      }),
     });
   }, [detected, proxyUrl, internalUrl, tabId, tabHref]);
 

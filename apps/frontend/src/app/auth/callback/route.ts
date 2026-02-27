@@ -149,27 +149,35 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        const { data: accountData } = await supabase
-          .schema('basejump')
-          .from('accounts')
-          .select('id, created_at')
-          .eq('primary_owner_user_id', data.user.id)
-          .eq('personal_account', true)
-          .single();
+        // Check subscription status via backend API (has direct DB access)
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || '';
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
 
-        if (accountData) {
-          const { data: creditAccount } = await supabase
-            .from('credit_accounts')
-            .select('tier, stripe_subscription_id')
-            .eq('account_id', accountData.id)
-            .single();
+        if (backendUrl && accessToken) {
+          try {
+            const accountStateRes = await fetch(`${backendUrl}/v1/billing/account-state`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              signal: AbortSignal.timeout(5000),
+            });
 
-          // Only redirect to setting-up if no subscription exists (webhook failed or old user)
-          if (creditAccount && (creditAccount.tier === 'none' || !creditAccount.stripe_subscription_id)) {
-            console.log('⚠️ No subscription detected - redirecting to setting-up (fallback)');
-            finalDestination = '/setting-up'
-          } else {
-            console.log('✅ Account already initialized via webhook');
+            if (accountStateRes.ok) {
+              const accountState = await accountStateRes.json();
+              const tierKey = accountState?.subscription?.tier_key || accountState?.tier?.name || '';
+              const hasSubscription = tierKey && tierKey !== 'none';
+
+              if (!hasSubscription) {
+                console.log('⚠️ No subscription detected - redirecting to setting-up (fallback)');
+                finalDestination = '/setting-up';
+              } else {
+                console.log('✅ Account already initialized via webhook');
+              }
+            }
+          } catch (err) {
+            console.warn('⚠️ Could not check account state from backend:', err);
           }
         }
       }

@@ -408,8 +408,8 @@ The sandbox needs to call the Kortix API (`KORTIX_API_URL`). How it reaches the 
 
 | Scenario | API running | Sandbox `KORTIX_API_URL` | Command |
 |---|---|---|---|
-| **Host dev** (most common) | `pnpm run dev` on Mac | `http://host.docker.internal:8008/v1/router` | `cd sandbox && docker compose up` |
-| **All Docker** | Docker container | `http://kortix-api:8008/v1/router` | `cd sandbox && docker compose -f docker-compose.yml -f docker-compose.docker.yml up` |
+| **Host dev** (most common) | `pnpm run dev` on Mac | `http://host.docker.internal:8008` | `cd sandbox && docker compose up` |
+| **All Docker** | Docker container | `http://kortix-api:8008` | `cd sandbox && docker compose -f docker-compose.yml -f docker-compose.docker.yml up` |
 
 ### Host dev (default — no extra config)
 
@@ -431,7 +431,7 @@ docker compose -f docker-compose.yml -f docker-compose.docker.yml up
 
 This override:
 1. Joins the sandbox to the `kortix_default` network (where the API lives)
-2. Sets `KORTIX_API_URL=http://kortix-api:8008/v1/router` (Docker DNS)
+2. Sets `KORTIX_API_URL=http://kortix-api:8008` (Docker DNS)
 
 If the API's compose project has a different name, override the network:
 
@@ -462,7 +462,7 @@ docker exec kortix-sandbox curl -sf http://kortix-api:8008/v1/health
 
 | Var | Used by | Purpose |
 |---|---|---|
-| `KORTIX_API_URL` | sandbox container | URL the sandbox uses to call the API. Default: `http://host.docker.internal:8008/v1/router` (host dev) |
+| `KORTIX_API_URL` | sandbox container | Base URL the sandbox uses to call the API. Default: `http://host.docker.internal:8008` (host dev). Consumers append service paths like `/v1/router`, `/v1/cron`, etc. |
 | `KORTIX_NETWORK` | `docker-compose.docker.yml` | External Docker network to join (default: `kortix_default`) |
 | `SANDBOX_NETWORK` | `kortix-api` (`local-docker.ts`) | Network for programmatically-created sandbox containers |
 | `KORTIX_URL` | `kortix-api` | URL the API gives to sandboxes for callbacks |

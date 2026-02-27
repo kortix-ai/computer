@@ -1,23 +1,22 @@
 import { tool } from "@opencode-ai/plugin";
+import { getEnv } from "./lib/get-env";
 
 /**
  * Cron Triggers tool — lets agents create, list, update, delete, pause, resume,
  * and manually run scheduled tasks via the Kortix platform API.
  *
  * Env vars used:
- *   KORTIX_API_URL  — e.g. https://new-api.kortix.com/v1/router
+ *   KORTIX_API_URL  — e.g. https://new-api.kortix.com (base URL, no path)
  *   KORTIX_TOKEN    — kortix_sb_xxx sandbox token
  */
 
 function getCronUrl(): string {
-  const routerUrl = process.env.KORTIX_API_URL;
-  if (!routerUrl) throw new Error("KORTIX_API_URL not set");
-  // /v1/router → /v1/cron
-  return routerUrl.replace(/\/router\/?$/, "/cron");
+  const apiUrl = getEnv("KORTIX_API_URL") || "http://localhost:8008";
+  return `${apiUrl.replace(/\/+$/, "")}/v1/cron`;
 }
 
 function getToken(): string | undefined {
-  return process.env.KORTIX_TOKEN || undefined;
+  return getEnv("KORTIX_TOKEN") || undefined;
 }
 
 async function cronFetch(

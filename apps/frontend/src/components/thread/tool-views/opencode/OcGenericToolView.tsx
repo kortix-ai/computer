@@ -22,6 +22,7 @@ import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { UnifiedMarkdown, CodeHighlight } from '@/components/markdown/unified-markdown';
 import { useOcFileOpen } from './useOcFileOpen';
+import { PreWithPaths, ClickablePath } from '@/components/common/clickable-path';
 import {
   type OutputSection as OutputSectionType,
   normalizeToolOutput,
@@ -301,12 +302,11 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
 
           case 'plain':
             return (
-              <pre
+              <PreWithPaths
                 key={i}
+                text={section.text}
                 className="px-3 py-1.5 font-mono text-xs leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
-              >
-                {section.text}
-              </pre>
+              />
             );
 
           default:
@@ -433,15 +433,22 @@ function SimpleArgsSection({
       <div className="divide-y divide-border">
         {entries.map(([key, val]) => {
           // Convert absolute file paths in arg values to relative display paths
-          const displayVal = isAbsolutePath(val) ? toDisplayPath(val as string) : (typeof val === 'string' ? val : JSON.stringify(val));
+          const isPath = isAbsolutePath(val);
+          const displayVal = isPath ? toDisplayPath(val as string) : (typeof val === 'string' ? val : JSON.stringify(val));
           return (
             <div key={key} className="flex items-start gap-3 px-3 py-2">
               <span className="text-[11px] font-medium text-muted-foreground min-w-[80px] pt-0.5 flex-shrink-0 font-mono">
                 {key}
               </span>
-              <span className="text-xs text-foreground break-all font-mono">
-                {displayVal}
-              </span>
+              {isPath ? (
+                <ClickablePath filePath={val as string} className="text-xs break-all font-mono">
+                  {displayVal}
+                </ClickablePath>
+              ) : (
+                <span className="text-xs text-foreground break-all font-mono">
+                  {displayVal}
+                </span>
+              )}
             </div>
           );
         })}

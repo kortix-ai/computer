@@ -37,7 +37,7 @@ export const SANDBOX_PORTS = {
 /**
  * Get a URL to access a specific container port on a sandbox.
  * ALL modes route through the backend's unified preview proxy:
- *   {BACKEND_URL}/preview/{sandboxId}/{containerPort}
+ *   {BACKEND_URL}/p/{sandboxId}/{containerPort}
  *
  * Provider-agnostic — sandboxId is the external_id (container name for local,
  * Daytona sandbox ID for cloud).
@@ -47,7 +47,7 @@ export function getDirectPortUrl(
   containerPort: string,
 ): string | null {
   if (server.sandboxId && server.sandboxId !== 'undefined') {
-    return `${PLATFORM_URL}/preview/${server.sandboxId}/${containerPort}`;
+    return `${PLATFORM_URL}/p/${server.sandboxId}/${containerPort}`;
   }
   return null;
 }
@@ -134,7 +134,7 @@ async function platformFetch<T>(
 
 /**
  * Build the OpenCode server URL for a sandbox.
- * Provider-agnostic: {BACKEND_URL}/preview/{externalId}/8000
+ * Provider-agnostic: {BACKEND_URL}/p/{externalId}/8000
  *
  * The external_id is the sandbox identifier used for routing:
  *   - Local Docker: container name (e.g. 'kortix-sandbox') — resolves via Docker DNS
@@ -150,19 +150,19 @@ export function getSandboxUrl(sandbox: SandboxInfo): string {
     );
   }
 
-  return `${PLATFORM_URL}/preview/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
+  return `${PLATFORM_URL}/p/${sandbox.external_id}/${SANDBOX_PORTS.KORTIX_MASTER}`;
 }
 
 /**
  * Build a URL to access a specific container port on a sandbox.
- * Provider-agnostic: {BACKEND_URL}/preview/{externalId}/{containerPort}
+ * Provider-agnostic: {BACKEND_URL}/p/{externalId}/{containerPort}
  */
 export function getSandboxPortUrl(
   sandbox: SandboxInfo,
   containerPort: string,
 ): string | null {
   if (sandbox.external_id) {
-    return `${PLATFORM_URL}/preview/${sandbox.external_id}/${containerPort}`;
+    return `${PLATFORM_URL}/p/${sandbox.external_id}/${containerPort}`;
   }
   return null;
 }

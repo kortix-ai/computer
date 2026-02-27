@@ -11,6 +11,7 @@ import {
 	Check,
 	CheckCircle,
 	CheckSquare,
+	Clock,
 	ChevronDown,
 	ChevronRight,
 	CircleAlert,
@@ -93,6 +94,7 @@ import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
 import { useServerStore, getActiveOpenCodeUrl, deriveSubdomainOpts } from "@/stores/server-store";
 import { openTabAndNavigate } from "@/stores/tab-store";
 import { enrichPreviewMetadata } from "@/lib/utils/session-context";
+import { PreWithPaths } from "@/components/common/clickable-path";
 
 import {
 	type ApplyPatchFile,
@@ -215,7 +217,7 @@ function InlineServicePreview({
 			id: `preview:${proxy.port}`,
 			title: `localhost:${proxy.port}`,
 			type: "preview",
-			href: `/preview/${proxy.port}`,
+			href: `/p/${proxy.port}`,
 			metadata: {
 				url: proxy.proxyUrl,
 				port: proxy.port,
@@ -1597,9 +1599,10 @@ function PtyReadTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 		>
 			{parsed.content && (
 				<div data-scrollable className="max-h-96 overflow-auto">
-					<pre className="p-2.5 font-mono text-[11px] leading-relaxed text-foreground/80 whitespace-pre-wrap">
-						{parsed.content}
-					</pre>
+					<PreWithPaths
+						text={parsed.content}
+						className="p-2.5 font-mono text-[11px] leading-relaxed text-foreground/80 whitespace-pre-wrap"
+					/>
 					{parsed.bufferInfo && (
 						<div className="px-2.5 pb-2 text-[10px] text-muted-foreground/50 italic">
 							{parsed.bufferInfo}
@@ -3403,7 +3406,7 @@ function useShowOpenInTab(props: { type: string; url: string; path: string; titl
 				id: `preview:${proxy.port}`,
 				title: title || `localhost:${proxy.port}`,
 				type: "preview",
-				href: `/preview/${proxy.port}`,
+				href: `/p/${proxy.port}`,
 				metadata: enrichPreviewMetadata({
 					url: proxy.proxyUrl,
 					port: proxy.port,
@@ -3843,6 +3846,75 @@ function TodoWriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 ToolRegistry.register("todowrite", TodoWriteTool);
 
 // --- Session Context ---
+
+/** Strip <session_context ...>...</session_context> wrapper */
+function extractSessionContent(raw: string): string {
+	const match = raw.match(/<session_context[^>]*>([\s\S]*)<\/session_context>/);
+	return match ? match[1].trim() : raw;
+}
+
+/** Extract attributes from the <session_context> opening tag */
+function extractSessionAttrs(raw: string): Record<string, string> {
+	const tagMatch = raw.match(/<session_context([^>]*)>/);
+	if (!tagMatch) return {};
+	const attrs: Record<string, string> = {};
+	const attrRegex = /(\w+)="([^"]*)"/g;
+	let m: RegExpExecArray | null;
+	while ((m = attrRegex.exec(tagMatch[1])) !== null) {
+		attrs[m[1]] = m[2];
+	}
+	return attrs;
+}
+
+/** Parse session summary header: title, dates, file changes */
+function parseSessionSummary(content: string) {
+	const titleMatch = content.match(/^# Session:\s*(.+)/m);
+	const createdMatch = content.match(/Created:\s*(.+)/m);
+	const updatedMatch = content.match(/Updated:\s*(.+)/m);
+	const filesChangedMatch = content.match(/Files changed:\s*(\d+)/m);
+	const additionsMatch = content.match(/Additions:\s*\+(\d+)/m);
+	const deletionsMatch = content.match(/Deletions:\s*-(\d+)/m);
+
+	return {
+		title: titleMatch?.[1]?.trim() || null,
+		created: createdMatch?.[1]?.trim() || null,
+		updated: updatedMatch?.[1]?.trim() || null,
+		filesChanged: filesChangedMatch ? parseInt(filesChangedMatch[1], 10) : null,
+		additions: additionsMatch ? parseInt(additionsMatch[1], 10) : null,
+		deletions: deletionsMatch ? parseInt(deletionsMatch[1], 10) : null,
+	};
+}
+
+/** Parse conversation lines into structured messages */
+function parseSessionMessages(content: string) {
+	const lines = content.split("\n");
+	const msgs: { role: "user" | "assistant"; content: string }[] = [];
+	let current: { role: "user" | "assistant"; content: string } | null = null;
+
+	for (const line of lines) {
+		const match = line.match(/^\[(user|assistant)\](?:\s*\(.*?\))?:\s*(.*)/);
+		if (match) {
+			if (current) msgs.push(current);
+			current = { role: match[1] as "user" | "assistant", content: match[2] };
+		} else if (current && line.trim()) {
+			current.content += "\n" + line;
+		}
+	}
+	if (current) msgs.push(current);
+	return msgs;
+}
+
+/** Format an ISO timestamp to a short readable form */
+function formatSessionISOTime(iso: string | null): string | null {
+	if (!iso) return null;
+	try {
+		const d = new Date(iso);
+		return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	} catch {
+		return iso;
+	}
+}
+
 function SessionContextTool({
 	part,
 	defaultOpen,
@@ -3852,6 +3924,7 @@ function SessionContextTool({
 	const input = partInput(part);
 	const metadata = partMetadata(part);
 	const status = partStatus(part);
+	const output = partOutput(part);
 
 	const mode = String(metadata.mode || input.mode || "summary");
 	const sessionTitle = String(metadata.sessionTitle || "");
@@ -3861,26 +3934,262 @@ function SessionContextTool({
 		diffs: "Diffs",
 		todo: "Todos",
 	};
-	const subtitle = sessionTitle
-		? `${sessionTitle} — ${modeLabels[mode] || mode}`
-		: modeLabels[mode] || mode;
+
+	const parsed = useMemo(() => {
+		if (!output) return null;
+		const content = extractSessionContent(output);
+		const attrs = extractSessionAttrs(output);
+		const summary = parseSessionSummary(content);
+		const conversationStart = content.indexOf("## Recent Conversation");
+		const conversationBlock =
+			conversationStart >= 0 ? content.slice(conversationStart) : "";
+		const messages = parseSessionMessages(conversationBlock);
+
+		return { content, attrs, summary, messages };
+	}, [output]);
+
+	const displayTitle = parsed?.summary?.title || sessionTitle || "Session";
+	const subtitle = modeLabels[mode] || mode;
 
 	return (
 		<BasicTool
 			icon={<BookOpen className="size-3.5 flex-shrink-0" />}
-			trigger={{ title: "Session Context", subtitle }}
+			trigger={
+				<div className="flex items-center gap-1.5 min-w-0 flex-1">
+					<span className="font-medium text-xs text-foreground whitespace-nowrap">
+						Session Context
+					</span>
+					<span className="text-muted-foreground text-xs truncate">
+						{displayTitle}
+					</span>
+					<span
+						className="text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ml-auto flex-shrink-0 bg-primary/10 text-primary"
+					>
+						{subtitle}
+					</span>
+				</div>
+			}
 			defaultOpen={defaultOpen}
 			forceOpen={forceOpen}
 			locked={locked}
 		>
-			{status === "completed" && (
-				<div className="px-3 py-2.5 text-xs text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap">
-					{partOutput(part).slice(0, 2000)}
+			{status === "completed" && parsed ? (
+				<div data-scrollable className="max-h-[420px] overflow-auto">
+					<div className="px-3 pb-2.5">
+						{/* Session info header */}
+						{(parsed.summary.created || parsed.summary.filesChanged !== null) && (
+							<div className="flex items-center gap-3 py-2 mb-1.5 border-b border-border/20">
+								{parsed.summary.created && (
+									<div className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
+										<Clock className="size-3" />
+										<span>{formatSessionISOTime(parsed.summary.created)}</span>
+										{parsed.summary.updated && parsed.summary.updated !== parsed.summary.created && (
+											<>
+												<span className="text-muted-foreground/30 mx-0.5">-</span>
+												<span>{formatSessionISOTime(parsed.summary.updated)}</span>
+											</>
+										)}
+									</div>
+								)}
+								{parsed.summary.filesChanged !== null && (
+									<div className="flex items-center gap-1.5 text-[10px] ml-auto">
+										<FileCode2 className="size-3 text-muted-foreground/50" />
+										<span className="text-muted-foreground/60">
+											{parsed.summary.filesChanged} file{parsed.summary.filesChanged !== 1 ? "s" : ""}
+										</span>
+										{(parsed.summary.additions !== null && parsed.summary.additions > 0) && (
+											<span className="text-emerald-500 font-medium">
+												+{parsed.summary.additions}
+											</span>
+										)}
+										{(parsed.summary.deletions !== null && parsed.summary.deletions > 0) && (
+											<span className="text-red-400 font-medium">
+												-{parsed.summary.deletions}
+											</span>
+										)}
+									</div>
+								)}
+							</div>
+						)}
+
+						{/* Mode-specific content */}
+						{mode === "todo" ? (
+							<SessionContextTodoInline content={parsed.content} />
+						) : mode === "diffs" ? (
+							<SessionContextDiffsInline content={parsed.content} />
+						) : (
+							/* summary / messages — show conversation */
+							<>
+								{parsed.messages.length > 0 ? (
+									<div className="space-y-1">
+										<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5 mt-1">
+											Conversation
+										</div>
+										{parsed.messages.map((msg, i) => (
+											<div
+												key={i}
+												className={cn(
+													"rounded-lg px-2.5 py-1.5 text-[11px] leading-relaxed",
+													msg.role === "user"
+														? "bg-muted/50 border border-border/40"
+														: "bg-transparent border border-border/20",
+												)}
+											>
+												<span
+													className={cn(
+														"text-[9px] font-semibold uppercase tracking-wide mr-1.5",
+														msg.role === "user"
+															? "text-primary/60"
+															: "text-muted-foreground/50",
+													)}
+												>
+													{msg.role}
+												</span>
+												<span className="text-foreground/80 whitespace-pre-wrap break-words">
+													{msg.content.trim().slice(0, 500)}
+													{msg.content.trim().length > 500 && (
+														<span className="text-muted-foreground/40">...</span>
+													)}
+												</span>
+											</div>
+										))}
+									</div>
+								) : (
+									<div className="text-xs text-muted-foreground/50 py-2 italic">
+										No conversation found.
+									</div>
+								)}
+							</>
+						)}
+					</div>
 				</div>
-			)}
+			) : status === "completed" && output ? (
+				<div data-scrollable className="p-2 max-h-72 overflow-auto">
+					<pre className="font-mono text-[11px] whitespace-pre-wrap text-muted-foreground/60">
+						{output.slice(0, 2000)}
+					</pre>
+				</div>
+			) : null}
 		</BasicTool>
 	);
 }
+
+/** Inline todo list rendering inside session context */
+function SessionContextTodoInline({ content }: { content: string }) {
+	const lines = content.split("\n").filter((l) => l.startsWith("- "));
+	if (lines.length === 0) {
+		return (
+			<div className="text-xs text-muted-foreground/50 py-2 italic">
+				No todos found.
+			</div>
+		);
+	}
+	return (
+		<div className="space-y-0.5 mt-1">
+			<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5">
+				Todos
+			</div>
+			{lines.map((line, i) => {
+				const isCompleted = line.includes("[x]");
+				const isInProgress = line.includes("[~]");
+				const isCancelled = line.includes("[-]");
+				const text = line.replace(/^- \[.\]\s*/, "");
+				return (
+					<div key={i} className="flex items-start gap-2 py-0.5">
+						<div
+							className={cn(
+								"size-3.5 rounded border flex items-center justify-center mt-0.5 flex-shrink-0",
+								isCompleted
+									? "bg-emerald-500/20 border-emerald-500/40"
+									: isCancelled
+										? "bg-muted border-border/30"
+										: isInProgress
+											? "bg-primary/10 border-primary/30"
+											: "border-border/40",
+							)}
+						>
+							{isCompleted && <Check className="size-2.5 text-emerald-500" />}
+							{isInProgress && (
+								<div className="size-1.5 rounded-full bg-primary" />
+							)}
+						</div>
+						<span
+							className={cn(
+								"text-[11px] leading-relaxed",
+								isCompleted && "line-through text-muted-foreground/50",
+								isCancelled && "line-through text-muted-foreground/40",
+								isInProgress && "text-foreground font-medium",
+								!isCompleted && !isCancelled && !isInProgress && "text-foreground/80",
+							)}
+						>
+							{text}
+						</span>
+					</div>
+				);
+			})}
+		</div>
+	);
+}
+
+/** Inline diffs rendering inside session context */
+function SessionContextDiffsInline({ content }: { content: string }) {
+	const sections = useMemo(() => {
+		const parts = content.split(/^## /m).filter(Boolean);
+		return parts.map((section) => {
+			const lines = section.split("\n");
+			const header = lines[0] || "";
+			const match = header.match(/^(.+?)\s*\((\w+)\)\s*\+(\d+)\s*-(\d+)/);
+			return {
+				path: match?.[1]?.trim() || header.trim(),
+				status: match?.[2] || "modified",
+				additions: match?.[3] || "0",
+				deletions: match?.[4] || "0",
+			};
+		});
+	}, [content]);
+
+	if (sections.length === 0) {
+		return (
+			<div className="text-xs text-muted-foreground/50 py-2 italic">
+				No file changes.
+			</div>
+		);
+	}
+
+	return (
+		<div className="space-y-0.5 mt-1">
+			<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40 mb-1.5">
+				Changed Files
+			</div>
+			{sections.map((file, i) => (
+				<div
+					key={i}
+					className="flex items-center gap-2 py-1 px-1.5 -mx-0.5 rounded hover:bg-muted/30 transition-colors"
+				>
+					<FileCode2 className="size-3 text-muted-foreground/40 flex-shrink-0" />
+					<span className="text-[11px] font-mono truncate flex-1 text-foreground/70">
+						{file.path}
+					</span>
+					<span
+						className={cn(
+							"text-[9px] px-1 py-0.5 rounded font-medium flex-shrink-0",
+							file.status === "added"
+								? "text-emerald-500 bg-emerald-500/10"
+								: file.status === "deleted"
+									? "text-red-400 bg-red-400/10"
+									: "text-muted-foreground/50 bg-muted/40",
+						)}
+					>
+						{file.status}
+					</span>
+					<span className="text-[10px] text-emerald-500 flex-shrink-0">+{file.additions}</span>
+					<span className="text-[10px] text-red-400 flex-shrink-0">-{file.deletions}</span>
+				</div>
+			))}
+		</div>
+	);
+}
+
 ToolRegistry.register("session_context", SessionContextTool);
 
 // --- Skill ---

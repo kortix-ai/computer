@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
+import { getEnv } from "./lib/get-env";
 
 /**
  * Execute a Pipedream action with structured parameters.
@@ -35,7 +36,10 @@ export default tool({
     try {
       const res = await fetch(`${masterUrl}/api/integrations/run-action`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+         headers: {
+          "Content-Type": "application/json",
+          ...(getEnv('INTERNAL_SERVICE_KEY') ? { Authorization: `Bearer ${getEnv('INTERNAL_SERVICE_KEY')}` } : {}),
+        },
         body: JSON.stringify({
           app: args.app,
           action_key: args.action_key,

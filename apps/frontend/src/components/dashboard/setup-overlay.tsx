@@ -9,7 +9,8 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/components/AuthProvider';
 
 import { LightRays } from '@/components/ui/light-rays';
-import { useCreateOpenCodeSession, useExecuteOpenCodeCommand } from '@/hooks/opencode/use-opencode-sessions';
+import { useCreateOpenCodeSession } from '@/hooks/opencode/use-opencode-sessions';
+import { getClient } from '@/lib/opencode-sdk';
 import { openTabAndNavigate } from '@/stores/tab-store';
 import { useServerStore } from '@/stores/server-store';
 import { SessionChat } from '@/components/session/session-chat';
@@ -31,7 +32,7 @@ const BIOS_LINES: { text: string; bold?: boolean }[] = [
   { text: 'Starting KORTIX OS...' },
 ];
 
-/** Get the sandbox instance URL (routed through backend at /v1/preview/{sandboxId}/8000) */
+/** Get the sandbox instance URL (routed through backend at /v1/p/{sandboxId}/8000) */
 function getInstanceUrl() {
   return useServerStore.getState().getActiveServerUrl();
 }
@@ -118,7 +119,6 @@ function LoadingDots() {
 
 export function SetupOverlay({ onComplete, existingSessionId }: SetupOverlayProps) {
   const createSession = useCreateOpenCodeSession();
-  const executeCommand = useExecuteOpenCodeCommand();
   const completedRef = useRef(false);
   const creatingRef = useRef(false); // guard against double-creation
   const retriesRef = useRef(0);
@@ -137,8 +137,6 @@ export function SetupOverlay({ onComplete, existingSessionId }: SetupOverlayProp
   // Stable refs for mutation functions — prevents useEffect re-triggers
   const createSessionRef = useRef(createSession);
   createSessionRef.current = createSession;
-  const executeCommandRef = useRef(executeCommand);
-  executeCommandRef.current = executeCommand;
 
   useEffect(() => setMounted(true), []);
   const isDark = !mounted || resolvedTheme !== 'light';
@@ -170,7 +168,14 @@ export function SetupOverlay({ onComplete, existingSessionId }: SetupOverlayProp
         const session = await createSessionRef.current.mutateAsync({ title: 'Kortix Onboarding' });
         setSessionId(session.id);
         persistOnboardingSessionId(session.id);
-        executeCommandRef.current.mutate({ sessionId: session.id, command: 'onboarding' });
+        // Fire command directly via SDK — no TanStack Query, no retry.
+        // Matches SolidJS reference (submit.ts:265-287).
+        const client = getClient();
+        void client.session.command({
+          sessionID: session.id,
+          command: 'onboarding',
+          arguments: '',
+        }).catch(() => {});
         retriesRef.current = 0;
       } catch {
         creatingRef.current = false;

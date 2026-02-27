@@ -1,7 +1,7 @@
 export type SandboxProviderName = 'daytona' | 'local_docker';
 
 /** Single source of truth for the sandbox version. Update on each release. */
-export const SANDBOX_VERSION = '0.7.1';
+export const SANDBOX_VERSION = '0.7.2';
 
 /** Parse comma-separated provider list (e.g. "daytona,local_docker") */
 function parseAllowedProviders(raw: string): SandboxProviderName[] {
@@ -120,11 +120,49 @@ export const config = {
   SANDBOX_PORT_BASE: parseInt(process.env.SANDBOX_PORT_BASE || '14000', 10),
 
   /**
-   * Internal service key for kortix-api → sandbox communication.
-   * Injected into proxied requests so the sandbox can validate the caller.
-   * In VPS mode this is auto-generated; in local mode defaults to empty (no auth).
+   * INTERNAL_SERVICE_KEY — direction: kortix-api → sandbox.
+   *
+   * This is how kortix-api authenticates itself TO the sandbox. Every request
+   * from kortix-api to the sandbox (proxy, cron, health, queue drain, etc.)
+   * includes `Authorization: Bearer <INTERNAL_SERVICE_KEY>`. The sandbox's
+   * kortix-master middleware validates it.
+   *
+   * Counterpart: KORTIX_TOKEN goes the other direction (sandbox → kortix-api).
+   *
+   * Auto-generated at startup if not provided — always present.
+   * Persisted to .env so the same key survives process restarts.
    */
-  INTERNAL_SERVICE_KEY: process.env.INTERNAL_SERVICE_KEY || '',
+  get INTERNAL_SERVICE_KEY(): string {
+    if (!process.env.INTERNAL_SERVICE_KEY) {
+      const { randomBytes } = require('crypto');
+      const generated = randomBytes(32).toString('hex');
+      process.env.INTERNAL_SERVICE_KEY = generated;
+      console.log('[config] Auto-generated INTERNAL_SERVICE_KEY for sandbox auth');
+      // Persist to .env so the key survives process restarts (avoids re-sync on every restart)
+      try {
+        const { appendFileSync, readFileSync, existsSync } = require('fs');
+        const { resolve } = require('path');
+        const candidates = [
+          resolve(__dirname, '../../.env'),       // from src/config.ts → ../../.env
+          resolve(process.cwd(), '.env'),          // cwd/.env
+        ];
+        for (const envPath of candidates) {
+          if (existsSync(envPath)) {
+            const content = readFileSync(envPath, 'utf-8');
+            if (!content.includes('INTERNAL_SERVICE_KEY=')) {
+              appendFileSync(envPath, `\n# Auto-generated service key for sandbox auth (do not remove)\nINTERNAL_SERVICE_KEY=${generated}\n`);
+              console.log(`[config] Persisted INTERNAL_SERVICE_KEY to ${envPath}`);
+            }
+            break;
+          }
+        }
+      } catch (err: any) {
+        // Non-fatal — key still works in-memory for this process lifetime
+        console.warn('[config] Could not persist INTERNAL_SERVICE_KEY to .env:', err.message);
+      }
+    }
+    return process.env.INTERNAL_SERVICE_KEY;
+  },
 
   // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
   SCHEDULER_ENABLED: process.env.SCHEDULER_ENABLED !== 'false',
@@ -172,6 +210,26 @@ export const config = {
   PIPEDREAM_CLIENT_SECRET: process.env.PIPEDREAM_CLIENT_SECRET || '',
   PIPEDREAM_PROJECT_ID: process.env.PIPEDREAM_PROJECT_ID || '',
   PIPEDREAM_ENVIRONMENT: process.env.PIPEDREAM_ENVIRONMENT || 'development',
+
+  // ─── Tunnel (Reverse-Tunnel to Local Machine) ──────────────────────────────
+  TUNNEL_ENABLED: process.env.TUNNEL_ENABLED !== 'false',
+  /** Heartbeat interval for tunnel agents (ms). Agent sends ping, server expects pong. */
+  TUNNEL_HEARTBEAT_INTERVAL_MS: parseInt(process.env.TUNNEL_HEARTBEAT_INTERVAL_MS || '30000', 10),
+  /** Max missed heartbeats before marking tunnel offline. */
+  TUNNEL_HEARTBEAT_MAX_MISSED: parseInt(process.env.TUNNEL_HEARTBEAT_MAX_MISSED || '3', 10),
+  /** Default timeout for RPC calls relayed to local agent (ms). */
+  TUNNEL_RPC_TIMEOUT_MS: parseInt(process.env.TUNNEL_RPC_TIMEOUT_MS || '30000', 10),
+  /** Max file size for tunnel filesystem operations (bytes). */
+  TUNNEL_MAX_FILE_SIZE: parseInt(process.env.TUNNEL_MAX_FILE_SIZE || String(10 * 1024 * 1024), 10),
+  /** TTL for tunnel permission requests before auto-expiring (ms). */
+  TUNNEL_PERMISSION_REQUEST_TTL_MS: parseInt(process.env.TUNNEL_PERMISSION_REQUEST_TTL_MS || '300000', 10),
+  /** Rate limits for tunnel endpoints (requests per 60s window). */
+  TUNNEL_RATE_LIMIT_RPC: parseInt(process.env.TUNNEL_RATE_LIMIT_RPC || '100', 10),
+  TUNNEL_RATE_LIMIT_PERM_REQUEST: parseInt(process.env.TUNNEL_RATE_LIMIT_PERM_REQUEST || '20', 10),
+  TUNNEL_RATE_LIMIT_WS_CONNECT: parseInt(process.env.TUNNEL_RATE_LIMIT_WS_CONNECT || '5', 10),
+  TUNNEL_RATE_LIMIT_PERM_GRANT: parseInt(process.env.TUNNEL_RATE_LIMIT_PERM_GRANT || '30', 10),
+  /** Max WebSocket message size for tunnel agents (bytes). Default 5MB. */
+  TUNNEL_MAX_WS_MESSAGE_SIZE: parseInt(process.env.TUNNEL_MAX_WS_MESSAGE_SIZE || String(5 * 1024 * 1024), 10),
 
   // ─── Slack (Platform App) ─────────────────────────────────────────────────
   SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID || '',

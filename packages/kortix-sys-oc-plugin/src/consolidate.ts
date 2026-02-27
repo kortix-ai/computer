@@ -11,11 +11,11 @@
  */
 
 import type { Database } from "bun:sqlite"
+import { getEnv } from "../../../tools/lib/get-env"
 import {
 	getObservationsBySession,
 	getAllLTM,
 	insertLTM,
-	reinforceLTM,
 	markConsolidated,
 } from "./db"
 import { resolveLLMConfig, callLLM, extractJson, type LLMOptions } from "./llm"
@@ -87,7 +87,7 @@ export async function consolidateMemories(
 	log: LogFn,
 	opts?: ConsolidateOptions,
 ): Promise<ConsolidationResult> {
-	const empty: ConsolidationResult = { newMemories: [], reinforcedIds: [] }
+	const empty: ConsolidationResult = { newMemories: [] }
 
 	// 1. Get session observations
 	const observations = getObservationsBySession(db, sessionId)
@@ -134,21 +134,12 @@ export async function consolidateMemories(
 			insertLTM(db, input)
 		}
 
-		// 8. Reinforce existing entries
-		const reinforcedIds: number[] = []
-		for (const id of parsed.reinforced_ids ?? []) {
-			if (typeof id === "number" && id > 0) {
-				reinforceLTM(db, id)
-				reinforcedIds.push(id)
-			}
-		}
-
-		// 9. Mark session as consolidated
+		// 8. Mark session as consolidated
 		markConsolidated(db, sessionId)
 
-		log("info", `[memory:consolidate] Created ${newMemories.length} LTM entries, reinforced ${reinforcedIds.length}`)
+		log("info", `[memory:consolidate] Created ${newMemories.length} LTM entries`)
 
-		return { newMemories, reinforcedIds }
+		return { newMemories }
 	} catch (err) {
 		log("warn", `[memory:consolidate] Failed: ${err}`)
 		return empty
@@ -162,7 +153,7 @@ function buildUserMessage(observations: Observation[], existingLTM: LTMEntry[]):
 
 	// Existing LTM section (for dedup)
 	if (existingLTM.length > 0) {
-		parts.push("EXISTING_LTM (do NOT duplicate — use reinforced_ids for known facts):")
+		parts.push("EXISTING_LTM (do NOT duplicate — skip facts that already exist):")
 		for (const ltm of existingLTM.slice(0, 50)) {
 			parts.push(`  [id=${ltm.id}] [${ltm.type}] ${ltm.content}`)
 		}
@@ -188,7 +179,6 @@ interface RawConsolidation {
 	episodic: RawMemoryEntry[]
 	semantic: RawMemoryEntry[]
 	procedural: RawMemoryEntry[]
-	reinforced_ids: number[]
 }
 
 interface RawMemoryEntry {
@@ -209,9 +199,6 @@ function parseConsolidationResponse(text: string, log: LogFn): RawConsolidation 
 			episodic: Array.isArray(parsed.episodic) ? parsed.episodic.filter(validEntry) : [],
 			semantic: Array.isArray(parsed.semantic) ? parsed.semantic.filter(validEntry) : [],
 			procedural: Array.isArray(parsed.procedural) ? parsed.procedural.filter(validEntry) : [],
-			reinforced_ids: Array.isArray(parsed.reinforced_ids)
-				? parsed.reinforced_ids.filter((id: unknown) => typeof id === "number")
-				: [],
 		}
 	} catch (err) {
 		log("warn", `[memory:consolidate] Failed to parse JSON: ${err}`)
@@ -239,7 +226,6 @@ function toLTMInput(
 		context: entry.context ?? null,
 		sourceSessionId: sessionId,
 		sourceObservationIds: entry.source_observation_ids ?? [],
-		confidence: 1.0,
 		tags: entry.tags ?? [],
 		files: entry.files ?? [],
 	}

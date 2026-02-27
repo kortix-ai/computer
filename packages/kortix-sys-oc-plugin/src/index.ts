@@ -306,7 +306,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					output.context.push(cachedContextBlock)
 				}
 
-				log("info", `[memory] Compaction consolidation complete: ${result.newMemories.length} new, ${result.reinforcedIds.length} reinforced`)
+				log("info", `[memory] Compaction consolidation complete: ${result.newMemories.length} new memories`)
 			} catch (err) {
 				log("warn", `[memory] Compaction consolidation failed: ${err}`)
 			}
@@ -410,7 +410,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 							`=== LTM #${entry.id} [${entry.type}] ===`,
 							`Caption: ${entry.caption || "(none)"}`,
 							`Content: ${entry.content}`,
-							`Confidence: ${entry.confidence.toFixed(2)}`,
 							`Session: ${entry.sourceSessionId || "unknown"}`,
 							`Created: ${entry.createdAt} | Updated: ${entry.updatedAt}`,
 							tags, files, ctx,
@@ -456,7 +455,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 						caption: args.text.slice(0, 80),
 						sourceSessionId: context.sessionID,
 						tags,
-						confidence: 1.0,
 					}
 
 					const id = insertLTM(db, input)

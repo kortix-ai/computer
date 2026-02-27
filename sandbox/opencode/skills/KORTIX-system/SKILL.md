@@ -149,17 +149,17 @@ The dynamic port proxy (`/proxy/:port/*`) injects a Service Worker into HTML res
 | Variable | Description |
 |---|---|
 | `ENV_MODE` | `local` (Docker) or `cloud` (Kortix platform) |
-| `KORTIX_API_URL` | Router proxy URL (cloud mode routes SDK calls through this) |
+| `KORTIX_API_URL` | Base URL of the Kortix API (e.g. `http://localhost:8008`). Consumers append service paths (`/v1/router`, `/v1/cron`, etc.) |
 | `KORTIX_TOKEN` | Auth token for Kortix API |
 | `SANDBOX_ID` | Sandbox identifier |
 | `PROJECT_ID` | Project identifier |
 
 When `ENV_MODE=cloud`, the init script `98-kortix-env` rewrites SDK base URLs:
-- `TAVILY_API_URL` → `${KORTIX_API_URL}/tavily`
-- `SERPER_API_URL` → `${KORTIX_API_URL}/serper`
-- `FIRECRAWL_API_URL` → `${KORTIX_API_URL}/firecrawl`
-- `REPLICATE_API_URL` → `${KORTIX_API_URL}/replicate`
-- `CONTEXT7_API_URL` → `${KORTIX_API_URL}/context7`
+- `TAVILY_API_URL` → `${KORTIX_API_URL}/v1/router/tavily`
+- `SERPER_API_URL` → `${KORTIX_API_URL}/v1/router/serper`
+- `FIRECRAWL_API_URL` → `${KORTIX_API_URL}/v1/router/firecrawl`
+- `REPLICATE_API_URL` → `${KORTIX_API_URL}/v1/router/replicate`
+- `CONTEXT7_API_URL` → `${KORTIX_API_URL}/v1/router/context7`
 
 ---
 
@@ -316,9 +316,7 @@ In cloud mode, deploy to live URLs via the Kortix Deployments API. The API handl
 #### API Call Pattern
 
 ```bash
-BASE_URL="${KORTIX_API_URL%/router}"
-
-curl -X POST "$BASE_URL/deployments" \
+curl -X POST "$KORTIX_API_URL/v1/deployments" \
   -H "Authorization: Bearer $KORTIX_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ ... }'
@@ -391,15 +389,13 @@ function readFilesRecursive(dir: string, base?: string): Array<{path: string, co
 #### Other Cloud API Endpoints
 
 ```bash
-BASE_URL="${KORTIX_API_URL%/router}"
-
 # List / Get / Logs / Stop / Redeploy / Delete
-curl "$BASE_URL/deployments" -H "Authorization: Bearer $KORTIX_TOKEN"
-curl "$BASE_URL/deployments/{id}" -H "Authorization: Bearer $KORTIX_TOKEN"
-curl "$BASE_URL/deployments/{id}/logs" -H "Authorization: Bearer $KORTIX_TOKEN"
-curl -X POST "$BASE_URL/deployments/{id}/stop" -H "Authorization: Bearer $KORTIX_TOKEN"
-curl -X POST "$BASE_URL/deployments/{id}/redeploy" -H "Authorization: Bearer $KORTIX_TOKEN"
-curl -X DELETE "$BASE_URL/deployments/{id}" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl "$KORTIX_API_URL/v1/deployments" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl "$KORTIX_API_URL/v1/deployments/{id}" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl "$KORTIX_API_URL/v1/deployments/{id}/logs" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl -X POST "$KORTIX_API_URL/v1/deployments/{id}/stop" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl -X POST "$KORTIX_API_URL/v1/deployments/{id}/redeploy" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl -X DELETE "$KORTIX_API_URL/v1/deployments/{id}" -H "Authorization: Bearer $KORTIX_TOKEN"
 ```
 
 #### Cloud Deploy Hard-Won Lessons
@@ -495,10 +491,9 @@ The Kortix Cron service manages scheduled triggers that fire agents on cron sche
 ### Quick Start (Local Mode — No Auth Needed)
 
 ```bash
-CRON_URL="${KORTIX_API_URL%/router}"
 SANDBOX_ID="${SANDBOX_ID:-kortix-sandbox}"
 
-curl -X POST "$CRON_URL/cron/triggers" \
+curl -X POST "$KORTIX_API_URL/v1/cron/triggers" \
   -H "Content-Type: application/json" \
   -d "{
     \"sandbox_id\": \"$SANDBOX_ID\",
@@ -522,28 +517,26 @@ Note: pg_cron strips seconds internally. Minimum resolution is 1 minute.
 ### API Reference
 
 ```bash
-CRON_URL="${KORTIX_API_URL%/router}"
-
 # Create trigger
-curl -X POST "$CRON_URL/cron/triggers" -H "Content-Type: application/json" \
+curl -X POST "$KORTIX_API_URL/v1/cron/triggers" -H "Content-Type: application/json" \
   -d '{"sandbox_id":"...","name":"...","cron_expr":"...","prompt":"..."}'
 
 # List triggers
-curl "$CRON_URL/cron/triggers?sandbox_id=$SANDBOX_ID"
+curl "$KORTIX_API_URL/v1/cron/triggers?sandbox_id=$SANDBOX_ID"
 
 # Get/Update/Delete trigger
-curl "$CRON_URL/cron/triggers/{id}"
-curl -X PATCH "$CRON_URL/cron/triggers/{id}" -d '{"prompt":"new prompt"}'
-curl -X DELETE "$CRON_URL/cron/triggers/{id}"
+curl "$KORTIX_API_URL/v1/cron/triggers/{id}"
+curl -X PATCH "$KORTIX_API_URL/v1/cron/triggers/{id}" -d '{"prompt":"new prompt"}'
+curl -X DELETE "$KORTIX_API_URL/v1/cron/triggers/{id}"
 
 # Pause/Resume/Fire now
-curl -X POST "$CRON_URL/cron/triggers/{id}/pause"
-curl -X POST "$CRON_URL/cron/triggers/{id}/resume"
-curl -X POST "$CRON_URL/cron/triggers/{id}/run"
+curl -X POST "$KORTIX_API_URL/v1/cron/triggers/{id}/pause"
+curl -X POST "$KORTIX_API_URL/v1/cron/triggers/{id}/resume"
+curl -X POST "$KORTIX_API_URL/v1/cron/triggers/{id}/run"
 
 # Execution history
-curl "$CRON_URL/cron/executions?limit=20"
-curl "$CRON_URL/cron/executions/by-trigger/{triggerId}"
+curl "$KORTIX_API_URL/v1/cron/executions?limit=20"
+curl "$KORTIX_API_URL/v1/cron/executions/by-trigger/{triggerId}"
 ```
 
 ### Trigger Properties
