@@ -308,7 +308,7 @@ app.post('/', async (c) => {
     const response = await callFreestyle('/web/v1/deployment', {
       method: 'POST',
       body: freestyleBody,
-      timeoutMs: 120000, // Freestyle deploys can take time with builds
+      timeoutMs: 300000, // 5 min — builds (Go, Rust, etc.) can take a while
     });
 
     if (response.ok) {
@@ -405,7 +405,7 @@ app.get('/:id', async (c) => {
   return c.json({ success: true, data: deployment });
 });
 
-// POST /v1/deployments/:id/stop - Stop a deployment (update DB status)
+// POST /v1/deployments/:id/stop - Stop a deployment (delete on Freestyle + update DB)
 app.post('/:id/stop', async (c) => {
   const userId = c.get('userId') as string;
   const deploymentId = c.req.param('id');
@@ -413,6 +413,18 @@ app.post('/:id/stop', async (c) => {
   const deployment = await getDeploymentForUser(deploymentId, userId);
   if (!deployment) {
     throw new NotFoundError('Deployment', deploymentId);
+  }
+
+  // If the deployment has a Freestyle ID, delete it on Freestyle to actually stop it
+  if (deployment.freestyleId && (await getFreestyleApiKey())) {
+    try {
+      await callFreestyle(`/web/v1/deployment/${deployment.freestyleId}`, {
+        method: 'DELETE',
+        timeoutMs: 15000,
+      });
+    } catch {
+      // Best-effort — still mark as stopped locally even if Freestyle call fails
+    }
   }
 
   const [updated] = await db
@@ -531,6 +543,18 @@ app.delete('/:id', async (c) => {
   const deployment = await getDeploymentForUser(deploymentId, userId);
   if (!deployment) {
     throw new NotFoundError('Deployment', deploymentId);
+  }
+
+  // If the deployment has a Freestyle ID, try to delete it on Freestyle too
+  if (deployment.freestyleId && (await getFreestyleApiKey())) {
+    try {
+      await callFreestyle(`/web/v1/deployment/${deployment.freestyleId}`, {
+        method: 'DELETE',
+        timeoutMs: 15000,
+      });
+    } catch {
+      // Best-effort — don't block local deletion if Freestyle call fails
+    }
   }
 
   await db
