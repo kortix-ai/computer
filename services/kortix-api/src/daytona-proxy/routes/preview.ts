@@ -288,10 +288,24 @@ export async function proxyToDaytona(
         duplex: 'half',
       });
 
-      // Daytona returns 400 "no IP address found" when sandbox is stopped,
-      // and 400 "failed to get runner info" when sandbox is archived (no runner assigned).
-      // Detect both and treat them like connection failures so auto-wake kicks in.
-      // We keep retrying even after wake is triggered (sandbox may still be booting).
+      // Daytona returns various error codes when sandbox isn't ready:
+      //   400 "no IP address found" — sandbox is stopped
+      //   400 "failed to get runner info" — sandbox is archived (no runner)
+      //   502 — sandbox container started but port isn't listening yet
+      //   503 — sandbox service temporarily unavailable
+      // Detect all and retry with auto-wake so the user doesn't see errors
+      // during the boot window (typically 10-30s after provisioning).
+      if ((upstream.status === 502 || upstream.status === 503) && attempt < MAX_RETRIES) {
+        // Port not ready yet — sandbox is booting. Retry without wake
+        // (the sandbox container is already running, just port 8000 isn't up).
+        console.warn(
+          `[PREVIEW] Sandbox ${sandboxId}:${port} returned ${upstream.status} (port not ready, attempt ${attempt + 1}/${MAX_RETRIES + 1})`
+        );
+        previewLinkCache.delete(`${sandboxId}:${port}`);
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+        continue;
+      }
+
       if (upstream.status === 400 && attempt < MAX_RETRIES) {
         const bodyText = await upstream.text();
         const isSandboxDown =
