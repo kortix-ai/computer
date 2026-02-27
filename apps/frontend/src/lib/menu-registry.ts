@@ -47,7 +47,6 @@ import {
   Key,
 
   // Preferences
-  Palette,
   Volume2,
   Bell,
   Keyboard,
@@ -105,7 +104,6 @@ export type MenuItemKind =
 
 export type SettingsTabId =
   | 'general'
-  | 'appearance'
   | 'sounds'
   | 'notifications'
   | 'plan'
@@ -434,16 +432,7 @@ export const menuRegistry: MenuItemDef[] = [
     settingsTab: 'general',
     keywords: 'settings preferences general profile name email language',
   },
-  {
-    id: 'pref-appearance',
-    label: 'Appearance',
-    icon: Palette,
-    group: 'preferences',
-    showIn: ['commandPalette', 'userMenu'],
-    kind: 'settings',
-    settingsTab: 'appearance',
-    keywords: 'appearance theme colors font size density',
-  },
+
   {
     id: 'pref-sounds',
     label: 'Sounds',
@@ -713,7 +702,7 @@ export interface SettingsTab {
 
 /** Preference tabs for the settings modal */
 export function getPreferenceTabs(): SettingsTab[] {
-  const preferenceIds: SettingsTabId[] = ['general', 'appearance', 'sounds', 'notifications', 'shortcuts'];
+  const preferenceIds: SettingsTabId[] = ['general', 'sounds', 'notifications', 'shortcuts'];
   return preferenceIds.map((tabId) => {
     const item = menuRegistry.find(
       (i) => i.kind === 'settings' && i.settingsTab === tabId,
