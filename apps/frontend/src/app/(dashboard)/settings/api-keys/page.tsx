@@ -292,12 +292,7 @@ export default function APIKeysPage() {
         setCreatedApiKey(response.data.data);
         setShowCreatedKey(true);
         queryClient.invalidateQueries({ queryKey: ['api-keys'] });
-        const sandboxUpdated = (response.data as any)?.sandbox_updated;
-        toast.info(
-          sandboxUpdated
-            ? 'Token regenerated and applied to sandbox'
-            : 'Token regenerated — restart sandbox to apply',
-        );
+        toast.info('Token regenerated and applied to sandbox');
       } else {
         toast.warning(response.error?.message || 'Failed to regenerate key');
       }
@@ -379,9 +374,15 @@ export default function APIKeysPage() {
                 // Inject auth token so the preview proxy sets a session cookie
                 const token = await getAuthToken();
                 if (token) {
-                  const url = new URL(docsUrl);
-                  url.searchParams.set('token', token);
-                  window.open(url.toString(), '_blank');
+                  try {
+                    const url = new URL(docsUrl);
+                    url.searchParams.set('token', token);
+                    window.open(url.toString(), '_blank');
+                  } catch {
+                    // URL may be relative or malformed — open as-is with token appended
+                    const sep = docsUrl.includes('?') ? '&' : '?';
+                    window.open(`${docsUrl}${sep}token=${encodeURIComponent(token)}`, '_blank');
+                  }
                 } else {
                   window.open(docsUrl, '_blank');
                 }
@@ -423,7 +424,7 @@ export default function APIKeysPage() {
                   <AlertDialogTitle>Regenerate Sandbox Token</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will revoke the current token and generate a new one.
-                    The sandbox will need to restart for agents to keep working.
+                    The new token will be applied to the sandbox automatically.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

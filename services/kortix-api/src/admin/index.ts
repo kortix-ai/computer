@@ -152,11 +152,11 @@ async function getSandboxEnv(): Promise<Record<string, string>> {
   catch { return {}; }
 }
 
-async function setSandboxEnv(keys: Record<string, string>, restart = true): Promise<void> {
+async function setSandboxEnv(keys: Record<string, string>): Promise<void> {
   await fetchMasterJson('/env', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keys, restart }),
+    body: JSON.stringify({ keys }),
   }, 15000);
 }
 
@@ -309,7 +309,7 @@ adminApp.post('/api/env', async (c) => {
       clean[k] = trimmed;
     }
     try {
-      await setSandboxEnv(clean, true);
+      await setSandboxEnv(clean);
       return c.json({ ok: true });
     } catch (e: any) {
       return c.json({ ok: false, error: 'Failed to save', details: e?.message || String(e) }, 500);

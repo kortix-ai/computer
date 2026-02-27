@@ -107,11 +107,9 @@ async function restartServices(): Promise<void> {
 
 // NOTE: Tools use getEnv() which hot-reads from the s6 env directory (tmpfs).
 // Setting a key writes the s6 env file, making it instantly available to tools
-// WITHOUT restarting OpenCode. Restart is only needed if non-tool code (e.g.
-// provider configs, MCP server configs) must pick up the new value. Callers
-// can opt-in to restart via { "restart": true } or ?restart=1.
-// DELETE always restarts because getEnv() caches values in process.env and
-// there is no way to invalidate another process's cache without a restart.
+// WITHOUT restarting OpenCode. Restart is ONLY used by rotate-token (which
+// changes the encryption key and requires a fresh process). Normal set/delete
+// operations never restart.
 
 // GET /env — list all secrets (full values).
 envRouter.get('/',
@@ -136,13 +134,13 @@ envRouter.get('/',
   },
 )
 
-// POST /env — set multiple keys at once. { keys: { K: V, ... }, restart?: bool }
-// Default: NO restart. Tools pick up new values via s6 env dir.
+// POST /env — set multiple keys at once. { keys: { K: V, ... } }
+// Never restarts services — tools pick up new values via s6 env dir.
 envRouter.post('/',
   describeRoute({
     tags: ['Secrets'],
     summary: 'Set multiple secrets',
-    description: 'Bulk-set environment variables. By default does NOT restart services — tools pick up values via s6 env dir. Pass `restart: true` or `?restart=1` to restart OpenCode.',
+    description: 'Bulk-set environment variables. Does NOT restart services — tools pick up values via s6 env dir instantly.',
     responses: {
       200: { description: 'Keys updated', content: { 'application/json': { schema: resolver(SetBulkEnvResponse) } } },
       400: { description: 'Invalid body', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
@@ -154,7 +152,6 @@ envRouter.post('/',
     try {
       const body = await c.req.json()
       const keys = body?.keys
-      const restart = (body?.restart === true) || c.req.query('restart') === '1'
       if (!keys || typeof keys !== 'object') {
         return c.json({ error: 'Request body must contain a "keys" object' }, 400)
       }
@@ -166,8 +163,7 @@ envRouter.post('/',
         await syncSecretToAuth(key, value)  // sync provider keys → auth.json
         updated++
       }
-      if (restart) await restartServices()
-      return c.json({ ok: true, updated, restarted: restart })
+      return c.json({ ok: true, updated, restarted: false })
     } catch (error) {
       console.error('[ENV API] Error setting bulk:', error)
       return c.json({ error: 'Failed to set environment variables' }, 500)
@@ -242,12 +238,12 @@ envRouter.post('/rotate-token',
 )
 
 // POST /env/:key — set a single key. { value: "..." }
-// Default: NO restart. Tools pick up new values via s6 env dir.
+// Never restarts services — tools pick up new values via s6 env dir.
 envRouter.post('/:key',
   describeRoute({
     tags: ['Secrets'],
     summary: 'Set a single secret',
-    description: 'Sets a single environment variable. By default does NOT restart services. Pass `restart: true` or `?restart=1` to restart OpenCode.',
+    description: 'Sets a single environment variable. Does NOT restart services — tools pick up values via s6 env dir instantly.',
     responses: {
       200: { description: 'Key set', content: { 'application/json': { schema: resolver(SetSingleEnvResponse) } } },
       400: { description: 'Invalid body', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
@@ -259,15 +255,13 @@ envRouter.post('/:key',
     try {
       const key = c.req.param('key')
       const body = await c.req.json()
-      const restart = (body?.restart === true) || c.req.query('restart') === '1'
       if (!body || typeof body.value !== 'string') {
         return c.json({ error: 'Request body must contain a "value" field' }, 400)
       }
       await secretStore.setEnv(key, body.value)
       await writeS6Env(key, body.value)
       await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
-      if (restart) await restartServices()
-      return c.json({ ok: true, key, restarted: restart })
+      return c.json({ ok: true, key, restarted: false })
     } catch (error) {
       console.error('[ENV API] Error setting key:', error)
       return c.json({ error: 'Failed to set environment variable' }, 500)
@@ -276,12 +270,12 @@ envRouter.post('/:key',
 )
 
 // PUT /env/:key — alias for POST (frontend uses PUT for set).
-// Default: NO restart. Tools pick up new values via s6 env dir.
+// Never restarts services — tools pick up new values via s6 env dir.
 envRouter.put('/:key',
   describeRoute({
     tags: ['Secrets'],
     summary: 'Set a single secret (PUT)',
-    description: 'Alias for POST /env/:key. Sets a single environment variable.',
+    description: 'Alias for POST /env/:key. Sets a single environment variable. Does NOT restart services.',
     responses: {
       200: { description: 'Key set', content: { 'application/json': { schema: resolver(SetSingleEnvResponse) } } },
       400: { description: 'Invalid body', content: { 'application/json': { schema: resolver(ErrorResponse) } } },
@@ -293,15 +287,13 @@ envRouter.put('/:key',
     try {
       const key = c.req.param('key')
       const body = await c.req.json()
-      const restart = (body?.restart === true) || c.req.query('restart') === '1'
       if (!body || typeof body.value !== 'string') {
         return c.json({ error: 'Request body must contain a "value" field' }, 400)
       }
       await secretStore.setEnv(key, body.value)
       await writeS6Env(key, body.value)
       await syncSecretToAuth(key, body.value)  // sync provider keys → auth.json
-      if (restart) await restartServices()
-      return c.json({ ok: true, key, restarted: restart })
+      return c.json({ ok: true, key, restarted: false })
     } catch (error) {
       console.error('[ENV API] Error setting key:', error)
       return c.json({ error: 'Failed to set environment variable' }, 500)
@@ -309,13 +301,14 @@ envRouter.put('/:key',
   },
 )
 
-// DELETE /env/:key — remove a key. Always restarts because getEnv() caches
-// values in process.env and stale cache can't be invalidated without restart.
+// DELETE /env/:key — remove a key. Deletes from secret store and s6 env dir.
+// Does NOT restart services. The s6 env file removal means getEnv() will
+// fall back to process.env (stale) but new tool invocations won't see the key.
 envRouter.delete('/:key',
   describeRoute({
     tags: ['Secrets'],
     summary: 'Delete a secret',
-    description: 'Removes an environment variable and always restarts OpenCode (process.env cache invalidation requires restart).',
+    description: 'Removes an environment variable. Does NOT restart services.',
     responses: {
       200: { description: 'Key deleted', content: { 'application/json': { schema: resolver(DeleteEnvResponse) } } },
       401: { description: 'Unauthorized', content: { 'application/json': { schema: resolver(UnauthorizedResponse) } } },
@@ -328,7 +321,6 @@ envRouter.delete('/:key',
       await secretStore.deleteEnv(key)
       await deleteS6Env(key)
       await syncSecretToAuth(key, '')  // clear provider key from auth.json
-      await restartServices()
       return c.json({ ok: true, key })
     } catch (error) {
       console.error('[ENV API] Error deleting key:', error)

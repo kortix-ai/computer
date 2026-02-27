@@ -176,7 +176,7 @@ async function attemptKeySync(baseUrl: string): Promise<boolean> {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${ourKey}`,
         },
-        body: JSON.stringify({ keys: keysToSync, restart: false }),
+        body: JSON.stringify({ keys: keysToSync }),
         signal: AbortSignal.timeout(10_000),
       });
 
