@@ -9,6 +9,7 @@ import {
   WifiOff,
   RefreshCw,
   ArrowLeftRight,
+  Loader,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
@@ -68,6 +69,9 @@ export function ConnectingScreen() {
           {status === 'connecting' && (
             <FirstConnectState label={serverLabel} url={serverUrl} />
           )}
+          {status === 'starting' && (
+            <StartingState label={serverLabel} url={serverUrl} />
+          )}
           {status === 'unreachable' && (
             <UnreachableState
               label={serverLabel}
@@ -119,8 +123,15 @@ export function useConnectionToasts() {
       });
     }
 
-    // Unreachable/connecting -> connected: show recovery toast
-    if ((prev === 'unreachable' || prev === 'connecting') && status === 'connected' && wasConnected) {
+    // Connected -> starting: show starting toast
+    if (prev === 'connected' && status === 'starting' && wasConnected) {
+      toast.info('OpenCode is restarting...', {
+        duration: 4000,
+      });
+    }
+
+    // Unreachable/connecting/starting -> connected: show recovery toast
+    if ((prev === 'unreachable' || prev === 'connecting' || prev === 'starting') && status === 'connected' && wasConnected) {
       toast.success('Instance reconnected!', {
         duration: 3000,
       });
@@ -128,7 +139,7 @@ export function useConnectionToasts() {
   }, [status, wasConnected, initialCheckDone]);
 }
 
-type SandboxConnectionStatus = 'connecting' | 'connected' | 'unreachable';
+type SandboxConnectionStatus = 'connecting' | 'connected' | 'starting' | 'unreachable';
 
 // ============================================================================
 // Sub-components
@@ -151,19 +162,20 @@ function ReconnectBanner({
   onSwitchInstance: () => void;
 }) {
   const elapsed = useElapsedTime(disconnectedAt);
+  const isStarting = status === 'starting';
 
   return (
     <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-2 fade-in duration-200">
       <div className="flex items-center gap-2.5 pl-3 pr-1.5 py-1.5 bg-background/95 backdrop-blur-xl border border-border/60 rounded-full shadow-lg">
-        {/* Pulsing dot */}
+        {/* Pulsing dot — blue for starting, amber for reconnecting */}
         <span className="relative flex h-2 w-2 flex-shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${isStarting ? 'bg-blue-400' : 'bg-amber-400'}`} />
+          <span className={`relative inline-flex h-2 w-2 rounded-full ${isStarting ? 'bg-blue-500' : 'bg-amber-500'}`} />
         </span>
 
         {/* Label */}
         <span className="text-xs text-muted-foreground whitespace-nowrap">
-          Reconnecting
+          {isStarting ? 'Starting up' : 'Reconnecting'}
           {elapsed && <span className="text-muted-foreground/50"> · {elapsed}</span>}
         </span>
 
@@ -196,6 +208,35 @@ function FirstConnectState({ label, url }: { label: string; url: string }) {
         <p className="text-sm text-muted-foreground/70">
           Setting up your environment...
         </p>
+      </div>
+    </>
+  );
+}
+
+/** Full-screen state when sandbox is reachable but OpenCode is still starting */
+function StartingState({ label, url }: { label: string; url: string }) {
+  return (
+    <>
+      <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+        <Loader className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-foreground">
+          Starting up
+        </h2>
+        {url && (
+          <p className="text-sm text-muted-foreground font-mono">{url}</p>
+        )}
+        <p className="text-sm text-muted-foreground/70">
+          Connected to <span className="font-medium text-foreground/80">{label}</span>.
+          {' '}The AI agent is initializing — this usually takes a few seconds.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
+        <span className="flex items-center gap-1.5">
+          <RefreshCw className="w-3 h-3 animate-spin" />
+          Waiting for OpenCode...
+        </span>
       </div>
     </>
   );

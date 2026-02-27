@@ -27,6 +27,7 @@ const FAIL_THRESHOLD_RECONNECT = 1;
 
 /** Interval between health checks (ms) */
 const POLL_CONNECTED = 30_000; // 30s when healthy
+const POLL_STARTING = 5_000; // 5s when sandbox up but OpenCode starting
 const POLL_FAILING = 3_000; // 3s when any failure detected (fast retry)
 const POLL_UNREACHABLE = 5_000; // 5s when confirmed unreachable
 
@@ -103,6 +104,32 @@ export function useSandboxConnection() {
 					throw new Error(`Auth error: ${res.status}`);
 				}
 
+				// 502 means Kortix Master is up but OpenCode is unreachable.
+				// Check /kortix/health to confirm sandbox is alive and get its status.
+				if (res.status === 502) {
+					try {
+						const fallbackRes = await authenticatedFetch(`${url}/kortix/health`, {
+							signal: AbortSignal.timeout(3000),
+						}, { retryOnAuthError: false });
+						// /kortix/health responds (200 = ready, 503 = starting) — sandbox is reachable
+						if (fallbackRes.status === 200 || fallbackRes.status === 503) {
+							const fallbackData = await fallbackRes.json();
+							setSandboxStatus("starting");
+							setOpenCodeHealth(false);
+							// Still extract version if available
+							if (fallbackData.version && fallbackData.version !== "0.0.0") {
+								setSandboxVersion(fallbackData.version);
+								versionFetchedRef.current = true;
+							}
+							scheduleNext();
+							return;
+						}
+					} catch {
+						// /kortix/health also failed — truly unreachable, fall through to failure path
+					}
+					throw new Error("OpenCode proxy error (502)");
+				}
+
 				resetSandboxFail();
 				setSandboxStatus("connected");
 
@@ -148,7 +175,8 @@ export function useSandboxConnection() {
 						const hRes = await authenticatedFetch(`${url}/kortix/health`, {
 							signal: AbortSignal.timeout(3000),
 						}, { retryOnAuthError: false });
-						if (hRes.ok) {
+						// Accept both 200 (ok) and 503 (starting) — both return valid JSON with version
+						if (hRes.ok || hRes.status === 503) {
 							const hData = await hRes.json();
 							if (hData.version) {
 								setSandboxVersion(hData.version);
@@ -188,6 +216,8 @@ export function useSandboxConnection() {
 			let delay: number;
 			if (status === "connected") {
 				delay = POLL_CONNECTED;
+			} else if (status === "starting") {
+				delay = POLL_STARTING;
 			} else if (status === "unreachable") {
 				delay = POLL_UNREACHABLE;
 			} else {

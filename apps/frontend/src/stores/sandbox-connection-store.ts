@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 export type SandboxConnectionStatus =
 	| "connecting"
 	| "connected"
+	| "starting"
 	| "unreachable";
 
 interface SandboxConnectionStore {
@@ -99,6 +100,13 @@ export function setSandboxStatus(next: SandboxConnectionStatus) {
 			reconnectAttempts: state.reconnectAttempts,
 			wasConnected: state.wasConnected,
 		});
+	} else if (next === "starting") {
+		// Sandbox is reachable but OpenCode isn't ready yet.
+		// Reset fail count (infra is up), but track disconnect time for elapsed display.
+		updates.failCount = 0;
+		if (!state.disconnectedAt) {
+			updates.disconnectedAt = Date.now();
+		}
 	} else if (next === "connecting") {
 		// Track when we first went down (don't overwrite if already set)
 		if (!state.disconnectedAt) {

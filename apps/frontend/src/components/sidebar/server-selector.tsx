@@ -47,7 +47,7 @@ import {
 // Connection status
 // ============================================================================
 
-type ConnectionStatus = 'unknown' | 'checking' | 'connected' | 'error';
+type ConnectionStatus = 'unknown' | 'checking' | 'connected' | 'starting' | 'error';
 
 function useConnectionStatus(url: string, enabled: boolean) {
   const [status, setStatus] = React.useState<ConnectionStatus>('unknown');
@@ -60,19 +60,25 @@ function useConnectionStatus(url: string, enabled: boolean) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
 
-      await authenticatedFetch(`${url}/session`, {
+      const res = await authenticatedFetch(`${url}/session`, {
         method: 'GET',
         signal: controller.signal,
       }, { retryOnAuthError: false });
       clearTimeout(timeout);
-      setStatus('connected');
+
+      // 502 means Kortix Master is up but OpenCode isn't ready yet
+      if (res.status === 502) {
+        setStatus('starting');
+      } else {
+        setStatus('connected');
+      }
 
       // Try to get version from /kortix/health
       try {
         const hres = await authenticatedFetch(`${url}/kortix/health`, {
           signal: AbortSignal.timeout(3000),
         }, { retryOnAuthError: false });
-        if (hres.ok) {
+        if (hres.ok || hres.status === 503) {
           const data = await hres.json();
           if (data.version && data.version !== '0.0.0') {
             setVersion(data.version);
@@ -102,6 +108,12 @@ function StatusDot({ status }: { status: ConnectionStatus }) {
           <span className="absolute inset-0 size-[7px] rounded-full bg-emerald-400 animate-ping opacity-40" />
         </>
       )}
+      {status === 'starting' && (
+        <>
+          <span className="size-[7px] rounded-full bg-blue-500" />
+          <span className="absolute inset-0 size-[7px] rounded-full bg-blue-400 animate-ping opacity-40" />
+        </>
+      )}
       {status === 'error' && <span className="size-[7px] rounded-full bg-red-400" />}
       {status === 'checking' && <span className="size-[7px] rounded-full bg-amber-400 animate-pulse" />}
       {status === 'unknown' && <span className="size-[7px] rounded-full bg-muted-foreground/20" />}
@@ -113,6 +125,7 @@ const statusLabel: Record<ConnectionStatus, string> = {
   unknown: '',
   checking: 'Connecting...',
   connected: 'Connected',
+  starting: 'Starting...',
   error: 'Unreachable',
 };
 
@@ -277,6 +290,7 @@ function DialogInstanceRow({
             <span className={cn(
               'flex items-center gap-1 text-[10px] font-medium',
               status === 'connected' && 'text-emerald-500',
+              status === 'starting' && 'text-blue-500',
               status === 'error' && 'text-red-400',
               status === 'checking' && 'text-amber-500',
             )}>
