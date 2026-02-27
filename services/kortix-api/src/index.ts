@@ -413,6 +413,16 @@ ensureSchema()
     startChannelService();
     startDrainer();
     startTunnelService();
+
+    // If local_docker is enabled and we have a DB, ensure the sandbox is registered
+    // and start the health monitor for self-healing connectivity.
+    // Must run AFTER schema push so the sandboxes table exists.
+    if (config.isLocalDockerEnabled() && config.DATABASE_URL) {
+      ensureLocalSandboxRegistered().catch((err) =>
+        console.error('[startup] Failed to register local sandbox:', err),
+      );
+      startSandboxHealthMonitor();
+    }
   })
   .catch(async (err) => {
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
@@ -420,17 +430,15 @@ ensureSchema()
     startChannelService();
     startDrainer();
     startTunnelService();
-  });
 
-// If local_docker is enabled and we have a DB, ensure the sandbox is registered
-// and start the health monitor for self-healing connectivity.
-if (config.isLocalDockerEnabled() && config.DATABASE_URL) {
-  ensureLocalSandboxRegistered().catch((err) =>
-    console.error('[startup] Failed to register local sandbox:', err),
-  );
-  // Start health monitor — proactively syncs keys and detects connectivity issues
-  startSandboxHealthMonitor();
-}
+    // Still try to register sandbox even if schema push fails — the table may already exist
+    if (config.isLocalDockerEnabled() && config.DATABASE_URL) {
+      ensureLocalSandboxRegistered().catch((e) =>
+        console.error('[startup] Failed to register local sandbox:', e),
+      );
+      startSandboxHealthMonitor();
+    }
+  });
 
 // Graceful shutdown
 function shutdown(signal: string) {
