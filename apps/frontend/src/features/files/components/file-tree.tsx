@@ -63,6 +63,11 @@ import { openTabAndNavigate } from '@/stores/tab-store';
 
 // ─── Recursive tree node ────────────────────────────────────────────────────
 
+interface CreatingInDir {
+  dirPath: string;
+  type: 'file' | 'folder';
+}
+
 interface TreeNodeProps {
   node: FileNode;
   depth: number;
@@ -73,6 +78,10 @@ interface TreeNodeProps {
   onCopy: (node: FileNode) => void;
   onCut: (node: FileNode) => void;
   onDropMove: (sourcePath: string, targetDirPath: string) => void;
+  onCreateInDir: (dirPath: string, type: 'file' | 'folder') => void;
+  creatingInDir: CreatingInDir | null;
+  onCreatingInDirSubmit: (name: string) => void;
+  onCreatingInDirCancel: () => void;
 }
 
 const gitStatusTextColor: Record<GitStatusType, string> = {
@@ -103,6 +112,10 @@ function TreeNode({
   onCopy,
   onCut,
   onDropMove,
+  onCreateInDir,
+  creatingInDir,
+  onCreatingInDirSubmit,
+  onCreatingInDirCancel,
 }: TreeNodeProps) {
   const expandedDirs = useFilesStore((s) => s.expandedDirs);
   const toggleDir = useFilesStore((s) => s.toggleDir);
@@ -330,6 +343,19 @@ function TreeNode({
               View History
             </ContextMenuItem>
           )}
+          {isDir && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => onCreateInDir(node.path, 'file')}>
+                <FilePlus className="mr-2 h-4 w-4" />
+                New File
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => onCreateInDir(node.path, 'folder')}>
+                <FolderPlus className="mr-2 h-4 w-4" />
+                New Folder
+              </ContextMenuItem>
+            </>
+          )}
           <ContextMenuSeparator />
           <ContextMenuItem onClick={() => onCopy(node)}>
             <ClipboardCopy className="mr-2 h-4 w-4" />
@@ -372,6 +398,10 @@ function TreeNode({
           onCopy={onCopy}
           onCut={onCut}
           onDropMove={onDropMove}
+          onCreateInDir={onCreateInDir}
+          creatingInDir={creatingInDir}
+          onCreatingInDirSubmit={onCreatingInDirSubmit}
+          onCreatingInDirCancel={onCreatingInDirCancel}
         />
       )}
     </>
@@ -390,6 +420,96 @@ interface TreeNodeChildrenProps {
   onCopy: (node: FileNode) => void;
   onCut: (node: FileNode) => void;
   onDropMove: (sourcePath: string, targetDirPath: string) => void;
+  onCreateInDir: (dirPath: string, type: 'file' | 'folder') => void;
+  creatingInDir: CreatingInDir | null;
+  onCreatingInDirSubmit: (name: string) => void;
+  onCreatingInDirCancel: () => void;
+}
+
+function InlineCreateInput({
+  type,
+  depth,
+  onSubmit,
+  onCancel,
+}: {
+  type: 'file' | 'folder';
+  depth: number;
+  onSubmit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(type === 'file' ? 'untitled.txt' : 'New Folder');
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Guard: ignore blur events until the input has been properly focused.
+  // Without this, the context-menu closing causes a stray blur that
+  // immediately submits the default name before the user can type.
+  const readyRef = useRef(false);
+  const submittedRef = useRef(false);
+
+  useEffect(() => {
+    // Triple-rAF to ensure the context menu portal has fully unmounted
+    // and focus can land on the input without being stolen.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = inputRef.current;
+          if (el) {
+            el.focus();
+            if (type === 'file') {
+              const d = el.value.lastIndexOf('.');
+              el.setSelectionRange(0, d > 0 ? d : el.value.length);
+            } else {
+              el.setSelectionRange(0, el.value.length);
+            }
+            readyRef.current = true;
+          }
+        });
+      });
+    });
+  }, [type]);
+
+  const handleSubmit = useCallback(() => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    const trimmed = name.trim();
+    if (trimmed) {
+      onSubmit(trimmed);
+    } else {
+      onCancel();
+    }
+  }, [name, onSubmit, onCancel]);
+
+  const handleBlur = useCallback(() => {
+    // Only treat blur as a submit once the input is truly active
+    if (!readyRef.current) return;
+    handleSubmit();
+  }, [handleSubmit]);
+
+  return (
+    <div
+      className="flex items-center gap-1.5 py-1"
+      style={{ paddingLeft: 8 + depth * 16 }}
+    >
+      {/* Spacer matching the chevron width in TreeNode rows */}
+      <span className="w-3.5 shrink-0" />
+      {type === 'file' ? (
+        <FilePlus className="h-4 w-4 text-green-400 shrink-0" />
+      ) : (
+        <FolderPlus className="h-4 w-4 text-blue-400 shrink-0" />
+      )}
+      <input
+        type="text"
+        ref={inputRef}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSubmit();
+          if (e.key === 'Escape') onCancel();
+        }}
+        onBlur={handleBlur}
+        className="flex-1 text-sm bg-transparent border border-primary/50 rounded px-1.5 py-0.5 outline-none min-w-0"
+      />
+    </div>
+  );
 }
 
 function TreeNodeChildren({
@@ -402,6 +522,10 @@ function TreeNodeChildren({
   onCopy,
   onCut,
   onDropMove,
+  onCreateInDir,
+  creatingInDir,
+  onCreatingInDirSubmit,
+  onCreatingInDirCancel,
 }: TreeNodeChildrenProps) {
   const { data: children, isLoading } = useFileList(dirPath);
 
@@ -413,6 +537,8 @@ function TreeNodeChildren({
     });
   }, [children]);
 
+  const showInlineCreate = creatingInDir && creatingInDir.dirPath === dirPath;
+
   if (isLoading) {
     return (
       <div className="py-1" style={{ paddingLeft: 8 + depth * 16 }}>
@@ -421,7 +547,7 @@ function TreeNodeChildren({
     );
   }
 
-  if (!sorted.length) {
+  if (!sorted.length && !showInlineCreate) {
     return (
       <div
         className="py-1 text-xs text-muted-foreground/40 italic select-none"
@@ -434,6 +560,14 @@ function TreeNodeChildren({
 
   return (
     <>
+      {showInlineCreate && (
+        <InlineCreateInput
+          type={creatingInDir.type}
+          depth={depth}
+          onSubmit={onCreatingInDirSubmit}
+          onCancel={onCreatingInDirCancel}
+        />
+      )}
       {sorted.map((node) => (
         <TreeNode
           key={node.path}
@@ -446,6 +580,10 @@ function TreeNodeChildren({
           onCopy={onCopy}
           onCut={onCut}
           onDropMove={onDropMove}
+          onCreateInDir={onCreateInDir}
+          creatingInDir={creatingInDir}
+          onCreatingInDirSubmit={onCreatingInDirSubmit}
+          onCreatingInDirCancel={onCreatingInDirCancel}
         />
       ))}
     </>
@@ -508,7 +646,7 @@ export function FileTree() {
   const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Inline create states
+  // Inline create states (root-level)
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -516,6 +654,9 @@ export function FileTree() {
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
   const folderCreateInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline create states (inside a specific folder via context menu)
+  const [creatingInDir, setCreatingInDir] = useState<CreatingInDir | null>(null);
 
   useEffect(() => {
     if (isCreatingFile) {
@@ -642,6 +783,41 @@ export function FileTree() {
     }
   }, [mkdirMutation, normalizedCurrentPath, newFolderName]);
 
+  // Handlers for creating inside a specific folder (via context menu)
+  const expandDir = useFilesStore((s) => s.expandDir);
+  
+  const handleCreateInDir = useCallback((dirPath: string, type: 'file' | 'folder') => {
+    // Expand the folder so the inline input is visible
+    expandDir(dirPath);
+    // Use setTimeout to let the context menu close and folder expand first
+    setTimeout(() => {
+      setCreatingInDir({ dirPath, type });
+    }, 100);
+  }, [expandDir]);
+
+  const handleCreatingInDirSubmit = useCallback(async (name: string) => {
+    if (!creatingInDir) return;
+    const { dirPath, type } = creatingInDir;
+    const fullPath = `${dirPath}/${name}`;
+    try {
+      if (type === 'file') {
+        await createMutation.mutateAsync({ filePath: fullPath });
+        toast.success(`Created ${name}`);
+      } else {
+        await mkdirMutation.mutateAsync({ dirPath: fullPath });
+        toast.success(`Created folder: ${name}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setCreatingInDir(null);
+    }
+  }, [creatingInDir, createMutation, mkdirMutation]);
+
+  const handleCreatingInDirCancel = useCallback(() => {
+    setCreatingInDir(null);
+  }, []);
+
   const handleUpload = useCallback(() => { fileInputRef.current?.click(); }, []);
 
   const handleFileInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -743,6 +919,10 @@ export function FileTree() {
             onCopy={handleCopy}
             onCut={handleCut}
             onDropMove={handleDropMove}
+            onCreateInDir={handleCreateInDir}
+            creatingInDir={creatingInDir}
+            onCreatingInDirSubmit={handleCreatingInDirSubmit}
+            onCreatingInDirCancel={handleCreatingInDirCancel}
           />
         </div>
       </ScrollArea>
