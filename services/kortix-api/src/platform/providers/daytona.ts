@@ -39,7 +39,10 @@ export class DaytonaProvider implements SandboxProvider {
       {
         snapshot,
         envVars: {
-          KORTIX_API_URL: config.KORTIX_URL,
+          // Strip /v1/router suffix — opencode.jsonc appends it already.
+          // KORTIX_URL may be "https://new-api.kortix.com/v1/router" but the
+          // sandbox expects the base: "https://new-api.kortix.com".
+          KORTIX_API_URL: config.KORTIX_URL.replace(/\/v1\/router\/?$/, ''),
           ENV_MODE: 'cloud',
           INTERNAL_SERVICE_KEY: serviceKey,
           ...opts.envVars,
