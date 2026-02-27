@@ -79,9 +79,25 @@ async function checkSandboxHealth(): Promise<void> {
 
   try {
     // 1. Check basic reachability (health endpoint bypasses auth)
+    // 503 means Kortix Master is running but OpenCode isn't ready yet —
+    // treat it as a soft failure (sandbox is reachable but not fully ready).
     const healthRes = await fetch(`${baseUrl}/kortix/health`, {
       signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
     });
+
+    if (healthRes.status === 503) {
+      // Sandbox is reachable but OpenCode is still starting — not a hard failure.
+      // Mark as connected (infra is up) but log that OpenCode isn't ready.
+      const wasDisconnected = !state.connected;
+      state.connected = true;
+      state.lastCheck = Date.now();
+      state.consecutiveFailures = 0;
+      state.lastError = 'OpenCode not ready (503 starting)';
+      if (wasDisconnected) {
+        console.log('[sandbox-health] Sandbox reachable but OpenCode still starting');
+      }
+      return;
+    }
 
     if (!healthRes.ok) {
       throw new Error(`Health returned ${healthRes.status}`);
@@ -176,7 +192,7 @@ async function attemptKeySync(baseUrl: string): Promise<boolean> {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${ourKey}`,
         },
-        body: JSON.stringify({ keys: keysToSync, restart: false }),
+        body: JSON.stringify({ keys: keysToSync }),
         signal: AbortSignal.timeout(10_000),
       });
 

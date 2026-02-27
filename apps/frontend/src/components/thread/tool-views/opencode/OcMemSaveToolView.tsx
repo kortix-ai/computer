@@ -43,7 +43,7 @@ const TYPE_CONFIG: Record<string, { icon: typeof Brain; label: string; color: st
 
 function parseSaveOutput(output: string): { id: string | null; type: string; preview: string } {
   // "Saved to long-term memory [semantic] #42: "the content...""
-  const m = output.match(/\[(\w+)\]\s*#(\d+):\s*"(.+)"$/s);
+  const m = output.match(/\[(\w+)\]\s*#(\d+):\s*"(.+)"$/);  // removed /s flag for ES target compat
   return {
     id: m?.[2] ?? null,
     type: m?.[1] ?? 'semantic',

@@ -318,16 +318,11 @@ export function isProxiableLocalhostUrl(url: string): boolean {
 
   if (EXCLUDED_PORTS.has(parsed.port)) return false;
 
-  // Never proxy URLs that point at the app itself or the backend API.
-  if (typeof window !== 'undefined') {
-    try {
-      const appOrigin = window.location.origin;
-      const urlOrigin = new URL(parsed.originalUrl).origin;
-      if (urlOrigin === appOrigin) return false;
-    } catch {
-      /* invalid URL, fall through */
-    }
-  }
+  // NOTE: We intentionally do NOT check if the URL matches the app's own origin.
+  // All localhost URLs in agent output originate from inside the sandbox container,
+  // even if they happen to use the same port as the frontend (e.g. both on :3000).
+  // The EXCLUDED_PORTS set above already handles infrastructure ports that should
+  // not be rewritten.
 
   return true;
 }

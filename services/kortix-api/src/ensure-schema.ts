@@ -2,19 +2,20 @@
  * Ensures the database schema is up-to-date.
  *
  * Sequence:
- *   1. Run bootstrap SQL (schemas, extensions, schema-level grants)
- *   2. Run `drizzle-kit push` (creates/updates tables, indexes, enums)
- *   3. Run post-push SQL (table grants, atomic credit functions)
+ *   1. Run bootstrap migration (schemas, extensions, schema-level grants)
+ *   2. `drizzle-kit push` (tables, indexes, enums — Drizzle-native)
+ *   3. Run post-push migrations (table grants, atomic credit functions)
  *
- * drizzle.config.ts has schemaFilter: ['kortix'] so it pushes
- * the kortix schema tables.
+ * SQL migrations live in supabase/migrations/ as individual files.
+ * Each file contains a single statement so both `supabase db reset`
+ * and this runner can execute them without prepared-statement issues.
  *
  * In production (INTERNAL_KORTIX_ENV=prod), schema is managed by external
  * migration pipelines, so this is a no-op.
  */
 
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { config } from './config';
 import postgres from 'postgres';
 
@@ -32,7 +33,7 @@ export async function ensureSchema(): Promise<void> {
 
   const migrationsDir = join(import.meta.dir, '../../../supabase/migrations');
 
-  // Step 1: Run bootstrap SQL (schemas, extensions, grants)
+  // Step 1: Run bootstrap migration (schemas, extensions, grants)
   console.log('[schema] Running bootstrap migration...');
   await runSqlFile(join(migrationsDir, '00000000000000_bootstrap.sql'));
 
@@ -69,15 +70,22 @@ export async function ensureSchema(): Promise<void> {
 
   console.log('[schema] Schema pushed successfully');
   if (stdout.trim()) {
-    const summary = stdout.trim().split('\n').filter(l =>
+    const summary = stdout.trim().split('\n').filter((l: string) =>
       l.includes('changes applied') || l.includes('CREATE') || l.includes('ALTER') || l.includes('No changes')
     );
     if (summary.length) console.log('[schema]', summary.join(' | '));
   }
 
-  // Step 3: Run post-push SQL (table grants, atomic functions)
-  console.log('[schema] Running post-push migration...');
-  await runSqlFile(join(migrationsDir, '00000000000001_post_push.sql'));
+  // Step 3: Run all post-push migrations (table grants, atomic functions)
+  // Each file is executed individually to avoid prepared-statement limits.
+  console.log('[schema] Running post-push migrations...');
+  const postPushFiles = readdirSync(migrationsDir)
+    .filter(f => f.endsWith('.sql') && f > '00000000000000_bootstrap.sql')
+    .sort();
+
+  for (const file of postPushFiles) {
+    await runSqlFile(join(migrationsDir, file));
+  }
 
   console.log('[schema] All migrations complete');
 }

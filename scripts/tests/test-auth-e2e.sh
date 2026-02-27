@@ -268,10 +268,12 @@ if [ "$SECTION" = "all" ] || [ "$SECTION" = "sandbox" ] || [ "$SECTION" = "bypas
 section "2. Auth Bypass Routes (No Auth Required)"
 
 # 2.1 /kortix/health — no auth
+# Returns 200 when OpenCode is ready, 503 when still starting.
+# Both are valid responses (no auth required for either).
 result=$(http GET /kortix/health)
 s=$(status "$result")
-if [ "$s" = "200" ]; then
-  pass "/kortix/health → 200 without auth"
+if [ "$s" = "200" ] || [ "$s" = "503" ]; then
+  pass "/kortix/health → $s without auth (200=ok, 503=starting)"
   # Verify it returns expected fields
   b=$(body "$result")
   if echo "$b" | jq -e '.status' &>/dev/null; then
@@ -285,7 +287,7 @@ if [ "$s" = "200" ]; then
     fail "/kortix/health missing .opencode field"
   fi
 else
-  fail "/kortix/health → expected 200, got $s"
+  fail "/kortix/health → expected 200 or 503, got $s"
 fi
 
 # 2.2 /docs — no auth

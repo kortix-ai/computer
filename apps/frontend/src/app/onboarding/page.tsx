@@ -387,10 +387,11 @@ export default function OnboardingPage() {
     audio.volume = 0.6;
     audio.preload = 'auto';
     audioRef.current = audio;
+    const timers = bootTimers.current;
     return () => {
       audio.pause();
       audioRef.current = null;
-      bootTimers.current.forEach(clearTimeout);
+      timers.forEach(clearTimeout);
     };
   }, []);
 

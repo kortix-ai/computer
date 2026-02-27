@@ -96,6 +96,7 @@ export function adaptMessagesToToolCalls(messages: MessageWithParts[]): ToolCall
   const toolCalls: ToolCallInput[] = [];
 
   for (const msg of messages) {
+    if (!msg.parts) continue;
     for (const part of msg.parts) {
       if (part.type === 'tool') {
         toolCalls.push(adaptToolPart(part as ToolPart));

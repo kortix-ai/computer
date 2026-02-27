@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import { config } from '../../config';
 
 /**
  * Sandbox version + changelog endpoint.
@@ -57,8 +58,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 async function getLatestVersion(): Promise<string> {
   // Dev override: set SANDBOX_VERSION env var to skip npm registry lookup.
-  const override = process.env.SANDBOX_VERSION;
-  if (override) return override;
+  if (config.SANDBOX_VERSION_OVERRIDE) return config.SANDBOX_VERSION_OVERRIDE;
 
   const now = Date.now();
   if (cachedVersion && (now - cachedAt) < CACHE_TTL_MS) {
@@ -126,9 +126,8 @@ async function getChangelog(): Promise<any[]> {
   // 2. Fall back to GitHub raw (works for public repos)
   try {
     const headers: Record<string, string> = {};
-    const ghToken = process.env.GITHUB_TOKEN;
-    if (ghToken) {
-      headers['Authorization'] = `token ${ghToken}`;
+    if (config.GITHUB_TOKEN) {
+      headers['Authorization'] = `token ${config.GITHUB_TOKEN}`;
     }
 
     const res = await fetch(CHANGELOG_GITHUB_URL, {

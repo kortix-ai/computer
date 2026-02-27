@@ -3,21 +3,19 @@
   "private": true,
   "scripts": {
     "env": "./scripts/setup-env.sh",
-    "dev": "nx run-many --target=dev --projects=Kortix-Computer-Frontend,kortix-api --parallel=10",
-    "dev:services": "nx run kortix-api:dev",
-    "dev:frontend": "nx run Kortix-Computer-Frontend:dev",
-    "dev:api": "nx run kortix-api:dev",
-    "build": "nx run-many --target=build --parallel",
-    "build:frontend": "nx run Kortix-Computer-Frontend:build",
-    "typecheck": "nx run-many --target=typecheck --parallel",
+    "dev": "pnpm --filter Kortix-Computer-Frontend dev & pnpm --filter kortix-api dev",
+    "dev:services": "pnpm --filter kortix-api dev",
+    "dev:frontend": "pnpm --filter Kortix-Computer-Frontend dev",
+    "dev:api": "pnpm --filter kortix-api dev",
+    "build": "pnpm -r run build",
+    "build:frontend": "pnpm --filter Kortix-Computer-Frontend build",
+    "typecheck": "pnpm -r run typecheck",
     "stripe": "stripe listen --forward-to http://localhost:8008/v1/billing/webhooks/stripe",
     "setup": "echo 'Run: bash scripts/get-kortix.sh'",
-    "test:cli": "bash scripts/tests/run-all.sh",
-    "graph": "nx graph"
+    "test:cli": "bash scripts/tests/run-all.sh"
   },
   "devDependencies": {
-    "@kortix/tunnel": "workspace:*",
-    "nx": "^22.4.5"
+    "@kortix/tunnel": "workspace:*"
   },
   "pnpm": {
     "overrides": {

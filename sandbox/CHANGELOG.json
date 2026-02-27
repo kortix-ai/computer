@@ -1,13 +1,71 @@
 [
   {
+    "version": "0.7.4",
+    "date": "2026-02-27",
+    "title": "Cloud sandbox auth, proxy resilience & WoA routing fix",
+    "description": "Fixes cloud sandbox authentication (preview proxy now injects service key), adds 502/503 retry during sandbox boot, fixes doubled KORTIX_API_URL path that caused chat 404s, moves WoA forum under /v1/router/woa for correct sandbox access, and creates the woa_posts table in production.",
+    "changes": [
+      {
+        "type": "fix",
+        "text": "Preview proxy injects sandbox service key (INTERNAL_SERVICE_KEY) so cloud sandboxes authenticate correctly instead of 401"
+      },
+      {
+        "type": "fix",
+        "text": "Preview proxy retries on 502/503 during sandbox boot window (progressive delays: 2s, 5s, 8s)"
+      },
+      {
+        "type": "fix",
+        "text": "KORTIX_API_URL no longer includes /v1/router suffix — fixes doubled path causing chat completions 404"
+      },
+      {
+        "type": "fix",
+        "text": "WoA tools construct URL as KORTIX_API_URL + /v1/router/woa (was broken by KORTIX_API_URL format change)"
+      },
+      {
+        "type": "improvement",
+        "text": "WoA API moved from /v1/woa to /v1/router/woa — scoped under router with apiKeyAuth like other services"
+      },
+      {
+        "type": "feature",
+        "text": "Sandbox API responses include version field from metadata"
+      },
+      {
+        "type": "fix",
+        "text": "Frontend duplicate sandbox instances — stable IDs and rehydration cleanup prevent random srv_ entries"
+      },
+      {
+        "type": "fix",
+        "text": "Frontend resolveServerUrl() fixes version/status not showing for cloud sandbox entries"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/sandbox@0.7.4",
+        "target": "npm"
+      },
+      {
+        "name": "v0.7.4",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.7.4",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.4",
+        "target": "daytona"
+      }
+    ]
+  },
+  {
     "version": "0.7.3",
     "date": "2026-02-26",
     "title": "Wisdom of Agents forum, tunnel refactor & local_docker bug fixes",
-    "description": "Introduces the Wisdom of Agents (WoA) internal forum \u2014 agents can search and share solutions to problems they encounter. Tunnel system refactored into a standalone plugin with cleaner env/config plumbing. Several local_docker bugs fixed: frontend routing, provider fallback, and token sync.",
+    "description": "Introduces the Wisdom of Agents (WoA) internal forum — agents can search and share solutions to problems they encounter. Tunnel system refactored into a standalone plugin with cleaner env/config plumbing. Several local_docker bugs fixed: frontend routing, provider fallback, and token sync.",
     "changes": [
       {
         "type": "feature",
-        "text": "Wisdom of Agents (WoA) forum \u2014 internal agent knowledge base for sharing problems and solutions via woa-find and woa-create tools"
+        "text": "Wisdom of Agents (WoA) forum — internal agent knowledge base for sharing problems and solutions via woa-find and woa-create tools"
       },
       {
         "type": "feature",
@@ -15,7 +73,7 @@
       },
       {
         "type": "feature",
-        "text": "WoA skill \u2014 failure protocol instructs agents to search the forum when stuck and post solutions after solving non-trivial problems"
+        "text": "WoA skill — failure protocol instructs agents to search the forum when stuck and post solutions after solving non-trivial problems"
       },
       {
         "type": "improvement",
@@ -69,51 +127,51 @@
     "changes": [
       {
         "type": "feature",
-        "text": "Kortix Tunnel v1 \u2014 connect your local machine with scoped permissions (files, shell, desktop, clipboard), real-time SSE connection sync, and live WebSocket permission notifications"
+        "text": "Kortix Tunnel v1 — connect your local machine with scoped permissions (files, shell, desktop, clipboard), real-time SSE connection sync, and live WebSocket permission notifications"
       },
       {
         "type": "feature",
-        "text": "Long-term memory plugin \u2014 agents can save and search memories across sessions, with a dedicated Memory page in the frontend and kortix-master API endpoints"
+        "text": "Long-term memory plugin — agents can save and search memories across sessions, with a dedicated Memory page in the frontend and kortix-master API endpoints"
       },
       {
         "type": "feature",
-        "text": "Clickable file paths across the entire frontend \u2014 detected in chat, tool output, and markdown with a file preview modal"
+        "text": "Clickable file paths across the entire frontend — detected in chat, tool output, and markdown with a file preview modal"
       },
       {
         "type": "feature",
-        "text": "Running services panel \u2014 port scanner detects running dev servers, shows them with icons and tooltips, replaces old deployment-based panel"
+        "text": "Running services panel — port scanner detects running dev servers, shows them with icons and tooltips, replaces old deployment-based panel"
       },
       {
         "type": "feature",
-        "text": "CMD+K command palette expanded \u2014 all sidebar items, settings pages, and account actions searchable"
+        "text": "CMD+K command palette expanded — all sidebar items, settings pages, and account actions searchable"
       },
       {
         "type": "feature",
-        "text": "Select & reply \u2014 text selection in chat messages sets reply context with XML rendering"
+        "text": "Select & reply — text selection in chat messages sets reply context with XML rendering"
       },
       {
         "type": "feature",
-        "text": "Fine-grained tool-input streaming \u2014 tool arguments stream in real-time during generation, with expanded card content streaming"
+        "text": "Fine-grained tool-input streaming — tool arguments stream in real-time during generation, with expanded card content streaming"
       },
       {
         "type": "feature",
-        "text": "VS Code-like tab focus history \u2014 closing a tab returns to the previously focused tab instead of the nearest neighbor"
+        "text": "VS Code-like tab focus history — closing a tab returns to the previously focused tab instead of the nearest neighbor"
       },
       {
         "type": "improvement",
-        "text": "Preview URL consolidation \u2014 renamed /v1/preview to /v1/p, eliminated ?token= query params, consolidated auth middleware, replaced EventSource with fetch+ReadableStream"
+        "text": "Preview URL consolidation — renamed /v1/preview to /v1/p, eliminated ?token= query params, consolidated auth middleware, replaced EventSource with fetch+ReadableStream"
       },
       {
         "type": "improvement",
-        "text": "Sidebar reorganization \u2014 nav pages moved to right sidebar, SSH key dialog added, tunnel panel added"
+        "text": "Sidebar reorganization — nav pages moved to right sidebar, SSH key dialog added, tunnel panel added"
       },
       {
         "type": "improvement",
-        "text": "Files page UX overhaul \u2014 larger fonts, icons, and hit targets across tree, toolbar, status bar, viewer, and history panel"
+        "text": "Files page UX overhaul — larger fonts, icons, and hit targets across tree, toolbar, status bar, viewer, and history panel"
       },
       {
         "type": "improvement",
-        "text": "Replaced browser skill with upstream agent-browser from vercel-labs \u2014 better session management, authentication, and video recording support"
+        "text": "Replaced browser skill with upstream agent-browser from vercel-labs — better session management, authentication, and video recording support"
       },
       {
         "type": "improvement",
@@ -129,7 +187,7 @@
       },
       {
         "type": "fix",
-        "text": "3-layer ECONNRESET resilience \u2014 proxy, deployer, and Node.js process guard prevent dev server crashes"
+        "text": "3-layer ECONNRESET resilience — proxy, deployer, and Node.js process guard prevent dev server crashes"
       },
       {
         "type": "fix",
@@ -161,7 +219,7 @@
       },
       {
         "type": "security",
-        "text": "Hardened sandbox auth \u2014 timing-safe key comparison, CORS restrictions, self-healing key sync with E2E test suite"
+        "text": "Hardened sandbox auth — timing-safe key comparison, CORS restrictions, self-healing key sync with E2E test suite"
       },
       {
         "type": "fix",
@@ -199,27 +257,27 @@
     "version": "0.7.1",
     "date": "2026-02-24",
     "title": "Unified API key auth & live sandbox token rotation",
-    "description": "Merges the two separate auth systems (sbt_ sandbox tokens and sk_ user API keys) into one unified table with kortix_ prefixes. Sandbox tokens (kortix_sb_) and user API keys (kortix_) share a single validation path. Token regeneration atomically pushes the new key to the running sandbox, re-encrypts all stored secrets, and restarts services \u2014 no manual intervention needed. Works for both local Docker and Daytona cloud providers.",
+    "description": "Merges the two separate auth systems (sbt_ sandbox tokens and sk_ user API keys) into one unified table with kortix_ prefixes. Sandbox tokens (kortix_sb_) and user API keys (kortix_) share a single validation path. Token regeneration atomically pushes the new key to the running sandbox, re-encrypts all stored secrets, and restarts services — no manual intervention needed. Works for both local Docker and Daytona cloud providers.",
     "changes": [
       {
         "type": "feature",
-        "text": "Unified API key system \u2014 single kortix.api_keys table with type column (user/sandbox) replaces separate auth_token and api_keys systems"
+        "text": "Unified API key system — single kortix.api_keys table with type column (user/sandbox) replaces separate auth_token and api_keys systems"
       },
       {
         "type": "feature",
-        "text": "Live sandbox token rotation \u2014 regenerating a sandbox token atomically pushes it to the running sandbox, re-encrypts all secrets with the new key, and restarts services"
+        "text": "Live sandbox token rotation — regenerating a sandbox token atomically pushes it to the running sandbox, re-encrypts all secrets with the new key, and restarts services"
       },
       {
         "type": "feature",
-        "text": "Atomic token rotation endpoint (POST /env/rotate-token) in kortix-master \u2014 decrypts all secrets with old key, switches encryption key, re-encrypts, restarts OpenCode"
+        "text": "Atomic token rotation endpoint (POST /env/rotate-token) in kortix-master — decrypts all secrets with old key, switches encryption key, re-encrypts, restarts OpenCode"
       },
       {
         "type": "improvement",
-        "text": "New key prefixes: kortix_ for user keys, kortix_sb_ for sandbox keys, pk_ for public identifiers \u2014 single isKortixToken() check in auth middleware"
+        "text": "New key prefixes: kortix_ for user keys, kortix_sb_ for sandbox keys, pk_ for public identifiers — single isKortixToken() check in auth middleware"
       },
       {
         "type": "improvement",
-        "text": "KORTIX_TOKEN in kortix-master config is now a live getter from process.env \u2014 no stale cached values after token rotation"
+        "text": "KORTIX_TOKEN in kortix-master config is now a live getter from process.env — no stale cached values after token rotation"
       },
       {
         "type": "improvement",
@@ -231,7 +289,7 @@
       },
       {
         "type": "security",
-        "text": "Dropped plaintext auth_token column from sandboxes table \u2014 all tokens stored as HMAC-SHA256 hashes only"
+        "text": "Dropped plaintext auth_token column from sandboxes table — all tokens stored as HMAC-SHA256 hashes only"
       },
       {
         "type": "security",
@@ -281,7 +339,7 @@
       },
       {
         "type": "feature",
-        "text": "Live model pricing from models.dev \u2014 134+ models across Anthropic, OpenAI, xAI, Google, Groq, and DeepSeek with 24h background refresh"
+        "text": "Live model pricing from models.dev — 134+ models across Anthropic, OpenAI, xAI, Google, Groq, and DeepSeek with 24h background refresh"
       },
       {
         "type": "feature",
@@ -289,11 +347,11 @@
       },
       {
         "type": "feature",
-        "text": "LLM proxy service registry \u2014 Anthropic, OpenAI, xAI, Gemini, and Groq registered as billable LLM services"
+        "text": "LLM proxy service registry — Anthropic, OpenAI, xAI, Gemini, and Groq registered as billable LLM services"
       },
       {
         "type": "security",
-        "text": "Hard 401 reject for invalid Kortix tokens (sbt_/sk_ prefix) \u2014 prevents falling through to free passthrough"
+        "text": "Hard 401 reject for invalid Kortix tokens (sbt_/sk_ prefix) — prevents falling through to free passthrough"
       },
       {
         "type": "improvement",
@@ -309,11 +367,11 @@
       },
       {
         "type": "improvement",
-        "text": "Failed upstream LLM calls (non-2xx) are never billed \u2014 billing only on successful responses"
+        "text": "Failed upstream LLM calls (non-2xx) are never billed — billing only on successful responses"
       },
       {
         "type": "improvement",
-        "text": "Billing is cloud-only \u2014 self-hosted instances (KORTIX_BILLING_INTERNAL_ENABLED=false) get unlimited credits with no-op billing"
+        "text": "Billing is cloud-only — self-hosted instances (KORTIX_BILLING_INTERNAL_ENABLED=false) get unlimited credits with no-op billing"
       }
     ],
     "artifacts": [
@@ -347,11 +405,11 @@
     "version": "0.6.3",
     "date": "2026-02-23",
     "title": "Setup wizard overhaul, sandbox-on-demand, and frontend UX improvements",
-    "description": "Major self-hosted setup improvements: sandbox is no longer started at install time \u2014 the frontend wizard provisions it on-demand with image pull progress. Added Tool API Keys as a new wizard step. Installer script now only pre-pulls the sandbox image. Multiple frontend UX fixes including streaming, tool calls, file downloads, tab persistence, and preview proxy.",
+    "description": "Major self-hosted setup improvements: sandbox is no longer started at install time — the frontend wizard provisions it on-demand with image pull progress. Added Tool API Keys as a new wizard step. Installer script now only pre-pulls the sandbox image. Multiple frontend UX fixes including streaming, tool calls, file downloads, tab persistence, and preview proxy.",
     "changes": [
       {
         "type": "feature",
-        "text": "Setup wizard now has 4 steps: Account \u2192 LLM Provider \u2192 Tool API Keys \u2192 Start using. Tool keys step lets users configure Tavily, Firecrawl, Serper, Replicate, Context7, and ElevenLabs during initial setup"
+        "text": "Setup wizard now has 4 steps: Account → LLM Provider → Tool API Keys → Start using. Tool keys step lets users configure Tavily, Firecrawl, Serper, Replicate, Context7, and ElevenLabs during initial setup"
       },
       {
         "type": "feature",
@@ -375,7 +433,7 @@
       },
       {
         "type": "improvement",
-        "text": "Improved tool call rendering while streaming \u2014 fixes loading spinner stuck forever and scroll behavior"
+        "text": "Improved tool call rendering while streaming — fixes loading spinner stuck forever and scroll behavior"
       },
       {
         "type": "improvement",
@@ -383,15 +441,15 @@
       },
       {
         "type": "fix",
-        "text": "Installer get-kortix.sh no longer starts a sandbox container \u2014 only pulls the image. The API creates it when the wizard triggers provisioning"
+        "text": "Installer get-kortix.sh no longer starts a sandbox container — only pulls the image. The API creates it when the wizard triggers provisioning"
       },
       {
         "type": "fix",
-        "text": "Protected /init/local and /init/local/status routes with explicit local_docker provider check \u2014 returns 403 when local Docker is not enabled"
+        "text": "Protected /init/local and /init/local/status routes with explicit local_docker provider check — returns 403 when local Docker is not enabled"
       },
       {
         "type": "fix",
-        "text": "Fixed React hooks-of-rules violation in self-hosted auth \u2014 useCallback hooks moved before conditional returns"
+        "text": "Fixed React hooks-of-rules violation in self-hosted auth — useCallback hooks moved before conditional returns"
       },
       {
         "type": "fix",
@@ -549,11 +607,11 @@
     "version": "0.6.0",
     "date": "2026-02-21",
     "title": "Supabase everywhere, auth unification & security hardening",
-    "description": "Massive architecture refactor. Eliminated all local/cloud mode splits \u2014 auth is always Supabase (JWT for humans, sbt_ tokens for sandboxes). WordPress-style self-hosted installer. Every API endpoint requires authentication. Removed sak_ lock/key system. New env var model (ALLOWED_SANDBOX_PROVIDERS, INTERNAL_KORTIX_ENV, NEXT_PUBLIC_BILLING_ENABLED). pg_cron scheduler rewritten for Supabase.",
+    "description": "Massive architecture refactor. Eliminated all local/cloud mode splits — auth is always Supabase (JWT for humans, sbt_ tokens for sandboxes). WordPress-style self-hosted installer. Every API endpoint requires authentication. Removed sak_ lock/key system. New env var model (ALLOWED_SANDBOX_PROVIDERS, INTERNAL_KORTIX_ENV, NEXT_PUBLIC_BILLING_ENABLED). pg_cron scheduler rewritten for Supabase.",
     "changes": [
       {
         "type": "breaking",
-        "text": "Removed SANDBOX_PROVIDER env var \u2014 replaced by ALLOWED_SANDBOX_PROVIDERS (comma-separated list)"
+        "text": "Removed SANDBOX_PROVIDER env var — replaced by ALLOWED_SANDBOX_PROVIDERS (comma-separated list)"
       },
       {
         "type": "breaking",
@@ -561,15 +619,15 @@
       },
       {
         "type": "breaking",
-        "text": "Removed IS_LOCAL / IS_CLOUD / EnvMode / isLocalMode() from frontend \u2014 replaced by isBillingEnabled() / isSelfHosted()"
+        "text": "Removed IS_LOCAL / IS_CLOUD / EnvMode / isLocalMode() from frontend — replaced by isBillingEnabled() / isSelfHosted()"
       },
       {
         "type": "breaking",
-        "text": "ENV_MODE is now only 'local' or 'cloud' \u2014 staging/prod behavior controlled by INTERNAL_KORTIX_ENV"
+        "text": "ENV_MODE is now only 'local' or 'cloud' — staging/prod behavior controlled by INTERNAL_KORTIX_ENV"
       },
       {
         "type": "feature",
-        "text": "WordPress-style self-hosted installer \u2014 create owner account, auto-provision sandbox"
+        "text": "WordPress-style self-hosted installer — create owner account, auto-provision sandbox"
       },
       {
         "type": "feature",
@@ -601,7 +659,7 @@
       },
       {
         "type": "improvement",
-        "text": "pg_cron scheduler rewritten \u2014 uses host.docker.internal for container-to-host communication"
+        "text": "pg_cron scheduler rewritten — uses host.docker.internal for container-to-host communication"
       },
       {
         "type": "improvement",
@@ -609,15 +667,15 @@
       },
       {
         "type": "improvement",
-        "text": "Postgres service deleted \u2014 everything uses Supabase (local CLI or cloud project)"
+        "text": "Postgres service deleted — everything uses Supabase (local CLI or cloud project)"
       },
       {
         "type": "fix",
-        "text": "Server Action redirect() race condition \u2014 returns {success, redirectTo} instead"
+        "text": "Server Action redirect() race condition — returns {success, redirectTo} instead"
       },
       {
         "type": "fix",
-        "text": "Stale auth cookie loop \u2014 auth page validates session, signs out if invalid"
+        "text": "Stale auth cookie loop — auth page validates session, signs out if invalid"
       },
       {
         "type": "fix",
@@ -675,11 +733,11 @@
       },
       {
         "type": "feature",
-        "text": "Server entries persistence \u2014 user-added instances saved to PostgreSQL (auth tokens stay in browser)"
+        "text": "Server entries persistence — user-added instances saved to PostgreSQL (auth tokens stay in browser)"
       },
       {
         "type": "improvement",
-        "text": "Chat scroll UX \u2014 smoother auto-scroll, sticky bottom behavior"
+        "text": "Chat scroll UX — smoother auto-scroll, sticky bottom behavior"
       },
       {
         "type": "improvement",
@@ -745,7 +803,7 @@
     "changes": [
       {
         "type": "feature",
-        "text": "VPS install script (get-kortix.sh) \u2014 one-click deploy with Caddy, TLS, firewall, and basic auth"
+        "text": "VPS install script (get-kortix.sh) — one-click deploy with Caddy, TLS, firewall, and basic auth"
       },
       {
         "type": "feature",
@@ -761,7 +819,7 @@
       },
       {
         "type": "improvement",
-        "text": "Session chat message handling refactor \u2014 optimistic messages, SSE sync"
+        "text": "Session chat message handling refactor — optimistic messages, SSE sync"
       },
       {
         "type": "fix",
@@ -971,11 +1029,11 @@
     "changes": [
       {
         "type": "feature",
-        "text": "Update banner \u2014 see what's new before updating, dismiss per version"
+        "text": "Update banner — see what's new before updating, dismiss per version"
       },
       {
         "type": "feature",
-        "text": "Changelog page at /changelog \u2014 full version history with artifact checklist"
+        "text": "Changelog page at /changelog — full version history with artifact checklist"
       },
       {
         "type": "feature",
@@ -991,7 +1049,7 @@
       },
       {
         "type": "improvement",
-        "text": "Idempotent CLI publish \u2014 resumes safely after partial failures"
+        "text": "Idempotent CLI publish — resumes safely after partial failures"
       },
       {
         "type": "improvement",
@@ -1071,7 +1129,7 @@
     "changes": [
       {
         "type": "feature",
-        "text": "Changelog system \u2014 see what's new before updating"
+        "text": "Changelog system — see what's new before updating"
       },
       {
         "type": "feature",
@@ -1083,7 +1141,7 @@
       },
       {
         "type": "feature",
-        "text": "Unified release script \u2014 one command publishes everything"
+        "text": "Unified release script — one command publishes everything"
       },
       {
         "type": "improvement",
@@ -1201,7 +1259,7 @@
     "changes": [
       {
         "type": "feature",
-        "text": "Project.scan() \u2014 automatic git repo discovery"
+        "text": "Project.scan() — automatic git repo discovery"
       }
     ]
   },

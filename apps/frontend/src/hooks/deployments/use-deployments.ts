@@ -122,7 +122,7 @@ const fetchDeployment = async (id: string): Promise<Deployment> => {
 
 const createDeployment = async (data: CreateDeploymentData): Promise<Deployment> => {
   const response = await backendApi.post<ApiSingleResponse>('/deployments', data, {
-    timeout: 150_000, // Freestyle deploys can take up to 120s
+    timeout: 330_000, // 5.5 min — builds (Go, Rust, etc.) can take a while
   });
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to create deployment');
@@ -140,7 +140,7 @@ const stopDeployment = async (id: string): Promise<Deployment> => {
 
 const redeployDeployment = async (id: string): Promise<Deployment> => {
   const response = await backendApi.post<ApiSingleResponse>(`/deployments/${id}/redeploy`, {}, {
-    timeout: 150_000,
+    timeout: 330_000,
   });
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to redeploy');

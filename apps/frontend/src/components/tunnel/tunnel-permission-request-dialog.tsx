@@ -42,7 +42,7 @@ export function TunnelPermissionRequestDialog() {
   const initialScope = useMemo(() => {
     if (!currentRequest) return {};
     return extractScopeFromRequest(currentRequest);
-  }, [currentRequest?.requestId]);
+  }, [currentRequest]);
 
   const [customScope, setCustomScope] = useState<PermissionScope>(initialScope);
 
@@ -54,7 +54,7 @@ export function TunnelPermissionRequestDialog() {
       setScopeExpanded(false);
       setCustomScope(extractScopeFromRequest(currentRequest));
     }
-  }, [currentRequest?.requestId]);
+  }, [currentRequest]);
 
   if (!currentRequest) return null;
 

@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useKortixComputerStore } from '@/stores/kortix-computer-store';
 import { getClient } from '@/lib/opencode-sdk';
+import { opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
 
 /**
  * Module-level cache of candidate prefixes.
@@ -25,41 +27,57 @@ function toRelative(absPath: string, prefixes: string[]): string {
 }
 
 /**
- * Fetch all candidate worktree/directory prefixes from the SDK.
- * Tries project.current() (same source as Files tab) and path.get().
- * Returns deduplicated, non-empty candidates ordered by specificity (longest first).
+ * Fetch all candidate worktree/directory prefixes.
+ *
+ * CONSOLIDATED: First checks the React Query cache (shared with
+ * useOpenCodeCurrentProject and useOpenCodePathInfo). Only makes SDK calls
+ * as a fallback if the cache is empty. This prevents duplicate /project/current
+ * and /path requests that were previously made on every tool-view mount.
  */
-async function fetchPrefixesFromSdk(): Promise<string[]> {
+async function fetchPrefixesFromSdk(queryClient?: ReturnType<typeof useQueryClient>): Promise<string[]> {
   const candidates: string[] = [];
 
+  // 1) Try React Query cache first (shared with other hooks)
+  if (queryClient) {
+    const cachedProject = queryClient.getQueryData<any>(opencodeKeys.currentProject());
+    if (cachedProject?.worktree) candidates.push(cachedProject.worktree);
+
+    const cachedPath = queryClient.getQueryData<any>(opencodeKeys.pathInfo());
+    if (cachedPath?.directory) candidates.push(cachedPath.directory);
+    if (cachedPath?.worktree) candidates.push(cachedPath.worktree);
+  }
+
+  // 2) If cache had results, use them without hitting the network
+  if (candidates.length > 0) {
+    const unique = [...new Set(candidates.filter(Boolean))];
+    unique.sort((a, b) => b.length - a.length);
+    cachedPrefixes = unique;
+    return unique;
+  }
+
+  // 3) Fallback: SDK calls (only on first mount before cache is populated)
   const client = getClient();
 
-  // 1) project.current() — same source the Files tab uses
   try {
     const projectRes = await client.project.current();
     const project = projectRes.data;
-    console.log('[useOcFileOpen] project.current():', JSON.stringify(project));
     if (project?.worktree) candidates.push(project.worktree);
-  } catch (err) {
-    console.warn('[useOcFileOpen] project.current() failed:', err);
+  } catch {
+    // non-critical
   }
 
-  // 2) path.get() — returns home, state, config, worktree, directory
   try {
     const pathRes = await client.path.get();
     const pathData = pathRes.data;
-    console.log('[useOcFileOpen] path.get():', JSON.stringify(pathData));
     if (pathData?.directory) candidates.push(pathData.directory);
     if (pathData?.worktree) candidates.push(pathData.worktree);
-  } catch (err) {
-    console.warn('[useOcFileOpen] path.get() failed:', err);
+  } catch {
+    // non-critical
   }
 
   // Deduplicate, filter empty, sort longest first (most specific prefix wins)
   const unique = [...new Set(candidates.filter(Boolean))];
   unique.sort((a, b) => b.length - a.length);
-
-  console.log('[useOcFileOpen] resolved prefixes:', unique);
 
   if (unique.length > 0) {
     cachedPrefixes = unique;
@@ -87,7 +105,6 @@ async function discoverPrefixViaFileApi(absPath: string): Promise<string | null>
       if (result.data) {
         // Derive the prefix from the original path minus the working suffix
         const prefix = '/' + segments.slice(0, segments.length - depth).join('/');
-        console.log('[useOcFileOpen] discovered prefix via file API:', prefix, '(candidate:', candidate, ')');
         // Merge into cache
         if (cachedPrefixes) {
           if (!cachedPrefixes.includes(prefix)) {
@@ -115,22 +132,23 @@ async function discoverPrefixViaFileApi(absPath: string): Promise<string | null>
  */
 export function useOcFileOpen() {
   const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
+  const queryClient = useQueryClient();
   const [prefixes, setPrefixes] = useState<string[]>(cachedPrefixes || []);
 
-  // Fetch prefixes on mount
+  // Fetch prefixes on mount — reads from React Query cache first
   useEffect(() => {
     if (cachedPrefixes && cachedPrefixes.length > 0) {
       setPrefixes(cachedPrefixes);
       return;
     }
     let cancelled = false;
-    fetchPrefixesFromSdk().then((result) => {
+    fetchPrefixesFromSdk(queryClient).then((result) => {
       if (!cancelled && result.length > 0) {
         setPrefixes(result);
       }
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [queryClient]);
 
   /** Sync: convert absolute → relative for display */
   const toDisplayPath = useCallback(
@@ -148,10 +166,10 @@ export function useOcFileOpen() {
   const getPrefixes = useCallback(async (): Promise<string[]> => {
     const current = prefixes.length > 0 ? prefixes : cachedPrefixes;
     if (current && current.length > 0) return current;
-    const fetched = await fetchPrefixesFromSdk();
+    const fetched = await fetchPrefixesFromSdk(queryClient);
     if (fetched.length > 0) setPrefixes(fetched);
     return fetched;
-  }, [prefixes]);
+  }, [prefixes, queryClient]);
 
   /** Resolve an absolute path to relative, with file-API probe fallback */
   const resolveAbsPath = useCallback(
@@ -183,7 +201,6 @@ export function useOcFileOpen() {
         return;
       }
       const resolved = await resolveAbsPath(filePath);
-      console.log('[useOcFileOpen] openFile', filePath, '→', resolved);
       openFileInComputer(resolved);
     },
     [openFileInComputer, resolveAbsPath],
@@ -203,7 +220,6 @@ export function useOcFileOpen() {
       const resolvedList = allPaths.map((p) =>
         p.startsWith('/') && pfx.length > 0 ? toRelative(p, pfx) : p,
       );
-      console.log('[useOcFileOpen] openFileWithList', filePath, '→', resolved);
       openFileInComputer(resolved, resolvedList);
     },
     [openFileInComputer, resolveAbsPath],

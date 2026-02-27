@@ -22,7 +22,7 @@ import {
   Download,
   Globe,
 } from 'lucide-react';
-import { useServerStore, type ServerEntry } from '@/stores/server-store';
+import { useServerStore, resolveServerUrl, type ServerEntry } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -33,7 +33,7 @@ import { toast } from '@/lib/toast';
 import { isBillingEnabled } from '@/lib/config';
 
 import { useSandboxUpdate } from '@/hooks/platform/use-sandbox-update';
-import { useProviders } from '@/hooks/platform/use-sandbox';
+import { useProviders, markSandboxDeleted } from '@/hooks/platform/use-sandbox';
 
 import {
   Dialog,
@@ -129,8 +129,9 @@ function CompactInstanceRow({
   isActive: boolean;
   onSelect: () => void;
 }) {
-  const { status } = useConnectionStatus(server.url, isActive);
-  const displayUrl = server.url.replace(/^https?:\/\//, '');
+  const resolvedUrl = resolveServerUrl(server);
+  const { status } = useConnectionStatus(resolvedUrl, isActive);
+  const displayUrl = resolvedUrl.replace(/^https?:\/\//, '');
   const hasCustomLabel = server.label && server.label !== displayUrl;
 
   return (
@@ -198,13 +199,14 @@ function DialogInstanceRow({
   onVersionDetected?: (version: string) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = React.useState(false);
-  const { status, version } = useConnectionStatus(server.url, true);
+  const resolvedUrl = resolveServerUrl(server);
+  const { status, version } = useConnectionStatus(resolvedUrl, true);
 
   // Report version back to parent when detected
   React.useEffect(() => {
     if (version && onVersionDetected) onVersionDetected(version);
   }, [version, onVersionDetected]);
-  const displayUrl = server.url.replace(/^https?:\/\//, '');
+  const displayUrl = resolvedUrl.replace(/^https?:\/\//, '');
   const hasCustomLabel = server.label && server.label !== displayUrl;
 
   React.useEffect(() => {
@@ -497,17 +499,21 @@ export function InstanceManagerDialog({
         : await createSandbox({ provider });
 
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
+      const isLocal = sandbox.provider === 'local_docker';
 
       const store = useServerStore.getState();
 
-      // Add (or deduplicate) by sandboxId — URL is derived at runtime by the store.
-      const newServer = store.addSandboxServer({
-        label,
-        provider: sandbox.provider,
-        sandboxId: sandbox.external_id,
-        mappedPorts: extractMappedPorts(sandbox),
-      });
-      const serverId = newServer.id;
+      // Use the centralized registerOrUpdateSandbox which uses stable IDs
+      // ('default' for local, 'cloud-sandbox' for cloud) — no duplicates.
+      const serverId = store.registerOrUpdateSandbox(
+        {
+          label,
+          provider: sandbox.provider,
+          sandboxId: sandbox.external_id,
+          mappedPorts: extractMappedPorts(sandbox),
+        },
+        { autoSwitch: false, isLocal },
+      );
 
       // Invalidate sandbox query so useSandbox picks up the latest state.
       queryClient.invalidateQueries({ queryKey: ['platform', 'sandbox'] });
@@ -547,22 +553,25 @@ export function InstanceManagerDialog({
         setIsRemovingSandbox(false);
       }
 
+      // Tell useSandbox NOT to auto-recreate — user intentionally deleted.
+      markSandboxDeleted();
+
       // Invalidate the sandbox query so useSandbox() knows the sandbox is gone.
-      // This lets the hook refetch — in cloud mode it will auto-create a new one
-      // when the user navigates or refreshes (or they can click "New Instance").
+      // It will refetch, find nothing, and respect the deletion flag (no auto-create).
       queryClient.invalidateQueries({ queryKey: ['platform', 'sandbox'] });
     }
 
-    // Remove from local store (manual/localhost entries just get this)
+    // Remove from local store — removeServer handles fallback to the best
+    // remaining entry and resets userSelected so the next sandbox creation
+    // can auto-switch.
+    const wasActive = id === activeServerId;
     removeServer(id);
 
-    // If we just deleted the active server, switch to the first remaining one
-    if (id === activeServerId) {
-      const remaining = useServerStore.getState().servers;
-      if (remaining.length > 0) {
-        const fallback = remaining[0];
-        useTabStore.getState().swapForServer(fallback.id, id);
-        setActiveServer(fallback.id);
+    // Swap tabs if we just deleted the active server.
+    if (wasActive) {
+      const newActiveId = useServerStore.getState().activeServerId;
+      if (newActiveId) {
+        useTabStore.getState().swapForServer(newActiveId, id);
       }
     }
   }

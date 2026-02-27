@@ -50,7 +50,9 @@ interface UseAutoScrollReturn {
   smoothScrollToAbsoluteBottom: () => void;
 }
 
+/** How close to the bottom (px) counts as "at the bottom" for hiding the FAB. */
 const BOTTOM_THRESHOLD = 80;
+
 const TURN_TOP_OFFSET = 24;
 
 /** scrollTop that puts the last [data-turn-id] at TURN_TOP_OFFSET from viewport top. */
@@ -66,6 +68,13 @@ function measureTarget(scrollEl: HTMLDivElement, contentEl: HTMLDivElement): num
 /** Classic "near the absolute bottom of scrollable content" check. */
 function isNearScrollEnd(el: HTMLDivElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
+}
+
+/** Whether the user has scrolled far enough from the bottom to warrant showing the FAB.
+ *  Subtracts the spacer height so the threshold is relative to actual content, not the spacer. */
+function isFarFromBottom(el: HTMLDivElement, spacerHeight: number): boolean {
+  const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight - spacerHeight;
+  return distFromBottom >= 300;
 }
 
 export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOptions): UseAutoScrollReturn {
@@ -230,7 +239,8 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
       // where the observer setup may have been deferred).
       recalcSpacer();
       const timer = setTimeout(() => {
-        if (!isAtBottom()) setShowScrollButton(true);
+        const el = scrollRef.current;
+        if (el && isFarFromBottom(el, spacerValRef.current)) setShowScrollButton(true);
         else setShowScrollButton(false);
       }, 400);
       return () => clearTimeout(timer);
@@ -266,11 +276,13 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
     const handle = (e: WheelEvent) => {
       if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
       if (e.deltaY < 0) {
-        // Scrolling up → disable auto-scroll, show FAB
-        if (!userScrolledRef.current) {
-          userScrolledRef.current = true;
-          setShowScrollButton(true);
-        }
+        // Scrolling up → show FAB only after scroll settles and user is far from bottom
+        requestAnimationFrame(() => {
+          if (!userScrolledRef.current && isFarFromBottom(el, spacerValRef.current)) {
+            userScrolledRef.current = true;
+            setShowScrollButton(true);
+          }
+        });
       } else if (e.deltaY > 0) {
         // Scrolling down → resume auto-scroll only if the user reached
         // the absolute bottom of the scrollable area (classic check).
@@ -296,10 +308,14 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
     const onMove = (e: TouchEvent) => {
       if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
       const dy = startY - (e.touches[0]?.clientY ?? 0);
-      if (dy < -10 && !userScrolledRef.current) {
-        // Swiping up → disable auto-scroll
-        userScrolledRef.current = true;
-        setShowScrollButton(true);
+      if (dy < -10) {
+        // Swiping up → show FAB only if far enough from bottom
+        requestAnimationFrame(() => {
+          if (!userScrolledRef.current && isFarFromBottom(el, spacerValRef.current)) {
+            userScrolledRef.current = true;
+            setShowScrollButton(true);
+          }
+        });
       } else if (dy > 10) {
         // Swiping down → resume only at absolute bottom
         requestAnimationFrame(() => {
@@ -324,7 +340,8 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
       const cur = el.scrollTop;
       // Detect upward scroll (keyboard, scrollbar drag) — but ignore
       // intermediate frames from programmatic smooth-scrolls.
-      if (cur < last - 2 && !userScrolledRef.current && !programmaticScrollRef.current) {
+      // Only show FAB if far enough from bottom.
+      if (cur < last - 2 && !userScrolledRef.current && !programmaticScrollRef.current && isFarFromBottom(el, spacerValRef.current)) {
         userScrolledRef.current = true;
         setShowScrollButton(true);
       }

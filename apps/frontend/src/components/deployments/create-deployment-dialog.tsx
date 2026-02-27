@@ -64,18 +64,49 @@ const sourceTypes: Array<{
 
 // ─── Workspace folder picker helpers ────────────────────────────────────────
 
-/** Recursively collect all text files from a directory */
+/** Extensions and filenames to skip — compiled binaries, build artifacts, etc. */
+const SKIP_EXTENSIONS = new Set([
+  '.exe', '.dll', '.so', '.dylib', '.a', '.o', '.obj',
+  '.bin', '.out',
+  '.pyc', '.pyo', '.class',
+  '.wasm',
+  '.zip', '.tar', '.gz', '.tgz', '.bz2', '.xz', '.rar', '.7z',
+  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.webp',
+  '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+  '.db', '.sqlite', '.sqlite3',
+]);
+const SKIP_DIRS = new Set([
+  'node_modules', '__pycache__', '.git', '.next', 'dist', 'build',
+  'vendor', 'target', '.cache', '.turbo',
+]);
+
+/** Check if a filename should be skipped based on extension or name pattern */
+function isLikelyBinary(name: string): boolean {
+  const lastDot = name.lastIndexOf('.');
+  // Files with a known binary extension
+  if (lastDot > 0) {
+    const ext = name.slice(lastDot).toLowerCase();
+    if (SKIP_EXTENSIONS.has(ext)) return true;
+  }
+  // Files with NO extension are often compiled binaries (e.g. Go/C/Rust output)
+  // Skip them to be safe — source files always have extensions
+  if (lastDot <= 0) return true;
+  return false;
+}
+
+/** Recursively collect all source (text) files from a directory */
 async function collectFilesRecursively(
   dirPath: string,
   basePath: string,
-): Promise<Array<{ path: string; content: string; encoding?: string }>> {
+): Promise<Array<{ path: string; content: string }>> {
   const nodes = await listFiles(dirPath);
-  const result: Array<{ path: string; content: string; encoding?: string }> = [];
+  const result: Array<{ path: string; content: string }> = [];
 
   for (const node of nodes) {
     // Skip hidden files/dirs and common non-deployable paths
     if (node.name.startsWith('.')) continue;
-    if (node.name === 'node_modules' || node.name === '__pycache__' || node.name === '.git') continue;
+    if (node.type === 'directory' && SKIP_DIRS.has(node.name)) continue;
 
     if (node.type === 'directory') {
       const children = await collectFilesRecursively(
@@ -84,19 +115,25 @@ async function collectFilesRecursively(
       );
       result.push(...children);
     } else {
+      // Skip files with known binary/artifact extensions
+      if (isLikelyBinary(node.name)) continue;
+
       try {
         const content = await readFile(node.absolute || node.path);
+
+        // Skip binary files entirely — only deploy text source files
+        if (content.type === 'binary') continue;
+
+        // Safety: if content has null bytes, it's binary even if server says text
+        if (content.content && content.content.includes('\u0000')) continue;
+
         // Get relative path from the selected folder
         const absolutePath = node.absolute || node.path;
         const relativePath = absolutePath.startsWith(basePath)
           ? absolutePath.slice(basePath.length).replace(/^\//, '')
           : node.name;
 
-        if (content.type === 'binary' && content.encoding === 'base64') {
-          result.push({ path: relativePath, content: content.content, encoding: 'base64' });
-        } else {
-          result.push({ path: relativePath, content: content.content });
-        }
+        result.push({ path: relativePath, content: content.content });
       } catch {
         // Skip files that can't be read
       }
@@ -244,6 +281,262 @@ function FolderBrowser({
   );
 }
 
+// ─── Project type detection & presets ────────────────────────────────────────
+
+interface ProjectPreset {
+  type: string;
+  label: string;
+  entrypoint: string;
+  buildCommand: string;
+  buildOutDir: string;
+  framework: string;
+  staticOnly: boolean;
+  envVars: Array<{ key: string; value: string }>;
+}
+
+const PROJECT_PRESETS: Record<string, ProjectPreset> = {
+  go: {
+    type: 'go',
+    label: 'Go',
+    entrypoint: './server',
+    buildCommand: 'go build -o server .',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '8080' }],
+  },
+  node_ts: {
+    type: 'node_ts',
+    label: 'Node.js (TypeScript)',
+    entrypoint: 'dist/index.js',
+    buildCommand: 'npm install && npm run build',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '3000' }],
+  },
+  node_js: {
+    type: 'node_js',
+    label: 'Node.js',
+    entrypoint: 'index.js',
+    buildCommand: 'npm install',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '3000' }],
+  },
+  nextjs: {
+    type: 'nextjs',
+    label: 'Next.js',
+    entrypoint: '',
+    buildCommand: 'npm install && npm run build',
+    buildOutDir: '.next',
+    framework: 'nextjs',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '3000' }],
+  },
+  vite: {
+    type: 'vite',
+    label: 'Vite',
+    entrypoint: '',
+    buildCommand: 'npm install && npm run build',
+    buildOutDir: 'dist',
+    framework: 'vite',
+    staticOnly: true,
+    envVars: [],
+  },
+  python_flask: {
+    type: 'python_flask',
+    label: 'Python (Flask)',
+    entrypoint: 'python app.py',
+    buildCommand: 'pip install -r requirements.txt',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '5000' }],
+  },
+  python_fastapi: {
+    type: 'python_fastapi',
+    label: 'Python (FastAPI)',
+    entrypoint: 'uvicorn main:app --host 0.0.0.0 --port $PORT',
+    buildCommand: 'pip install -r requirements.txt',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '8000' }],
+  },
+  python: {
+    type: 'python',
+    label: 'Python',
+    entrypoint: 'python main.py',
+    buildCommand: 'pip install -r requirements.txt',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '8000' }],
+  },
+  rust: {
+    type: 'rust',
+    label: 'Rust',
+    entrypoint: './target/release/app',
+    buildCommand: 'cargo build --release',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: false,
+    envVars: [{ key: 'PORT', value: '8080' }],
+  },
+  static_html: {
+    type: 'static_html',
+    label: 'Static HTML',
+    entrypoint: '',
+    buildCommand: '',
+    buildOutDir: '',
+    framework: '',
+    staticOnly: true,
+    envVars: [],
+  },
+};
+
+/**
+ * Detect project type from collected file paths and (optionally) content.
+ * Returns the best matching preset, or null if unknown.
+ */
+function detectProjectType(
+  files: Array<{ path: string; content: string }>,
+): ProjectPreset | null {
+  const filePaths = new Set(files.map((f) => f.path));
+  const fileNames = new Set(files.map((f) => f.path.split('/').pop() || ''));
+
+  // Check for key marker files
+  const hasGoMod = fileNames.has('go.mod');
+  const hasPackageJson = fileNames.has('package.json');
+  const hasTsConfig = fileNames.has('tsconfig.json');
+  const hasRequirementsTxt = fileNames.has('requirements.txt');
+  const hasPyprojectToml = fileNames.has('pyproject.toml');
+  const hasCargoToml = fileNames.has('Cargo.toml');
+  const hasIndexHtml = fileNames.has('index.html');
+
+  // Check file extensions
+  const hasGoFiles = files.some((f) => f.path.endsWith('.go'));
+  const hasPyFiles = files.some((f) => f.path.endsWith('.py'));
+  const hasTsFiles = files.some((f) => f.path.endsWith('.ts') || f.path.endsWith('.tsx'));
+  const hasJsFiles = files.some((f) => f.path.endsWith('.js') || f.path.endsWith('.jsx'));
+  const hasRsFiles = files.some((f) => f.path.endsWith('.rs'));
+
+  // ─── Go ─────────────────────────────────────
+  if (hasGoMod || hasGoFiles) {
+    // Try to detect the binary name from go.mod module path
+    const goModFile = files.find((f) => f.path === 'go.mod' || f.path.endsWith('/go.mod'));
+    let binaryName = 'server';
+    if (goModFile) {
+      const moduleMatch = goModFile.content.match(/^module\s+(\S+)/m);
+      if (moduleMatch) {
+        const parts = moduleMatch[1].split('/');
+        binaryName = parts[parts.length - 1] || 'server';
+      }
+    }
+    return {
+      ...PROJECT_PRESETS.go,
+      entrypoint: `./${binaryName}`,
+      buildCommand: `go build -o ${binaryName} .`,
+    };
+  }
+
+  // ─── Node.js ecosystem (check before generic JS) ───────────────
+  if (hasPackageJson) {
+    // Try to read package.json content to detect framework
+    const pkgFile = files.find((f) => f.path === 'package.json' || f.path.endsWith('/package.json'));
+    if (pkgFile) {
+      try {
+        const pkg = JSON.parse(pkgFile.content);
+        const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+        // Next.js
+        if (allDeps['next']) return PROJECT_PRESETS.nextjs;
+        // Vite
+        if (allDeps['vite']) return PROJECT_PRESETS.vite;
+
+        // Detect entrypoint from package.json "main" or "scripts.start"
+        const mainEntry = pkg.main || '';
+        const startScript = pkg.scripts?.start || '';
+
+        if (hasTsConfig || hasTsFiles) {
+          const preset = { ...PROJECT_PRESETS.node_ts };
+          if (mainEntry) preset.entrypoint = mainEntry;
+          return preset;
+        }
+
+        const preset = { ...PROJECT_PRESETS.node_js };
+        if (mainEntry) preset.entrypoint = mainEntry;
+        else if (startScript) {
+          // If start script is like "node server.js", extract entry
+          const nodeMatch = startScript.match(/node\s+(\S+)/);
+          if (nodeMatch) preset.entrypoint = nodeMatch[1];
+        }
+        return preset;
+      } catch {
+        // Failed to parse package.json, use defaults
+      }
+    }
+
+    if (hasTsConfig || hasTsFiles) return PROJECT_PRESETS.node_ts;
+    return PROJECT_PRESETS.node_js;
+  }
+
+  // ─── Python ─────────────────────────────────
+  if (hasRequirementsTxt || hasPyprojectToml || hasPyFiles) {
+    // Check for FastAPI or Flask in requirements.txt
+    const reqFile = files.find(
+      (f) => f.path === 'requirements.txt' || f.path.endsWith('/requirements.txt'),
+    );
+    if (reqFile) {
+      const reqContent = reqFile.content.toLowerCase();
+      if (reqContent.includes('fastapi')) return PROJECT_PRESETS.python_fastapi;
+      if (reqContent.includes('flask')) return PROJECT_PRESETS.python_flask;
+    }
+
+    // Check for imports in .py files
+    const mainPy = files.find(
+      (f) => f.path === 'main.py' || f.path === 'app.py' || f.path.endsWith('/main.py') || f.path.endsWith('/app.py'),
+    );
+    if (mainPy) {
+      if (mainPy.content.includes('fastapi') || mainPy.content.includes('FastAPI'))
+        return PROJECT_PRESETS.python_fastapi;
+      if (mainPy.content.includes('flask') || mainPy.content.includes('Flask'))
+        return PROJECT_PRESETS.python_flask;
+    }
+
+    // Check if entry file is app.py vs main.py
+    if (fileNames.has('app.py')) {
+      return { ...PROJECT_PRESETS.python, entrypoint: 'python app.py' };
+    }
+    return PROJECT_PRESETS.python;
+  }
+
+  // ─── Rust ───────────────────────────────────
+  if (hasCargoToml || hasRsFiles) {
+    // Try to get binary name from Cargo.toml
+    const cargoFile = files.find((f) => f.path === 'Cargo.toml' || f.path.endsWith('/Cargo.toml'));
+    if (cargoFile) {
+      const nameMatch = cargoFile.content.match(/^name\s*=\s*"([^"]+)"/m);
+      if (nameMatch) {
+        return {
+          ...PROJECT_PRESETS.rust,
+          entrypoint: `./target/release/${nameMatch[1]}`,
+        };
+      }
+    }
+    return PROJECT_PRESETS.rust;
+  }
+
+  // ─── Static HTML ────────────────────────────
+  if (hasIndexHtml && !hasPackageJson && !hasGoMod && !hasRequirementsTxt) {
+    return PROJECT_PRESETS.static_html;
+  }
+
+  return null;
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 interface CreateDeploymentDialogProps {
@@ -287,8 +580,9 @@ export function CreateDeploymentDialog({
   // Workspace fields
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFolderName, setWorkspaceFolderName] = useState<string>('');
-  const [workspaceFiles, setWorkspaceFiles] = useState<Array<{ path: string; content: string; encoding?: string }>>([]);
+  const [workspaceFiles, setWorkspaceFiles] = useState<Array<{ path: string; content: string }>>([]);
   const [isCollectingFiles, setIsCollectingFiles] = useState(false);
+  const [detectedPreset, setDetectedPreset] = useState<ProjectPreset | null>(null);
 
   // Advanced config
   const [entrypoint, setEntrypoint] = useState('');
@@ -311,6 +605,7 @@ export function CreateDeploymentDialog({
     setWorkspaceFolderName('');
     setWorkspaceFiles([]);
     setIsCollectingFiles(false);
+    setDetectedPreset(null);
     setEntrypoint('');
     setFramework('');
     setBuildCommand('');
@@ -320,17 +615,37 @@ export function CreateDeploymentDialog({
     setShowAdvanced(false);
   }, []);
 
-  // When a workspace folder is selected, collect all its files
+  // When a workspace folder is selected, collect files and auto-detect project type
   const handleSelectWorkspaceFolder = useCallback(async (path: string, name: string) => {
     setWorkspacePath(path);
     setWorkspaceFolderName(name);
     setWorkspaceFiles([]);
+    setDetectedPreset(null);
     setIsCollectingFiles(true);
     try {
       const collected = await collectFilesRecursively(path, path);
       setWorkspaceFiles(collected);
       if (collected.length === 0) {
         toast.error('No files found in the selected folder');
+        return;
+      }
+
+      // Auto-detect project type and fill config
+      const preset = detectProjectType(collected);
+      setDetectedPreset(preset);
+      if (preset) {
+        setEntrypoint(preset.entrypoint);
+        setBuildCommand(preset.buildCommand);
+        setBuildOutDir(preset.buildOutDir);
+        setFramework(preset.framework);
+        setStaticOnly(preset.staticOnly);
+        if (preset.envVars.length > 0) {
+          setEnvVars(preset.envVars.map((e) => ({ ...e })));
+        }
+        // Auto-expand advanced config so user can see the auto-filled values
+        if (preset.entrypoint || preset.buildCommand || preset.envVars.length > 0) {
+          setShowAdvanced(true);
+        }
       }
     } catch (err) {
       toast.error('Failed to read workspace files');
@@ -585,16 +900,25 @@ export function CreateDeploymentDialog({
                     <span className="text-sm font-medium text-foreground truncate">
                       {workspaceFolderName}
                     </span>
-                    {isCollectingFiles ? (
-                      <Badge variant="beta" className="text-xs ml-auto shrink-0">
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                        Scanning...
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-xs ml-auto shrink-0">
-                        {workspaceFiles.length} {workspaceFiles.length === 1 ? 'file' : 'files'}
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1.5 ml-auto shrink-0">
+                      {isCollectingFiles ? (
+                        <Badge variant="beta" className="text-xs">
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          Scanning...
+                        </Badge>
+                      ) : (
+                        <>
+                          {detectedPreset && (
+                            <Badge variant="default" className="text-xs">
+                              {detectedPreset.label}
+                            </Badge>
+                          )}
+                          <Badge variant="secondary" className="text-xs">
+                            {workspaceFiles.length} {workspaceFiles.length === 1 ? 'file' : 'files'}
+                          </Badge>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
                 {/* Folder tree browser */}

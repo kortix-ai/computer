@@ -105,26 +105,11 @@ function SidebarProvider({
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen, setOpenMobile]);
 
-  // Adds a keyboard shortcut to toggle the sidebar.
+  // Adds a keyboard shortcut to toggle the sidebar (works globally, even when typing).
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isDocumentModalOpen) {
         return;
-      }
-
-      // Skip if user is in an editable element (editor, input, textarea)
-      const el = document.activeElement;
-      if (el) {
-        const tagName = el.tagName.toLowerCase();
-        if (
-          tagName === 'input' ||
-          tagName === 'textarea' ||
-          el.getAttribute('contenteditable') === 'true' ||
-          el.closest('.cm-editor') ||
-          el.closest('.ProseMirror')
-        ) {
-          return;
-        }
       }
 
       if (

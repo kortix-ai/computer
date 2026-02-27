@@ -12,8 +12,42 @@
 
 import { MessageCircle, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import type { QuestionAnswer, QuestionInfo, QuestionRequest } from "@/ui";
+
+// ---------------------------------------------------------------------------
+// Lightweight markdown renderer for question text (no Shiki/KaTeX/Mermaid)
+// ---------------------------------------------------------------------------
+
+function QuestionMarkdown({ content, className }: { content: string; className?: string }) {
+	return (
+		<div className={cn("question-md", className)}>
+		<ReactMarkdown
+			remarkPlugins={[remarkGfm]}
+			components={{
+				p: ({ children }) => <p className="my-0.5 leading-snug">{children}</p>,
+				strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+				em: ({ children }) => <em className="text-muted-foreground">{children}</em>,
+				ul: ({ children }) => <ul className="my-0.5 pl-4 list-disc">{children}</ul>,
+				ol: ({ children }) => <ol className="my-0.5 pl-4 list-decimal">{children}</ol>,
+				li: ({ children }) => <li className="my-0">{children}</li>,
+				code: ({ children }) => (
+					<code className="text-[11px] px-1 py-0.5 rounded bg-muted font-mono">{children}</code>
+				),
+				a: ({ href, children }) => (
+					<a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 hover:text-primary/80">
+						{children}
+					</a>
+				),
+			}}
+		>
+			{content}
+		</ReactMarkdown>
+		</div>
+	);
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -178,9 +212,7 @@ export function QuestionPrompt({
 	const headerSummary = (() => {
 		if (isSingle) {
 			const q = questions[0];
-			return q.question.length > 60
-				? q.question.slice(0, 60) + "\u2026"
-				: q.question;
+			return q.question;
 		}
 		const answered = answers.filter((a) => a.length > 0).length;
 		return `${answered} of ${questions.length} answered`;
@@ -197,7 +229,7 @@ export function QuestionPrompt({
 				<MessageCircle className="size-3.5 text-muted-foreground flex-shrink-0" />
 				<span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
 					{isSingle ? "" : `${questions.length} questions \u00B7 `}
-					<span className="text-foreground/80 font-medium">
+					<span className="text-foreground/80 font-medium truncate">
 						{headerSummary}
 					</span>
 				</span>
@@ -306,11 +338,11 @@ export function QuestionPrompt({
 											</span>
 											<span
 												className={cn(
-													"text-[11px] leading-tight truncate flex-1 min-w-0",
+													"text-[11px] leading-tight flex-1 min-w-0",
 													done ? "text-foreground" : "text-muted-foreground",
 												)}
 											>
-												{q.header || q.question}
+												<span className="truncate block">{q.header || q.question}</span>
 											</span>
 											<span className="text-[10px] text-muted-foreground truncate max-w-[40%] shrink-0">
 												{ans.length > 0 ? ans.join(", ") : "\u2014"}
@@ -330,14 +362,11 @@ export function QuestionPrompt({
 						) : currentQuestion ? (
 							<div className="space-y-1">
 								{/* Question text */}
-								<p className="text-xs text-foreground leading-snug line-clamp-2">
-									{currentQuestion.question}
-									{isMulti && (
-										<span className="text-muted-foreground/60 font-normal ml-1">
-											(select multiple)
-										</span>
-									)}
-								</p>
+								<div className="text-xs text-foreground leading-snug max-h-[300px] overflow-y-auto">
+									<QuestionMarkdown
+										content={currentQuestion.question + (isMulti ? " *(select multiple)*" : "")}
+									/>
+								</div>
 
 								{/* Options — compact rows */}
 								<div className="space-y-px">
@@ -368,7 +397,7 @@ export function QuestionPrompt({
 														</svg>
 													)}
 												</span>
-												<span className="text-xs leading-tight truncate min-w-0">
+												<span className="text-xs leading-tight min-w-0">
 													<span
 														className={cn(
 															"font-semibold transition-colors duration-150",
