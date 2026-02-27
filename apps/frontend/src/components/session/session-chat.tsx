@@ -2674,6 +2674,7 @@ export function SessionChat({
 		const pendingPrompt = sessionStorage.getItem(
 			`opencode_pending_prompt:${sessionId}`,
 		);
+		console.log("[session-chat] pending prompt check", { sessionId, hasPending: !!pendingPrompt });
 		if (pendingPrompt) {
 			pendingPromptHandled.current = true;
 			setPollingActive(true);
@@ -2725,14 +2726,35 @@ export function SessionChat({
 			// server generate it with its own clock to avoid clock-skew issues.
 			const client = getClient();
 			const handlePromptError = () => {
-				removeOptimisticUserMessage(messageID);
-				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
 				setIsRetrying(false);
 				setPendingSendInFlight(false);
 				setPendingSendMessageId(null);
 				setOptimisticPrompt(null);
 				setPollingActive(false);
+				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+				// Fetch real messages from the server. Some error paths
+				// (e.g. missing API key) return the error directly in the
+				// HTTP response without ever emitting a session.error SSE
+				// event. Without this fetch, removing the optimistic message
+				// leaves the UI blank because no SSE event will bring in the
+				// server-persisted messages.
+				client.session
+					.messages({ sessionID: sessionId })
+					.then((res) => {
+						if (res.data) {
+							useSyncStore.getState().hydrate(sessionId, res.data as any);
+							useSyncStore.getState().clearOptimisticMessages(sessionId);
+						} else {
+							// No server data — just remove the optimistic message
+							removeOptimisticUserMessage(messageID);
+						}
+					})
+					.catch(() => {
+						// Fetch failed — fall back to removing the optimistic message
+						removeOptimisticUserMessage(messageID);
+					});
 			};
+			console.log("[session-chat] sending promptAsync for pending prompt", { sessionId });
 			void client.session
 				.promptAsync({
 					sessionID: sessionId,
@@ -2742,12 +2764,16 @@ export function SessionChat({
 					...(sendOpts?.variant && { variant: sendOpts.variant }),
 				} as any)
 				.then((res: any) => {
+					console.log("[session-chat] promptAsync resolved", { sessionId, status: res?.response?.status, hasError: !!res?.error, res });
 					// The SDK resolves (not rejects) on HTTP errors, returning
 					// { error: ... } instead of throwing. Handle this case so
 					// the UI doesn't stay stuck on "busy" forever.
 					if (res?.error) handlePromptError();
 				})
-				.catch(handlePromptError);
+				.catch((err: any) => {
+					console.error("[session-chat] promptAsync rejected", { sessionId, err });
+					handlePromptError();
+				});
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [sessionId, addOptimisticUserMessage, removeOptimisticUserMessage]);
@@ -3638,6 +3664,27 @@ export function SessionChat({
 			});
 			const sendOpts = Object.keys(options).length > 0 ? options : undefined;
 			const client = getClient();
+			const handleSendError = () => {
+				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
+				// Fetch real messages from the server. Some error paths
+				// (e.g. missing API key) return the error directly in the
+				// HTTP response without emitting a session.error SSE event.
+				// Without this fetch, removing the optimistic message can
+				// leave the UI blank.
+				client.session
+					.messages({ sessionID: sessionId })
+					.then((res) => {
+						if (res.data) {
+							useSyncStore.getState().hydrate(sessionId, res.data as any);
+							useSyncStore.getState().clearOptimisticMessages(sessionId);
+						} else {
+							removeOptimisticUserMessage(messageID);
+						}
+					})
+					.catch(() => {
+						removeOptimisticUserMessage(messageID);
+					});
+			};
 			void client.session
 				.promptAsync({
 					sessionID: sessionId,
@@ -3651,16 +3698,9 @@ export function SessionChat({
 					// { error: ... } instead of throwing. Without this check the
 					// catch handler never fires and the UI stays stuck on "busy"
 					// with the optimistic user bubble forever.
-					if (res?.error) {
-						useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-						removeOptimisticUserMessage(messageID);
-					}
+					if (res?.error) handleSendError();
 				})
-				.catch(() => {
-					// On network-level failure, set status to idle and remove optimistic message
-					useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-					removeOptimisticUserMessage(messageID);
-				});
+				.catch(handleSendError);
 
 			return messageID;
 		},

@@ -507,6 +507,7 @@ export function useOpenCodeEventStream() {
 				// ---- Session errors ----
 				case "session.error": {
 					const props = event.properties as { sessionID?: string; error?: any };
+					console.log("[sse-handler] session.error event received", { sessionID: props.sessionID, error: props.error });
 					if (props.sessionID && props.error) {
 						// Fire browser notification
 						const errorTitle =
@@ -554,13 +555,15 @@ export function useOpenCodeEventStream() {
 						client.session
 							.messages({ sessionID: sid })
 							.then((res) => {
+								console.log("[sse-handler] session.error hydrate fetch result:", { hasData: !!res.data, messageCount: (res.data as any)?.length ?? 0 });
 								if (!res.data) return;
 								useSyncStore.getState().hydrate(sid, res.data as any);
 								// Remove optimistic messages — real ones from the
 								// server are now in the store via hydrate.
 								useSyncStore.getState().clearOptimisticMessages(sid);
+								console.log("[sse-handler] session.error hydrate complete, messages in store:", useSyncStore.getState().messages[sid]?.length ?? 0);
 							})
-							.catch(() => {});
+							.catch((err) => { console.error("[sse-handler] session.error hydrate fetch failed:", err); });
 					}
 					break;
 				}
