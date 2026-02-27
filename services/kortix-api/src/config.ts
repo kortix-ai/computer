@@ -1,7 +1,7 @@
 export type SandboxProviderName = 'daytona' | 'local_docker';
 
 /** Single source of truth for the sandbox version. Update on each release. */
-export const SANDBOX_VERSION = '0.7.2';
+export const SANDBOX_VERSION = '0.7.3';
 
 /** Parse comma-separated provider list (e.g. "daytona,local_docker") */
 function parseAllowedProviders(raw: string): SandboxProviderName[] {
