@@ -104,9 +104,11 @@ export function useSandboxConnection() {
 					throw new Error(`Auth error: ${res.status}`);
 				}
 
-				// 502 means Kortix Master is up but OpenCode is unreachable.
-				// Check /kortix/health to confirm sandbox is alive and get its status.
-				if (res.status === 502) {
+				// 500/502 means the sandbox proxy or Kortix Master couldn't reach OpenCode.
+				// 500 = kortix-api proxy got ECONNREFUSED from Kortix Master (sandbox starting)
+				// 502 = Kortix Master is up but OpenCode is unreachable
+				// In both cases, check /kortix/health to see if the sandbox is alive.
+				if (res.status === 500 || res.status === 502) {
 					try {
 						const fallbackRes = await authenticatedFetch(`${url}/kortix/health`, {
 							signal: AbortSignal.timeout(3000),
@@ -127,7 +129,7 @@ export function useSandboxConnection() {
 					} catch {
 						// /kortix/health also failed — truly unreachable, fall through to failure path
 					}
-					throw new Error("OpenCode proxy error (502)");
+					throw new Error(`OpenCode proxy error (${res.status})`);
 				}
 
 				resetSandboxFail();

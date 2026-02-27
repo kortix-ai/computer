@@ -66,9 +66,21 @@ function useConnectionStatus(url: string, enabled: boolean) {
       }, { retryOnAuthError: false });
       clearTimeout(timeout);
 
-      // 502 means Kortix Master is up but OpenCode isn't ready yet
-      if (res.status === 502) {
-        setStatus('starting');
+      // 500/502 means the sandbox or OpenCode isn't ready yet.
+      // Fall back to /kortix/health to confirm sandbox is alive.
+      if (res.status === 500 || res.status === 502) {
+        try {
+          const healthRes = await authenticatedFetch(`${url}/kortix/health`, {
+            signal: AbortSignal.timeout(3000),
+          }, { retryOnAuthError: false });
+          if (healthRes.status === 200 || healthRes.status === 503) {
+            setStatus('starting');
+          } else {
+            setStatus('error');
+          }
+        } catch {
+          setStatus('error');
+        }
       } else {
         setStatus('connected');
       }
