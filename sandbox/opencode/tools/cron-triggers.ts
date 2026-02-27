@@ -115,7 +115,7 @@ export default tool({
       .string()
       .optional()
       .describe(
-        "Model to use: 'kortix/basic' (Sonnet, default) or 'kortix/power' (Opus 4.6).",
+        "Model to use, e.g. 'anthropic/claude-sonnet-4.6' (default), 'anthropic/claude-opus-4.6', 'openai/gpt-5.3-codex'.",
       ),
     session_mode: tool.schema
       .string()

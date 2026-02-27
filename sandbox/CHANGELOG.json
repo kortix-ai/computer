@@ -1,5 +1,39 @@
 [
   {
+    "version": "0.7.5",
+    "date": "2026-02-27",
+    "title": "Real model names — 8 models replace opaque aliases",
+    "description": "Replaces the kortix/basic and kortix/power model aliases with 8 real model IDs (anthropic/claude-opus-4.6, claude-sonnet-4.6, claude-haiku-4.5, openai/gpt-5.3-codex, minimax/minimax-m2.5, z-ai/glm-5, moonshotai/kimi-k2.5, x-ai/grok-4.1-fast). All models verified on OpenRouter with correct pricing and context windows.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "8 real model IDs under Kortix provider — users see actual model names instead of opaque kortix/basic and kortix/power aliases"
+      },
+      {
+        "type": "improvement",
+        "text": "opencode.jsonc updated with all 8 models, correct context windows, and pricing tiers"
+      },
+      {
+        "type": "fix",
+        "text": "Instance deletion no longer triggers zombie auto-recreate via markSandboxDeleted flag"
+      },
+      {
+        "type": "fix",
+        "text": "Server removal falls back to best available server instead of broken DEFAULT_SERVER_ID"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "@kortix/sandbox@0.7.5",
+        "target": "npm"
+      },
+      {
+        "name": "v0.7.5",
+        "target": "github-release"
+      }
+    ]
+  },
+  {
     "version": "0.7.4",
     "date": "2026-02-27",
     "title": "Cloud sandbox auth, proxy resilience & WoA routing fix",

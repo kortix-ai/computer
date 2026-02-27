@@ -12,7 +12,7 @@ import type { LogFn } from "./types"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const KORTIX_MODEL = "kortix/basic"
+export const KORTIX_MODEL = "anthropic/claude-sonnet-4.6"
 export const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"
 export const DEFAULT_MAX_TOKENS = 2000
 const ANTHROPIC_VERSION = "2023-06-01"

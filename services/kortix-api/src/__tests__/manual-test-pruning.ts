@@ -81,7 +81,7 @@ function buildRequest(numToolResults: number, contentSize: number) {
   messages.push({ role: 'user', content: 'What did the old commands show?' });
 
   return {
-    model: 'kortix/basic',
+    model: 'anthropic/claude-sonnet-4.6',
     messages,
     session_id: SESSION_ID,
     stream: false,

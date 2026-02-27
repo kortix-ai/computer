@@ -30,14 +30,14 @@ describe('Slack Command Parser', () => {
     it('parses "use power"', () => {
       const result = parseCommand('use power');
       expect(result.type).toBe('set_model');
-      expect(result.model?.modelID).toBe('kortix/power');
+      expect(result.model?.modelID).toBe('anthropic/claude-opus-4.6');
       expect(result.model?.providerID).toBe('kortix');
     });
 
     it('parses "use basic"', () => {
       const result = parseCommand('use basic');
       expect(result.type).toBe('set_model');
-      expect(result.model?.modelID).toBe('kortix/basic');
+      expect(result.model?.modelID).toBe('anthropic/claude-sonnet-4.6');
     });
 
     it('parses "Use Power" (case insensitive)', () => {

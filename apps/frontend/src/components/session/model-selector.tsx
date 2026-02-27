@@ -44,6 +44,7 @@ export { ConnectProviderContent } from '@/components/providers/connect-provider-
 // =============================================================================
 
 const POPULAR_PROVIDERS = [
+  'kortix',
   'opencode',
   'anthropic',
   'github-copilot',
