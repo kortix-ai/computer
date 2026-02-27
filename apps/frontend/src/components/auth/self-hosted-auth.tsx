@@ -6,7 +6,7 @@ import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Search, Globe, Image,
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
-import { createClient } from '@/lib/supabase/client';
+import { installOwner, selfHostedSignIn } from '@/app/auth/actions';
 import { ProviderSettings } from '@/components/providers/provider-settings';
 import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import { resetClient } from '@/lib/opencode-sdk';
@@ -447,8 +447,6 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
       return;
     }
 
-    const supabase = createClient();
-
     try {
       if (isInstaller) {
         const confirmPassword = (form.elements.namedItem('confirmPassword') as HTMLInputElement).value;
@@ -458,39 +456,33 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
           return;
         }
 
-        const { error: signUpError } = await supabase.auth.signUp({ email, password });
-        if (signUpError) {
-          setErrorMessage(signUpError.message);
+        // Use server action — runs server-side with runtime env vars,
+        // bypassing the NEXT_PUBLIC_ baked-key issue in Docker deployments.
+        const formData = new FormData();
+        formData.set('email', email);
+        formData.set('password', password);
+        formData.set('confirmPassword', confirmPassword);
+
+        const result = await installOwner(null, formData);
+
+        if (result.message) {
+          setErrorMessage(result.message);
           setPending(false);
           return;
         }
 
-        // Tell the parent we're entering step 2 BEFORE signIn — because
-        // signInWithPassword triggers AuthProvider.onAuthStateChange which
-        // makes `user` truthy, and SelfHostedLoginContent auto-redirects
-        // to /onboarding if wizardStep is still 1. The ref-based callback
-        // is synchronous, so the parent sees step=2 immediately.
-        setWizardStep(2);
-        onWizardStepChange?.(2);
-
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) {
-          // Revert wizard step on sign-in failure
-          setWizardStep(1);
-          onWizardStepChange?.(1);
-          setErrorMessage(signInError.message);
-          setPending(false);
-          return;
-        }
-
-        // We have the JWT right here — use it directly instead of going through
-        // getSupabaseAccessToken() which may have a stale null cached from before signup.
-        const jwt = signInData.session?.access_token;
+        // Server action succeeded — session cookies are set server-side.
+        // Store the JWT for sandbox provisioning in subsequent steps.
+        const jwt = result.accessToken;
         jwtRef.current = jwt || null;
 
         // Invalidate the token cache so subsequent calls (e.g. ProviderSettings)
         // pick up the fresh session instead of stale null.
         invalidateTokenCache();
+
+        // Tell the parent we're entering step 2
+        setWizardStep(2);
+        onWizardStepChange?.(2);
 
         // Provision sandbox — if only one provider, auto-provision immediately.
         // If multiple providers, defer to step 2 where user picks.
@@ -505,14 +497,24 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
 
         setPending(false);
       } else {
-        // Returning user: just sign in and go
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          setErrorMessage(error.message);
+        // Returning user: use server action for sign-in
+        const formData = new FormData();
+        formData.set('email', email);
+        formData.set('password', password);
+        if (returnUrl) formData.set('returnUrl', returnUrl);
+
+        const result = await selfHostedSignIn(null, formData);
+
+        if (result.message) {
+          setErrorMessage(result.message);
           setPending(false);
           return;
         }
-        router.push(returnUrl || '/dashboard');
+
+        // Hard redirect — router.push() does a soft navigation that doesn't
+        // re-run middleware, so the auth cookie set by the server action
+        // wouldn't be picked up. A full page load ensures middleware sees it.
+        window.location.href = result.redirectTo || returnUrl || '/dashboard';
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'An unexpected error occurred');

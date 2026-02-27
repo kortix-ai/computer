@@ -429,6 +429,7 @@ generate_secrets() {
   CRON_SECRET=$(generate_password)
   CHANNELS_CREDENTIAL_KEY=$(generate_token)
   INTERNAL_SERVICE_KEY=$(generate_token)
+  API_KEY_SECRET=$(generate_token)
 
   if [ "$DEPLOY_MODE" = "vps" ] && [ "$ENABLE_AUTH" = "yes" ]; then
     ADMIN_PASSWORD=$(generate_password)
@@ -946,6 +947,7 @@ ${supabase_db_env}
       - FRONTEND_URL=\${PUBLIC_URL}
       - CHANNELS_PUBLIC_URL=\${API_PUBLIC_URL}
       - CHANNELS_CREDENTIAL_KEY=\${CHANNELS_CREDENTIAL_KEY}
+      - API_KEY_SECRET=\${API_KEY_SECRET}
       - CORS_ALLOWED_ORIGINS=\${PUBLIC_URL}
       - KORTIX_ROUTER_INTERNAL_ENABLED=false
       - KORTIX_BILLING_INTERNAL_ENABLED=false
@@ -993,6 +995,7 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
 CRON_TICK_SECRET=${CRON_SECRET}
 CHANNELS_CREDENTIAL_KEY=${CHANNELS_CREDENTIAL_KEY}
+API_KEY_SECRET=${API_KEY_SECRET}
 
 # ─── Integrations (Pipedream) ────────────────────────────────────────────────
 INTEGRATION_AUTH_PROVIDER=pipedream
@@ -1297,6 +1300,15 @@ main() {
   banner
   preflight
 
+  # Clean up any stale Docker volumes from a previous install that was
+  # manually removed (rm -rf ~/.kortix) without running `docker compose down -v`.
+  # Without this, fresh installs reuse old Postgres data with old passwords,
+  # causing supabase-auth to fail with SASL auth errors.
+  if [ ! -f "$INSTALL_DIR/docker-compose.yml" ]; then
+    docker volume rm kortix_supabase-db-data 2>/dev/null || true
+    docker rm -f kortix-sandbox 2>/dev/null || true
+  fi
+
   # Existing install?
   if [ -f "$INSTALL_DIR/docker-compose.yml" ]; then
     warn "Existing installation found at $INSTALL_DIR"
@@ -1322,8 +1334,15 @@ main() {
     fi
     info "Stopping old services..."
     cd "$INSTALL_DIR"
-    docker compose --profile vps down 2>/dev/null || docker compose down 2>/dev/null || true
+    # Down with -v to remove volumes (especially supabase-db-data).
+    # Without this, old Postgres data retains old passwords while the
+    # installer generates new ones, causing supabase-auth to fail with
+    # "password authentication failed for user supabase_auth_admin".
+    docker compose --profile vps down -v 2>/dev/null || docker compose down -v 2>/dev/null || true
     docker rm -f kortix-sandbox 2>/dev/null || true
+    # Also remove any leftover named volumes from previous installs
+    docker volume rm kortix_supabase-db-data 2>/dev/null || true
+    docker volume rm supabase_db_kortix-local 2>/dev/null || true
     echo ""
   fi
 

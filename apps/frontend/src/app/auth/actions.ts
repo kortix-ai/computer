@@ -299,13 +299,19 @@ export async function signUpWithPassword(prevState: any, formData: FormData) {
 /**
  * Self-hosted installer: create the owner account + immediately sign in.
  * Only works when email confirmations are disabled (self-hosted Supabase).
- * After success, redirects to /onboarding.
+ *
+ * This runs SERVER-SIDE so it uses runtime env vars (SUPABASE_URL,
+ * SUPABASE_ANON_KEY) instead of NEXT_PUBLIC_ vars that are baked at build
+ * time — critical for Docker deployments where the baked values are stale.
+ *
+ * Returns the access_token so the client-side wizard can continue with
+ * sandbox provisioning (which requires the JWT for Bearer auth to the
+ * backend API, and may involve async polling for Docker image pulls).
  */
-export async function installOwner(prevState: any, formData: FormData) {
+export async function installOwner(_prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
   const confirmPassword = formData.get('confirmPassword') as string;
-  const returnUrl = formData.get('returnUrl') as string | undefined;
 
   if (!email || !email.includes('@')) {
     return { message: 'Please enter a valid email address' };
@@ -341,33 +347,47 @@ export async function installOwner(prevState: any, formData: FormData) {
     return { message: signInError.message || 'Account created but could not sign in' };
   }
 
-  // Wizard step: provision the sandbox for the owner.
-  // This is the self-hosted "install" — the first user gets a sandbox automatically.
-  // Server-side: prefer BACKEND_URL (internal Docker hostname) over
-  // NEXT_PUBLIC_BACKEND_URL (browser-facing localhost, unreachable from container)
-  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-  const accessToken = signInData.session?.access_token;
-  if (accessToken) {
-    try {
-      await fetch(`${backendUrl}/platform/init`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-    } catch (err) {
-      // Non-fatal — sandbox can be created later from the dashboard.
-      console.warn('[installOwner] Failed to provision sandbox:', err);
-    }
-  }
-
-  // Return success — let the client redirect after auth state hydrates.
-  // Using redirect() here causes a 303 that races with AuthProvider hydration.
+  // Return the access token so the client wizard can provision the sandbox.
+  // We intentionally do NOT provision the sandbox here because the local
+  // Docker flow involves async image pulling with progress polling that
+  // the client-side wizard handles with its own UI.
   return {
     success: true,
-    redirectTo: returnUrl || '/onboarding',
+    accessToken: signInData.session?.access_token || null,
+  };
+}
+
+/**
+ * Self-hosted sign-in for returning users.
+ * Runs SERVER-SIDE to use runtime env vars instead of baked NEXT_PUBLIC_ vars.
+ */
+export async function selfHostedSignIn(_prevState: any, formData: FormData) {
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+  const returnUrl = formData.get('returnUrl') as string | undefined;
+
+  if (!email || !email.includes('@')) {
+    return { message: 'Please enter a valid email address' };
+  }
+
+  if (!password || password.length < 6) {
+    return { message: 'Password must be at least 6 characters' };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  if (error) {
+    return { message: error.message || 'Invalid email or password' };
+  }
+
+  return {
+    success: true,
+    redirectTo: returnUrl || '/dashboard',
   };
 }
 
