@@ -20,6 +20,7 @@ import {
   ExternalLink,
   ChevronDown,
   Download,
+  Globe,
 } from 'lucide-react';
 import { useServerStore, type ServerEntry } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
@@ -27,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/auth-token';
-import { createSandbox, extractMappedPorts, removeSandbox, setupSSH, type SandboxProviderName, type ChangelogEntry, type SSHSetupResult } from '@/lib/platform-client';
+import { createSandbox, ensureSandbox, extractMappedPorts, removeSandbox, setupSSH, type SandboxProviderName, type ChangelogEntry, type SSHSetupResult } from '@/lib/platform-client';
 import { toast } from '@/lib/toast';
 import { isBillingEnabled } from '@/lib/config';
 
@@ -385,11 +386,6 @@ function DialogInstanceRow({
 }
 
 // ============================================================================
-// Generated Key — inline display inside Instance Manager
-// ============================================================================
-
-
-// ============================================================================
 // Instance Manager Dialog
 // ============================================================================
 
@@ -405,7 +401,7 @@ export function InstanceManagerDialog({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = React.useState('');
-  const [mode, setMode] = React.useState<'list' | 'add' | 'edit' | 'ssh'>('list');
+  const [mode, setMode] = React.useState<'list' | 'add' | 'edit' | 'ssh' | 'custom'>('list');
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [isCreatingSandbox, setIsCreatingSandbox] = React.useState(false);
   const [sandboxError, setSandboxError] = React.useState<string | null>(null);
@@ -428,7 +424,10 @@ export function InstanceManagerDialog({
   const hasDaytona = availableProviders.includes('daytona');
   const hasLocalDocker = availableProviders.includes('local_docker');
 
-  // Form state
+  // Derived: does the user already have a managed sandbox?
+  const hasActiveSandbox = servers.some((s) => s.provider === 'daytona' || s.provider === 'local_docker');
+
+  // Form state (for custom URL / edit)
   const [formUrl, setFormUrl] = React.useState('');
   const [formLabel, setFormLabel] = React.useState('');
   const urlInputRef = React.useRef<HTMLInputElement>(null);
@@ -454,19 +453,13 @@ export function InstanceManagerDialog({
     }
   }, [open]);
 
-  // Focus URL input when entering add/edit mode
+  // Focus URL input when entering custom/edit mode
   React.useEffect(() => {
-    if ((mode === 'add' || mode === 'edit') && urlInputRef.current) {
+    if ((mode === 'custom' || mode === 'edit') && urlInputRef.current) {
       const timer = setTimeout(() => urlInputRef.current?.focus(), 100);
       return () => clearTimeout(timer);
     }
   }, [mode]);
-
-  function startAdd() {
-    setFormUrl('');
-    setFormLabel('');
-    setMode('add');
-  }
 
   function startEdit(server: ServerEntry) {
     setEditingId(server.id);
@@ -475,12 +468,12 @@ export function InstanceManagerDialog({
     setMode('edit');
   }
 
-  function handleSave() {
+  function handleSaveCustom() {
     const url = formUrl.trim();
     if (!url) return;
     const label = formLabel.trim();
 
-    if (mode === 'add') {
+    if (mode === 'custom') {
       const newServer = addServer(label, url);
       useTabStore.getState().swapForServer(newServer.id, activeServerId);
       setActiveServer(newServer.id);
@@ -493,11 +486,16 @@ export function InstanceManagerDialog({
     }
   }
 
-  async function handleCreateSandbox(provider?: SandboxProviderName) {
+  async function handleCreateSandbox(provider: SandboxProviderName) {
     setIsCreatingSandbox(true);
     setSandboxError(null);
     try {
-      const { sandbox } = await createSandbox(provider ? { provider } : undefined);
+      // In cloud mode (billing), use ensureSandbox (idempotent — handles archived → reactivate → create).
+      // In self-hosted mode, use createSandbox (explicit creation).
+      const { sandbox } = isBillingEnabled() && provider === 'daytona'
+        ? await ensureSandbox({ provider })
+        : await createSandbox({ provider });
+
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
 
       const store = useServerStore.getState();
@@ -549,10 +547,10 @@ export function InstanceManagerDialog({
         setIsRemovingSandbox(false);
       }
 
-      // Kill the cached sandbox query so useSandbox() doesn't auto-recreate it.
-      // removeQueries wipes the data entirely — the hook won't refetch because
-      // there's no stale data to trigger it until the user explicitly creates again.
-      queryClient.removeQueries({ queryKey: ['platform', 'sandbox'] });
+      // Invalidate the sandbox query so useSandbox() knows the sandbox is gone.
+      // This lets the hook refetch — in cloud mode it will auto-create a new one
+      // when the user navigates or refreshes (or they can click "New Instance").
+      queryClient.invalidateQueries({ queryKey: ['platform', 'sandbox'] });
     }
 
     // Remove from local store (manual/localhost entries just get this)
@@ -607,6 +605,15 @@ export function InstanceManagerDialog({
     toast.success('Private key downloaded. Run: chmod 600 ~/Downloads/kortix_sandbox');
   }
 
+  // Compute description text based on mode
+  const modeDescription: Record<string, string> = {
+    list: 'Manage your Kortix instances.',
+    add: 'Choose how to connect.',
+    custom: 'Connect to a Kortix instance by entering its address.',
+    edit: 'Update the connection details for this instance.',
+    ssh: 'Connect via SSH or VS Code Remote SSH.',
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 gap-0 overflow-hidden max-w-lg" aria-describedby="instance-dialog-desc">
@@ -622,48 +629,41 @@ export function InstanceManagerDialog({
                 <KeyRound className="h-4 w-4 text-muted-foreground" />
                 SSH Access
               </>
-            ) : mode === 'add' ? 'Add Instance' : 'Edit Instance'}
+            ) : mode === 'add' ? (
+              <>
+                <Plus className="h-4 w-4 text-muted-foreground" />
+                New Instance
+              </>
+            ) : mode === 'custom' ? 'Custom Instance' : 'Edit Instance'}
           </DialogTitle>
           <DialogDescription id="instance-dialog-desc" className="text-xs">
-            {mode === 'list'
-              ? 'Manage your Kortix instances. Switch between local and remote servers.'
-              : mode === 'ssh'
-                ? 'Connect via SSH or VS Code Remote SSH.'
-                : mode === 'add'
-                  ? 'Connect to a new Kortix instance by entering its address.'
-                  : 'Update the connection details for this instance.'}
+            {modeDescription[mode] || ''}
           </DialogDescription>
         </DialogHeader>
 
-        {/* ---- List view ---- */}
+        {/* ──── List view ──── */}
         {mode === 'list' && (
           <div className="flex flex-col">
-            {/* Search + Add bar */}
-            <div className="flex items-center gap-2 px-4 pb-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
-                <input
-                  placeholder="Search instances..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-8 text-xs pl-8 pr-3 rounded-lg bg-muted/40 border border-border/40 outline-none placeholder:text-muted-foreground/40 focus:border-primary/30 focus:bg-muted/60 transition-all"
-                />
+            {/* Search (only when 3+ instances) */}
+            {servers.length >= 3 && (
+              <div className="px-4 pb-3">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
+                  <input
+                    placeholder="Search instances..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full h-8 text-xs pl-8 pr-3 rounded-lg bg-muted/40 border border-border/40 outline-none placeholder:text-muted-foreground/40 focus:border-primary/30 focus:bg-muted/60 transition-all"
+                  />
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={startAdd}
-                className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors cursor-pointer flex-shrink-0"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add
-              </button>
-            </div>
+            )}
 
             {/* Instance list */}
             <div className="flex flex-col gap-1.5 px-3 pb-3 max-h-[400px] overflow-y-auto">
               {filtered.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground/60">
-                  {search ? `No instances match "${search}"` : 'No instances configured'}
+                  {search ? `No instances match "${search}"` : 'No instances yet'}
                 </div>
               ) : (
                 filtered.map((server) => (
@@ -682,102 +682,142 @@ export function InstanceManagerDialog({
               )}
             </div>
 
-            {/* New Sandbox buttons */}
-            <div className="border-t border-border/40 px-4 py-3">
+            {/* Footer: New Instance + SSH */}
+            <div className="border-t border-border/40 px-4 py-3 flex flex-col gap-2">
               {sandboxError && (
-                <p className="text-xs text-destructive mb-2">{sandboxError}</p>
+                <p className="text-xs text-destructive">{sandboxError}</p>
               )}
               {sshError && (
-                <p className="text-xs text-destructive mb-2">{sshError}</p>
+                <p className="text-xs text-destructive">{sshError}</p>
               )}
-              {/* Provider buttons — only shows providers returned by GET /platform/providers */}
-              <>
-                <div className="flex items-center gap-2">
-                  {hasDaytona && (
-                    isBillingEnabled() ? (
-                      <button
-                        type="button"
-                        disabled
-                        title="Sandbox is auto-provisioned in cloud mode"
-                        className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-muted-foreground/50 bg-muted/30 border border-border/30 rounded-lg cursor-not-allowed"
-                      >
-                        <Cloud className="h-3.5 w-3.5" />
-                        Coming soon
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleCreateSandbox('daytona')}
-                        disabled={isCreatingSandbox}
-                        className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isCreatingSandbox ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <>
-                            <Cloud className="h-3.5 w-3.5" />
-                            Cloud
-                          </>
-                        )}
-                      </button>
-                    )
-                  )}
-                  {hasLocalDocker && (
-                    <button
-                      type="button"
-                      onClick={() => handleCreateSandbox('local_docker')}
-                      disabled={isCreatingSandbox}
-                      className="flex items-center justify-center gap-2 flex-1 h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isCreatingSandbox ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Container className="h-3.5 w-3.5" />
-                          Local Docker
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-                {hasDaytona && hasLocalDocker && (
-                  <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
-                    Cloud uses Daytona. Local Docker runs on your machine.
-                  </p>
-                )}
-              </>
 
-              {/* Generate SSH button — only for Local Docker sandboxes (Daytona has its own SSH) */}
-              {servers.some((s) => s.provider === 'local_docker') && (
-                <div className="mt-3 pt-3 border-t border-border/30">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMode('add')}
+                  className="flex items-center justify-center gap-1.5 flex-1 h-9 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New Instance
+                </button>
+
+                {/* SSH shortcut — only for local docker sandboxes */}
+                {servers.some((s) => s.provider === 'local_docker') && (
                   <button
                     type="button"
                     onClick={handleGenerateSSH}
                     disabled={isGeneratingSSH}
-                    className="flex items-center justify-center gap-2 w-full h-9 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Generate SSH key for Local Docker sandbox"
+                    className="flex items-center justify-center h-9 w-9 text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted/80 border border-border/50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isGeneratingSSH ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <>
-                        <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
-                        Generate SSH Key
-                      </>
+                      <KeyRound className="h-3.5 w-3.5" />
                     )}
                   </button>
-                  <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
-                    SSH into your Local Docker sandbox via terminal or VS Code Remote SSH.
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* ---- Add / Edit view ---- */}
-        {(mode === 'add' || mode === 'edit') && (
+        {/* ──── Add view — pick instance type ──── */}
+        {mode === 'add' && (
+          <div className="flex flex-col gap-3 px-5 pb-5">
+            {sandboxError && (
+              <p className="text-xs text-destructive">{sandboxError}</p>
+            )}
+
+            <div className="flex flex-col gap-2">
+              {/* Cloud (Daytona) */}
+              {hasDaytona && (
+                <button
+                  type="button"
+                  onClick={() => handleCreateSandbox('daytona')}
+                  disabled={isCreatingSandbox || (isBillingEnabled() && hasActiveSandbox)}
+                  className={cn(
+                    'flex items-start gap-3 w-full p-3.5 rounded-xl border text-left transition-all',
+                    isBillingEnabled() && hasActiveSandbox
+                      ? 'border-border/30 bg-muted/20 opacity-50 cursor-not-allowed'
+                      : 'border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+                  )}
+                >
+                  <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-violet-500/10 flex-shrink-0 mt-0.5">
+                    {isCreatingSandbox ? (
+                      <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
+                    ) : (
+                      <Cloud className="h-4 w-4 text-violet-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">Cloud</p>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">
+                      {isBillingEnabled() && hasActiveSandbox
+                        ? 'Limit: 1 sandbox per account'
+                        : 'Managed sandbox on Daytona cloud'}
+                    </p>
+                  </div>
+                </button>
+              )}
+
+              {/* Local Docker */}
+              {hasLocalDocker && (
+                <button
+                  type="button"
+                  onClick={() => handleCreateSandbox('local_docker')}
+                  disabled={isCreatingSandbox}
+                  className="flex items-start gap-3 w-full p-3.5 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-blue-500/10 flex-shrink-0 mt-0.5">
+                    {isCreatingSandbox ? (
+                      <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                    ) : (
+                      <Container className="h-4 w-4 text-blue-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">Local Docker</p>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">
+                      Runs on your machine via Docker
+                    </p>
+                  </div>
+                </button>
+              )}
+
+              {/* Custom URL */}
+              <button
+                type="button"
+                onClick={() => { setFormUrl(''); setFormLabel(''); setMode('custom'); }}
+                className="flex items-start gap-3 w-full p-3.5 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-muted/60 flex-shrink-0 mt-0.5">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">Custom URL</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">
+                    Connect to any Kortix instance by address
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Back */}
+            <button
+              type="button"
+              className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer self-start"
+              onClick={() => { setMode('list'); setSandboxError(null); }}
+            >
+              Back
+            </button>
+          </div>
+        )}
+
+        {/* ──── Custom URL form ──── */}
+        {(mode === 'custom' || mode === 'edit') && (
           <form
-            onSubmit={(e) => { e.preventDefault(); handleSave(); }}
+            onSubmit={(e) => { e.preventDefault(); handleSaveCustom(); }}
             className="flex flex-col gap-4 px-5 pb-5"
           >
             <div className="flex flex-col gap-3">
@@ -788,7 +828,7 @@ export function InstanceManagerDialog({
                 </label>
                 <input
                   ref={urlInputRef}
-                   placeholder="http://localhost:8008/v1/p/kortix-sandbox/8000"
+                  placeholder="http://localhost:8008/v1/p/kortix-sandbox/8000"
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
                   className="w-full h-9 px-3 text-sm font-mono rounded-lg bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
@@ -811,8 +851,6 @@ export function InstanceManagerDialog({
                   className="w-full h-9 px-3 text-sm rounded-lg bg-muted/30 border border-border/60 outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
-
-
             </div>
 
             {/* Actions */}
@@ -820,7 +858,7 @@ export function InstanceManagerDialog({
               <button
                 type="button"
                 className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer"
-                onClick={() => setMode('list')}
+                onClick={() => setMode(mode === 'edit' ? 'list' : 'add')}
               >
                 Back
               </button>
@@ -829,13 +867,13 @@ export function InstanceManagerDialog({
                 disabled={!formUrl.trim()}
                 className="h-8 px-4 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
-                {mode === 'add' ? 'Add & Connect' : 'Save Changes'}
+                {mode === 'custom' ? 'Add & Connect' : 'Save Changes'}
               </button>
             </div>
           </form>
         )}
 
-        {/* ---- SSH result view ---- */}
+        {/* ──── SSH result view ──── */}
         {mode === 'ssh' && sshResult && (() => {
           const pk = sshResult.private_key.trim();
           const connectScript = `mkdir -p ~/.ssh && cat > ~/.ssh/kortix_sandbox << 'KORTIX_KEY'\n${pk}\nKORTIX_KEY\nchmod 600 ~/.ssh/kortix_sandbox && ${sshResult.ssh_command}`;
