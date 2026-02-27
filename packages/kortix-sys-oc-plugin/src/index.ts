@@ -42,7 +42,8 @@ const TOOL_OUTPUTS_DIR = "/workspace/.kortix/tool-outputs"
 function isAnthropicModel(modelId: string | null): boolean {
 	if (!modelId) return false
 	const lower = modelId.toLowerCase()
-	return lower.includes("anthropic") || lower.includes("claude")
+	// Direct Anthropic model IDs + Kortix aliases that resolve to Anthropic
+	return lower.includes("anthropic") || lower.includes("claude") || lower.startsWith("kortix/")
 }
 
 export const KortixMemoryPlugin: Plugin = async ({ client }) => {
