@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { db } from '../../shared/db';
 import { channelSessions } from '@kortix/db';
-import { SandboxConnector } from './sandbox-connector';
+import { OpenCodeClient } from 'opencode-channels';
 import type { NormalizedMessage, SessionStrategy } from '../types';
 import type { ChannelConfig } from '@kortix/db';
 
@@ -46,7 +46,7 @@ export class SessionManager {
   async resolve(
     config: ChannelConfig,
     message: NormalizedMessage,
-    connector: SandboxConnector,
+    client: OpenCodeClient,
   ): Promise<string> {
     const strategy = config.sessionStrategy as SessionStrategy;
     const key = this.buildKey(
@@ -57,7 +57,7 @@ export class SessionManager {
     );
 
     if (strategy === 'per-message') {
-      const sessionId = await connector.createSession(config.agentName ?? undefined);
+      const sessionId = await client.createSession(config.agentName ?? undefined);
       return sessionId;
     }
 
@@ -90,7 +90,7 @@ export class SessionManager {
       }
     }
 
-    const sessionId = await connector.createSession(config.agentName ?? undefined);
+    const sessionId = await client.createSession(config.agentName ?? undefined);
 
     this.cache.set(key, { sessionId, lastUsedAt: Date.now() });
 
