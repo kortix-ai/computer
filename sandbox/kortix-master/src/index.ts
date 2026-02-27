@@ -195,21 +195,19 @@ app.get('/docs/openapi.json',
     // Merge with OpenCode's spec (fetched from localhost, cached 30s)
     const merged = await buildMergedSpec(kortixSpec as any)
 
-    // Dynamically construct the server URL for the OpenAPI spec.
-    // When KORTIX_API_URL + SANDBOX_ID are available (always in production, usually in local dev),
-    // build the platform proxy URL: {kortix-api}/v1/p/{sandboxId}/8000
-    // Otherwise fall back to '/' (relative) — the browser resolves it from the current origin.
-    let serverUrl = '/'
-    if (config.KORTIX_API_URL && config.SANDBOX_ID) {
-      const base = config.KORTIX_API_URL.replace(/\/$/, '')
-      serverUrl = `${base}/v1/p/${config.SANDBOX_ID}/8000`
+    // Use the X-Forwarded-Prefix header injected by the platform proxy to set
+    // the correct server URL for Scalar "Try It". This header contains the full
+    // public base URL (e.g. "http://localhost:8008/v1/p/kortix-sandbox/8000").
+    // Without it, fall back to the placeholder from spec-merger.
+    const forwardedPrefix = c.req.header('x-forwarded-prefix')
+    if (forwardedPrefix) {
+      return c.json({
+        ...merged,
+        servers: [{ url: forwardedPrefix, description: 'Current sandbox' }],
+      })
     }
 
-    const spec = {
-      ...merged,
-      servers: [{ url: serverUrl, description: 'Current sandbox' }],
-    }
-    return c.json(spec)
+    return c.json(merged)
   },
 )
 

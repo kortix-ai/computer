@@ -1,18 +1,11 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Key, Plus, Trash2, Copy, Check, Shield, RefreshCw, Bot, AlertCircle, ExternalLink, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Check, Shield, RefreshCw, Bot, AlertCircle, ExternalLink } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/lib/toast';
 
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -24,7 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -54,13 +46,13 @@ import { getActiveSandboxId, getActiveServer, getActiveOpenCodeUrl } from '@/sto
 import { getAuthToken } from '@/lib/auth-token';
 import { useServerStore } from '@/stores/server-store';
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 interface NewAPIKeyData {
   title: string;
   description: string;
   expiresInDays: string;
 }
-
-// ── Inline copy button with check feedback ─────────────────────────────────
 
 function CopyButton({ value, label, size = 'sm' }: { value: string; label?: string; size?: 'sm' | 'icon' }) {
   const [copied, setCopied] = useState(false);
@@ -96,110 +88,60 @@ function CopyButton({ value, label, size = 'sm' }: { value: string; label?: stri
   );
 }
 
-// ── Auth guide ─────────────────────────────────────────────────────────────
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
-function AuthGuide() {
-  const [open, setOpen] = useState(false);
+function formatDateFull(dateString: string) {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
-  return (
-    <div className="rounded-lg border">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-muted/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Info className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium">How Authentication Works</span>
-        </div>
-        {open
-          ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          : <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        }
-      </button>
+function isKeyExpired(expiresAt?: string) {
+  if (!expiresAt) return false;
+  return new Date(expiresAt) < new Date();
+}
 
-      {open && (
-        <div className="border-t px-4 py-4 space-y-4 text-sm">
-          {/* API Key Auth */}
-          <div className="space-y-2">
-            <h4 className="font-medium">API Key Authentication</h4>
-            <p className="text-muted-foreground">
-              API keys created here can be used for programmatic access to the Kortix API.
-              Each key is a public/secret pair:
-            </p>
-            <div className="bg-muted rounded-lg p-3 space-y-1 font-mono text-xs">
-              <div><span className="text-muted-foreground">Secret key:</span> kortix_{'<32 alphanumeric chars>'} <span className="text-muted-foreground">(39 chars)</span></div>
-              <div><span className="text-muted-foreground">Public key:</span> pk_{'<32 alphanumeric chars>'} <span className="text-muted-foreground">(35 chars, safe to share)</span></div>
-            </div>
-            <p className="text-muted-foreground">
-              The secret key is shown <strong>once</strong> at creation. Only an HMAC-SHA256 hash is stored server-side.
-            </p>
-          </div>
-
-          {/* Usage */}
-          <div className="space-y-2">
-            <h4 className="font-medium">Usage</h4>
-            <p className="text-muted-foreground">
-              Pass the secret key as a Bearer token in the Authorization header:
-            </p>
-            <pre className="bg-muted rounded-lg p-3 text-xs font-mono overflow-x-auto">
-{`Authorization: Bearer kortix_<your-secret-key>`}
-            </pre>
-          </div>
-
-          {/* E2E Flow */}
-          <div className="space-y-2">
-            <h4 className="font-medium">End-to-End Flow</h4>
-            <div className="text-muted-foreground space-y-1.5">
-              <div className="flex gap-2">
-                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">1</span>
-                <span>Client sends <code className="text-xs bg-muted px-1 rounded">Authorization: Bearer kortix_...</code> to the platform proxy</span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">2</span>
-                <span>Proxy validates: hashes the key with HMAC-SHA256, looks up the hash in the database</span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">3</span>
-                <span>Proxy strips client auth, injects <code className="text-xs bg-muted px-1 rounded">INTERNAL_SERVICE_KEY</code> as Bearer token</span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">4</span>
-                <span>Sandbox receives the request with the internal key — response streams back</span>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2 italic">
-              Your API key is never forwarded to the sandbox. The sandbox only sees the internal service key.
-            </p>
-          </div>
-
-          {/* Other auth methods */}
-          <div className="space-y-2">
-            <h4 className="font-medium text-muted-foreground">Other Token Types</h4>
-            <div className="text-muted-foreground space-y-1.5 text-xs">
-              <p>
-                <strong>Supabase JWT</strong> — Used by the dashboard frontend (ES256, ~900 chars).
-                Passed as <code className="bg-muted px-1 rounded">Authorization: Bearer eyJhbGci...</code>. Handled automatically by the UI.
-              </p>
-              <p>
-                <strong>Sandbox token</strong> — Auto-generated per sandbox (<code className="bg-muted px-1 rounded">kortix_sb_</code> prefix, 42 chars).
-                Injected as the <code className="bg-muted px-1 rounded">KORTIX_TOKEN</code> env var. Used by AI agents running inside the sandbox to call back to the platform API.
-              </p>
-              <p>
-                <strong>Supabase service/anon keys</strong> — These are <em>not</em> valid auth tokens. They are rejected by all endpoints.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+function StatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'active':
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          Active
+        </span>
+      );
+    case 'revoked':
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs text-red-500 dark:text-red-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+          Revoked
+        </span>
+      );
+    case 'expired':
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs text-yellow-600 dark:text-yellow-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+          Expired
+        </span>
+      );
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
+  }
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function APIKeysPage() {
-  // Re-render when active server changes (sandboxId may change)
   const activeServerId = useServerStore((s) => s.activeServerId);
   const activeSandboxId = getActiveSandboxId();
   const activeServer = getActiveServer();
@@ -213,7 +155,8 @@ export default function APIKeysPage() {
   const [showCreatedKey, setShowCreatedKey] = useState(false);
   const queryClient = useQueryClient();
 
-  // Fetch API keys (sandbox-scoped)
+  // ── Queries & mutations ────────────────────────────────────────────────
+
   const {
     data: apiKeysResponse,
     isLoading,
@@ -225,23 +168,18 @@ export default function APIKeysPage() {
     enabled: !!activeSandboxId,
   });
 
-  // Split into sandbox-managed and user-created keys
   const apiKeysData = apiKeysResponse?.data?.data;
   const { sandboxKeys, userKeys } = useMemo(() => {
     const all = apiKeysData || [];
     const sandbox: APIKeyResponse[] = [];
     const user: APIKeyResponse[] = [];
     for (const key of all) {
-      if (key.type === 'sandbox') {
-        sandbox.push(key);
-      } else {
-        user.push(key);
-      }
+      if (key.type === 'sandbox') sandbox.push(key);
+      else user.push(key);
     }
     return { sandboxKeys: sandbox, userKeys: user };
   }, [apiKeysData]);
 
-  // Create API key mutation
   const createMutation = useMutation({
     mutationFn: (request: APIKeyCreateRequest) => apiKeysApi.create(request),
     onSuccess: (response) => {
@@ -255,36 +193,27 @@ export default function APIKeysPage() {
         toast.warning(response.error?.message || 'Failed to create API key');
       }
     },
-    onError: () => {
-      toast.warning('Failed to create API key');
-    },
+    onError: () => toast.warning('Failed to create API key'),
   });
 
-  // Revoke API key mutation
   const revokeMutation = useMutation({
     mutationFn: (keyId: string) => apiKeysApi.revoke(keyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
       toast.info('API key revoked');
     },
-    onError: () => {
-      toast.warning('Failed to revoke API key');
-    },
+    onError: () => toast.warning('Failed to revoke API key'),
   });
 
-  // Delete API key mutation
   const deleteMutation = useMutation({
     mutationFn: (keyId: string) => apiKeysApi.delete(keyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
       toast.info('API key deleted');
     },
-    onError: () => {
-      toast.warning('Failed to delete API key');
-    },
+    onError: () => toast.warning('Failed to delete API key'),
   });
 
-  // Regenerate sandbox key mutation
   const regenerateMutation = useMutation({
     mutationFn: (keyId: string) => apiKeysApi.regenerate(keyId),
     onSuccess: (response) => {
@@ -292,23 +221,20 @@ export default function APIKeysPage() {
         setCreatedApiKey(response.data.data);
         setShowCreatedKey(true);
         queryClient.invalidateQueries({ queryKey: ['api-keys'] });
-        toast.info('Token regenerated and applied to sandbox');
+        toast.info('Token regenerated');
       } else {
         toast.warning(response.error?.message || 'Failed to regenerate key');
       }
     },
-    onError: () => {
-      toast.warning('Failed to regenerate sandbox key');
-    },
+    onError: () => toast.warning('Failed to regenerate sandbox key'),
   });
 
   const handleCreateAPIKey = () => {
     if (!activeSandboxId) {
-      toast.warning('No active sandbox — start a sandbox first');
+      toast.warning('No active sandbox');
       return;
     }
-
-    const request: APIKeyCreateRequest = {
+    createMutation.mutate({
       sandbox_id: activeSandboxId,
       title: newKeyData.title.trim(),
       description: newKeyData.description.trim() || undefined,
@@ -316,99 +242,68 @@ export default function APIKeysPage() {
         newKeyData.expiresInDays && newKeyData.expiresInDays !== 'never'
           ? parseInt(newKeyData.expiresInDays)
           : undefined,
-    };
-
-    createMutation.mutate(request);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="secondary">Active</Badge>;
-      case 'revoked':
-        return <Badge variant="destructive">Revoked</Badge>;
-      case 'expired':
-        return <Badge variant="outline">Expired</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
-  const isKeyExpired = (expiresAt?: string) => {
-    if (!expiresAt) return false;
-    return new Date(expiresAt) < new Date();
-  };
-
-  // Find the active sandbox key (there should be exactly one active)
   const activeSandboxKey = sandboxKeys.find((k) => k.status === 'active');
-
-  // Build the display value for the created key
   const createdKeyDisplayValue = createdApiKey && 'secret_key' in createdApiKey
     ? createdApiKey.secret_key
     : '';
 
+  // ── Render ─────────────────────────────────────────────────────────────
+
   return (
-    <div className="container mx-auto max-w-6xl px-3 sm:px-6 py-4 sm:py-6">
-      <div className="space-y-4 sm:space-y-6">
-        <div className="space-y-1 sm:space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl sm:text-2xl font-medium">API Keys</h1>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                const base = getActiveOpenCodeUrl().replace(/\/+$/, '');
-                const docsUrl = `${base}/docs`;
-                // Inject auth token so the preview proxy sets a session cookie
-                const token = await getAuthToken();
-                if (token) {
-                  try {
-                    const url = new URL(docsUrl);
-                    url.searchParams.set('token', token);
-                    window.open(url.toString(), '_blank');
-                  } catch {
-                    // URL may be relative or malformed — open as-is with token appended
-                    const sep = docsUrl.includes('?') ? '&' : '?';
-                    window.open(`${docsUrl}${sep}token=${encodeURIComponent(token)}`, '_blank');
-                  }
-                } else {
-                  window.open(docsUrl, '_blank');
-                }
-              }}
-            >
-              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-              API Docs
-            </Button>
+    <div className="container mx-auto max-w-4xl px-3 sm:px-4 py-4 sm:py-8">
+      <div className="space-y-6 sm:space-y-8">
+
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg sm:text-xl font-semibold">API Keys</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage keys for programmatic access to your sandbox.
+            </p>
           </div>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Manage your API keys for programmatic access to Kortix
-          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const base = getActiveOpenCodeUrl().replace(/\/+$/, '');
+              const docsUrl = `${base}/docs`;
+              const token = await getAuthToken();
+              if (token) {
+                try {
+                  const url = new URL(docsUrl);
+                  url.searchParams.set('token', token);
+                  window.open(url.toString(), '_blank');
+                } catch {
+                  const sep = docsUrl.includes('?') ? '&' : '?';
+                  window.open(`${docsUrl}${sep}token=${encodeURIComponent(token)}`, '_blank');
+                }
+              } else {
+                window.open(docsUrl, '_blank');
+              }
+            }}
+          >
+            <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+            API Docs
+          </Button>
         </div>
 
-        {/* ── Sandbox Token ─────────────────────────────────────────────── */}
+        {/* ── Sandbox Token ───────────────────────────────────────────── */}
         {!isLoading && activeSandboxKey && (
-          <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border bg-card px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
-              <Bot className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                <Bot className="w-4 h-4 text-muted-foreground" />
+              </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{activeServer?.label || 'Sandbox'}</span>
-                  {getStatusBadge(activeSandboxKey.status)}
+                  <span className="text-sm font-medium">Sandbox Token</span>
+                  <StatusBadge status={activeSandboxKey.status} />
                 </div>
-                <p className="text-xs text-muted-foreground font-mono truncate mt-0.5">
-                  {activeSandboxKey.public_key}
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Used by the agent inside your sandbox to call the platform API
                 </p>
               </div>
             </div>
@@ -423,8 +318,8 @@ export default function APIKeysPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Regenerate Sandbox Token</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will revoke the current token and generate a new one.
-                    The new token will be applied to the sandbox automatically.
+                    This will revoke the current token and create a new one.
+                    It will be applied to the sandbox automatically.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -441,96 +336,55 @@ export default function APIKeysPage() {
           </div>
         )}
 
-        {/* ── User API Keys Section ──────────────────────────────────────── */}
+        {/* ── User API Keys ───────────────────────────────────────────── */}
         <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Key className="w-4 h-4 text-muted-foreground" />
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                API Keys
-              </h2>
-              <div className="flex items-center gap-2 ml-2 text-xs text-muted-foreground">
-                <Shield className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Public/secret key pair for secure authentication</span>
-              </div>
-            </div>
-
-            <Dialog
-              open={isCreateDialogOpen}
-              onOpenChange={setIsCreateDialogOpen}
-            >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-muted-foreground">Your Keys</h2>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New API Key
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Create Key
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-sm">
                 <DialogHeader>
-                  <DialogTitle>Create API Key</DialogTitle>
-                  <DialogDescription>
-                    Create a new API key for programmatic access to your sandbox.
-                  </DialogDescription>
+                  <DialogTitle>New API Key</DialogTitle>
                 </DialogHeader>
-
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="title" className="m-1">
-                      Title *
-                    </Label>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="title" className="text-xs text-muted-foreground">Name</Label>
                     <Input
                       id="title"
-                      placeholder="My API Key"
+                      placeholder="e.g. CI/CD Pipeline"
                       value={newKeyData.title}
-                      onChange={(e) =>
-                        setNewKeyData((prev) => ({
-                          ...prev,
-                          title: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNewKeyData((prev) => ({ ...prev, title: e.target.value }))}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newKeyData.title.trim()) {
-                          handleCreateAPIKey();
-                        }
+                        if (e.key === 'Enter' && newKeyData.title.trim()) handleCreateAPIKey();
                       }}
+                      autoFocus
                     />
                   </div>
-
-                  <div>
-                    <Label htmlFor="description" className="m-1">
-                      Description
-                    </Label>
-                    <Textarea
+                  <div className="space-y-1.5">
+                    <Label htmlFor="description" className="text-xs text-muted-foreground">Description <span className="font-normal">(optional)</span></Label>
+                    <Input
                       id="description"
-                      placeholder="Optional description for this API key"
+                      placeholder="What is this key for?"
                       value={newKeyData.description}
-                      onChange={(e) =>
-                        setNewKeyData((prev) => ({
-                          ...prev,
-                          description: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNewKeyData((prev) => ({ ...prev, description: e.target.value }))}
                     />
                   </div>
-
-                  <div>
-                    <Label htmlFor="expires" className="m-1">
-                      Expires In
-                    </Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="expires" className="text-xs text-muted-foreground">Expiration</Label>
                     <Select
                       value={newKeyData.expiresInDays}
-                      onValueChange={(value) =>
-                        setNewKeyData((prev) => ({
-                          ...prev,
-                          expiresInDays: value,
-                        }))
-                      }
+                      onValueChange={(value) => setNewKeyData((prev) => ({ ...prev, expiresInDays: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Never expires" />
+                        <SelectValue placeholder="Never" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="never">Never expires</SelectItem>
+                        <SelectItem value="never">No expiration</SelectItem>
                         <SelectItem value="7">7 days</SelectItem>
                         <SelectItem value="30">30 days</SelectItem>
                         <SelectItem value="90">90 days</SelectItem>
@@ -539,42 +393,39 @@ export default function APIKeysPage() {
                     </Select>
                   </div>
                 </div>
-
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsCreateDialogOpen(false)}
-                  >
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button
                     onClick={handleCreateAPIKey}
-                    disabled={
-                      !newKeyData.title.trim() || createMutation.isPending
-                    }
+                    disabled={!newKeyData.title.trim() || createMutation.isPending}
                   >
-                    {createMutation.isPending ? 'Creating...' : 'Create API Key'}
+                    {createMutation.isPending ? 'Creating...' : 'Create'}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* User API Keys List */}
-          {isLoading ? (
-            <div className="grid gap-4">
-              {[1, 2].map((i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader>
-                    <div className="h-4 bg-muted rounded w-1/3"></div>
-                    <div className="h-3 bg-muted rounded w-1/2"></div>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          ) : error || (apiKeysResponse && !apiKeysResponse.success) ? (
-            <Card>
-              <CardContent className="p-6 text-center space-y-3">
+          {/* Keys list */}
+          <div className="rounded-2xl border bg-card overflow-hidden">
+            {isLoading ? (
+              <div className="divide-y">
+                {[1, 2].map((i) => (
+                  <div key={i} className="px-4 py-4 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-muted" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3.5 bg-muted rounded w-1/4" />
+                        <div className="h-3 bg-muted rounded w-1/3" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : error || (apiKeysResponse && !apiKeysResponse.success) ? (
+              <div className="px-4 py-12 text-center space-y-3">
                 <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto" />
                 <p className="text-muted-foreground text-sm">
                   {apiKeysResponse?.error?.message || 'Failed to load API keys.'}
@@ -582,252 +433,170 @@ export default function APIKeysPage() {
                 <Button variant="outline" size="sm" onClick={() => refetch()}>
                   Try Again
                 </Button>
-              </CardContent>
-            </Card>
-          ) : userKeys.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="p-6 text-center">
-                <Key className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                <h3 className="text-base font-medium mb-1">No API keys yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create an API key to access the Kortix API programmatically from external applications.
+              </div>
+            ) : userKeys.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                  <Key className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium mb-1">No API keys</p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Create a key to access your sandbox programmatically.
                 </p>
                 <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create API Key
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Create Key
                 </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {userKeys.map((apiKey: APIKeyResponse) => (
-                <Card
-                  key={apiKey.key_id}
-                  className={
-                    isKeyExpired(apiKey.expires_at) ? 'border-yellow-500/30' : ''
-                  }
-                >
-                  <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base sm:text-lg truncate">{apiKey.title}</CardTitle>
-                        {apiKey.description && (
-                          <CardDescription className="mt-0.5 text-xs sm:text-sm line-clamp-2">
-                            {apiKey.description}
-                          </CardDescription>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {getStatusBadge(apiKey.status)}
-                      </div>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {userKeys.map((apiKey: APIKeyResponse) => (
+                  <div
+                    key={apiKey.key_id}
+                    className={`px-4 py-3.5 flex items-center gap-3 ${
+                      isKeyExpired(apiKey.expires_at) ? 'bg-yellow-500/5' : ''
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <Key className="w-3.5 h-3.5 text-muted-foreground" />
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-0 px-3 sm:px-6 pb-3 sm:pb-4">
-                    <div className="space-y-3">
-                      {/* Public key identifier */}
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">Key:</span>
-                        <code className="font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          {apiKey.public_key}
-                        </code>
-                        <CopyButton value={apiKey.public_key} size="icon" />
-                      </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
-                        <div>
-                          <p className="text-muted-foreground mb-0.5">Created</p>
-                          <p className="font-medium truncate">
-                            {formatDate(apiKey.created_at)}
-                          </p>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate">{apiKey.title}</span>
+                        <StatusBadge status={apiKey.status} />
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                        <span>Created {formatDate(apiKey.created_at)}</span>
                         {apiKey.expires_at && (
-                          <div>
-                            <p className="text-muted-foreground mb-0.5">Expires</p>
-                            <p
-                              className={`font-medium truncate ${isKeyExpired(apiKey.expires_at) ? 'text-yellow-600 dark:text-yellow-400' : ''}`}
-                            >
-                              {formatDate(apiKey.expires_at)}
-                            </p>
-                          </div>
+                          <span className={isKeyExpired(apiKey.expires_at) ? 'text-yellow-600 dark:text-yellow-400' : ''}>
+                            {isKeyExpired(apiKey.expires_at) ? 'Expired' : 'Expires'} {formatDate(apiKey.expires_at)}
+                          </span>
                         )}
                         {apiKey.last_used_at && (
-                          <div className="col-span-2 sm:col-span-1">
-                            <p className="text-muted-foreground mb-0.5">
-                              Last Used
-                            </p>
-                            <p className="font-medium truncate">
-                              {formatDate(apiKey.last_used_at)}
-                            </p>
-                          </div>
+                          <span>Last used {formatDate(apiKey.last_used_at)}</span>
                         )}
                       </div>
                     </div>
 
-                    {apiKey.status === 'active' && (
-                      <div className="flex gap-2 mt-3">
+                    {/* Actions */}
+                    <div className="flex-shrink-0">
+                      {apiKey.status === 'active' ? (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                              Revoke
+                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
+                              <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
+                              <AlertDialogTitle>Revoke &quot;{apiKey.title}&quot;</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to revoke &quot;{apiKey.title}&quot;?
-                                This action cannot be undone and any applications
-                                using this key will stop working.
+                                This will immediately invalidate the key. Any applications using it will stop working.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() =>
-                                  revokeMutation.mutate(apiKey.key_id)
-                                }
+                                onClick={() => revokeMutation.mutate(apiKey.key_id)}
                                 className="bg-destructive hover:bg-destructive/90 text-white"
                               >
-                                Revoke Key
+                                Revoke
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                      </div>
-                    )}
-
-                    {(apiKey.status === 'revoked' ||
-                      apiKey.status === 'expired') && (
-                        <div className="flex gap-2 mt-3">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                      ) : (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete &quot;{apiKey.title}&quot;</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently remove the key. This cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteMutation.mutate(apiKey.key_id)}
+                                className="bg-destructive hover:bg-destructive/90 text-white"
+                              >
                                 Delete
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete API Key</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to permanently delete &quot;
-                                  {apiKey.title}&quot;? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() =>
-                                    deleteMutation.mutate(apiKey.key_id)
-                                  }
-                                  className="bg-destructive hover:bg-destructive/90 text-white"
-                                >
-                                  Delete Key
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Authentication Guide ─────────────────────────────────────── */}
-        <AuthGuide />
-
-        {/* Show Created API Key Dialog */}
-        <Dialog open={showCreatedKey} onOpenChange={setShowCreatedKey}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                {createdApiKey && 'secret_key' in createdApiKey
-                  ? createdApiKey.type === 'sandbox'
-                    ? 'Sandbox Token Regenerated'
-                    : 'API Key Created'
-                  : 'API Key Created'}
-              </DialogTitle>
-              <DialogDescription>
-                {createdApiKey?.type === 'sandbox'
-                  ? 'Your sandbox token has been regenerated and applied to the running sandbox.'
-                  : 'Your new API key is ready. Copy the secret key now — it won\'t be shown again.'}
-              </DialogDescription>
-            </DialogHeader>
-
-            {createdApiKey && 'secret_key' in createdApiKey && (
-              <div className="space-y-4">
-                {/* Secret key */}
-                <div>
-                  <Label className="m-1">
-                    {createdApiKey.type === 'sandbox' ? 'New Sandbox Token' : 'Secret Key'}
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={createdKeyDisplayValue}
-                      readOnly
-                      className="font-mono text-sm"
-                    />
-                    <CopyButton value={createdKeyDisplayValue} />
-                  </div>
-                </div>
-
-                {/* Public key (for user keys) */}
-                {createdApiKey.type !== 'sandbox' && (
-                  <div>
-                    <Label className="m-1">Public Key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={createdApiKey.public_key}
-                        readOnly
-                        className="font-mono text-sm text-muted-foreground"
-                      />
-                      <CopyButton value={createdApiKey.public_key} />
                     </div>
                   </div>
-                )}
-
-                {/* Usage example for user API keys */}
-                {createdApiKey.type !== 'sandbox' && (
-                  <div>
-                    <Label className="m-1">Usage</Label>
-                    <div className="relative">
-                      <pre className="bg-muted rounded-lg p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">
-{`curl https://api.kortix.ai/v1/chat/completions \\
-  -H "Authorization: Bearer ${createdApiKey.secret_key}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model":"anthropic/claude-sonnet-4-20250514","messages":[{"role":"user","content":"Hello"}]}'`}
-                      </pre>
-                      <div className="absolute top-2 right-2">
-                        <CopyButton
-                          value={`curl https://api.kortix.ai/v1/chat/completions \\\n  -H "Authorization: Bearer ${createdApiKey.secret_key}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"anthropic/claude-sonnet-4-20250514","messages":[{"role":"user","content":"Hello"}]}'`}
-                          size="icon"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Warning */}
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                    <strong>Important:</strong> Store this key securely.
-                    For security reasons, we cannot show it again.
-                  </p>
-                </div>
+                ))}
               </div>
             )}
+          </div>
+        </div>
 
-            <div className="flex justify-end">
-              <Button onClick={() => setShowCreatedKey(false)}>Done</Button>
+        {/* ── Usage hint ──────────────────────────────────────────────── */}
+        <div className="rounded-2xl border bg-card px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Shield className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>
+                Pass your secret key as a Bearer token: <code className="bg-muted px-1 py-0.5 rounded text-foreground">Authorization: Bearer kortix_...</code>
+              </p>
+              <p>
+                Keys are hashed server-side and never stored in plain text. The secret is shown once at creation.
+              </p>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </div>
       </div>
+
+      {/* ── Created Key Dialog ──────────────────────────────────────────── */}
+      <Dialog open={showCreatedKey} onOpenChange={setShowCreatedKey}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {createdApiKey?.type === 'sandbox' ? 'Token Regenerated' : 'Key Created'}
+            </DialogTitle>
+            <DialogDescription>
+              {createdApiKey?.type === 'sandbox'
+                ? 'The new token has been applied to your sandbox.'
+                : 'Copy your secret key now. It won\'t be shown again.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdApiKey && 'secret_key' in createdApiKey && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{createdApiKey.type === 'sandbox' ? 'Sandbox Token' : 'Secret Key'}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={createdKeyDisplayValue}
+                    readOnly
+                    className="font-mono text-sm"
+                  />
+                  <CopyButton value={createdKeyDisplayValue} label="Copy" />
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 px-3 py-2.5">
+                <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                  Store this key securely. It cannot be retrieved after closing this dialog.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-1">
+            <Button onClick={() => setShowCreatedKey(false)}>Done</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

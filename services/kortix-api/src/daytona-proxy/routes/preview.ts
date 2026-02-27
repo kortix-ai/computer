@@ -274,6 +274,14 @@ export async function proxyToDaytona(
         headers.set('Authorization', `Bearer ${serviceKey}`);
       }
 
+      // Tell the sandbox what the public proxy base URL is so it can set the
+      // OpenAPI server URL correctly.
+      const originalHost = incomingHeaders.get('host');
+      if (originalHost) {
+        const proto = incomingHeaders.get('x-forwarded-proto') || 'https';
+        headers.set('X-Forwarded-Prefix', `${proto}://${originalHost}/v1/p/${sandboxId}/${port}`);
+      }
+
       console.log(
         `[PREVIEW] ${method} ${sandboxId}:${port}${remainingPath} -> ${targetUrl}${attempt > 0 ? ` (retry ${attempt})` : ''}`
       );
