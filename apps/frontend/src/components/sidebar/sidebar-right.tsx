@@ -27,8 +27,11 @@ import { getDirectPortUrl, SANDBOX_PORTS } from '@/lib/platform-client';
 import { SSHKeyDialog } from '@/components/sidebar/ssh-key-dialog';
 import {
   getItemsByGroup,
+  getNavItemsClustered,
   isItemActive,
+  navSubGroupLabels,
   type MenuItemDef,
+  type NavSubGroup,
 } from '@/lib/menu-registry';
 
 // ============================================================================
@@ -134,7 +137,7 @@ export function SidebarRight() {
 
   // Get registry items for the right sidebar
   const quickActionItems = getItemsByGroup('rightSidebar', 'quickActions');
-  const navItems = getItemsByGroup('rightSidebar', 'navigation');
+  const navClusters = getNavItemsClustered('rightSidebar', 'navigation');
 
   if (isMobile) return null;
 
@@ -207,61 +210,72 @@ export function SidebarRight() {
             'flex min-h-0 flex-1 flex-col relative',
             state === 'collapsed' ? 'overflow-visible' : 'overflow-hidden',
           )}>
-            {/* --- Collapsed: icon buttons (registry-driven) --- */}
+            {/* --- Collapsed: icon buttons (registry-driven, clustered) --- */}
             <div className={cn(
-              'absolute inset-0 px-2 pt-2 space-y-0.5 flex flex-col items-center overflow-visible',
+              'absolute inset-0 px-2 pt-2 flex flex-col items-center overflow-visible',
               state === 'collapsed' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
             )}>
-              {quickActionItems.map((item) => {
-                const Icon = item.icon;
-                const isTerminal = item.actionId === 'newTerminal';
-                return (
-                  <Tooltip key={item.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleItemAction(item)}
-                        disabled={isTerminal && createPty.isPending}
-                        className={cn(
-                          'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer',
-                          'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
-                          'disabled:opacity-50 disabled:cursor-not-allowed',
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" sideOffset={12} className="text-xs">
-                      {item.label}
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
+              {/* Quick actions cluster */}
+              <div className="w-full space-y-0.5">
+                {quickActionItems.map((item) => {
+                  const Icon = item.icon;
+                  const isTerminal = item.actionId === 'newTerminal';
+                  return (
+                    <Tooltip key={item.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => handleItemAction(item)}
+                          disabled={isTerminal && createPty.isPending}
+                          className={cn(
+                            'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer',
+                            'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" sideOffset={12} className="text-xs">
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
 
-              {/* ── Navigation pages ── */}
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = isItemActive(item, pathname);
-                return (
-                  <Tooltip key={item.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleItemAction(item)}
-                        className={cn(
-                          'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
-                          active
-                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent',
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" sideOffset={12} className="text-xs">
-                      {item.label}
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
+              {/* Navigation clusters with separators */}
+              {navClusters.map((cluster, clusterIdx) => (
+                <div key={cluster[0]?.subGroup ?? clusterIdx} className="w-full">
+                  {/* Separator between clusters */}
+                  <div className="mx-auto my-2 h-px w-6 bg-sidebar-border/60" />
+                  <div className="space-y-0.5">
+                    {cluster.map((item) => {
+                      const Icon = item.icon;
+                      const active = isItemActive(item, pathname);
+                      return (
+                        <Tooltip key={item.id}>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => handleItemAction(item)}
+                              className={cn(
+                                'flex items-center justify-center w-full py-2 rounded-lg cursor-pointer transition-colors duration-150',
+                                active
+                                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                              )}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" sideOffset={12} className="text-xs">
+                            {item.label}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
 
               {/* SSH — pinned to bottom */}
               <div className="mt-auto pb-3 w-full">
@@ -281,50 +295,70 @@ export function SidebarRight() {
               </div>
             </div>
 
-            {/* --- Expanded: action list (registry-driven) --- */}
+            {/* --- Expanded: action list (registry-driven, clustered) --- */}
             <div className={cn(
               'flex flex-col h-full',
               state === 'collapsed' ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto',
             )}>
-              <nav className="flex-1 px-3 pt-2 space-y-0.5">
-                {quickActionItems.map((item) => {
-                  const Icon = item.icon;
-                  const isTerminal = item.actionId === 'newTerminal';
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleItemAction(item)}
-                      disabled={isTerminal && createPty.isPending}
-                      className={cn(
-                        'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] cursor-pointer',
-                        'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                      )}
-                    >
-                      <Icon className="h-4 w-4 flex-shrink-0" />
-                      <span>{isTerminal && createPty.isPending ? 'Creating...' : item.label}</span>
-                    </button>
-                  );
-                })}
+              <nav className="flex-1 px-3 pt-2 overflow-y-auto">
+                {/* Quick actions */}
+                <div className="space-y-0.5">
+                  {quickActionItems.map((item) => {
+                    const Icon = item.icon;
+                    const isTerminal = item.actionId === 'newTerminal';
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleItemAction(item)}
+                        disabled={isTerminal && createPty.isPending}
+                        className={cn(
+                          'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] cursor-pointer',
+                          'text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150',
+                          'disabled:opacity-50 disabled:cursor-not-allowed',
+                        )}
+                      >
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span>{isTerminal && createPty.isPending ? 'Creating...' : item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                {/* ── Navigation pages ── */}
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = isItemActive(item, pathname);
+                {/* Navigation clusters with section labels */}
+                {navClusters.map((cluster, clusterIdx) => {
+                  const subGroup = cluster[0]?.subGroup as NavSubGroup | undefined;
+                  const label = subGroup ? navSubGroupLabels[subGroup] : undefined;
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleItemAction(item)}
-                      className={cn(
-                        'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
-                        active
-                          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                    <div key={subGroup ?? clusterIdx} className="mt-3">
+                      {label && (
+                        <div className="px-3 pb-1.5 pt-1">
+                          <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider select-none">
+                            {label}
+                          </span>
+                        </div>
                       )}
-                    >
-                      <Icon className="h-4 w-4 flex-shrink-0" />
-                      <span>{item.label}</span>
-                    </button>
+                      <div className="space-y-0.5">
+                        {cluster.map((item) => {
+                          const Icon = item.icon;
+                          const active = isItemActive(item, pathname);
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => handleItemAction(item)}
+                              className={cn(
+                                'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 cursor-pointer',
+                                active
+                                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                                  : 'text-sidebar-foreground hover:bg-sidebar-accent',
+                              )}
+                            >
+                              <Icon className="h-4 w-4 flex-shrink-0" />
+                              <span>{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </nav>

@@ -124,6 +124,23 @@ export type MenuGroup =
   | 'view'
   | 'admin';
 
+/**
+ * Optional sub-group within a group for visual clustering.
+ * Used by the right sidebar to add separators between logical sections
+ * without changing the overall group structure.
+ */
+export type NavSubGroup =
+  | 'core'
+  | 'automation'
+  | 'infrastructure';
+
+/** Human-readable labels for sub-groups (used in expanded sidebar) */
+export const navSubGroupLabels: Record<NavSubGroup, string> = {
+  core: 'Pages',
+  automation: 'Automation',
+  infrastructure: 'Infrastructure',
+};
+
 export interface MenuItemDef {
   /** Unique identifier for this item (used as React key, cmdk value, etc.) */
   id: string;
@@ -157,6 +174,9 @@ export interface MenuItemDef {
 
   /** For kind='action': a string key identifying the action (resolved at runtime) */
   actionId?: string;
+
+  /** Optional sub-group for visual clustering within a group (e.g. right sidebar sections) */
+  subGroup?: NavSubGroup;
 
   // --- Display hints ---
   /** Keyboard shortcut string to show (e.g. "⌘J") */
@@ -281,6 +301,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Workspace',
     icon: Blocks,
     group: 'navigation',
+    subGroup: 'core',
     showIn: ['commandPalette', 'rightSidebar'],
     kind: 'navigate',
     href: '/workspace',
@@ -291,6 +312,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Files',
     icon: FolderOpen,
     group: 'navigation',
+    subGroup: 'core',
     showIn: ['commandPalette'],
     kind: 'navigate',
     href: '/files',
@@ -300,6 +322,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Memory',
     icon: Brain,
     group: 'navigation',
+    subGroup: 'core',
     showIn: ['rightSidebar'],
     kind: 'navigate',
     href: '/memory',
@@ -309,6 +332,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Integrations',
     icon: Plug,
     group: 'navigation',
+    subGroup: 'core',
     showIn: ['commandPalette', 'rightSidebar'],
     kind: 'navigate',
     href: '/integrations',
@@ -318,6 +342,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Channels',
     icon: MessageSquare,
     group: 'navigation',
+    subGroup: 'core',
     showIn: ['commandPalette', 'rightSidebar'],
     kind: 'navigate',
     href: '/channels',
@@ -327,6 +352,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Scheduled Tasks',
     icon: Calendar,
     group: 'navigation',
+    subGroup: 'automation',
     showIn: ['commandPalette', 'rightSidebar'],
     kind: 'navigate',
     href: '/scheduled-tasks',
@@ -336,6 +362,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Tunnel',
     icon: Cable,
     group: 'navigation',
+    subGroup: 'infrastructure',
     showIn: ['rightSidebar'],
     kind: 'navigate',
     href: '/tunnel',
@@ -345,6 +372,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Deployments',
     icon: Rocket,
     group: 'navigation',
+    subGroup: 'automation',
     showIn: ['commandPalette', 'rightSidebar'],
     kind: 'navigate',
     href: '/deployments',
@@ -367,6 +395,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Agent Browser',
     icon: Globe,
     group: 'navigation',
+    subGroup: 'infrastructure',
     showIn: ['rightSidebar'],
     kind: 'sandboxService',
     actionId: 'openAgentBrowser',
@@ -376,6 +405,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Browser',
     icon: Compass,
     group: 'navigation',
+    subGroup: 'infrastructure',
     showIn: ['rightSidebar'],
     kind: 'navigate',
     href: '/p/browser',
@@ -387,6 +417,7 @@ export const menuRegistry: MenuItemDef[] = [
     label: 'Running Services',
     icon: Activity,
     group: 'navigation',
+    subGroup: 'infrastructure',
     showIn: ['rightSidebar'],
     kind: 'navigate',
     href: '/services/running',
@@ -676,6 +707,33 @@ export function getItemsByGroup(
 
 export function getItemById(id: string): MenuItemDef | undefined {
   return menuRegistry.find((item) => item.id === id);
+}
+
+/**
+ * Returns navigation items for a surface, clustered by subGroup.
+ * All items with the same subGroup are merged into a single cluster,
+ * regardless of their ordering in the registry.
+ * The cluster order follows the first appearance of each subGroup.
+ * Items without a subGroup are placed in a leading "ungrouped" cluster.
+ */
+export function getNavItemsClustered(
+  surface: MenuSurface,
+  group: MenuGroup,
+): MenuItemDef[][] {
+  const items = getItemsByGroup(surface, group);
+  const clusterMap = new Map<string, MenuItemDef[]>();
+  const order: string[] = [];
+
+  for (const item of items) {
+    const key = item.subGroup ?? '__ungrouped__';
+    if (!clusterMap.has(key)) {
+      clusterMap.set(key, []);
+      order.push(key);
+    }
+    clusterMap.get(key)!.push(item);
+  }
+
+  return order.map((key) => clusterMap.get(key)!);
 }
 
 /**
