@@ -254,7 +254,7 @@ When running locally (`ENV_MODE=local`), a bundled PostgreSQL 16 container provi
 - **Source:** `services/postgres/Dockerfile`
 - **Base:** `postgres:16` (Debian Bookworm)
 - **Extensions:** `pg_cron` 1.6 (apt), `pg_net` 0.20.2 (compiled from source)
-- **Port:** `54322` on host → `5432` in container
+- **Port:** `64322` on host → `5432` in container
 - **Volume:** `postgres-data` (persisted across restarts)
 - **Init SQL:** `services/postgres/init/00-init-kortix.sql` (runs on first start only)
 
