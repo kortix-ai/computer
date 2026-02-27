@@ -514,7 +514,7 @@ export function CommandPalette() {
       });
       close();
     },
-    [router, close],
+    [close],
   );
 
   const handleSelectFile = useCallback(

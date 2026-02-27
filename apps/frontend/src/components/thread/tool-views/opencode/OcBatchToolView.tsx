@@ -31,18 +31,18 @@ export function OcBatchToolView({
   const totalCalls = (metadata.totalCalls as number) || 0;
   const successful = (metadata.successful as number) || 0;
   const failed = (metadata.failed as number) || 0;
-  const tools = (metadata.tools as string[]) || [];
-  const details = (metadata.details as BatchDetail[]) || [];
 
   // Fall back to input tool_calls if metadata not yet available
   const toolCalls = useMemo(() => {
+    const details = (metadata.details as BatchDetail[]) || [];
+    const tools = (metadata.tools as string[]) || [];
     if (details.length > 0) return details;
     const inputCalls = args.tool_calls as Array<{ tool: string }> | undefined;
     if (Array.isArray(inputCalls)) {
       return inputCalls.map((c) => ({ tool: c.tool, success: true }));
     }
     return tools.map((t) => ({ tool: t, success: true }));
-  }, [details, args.tool_calls, tools]);
+  }, [metadata.details, metadata.tools, args.tool_calls]);
 
   const isError = toolResult?.success === false || !!toolResult?.error;
   const hasFailed = failed > 0;

@@ -367,7 +367,7 @@ function HighlightMentions({
 				type: agentSet.has(name) ? "agent" : "file",
 			});
 		}
-		if (detected.length === 0) return [{ text, type: undefined }];
+		if (detected.length === 0) return [{ text: cleanText, type: undefined }];
 
 		detected.sort((a, b) => a.start - b.start || b.end - a.end);
 		const result: { text: string; type?: MentionType }[] = [];
@@ -1894,10 +1894,9 @@ function SessionTurn({
 		undefined,
 	);
 	const childMessages = undefined as MessageWithParts[] | undefined; // placeholder for child session delegation
-	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const rawStatus = useMemo(
 		() => getTurnStatus(allParts, childMessages),
-		[allParts],
+		[allParts, childMessages],
 	);
 	const [throttledStatus, setThrottledStatus] = useState("");
 
@@ -2922,6 +2921,7 @@ export function SessionChat({
 				});
 			});
 		}, 350);
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- handleSend is defined later in the component; accessed via closure at call-time only
 	}, [
 		sessionId,
 		queueDequeue,
@@ -2930,7 +2930,7 @@ export function SessionChat({
 		hasPendingUserReply,
 		pendingSendInFlight,
 		hasActiveQuestionForQueue,
-	]); // eslint-disable-line react-hooks/exhaustive-deps
+	]);
 
 	// Release queue lock only after the queued message lifecycle is fully settled.
 	useEffect(() => {
@@ -2987,8 +2987,9 @@ export function SessionChat({
 				handleSend(msg.text, msg.files);
 			}, 150);
 		},
-		[sessionId, abortSession, queueRemove], // handleSend added via eslint-disable below
-	); // eslint-disable-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- handleSend is defined later in the component; accessed via closure at call-time only
+		[sessionId, abortSession, queueRemove],
+	);
 
 	// Stop polling when session goes idle (via SSE or polling fallback).
 	// Grace period: if we sent a message recently (within 5s), don't stop polling

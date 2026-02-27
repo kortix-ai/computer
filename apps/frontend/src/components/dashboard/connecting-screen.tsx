@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSandboxConnectionStore } from '@/stores/sandbox-connection-store';
 import { useServerStore } from '@/stores/server-store';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -101,13 +101,13 @@ export function useConnectionToasts() {
   const initialCheckDone = useSandboxConnectionStore((s) => s.initialCheckDone);
 
   // Track previous status to detect transitions
-  const prevStatusRef = useState<SandboxConnectionStatus | null>(null);
+  const prevStatusRef = useRef<SandboxConnectionStatus | null>(null);
 
   useEffect(() => {
     if (!initialCheckDone) return;
 
-    const prev = prevStatusRef[0];
-    prevStatusRef[1](status);
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
 
     // Skip the very first status (no transition yet)
     if (prev === null) return;
