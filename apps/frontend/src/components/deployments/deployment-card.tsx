@@ -56,7 +56,7 @@ const sourceLabels: Record<DeploymentSource, string> = {
   tar: 'Tar',
 };
 
-function isFreestyleKeyError(error: string): boolean {
+export function isFreestyleKeyError(error: string): boolean {
   const lower = error.toLowerCase();
   return lower.includes('freestyle') && (lower.includes('key') || lower.includes('configured'));
 }
@@ -124,10 +124,24 @@ export function DeploymentCard({
           <Badge variant="secondary" className="text-xs shrink-0 tabular-nums">
             v{deployment.version}
           </Badge>
-          <Badge variant={status.variant} className="text-xs shrink-0">
-            <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', status.dotColor)} />
-            {status.label}
-          </Badge>
+          {deployment.status === 'failed' && deployment.error ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant={status.variant} className="text-xs shrink-0 cursor-help">
+                  <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', status.dotColor)} />
+                  {status.label}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-[300px]">
+                {deployment.error}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Badge variant={status.variant} className="text-xs shrink-0">
+              <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', status.dotColor)} />
+              {status.label}
+            </Badge>
+          )}
           <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
             <span className="flex items-center gap-1 shrink-0">
               <SourceIcon className="h-3 w-3" />
@@ -172,7 +186,7 @@ export function DeploymentCard({
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">View logs</TooltipContent>
           </Tooltip>
-          {canRedeploy && (
+           {canRedeploy && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -187,6 +201,23 @@ export function DeploymentCard({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Redeploy</TooltipContent>
+            </Tooltip>
+          )}
+          {(deployment.status === 'active' || isInProgress) && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onStop(deployment)}
+                  disabled={isStopPending}
+                  className={cn(
+                    'p-1.5 rounded-lg cursor-pointer text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors',
+                    isStopPending && 'opacity-50 !cursor-not-allowed',
+                  )}
+                >
+                  <Square className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Stop</TooltipContent>
             </Tooltip>
           )}
           <Tooltip>
