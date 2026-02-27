@@ -25,31 +25,45 @@
         "headers": { "X-Session-ID": "{env:SANDBOX_ID}" }
       },
       "models": {
-        "kortix/basic": {
-          "name": "Kortix Basic",
-          "cost": {
-            "input": 3,
-            "output": 15,
-            "cache_read": 0.30,
-            "cache_write": 3.75
-          },
-          "limit": {
-            "context": 200000,
-            "output": 8192
-          }
+        "anthropic/claude-opus-4.6": {
+          "name": "Claude Opus 4.6",
+          "cost": { "input": 5, "output": 25, "cache_read": 0.50, "cache_write": 6.25 },
+          "limit": { "context": 200000, "output": 16384 }
         },
-        "kortix/power": {
-          "name": "Kortix Power",
-          "cost": {
-            "input": 5,
-            "output": 25,
-            "cache_read": 0.50,
-            "cache_write": 6.25
-          },
-          "limit": {
-            "context": 200000,
-            "output": 8192
-          }
+        "openai/gpt-5.3-codex": {
+          "name": "GPT-5.3 Codex",
+          "cost": { "input": 1.75, "output": 14 },
+          "limit": { "context": 400000, "output": 16384 }
+        },
+        "anthropic/claude-sonnet-4.6": {
+          "name": "Claude Sonnet 4.6",
+          "cost": { "input": 3, "output": 15, "cache_read": 0.30, "cache_write": 3.75 },
+          "limit": { "context": 200000, "output": 16384 }
+        },
+        "anthropic/claude-haiku-4.5": {
+          "name": "Claude Haiku 4.5",
+          "cost": { "input": 1, "output": 5, "cache_read": 0.10, "cache_write": 1.25 },
+          "limit": { "context": 200000, "output": 8192 }
+        },
+        "minimax/minimax-m2.5": {
+          "name": "MiniMax M2.5",
+          "cost": { "input": 0.295, "output": 1.20 },
+          "limit": { "context": 196608, "output": 8192 }
+        },
+        "z-ai/glm-5": {
+          "name": "GLM-5",
+          "cost": { "input": 0.95, "output": 2.55 },
+          "limit": { "context": 204800, "output": 8192 }
+        },
+        "moonshotai/kimi-k2.5": {
+          "name": "Kimi K2.5",
+          "cost": { "input": 0.45, "output": 2.20 },
+          "limit": { "context": 262144, "output": 8192 }
+        },
+        "x-ai/grok-4.1-fast": {
+          "name": "Grok 4.1 Fast",
+          "cost": { "input": 0.20, "output": 0.50 },
+          "limit": { "context": 200000, "output": 16384 }
         }
       }
     },
@@ -57,14 +71,11 @@
     //
     // In cloud mode, LLM traffic is routed through the Kortix proxy for
     // usage metering. X-Kortix-Token identifies the account for billing
-    // at the platform fee rate (0.1×) when using user-owned keys.
+    // at the platform fee rate (0.1x) when using user-owned keys.
     //
-    // Base URL routing:
-    //   Anthropic & OpenAI: routed via ANTHROPIC_BASE_URL / OPENAI_BASE_URL
-    //     env vars (set by kortix-env-setup.sh, read by the SDK natively).
-    //   XAI, Google, Groq: no SDK env var exists, so baseURL is set here
-    //     using {env:KORTIX_API_URL}/provider. In local mode KORTIX_API_URL
-    //     is empty and the SDK falls back to its hardcoded default.
+    // These overrides ONLY inject headers/baseURL — they don't add models.
+    // Providers only show in the model selector if the user sets their own
+    // API key (e.g. ANTHROPIC_API_KEY). Without a key, only Kortix shows.
     "anthropic": {
       "options": {
         "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }

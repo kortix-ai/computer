@@ -75,7 +75,7 @@ async function fetchWithRetry(
  * OpenCode expects: { parts: [{ type: "text", text: "..." }] }
  */
 /** Default model for cron prompts — matches the "kortix" provider in opencode.jsonc */
-const DEFAULT_CRON_MODEL = { providerID: 'kortix', modelID: 'kortix/basic' };
+const DEFAULT_CRON_MODEL = { providerID: 'kortix', modelID: 'anthropic/claude-sonnet-4.6' };
 
 interface ModelOverride {
   providerID?: string;

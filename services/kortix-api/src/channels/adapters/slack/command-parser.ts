@@ -9,8 +9,8 @@ export interface ParsedCommand {
 }
 
 const MODEL_TIERS: Record<string, { providerID: string; modelID: string }> = {
-  power: { providerID: 'kortix', modelID: 'kortix/power' },
-  basic: { providerID: 'kortix', modelID: 'kortix/basic' },
+  power: { providerID: 'kortix', modelID: 'anthropic/claude-opus-4.6' },
+  basic: { providerID: 'kortix', modelID: 'anthropic/claude-sonnet-4.6' },
 };
 
 export function parseCommand(text: string): ParsedCommand {
