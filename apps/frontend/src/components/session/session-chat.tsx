@@ -4076,16 +4076,16 @@ export function SessionChat({
 					{/* Scroll to bottom FAB */}
 					<div
 						className={cn(
-							"absolute bottom-4 left-1/2 -translate-x-1/2 transition-all",
+							"absolute bottom-4 left-1/2 -translate-x-1/2 transition-all duration-300 ease-out",
 							showScrollButton
-								? "opacity-100 translate-y-0"
-								: "opacity-0 translate-y-2 pointer-events-none",
+								? "opacity-100 translate-y-0 scale-100"
+								: "opacity-0 translate-y-4 scale-95 pointer-events-none",
 						)}
 					>
 						<Button
 							variant="outline"
 							size="sm"
-							className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60"
+							className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60 shadow-lg"
 							onClick={smoothScrollToAbsoluteBottom}
 						>
 							<ArrowDown className="size-3 mr-1" />
