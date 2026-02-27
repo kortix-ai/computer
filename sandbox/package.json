@@ -1,6 +1,6 @@
 {
   "name": "@kortix/sandbox",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Kortix sandbox runtime — kortix-master, opencode config/agents/skills, and dependencies",
   "license": "Elastic-2.0",
   "private": false,
