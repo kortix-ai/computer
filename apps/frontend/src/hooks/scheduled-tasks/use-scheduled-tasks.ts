@@ -191,8 +191,9 @@ const fetchExecutions = async (triggerId: string, limit = 50, offset = 0): Promi
 
 export const useTriggers = (sandboxId?: string) => {
   return useQuery({
-    queryKey: ['triggers', sandboxId],
+    queryKey: ['triggers', sandboxId ?? null],
     queryFn: () => fetchTriggers(sandboxId),
+    enabled: !!sandboxId,
     staleTime: 1 * 60 * 1000,
     refetchInterval: 30 * 1000,
   });
