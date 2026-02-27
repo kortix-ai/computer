@@ -223,7 +223,7 @@ export const IntegrationRunActionBody = z.object({
 // ─── Health schemas ─────────────────────────────────────────────────────────
 
 export const HealthResponse = z.object({
-  status: z.literal('ok'),
+  status: z.enum(['ok', 'starting']).describe("'ok' when OpenCode is reachable, 'starting' otherwise"),
   version: z.string().describe('Current sandbox version'),
   changelog: z.any().nullable().describe('Changelog entry for current version'),
   activeWs: z.number().int().describe('Active WebSocket connections'),

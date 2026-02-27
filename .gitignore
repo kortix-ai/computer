@@ -1,11 +1,7 @@
 # Dependencies
 node_modules/
 **/node_modules/
-**/node_modules/**
 .pnpm-store/
-.pnpm-store/**
-**/node_modules/.bin/**
-**/.bin/**
 
 # Build outputs
 .next/
@@ -28,20 +24,11 @@ build/
 # Logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
 # OS files
 .DS_Store
-.DS_Store?
 **/.DS_Store
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
 # IDE
 .vscode/
@@ -53,20 +40,6 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
-*.lcov
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
 
 # Temporary files
 *.tmp
@@ -76,107 +49,20 @@ cover/
 # Next.js
 .vercel/
 
-# Python
-__pycache__/
-**/__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-*.manifest
-*.spec
-pip-log.txt
-pip-delete-this-directory.txt
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-*.venvy/*
-*.venvy*
-.pdm.toml
-__pypackages__/
-celerybeat-schedule
-celerybeat.pid
-*.sage.py
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.pytype/
-cython_debug/
-.pybuilder/
-target/
-*.excalidraw
-# Claude
-CLAUDE.md
-.claude
+# Supabase
+supabase/.temp/
 
 # Misc
-eas.json
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-instance/
-.webassets-cache
-.scrapy
-docs/_build/
-.ipynb_checkpoints
-profile_default/
-ipython_config.py
-/site
-/threads
 state.json
-/workspace/
-/workspace/*
-/workspace/**
 *.db
+dump.rdb
 .aider*
-supabase/.temp/
-**/.prompts/
-redis_data
 .setup_progress
 .setup_env.json
-dump.rdb
+**/.prompts/
 .cwc/
-.nx/
 test/
-thread_search_test/
 
-# Mobile specific
-apps/mobile/node_modules/
-apps/mobile/.expo/
-apps/mobile/dist/
-apps/mobile/web-build/
-apps/mobile/expo-env.d.ts
-apps/mobile/.metro-health-check*
-apps/mobile/npm-debug.*
-apps/mobile/yarn-debug.*
-apps/mobile/yarn-error.*
-apps/mobile/*.tsbuildinfo
-apps/mobile/.DS_Store
-apps/mobile/*.pem
-apps/mobile/.env
-apps/mobile/.env*.local
-apps/mobile/app-example
-
-# Debug
-backend/debug_streams/
-backend/core/agentpress/debug_streams/
-backend/.test_token_compression.py
-backend/test_token_compression_data.py
+# Sandbox data
+services/kortix-api/.kortix-data/
+services/kortix-api/.sandbox-auth-token.json

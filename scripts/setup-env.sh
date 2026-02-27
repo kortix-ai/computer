@@ -14,7 +14,7 @@ ENV_FILE="${1:-.env}"
 
 if [ ! -f "$ROOT_DIR/$ENV_FILE" ]; then
   echo "ERROR: $ROOT_DIR/$ENV_FILE not found."
-  echo "  cp .env.example .env  # then fill in your values"
+  echo "  Create a root .env with your values (see services/kortix-api/.env.example)"
   exit 1
 fi
 
@@ -57,49 +57,56 @@ echo "Generating .env files from $ENV_FILE ..."
 echo ""
 
 write_env "services/kortix-api/.env" \
+  "# Core" \
   "PORT=8008" \
   "$(kv ENV_MODE local)" \
-  "$(kv INTERNAL_KORTIX_ENV dev)" \
   "" \
+  "# Database + Supabase (REQUIRED)" \
   "$(kv DATABASE_URL)" \
-  "" \
   "$(kv SUPABASE_URL)" \
   "$(kv SUPABASE_SERVICE_ROLE_KEY)" \
   "" \
+  "# Security (REQUIRED)" \
   "$(kv API_KEY_SECRET)" \
   "" \
-  "$(kv STRIPE_SECRET_KEY)" \
-  "$(kv STRIPE_WEBHOOK_SECRET)" \
+  "# Sandbox" \
+  "$(kv ALLOWED_SANDBOX_PROVIDERS local_docker)" \
+  "$(kv DOCKER_HOST)" \
   "" \
-  "$(kv REVENUECAT_API_KEY)" \
-  "$(kv REVENUECAT_WEBHOOK_SECRET)" \
-  "" \
+  "# Daytona (conditional — only if daytona provider enabled)" \
   "$(kv DAYTONA_API_KEY)" \
   "$(kv DAYTONA_SERVER_URL)" \
   "$(kv DAYTONA_TARGET)" \
-  "$(kv DAYTONA_SNAPSHOT)" \
   "" \
-  "KORTIX_URL=http://localhost:8008/v1/router" \
-  "$(kv ALLOWED_SANDBOX_PROVIDERS local_docker)" \
-  "$(kv SANDBOX_IMAGE kortix/computer:latest)" \
+  "# Integrations / Pipedream" \
+  "$(kv INTEGRATION_AUTH_PROVIDER pipedream)" \
+  "$(kv PIPEDREAM_CLIENT_ID)" \
+  "$(kv PIPEDREAM_CLIENT_SECRET)" \
+  "$(kv PIPEDREAM_PROJECT_ID)" \
+  "$(kv PIPEDREAM_ENVIRONMENT development)" \
   "" \
+  "# Scheduler" \
+  "$(kv SCHEDULER_ENABLED true)" \
+  "$(kv CRON_TICK_SECRET)" \
+  "# CRON_API_URL auto-derived from PORT + DOCKER_HOST" \
+  "" \
+  "# LLM Providers (optional — cloud routing)" \
   "$(kv OPENROUTER_API_KEY)" \
-  "$(kv ANTHROPIC_API_KEY)" \
   "$(kv OPENAI_API_KEY)" \
   "$(kv XAI_API_KEY)" \
   "$(kv GEMINI_API_KEY)" \
   "$(kv GROQ_API_KEY)" \
   "" \
+  "# Search & Proxy Providers (optional)" \
   "$(kv TAVILY_API_KEY)" \
   "$(kv SERPER_API_KEY)" \
   "$(kv FIRECRAWL_API_KEY)" \
   "$(kv REPLICATE_API_TOKEN)" \
-  "$(kv CONTEXT7_API_KEY)" \
   "" \
-  "$(kv CRON_TICK_SECRET)" \
-  "$(kv CRON_API_URL)" \
-  "$(kv SCHEDULER_ENABLED true)" \
-  "$(kv CHANNELS_ENABLED true)"
+  "# Billing (optional)" \
+  "$(kv STRIPE_SECRET_KEY)" \
+  "$(kv STRIPE_WEBHOOK_SECRET)" \
+  "$(kv REVENUECAT_WEBHOOK_SECRET)"
 
 write_env "apps/frontend/.env" \
   "$(kv NEXT_PUBLIC_BILLING_ENABLED false)" \

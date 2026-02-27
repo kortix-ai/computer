@@ -1,23 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { describe, it, expect, afterEach } from 'bun:test'
 import { Hono } from 'hono'
 
 /**
  * Tests for GET /kortix/health
  *
  * The health endpoint reads /opt/kortix/.version (a JSON file with { version })
- * and returns { status: 'ok', version }. When the file is missing or unreadable
- * it falls back to version '0.0.0'.
+ * and checks OpenCode readiness. Behaviour:
+ *
+ *   - OpenCode ready   → 200 { status: 'ok',       opencode: true,  ... }
+ *   - OpenCode not ready → 503 { status: 'starting', opencode: false, ... }
+ *
+ * When the version file is missing or unreadable it falls back to '0.0.0'.
  *
  * Because the handler calls Bun.file() directly (a global), we create a
  * standalone Hono app per test and mock Bun.file to return controlled values.
  */
 
 describe('GET /kortix/health', () => {
-  // We'll store the original Bun.file so we can restore it
   const originalBunFile = Bun.file
 
   afterEach(() => {
-    // Restore original Bun.file after every test
     ;(Bun as any).file = originalBunFile
   })
 
@@ -25,8 +27,10 @@ describe('GET /kortix/health', () => {
    * Helper: build a fresh Hono app with the health handler (same logic as index.ts).
    * We inline the handler to avoid importing index.ts which has side-effects
    * (SecretStore init, port binding, etc.).
+   *
+   * @param openCodeReady - simulates whether OpenCode is reachable
    */
-  function buildApp() {
+  function buildApp(openCodeReady: boolean) {
     const app = new Hono()
     app.get('/kortix/health', async (c) => {
       let version = '0.0.0'
@@ -37,29 +41,60 @@ describe('GET /kortix/health', () => {
           version = data.version || '0.0.0'
         }
       } catch {}
-      return c.json({ status: 'ok', version })
+      const status = openCodeReady ? 'ok' : 'starting'
+      const httpStatus = openCodeReady ? 200 : 503
+      return c.json({ status, version, opencode: openCodeReady }, httpStatus)
     })
     return app
   }
 
-  it('returns { status: "ok", version } when version file is present', async () => {
+  // ─── OpenCode ready (200) ─────────────────────────────────────────────────
+
+  it('returns 200 with status "ok" when OpenCode is ready', async () => {
     ;(Bun as any).file = (path: string) => {
       if (path === '/opt/kortix/.version') {
         return {
           exists: async () => true,
-          json: async () => ({ version: '1.2.3', updatedAt: '2025-01-01' }),
+          json: async () => ({ version: '1.2.3' }),
         }
       }
       return originalBunFile(path)
     }
 
-    const app = buildApp()
+    const app = buildApp(true)
     const res = await app.request('/kortix/health')
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ status: 'ok', version: '1.2.3' })
+    expect(body.status).toBe('ok')
+    expect(body.version).toBe('1.2.3')
+    expect(body.opencode).toBe(true)
   })
+
+  // ─── OpenCode NOT ready (503) ─────────────────────────────────────────────
+
+  it('returns 503 with status "starting" when OpenCode is not ready', async () => {
+    ;(Bun as any).file = (path: string) => {
+      if (path === '/opt/kortix/.version') {
+        return {
+          exists: async () => true,
+          json: async () => ({ version: '1.2.3' }),
+        }
+      }
+      return originalBunFile(path)
+    }
+
+    const app = buildApp(false)
+    const res = await app.request('/kortix/health')
+
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.status).toBe('starting')
+    expect(body.version).toBe('1.2.3')
+    expect(body.opencode).toBe(false)
+  })
+
+  // ─── Version file edge cases ──────────────────────────────────────────────
 
   it('returns version "0.0.0" when the file does not exist', async () => {
     ;(Bun as any).file = (path: string) => {
@@ -72,12 +107,12 @@ describe('GET /kortix/health', () => {
       return originalBunFile(path)
     }
 
-    const app = buildApp()
+    const app = buildApp(true)
     const res = await app.request('/kortix/health')
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ status: 'ok', version: '0.0.0' })
+    expect(body.version).toBe('0.0.0')
   })
 
   it('returns version "0.0.0" when the file contains invalid JSON', async () => {
@@ -91,12 +126,12 @@ describe('GET /kortix/health', () => {
       return originalBunFile(path)
     }
 
-    const app = buildApp()
+    const app = buildApp(true)
     const res = await app.request('/kortix/health')
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ status: 'ok', version: '0.0.0' })
+    expect(body.version).toBe('0.0.0')
   })
 
   it('returns version "0.0.0" when JSON has no "version" field', async () => {
@@ -110,12 +145,12 @@ describe('GET /kortix/health', () => {
       return originalBunFile(path)
     }
 
-    const app = buildApp()
+    const app = buildApp(true)
     const res = await app.request('/kortix/health')
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ status: 'ok', version: '0.0.0' })
+    expect(body.version).toBe('0.0.0')
   })
 
   it('returns version "0.0.0" when file.exists() throws', async () => {
@@ -129,12 +164,12 @@ describe('GET /kortix/health', () => {
       return originalBunFile(path)
     }
 
-    const app = buildApp()
+    const app = buildApp(true)
     const res = await app.request('/kortix/health')
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ status: 'ok', version: '0.0.0' })
+    expect(body.version).toBe('0.0.0')
   })
 
   it('returns correct Content-Type header', async () => {
@@ -148,7 +183,7 @@ describe('GET /kortix/health', () => {
       return originalBunFile(path)
     }
 
-    const app = buildApp()
+    const app = buildApp(true)
     const res = await app.request('/kortix/health')
 
     expect(res.headers.get('content-type')).toContain('application/json')
@@ -165,11 +200,34 @@ describe('GET /kortix/health', () => {
       return originalBunFile(path)
     }
 
-    const app = buildApp()
+    const app = buildApp(true)
     const res = await app.request('/kortix/health')
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ status: 'ok', version: '1.0.0-beta.3' })
+    expect(body.version).toBe('1.0.0-beta.3')
+  })
+
+  // ─── 503 still returns valid JSON with version info ───────────────────────
+
+  it('503 response still includes version and content-type for debugging', async () => {
+    ;(Bun as any).file = (path: string) => {
+      if (path === '/opt/kortix/.version') {
+        return {
+          exists: async () => true,
+          json: async () => ({ version: '3.1.0' }),
+        }
+      }
+      return originalBunFile(path)
+    }
+
+    const app = buildApp(false)
+    const res = await app.request('/kortix/health')
+
+    expect(res.status).toBe(503)
+    expect(res.headers.get('content-type')).toContain('application/json')
+    const body = await res.json()
+    expect(body.version).toBe('3.1.0')
+    expect(body.status).toBe('starting')
   })
 })

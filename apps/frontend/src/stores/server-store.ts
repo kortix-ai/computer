@@ -354,11 +354,23 @@ export const useServerStore = create<ServerStore>()(
 
         const wasActive = state.activeServerId === id;
         const newServers = state.servers.filter((s) => s.id !== id);
+
+        // Find a valid fallback — prefer 'default', then first remaining, then empty.
+        const fallbackId = wasActive
+          ? (newServers.find((s) => s.id === DEFAULT_SERVER_ID)?.id
+            ?? newServers[0]?.id
+            ?? '')
+          : state.activeServerId;
+
         set({
           servers: newServers,
-          activeServerId: wasActive ? DEFAULT_SERVER_ID : state.activeServerId,
-          // If we removed the active server, bump version
-          ...(wasActive ? { serverVersion: state.serverVersion + 1 } : {}),
+          activeServerId: fallbackId,
+          // If we removed the active server, bump version and reset userSelected
+          // so the next sandbox creation can auto-switch.
+          ...(wasActive ? {
+            serverVersion: state.serverVersion + 1,
+            userSelected: false,
+          } : {}),
         });
         deleteServerFromApi(id);
       },

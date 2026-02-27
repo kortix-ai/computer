@@ -74,7 +74,9 @@ async function fetchMasterJson<T>(path: string, init: RequestInit = {}, timeoutM
     const url = `${base}${path}`;
     try {
       const res = await fetchWithTimeout(url, init, timeoutMs);
-      if (!res.ok) {
+      // 503 from /kortix/health means "starting" — still return the JSON body
+      // so callers can inspect the status/opencode fields.
+      if (!res.ok && res.status !== 503) {
         lastErr = new Error(`Master ${url} returned ${res.status}`);
         continue;
       }
@@ -421,9 +423,12 @@ providersApp.get('/health', async (c) => {
   if (!repoRoot) {
     // Docker mode: check sandbox via HTTP
     try {
-      await fetchMasterJson('/kortix/health', {}, 5000);
+      const health = await fetchMasterJson<{ status: string; opencode?: boolean }>('/kortix/health', {}, 5000);
       checks.sandbox = { ok: true };
       checks.docker = { ok: true };
+      if (health.status === 'starting' || health.opencode === false) {
+        checks.sandbox = { ok: false, error: 'Sandbox reachable but OpenCode is still starting' };
+      }
     } catch (e: any) {
       const msg = e?.message || String(e);
       checks.sandbox = { ok: false, error: msg };
