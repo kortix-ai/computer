@@ -238,7 +238,6 @@ export function SidebarRight() {
               })}
 
               {/* ── Navigation pages ── */}
-              <div className="w-full border-t border-sidebar-border/40 my-1.5" />
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = isItemActive(item, pathname);
@@ -309,7 +308,6 @@ export function SidebarRight() {
                 })}
 
                 {/* ── Navigation pages ── */}
-                <div className="w-full border-t border-sidebar-border/40 my-1.5" />
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isItemActive(item, pathname);

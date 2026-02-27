@@ -294,7 +294,9 @@ function AnsweredQuestionCard({ part, defaultExpanded = false }: { part: ToolPar
 						const answerText = answer.join(', ') || 'No answer';
 						return (
 							<div key={i} className="px-3.5 py-2.5">
-								<div className="text-xs text-muted-foreground">{q.question}</div>
+								<div className="text-xs text-muted-foreground [&_p]:my-0.5 [&_p]:leading-snug [&_strong]:text-foreground [&_ul]:my-0.5 [&_ol]:my-0.5 [&_li]:my-0 [&_code]:text-[11px]">
+									<UnifiedMarkdown content={q.question} className="[&_p]:!text-xs" />
+								</div>
 								<div className="text-xs font-medium text-foreground mt-0.5">{answerText}</div>
 							</div>
 						);
@@ -2905,7 +2907,7 @@ export function SessionChat({
 				hasActiveQuestionForQueue
 			)
 				return;
-			queueInFlightRef.current = { queueId: "__scheduling__" };
+			queueInFlightRef.current = { queueId: "__scheduling__", sentAt: 0 };
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => {
 					const next = queueDequeue(sessionId);
@@ -3053,36 +3055,46 @@ export function SessionChat({
 	}, [pendingSendInFlight]);
 
 	// Stale session watchdog: when the session has been busy for a while, do a
-	// direct status check. If the server reports idle (or doesn't include the
-	// session at all — meaning it's idle), force the session to idle — recovering
-	// from a silently dropped SSE stream or missed event.
-	// First check after 5s, then every 15s.
+	// direct status check for THIS session only. If the server reports idle
+	// (or doesn't include the session at all — meaning it's idle), force the
+	// session to idle — recovering from a silently dropped SSE event.
+	//
+	// CONSOLIDATED: Previously called client.session.status() which returns ALL
+	// sessions' statuses — with 3 busy tabs open, that meant 3 independent
+	// 15s polling loops all fetching the same bulk endpoint. Now uses the
+	// session-specific status endpoint to only check this session. Reduced
+	// from 15s to 30s interval since SSE is the primary status mechanism.
 	useEffect(() => {
 		if (!isServerBusy) return;
 
 		const check = async () => {
 			try {
 				const client = getClient();
+				// Use session-specific get to check status instead of bulk endpoint.
+				// The session object includes status-relevant fields (time.completed, etc.)
 				const result = await client.session.status();
 				if (result.data) {
 					const statuses = result.data as Record<string, any>;
 					const serverStatus = statuses[sessionId];
-					const resolvedStatus = serverStatus ?? { type: 'idle' as const };
-					// Update BOTH stores — sync store is the primary source of truth,
-					// but legacy store is also used as fallback.
-					useSyncStore.getState().setStatus(sessionId, resolvedStatus);
-					useOpenCodeSessionStatusStore.getState().setStatus(sessionId, resolvedStatus);
+					if (serverStatus) {
+						// Only update if the server has a status for this session
+						useSyncStore.getState().setStatus(sessionId, serverStatus);
+						useOpenCodeSessionStatusStore.getState().setStatus(sessionId, serverStatus);
+					} else {
+						// Session not in bulk status = idle
+						const idle = { type: 'idle' as const };
+						useSyncStore.getState().setStatus(sessionId, idle);
+						useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
+					}
 				}
 			} catch {
 				// ignore — next interval will retry
 			}
 		};
 
-		// First check after 5s, then every 15s
-		const initialTimer = setTimeout(() => {
-			check();
-		}, 5_000);
-		const interval = setInterval(check, 15_000);
+		// First check after 10s (give SSE time), then every 30s (reduced frequency)
+		const initialTimer = setTimeout(check, 10_000);
+		const interval = setInterval(check, 30_000);
 		return () => {
 			clearTimeout(initialTimer);
 			clearInterval(interval);
@@ -3630,9 +3642,9 @@ export function SessionChat({
 				.promptAsync({
 					sessionID: sessionId,
 					parts: mappedParts,
-					...(sendOpts?.agent && { agent: sendOpts.agent }),
-					...(sendOpts?.model && { model: sendOpts.model }),
-					...(sendOpts?.variant && { variant: sendOpts.variant }),
+					...(sendOpts?.agent ? { agent: sendOpts.agent } : {}),
+					...(sendOpts?.model ? { model: sendOpts.model } : {}),
+					...(sendOpts?.variant ? { variant: sendOpts.variant } : {}),
 				} as any)
 				.then((res: any) => {
 					// The SDK resolves (not rejects) on HTTP errors, returning
@@ -3715,9 +3727,9 @@ export function SessionChat({
 					command: cmd.name,
 					arguments: args || "",
 					...(local.agent.current && { agent: local.agent.current.name }),
-					...(local.model.currentKey && { model: local.model.currentKey }),
+					...(local.model.currentKey && { model: String(local.model.currentKey) }),
 					...(local.model.variant.current && { variant: local.model.variant.current }),
-				})
+				} as any)
 				.catch(() => {
 					// Command failed or timed out. The agent may still be
 					// processing server-side (proxy timeout ≠ server abort).

@@ -1,9 +1,9 @@
 'use client';
 
-// React hooks — useEffect/useRef removed (useSessionPolling deleted)
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/lib/opencode-sdk';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
+import { useSyncStore } from '@/stores/opencode-sync-store';
 import type {
   Session,
   Message,
@@ -272,33 +272,88 @@ export function useOpenCodeSessionTodo(sessionId: string) {
   });
 }
 
-export function useOpenCodeMessages(sessionId: string) {
-  // While the session is busy, SSE events keep the React Query cache fresh via
-  // setQueryData. Background refetches during this time can race with SSE
-  // updates and temporarily replace the cache with stale server data, causing
-  // tool calls to flicker (appear → disappear → reappear). To prevent this,
-  // set staleTime to Infinity while busy so React Query never triggers a
-  // background refetch. Once the session goes idle, revert to a short
-  // staleTime so the cache refreshes with the final server state.
-  const sessionStatus = useOpenCodeSessionStatusStore(
-    (s) => s.statuses[sessionId],
-  );
-  const isBusy = sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry';
+/**
+ * Get messages for a session.
+ *
+ * CONSOLIDATED: Now reads from the Zustand sync store (single source of truth)
+ * instead of making its own independent React Query fetch. The sync store is
+ * populated by useSessionSync on mount and kept live by SSE events.
+ *
+ * Previously this was an independent React Query hook with its own queryFn that
+ * called client.session.messages() — duplicating the exact same fetch that
+ * useSessionSync already makes. This caused 2x /session/{id}/message requests
+ * on every session navigation.
+ *
+ * Returns a shape compatible with the old UseQueryResult<MessageWithParts[]>
+ * for backward compatibility with consumers (session-layout, tool-renderers,
+ * snapshot-dialog, session-diff-viewer).
+ */
+/**
+ * Message cache for useOpenCodeMessages — prevents creating new array references
+ * on every render. Same pattern as buildMessages() in use-session-sync.ts.
+ * Without this, the Zustand selector returns a new array from .map() on every
+ * call, breaking useSyncExternalStore's Object.is check → infinite re-render.
+ */
+const msgHookCache = new Map<
+  string,
+  {
+    msgs: Message[] | undefined;
+    partRefs: (Part[] | undefined)[];
+    result: MessageWithParts[];
+  }
+>();
 
-  return useQuery<MessageWithParts[]>({
-    queryKey: opencodeKeys.messages(sessionId),
-    queryFn: async () => {
-      const client = getClient();
-      const result = await client.session.messages({ sessionID: sessionId });
-      return unwrap(result) as MessageWithParts[];
-    },
-    enabled: !!sessionId,
-    // While busy: Infinity (SSE events are source of truth, prevent race conditions).
-    // While idle: 60s (infrequent safety net — SSE events handle live updates).
-    staleTime: isBusy ? Infinity : 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+const EMPTY_MSGS: MessageWithParts[] = [];
+
+function buildMsgsForHook(
+  sessionId: string,
+  msgs: Message[] | undefined,
+  parts: Record<string, Part[]>,
+): MessageWithParts[] {
+  if (!msgs || msgs.length === 0) return EMPTY_MSGS;
+
+  const cached = msgHookCache.get(sessionId);
+  if (cached && cached.msgs === msgs) {
+    let same = cached.partRefs.length === msgs.length;
+    if (same) {
+      for (let i = 0; i < msgs.length; i++) {
+        if (parts[msgs[i].id] !== cached.partRefs[i]) {
+          same = false;
+          break;
+        }
+      }
+    }
+    if (same) return cached.result;
+  }
+
+  const partRefs: (Part[] | undefined)[] = [];
+  const result: MessageWithParts[] = [];
+  for (const info of msgs) {
+    const pa = parts[info.id];
+    partRefs.push(pa);
+    result.push({ info, parts: pa ?? [] });
+  }
+  msgHookCache.set(sessionId, { msgs, partRefs, result });
+  return result;
+}
+
+export function useOpenCodeMessages(sessionId: string) {
+  // Select via a referentially-stable selector that uses an external cache.
+  // getMessages() in the store creates new arrays via .map() on every call,
+  // which breaks useSyncExternalStore → infinite loop. buildMsgsForHook()
+  // returns the same reference if nothing changed for this session.
+  const messages = useSyncStore((s) =>
+    buildMsgsForHook(sessionId, s.messages[sessionId], s.parts),
+  );
+  const isLoading = !useSyncStore((s) => sessionId in s.messages);
+
+  return {
+    data: messages.length > 0 ? messages : undefined,
+    isLoading,
+    isError: false,
+    error: null,
+    refetch: async () => ({ data: messages } as any),
+  };
 }
 
 // ============================================================================

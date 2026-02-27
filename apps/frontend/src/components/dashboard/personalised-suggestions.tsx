@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Code2,
@@ -95,36 +96,40 @@ function pickRandom<T>(arr: T[], n: number): T[] {
   return result;
 }
 
+// Stable fallback — generated once at module level so it doesn't change on re-renders
+const fallbackSuggestions = pickRandom(defaultSuggestions, 4);
+
 // ============================================================================
 // Component
 // ============================================================================
 
+/**
+ * Personalised suggestions component.
+ *
+ * CONSOLIDATED: Now uses React Query with staleTime: 5min to prevent
+ * duplicate fetches on remount. Previously used raw fetch + useState
+ * with no caching, causing 4x /memory/suggestions calls when the
+ * DashboardContent component remounted (React 18 Strict Mode + tab switching).
+ */
 export function PersonalisedSuggestions({ onSuggestionClick }: PersonalisedSuggestionsProps) {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fallback] = useState<Suggestion[]>(() => pickRandom(defaultSuggestions, 4));
-
-  const fetchSuggestions = useCallback(async () => {
-    try {
+  const { data: suggestions, isLoading } = useQuery<Suggestion[]>({
+    queryKey: ['opencode', 'memory', 'suggestions'],
+    queryFn: async () => {
       const baseUrl = getActiveOpenCodeUrl();
-      if (!baseUrl) {
-        setLoading(false);
-        return;
-      }
+      if (!baseUrl) return [];
       const res = await authenticatedFetch(`${baseUrl}/memory/suggestions`);
       if (res.ok) {
         const data: SuggestionsResponse = await res.json();
-        setSuggestions(data.suggestions || []);
+        return data.suggestions || [];
       }
-    } catch {
-      // Non-critical — fail silently
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchSuggestions();
-  }, [fetchSuggestions]);
+      return [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 min — suggestions don't change often
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false, // Don't refetch if cached data exists
+    retry: 1,
+  });
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -133,13 +138,13 @@ export function PersonalisedSuggestions({ onSuggestionClick }: PersonalisedSugge
     return 'Good evening';
   }, []);
 
-  const items = suggestions.length > 0 ? suggestions : fallback;
+  const items = suggestions && suggestions.length > 0 ? suggestions : fallbackSuggestions;
 
   return (
     <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
       <div className="w-full max-w-[540px] px-6 pointer-events-auto">
         <AnimatePresence mode="wait">
-          {loading ? (
+          {isLoading ? (
             <motion.div
               key="loading"
               initial={{ opacity: 0 }}

@@ -71,51 +71,76 @@ export function useOpenCodeEventStream() {
 
 		const client = getClient();
 
-		// Hydrate pending permissions, questions, AND session statuses on connect.
-		// The sync store is in-memory only — on hard refresh ALL session statuses
-		// are wiped, so the UI thinks every session is idle. Without this hydration,
-		// a busy session won't show as busy until a session.status SSE event arrives
-		// (which only fires on status *changes*, not for already-busy sessions).
-		client.permission
-			.list()
-			.then((res) => {
-				if (res.data) (res.data as any[]).forEach(addPermission);
-			})
-			.catch((err) => {
-				logger.error("Failed to hydrate pending permissions", {
-					error: String(err),
+		// ---- CONSOLIDATED hydration function ----
+		// Single function for hydrating permissions, questions, and session statuses.
+		// Called both on initial connect and on SSE reconnect (gap > 5s).
+		// Previously this logic was duplicated in two places.
+		const hydrateCore = (options?: { refetchSessions?: boolean; rehydrateMessages?: boolean }) => {
+			client.permission
+				.list()
+				.then((res) => {
+					if (res.data) (res.data as any[]).forEach(addPermission);
+				})
+				.catch((err) => {
+					logger.error("Failed to hydrate pending permissions", {
+						error: String(err),
+					});
 				});
-			});
 
-		client.question
-			.list()
-			.then((res) => {
-				if (res.data) (res.data as any[]).forEach(addQuestion);
-			})
-			.catch((err) => {
-				logger.error("Failed to hydrate pending questions", {
-					error: String(err),
+			client.question
+				.list()
+				.then((res) => {
+					if (res.data) (res.data as any[]).forEach(addQuestion);
+				})
+				.catch((err) => {
+					logger.error("Failed to hydrate pending questions", {
+						error: String(err),
+					});
 				});
-			});
 
-		client.session
-			.status()
-			.then((res) => {
-				if (res.data) {
-					const statuses = res.data as Record<string, any>;
-					for (const [sessionID, status] of Object.entries(statuses)) {
-						applySyncEvent({
-							type: "session.status",
-							properties: { sessionID, status },
-						} as any);
+			client.session
+				.status()
+				.then((res) => {
+					if (res.data) {
+						const statuses = res.data as Record<string, any>;
+						for (const [sessionID, status] of Object.entries(statuses)) {
+							applySyncEvent({
+								type: "session.status",
+								properties: { sessionID, status },
+							} as any);
+						}
 					}
-				}
-			})
-			.catch((err) => {
-				logger.error("Failed to hydrate session statuses", {
-					error: String(err),
+				})
+				.catch((err) => {
+					logger.error("Failed to hydrate session statuses", {
+						error: String(err),
+					});
 				});
-			});
+
+			if (options?.refetchSessions) {
+				queryClient.refetchQueries({
+					queryKey: opcodeKeys.sessions(),
+					type: 'active',
+				});
+			}
+
+			if (options?.rehydrateMessages) {
+				const syncState = useSyncStore.getState();
+				const loadedSessionIds = Object.keys(syncState.messages);
+				for (const sid of loadedSessionIds) {
+					client.session
+						.messages({ sessionID: sid })
+						.then((res) => {
+							if (res.data)
+								useSyncStore.getState().hydrate(sid, res.data as any);
+						})
+						.catch(() => {});
+				}
+			}
+		};
+
+		// Hydrate on initial connect — permissions, questions, and statuses
+		hydrateCore();
 
 		// Set up SSE via the SDK's AsyncGenerator
 		const abortController = new AbortController();
@@ -195,60 +220,14 @@ export function useOpenCodeEventStream() {
 				// Quick reconnects (<5s) don't need full re-hydration because SSE
 				// events will catch up. This prevents unnecessary HTTP requests on
 				// the frequent ERR_INCOMPLETE_CHUNKED_ENCODING reconnects.
+				// On reconnect, only re-hydrate if the gap was significant (>5s).
+				// Quick reconnects (<5s) don't need full re-hydration because SSE
+				// events will catch up. Uses the consolidated hydrateCore() function
+				// to avoid code duplication with the initial hydration above.
 				if (retryCount > 0) {
 					const reconnectGap = Date.now() - lastEventTime;
-					const needsFullHydration = reconnectGap > 5000;
-
-					if (needsFullHydration) {
-						// Long gap — may have missed events, re-hydrate everything
-						queryClient.refetchQueries({
-							queryKey: opcodeKeys.sessions(),
-							type: 'active',
-						});
-						client.permission
-							.list()
-							.then((res) => {
-								if (res.data) (res.data as any[]).forEach(addPermission);
-							})
-							.catch(() => {});
-						client.question
-							.list()
-							.then((res) => {
-								if (res.data) (res.data as any[]).forEach(addQuestion);
-							})
-							.catch(() => {});
-						client.session
-							.status()
-							.then((res) => {
-								if (res.data) {
-									const statuses = res.data as Record<string, any>;
-									for (const [sessionID, status] of Object.entries(
-										statuses,
-									)) {
-										applySyncEvent({
-											type: "session.status",
-											properties: { sessionID, status },
-										} as any);
-									}
-								}
-							})
-							.catch(() => {});
-
-						// Re-hydrate messages for sessions that are currently
-						// loaded in the sync store. During the SSE gap, message
-						// and part events may have been lost — this ensures the
-						// streaming response catches up after reconnection.
-						const syncState = useSyncStore.getState();
-						const loadedSessionIds = Object.keys(syncState.messages);
-						for (const sid of loadedSessionIds) {
-							client.session
-								.messages({ sessionID: sid })
-								.then((res) => {
-									if (res.data)
-										useSyncStore.getState().hydrate(sid, res.data as any);
-								})
-								.catch(() => {});
-						}
+					if (reconnectGap > 5000) {
+						hydrateCore({ refetchSessions: true, rehydrateMessages: true });
 					}
 				}
 					// Only reset backoff if connection was stable (>10s).
