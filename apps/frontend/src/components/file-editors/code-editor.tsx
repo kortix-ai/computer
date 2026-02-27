@@ -70,17 +70,19 @@ const getLangExtension = (langKey: string): any => {
 };
 
 // Language mapping: maps language identifiers to CodeMirror language keys
-// This ensures consistent language detection and proper extension loading
+// IMPORTANT: The keys passed to getLangExtension() must match the keys in the
+// @uiw/codemirror-extensions-langs `langs` object, which are file extensions
+// (e.g., 'js', 'py', 'ts'), NOT language names (e.g., 'javascript', 'python').
 const languageMap: Record<string, () => any> = {
   // JavaScript/TypeScript family
-  js: () => getLangExtension('javascript'),
-  javascript: () => getLangExtension('javascript'),
+  js: () => getLangExtension('js'),
+  javascript: () => getLangExtension('js'),
   jsx: () => getLangExtension('jsx'),
-  ts: () => getLangExtension('typescript'),
-  typescript: () => getLangExtension('typescript'),
+  ts: () => getLangExtension('ts'),
+  typescript: () => getLangExtension('ts'),
   tsx: () => getLangExtension('tsx'),
-  mjs: () => getLangExtension('javascript'),
-  cjs: () => getLangExtension('javascript'),
+  mjs: () => getLangExtension('js'),
+  cjs: () => getLangExtension('js'),
   
   // Web technologies
   html: () => getLangExtension('html'),
@@ -96,19 +98,19 @@ const languageMap: Record<string, () => any> = {
   json5: () => getLangExtension('json'),
   
   // Markdown
-  md: () => getLangExtension('markdown'),
-  markdown: () => getLangExtension('markdown'),
-  mdx: () => getLangExtension('markdown'),
+  md: () => getLangExtension('md'),
+  markdown: () => getLangExtension('md'),
+  mdx: () => getLangExtension('md'),
   
   // Python
-  python: () => getLangExtension('python'),
-  py: () => getLangExtension('python'),
-  pyi: () => getLangExtension('python'),
-  pyw: () => getLangExtension('python'),
+  python: () => getLangExtension('py'),
+  py: () => getLangExtension('py'),
+  pyi: () => getLangExtension('py'),
+  pyw: () => getLangExtension('py'),
   
   // Systems languages
-  rust: () => getLangExtension('rust'),
-  rs: () => getLangExtension('rust'),
+  rust: () => getLangExtension('rs'),
+  rs: () => getLangExtension('rs'),
   go: () => getLangExtension('go'),
   golang: () => getLangExtension('go'),
   c: () => getLangExtension('c'),
@@ -121,30 +123,30 @@ const languageMap: Record<string, () => any> = {
   
   // Java family
   java: () => getLangExtension('java'),
-  cs: () => getLangExtension('csharp'),
-  csharp: () => getLangExtension('csharp'),
-  kotlin: () => getLangExtension('kotlin'),
-  kt: () => getLangExtension('kotlin'),
+  cs: () => getLangExtension('cs'),
+  csharp: () => getLangExtension('cs'),
+  kotlin: () => getLangExtension('kt'),
+  kt: () => getLangExtension('kt'),
   scala: () => getLangExtension('scala'),
   
   // Scripting languages
   php: () => getLangExtension('php'),
-  ruby: () => getLangExtension('ruby'),
-  rb: () => getLangExtension('ruby'),
-  rbx: () => getLangExtension('ruby'),
-  rjs: () => getLangExtension('ruby'),
-  perl: () => getLangExtension('perl'),
-  pl: () => getLangExtension('perl'),
-  pm: () => getLangExtension('perl'),
+  ruby: () => getLangExtension('rb'),
+  rb: () => getLangExtension('rb'),
+  rbx: () => getLangExtension('rb'),
+  rjs: () => getLangExtension('rb'),
+  perl: () => getLangExtension('pl'),
+  pl: () => getLangExtension('pl'),
+  pm: () => getLangExtension('pl'),
   lua: () => getLangExtension('lua'),
   r: () => getLangExtension('r'),
   
   // Shell scripts
-  sh: () => getLangExtension('shell'),
-  bash: () => getLangExtension('shell'),
-  zsh: () => getLangExtension('shell'),
-  fish: () => getLangExtension('shell'),
-  shell: () => getLangExtension('shell'),
+  sh: () => getLangExtension('sh'),
+  bash: () => getLangExtension('bash'),
+  zsh: () => getLangExtension('sh'),
+  fish: () => getLangExtension('sh'),
+  shell: () => getLangExtension('sh'),
   
   // Data/Config
   sql: () => getLangExtension('sql'),
