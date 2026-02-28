@@ -276,10 +276,11 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
     const handle = (e: WheelEvent) => {
       if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
       if (e.deltaY < 0) {
-        // Scrolling up → show FAB only after scroll settles and user is far from bottom
+        // Scrolling up → immediately suppress auto-scroll so the RAF loop
+        // stops fighting the user. Show the FAB once they're far enough.
+        userScrolledRef.current = true;
         requestAnimationFrame(() => {
-          if (!userScrolledRef.current && isFarFromBottom(el, spacerValRef.current)) {
-            userScrolledRef.current = true;
+          if (isFarFromBottom(el, spacerValRef.current)) {
             setShowScrollButton(true);
           }
         });
@@ -309,10 +310,11 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
       if ((e.target as HTMLElement | null)?.closest?.('[data-scrollable]')) return;
       const dy = startY - (e.touches[0]?.clientY ?? 0);
       if (dy < -10) {
-        // Swiping up → show FAB only if far enough from bottom
+        // Swiping up → immediately suppress auto-scroll so the RAF loop
+        // stops fighting the user. Show the FAB once they're far enough.
+        userScrolledRef.current = true;
         requestAnimationFrame(() => {
-          if (!userScrolledRef.current && isFarFromBottom(el, spacerValRef.current)) {
-            userScrolledRef.current = true;
+          if (isFarFromBottom(el, spacerValRef.current)) {
             setShowScrollButton(true);
           }
         });
@@ -341,9 +343,13 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
       // Detect upward scroll (keyboard, scrollbar drag) — but ignore
       // intermediate frames from programmatic smooth-scrolls.
       // Only show FAB if far enough from bottom.
-      if (cur < last - 2 && !userScrolledRef.current && !programmaticScrollRef.current && isFarFromBottom(el, spacerValRef.current)) {
+      if (cur < last - 2 && !programmaticScrollRef.current) {
+        // Immediately suppress auto-scroll on any upward scroll.
+        // Show FAB only if far enough from the bottom.
         userScrolledRef.current = true;
-        setShowScrollButton(true);
+        if (isFarFromBottom(el, spacerValRef.current)) {
+          setShowScrollButton(true);
+        }
       }
       last = cur;
     };
