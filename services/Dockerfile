@@ -55,6 +55,10 @@ COPY --from=deps /app/packages/db/src ./packages/db/src
 COPY --from=deps /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
 COPY --from=deps /app/packages/db/package.json ./packages/db/package.json
 COPY --from=deps /app/packages/db/tsconfig.json ./packages/db/tsconfig.json
+COPY --from=deps /app/packages/opencode-channels/src ./packages/opencode-channels/src
+COPY --from=deps /app/packages/opencode-channels/package.json ./packages/opencode-channels/package.json
+COPY --from=deps /app/packages/opencode-channels/tsconfig.json ./packages/opencode-channels/tsconfig.json
+COPY --from=deps /app/packages/opencode-channels/tsconfig.build.json ./packages/opencode-channels/tsconfig.build.json
 
 # Copy the service (source + its node_modules if any)
 COPY --from=deps /app/services/${SERVICE} ./services/${SERVICE}
