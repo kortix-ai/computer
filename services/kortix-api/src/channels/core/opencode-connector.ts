@@ -1,4 +1,6 @@
-import { OpenCodeClient } from 'opencode-channels';
+// Import directly from the opencode module to avoid the barrel index.ts
+// which has a CLI entry-point side effect that starts a competing server.
+import { OpenCodeClient } from 'opencode-channels/src/opencode.js';
 import type { SandboxTarget } from '../types';
 import { getProvider } from '../../platform/providers';
 import type { ProviderName } from '../../platform/providers';
