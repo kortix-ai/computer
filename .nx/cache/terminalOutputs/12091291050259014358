@@ -1,18 +1,0 @@
-> bun run dev -- 
-
-[0m[2m[35m$[0m [2m[1mNODE_OPTIONS='--max-http-header-size=32768' next dev --turbopack --port 3000[0m
-   [1m[38;2;173;127;168m▲ Next.js 15.5.12[39m[22m (Turbopack)
-   - Local:        http://localhost:3000
-   - Network:      http://192.168.1.7:3000
-   - Environments: .env
-   - Experiments (use with caution):
-     · optimizePackageImports
-
- [32m[1m✓[22m[39m Starting...
- [32m[1m✓[22m[39m Compiled middleware in 346ms
- [32m[1m✓[22m[39m Ready in 1540ms
- [37m[1m○[22m[39m Compiling /channels ...
- [32m[1m✓[22m[39m Compiled /channels in 28.9s
- GET /channels [32m200[39m in 29615ms
- [32m[1m✓[22m[39m Compiled in 968ms
- GET /channels?slack=connected [32m200[39m in 294ms

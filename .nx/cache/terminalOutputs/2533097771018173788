@@ -1,14 +1,0 @@
-> bun run dev -- 
-
-[0m[2m[35m$[0m [2m[1mNODE_OPTIONS='--max-http-header-size=32768' next dev --turbopack[0m
- [31m[1m⨯[22m[39m Failed to start server
-Error: listen EADDRINUSE: address already in use :::8008
-    at <unknown> (Error: listen EADDRINUSE: address already in use :::8008)
-    at new Promise (<anonymous>) {
-  code: [32m'EADDRINUSE'[39m,
-  errno: [33m-48[39m,
-  syscall: [32m'listen'[39m,
-  address: [32m'::'[39m,
-  port: [33m8008[39m
-}
-[?25h
