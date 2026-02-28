@@ -104,7 +104,9 @@ async function callOpenAICompatible(
 	log: LogFn,
 	maxTokens?: number,
 ): Promise<string | null> {
-	const url = `${config.baseURL}/chat/completions`
+	// Append /v1/router if the base URL points to a Kortix API root (no path suffix)
+	const base = config.baseURL.endsWith("/v1/router") ? config.baseURL : `${config.baseURL}/v1/router`
+	const url = `${base}/chat/completions`
 	const response = await fetch(url, {
 		method: "POST",
 		headers: {
