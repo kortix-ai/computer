@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // ============================================================================
 // Types
@@ -306,7 +307,9 @@ function normalizeRawDiagnostic(file: string, raw: RawDiagnostic): LspDiagnostic
 // Store
 // ============================================================================
 
-export const useDiagnosticsStore = create<DiagnosticsState>()((set, get) => ({
+export const useDiagnosticsStore = create<DiagnosticsState>()(
+  persist(
+  (set, get) => ({
   byFile: {},
 
   setFileDiagnostics: (file, diagnostics) =>
@@ -376,7 +379,27 @@ export const useDiagnosticsStore = create<DiagnosticsState>()((set, get) => ({
     });
     return all;
   },
-}));
+}),
+  {
+    name: 'kortix-diagnostics',
+    storage: {
+      getItem: (name) => {
+        if (typeof window === 'undefined') return null;
+        const str = sessionStorage.getItem(name);
+        return str ? JSON.parse(str) : null;
+      },
+      setItem: (name, value) => {
+        if (typeof window === 'undefined') return;
+        sessionStorage.setItem(name, JSON.stringify(value));
+      },
+      removeItem: (name) => {
+        if (typeof window === 'undefined') return;
+        sessionStorage.removeItem(name);
+      },
+    },
+    partialize: (state) => ({ byFile: state.byFile }) as unknown as DiagnosticsState,
+  },
+));
 
 // Expose on window for console debugging
 if (typeof window !== 'undefined') {

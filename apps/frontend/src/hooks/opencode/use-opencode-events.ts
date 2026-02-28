@@ -203,6 +203,10 @@ export function useOpenCodeEventStream() {
 					});
 				});
 
+			// Fetch current LSP diagnostics so errors/warnings show immediately
+			// on page load (or reconnect) without waiting for agent tool output.
+			fetchLspDiagnosticsDebounced.current();
+
 			if (options?.refetchSessions) {
 				queryClient.refetchQueries({
 					queryKey: opcodeKeys.sessions(),
