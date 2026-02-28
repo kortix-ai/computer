@@ -156,8 +156,8 @@ const envSchema = z.object({
   // ── Frontend (optional) ──────────────────────────────────────────────────
   FRONTEND_URL:                optUrl('http://localhost:3000'),
 
-  // ── Integrations / Pipedream (conditional: required if pipedream is the provider) ──
-  INTEGRATION_AUTH_PROVIDER:   optStrDefault('pipedream'),
+  // ── Integrations / Pipedream (optional: only validated if explicitly set to "pipedream") ──
+  INTEGRATION_AUTH_PROVIDER:   optStr,
   PIPEDREAM_CLIENT_ID:         optStr,
   PIPEDREAM_CLIENT_SECRET:     optStr,
   PIPEDREAM_PROJECT_ID:        optStr,
