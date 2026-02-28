@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && npx nx build Kortix-Computer-Frontend",
+  "buildCommand": "next build",
   "rewrites": [
     {
       "source": "/api/:path*",
