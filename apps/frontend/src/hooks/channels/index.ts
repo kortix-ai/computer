@@ -24,3 +24,10 @@ export {
   type PlatformCredentialStatus,
   type PlatformCredentialEntry,
 } from './use-platform-credentials';
+
+export {
+  useDetectPublicUrl,
+  useGenerateManifest,
+  type DetectUrlResult,
+  type GenerateManifestResult,
+} from './use-slack-wizard';

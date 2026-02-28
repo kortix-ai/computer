@@ -295,6 +295,22 @@ app.route('/file', filesRouter)
 
 // Memory — read-only access to the OpenCode memory plugin's SQLite database
 app.route('/memory', memoryRouter)
+// Proxy channel webhooks (and /reload) to opencode-channels on port 3456
+app.all('/channels/*', async (c) => {
+  const subPath = c.req.path.replace(/^\/channels/, '') || '/'
+  const targetUrl = `http://localhost:3456${subPath}`
+  const res = await fetch(targetUrl, {
+    method: c.req.method,
+    headers: c.req.raw.headers,
+    body: c.req.method !== 'GET' ? c.req.raw.body : undefined,
+    // @ts-ignore — bun supports duplex
+    duplex: 'half',
+  })
+  return new Response(res.body, {
+    status: res.status,
+    headers: res.headers,
+  })
+})
 
 // Proxy all other requests to OpenCode
 app.all('*',

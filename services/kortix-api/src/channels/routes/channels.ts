@@ -5,7 +5,8 @@ import { db } from '../../shared/db';
 import { channelConfigs, channelMessages, sandboxes } from '@kortix/db';
 import { NotFoundError, ValidationError } from '../../errors';
 import type { AppEnv } from '../../types';
-import type { ChannelEngineImpl } from '../core/engine';
+import type { ChannelAdapter } from '../adapters/adapter';
+import type { ChannelType } from '../types';
 import { encryptCredentials, decryptCredentials } from '../lib/credentials';
 import { resolveAccountId } from '../../shared/resolve-account';
 
@@ -47,7 +48,7 @@ const updateChannelSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
+export function createChannelsRouter(adapters: Map<ChannelType, ChannelAdapter>): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
   app.post('/', async (c) => {
@@ -94,7 +95,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       }
     }
 
-    const adapter = engine.getAdapter(parsed.data.channel_type);
+    const adapter = adapters.get(parsed.data.channel_type);
     if (adapter?.validateCredentials) {
       const validation = await adapter.validateCredentials(parsed.data.credentials);
       if (!validation.valid) {
@@ -376,7 +377,7 @@ export function createChannelsRouter(engine: ChannelEngineImpl): Hono<AppEnv> {
       throw new NotFoundError('Channel config', configId);
     }
 
-    const adapter = engine.getAdapter(config.channelType as typeof CHANNEL_TYPES[number]);
+    const adapter = adapters.get(config.channelType as typeof CHANNEL_TYPES[number]);
     if (adapter?.onChannelRemoved) {
       try {
         await adapter.onChannelRemoved(config);

@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.7.6",
+    "date": "2026-02-28",
+    "title": "OpenCode Channels — connect Slack (and more) to your sandbox agent",
+    "description": "Introduces the OpenCode Channels service: a new sidecar running inside the sandbox that bridges external messaging platforms to your agent. Slack is the first supported adapter — install via OAuth, and your sandbox agent receives and responds to Slack messages in real time with streaming, typing indicators, and thread support.",
+    "changes": [
+      {
+        "type": "feature",
+        "text": "OpenCode Channels sidecar service — runs on port 3456 inside the sandbox, bridging messaging platforms to the agent via Chat SDK adapters"
+      },
+      {
+        "type": "feature",
+        "text": "Slack adapter with full OAuth install flow — one-click 'Add to Slack' from the Channels page creates the bot, pushes credentials, and hot-reloads the service"
+      },
+      {
+        "type": "feature",
+        "text": "Platform credentials management — securely store Slack app client ID, client secret, and signing secret per account or per sandbox"
+      },
+      {
+        "type": "feature",
+        "text": "Slack webhook proxy on kortix-api forwards events/commands/interactivity to the sandbox channels service for processing"
+      },
+      {
+        "type": "feature",
+        "text": "Hot-reload support — credential changes push to the sandbox and reload adapters without restarting the service"
+      },
+      {
+        "type": "improvement",
+        "text": "Channels UI with guided Slack setup wizard — walks through app creation, OAuth scopes, and event subscriptions"
+      },
+      {
+        "type": "fix",
+        "text": "Sandbox env API merge conflict resolved — keeps OpenAPI-decorated routes with no-restart policy"
+      }
+    ],
+    "artifacts": []
+  },
+  {
     "version": "0.7.5",
     "date": "2026-02-27",
     "title": "Real model names — 8 models replace opaque aliases",
