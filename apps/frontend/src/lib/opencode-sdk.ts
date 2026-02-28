@@ -25,9 +25,15 @@ registerClientResetter(resetClient);
 /**
  * Get (or create) the SDK client for the current active server.
  * Safe to call from non-React contexts (API modules, etc.).
+ *
+ * Throws if the server URL isn't resolved yet (e.g. cloud sandbox still
+ * loading). React Query hooks will catch this and retry automatically.
  */
 export function getClient(): OpencodeClient {
 	const url = getActiveOpenCodeUrl();
+	if (!url) {
+		throw new Error('[opencode-sdk] Server URL not ready — sandbox is still loading');
+	}
 	if (cachedClient && cachedUrl === url) return cachedClient;
 
 	cachedClient = createOpencodeClient({
