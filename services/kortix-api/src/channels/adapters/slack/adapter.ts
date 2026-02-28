@@ -1,8 +1,7 @@
 import type { Context } from 'hono';
 import type { Hono } from 'hono';
-import type { ChannelEngine } from '../adapter';
 import { BaseAdapter } from '../adapter';
-import type { ChannelCapabilities, NormalizedMessage, AgentResponse } from '../../types';
+import type { ChannelCapabilities } from '../../types';
 import type { ChannelConfig } from '@kortix/db';
 import { proxySlackWebhook } from './proxy';
 import { config } from '../../../config';
@@ -25,19 +24,13 @@ export class SlackAdapter extends BaseAdapter {
     connectionType: 'webhook',
   };
 
-  registerRoutes(router: Hono, _engine: ChannelEngine): void {
+  registerRoutes(router: Hono): void {
     router.post('/slack/events', (c) => proxySlackWebhook(c));
     router.post('/slack/commands', (c) => proxySlackWebhook(c));
     router.post('/slack/interactivity', (c) => proxySlackWebhook(c));
     router.get('/slack/install', (c) => this.handleInstall(c));
     router.get('/slack/oauth_callback', (c) => this.handleOAuthCallback(c));
   }
-
-  async sendResponse(
-    _channelConfig: ChannelConfig,
-    _message: NormalizedMessage,
-    _response: AgentResponse,
-  ): Promise<void> {}
 
   override async onChannelRemoved(channelConfig: ChannelConfig): Promise<void> {
     console.log(

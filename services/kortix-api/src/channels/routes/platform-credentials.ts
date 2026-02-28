@@ -7,8 +7,9 @@ import type { AppEnv } from '../../types';
 import { resolveAccountId } from '../../shared/resolve-account';
 import { encryptCredentials, decryptCredentials } from '../lib/credentials';
 import { clearPlatformCredentialsCache } from '../lib/platform-credentials';
+import { resolveDirectEndpoint, resolveSandboxTarget } from '../core/opencode-connector';
 
-const VALID_CHANNEL_TYPES = ['slack'] as const;
+const VALID_CHANNEL_TYPES = ['slack', 'discord'] as const;
 type SupportedChannelType = (typeof VALID_CHANNEL_TYPES)[number];
 
 function isValidChannelType(type: string): type is SupportedChannelType {
@@ -56,7 +57,11 @@ export function createPlatformCredentialsRouter(): Hono<AppEnv> {
           const decrypted = await decryptCredentials(
             row.credentials as Record<string, unknown>,
           );
-          configured = !!(decrypted.clientId && decrypted.clientSecret && decrypted.signingSecret);
+          if (row.channelType === 'discord') {
+            configured = !!(decrypted.botToken && decrypted.publicKey && decrypted.applicationId);
+          } else {
+            configured = !!(decrypted.clientId && decrypted.clientSecret && decrypted.signingSecret);
+          }
         } catch {
           // leave configured = false
         }
@@ -119,19 +124,31 @@ export function createPlatformCredentialsRouter(): Hono<AppEnv> {
       .from(channelPlatformCredentials)
       .where(and(...conditions));
 
+    const discordFields = { botToken: false, publicKey: false, applicationId: false };
+    const slackFields = { clientId: false, clientSecret: false, signingSecret: false };
+    const emptyFields = channelType === 'discord' ? discordFields : slackFields;
+
     if (!row || !row.credentials) {
       return c.json({
         configured: false,
         source: 'none',
-        fields: {
-          clientId: false,
-          clientSecret: false,
-          signingSecret: false,
-        },
+        fields: emptyFields,
       });
     }
 
     const decrypted = await decryptCredentials(row.credentials as Record<string, unknown>);
+
+    if (channelType === 'discord') {
+      return c.json({
+        configured: !!(decrypted.botToken && decrypted.publicKey && decrypted.applicationId),
+        source: 'db',
+        fields: {
+          botToken: !!decrypted.botToken,
+          publicKey: !!decrypted.publicKey,
+          applicationId: !!decrypted.applicationId,
+        },
+      });
+    }
 
     return c.json({
       configured: !!(decrypted.clientId && decrypted.clientSecret && decrypted.signingSecret),
@@ -206,6 +223,116 @@ export function createPlatformCredentialsRouter(): Hono<AppEnv> {
       }
 
       clearPlatformCredentialsCache();
+
+      return c.json({
+        success: true,
+        configured: true,
+        source: 'db',
+      });
+    }
+
+    if (channelType === 'discord') {
+      const { botToken, publicKey, applicationId, sandbox_id } = body as {
+        botToken?: string;
+        publicKey?: string;
+        applicationId?: string;
+        sandbox_id?: string | null;
+      };
+
+      if (!botToken || !publicKey || !applicationId) {
+        return c.json({ error: 'botToken, publicKey, and applicationId are all required' }, 400);
+      }
+
+      const userId = c.get('userId') as string;
+      const accountId = await resolveAccountId(userId);
+      const sandboxId = sandbox_id || null;
+      const encrypted = await encryptCredentials({ botToken, publicKey, applicationId });
+
+      const existingConditions = [
+        eq(channelPlatformCredentials.accountId, accountId),
+        eq(channelPlatformCredentials.channelType, channelType),
+      ];
+
+      if (sandboxId) {
+        existingConditions.push(eq(channelPlatformCredentials.sandboxId, sandboxId));
+      } else {
+        existingConditions.push(isNull(channelPlatformCredentials.sandboxId));
+      }
+
+      const [existing] = await db
+        .select({ id: channelPlatformCredentials.id })
+        .from(channelPlatformCredentials)
+        .where(and(...existingConditions));
+
+      if (existing) {
+        await db
+          .update(channelPlatformCredentials)
+          .set({ credentials: encrypted, updatedAt: new Date() })
+          .where(eq(channelPlatformCredentials.id, existing.id));
+      } else {
+        await db
+          .insert(channelPlatformCredentials)
+          .values({
+            accountId,
+            sandboxId,
+            channelType,
+            credentials: encrypted,
+          });
+      }
+
+      clearPlatformCredentialsCache();
+
+      // Push credentials to sandbox so opencode-channels can connect to Discord gateway
+      if (sandboxId) {
+        try {
+          const target = await resolveSandboxTarget(sandboxId);
+          if (target) {
+            const { url, headers } = await resolveDirectEndpoint(target);
+            console.log(`[DISCORD] Pushing credentials to sandbox at ${url}`);
+
+            await fetch(`${url}/env`, {
+              method: 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                keys: {
+                  DISCORD_BOT_TOKEN: botToken,
+                  DISCORD_PUBLIC_KEY: publicKey,
+                  DISCORD_APPLICATION_ID: applicationId,
+                },
+              }),
+            });
+
+            try {
+              const reloadRes = await fetch(`${url}/channels/reload`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  credentials: {
+                    discord: { botToken, publicKey, applicationId },
+                  },
+                }),
+              });
+              const reloadText = await reloadRes.text();
+              if (reloadRes.ok) {
+                try {
+                  const reloadResult = JSON.parse(reloadText);
+                  console.log(`[DISCORD] Hot-reload result:`, reloadResult);
+                } catch {
+                  console.log(`[DISCORD] Hot-reload responded (${reloadRes.status}):`, reloadText.slice(0, 200));
+                }
+              } else {
+                console.warn(`[DISCORD] Hot-reload returned ${reloadRes.status}:`, reloadText.slice(0, 200));
+              }
+            } catch (reloadErr) {
+              console.warn('[DISCORD] Hot-reload failed (service may not be running yet):', reloadErr);
+            }
+          } else {
+            console.warn('[DISCORD] No sandbox target found for', sandboxId);
+          }
+        } catch (err) {
+          console.warn('[DISCORD] Failed to push credentials to sandbox:', err);
+        }
+      }
 
       return c.json({
         success: true,
