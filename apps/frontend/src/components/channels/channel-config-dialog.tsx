@@ -43,7 +43,6 @@ import { ensureSandbox } from '@/lib/platform-client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { SlackSetupWizard } from './slack-setup-wizard';
-import { DiscordSetupWizard } from './discord-setup-wizard';
 
 interface ChannelConfigDialogProps {
   open: boolean;
@@ -54,7 +53,7 @@ interface ChannelConfigDialogProps {
 const CHANNEL_OPTIONS: { type: ChannelType; label: string; icon: React.ComponentType<{ className?: string }>; available: boolean }[] = [
   { type: 'slack', label: 'Slack', icon: SlackIcon, available: true },
   { type: 'telegram', label: 'Telegram', icon: TelegramIcon, available: false },
-  { type: 'discord', label: 'Discord', icon: DiscordIcon, available: true },
+  { type: 'discord', label: 'Discord', icon: DiscordIcon, available: false },
   { type: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon, available: false },
   { type: 'teams', label: 'Teams', icon: Users, available: false },
   { type: 'voice', label: 'Voice', icon: Mic, available: false },
@@ -70,7 +69,7 @@ const SESSION_STRATEGIES: { value: SessionStrategy; label: string; description: 
 ];
 
 export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelConfigDialogProps) {
-  const [step, setStep] = useState<'type' | 'slack-creds' | 'discord-creds' | 'config'>('type');
+  const [step, setStep] = useState<'type' | 'slack-creds' | 'config'>('type');
   const [channelType, setChannelType] = useState<ChannelType | null>(null);
   const [name, setName] = useState('');
   const [botToken, setBotToken] = useState('');
@@ -147,10 +146,6 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
       }
       return;
     }
-    if (type === 'discord') {
-      setStep('discord-creds');
-      return;
-    }
     setChannelType(type);
     setName(`My ${CHANNEL_OPTIONS.find((o) => o.type === type)?.label} Bot`);
     setStep('config');
@@ -222,36 +217,6 @@ export function ChannelConfigDialog({ open, onOpenChange, onCreated }: ChannelCo
           </div>
           <SlackSetupWizard
             onSaved={(publicUrl) => proceedToSlackOAuth(publicUrl)}
-            onBack={() => setStep('type')}
-            sandboxId={sandbox?.sandbox_id}
-          />
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (step === 'discord-creds') {
-    return (
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
-          <div className="bg-muted/30 border-b px-6 pt-6 pb-5">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2.5">
-                <div className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-muted border border-border/50">
-                  <DiscordIcon className="h-4.5 w-4.5" />
-                </div>
-                Set Up Discord Integration
-              </DialogTitle>
-              <DialogDescription className="mt-1.5">
-                Create a Discord bot and paste your credentials
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-          <DiscordSetupWizard
-            onSaved={() => {
-              handleClose();
-              onCreated?.();
-            }}
             onBack={() => setStep('type')}
             sandboxId={sandbox?.sandbox_id}
           />
