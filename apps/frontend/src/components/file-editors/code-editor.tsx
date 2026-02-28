@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import CodeMirror from '@uiw/react-codemirror';
+import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { xcodeLight } from '@uiw/codemirror-theme-xcode';
 import { langs } from '@uiw/codemirror-extensions-langs';
 import { EditorView, keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
+import { lintGutter } from '@codemirror/lint';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import type { LspDiagnostic } from '@/stores/diagnostics-store';
+import { diagnosticsExtension, injectDiagnosticStyles } from './codemirror-diagnostics';
 
 // Map of language aliases to CodeMirror language support
 // Note: langs object from @uiw/codemirror-extensions-langs is keyed by file extensions
@@ -301,6 +304,10 @@ interface CodeEditorProps {
   showLineNumbers?: boolean;
   showHeader?: boolean; // Show the built-in header with save/discard/language badge (default: true)
   fontSize?: string; // CSS font-size for the editor (default: 'text-sm' / 14px)
+  /** LSP diagnostics to render inline (squiggly underlines, gutter markers, hover tooltips) */
+  diagnostics?: LspDiagnostic[];
+  /** 1-indexed line number to scroll to after mount (used for click-to-navigate from diagnostics panel) */
+  targetLine?: number | null;
 }
 
 export function CodeEditor({
@@ -318,6 +325,8 @@ export function CodeEditor({
   showLineNumbers = true,
   showHeader = true,
   fontSize,
+  diagnostics,
+  targetLine,
 }: CodeEditorProps) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -326,9 +335,12 @@ export function CodeEditor({
   // Use originalContent if provided, otherwise fall back to content (for backwards compatibility)
   const savedContent = useRef<string>(originalContent ?? content);
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<ReactCodeMirrorRef>(null);
   const [editorHeight, setEditorHeight] = useState<string>('100%');
   // Track initialization state — ready once content is present
   const [isReady, setIsReady] = useState(!!content);
+  // Track last targetLine we scrolled to, so we only scroll once per value
+  const lastScrolledLine = useRef<number | null>(null);
   
   // Store callback in ref to avoid it being a dependency
   const onUnsavedChangeRef = useRef(onUnsavedChange);
@@ -366,10 +378,29 @@ export function CodeEditor({
     }
   }, [originalContent, localContent]);
 
-  // Set mounted state
+  // Set mounted state & inject diagnostic CSS
   useEffect(() => {
     setMounted(true);
+    injectDiagnosticStyles();
   }, []);
+
+  // Scroll to targetLine when it changes
+  useEffect(() => {
+    if (!targetLine || targetLine === lastScrolledLine.current) return;
+    const view = editorRef.current?.view;
+    if (!view) return;
+
+    // targetLine is 1-indexed, CodeMirror doc.line is 1-indexed
+    const lineNumber = Math.max(1, Math.min(targetLine, view.state.doc.lines));
+    const line = view.state.doc.line(lineNumber);
+
+    // Scroll so the line is centered vertically
+    view.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+    });
+    lastScrolledLine.current = targetLine;
+  }, [targetLine]);
 
   // Calculate editor height based on container - never exceed container bounds
   // For read-only mode, use auto height to let content expand naturally (better for preview contexts)
@@ -530,6 +561,12 @@ export function CodeEditor({
   // Theme selection
   const theme = mounted && resolvedTheme === 'dark' ? vscodeDark : xcodeLight;
 
+  // Build the diagnostics CodeMirror extension from the diagnostics prop
+  const diagExt = useMemo(() => {
+    if (!diagnostics || diagnostics.length === 0) return null;
+    return diagnosticsExtension(diagnostics);
+  }, [diagnostics]);
+
   // Extensions - ensure we only include valid extensions
   const extensions = useMemo(() => {
     const exts: any[] = [];
@@ -547,9 +584,14 @@ export function CodeEditor({
       EditorView.lineWrapping,
       keymap.of([indentWithTab])
     );
+
+    // Add lint gutter + diagnostic decorations when diagnostics are present
+    if (diagExt) {
+      exts.push(lintGutter(), diagExt);
+    }
     
     return exts;
-  }, [langExtension]);
+  }, [langExtension, diagExt]);
 
   const SaveButton = () => {
     if (readOnly || !onSave) return null;
@@ -686,6 +728,7 @@ export function CodeEditor({
       >
         {mounted && (
           <CodeMirror
+            ref={editorRef}
             value={localContent}
             onChange={handleChange}
             theme={theme}

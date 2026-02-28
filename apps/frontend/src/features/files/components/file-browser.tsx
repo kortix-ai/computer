@@ -48,7 +48,7 @@ import { FileTreeItem, DRAG_MIME } from './file-tree-item';
 import { FileSearch } from './file-search';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
-import { useDiagnosticsStore } from '@/stores/diagnostics-store';
+import { useDiagnosticsStore, buildDiagnosticCountsMap } from '@/stores/diagnostics-store';
 
 /** Drop target for the ".." (parent directory) row */
 function ParentDropTarget({
@@ -227,44 +227,41 @@ export function FileBrowser() {
   }, [files]);
 
   // Build per-entry diagnostic counts from the diagnostics store.
-  // For files: exact match. For directories: aggregate all files under that path.
+  // Uses buildDiagnosticCountsMap for flexible absolute→relative path matching.
   const diagByFile = useDiagnosticsStore((s) => s.byFile);
+  const diagCountsLookup = useMemo(
+    () => buildDiagnosticCountsMap(diagByFile),
+    [diagByFile],
+  );
   const diagnosticCountsMap = useMemo(() => {
     const map = new Map<string, { errors: number; warnings: number }>();
-    if (!files || Object.keys(diagByFile).length === 0) return map;
+    if (!files || Object.keys(diagCountsLookup).length === 0) return map;
 
     for (const node of files) {
-      let errors = 0;
-      let warnings = 0;
-
       if (node.type === 'file') {
-        // Exact match — try the node.path directly
-        const diags = diagByFile[node.path];
-        if (diags) {
-          for (const d of diags) {
-            if (d.severity === 1) errors++;
-            else if (d.severity === 2) warnings++;
-          }
+        // Direct lookup for files
+        const counts = diagCountsLookup[node.path];
+        if (counts && (counts.errors > 0 || counts.warnings > 0)) {
+          map.set(node.path, counts);
         }
       } else {
-        // Directory — aggregate all diagnostics whose file path starts with this dir
+        // Aggregate counts for directories
         const prefix = node.path.endsWith('/') ? node.path : node.path + '/';
-        for (const [filePath, diags] of Object.entries(diagByFile)) {
+        let errors = 0;
+        let warnings = 0;
+        for (const [filePath, counts] of Object.entries(diagCountsLookup)) {
           if (filePath.startsWith(prefix) || filePath === node.path) {
-            for (const d of diags) {
-              if (d.severity === 1) errors++;
-              else if (d.severity === 2) warnings++;
-            }
+            errors += counts.errors;
+            warnings += counts.warnings;
           }
         }
-      }
-
-      if (errors > 0 || warnings > 0) {
-        map.set(node.path, { errors, warnings });
+        if (errors > 0 || warnings > 0) {
+          map.set(node.path, { errors, warnings });
+        }
       }
     }
     return map;
-  }, [files, diagByFile]);
+  }, [files, diagCountsLookup]);
 
   const isRootPath = currentPath === '/' || currentPath === '.' || currentPath === '';
   const normalizedCurrentPath = isRootPath ? '' : currentPath.replace(/\/$/, '');

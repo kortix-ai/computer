@@ -2,7 +2,9 @@
 
 import { useMemo, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
+  AlertTriangle,
   Braces,
+  CircleAlert,
   Code,
   Download,
   Eye,
@@ -20,6 +22,7 @@ import { toast } from '@/lib/toast';
 import { UnifiedMarkdown } from '@/components/markdown';
 import { CodeEditor } from '@/components/file-editors/code-editor';
 import { getFileIcon } from './file-icon';
+import { useDiagnosticsStore, findDiagnosticsForFile } from '@/stores/diagnostics-store';
 
 // ---------------------------------------------------------------------------
 // Lazy-load heavy renderers to keep initial bundle small
@@ -154,6 +157,8 @@ export interface FileContentRendererProps {
   /** Custom error UI. When provided, replaces the default error display.
    *  Receives the error message and filePath so callers can render a graceful fallback. */
   errorFallback?: (error: string, filePath: string) => React.ReactNode;
+  /** 1-indexed line number to scroll to after mount */
+  targetLine?: number | null;
 }
 
 export function FileContentRenderer({
@@ -164,6 +169,7 @@ export function FileContentRenderer({
   onSaved,
   className,
   errorFallback,
+  targetLine,
 }: FileContentRendererProps) {
   // Text content (for code/text files, CSV, images)
   const { data: fileContent, isLoading, error, refetch } = useFileContent(filePath);
@@ -177,6 +183,22 @@ export function FileContentRenderer({
   const fileCategory = getFileCategory(fileName, fileContent?.mimeType);
   const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
   const [isJsonTreeView, setIsJsonTreeView] = useState(false);
+
+  // LSP diagnostics for this file from the global diagnostics store
+  // Uses suffix-matching because LSP stores absolute paths but we use relative paths
+  const diagByFile = useDiagnosticsStore((s) => s.byFile);
+  const fileDiagnostics = useMemo(
+    () => findDiagnosticsForFile(diagByFile, filePath),
+    [diagByFile, filePath],
+  );
+  const fileDiagErrorCount = useMemo(
+    () => fileDiagnostics?.filter((d) => d.severity === 1).length ?? 0,
+    [fileDiagnostics],
+  );
+  const fileDiagWarningCount = useMemo(
+    () => fileDiagnostics?.filter((d) => d.severity === 2).length ?? 0,
+    [fileDiagnostics],
+  );
 
   const isMarkdownFile = language === 'markdown';
   const isJsonFile = language === 'json';
@@ -285,6 +307,23 @@ export function FileContentRenderer({
             <span className="text-sm truncate">{fileName}</span>
             {hasUnsavedChanges && (
               <span className="h-2 w-2 rounded-full bg-yellow-500 shrink-0" title="Unsaved changes" />
+            )}
+            {/* Inline diagnostic counts */}
+            {(fileDiagErrorCount > 0 || fileDiagWarningCount > 0) && (
+              <span className="inline-flex items-center gap-1.5 shrink-0">
+                {fileDiagErrorCount > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-red-500 text-xs font-medium">
+                    <CircleAlert className="h-3 w-3" />
+                    {fileDiagErrorCount}
+                  </span>
+                )}
+                {fileDiagWarningCount > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-yellow-500 text-xs font-medium">
+                    <AlertTriangle className="h-3 w-3" />
+                    {fileDiagWarningCount}
+                  </span>
+                )}
+              </span>
             )}
           </div>
 
@@ -504,6 +543,8 @@ export function FileContentRenderer({
                   showHeader={false}
                   fontSize="text-sm"
                   className="h-full"
+                  diagnostics={fileDiagnostics}
+                  targetLine={targetLine}
                 />
               )}
             </div>

@@ -50,6 +50,56 @@ export function useOpenCodeEventStream() {
 	const abortRef = useRef<AbortController | null>(null);
 	const prevServerVersionRef = useRef(serverVersion);
 
+	/**
+	 * Resolve an absolute sandbox path to a project-relative path by stripping
+	 * known worktree/directory prefixes from the React Query cache.
+	 *
+	 * For example: `/workspace/desktop/express-crud-app/src/server.js` → `src/server.js`
+	 *
+	 * This is critical for LSP diagnostics: the backend sends absolute paths,
+	 * but the frontend file tree / file viewer uses project-relative paths.
+	 */
+	const normalizeLspPath = useRef((absPath: string): string => {
+		if (!absPath || !absPath.startsWith('/')) return absPath;
+
+		// Collect prefixes from cached project/path data
+		const prefixes: string[] = [];
+		try {
+			const project = queryClient.getQueryData<any>(opencodeKeys.currentProject());
+			if (project?.worktree) prefixes.push(project.worktree);
+			const pathInfo = queryClient.getQueryData<any>(opencodeKeys.pathInfo());
+			if (pathInfo?.directory) prefixes.push(pathInfo.directory);
+			if (pathInfo?.worktree) prefixes.push(pathInfo.worktree);
+		} catch {
+			// non-critical
+		}
+
+		// Deduplicate and sort longest first (most specific prefix wins)
+		const unique = [...new Set(prefixes.filter(Boolean))].sort((a, b) => b.length - a.length);
+
+		for (const wt of unique) {
+			if (!wt || wt === '/') continue;
+			const prefix = wt.endsWith('/') ? wt : wt + '/';
+			if (absPath.startsWith(prefix)) {
+				return absPath.slice(prefix.length);
+			}
+		}
+
+		return absPath;
+	});
+
+	/** Normalize all keys in a diagnostic map from absolute to relative paths */
+	const normalizeDiagnosticPaths = useRef((
+		diagsByFile: Record<string, any[]>,
+	): Record<string, any[]> => {
+		const normalized: Record<string, any[]> = {};
+		for (const [file, diags] of Object.entries(diagsByFile)) {
+			const relPath = normalizeLspPath.current(file);
+			normalized[relPath] = diags;
+		}
+		return normalized;
+	});
+
 	useEffect(() => {
 		// Only nuke caches on actual server switches (not URL/port updates)
 		const isServerSwitch = prevServerVersionRef.current !== serverVersion;
@@ -364,7 +414,10 @@ export function useOpenCodeEventStream() {
 							}
 						}
 						if (hasValid) {
-							useDiagnosticsStore.getState().setFromLspEvent(validEntries);
+							// Normalize absolute paths to project-relative before storing
+							useDiagnosticsStore.getState().setFromLspEvent(
+								normalizeDiagnosticPaths.current(validEntries),
+							);
 						}
 					}
 					break;
@@ -678,7 +731,10 @@ export function useOpenCodeEventStream() {
 							}
 						}
 						if (hasDiags) {
-							useDiagnosticsStore.getState().setFromLspEvent(diagEntries);
+							// Normalize absolute paths to project-relative before storing
+							useDiagnosticsStore.getState().setFromLspEvent(
+								normalizeDiagnosticPaths.current(diagEntries),
+							);
 						}
 					}
 					break;
@@ -694,8 +750,10 @@ export function useOpenCodeEventStream() {
 					if (diagPath) {
 						const diagnostics = diagProps?.diagnostics;
 						if (Array.isArray(diagnostics)) {
+							// Normalize the path from absolute to project-relative
+							const relPath = normalizeLspPath.current(diagPath);
 							useDiagnosticsStore.getState().setFromLspEvent({
-								[diagPath]: diagnostics,
+								[relPath]: diagnostics,
 							});
 						}
 					}

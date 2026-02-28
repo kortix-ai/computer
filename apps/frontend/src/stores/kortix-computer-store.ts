@@ -92,7 +92,7 @@ export const useKortixComputerStore = create<KortixComputerState>()(
         set({ activeView: finalView });
       },
       
-      openFileInComputer: (filePath: string, _filePathList?: string[], _targetLine?: number) => {
+      openFileInComputer: (filePath: string, _filePathList?: string[], targetLine?: number) => {
         // Open the file as a new tab (same as clicking a file in the explorer)
         const fileName = filePath.split('/').pop() || filePath;
         const tabId = `file:${filePath}`;
@@ -101,6 +101,8 @@ export const useKortixComputerStore = create<KortixComputerState>()(
           title: fileName,
           type: 'file',
           href: `/files/${encodeURIComponent(filePath)}`,
+          // Store targetLine in tab metadata so the file viewer can scroll to it
+          ...(targetLine ? { metadata: { targetLine } } : {}),
         });
       },
       

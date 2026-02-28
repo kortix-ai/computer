@@ -837,21 +837,37 @@ function InlineDiffView({
 // DiagnosticsDisplay
 // ============================================================================
 
-function DiagnosticsDisplay({ diagnostics }: { diagnostics: Diagnostic[] }) {
+function DiagnosticsDisplay({ diagnostics, filePath }: { diagnostics: Diagnostic[]; filePath?: string }) {
 	if (diagnostics.length === 0) return null;
+
+	const handleClick = (d: Diagnostic) => {
+		if (!filePath) return;
+		const targetLine = d.range.start.line + 1; // 1-indexed
+		const tabId = `file:${filePath}`;
+		const fileName = filePath.split("/").pop() || filePath;
+		openTabAndNavigate({
+			id: tabId,
+			title: fileName,
+			type: "file",
+			href: `/files/${encodeURIComponent(filePath)}`,
+			metadata: { targetLine },
+		});
+	};
 
 	return (
 		<div className="space-y-1 px-2 pb-2">
 			{diagnostics.map((d, i) => (
-				<div
+				<button
+					type="button"
 					key={i}
-					className="flex items-start gap-1.5 text-[10px] text-red-500"
+					className="flex items-start gap-1.5 text-[10px] text-red-500 hover:text-red-400 transition-colors cursor-pointer text-left w-full group"
+					onClick={() => handleClick(d)}
 				>
 					<CircleAlert className="size-3 flex-shrink-0 mt-0.5" />
-					<span>
+					<span className="group-hover:underline">
 						[{d.range.start.line + 1}:{d.range.start.character + 1}] {d.message}
 					</span>
-				</div>
+				</button>
 			))}
 		</div>
 	);
@@ -1757,7 +1773,7 @@ function EditTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 					</div>
 				</div>
 			) : null}
-			<DiagnosticsDisplay diagnostics={diagnostics} />
+			<DiagnosticsDisplay diagnostics={diagnostics} filePath={filePath} />
 		</BasicTool>
 	);
 }
@@ -1834,7 +1850,7 @@ function WriteTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 				Waiting for file content...
 			</div>
 		) : null}
-			<DiagnosticsDisplay diagnostics={diagnostics} />
+			<DiagnosticsDisplay diagnostics={diagnostics} filePath={filePath} />
 		</BasicTool>
 	);
 }

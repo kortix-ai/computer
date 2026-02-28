@@ -57,7 +57,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDiagnosticsStore } from '@/stores/diagnostics-store';
+import { useDiagnosticsStore, buildDiagnosticCountsMap } from '@/stores/diagnostics-store';
 import { toast } from '@/lib/toast';
 import { openTabAndNavigate } from '@/stores/tab-store';
 
@@ -608,33 +608,31 @@ export function FileTree() {
   const { data: gitStatuses } = useGitStatus({ enabled: health?.healthy === true });
   const gitStatusMap = useMemo(() => buildGitStatusMap(gitStatuses), [gitStatuses]);
 
-  // Diagnostics
+  // Diagnostics — uses buildDiagnosticCountsMap to handle abs→rel path matching
   const diagByFile = useDiagnosticsStore((s) => s.byFile);
+  const diagCountsLookup = useMemo(
+    () => buildDiagnosticCountsMap(diagByFile),
+    [diagByFile],
+  );
   const diagnosticCountsMap = useMemo(() => {
     const map = new Map<string, { errors: number; warnings: number }>();
-    for (const [filePath, diags] of Object.entries(diagByFile)) {
-      let errors = 0;
-      let warnings = 0;
-      for (const d of diags) {
-        if (d.severity === 1) errors++;
-        else if (d.severity === 2) warnings++;
-      }
-      if (errors > 0 || warnings > 0) {
-        map.set(filePath, { errors, warnings });
+    for (const [filePath, counts] of Object.entries(diagCountsLookup)) {
+      if (counts.errors > 0 || counts.warnings > 0) {
+        map.set(filePath, counts);
         // Propagate to ancestor directories
         const parts = filePath.split('/');
         for (let i = 1; i < parts.length; i++) {
           const dirPath = parts.slice(0, i).join('/');
           const existing = map.get(dirPath) || { errors: 0, warnings: 0 };
           map.set(dirPath, {
-            errors: existing.errors + errors,
-            warnings: existing.warnings + warnings,
+            errors: existing.errors + counts.errors,
+            warnings: existing.warnings + counts.warnings,
           });
         }
       }
     }
     return map;
-  }, [diagByFile]);
+  }, [diagCountsLookup]);
 
   // Mutations
   const renameMutation = useFileRename();
