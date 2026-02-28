@@ -200,7 +200,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		},
 
 		// ── HOOK: Track session + prompt count ────────────────────────
-		"chat.message": async (input) => {
+		"chat.message": async (input, _output) => {
 			try {
 				if (input.sessionID && input.sessionID !== currentSessionId) {
 					currentSessionId = input.sessionID
