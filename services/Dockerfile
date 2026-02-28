@@ -24,12 +24,8 @@ COPY packages/ ./packages/
 # Install pnpm and deps for this service + workspace packages it depends on.
 # --shamefully-hoist flattens node_modules (no symlinks) so COPY works on all Docker versions.
 # Include devDeps so drizzle-kit is available for schema push at runtime.
-# Then build opencode-channels (it ships as TS source; its package.json points to dist/).
 RUN corepack enable pnpm && \
-    pnpm install --filter ./services/${SERVICE}... --shamefully-hoist --prod=false && \
-    if [ -f packages/opencode-channels/package.json ]; then \
-      ./node_modules/.bin/tsc -p packages/opencode-channels/tsconfig.build.json; \
-    fi
+    pnpm install --filter ./services/${SERVICE}... --shamefully-hoist --prod=false
 
 # ---- Runner Stage ----
 FROM base AS runner
@@ -60,13 +56,22 @@ COPY --from=deps /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config
 COPY --from=deps /app/packages/db/package.json ./packages/db/package.json
 COPY --from=deps /app/packages/db/tsconfig.json ./packages/db/tsconfig.json
 COPY --from=deps /app/packages/opencode-channels/src ./packages/opencode-channels/src
-COPY --from=deps /app/packages/opencode-channels/dist ./packages/opencode-channels/dist
 COPY --from=deps /app/packages/opencode-channels/package.json ./packages/opencode-channels/package.json
 COPY --from=deps /app/packages/opencode-channels/tsconfig.json ./packages/opencode-channels/tsconfig.json
 COPY --from=deps /app/packages/opencode-channels/tsconfig.build.json ./packages/opencode-channels/tsconfig.build.json
 
 # Copy the service (source + its node_modules if any)
 COPY --from=deps /app/services/${SERVICE} ./services/${SERVICE}
+
+# Fix opencode-channels resolution.
+# pnpm creates a workspace symlink in the service's node_modules that breaks after COPY
+# (symlink target is relative to deps stage layout). Replace with a direct copy of the
+# TS source and patch "main" to point at src/ since Bun runs TypeScript natively.
+RUN rm -f services/${SERVICE}/node_modules/opencode-channels 2>/dev/null; \
+    mkdir -p services/${SERVICE}/node_modules/opencode-channels
+COPY --from=deps /app/packages/opencode-channels/src ./services/${SERVICE}/node_modules/opencode-channels/src
+COPY --from=deps /app/packages/opencode-channels/package.json ./services/${SERVICE}/node_modules/opencode-channels/package.json
+RUN sed -i 's|"main": "dist/index.js"|"main": "src/index.ts"|;s|"types": "dist/index.d.ts"|"types": "src/index.ts"|' services/${SERVICE}/node_modules/opencode-channels/package.json
 
 WORKDIR /app/services/${SERVICE}
 
