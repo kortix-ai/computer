@@ -31,6 +31,7 @@ jobs:
             cd ~/computer
             git fetch origin main
             git reset --hard origin/main
+            git submodule update --init --recursive
 
             # Stop and remove old containers first to avoid name conflicts
             docker compose --profile backend down --remove-orphans || true

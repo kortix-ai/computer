@@ -1,3 +1,6 @@
 [submodule "services/lss"]
 	path = services/lss
 	url = https://github.com/kortix-ai/lss.git
+[submodule "packages/opencode-channels"]
+	path = packages/opencode-channels
+	url = https://github.com/kortix-ai/opencode-channels.git
