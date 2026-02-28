@@ -2,7 +2,9 @@ node_modules
 **/node_modules
 .next
 **/.next
+# Only exclude the root .git directory, not submodule .git files
 .git
+!packages/opencode-channels
 **/.env
 **/.env.*
 dist
