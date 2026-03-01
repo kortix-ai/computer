@@ -306,16 +306,33 @@ export function useOpenCodeEventStream() {
 					const { stream } = result;
 					streamConnectedAt = Date.now();
 
-				// On reconnect, re-hydrate if the gap was significant (>5s).
-				// Short reconnects (<5s) don't call hydrate because it would
-				// clobber SSE-driven streaming state with a stale server
-				// snapshot — causing visible content resets. The stale content
-				// watchdog in session-chat.tsx handles recovery for short gaps
-				// by polling when the last message is still a user message.
+				// On reconnect, re-hydrate lightweight state if the gap was
+				// significant (>5s). Message rehydration is SKIPPED for sessions
+				// that are currently busy — hydrate would clobber live SSE
+				// streaming state with a stale server snapshot, causing visible
+				// content resets/chunks. The post-idle recovery in session-chat.tsx
+				// handles message recovery after the session finishes.
 				if (retryCount > 0) {
 					const reconnectGap = Date.now() - lastEventTime;
 					if (reconnectGap > 5000) {
-						hydrateCore({ refetchSessions: true, rehydrateMessages: true });
+						// Hydrate permissions, questions, session statuses — but
+						// only rehydrate messages for IDLE sessions (not busy ones).
+						hydrateCore({ refetchSessions: true, rehydrateMessages: false });
+
+						// Selectively rehydrate messages only for idle sessions
+						const syncState = useSyncStore.getState();
+						const loadedSessionIds = Object.keys(syncState.messages);
+						for (const sid of loadedSessionIds) {
+							const status = useOpenCodeSessionStatusStore.getState().statuses[sid];
+							if (status?.type === "busy" || status?.type === "retry") continue;
+							client.session
+								.messages({ sessionID: sid })
+								.then((res) => {
+									if (res.data)
+										useSyncStore.getState().hydrate(sid, res.data as any);
+								})
+								.catch(() => {});
+						}
 					}
 				}
 					// Only reset backoff if connection was stable (>10s).
