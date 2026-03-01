@@ -672,19 +672,29 @@ export function useOpenCodeEventStream() {
 						// optimistic duplicate. After hydrating server data,
 						// clear any optimistic messages (now superseded by real
 						// ones) to prevent double user bubbles.
+						//
+						// EXCEPTION: On abort, skip the fetch+hydrate — the server
+						// may not have persisted the partial assistant response yet,
+						// so hydrating would wipe the streamed content the user saw.
+						// The error is already patched onto the message above.
+						const isAbortError =
+							props.error?.name === "AbortError" ||
+							String(props.error?.data?.message || props.error?.message || "").toLowerCase().includes("abort");
 						const sid = props.sessionID;
-						client.session
-							.messages({ sessionID: sid })
-							.then((res) => {
-								console.log("[sse-handler] session.error hydrate fetch result:", { hasData: !!res.data, messageCount: (res.data as any)?.length ?? 0 });
-								if (!res.data) return;
-								useSyncStore.getState().hydrate(sid, res.data as any);
-								// Remove optimistic messages — real ones from the
-								// server are now in the store via hydrate.
-								useSyncStore.getState().clearOptimisticMessages(sid);
-								console.log("[sse-handler] session.error hydrate complete, messages in store:", useSyncStore.getState().messages[sid]?.length ?? 0);
-							})
-							.catch((err) => { console.error("[sse-handler] session.error hydrate fetch failed:", err); });
+						if (!isAbortError) {
+							client.session
+								.messages({ sessionID: sid })
+								.then((res) => {
+									if (!res.data) return;
+									useSyncStore.getState().hydrate(sid, res.data as any);
+									useSyncStore.getState().clearOptimisticMessages(sid);
+								})
+								.catch(() => {});
+						} else {
+							// Still clear optimistic messages on abort — the real
+							// user message should have arrived via SSE by now.
+							useSyncStore.getState().clearOptimisticMessages(sid);
+						}
 					}
 					break;
 				}
