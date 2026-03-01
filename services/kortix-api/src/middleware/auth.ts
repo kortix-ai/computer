@@ -151,6 +151,14 @@ export async function combinedAuth(c: Context, next: Next) {
     throw new HTTPException(401, { message: 'Missing authentication token' });
   }
 
+  // Local mode: accept any bearer token (matches apiKeyAuth local bypass)
+  if (config.isLocal() && !isKortixToken(token)) {
+    c.set('userId', '00000000-0000-0000-0000-000000000000');
+    c.set('userEmail', '');
+    await next();
+    return;
+  }
+
   // Determine if this is a preview proxy route (for cookie management)
   const isPreviewRoute = c.req.path.startsWith('/v1/p/') || c.req.path === '/v1/p';
 
