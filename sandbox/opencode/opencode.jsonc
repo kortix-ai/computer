@@ -6,6 +6,7 @@
     "paths": ["./plugin/kortix-sys/skills"]
   },
   "autoupdate": true,
+  "model": "kortix/anthropic/claude-sonnet-4.6",
   "default_agent": "kortix",
   "agent": {
     // Disable all built-in agents -- Kortix provides its own
@@ -65,48 +66,6 @@
           "cost": { "input": 0.20, "output": 0.50 },
           "limit": { "context": 200000, "output": 16384 }
         }
-      }
-    },
-    // ── LLM provider overrides for Kortix Cloud billing ──────────────
-    //
-    // In cloud mode, LLM traffic is routed through the Kortix proxy for
-    // usage metering. X-Kortix-Token identifies the account for billing
-    // at the platform fee rate (0.1x) when using user-owned keys.
-    //
-    // These overrides ONLY inject headers/baseURL — they don't add models.
-    // Providers only show in the model selector if the user sets their own
-    // API key (e.g. ANTHROPIC_API_KEY). Without a key, only Kortix shows.
-    "anthropic": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "openai": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "openrouter": {
-      "options": {
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "xai": {
-      "options": {
-        "baseURL": "{env:XAI_BASE_URL}",
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "google": {
-      "options": {
-        "baseURL": "{env:GOOGLE_BASE_URL}",
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
-      }
-    },
-    "groq": {
-      "options": {
-        "baseURL": "{env:GROQ_BASE_URL}",
-        "headers": { "X-Kortix-Token": "{env:KORTIX_TOKEN}" }
       }
     }
   },
