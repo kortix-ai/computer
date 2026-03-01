@@ -557,6 +557,7 @@ if ! $DRY_RUN && ! $NO_COMMIT; then
     cd "$REPO_ROOT"
     git add sandbox/package.json sandbox/CHANGELOG.json
     [ -f "$GET_KORTIX" ] && git add scripts/get-kortix.sh
+    [ -f services/kortix-api/src/config.ts ] && git add services/kortix-api/src/config.ts
     git commit -m "release: v$VERSION" --allow-empty 2>/dev/null || true
   )
   ok "Committed: release: v$VERSION"
