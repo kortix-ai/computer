@@ -87,8 +87,8 @@ export default function SettingUpPage() {
                 router.push('/dashboard');
               }, 1500);
             },
-            onError: (error) => {
-              console.error('Setup error:', error);
+            onError: (err) => {
+              console.error('Setup error:', err);
               isInitializing.current = false;
               setStatus('error');
             },
@@ -199,7 +199,7 @@ export default function SettingUpPage() {
                           <div className="h-2.5 w-2.5 bg-red-500 rounded-full"></div>
                           <span className="text-base font-medium text-red-400">Setup Error</span>
                         </div>
-                        <p className="text-base text-gray-400">Don't worry, you can try again later.</p>
+                        <p className="text-base text-gray-400">Don't worry, you can choose a plan manually.</p>
                       </div>
                     </div>
                     <div className="h-12 w-12 flex items-center justify-center">
@@ -207,11 +207,11 @@ export default function SettingUpPage() {
                     </div>
                   </div>
                   <Button
-                    onClick={() => router.push('/dashboard')}
+                    onClick={() => router.push('/subscription')}
                     className="w-full mt-4"
                     variant="default"
                   >
-                    Continue to Dashboard
+                    Choose a Plan
                   </Button>
                 </CardContent>
               </Card>
