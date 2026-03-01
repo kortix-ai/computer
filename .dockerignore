@@ -2,7 +2,8 @@ node_modules
 **/node_modules
 .next
 **/.next
-.git
+# Only exclude the root .git directory, not submodule .git files
+/.git
 **/.env
 **/.env.*
 dist

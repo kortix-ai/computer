@@ -31,9 +31,12 @@ jobs:
             cd ~/computer
             git fetch origin main
             git reset --hard origin/main
+            git submodule update --init --recursive
 
+            # Stop and remove old containers first to avoid name conflicts
+            docker compose --profile backend down --remove-orphans || true
             docker compose --profile backend build --no-cache
-            docker compose --profile backend up -d --force-recreate --remove-orphans
+            docker compose --profile backend up -d
 
             for i in $(seq 1 15); do
               if curl -sf http://localhost:8008/v1/health > /dev/null 2>&1; then

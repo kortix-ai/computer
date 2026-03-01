@@ -513,7 +513,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         max_tokens: 1024,
         temperature: 0.8,
         messages: [

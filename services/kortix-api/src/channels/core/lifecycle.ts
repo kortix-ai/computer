@@ -1,12 +1,9 @@
-import type { ChannelEngineImpl } from './engine';
 import type { ChannelAdapter } from '../adapters/adapter';
 import type { ChannelType } from '../types';
 
 let abortController: AbortController | null = null;
-let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
 export async function startChannels(
-  engine: ChannelEngineImpl,
   adapters: Map<ChannelType, ChannelAdapter>,
 ): Promise<void> {
   abortController = new AbortController();
@@ -20,10 +17,6 @@ export async function startChannels(
     }
   }
 
-  cleanupInterval = setInterval(() => {
-    engine.cleanup();
-  }, 5 * 60 * 1000);
-
   console.log(`[CHANNELS] Started with ${adapters.size} adapter(s)`);
 }
 
@@ -35,11 +28,6 @@ export async function stopChannels(
   if (abortController) {
     abortController.abort();
     abortController = null;
-  }
-
-  if (cleanupInterval) {
-    clearInterval(cleanupInterval);
-    cleanupInterval = null;
   }
 
   for (const [type, adapter] of adapters) {

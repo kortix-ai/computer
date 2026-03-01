@@ -32,7 +32,7 @@ export interface ExtractionResult {
 /** Tools that should NOT generate observations (our own tools, noisy tools) */
 export const SKIP_TOOLS = new Set([
 	"mem_search",
-	"mem_save",
+	"ltm_save",
 	"ltm_search",
 	"observation_search",
 	"get_mem",

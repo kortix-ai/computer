@@ -16,7 +16,7 @@
  *   ltm_search                 — hybrid search across long-term memories
  *   observation_search         — hybrid search across observations
  *   get_mem                    — fetch full record by ID (LTM or observation)
- *   mem_save                   — manually persist an LTM entry
+ *   ltm_save                   — manually persist an LTM entry
  *   session_list               — browse past sessions with metadata
  *   session_get                — retrieve a session's conversation (TTC-compressed)
  */
@@ -42,7 +42,8 @@ const TOOL_OUTPUTS_DIR = "/workspace/.kortix/tool-outputs"
 function isAnthropicModel(modelId: string | null): boolean {
 	if (!modelId) return false
 	const lower = modelId.toLowerCase()
-	return lower.includes("anthropic") || lower.includes("claude")
+	// Direct Anthropic model IDs + Kortix aliases that resolve to Anthropic
+	return lower.includes("anthropic") || lower.includes("claude") || lower.startsWith("kortix/")
 }
 
 export const KortixMemoryPlugin: Plugin = async ({ client }) => {
@@ -199,7 +200,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		},
 
 		// ── HOOK: Track session + prompt count ────────────────────────
-		"chat.message": async (input) => {
+		"chat.message": async (input, _output) => {
 			try {
 				if (input.sessionID && input.sessionID !== currentSessionId) {
 					currentSessionId = input.sessionID
@@ -279,7 +280,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 						`- Soft-trimmed: "[Tool result trimmed: kept first X and last Y of Z chars.]" — head + tail preserved, middle removed`,
 						`- Hard-cleared: "[Old tool result content cleared]" — entire output replaced`,
 						`When you need the full output: use observation_search to find the observation, then call get_tool_output(observation_id).`,
-						`If a trimmed result has important info, save it via mem_save before it gets hard-cleared.`,
+						`If a trimmed result has important info, save it via ltm_save before it gets hard-cleared.`,
 						`</context_pruning_awareness>`,
 					].join("\n"))
 				}
@@ -509,7 +510,7 @@ ${content}`
 			}),
 
 			// Manually save an LTM entry
-			mem_save: tool({
+			ltm_save: tool({
 				description: `Manually save an important fact, insight, or workflow to long-term memory. Use this when you discover something worth remembering permanently — a codebase pattern, deployment process, architectural decision, or user preference. The memory persists across all future sessions.`,
 				args: {
 					text: tool.schema.string().describe("The memory content to save"),

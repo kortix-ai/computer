@@ -12,7 +12,7 @@ import type { LogFn } from "./types"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const KORTIX_MODEL = "kortix/basic"
+export const KORTIX_MODEL = "anthropic/claude-sonnet-4.6"
 export const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"
 export const DEFAULT_MAX_TOKENS = 2000
 const ANTHROPIC_VERSION = "2023-06-01"
@@ -104,7 +104,9 @@ async function callOpenAICompatible(
 	log: LogFn,
 	maxTokens?: number,
 ): Promise<string | null> {
-	const url = `${config.baseURL}/chat/completions`
+	// Append /v1/router if the base URL points to a Kortix API root (no path suffix)
+	const base = config.baseURL.endsWith("/v1/router") ? config.baseURL : `${config.baseURL}/v1/router`
+	const url = `${base}/chat/completions`
 	const response = await fetch(url, {
 		method: "POST",
 		headers: {

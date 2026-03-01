@@ -1,4 +1,3 @@
-import { config } from '../../config';
 import { getModelPricing } from './model-pricing';
 
 // =============================================================================
@@ -19,23 +18,17 @@ export interface ModelConfig {
 }
 
 /**
- * Kortix model aliases → OpenRouter model IDs.
+ * Kortix model registry — maps model IDs exposed through the Kortix provider
+ * to their OpenRouter equivalents with pricing.
  *
- * Users can send `kortix/basic` and we resolve it to the actual model.
- * Any model NOT in this registry is passed through to OpenRouter as-is.
+ * Model IDs use the real provider/model format (e.g. "anthropic/claude-opus-4.6")
+ * so users see actual model names, not opaque aliases.
+ *
+ * Any model NOT in this registry is passed through to OpenRouter as-is
+ * with live pricing from models.dev (or zero if unknown).
  */
 export const MODELS: Record<string, ModelConfig> = {
-  'kortix/basic': {
-    openrouterId: 'anthropic/claude-sonnet-4.5',
-    inputPer1M: 3.00,
-    outputPer1M: 15.00,
-    contextWindow: 200000,
-    tier: 'free',
-    cachingStrategy: 'manual',
-    cacheReadPer1M: 0.30,
-    cacheWritePer1M: 3.75,
-  },
-  'kortix/power': {
+  'anthropic/claude-opus-4.6': {
     openrouterId: 'anthropic/claude-opus-4.6',
     inputPer1M: 5.00,
     outputPer1M: 25.00,
@@ -45,7 +38,68 @@ export const MODELS: Record<string, ModelConfig> = {
     cacheReadPer1M: 0.50,
     cacheWritePer1M: 6.25,
   },
+  'anthropic/claude-sonnet-4.6': {
+    openrouterId: 'anthropic/claude-sonnet-4.6',
+    inputPer1M: 3.00,
+    outputPer1M: 15.00,
+    contextWindow: 200000,
+    tier: 'free',
+    cachingStrategy: 'manual',
+    cacheReadPer1M: 0.30,
+    cacheWritePer1M: 3.75,
+  },
+  'anthropic/claude-haiku-4.5': {
+    openrouterId: 'anthropic/claude-haiku-4.5',
+    inputPer1M: 1.00,
+    outputPer1M: 5.00,
+    contextWindow: 200000,
+    tier: 'free',
+    cachingStrategy: 'manual',
+    cacheReadPer1M: 0.10,
+    cacheWritePer1M: 1.25,
+  },
+  'openai/gpt-5.3-codex': {
+    openrouterId: 'openai/gpt-5.3-codex',
+    inputPer1M: 1.75,
+    outputPer1M: 14.00,
+    contextWindow: 400000,
+    tier: 'paid',
+  },
+  'minimax/minimax-m2.5': {
+    openrouterId: 'minimax/minimax-m2.5',
+    inputPer1M: 0.295,
+    outputPer1M: 1.20,
+    contextWindow: 196608,
+    tier: 'free',
+  },
+  'z-ai/glm-5': {
+    openrouterId: 'z-ai/glm-5',
+    inputPer1M: 0.95,
+    outputPer1M: 2.55,
+    contextWindow: 204800,
+    tier: 'free',
+  },
+  'moonshotai/kimi-k2.5': {
+    openrouterId: 'moonshotai/kimi-k2.5',
+    inputPer1M: 0.45,
+    outputPer1M: 2.20,
+    contextWindow: 262144,
+    tier: 'free',
+  },
+  'x-ai/grok-4.1-fast': {
+    openrouterId: 'x-ai/grok-4.1-fast',
+    inputPer1M: 0.20,
+    outputPer1M: 0.50,
+    contextWindow: 200000,
+    tier: 'free',
+  },
 };
+
+/**
+ * Default model for Kortix-managed contexts (cron, memory, etc.)
+ * that need a sensible default without user input.
+ */
+export const DEFAULT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 
 // =============================================================================
 // Model Resolution
@@ -53,7 +107,7 @@ export const MODELS: Record<string, ModelConfig> = {
 
 /**
  * Resolve a user-provided model ID to a ModelConfig.
- * - Known Kortix aliases (kortix/basic, etc.) → mapped config with pricing
+ * - Known Kortix models → mapped config with pricing
  * - Unknown models → look up live pricing from models.dev (refreshed every 24 h)
  * - If models.dev has no pricing → fall back to zero (billing will skip)
  */
@@ -104,7 +158,7 @@ export function getAllModels() {
   return Object.entries(MODELS).map(([id, cfg]) => ({
     id,
     object: 'model' as const,
-    owned_by: getProvider(id),
+    owned_by: 'kortix',
     context_window: cfg.contextWindow,
     pricing: {
       input: cfg.inputPer1M,
@@ -112,13 +166,4 @@ export function getAllModels() {
     },
     tier: cfg.tier,
   }));
-}
-
-function getProvider(modelId: string): string {
-  if (modelId.startsWith('kortix/')) return 'kortix';
-  if (modelId.startsWith('claude')) return 'anthropic';
-  if (modelId.startsWith('gpt') || modelId.startsWith('o1')) return 'openai';
-  if (modelId.startsWith('grok')) return 'xai';
-  if (modelId.startsWith('llama')) return 'groq';
-  return 'openrouter';
 }

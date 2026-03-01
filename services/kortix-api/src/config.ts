@@ -6,7 +6,7 @@ export type SandboxProviderName = 'daytona' | 'local_docker';
 export type InternalKortixEnv = 'dev' | 'staging' | 'prod';
 
 /** Single source of truth for the sandbox version. Update on each release. */
-export const SANDBOX_VERSION = '0.7.4';
+export const SANDBOX_VERSION = '0.7.5';
 
 // ─── Zod Helpers ────────────────────────────────────────────────────────────
 
@@ -156,8 +156,8 @@ const envSchema = z.object({
   // ── Frontend (optional) ──────────────────────────────────────────────────
   FRONTEND_URL:                optUrl('http://localhost:3000'),
 
-  // ── Integrations / Pipedream (conditional: required if pipedream is the provider) ──
-  INTEGRATION_AUTH_PROVIDER:   optStrDefault('pipedream'),
+  // ── Integrations / Pipedream (optional: only validated if explicitly set to "pipedream") ──
+  INTEGRATION_AUTH_PROVIDER:   optStr,
   PIPEDREAM_CLIENT_ID:         optStr,
   PIPEDREAM_CLIENT_SECRET:     optStr,
   PIPEDREAM_PROJECT_ID:        optStr,

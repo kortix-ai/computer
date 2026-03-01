@@ -393,7 +393,13 @@ export const useServerStore = create<ServerStore>()(
       getActiveServerUrl: () => {
         const state = get();
         const active = state.servers.find((s) => s.id === state.activeServerId);
-        if (!active) return DEFAULT_SANDBOX_URL;
+        if (!active) {
+          // In cloud mode, don't fall back to the local Docker URL —
+          // useSandbox will register the real sandbox shortly.
+          // Returning '' signals callers to wait / skip the request.
+          if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
+          return DEFAULT_SANDBOX_URL;
+        }
         // Sandbox entries: always derive URL fresh (never stale)
         if (active.sandboxId) return getSandboxServerUrl(active.sandboxId);
         // Custom entries: use the user-provided URL
@@ -564,11 +570,16 @@ export function getBackendPort(): number {
 /**
  * Get the sandboxId for the active server.
  * - Local mode: defaults to 'kortix-sandbox' (the Docker container name)
- * - Cloud mode: uses the server's sandboxId from the store
+ * - Cloud mode: uses the server's sandboxId from the store (empty if not yet loaded)
  */
 export function getActiveSandboxId(): string {
-  const server = getActiveServer();
-  return server?.sandboxId || 'kortix-sandbox';
+  const state = useServerStore.getState();
+  const server = state.servers.find((s) => s.id === state.activeServerId) ?? null;
+  if (server?.sandboxId) return server.sandboxId;
+  // In cloud mode, don't fall back to the local Docker container name —
+  // return '' until useSandbox registers the real sandbox.
+  if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
+  return 'kortix-sandbox';
 }
 
 /**

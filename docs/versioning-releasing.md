@@ -38,24 +38,42 @@ For Docker releases (`--docker`), also need:
 ## Quick Reference
 
 ```bash
-# Full release (sandbox + GitHub)
-./sandbox/release.sh 0.7.0
+# STANDARD RELEASE — always use --docker
+./sandbox/release.sh --docker 0.7.0
 
 # Dry run — validate everything, publish nothing
 ./sandbox/release.sh --dry-run 0.7.0
 
-# Full release + Docker images + Daytona snapshot
+# Skip auto-commit (you'll commit manually)
+./sandbox/release.sh --docker --no-commit 0.7.0
+
+# Sandbox image only (skip API + frontend Docker images, still creates Daytona snapshot)
+./sandbox/release.sh --docker --sandbox-only 0.7.0
+```
+
+## CRITICAL: Always Do a Full Release
+
+**Never do a partial release.** Every release MUST build ALL artifacts — npm, GitHub,
+Docker images, AND the Daytona snapshot. A half-done release WILL break production.
+
+**Why:** The release script stamps `SANDBOX_VERSION` in `config.ts`. When the API
+deploys, it tells Daytona to create sandboxes from snapshot `kortix-sandbox-v{version}`.
+If that snapshot doesn't exist because you skipped `--docker`, every new sandbox
+creation fails with `"Snapshot not found"` and the platform is broken.
+
+```bash
+# THE ONLY WAY TO RELEASE:
 ./sandbox/release.sh --docker 0.7.0
 
-# Full release + Docker Hub only (no Daytona)
-./sandbox/release.sh --docker --skip-daytona 0.7.0
-
-# Full release + Docker sandbox image only (skip API + frontend Docker)
-./sandbox/release.sh --docker --sandbox-only 0.7.0
-
-# Full release + Docker, skip auto-commit
-./sandbox/release.sh --docker --no-commit 0.7.0
+# Then push + deploy:
+git push
 ```
+
+**Do NOT:**
+- Run `release.sh` without `--docker` and "plan to build Docker later"
+- Manually bump `SANDBOX_VERSION` without building the matching snapshot
+- Push a version bump commit before all artifacts are published
+- Use `--skip-daytona` unless you are 100% sure no new sandboxes will be created
 
 ## How to Release
 
@@ -106,28 +124,28 @@ This version is read by both the Dockerfile (initial build) and `postinstall.sh`
 This validates the changelog, checks npm/GitHub/Daytona availability, previews
 release notes, and shows what files would be published — publishes nothing.
 
-### 4. Release
+### 4. Release (full — always use --docker)
 
 ```bash
-./sandbox/release.sh 0.7.0
+./sandbox/release.sh --docker 0.7.0
 ```
 
 The script does everything in order:
 
 | Step | What happens |
 |------|-------------|
-| **0. Prerequisites** | Checks `node`, `bun`, `npm`, `gh` on PATH. Verifies npm + gh auth. If `--docker`: checks Docker daemon, buildx builder, and daytona CLI **upfront**. |
+| **0. Prerequisites** | Checks `node`, `bun`, `npm`, `gh` on PATH. Verifies npm + gh auth. Checks Docker daemon, buildx builder, and daytona CLI **upfront**. |
 | **1. Validate changelog** | Reads `CHANGELOG.json`, ensures entry for this version exists with `title` and `changes`. |
 | **2. Check existing** | Detects already-published artifacts (npm, GitHub, Daytona) and auto-skips them. This makes re-runs after partial failure safe. |
-| **3. Bump versions** | Stamps `sandbox/package.json` (version) and `scripts/get-kortix.sh` (VERSION line). |
+| **3. Bump versions** | Stamps `sandbox/package.json` (version), `scripts/get-kortix.sh` (VERSION line), and `services/kortix-api/src/config.ts` (SANDBOX_VERSION). |
 | **4. Publish sandbox** | `npm publish` for `@kortix/sandbox@{version}`. This triggers live auto-update on all running sandboxes. Waits 5s and verifies on npm registry. |
 | **5. GitHub Release** | Creates `v{version}` release on `kortix-ai/computer` with formatted release notes from the changelog entry. |
-| **6. Docker** *(optional)* | Only runs when `--docker` is passed. Order: (a) sandbox image, (b) Daytona snapshot, (c) API image, (d) frontend image. See [Docker details](#docker-details) below. |
+| **6. Docker images** | Builds all 3 images (sandbox, API, frontend) multi-platform and pushes to Docker Hub. Then creates the Daytona snapshot from the sandbox image. |
 | **7. Write artifacts** | Records every successful publish step in the `artifacts[]` array of the `CHANGELOG.json` entry. |
-| **8. Validate** | Checks every expected artifact actually exists on npm, GitHub, Docker Hub. Reports pass/fail for each. |
-| **9. Auto-commit** | Commits `sandbox/package.json`, `sandbox/CHANGELOG.json`, and `scripts/get-kortix.sh` with message `release: v{version}`. (Skipped with `--no-commit`.) |
+| **8. Validate** | Checks every expected artifact actually exists on npm, GitHub, Docker Hub, Daytona. Reports pass/fail for each. |
+| **9. Auto-commit** | Commits all version-stamped files with message `release: v{version}`. (Skipped with `--no-commit`.) |
 
-### 5. Push
+### 5. Push and deploy
 
 The script auto-commits but does NOT push. Review the commit, then:
 
@@ -135,11 +153,22 @@ The script auto-commits but does NOT push. Review the commit, then:
 git push
 ```
 
+This triggers the VPS deploy action which rebuilds the API container on prod.
+The new API will use `SANDBOX_VERSION` to create sandboxes from the snapshot
+you just published. **Everything must be in sync.**
+
 ### 6. Verify
 
 ```bash
+# Check all artifacts exist:
 npm view @kortix/sandbox@0.7.0 version
 gh release view v0.7.0 --repo kortix-ai/computer
+docker manifest inspect kortix/computer:0.7.0
+docker manifest inspect kortix/kortix-api:0.7.0
+daytona snapshot list | grep 0.7.0
+
+# Check the deployed API uses the right version:
+curl -s https://new-api.kortix.com/v1/health | jq .
 ```
 
 Running sandboxes auto-detect the new version within ~5 minutes.
@@ -156,18 +185,15 @@ Running sandboxes auto-detect the new version within ~5 minutes.
 
 ## Docker Details
 
-### When to build Docker
+### Always build Docker
 
-Build Docker (`--docker`) when the release changes:
+**Every release must include `--docker`.** The release script stamps `SANDBOX_VERSION`
+in `config.ts`, and the deployed API uses that to look up the Daytona snapshot. If the
+snapshot doesn't exist, sandbox creation is broken for all users.
 
-- Alpine base packages or OS-level dependencies
-- Bun runtime version
-- Chromium / Playwright version
-- Branding assets (wallpapers, icons)
-- Python dependencies in `sandbox/package.json` → `kortix.pythonDependencies`
-- Anything NOT deployable via `postinstall.sh`
-
-Most releases **don't need Docker** — the npm live-update mechanism handles everything else.
+The npm live-update mechanism (`postinstall.sh`) handles config/tool/skill changes on
+*running* sandboxes, but **new sandboxes** are always created from the Daytona snapshot.
+No snapshot = no new sandboxes = broken platform.
 
 ### What `--docker` does
 

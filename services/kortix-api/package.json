@@ -19,6 +19,7 @@
     "@ai-sdk/xai": "^3.0.48",
     "@daytonaio/sdk": "^0.143.0",
     "@kortix/db": "workspace:*",
+    "opencode-channels": "workspace:*",
     "drizzle-kit": "^0.31.0",
     "@supabase/supabase-js": "^2.95.3",
     "ai": "^6.0.77",

@@ -200,7 +200,8 @@ export function useOpenCodeLocal({
     if (config?.model) {
       const parts = config.model.split('/');
       if (parts.length >= 2) {
-        const [providerID, modelID] = parts;
+        const [providerID, ...rest] = parts;
+        const modelID = rest.join('/');
         if (isModelValid({ providerID, modelID })) {
           return { providerID, modelID };
         }

@@ -151,21 +151,17 @@ mock.module('../router/services/llm', () => ({
             (completion / 1_000_000) * (modelConfig?.outputPer1M || 0)) * 1.2;
   },
   getAllModels: () => [
-    { id: 'kortix/basic', object: 'model', owned_by: 'kortix', context_window: 200000, pricing: { input: 3, output: 15 }, tier: 'free' },
-    { id: 'kortix/power', object: 'model', owned_by: 'kortix', context_window: 200000, pricing: { input: 5, output: 25 }, tier: 'paid' },
+    { id: 'anthropic/claude-sonnet-4.6', object: 'model', owned_by: 'kortix', context_window: 200000, pricing: { input: 3, output: 15 }, tier: 'free' },
+    { id: 'anthropic/claude-opus-4.6', object: 'model', owned_by: 'kortix', context_window: 200000, pricing: { input: 5, output: 25 }, tier: 'paid' },
   ],
   getModel: (id: string) => ({
-    openrouterId: id === 'kortix/basic' ? 'anthropic/claude-sonnet-4-5' : 'anthropic/claude-opus-4-6',
-    inputPer1M: id === 'kortix/basic' ? 3 : 5,
-    outputPer1M: id === 'kortix/basic' ? 15 : 25,
+    openrouterId: id,
+    inputPer1M: id === 'anthropic/claude-sonnet-4.6' ? 3 : 5,
+    outputPer1M: id === 'anthropic/claude-sonnet-4.6' ? 15 : 25,
     contextWindow: 200000,
-    tier: (id === 'kortix/basic' ? 'free' : 'paid') as 'free' | 'paid',
+    tier: (id === 'anthropic/claude-sonnet-4.6' ? 'free' : 'paid') as 'free' | 'paid',
   }),
-  resolveOpenRouterId: (id: string) => {
-    if (id === 'kortix/basic') return 'anthropic/claude-sonnet-4-5';
-    if (id === 'kortix/power') return 'anthropic/claude-opus-4-6';
-    return id;
-  },
+  resolveOpenRouterId: (id: string) => id,
 }));
 
 // ─── Import router AFTER mocks ───────────────────────────────────────────────
@@ -375,14 +371,14 @@ describe('Router: models', () => {
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBeGreaterThanOrEqual(2);
 
-    const basic = body.data.find((m: any) => m.id === 'kortix/basic');
-    expect(basic).toBeDefined();
-    expect(basic.tier).toBe('free');
-    expect(basic.pricing.input).toBe(3);
+    const sonnet = body.data.find((m: any) => m.id === 'anthropic/claude-sonnet-4.6');
+    expect(sonnet).toBeDefined();
+    expect(sonnet.tier).toBe('free');
+    expect(sonnet.pricing.input).toBe(3);
 
-    const power = body.data.find((m: any) => m.id === 'kortix/power');
-    expect(power).toBeDefined();
-    expect(power.tier).toBe('paid');
+    const opus = body.data.find((m: any) => m.id === 'anthropic/claude-opus-4.6');
+    expect(opus).toBeDefined();
+    expect(opus.tier).toBe('paid');
   });
 
   test('GET /v1/router/models/:model returns 404 for unknown model', async () => {
@@ -396,7 +392,7 @@ describe('Router: models', () => {
 
   test('GET /v1/router/models/:model works for single-segment model ID', async () => {
     const app = createRouterTestApp();
-    const res = await app.request('/v1/router/models/kortix%2Fbasic', {
+    const res = await app.request('/v1/router/models/anthropic%2Fclaude-sonnet-4.6', {
       method: 'GET',
       headers: { Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
     });
@@ -412,7 +408,7 @@ describe('Router: chat/completions (non-streaming)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages: [{ role: 'user', content: 'Hello' }],
       }),
     });
@@ -467,7 +463,7 @@ describe('Router: chat/completions (non-streaming)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages: [{ role: 'user', content: 'Hello' }],
       }),
     });
@@ -499,7 +495,7 @@ describe('Router: chat/completions (non-streaming)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages: [{ role: 'user', content: 'Hello' }],
         temperature: 0.7,
         max_tokens: 1000,
@@ -516,7 +512,7 @@ describe('Router: chat/completions (streaming)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages: [{ role: 'user', content: 'Hello' }],
         stream: true,
       }),
@@ -555,7 +551,7 @@ describe('Router: chat/completions (tool support)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages: [{ role: 'user', content: 'What is the weather in SF?' }],
         tools,
         tool_choice: 'auto',
@@ -581,7 +577,7 @@ describe('Router: chat/completions (tool support)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages,
       }),
     });
@@ -623,7 +619,7 @@ describe('Router: chat/completions (tool support)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages: [{ role: 'user', content: 'What is the weather in SF?' }],
         tools: [{ type: 'function', function: { name: 'get_weather', parameters: {} } }],
       }),
@@ -641,7 +637,7 @@ describe('Router: chat/completions (tool support)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TEST_ACCOUNT_ID}` },
       body: JSON.stringify({
-        model: 'kortix/basic',
+        model: 'anthropic/claude-sonnet-4.6',
         messages: [{ role: 'user', content: 'Hello' }],
         response_format: { type: 'json_object' },
       }),
