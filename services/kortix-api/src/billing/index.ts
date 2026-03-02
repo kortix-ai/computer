@@ -77,13 +77,15 @@ billingApp.post('/setup/initialize', async (c: any) => {
     });
 
     const dailyConfig = getDailyCreditConfig('free');
+    const initialBalance = String(dailyConfig?.dailyAmount ?? 3);
     await upsertCreditAccount(accountId, {
       tier: 'free',
       provider: 'stripe',
       stripeSubscriptionId: subscription.id,
       stripeSubscriptionStatus: 'active',
       planType: 'monthly',
-      dailyCreditsBalance: String(dailyConfig?.dailyAmount ?? 3),
+      dailyCreditsBalance: initialBalance,
+      balance: initialBalance,
       lastDailyRefresh: new Date().toISOString(),
     });
   }

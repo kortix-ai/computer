@@ -61,6 +61,10 @@ export async function getCreditBalance(accountId: string): Promise<CreditBalance
 /**
  * Check if account has sufficient credits.
  * When billing is disabled (self-hosted), credits are unlimited — always returns true.
+ *
+ * Performs lazy daily credit refresh: if 24h have passed since the last refresh,
+ * credits are topped up before the balance check. This ensures users don't get
+ * stuck at $0 waiting for a cron that doesn't exist.
  */
 export async function checkCredits(
   accountId: string,
@@ -69,6 +73,45 @@ export async function checkCredits(
   // Billing disabled: no credit gating
   if (!config.KORTIX_BILLING_INTERNAL_ENABLED) {
     return { hasCredits: true, balance: 0, message: 'OK' };
+  }
+
+  // Lazy daily refresh: top up credits if 24h have passed.
+  // This is idempotent — refreshDailyCredits checks lastDailyRefresh internally.
+  try {
+    const account = await db
+      .select({
+        tier: creditAccounts.tier,
+        balance: creditAccounts.balance,
+        dailyCreditsBalance: creditAccounts.dailyCreditsBalance,
+      })
+      .from(creditAccounts)
+      .where(eq(creditAccounts.accountId, accountId))
+      .limit(1)
+      .then(rows => rows[0] ?? null);
+
+    if (account?.tier) {
+      const bal = Number(account.balance) || 0;
+      const daily = Number(account.dailyCreditsBalance) || 0;
+
+      if (bal < minimumRequired && daily > 0) {
+        // Balance is empty but daily credits exist — this happens when:
+        // (a) Account was initialized before the balance-init fix, or
+        // (b) All credits were spent and 24h refresh is due.
+        // Force-sync balance to match daily credits immediately so user isn't stuck.
+        await db
+          .update(creditAccounts)
+          .set({ balance: account.dailyCreditsBalance, updatedAt: new Date().toISOString() })
+          .where(eq(creditAccounts.accountId, accountId));
+        console.log(`[checkCredits] Fixed zero balance for ${accountId}: set balance = ${daily}`);
+      } else {
+        // Normal path: try daily refresh (no-ops if <24h since last)
+        const { refreshDailyCredits } = await import('../billing/services/credits');
+        await refreshDailyCredits(accountId, account.tier);
+      }
+    }
+  } catch (err) {
+    // Non-fatal: if refresh fails, still check existing balance
+    console.warn('[checkCredits] Daily refresh failed:', err);
   }
 
   const balance = await getCreditBalance(accountId);
