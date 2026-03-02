@@ -19,46 +19,52 @@ import { tunnelRpc, resolveTunnelId, getTunnelBase, getToken } from "./rpc"
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
 export const tunnelStatusTool = tool({
-	description: `Check the status of a Kortix Tunnel connection to the user's local machine. Returns connection status, available capabilities (filesystem, shell, etc.), and machine info. Use this to verify the tunnel is connected before attempting local operations.`,
-	args: {
-		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (defaults to KORTIX_TUNNEL_ID env var)"),
-	},
-	async execute(args) {
-		const tunnelId = await resolveTunnelId(args)
+	description: `Check the status of all Kortix Tunnel connections to the user's local machine. Lists every registered tunnel with its live/offline status, capabilities, and machine info. Use this to verify a tunnel is connected before attempting local operations.`,
+	args: {},
+	async execute() {
 		const token = getToken()
 
-		const res = await fetch(`${getTunnelBase()}/connections/${tunnelId}`, {
-			headers: { Authorization: `Bearer ${token}` },
+		const res = await fetch(`${getTunnelBase()}/connections`, {
+			headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
 		})
 
 		if (!res.ok) {
-			if (res.status === 404) {
-				return "Tunnel connection not found. The user needs to set up Kortix Tunnel first."
-			}
 			return `Failed to check tunnel status: HTTP ${res.status}`
 		}
 
-		const data = (await res.json()) as Record<string, unknown>
-		const status = data.isLive ? "ONLINE" : "OFFLINE"
-		const capabilities = (data.capabilities as string[]) || []
-		const machineInfo = data.machineInfo as Record<string, unknown> || {}
+		const connections = (await res.json()) as Array<Record<string, unknown>>
 
-		const lines = [
-			`=== Tunnel Status: ${status} ===`,
-			`ID: ${data.tunnelId}`,
-			`Name: ${data.name}`,
-			`Capabilities: ${capabilities.length > 0 ? capabilities.join(", ") : "(none registered)"}`,
-		]
-
-		if (Object.keys(machineInfo).length > 0) {
-			lines.push(`Machine: ${machineInfo.hostname || "unknown"} (${machineInfo.platform || "?"} ${machineInfo.arch || "?"})`)
+		if (connections.length === 0) {
+			return "No tunnel connections found. The user needs to set up Kortix Tunnel first:\n1. Go to the Tunnel page in Kortix dashboard\n2. Create a new connection\n3. Run `npx @kortix/tunnel connect` on their local machine"
 		}
 
-		if (!data.isLive) {
-			lines.push("", "The tunnel agent is not currently connected. Ask the user to run `npx @kortix/tunnel connect` on their local machine.")
+		const sections: string[] = []
+		let hasOnline = false
+
+		for (const data of connections) {
+			const status = data.isLive ? "ONLINE" : "OFFLINE"
+			if (data.isLive) hasOnline = true
+			const capabilities = (data.capabilities as string[]) || []
+			const machineInfo = (data.machineInfo as Record<string, unknown>) || {}
+
+			const lines = [
+				`=== Tunnel: ${data.name || "Unnamed"} — ${status} ===`,
+				`ID: ${data.tunnelId}`,
+				`Capabilities: ${capabilities.length > 0 ? capabilities.join(", ") : "(none registered)"}`,
+			]
+
+			if (Object.keys(machineInfo).length > 0) {
+				lines.push(`Machine: ${machineInfo.hostname || "unknown"} (${machineInfo.platform || "?"} ${machineInfo.arch || "?"})`)
+			}
+
+			sections.push(lines.join("\n"))
 		}
 
-		return lines.join("\n")
+		if (!hasOnline) {
+			sections.push("\nNo tunnel is currently online. Ask the user to run `npx @kortix/tunnel connect` on their local machine.")
+		}
+
+		return sections.join("\n\n")
 	},
 })
 
