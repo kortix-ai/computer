@@ -151,8 +151,7 @@ export async function combinedAuth(c: Context, next: Next) {
     throw new HTTPException(401, { message: 'Missing authentication token' });
   }
 
-  // Local mode: accept any bearer token (matches apiKeyAuth local bypass)
-  if (config.isLocal() && !isKortixToken(token)) {
+  if (config.isLocal()) {
     c.set('userId', '00000000-0000-0000-0000-000000000000');
     c.set('userEmail', '');
     await next();

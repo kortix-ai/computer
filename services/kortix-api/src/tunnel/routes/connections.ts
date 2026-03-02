@@ -10,23 +10,39 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, or, desc } from 'drizzle-orm';
 import { tunnelConnections } from '@kortix/db';
 import { db } from '../../shared/db';
 import { tunnelRelay } from '../core/relay';
 import { generateTunnelToken, hashSecretKey } from '../../shared/crypto';
+import { resolveAccountId } from '../../shared/resolve-account';
 
 export function createConnectionsRouter(): Hono {
   const router = new Hono();
 
   router.get('/', async (c: any) => {
-    const accountId = c.get('userId') as string;
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+
+    console.log(`[TUNNEL][GET /connections] userId=${userId} resolvedAccountId=${accountId} same=${userId === accountId}`);
+
+    // Match tunnels owned by the resolved accountId OR the raw userId
+    // (tunnels created before accountId resolution was added use the raw userId)
+    const whereClause = accountId !== userId
+      ? or(eq(tunnelConnections.accountId, accountId), eq(tunnelConnections.accountId, userId))
+      : eq(tunnelConnections.accountId, accountId);
 
     const connections = await db
       .select()
       .from(tunnelConnections)
-      .where(eq(tunnelConnections.accountId, accountId))
+      .where(whereClause!)
       .orderBy(desc(tunnelConnections.createdAt));
+
+    console.log(`[TUNNEL][GET /connections] found ${connections.length} connections`, connections.map(c => ({ tunnelId: c.tunnelId, accountId: c.accountId })));
+
+    // Also log all tunnel connections in the DB for debugging
+    const allConnections = await db.select({ tunnelId: tunnelConnections.tunnelId, accountId: tunnelConnections.accountId }).from(tunnelConnections);
+    console.log(`[TUNNEL][GET /connections] ALL tunnels in DB:`, allConnections);
 
     const enriched = connections.map((conn) => ({
       ...conn,
@@ -37,7 +53,8 @@ export function createConnectionsRouter(): Hono {
   });
 
   router.post('/', async (c: any) => {
-    const accountId = c.get('userId') as string;
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const body = await c.req.json();
 
     const { name, sandboxId, capabilities } = body;
@@ -65,8 +82,15 @@ export function createConnectionsRouter(): Hono {
   });
 
   router.get('/:tunnelId', async (c: any) => {
-    const accountId = c.get('userId') as string;
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const tunnelId = c.req.param('tunnelId');
+
+    console.log(`[TUNNEL][GET /:tunnelId] userId=${userId} accountId=${accountId} tunnelId=${tunnelId}`);
+
+    const ownerClause = accountId !== userId
+      ? or(eq(tunnelConnections.accountId, accountId), eq(tunnelConnections.accountId, userId))
+      : eq(tunnelConnections.accountId, accountId);
 
     const [connection] = await db
       .select()
@@ -74,9 +98,11 @@ export function createConnectionsRouter(): Hono {
       .where(
         and(
           eq(tunnelConnections.tunnelId, tunnelId),
-          eq(tunnelConnections.accountId, accountId),
+          ownerClause,
         ),
       );
+
+    console.log(`[TUNNEL][GET /:tunnelId] found=${!!connection}`);
 
     if (!connection) {
       return c.json({ error: 'Tunnel connection not found' }, 404);
@@ -89,7 +115,8 @@ export function createConnectionsRouter(): Hono {
   });
 
   router.patch('/:tunnelId', async (c: any) => {
-    const accountId = c.get('userId') as string;
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const tunnelId = c.req.param('tunnelId');
     const body = await c.req.json();
 
@@ -98,13 +125,17 @@ export function createConnectionsRouter(): Hono {
     if (body.capabilities !== undefined) updates.capabilities = body.capabilities;
     if (body.sandboxId !== undefined) updates.sandboxId = body.sandboxId || null;
 
+    const ownerClause = accountId !== userId
+      ? or(eq(tunnelConnections.accountId, accountId), eq(tunnelConnections.accountId, userId))
+      : eq(tunnelConnections.accountId, accountId);
+
     const [updated] = await db
       .update(tunnelConnections)
       .set(updates)
       .where(
         and(
           eq(tunnelConnections.tunnelId, tunnelId),
-          eq(tunnelConnections.accountId, accountId),
+          ownerClause,
         ),
       )
       .returning();
@@ -117,8 +148,13 @@ export function createConnectionsRouter(): Hono {
   });
 
   router.post('/:tunnelId/rotate-token', async (c: any) => {
-    const accountId = c.get('userId') as string;
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const tunnelId = c.req.param('tunnelId');
+
+    const ownerClause = accountId !== userId
+      ? or(eq(tunnelConnections.accountId, accountId), eq(tunnelConnections.accountId, userId))
+      : eq(tunnelConnections.accountId, accountId);
 
     const [tunnel] = await db
       .select()
@@ -126,7 +162,7 @@ export function createConnectionsRouter(): Hono {
       .where(
         and(
           eq(tunnelConnections.tunnelId, tunnelId),
-          eq(tunnelConnections.accountId, accountId),
+          ownerClause,
         ),
       );
 
@@ -154,15 +190,20 @@ export function createConnectionsRouter(): Hono {
   });
 
   router.delete('/:tunnelId', async (c: any) => {
-    const accountId = c.get('userId') as string;
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const tunnelId = c.req.param('tunnelId');
+
+    const ownerClause = accountId !== userId
+      ? or(eq(tunnelConnections.accountId, accountId), eq(tunnelConnections.accountId, userId))
+      : eq(tunnelConnections.accountId, accountId);
 
     const [deleted] = await db
       .delete(tunnelConnections)
       .where(
         and(
           eq(tunnelConnections.tunnelId, tunnelId),
-          eq(tunnelConnections.accountId, accountId),
+          ownerClause,
         ),
       )
       .returning();

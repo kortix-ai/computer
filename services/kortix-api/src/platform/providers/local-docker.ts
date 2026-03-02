@@ -85,23 +85,19 @@ function getSandboxInternalApiUrl(): string {
     return `http://kortix-api:${config.PORT}`;
   }
 
-  const externalUrl = config.KORTIX_URL;
+  const externalUrl = config.KORTIX_URL?.replace(/\/v1\/router\/?$/, '');
   if (externalUrl) {
     try {
       const parsed = new URL(externalUrl);
-      // localhost/127.0.0.1 is unreachable from inside Docker — swap to host.docker.internal
       if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
         parsed.hostname = 'host.docker.internal';
         return parsed.toString().replace(/\/$/, '');
       }
-      // Real domain or IP — sandbox can reach it directly
       return externalUrl.replace(/\/$/, '');
     } catch {
-      // Invalid URL — fall through to default
     }
   }
 
-  // Fallback: host.docker.internal on the default port
   return `http://host.docker.internal:${config.PORT}`;
 }
 

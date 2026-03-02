@@ -820,6 +820,10 @@ export default {
   },
 
   websocket: {
+    // Disable Bun's default 120s idle timeout — tunnel agents use their own
+    // heartbeat mechanism (30s ping/pong) for liveness detection.
+    idleTimeout: 0,
+
     open(ws: { data: any; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
       if (ws.data?.type === 'tunnel-agent') {
         const { tunnelId, accountId, signingKey } = ws.data;

@@ -14,7 +14,7 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { tunnelConnections, tunnelPermissionRequests } from '@kortix/db';
 import { db } from '../../shared/db';
 import { tunnelRelay, TunnelRelayError } from '../core/relay';
@@ -25,12 +25,14 @@ import { TunnelMethods, TunnelErrorCode } from '../types';
 import type { TunnelCapability } from '../types';
 import { tunnelRateLimiter } from '../core/rate-limiter';
 import { isValidCapability, validateScope as validateScopeInput } from '../core/scope-validator';
+import { resolveAccountId } from '../../shared/resolve-account';
 
 export function createRpcRouter(): Hono {
   const router = new Hono();
 
   router.post('/:tunnelId', async (c: any) => {
-    const accountId = c.get('userId') as string;
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
     const tunnelId = c.req.param('tunnelId');
 
     const rpcRateCheck = tunnelRateLimiter.check('rpc', tunnelId);
@@ -49,13 +51,18 @@ export function createRpcRouter(): Hono {
       return c.json({ error: 'method is required' }, 400);
     }
 
+    // Match tunnel by accountId or raw userId (for tunnels created before resolution was added)
+    const ownerClause = accountId !== userId
+      ? or(eq(tunnelConnections.accountId, accountId), eq(tunnelConnections.accountId, userId))
+      : eq(tunnelConnections.accountId, accountId);
+
     const [tunnel] = await db
       .select()
       .from(tunnelConnections)
       .where(
         and(
           eq(tunnelConnections.tunnelId, tunnelId),
-          eq(tunnelConnections.accountId, accountId),
+          ownerClause,
         ),
       );
 

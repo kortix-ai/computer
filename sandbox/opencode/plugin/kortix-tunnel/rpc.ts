@@ -55,13 +55,18 @@ export async function tunnelRpc(
 // ─── Tunnel ID resolution ───────────────────────────────────────────────────
 
 let cachedTunnelId: string | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 10_000 // re-discover every 10s to avoid stale IDs
 
 export async function resolveTunnelId(args: { tunnel_id?: string }): Promise<string> {
-	if (args.tunnel_id) return args.tunnel_id
 	if (getEnv("KORTIX_TUNNEL_ID")) return getEnv("KORTIX_TUNNEL_ID")!
-	if (cachedTunnelId) return cachedTunnelId
 
-	// Auto-discover via API
+	// Use cache if fresh
+	if (cachedTunnelId && (Date.now() - cacheTimestamp) < CACHE_TTL_MS) {
+		return cachedTunnelId
+	}
+
+	// Always auto-discover from API (ignores args.tunnel_id to prevent stale IDs)
 	const token = getToken()
 
 	try {
@@ -72,12 +77,14 @@ export async function resolveTunnelId(args: { tunnel_id?: string }): Promise<str
 		})
 		if (res.ok) {
 			const connections = (await res.json()) as Array<{ tunnelId: string; isLive: boolean }>
+			// Prefer a live connection, fall back to most recent
 			const online = connections.find((c) => c.isLive)
-			if (online) { cachedTunnelId = online.tunnelId; return online.tunnelId }
-			if (connections.length > 0) { cachedTunnelId = connections[0].tunnelId; return connections[0].tunnelId }
+			if (online) { cachedTunnelId = online.tunnelId; cacheTimestamp = Date.now(); return online.tunnelId }
+			if (connections.length > 0) { cachedTunnelId = connections[0].tunnelId; cacheTimestamp = Date.now(); return connections[0].tunnelId }
 		}
 	} catch {}
 
+	cachedTunnelId = null
 	throw new Error(
 		"No tunnel connection found. The user needs to set up Kortix Tunnel first:\n" +
 		"1. Go to the Tunnel page in Kortix dashboard\n" +
