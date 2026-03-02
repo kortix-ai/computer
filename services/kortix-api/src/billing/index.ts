@@ -41,48 +41,79 @@ billingApp.use('*', async (c, next) => {
   return next();
 });
 
-// Setup initialize endpoint (requires billing — creates Stripe subscription)
+// Setup initialize endpoint (requires billing — creates Stripe subscription + sandbox)
 billingApp.post('/setup/initialize', async (c: any) => {
-  const accountId = c.get('userId') as string;
+  const userId = c.get('userId') as string;
   const email = c.get('userEmail') as string;
   const { upsertCreditAccount, getCreditAccount } = await import('./repositories/credit-accounts');
   const { getDailyCreditConfig, resolvePriceId } = await import('./services/tiers');
   const { getOrCreateStripeCustomer } = await import('./services/subscriptions');
+  const { resolveAccountId } = await import('../shared/resolve-account');
 
+  const accountId = await resolveAccountId(userId);
+
+  // ── Step 1: Create free Stripe subscription ──────────────────────────
   const existing = await getCreditAccount(accountId);
+  let subscriptionStatus: 'already_initialized' | 'initialized' = 'initialized';
+
   if (existing?.stripeSubscriptionId) {
-    return c.json({ status: 'already_initialized', tier: existing.tier });
+    subscriptionStatus = 'already_initialized';
+  } else {
+    const customerId = await getOrCreateStripeCustomer(accountId, email);
+    const { getStripe } = await import('../shared/stripe');
+    const stripe = getStripe();
+
+    const freePriceId = resolvePriceId('free', 'monthly');
+    if (!freePriceId) {
+      return c.json({ error: 'Free tier price not configured' }, 500);
+    }
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: freePriceId }],
+      payment_behavior: 'allow_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      metadata: { account_id: accountId, tier_key: 'free' },
+    });
+
+    const dailyConfig = getDailyCreditConfig('free');
+    await upsertCreditAccount(accountId, {
+      tier: 'free',
+      provider: 'stripe',
+      stripeSubscriptionId: subscription.id,
+      stripeSubscriptionStatus: 'active',
+      planType: 'monthly',
+      dailyCreditsBalance: String(dailyConfig?.dailyAmount ?? 3),
+      lastDailyRefresh: new Date().toISOString(),
+    });
   }
 
-  const customerId = await getOrCreateStripeCustomer(accountId, email);
-  const { getStripe } = await import('../shared/stripe');
-  const stripe = getStripe();
+  // ── Step 2: Ensure sandbox exists (best-effort) ──────────────────────
+  // Sandbox creation can be slow (Daytona provisioning). We attempt it here
+  // so new users get everything in one shot, but if it fails the frontend
+  // useSandbox() hook on /dashboard will retry automatically.
+  let sandboxStatus: 'created' | 'exists' | 'skipped' | 'failed' = 'skipped';
+  let sandboxError: string | undefined;
 
-  const freePriceId = resolvePriceId('free', 'monthly');
-  if (!freePriceId) {
-    return c.json({ error: 'Free tier price not configured' }, 500);
+  try {
+    const { ensureSandbox } = await import('../platform/services/ensure-sandbox');
+    const { row, created } = await ensureSandbox({ accountId, userId });
+    sandboxStatus = created ? 'created' : 'exists';
+    console.log(`[setup/initialize] Sandbox ${row.sandboxId} ${sandboxStatus} for account ${accountId}`);
+  } catch (err) {
+    sandboxStatus = 'failed';
+    sandboxError = err instanceof Error ? err.message : String(err);
+    console.error(`[setup/initialize] Sandbox creation failed for account ${accountId}:`, sandboxError);
+    // Don't fail the whole request — subscription was created successfully.
+    // Frontend useSandbox() will retry on dashboard load.
   }
 
-  const subscription = await stripe.subscriptions.create({
-    customer: customerId,
-    items: [{ price: freePriceId }],
-    payment_behavior: 'allow_incomplete',
-    payment_settings: { save_default_payment_method: 'on_subscription' },
-    metadata: { account_id: accountId, tier_key: 'free' },
-  });
-
-  const dailyConfig = getDailyCreditConfig('free');
-  await upsertCreditAccount(accountId, {
+  return c.json({
+    status: subscriptionStatus,
     tier: 'free',
-    provider: 'stripe',
-    stripeSubscriptionId: subscription.id,
-    stripeSubscriptionStatus: 'active',
-    planType: 'monthly',
-    dailyCreditsBalance: String(dailyConfig?.dailyAmount ?? 3),
-    lastDailyRefresh: new Date().toISOString(),
+    sandbox: sandboxStatus,
+    ...(sandboxError ? { sandbox_error: sandboxError } : {}),
   });
-
-  return c.json({ status: 'initialized', tier: 'free' });
 });
 
 // Billing routes — subscriptions, payments, credits (all require billing enabled)

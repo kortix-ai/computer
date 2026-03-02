@@ -3,11 +3,14 @@ import { createClient } from '@/lib/supabase/client';
 import { backendApi } from '@/lib/api-client';
 
 /**
- * Account Initialization Hook (Fallback)
- * 
- * NOTE: Most users are initialized automatically via backend webhook on signup.
- * This hook is only used as a fallback if webhook failed or user signed up before
- * automatic initialization was implemented.
+ * Account Initialization Hook
+ *
+ * Calls POST /billing/setup/initialize which creates:
+ *   1. Free Stripe subscription + credit_accounts row
+ *   2. Cloud sandbox via Daytona (best-effort)
+ *
+ * Primary usage: /setting-up page calls this for new users.
+ * There is no webhook-based auto-init — this is the only path.
  */
 export function useInitializeAccount() {
   return useMutation({
