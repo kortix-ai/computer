@@ -1794,6 +1794,16 @@
 }
 
 @layer base {
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 72%, transparent);
+    color: var(--primary-foreground);
+  }
+
+  ::-moz-selection {
+    background: color-mix(in oklch, var(--primary) 72%, transparent);
+    color: var(--primary-foreground);
+  }
+
   * {
     /* stylelint-disable-next-line at-rule-no-unknown */
     @apply border-border outline-ring/50;
