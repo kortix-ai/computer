@@ -545,9 +545,9 @@
           "content": "Different AI models have different costs based on their capabilities and token usage. Credits are consumed for input tokens (your prompts and context), output tokens (Worker responses), and vary by model tier (Claude, GPT, etc.)."
         },
         "pricingModel": {
-          "title": "Pricing Model",
-          "description": "20% markup on AI model costs",
-          "content": "We apply a 20% markup on all API and model costs to cover platform infrastructure, security, and ongoing development. This transparent pricing ensures you know exactly what you're paying for."
+          "title": "Pricing",
+          "description": "Platform rates vary by service type",
+          "content": "We apply a markup on top of provider costs to cover platform infrastructure, security, and ongoing development. AI models have a 20% markup, tool usage (web search, scraping, etc.) has a 50% markup, image search has a 100% markup, and if you use your own API key, a flat 10% platform fee applies instead."
         }
       },
       "gettingMoreCredits": {

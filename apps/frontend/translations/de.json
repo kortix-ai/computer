@@ -460,9 +460,9 @@
           "content": "Verschiedene KI-Modelle haben unterschiedliche Kosten basierend auf ihren Fähigkeiten und der Token-Nutzung. Credits werden für Eingabe-Tokens (deine Prompts und Kontext), Ausgabe-Tokens (Worker-Antworten) verbraucht und variieren je nach Modell-Tier (Claude, GPT usw.)."
         },
         "pricingModel": {
-          "title": "Preismodell",
-          "description": "20% Aufschlag auf KI-Modellkosten",
-          "content": "Wir erheben einen Aufschlag von 20% auf alle API- und Modellkosten, um die Plattforminfrastruktur, Sicherheit und laufende Entwicklung zu decken. Diese transparente Preisgestaltung stellt sicher, dass du genau weißt, wofür du bezahlst."
+          "title": "Preise",
+          "description": "Die Gebühren variieren je nach Servicetyp",
+          "content": "Wir erheben einen Aufschlag auf die Anbieterkosten, um die Plattforminfrastruktur, Sicherheit und laufende Entwicklung zu decken. KI-Modelle haben einen Aufschlag von 20%, Tool-Nutzung (Websuche, Scraping, usw.) hat 50%, Bildersuche hat 100%, und wenn du deinen eigenen API-Schlüssel verwendest, fällt stattdessen eine Pauschalgebühr von 10% an."
         }
       },
       "gettingMoreCredits": {

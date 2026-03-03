@@ -16,6 +16,7 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion';
 import type { MessageWithParts } from '@/ui/types';
+import { COST_MARKUP } from '@/ui/turns';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
 import type { Session, AssistantMessage, Message, Part } from '@opencode-ai/sdk/v2/client';
 
@@ -49,7 +50,9 @@ function tokenTotal(msg: AssistantMessage) {
 }
 
 function getSessionContextMetrics(messages: Message[], providers: ProviderListResponse | undefined): Metrics {
-  const totalCost = messages.reduce((sum, msg) => sum + (msg.role === 'assistant' ? (msg.cost ?? 0) : 0), 0);
+  // Apply COST_MARKUP (1.2×) so the displayed total matches actual billed credits.
+  // Raw msg.cost is provider cost; billing deducts cost × COST_MARKUP.
+  const totalCost = messages.reduce((sum, msg) => sum + (msg.role === 'assistant' ? (msg.cost ?? 0) : 0), 0) * COST_MARKUP;
 
   // Find last assistant with tokens
   let last: AssistantMessage | undefined;

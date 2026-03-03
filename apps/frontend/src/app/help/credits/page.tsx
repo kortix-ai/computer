@@ -145,17 +145,36 @@ export default function CreditsPage() {
                   <div>
                     <CardTitle>Pricing Model</CardTitle>
                     <CardDescription>
-                      20% markup on AI model costs
+                      Platform rates vary by service type
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  We apply a 20% markup on all API and model costs to cover platform infrastructure, 
-                  security, and ongoing development. This transparent pricing ensures you know exactly 
-                  what you're paying for.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    We apply a markup on top of provider costs to cover platform infrastructure, 
+                    security, and ongoing development. Rates vary by service type:
+                  </p>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                      <span><strong className="text-foreground">AI models:</strong> 20% markup on all LLM API costs (input/output tokens, prompt caching).</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                      <span><strong className="text-foreground">Tool usage:</strong> 50% markup on web search, web scraping, and other third-party tool calls.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                      <span><strong className="text-foreground">Image search:</strong> 100% markup on image search queries.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                      <span><strong className="text-foreground">Bring your own key:</strong> If you use your own API key, a flat 10% platform fee applies instead.</span>
+                    </li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </div>

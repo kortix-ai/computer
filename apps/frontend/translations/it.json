@@ -544,9 +544,9 @@
           "content": "Diversi modelli AI hanno costi diversi in base alle loro capacità e all'utilizzo dei token. I crediti vengono consumati per i token di input (i tuoi prompt e contesto), i token di output (risposte dell'agente) e variano in base al livello del modello (Claude, GPT, ecc.)."
         },
         "pricingModel": {
-          "title": "Modello di prezzo",
-          "description": "20% di ricarico sui costi del modello AI",
-          "content": "Applichiamo un ricarico del 20% su tutti i costi API e del modello per coprire l'infrastruttura della piattaforma, la sicurezza e lo sviluppo continuo. Questa tariffazione trasparente garantisce che tu sappia esattamente per cosa stai pagando."
+          "title": "Prezzi",
+          "description": "Le tariffe variano per tipo di servizio",
+          "content": "Applichiamo un ricarico sui costi dei fornitori per coprire l'infrastruttura della piattaforma, la sicurezza e lo sviluppo continuo. I modelli AI hanno un ricarico del 20%, l'uso degli strumenti (ricerca web, scraping, ecc.) ha un ricarico del 50%, la ricerca immagini ha un ricarico del 100%, e se usi la tua chiave API, si applica una tariffa fissa del 10%."
         }
       },
       "gettingMoreCredits": {

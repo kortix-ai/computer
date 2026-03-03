@@ -1,6 +1,6 @@
 'use client';
 
-import { Zap, Clock, Sparkles, Info, RotateCcw, Infinity, X } from 'lucide-react';
+import { Zap, Clock, Sparkles, Info, RotateCcw, Infinity, X, DollarSign } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -76,6 +76,49 @@ export function CreditsExplainedModal({ open, onOpenChange }: CreditsExplainedMo
                     <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
                     <div>
                       <span className="font-medium text-foreground">Third-party services:</span> External APIs and integrated services.
+                    </div>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Pricing Model */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Pricing</h2>
+            </div>
+
+            <p className="text-muted-foreground leading-relaxed text-sm">
+              Platform rates vary by service type:
+            </p>
+
+            <Card>
+              <CardContent className="pt-5">
+                <ul className="space-y-2.5 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                    <div>
+                      <span className="font-medium text-foreground">AI models:</span> 20% markup on LLM costs.
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                    <div>
+                      <span className="font-medium text-foreground">Tools:</span> 50% markup on web search, scraping, and third-party tools.
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                    <div>
+                      <span className="font-medium text-foreground">Image search:</span> 100% markup.
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                    <div>
+                      <span className="font-medium text-foreground">Own API key:</span> 10% platform fee instead.
                     </div>
                   </li>
                 </ul>
