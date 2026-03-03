@@ -395,6 +395,13 @@ export default function DashboardLayoutContent({
 		const checkOnboarding = async () => {
 			try {
 				const instanceUrl = useServerStore.getState().getActiveServerUrl();
+				if (!instanceUrl) {
+					// Sandbox URL not ready yet (cloud rehydration) — skip and
+					// assume onboarded. useSandbox will set it shortly and the
+					// next navigation will re-check.
+					setOnboardingChecked(true);
+					return;
+				}
 				const { authenticatedFetch } = await import("@/lib/auth-token");
 				const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, undefined, { retryOnAuthError: false });
 

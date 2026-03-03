@@ -188,7 +188,7 @@ export default function OnboardingPage() {
     const params = new URLSearchParams(window.location.search);
     const instanceUrl = getInstanceUrl();
 
-    if (params.has('skip_onboarding')) {
+    if (params.has('skip_onboarding') && instanceUrl) {
       // Directly mark complete and redirect — only allowed via query param
       authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
         method: 'POST',
@@ -198,7 +198,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (params.has('redo')) {
+    if (params.has('redo') && instanceUrl) {
       // Reset onboarding flags so the full flow runs again
       authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
         method: 'POST',
@@ -229,6 +229,7 @@ export default function OnboardingPage() {
     const check = async () => {
       try {
         const instanceUrl = getInstanceUrl();
+        if (!instanceUrl) return; // Sandbox URL not ready yet — skip
         const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
         if (res.ok) {
           const data = await res.json();
@@ -404,9 +405,10 @@ export default function OnboardingPage() {
   // The onboarding agent marks this true when it finishes.
   useEffect(() => {
     if (phase !== 'session') return;
-    const instanceUrl = getInstanceUrl();
     const interval = setInterval(async () => {
       try {
+        const instanceUrl = getInstanceUrl();
+        if (!instanceUrl) return; // Sandbox URL not ready yet — skip this tick
         const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
         if (res.ok) {
           const data = await res.json();
