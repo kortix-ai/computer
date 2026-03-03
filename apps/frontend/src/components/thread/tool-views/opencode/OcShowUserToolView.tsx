@@ -414,7 +414,7 @@ export function OcShowUserToolView({
         </CardHeader>
         <CardContent className="p-0 h-full flex-1 overflow-hidden">
           <ScrollArea className="h-full w-full">
-            <ShowCarousel items={items!} />
+            <ShowCarousel items={items!} LocalhostPreview={SidePanelIframePreview} />
           </ScrollArea>
         </CardContent>
         <ToolViewFooter assistantTimestamp={assistantTimestamp} toolTimestamp={toolTimestamp} isStreaming={isStreaming}>

@@ -117,6 +117,18 @@ function stripMarkdownArtifacts(url: string): string {
   return url.slice(0, markerIndex);
 }
 
+function stripUrlWrappers(url: string): string {
+  let out = url.trim();
+  out = out.replace(/^['"`<\(\[]+/, '');
+  out = out.replace(/[>'"`\)\],;.!?]+$/, '');
+  return out;
+}
+
+function extractLocalhostCandidate(text: string): string | null {
+  const match = text.match(/https?:\/\/(?:localhost|127\.0\.0\.1):\d{1,5}[^\s"'<>)]*/i);
+  return match?.[0] ?? null;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -138,7 +150,21 @@ export function parseLocalhostUrl(
 ): ParsedLocalhostUrl | null {
   if (!rawUrl) return null;
 
-  const candidate = stripMarkdownArtifacts(rawUrl.trim());
+  const candidate = stripUrlWrappers(stripMarkdownArtifacts(rawUrl.trim()));
+
+  // Already-proxied subdomain preview URL:
+  // http://p{port}-{sandboxId}.localhost:{backendPort}/{path}
+  // Treat as an internal localhost URL so callers can render it like any
+  // other live service URL.
+  const subdomain = parseSubdomainUrl(candidate);
+  if (subdomain) {
+    const path = normalizePath(subdomain.path || '/');
+    return {
+      originalUrl: `http://localhost:${subdomain.port}${path}`,
+      port: subdomain.port,
+      path,
+    };
+  }
 
   try {
     const parsed = new URL(candidate);
@@ -182,6 +208,12 @@ export function parseLocalhostUrl(
       path,
     };
   } catch {
+    // Fallback: some tool outputs embed the localhost URL inside additional
+    // prose. Extract the first localhost URL and parse it.
+    const extracted = extractLocalhostCandidate(rawUrl);
+    if (extracted && extracted !== rawUrl) {
+      return parseLocalhostUrl(extracted);
+    }
     return null;
   }
 }

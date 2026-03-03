@@ -567,6 +567,55 @@ const DCP_LEGACY_PRUNING_REGEX =
 	/▣ Pruning \(~([\d.]+K?) tokens(?:, distilled ([\d.]+K?) tokens)?\)(?:\s*—\s*(.+))?/;
 const DCP_LEGACY_ITEM_REGEX = /→\s+(\S+?):\s+(.+)/g;
 
+const PTY_EXITED_BLOCK_REGEX = /<pty_exited>[\s\S]*?<\/pty_exited>/gi;
+const PTY_FAILURE_HINT_REGEX =
+	/Process failed\.\s*Use pty_read with the pattern parameter to search for errors in the output\.?/gi;
+
+interface PtyExitedNotification {
+	id?: string;
+	description?: string;
+	exitCode?: string;
+	outputLines?: string;
+	lastLine?: string;
+}
+
+function parsePtyExitedNotifications(text: string): {
+	cleanText: string;
+	notifications: PtyExitedNotification[];
+} {
+	const notifications: PtyExitedNotification[] = [];
+	const cleanText = text
+		.replace(PTY_EXITED_BLOCK_REGEX, (full) => {
+			const body = full.replace(/<\/?pty_exited>/gi, "").trim();
+			const getField = (label: string) => {
+				const m = body.match(new RegExp(`^${label}:\\s*(.+)$`, "mi"));
+				return m?.[1]?.trim();
+			};
+			notifications.push({
+				id: getField("ID"),
+				description: getField("Description"),
+				exitCode: getField("Exit Code"),
+				outputLines: getField("Output Lines"),
+				lastLine: getField("Last Line"),
+			});
+			return "";
+		})
+		.replace(PTY_FAILURE_HINT_REGEX, "")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+
+	return { cleanText, notifications };
+}
+
+function stripSystemPtyText(text: string): string {
+	if (!text) return "";
+	return text
+		.replace(PTY_EXITED_BLOCK_REGEX, " ")
+		.replace(PTY_FAILURE_HINT_REGEX, " ")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+}
+
 function parseLegacyDCPNotification(text: string): DCPNotification | null {
 	const headerMatch = text.match(DCP_LEGACY_REGEX);
 	if (!headerMatch) return null;
@@ -835,6 +884,48 @@ function DCPNotificationCard({
 	);
 }
 
+function PtyExitedNotificationCard({
+	notification,
+}: {
+	notification: PtyExitedNotification;
+}) {
+	return (
+		<div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
+			<div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 bg-muted/30">
+				<Terminal className="size-3.5 text-muted-foreground/70 flex-shrink-0" />
+				<span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+					Automated PTY response
+				</span>
+			</div>
+			<div className="px-3 py-2 text-xs text-muted-foreground space-y-1">
+				{notification.description && (
+					<div>
+						<span className="text-muted-foreground/60">Description:</span>{" "}
+						{notification.description}
+					</div>
+				)}
+				<div className="flex flex-wrap gap-x-3 gap-y-1">
+					{notification.id && (
+						<span>
+							<span className="text-muted-foreground/60">ID:</span> {notification.id}
+						</span>
+					)}
+					{notification.exitCode && (
+						<span>
+							<span className="text-muted-foreground/60">Exit:</span> {notification.exitCode}
+						</span>
+					)}
+					{notification.outputLines && (
+						<span>
+							<span className="text-muted-foreground/60">Lines:</span> {notification.outputLines}
+						</span>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 // ============================================================================
 // Edit Part Dialog — inline editing for text parts
 // ============================================================================
@@ -1049,15 +1140,20 @@ function UserMessageRow({
 
 	// Extract text from sticky parts, parse out <file> and <session_ref> XML references
 	// Filter out both synthetic AND ignored parts from user-visible text
-	const textParts = stickyParts
+	const visibleTextParts = stickyParts
 		.filter(isTextPart)
 		.filter(
 			(p) =>
 				(p as TextPart).text?.trim() &&
 				!(p as TextPart).synthetic &&
 				!(p as any).ignored,
-		);
-	const rawText = textParts.map((p) => (p as TextPart).text).join("\n");
+		) as TextPart[];
+	const rawVisibleText = visibleTextParts.map((p) => p.text).join("\n");
+	const { cleanText: textAfterPty, notifications: ptyNotifications } = useMemo(
+		() => parsePtyExitedNotifications(rawVisibleText),
+		[rawVisibleText],
+	);
+	const rawText = stripSystemPtyText(textAfterPty);
 	const { cleanText: textAfterReply, replyContext } = useMemo(
 		() => parseReplyContext(rawText),
 		[rawText],
@@ -1090,7 +1186,7 @@ function UserMessageRow({
 	}, [ignoredRawText]);
 
 	// Check if any text part was edited
-	const isEdited = textParts.some((p) => (p as any).metadata?.edited);
+	const isEdited = visibleTextParts.some((p) => (p as any).metadata?.edited);
 
 	// Inline file references
 	const inlineFiles = stickyParts.filter(isFilePart) as FilePart[];
@@ -1232,12 +1328,16 @@ function UserMessageRow({
 		replyContext ||
 		uploadedFiles.length > 0 ||
 		sessionRefs.length > 0 ||
+		ptyNotifications.length > 0 ||
 		attachments.length > 0
 	);
 
-	if (!hasUserContent && dcpNotifications.length > 0) {
+	if (!hasUserContent && (dcpNotifications.length > 0 || ptyNotifications.length > 0)) {
 		return (
 			<div className="flex flex-col gap-1.5 w-full">
+				{ptyNotifications.map((n, i) => (
+					<PtyExitedNotificationCard key={`pty-${i}`} notification={n} />
+				))}
 				{dcpNotifications.map((n, i) => (
 					<DCPNotificationCard key={i} notification={n} />
 				))}
@@ -1270,6 +1370,13 @@ function UserMessageRow({
 					<div className="flex flex-col gap-1.5 w-full mt-1">
 						{dcpNotifications.map((n, i) => (
 							<DCPNotificationCard key={i} notification={n} />
+						))}
+					</div>
+				)}
+				{ptyNotifications.length > 0 && (
+					<div className="flex flex-col gap-1.5 w-full mt-1">
+						{ptyNotifications.map((n, i) => (
+							<PtyExitedNotificationCard key={`cmd-pty-${i}`} notification={n} />
 						))}
 					</div>
 				)}
@@ -1443,6 +1550,13 @@ function UserMessageRow({
 				<div className="flex flex-col gap-1.5 w-full mt-1">
 					{dcpNotifications.map((n, i) => (
 						<DCPNotificationCard key={i} notification={n} />
+					))}
+				</div>
+			)}
+			{ptyNotifications.length > 0 && (
+				<div className="flex flex-col gap-1.5 w-full mt-1">
+					{ptyNotifications.map((n, i) => (
+						<PtyExitedNotificationCard key={`pty-mixed-${i}`} notification={n} />
 					))}
 				</div>
 			)}
@@ -1863,9 +1977,10 @@ function SessionTurn({
 		const hasVisibleText = parts.some(
 			(p) =>
 				isTextPart(p) &&
-				(p as TextPart).text?.trim() &&
 				!(p as TextPart).synthetic &&
-				!(p as any).ignored,
+				!(p as any).ignored &&
+				(!!stripSystemPtyText((p as TextPart).text || "") ||
+					(p as TextPart).text?.includes("<pty_exited>")),
 		);
 		if (hasVisibleText) return true;
 		// Has any attachment (image/PDF)?
@@ -1877,9 +1992,15 @@ function SessionTurn({
 
 	// User message text — for copy action
 	const userMessageText = useMemo(() => {
-		const textParts = turn.userMessage.parts.filter(isTextPart) as TextPart[];
+		const textParts = turn.userMessage.parts.filter(
+			(p) =>
+				isTextPart(p) &&
+				!(p as TextPart).synthetic &&
+				!(p as any).ignored,
+		) as TextPart[];
 		return textParts
-			.map((p) => p.text)
+			.map((p) => stripSystemPtyText(p.text))
+			.filter((t) => t.trim())
 			.join("\n")
 			.trim();
 	}, [turn.userMessage.parts]);
@@ -2072,12 +2193,13 @@ function SessionTurn({
 							<TooltipContent>{userCopied ? "Copied!" : "Copy"}</TooltipContent>
 						</Tooltip>
 					{(() => {
-						const userTextPart = turn.userMessage.parts.find(
-							(p) =>
-								isTextPart(p) &&
-								(p as TextPart).text?.trim() &&
-								!(p as TextPart).synthetic,
-						);
+					const userTextPart = turn.userMessage.parts.find(
+						(p) =>
+							isTextPart(p) &&
+							!(p as TextPart).synthetic &&
+							!(p as any).ignored &&
+							!!stripSystemPtyText((p as TextPart).text || ""),
+					);
 						if (!userTextPart) return null;
 						return (
 							<PartActions
