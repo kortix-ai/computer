@@ -1,17 +1,3 @@
-/**
- * TunnelAgent — WebSocket client that connects to a tunnel relay
- * and handles JSON-RPC requests from the cloud.
- *
- * Responsibilities:
- *   - Maintain persistent WS connection with auto-reconnect
- *   - Respond to heartbeat pings
- *   - Dispatch incoming RPC requests to registered capabilities
- *   - Enforce permissions locally (defense-in-depth)
- *   - Verify HMAC signatures on incoming messages (replay protection)
- *   - Handle permission revocation / sync notifications
- *   - Handle token rotation notifications
- */
-
 import { hostname, platform, arch, release } from 'os';
 import type { TunnelConfig } from './config';
 import { CapabilityRegistry, type RpcHandler } from './capabilities/index';
@@ -38,7 +24,6 @@ interface JsonRpcNotification {
 
 type IncomingMessage = JsonRpcRequest | JsonRpcNotification;
 
-// ─── ANSI helpers ────────────────────────────────────────────────────────────
 const c = {
   reset:   '\x1b[0m',
   bold:    '\x1b[1m',

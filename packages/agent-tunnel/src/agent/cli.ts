@@ -1,13 +1,4 @@
 #!/usr/bin/env bun
-/**
- * agent-tunnel CLI — local agent that bridges your machine to cloud sandboxes.
- *
- * Usage:
- *   npx agent-tunnel connect --token <token> --tunnel-id <id> [--api-url <url>]
- *   npx agent-tunnel status  --token <token> --tunnel-id <id> [--api-url <url>]
- *   npx agent-tunnel permissions --token <token> --tunnel-id <id> [--api-url <url>]
- */
-
 import { loadConfig } from './config';
 import { TunnelAgent } from './agent';
 import { CapabilityRegistry } from './capabilities/index';
@@ -16,7 +7,6 @@ import { createShellCapability } from './capabilities/shell';
 import { createDesktopCapability } from './capabilities/desktop';
 import { hostname, platform, arch, release } from 'os';
 
-// ─── ANSI helpers ────────────────────────────────────────────────────────────
 const c = {
   reset:   '\x1b[0m',
   bold:    '\x1b[1m',
