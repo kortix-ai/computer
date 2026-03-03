@@ -48,6 +48,7 @@ export function useOpenCodeEventStream() {
 	const clearPending = useOpenCodePendingStore((s) => s.clear);
 	const applySyncEvent = useSyncStore((s) => s.applyEvent);
 	const serverVersion = useServerStore((s) => s.serverVersion);
+	const hasServerUrl = useServerStore((s) => Boolean(s.getActiveServerUrl()));
 	const abortRef = useRef<AbortController | null>(null);
 	const prevServerVersionRef = useRef(serverVersion);
 
@@ -154,6 +155,10 @@ export function useOpenCodeEventStream() {
 			useDiagnosticsStore.getState().clearAll();
 			queryClient.removeQueries({ queryKey: opcodeKeys.all });
 		}
+
+		// During initial cloud bootstrap, the active server URL may be unresolved
+		// briefly (rehydration gap). Skip SSE setup until a URL exists.
+		if (!hasServerUrl) return;
 
 		const client = getClient();
 
@@ -922,6 +927,7 @@ export function useOpenCodeEventStream() {
 		removeQuestion,
 		clearPending,
 		serverVersion,
+		hasServerUrl,
 		applySyncEvent,
 	]);
 }

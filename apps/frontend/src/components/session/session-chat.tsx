@@ -3013,6 +3013,9 @@ export function SessionChat({
 	const drainNextWhenSettled = useCallback(() => {
 		if (drainScheduledRef.current) return;
 		if (queueInFlightRef.current) return;
+		// Wait for the UI-level busy debounce to finish so the completed
+		// assistant turn is actually rendered before sending the next queued item.
+		if (isBusy) return;
 		if (isServerBusy || hasIncompleteAssistant) return;
 		if (hasPendingUserReply) return;
 		if (pendingSendInFlight) return;
@@ -3026,6 +3029,7 @@ export function SessionChat({
 			drainScheduledRef.current = false;
 			if (
 				queueInFlightRef.current ||
+				isBusy ||
 				isServerBusy ||
 				hasIncompleteAssistant ||
 				hasPendingUserReply ||
@@ -3053,6 +3057,7 @@ export function SessionChat({
 	}, [
 		sessionId,
 		queueDequeue,
+		isBusy,
 		isServerBusy,
 		hasIncompleteAssistant,
 		hasPendingUserReply,
@@ -3065,6 +3070,7 @@ export function SessionChat({
 		const inFlight = queueInFlightRef.current;
 		if (!inFlight) return;
 		if (
+			isBusy ||
 			isServerBusy ||
 			hasIncompleteAssistant ||
 			hasPendingUserReply ||
@@ -3078,6 +3084,7 @@ export function SessionChat({
 		});
 	}, [
 		messages,
+		isBusy,
 		isServerBusy,
 		hasIncompleteAssistant,
 		hasPendingUserReply,
