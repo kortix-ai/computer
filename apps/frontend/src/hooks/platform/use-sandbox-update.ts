@@ -14,6 +14,7 @@ import {
   getLatestSandboxVersion,
   triggerSandboxUpdate,
 } from '@/lib/platform-client';
+import { setSandboxVersion } from '@/stores/sandbox-connection-store';
 import { useSandbox } from './use-sandbox';
 
 /**
@@ -54,6 +55,13 @@ export function useSandboxUpdate(currentVersion: string | null) {
     mutationFn: () => {
       if (!sandbox || !latestVersion) throw new Error('No sandbox or version');
       return triggerSandboxUpdate(sandbox, latestVersion);
+    },
+    onSuccess: (data) => {
+      // Update the store's version so the "update available" banner disappears
+      // immediately without needing a page refresh or health re-check.
+      if (data?.success && data?.currentVersion) {
+        setSandboxVersion(data.currentVersion);
+      }
     },
   });
 

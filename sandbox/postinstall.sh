@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
-# @kortix/sandbox postinstall
+# @kortix/sandbox postinstall — ACID staging-based deployment
 #
-# Copies source files to their runtime locations under /opt/ and installs
-# local dependencies. Runs automatically after `npm install -g @kortix/sandbox`.
+# Instead of deploying directly to /opt/ (live system mutation), this script
+# stages everything into /opt/kortix-staging-{version}/ in complete isolation.
+# Nothing touches the live system. The update.ts "commit" step atomically
+# swaps symlinks from old → new staging dir.
+#
+# On initial Docker build (no symlinks yet), falls back to direct deployment
+# for backward compatibility.
 #
 # This script is idempotent — safe to run multiple times.
 
@@ -16,7 +21,8 @@ if [ ! -d "/opt" ] || [ "$(id -u)" = "0" ] && [ ! -d "/opt/bun" ]; then
   exit 0
 fi
 
-echo "[sandbox-postinstall] Deploying @kortix/sandbox files..."
+PKG_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').version)" 2>/dev/null || echo "0.0.0")
+echo "[sandbox-postinstall] Deploying @kortix/sandbox@$PKG_VERSION..."
 
 # Ensure rsync is available (Alpine base may not have it after cleanup)
 if ! command -v rsync &>/dev/null; then
@@ -24,31 +30,80 @@ if ! command -v rsync &>/dev/null; then
   apk add --no-cache rsync 2>/dev/null || true
 fi
 
+# ─── Detect mode: staging (live update) vs direct (Docker build) ─────────────
+# If /opt/kortix-master is a symlink, we're in a live sandbox with the ACID
+# update system. Stage into an isolated directory.
+# If it's a real directory (or doesn't exist), we're in the initial Docker
+# build — deploy directly (Dockerfile will create symlinks afterward).
+
+if [ -L /opt/kortix-master ]; then
+  MODE="staging"
+  STAGING="/opt/kortix-staging-$PKG_VERSION"
+  echo "[sandbox-postinstall] ACID mode: staging to $STAGING"
+else
+  MODE="direct"
+  STAGING=""
+  echo "[sandbox-postinstall] Direct mode (initial Docker build)"
+fi
+
+# ─── Set target directories based on mode ────────────────────────────────────
+if [ "$MODE" = "staging" ]; then
+  # Clean any previous failed staging attempt for this version
+  rm -rf "$STAGING"
+  mkdir -p "$STAGING"
+
+  KM_DIR="$STAGING/kortix-master"
+  OC_DIR="$STAGING/opencode"
+  BV_DIR="$STAGING/agent-browser-viewer"
+  KX_DIR="$STAGING/kortix"
+else
+  KM_DIR="/opt/kortix-master"
+  OC_DIR="/opt/opencode"
+  BV_DIR="/opt/agent-browser-viewer"
+  KX_DIR="/opt/kortix"
+fi
+
 # ── Kortix Master ────────────────────────────────────────────────────────────
-echo "[sandbox-postinstall] Updating kortix-master..."
-mkdir -p /opt/kortix-master
-# Copy source files (preserving structure), skip node_modules
+echo "[sandbox-postinstall] Building kortix-master..."
+mkdir -p "$KM_DIR"
 rsync -a --delete \
   --exclude='node_modules' \
   --exclude='bun.lock' \
-  "$PKG_DIR/kortix-master/" /opt/kortix-master/
+  "$PKG_DIR/kortix-master/" "$KM_DIR/"
 
-# Install deps
-cd /opt/kortix-master && bun install 2>/dev/null || true
+if ! (cd "$KM_DIR" && bun install 2>/dev/null); then
+  echo "[sandbox-postinstall] ERROR: bun install failed for kortix-master"
+  [ "$MODE" = "staging" ] && rm -rf "$STAGING"
+  exit 1
+fi
 
 # ── OpenCode config/agents/tools/skills ──────────────────────────────────────
-echo "[sandbox-postinstall] Updating opencode config..."
-mkdir -p /opt/opencode
+echo "[sandbox-postinstall] Building opencode..."
+mkdir -p "$OC_DIR"
 
-# Sync source files — delete stale files but preserve node_modules and runtime data
+if [ "$MODE" = "staging" ] && [ -L /opt/opencode ]; then
+  # Copy node_modules from current live version to avoid full reinstall
+  CURRENT_OC=$(readlink -f /opt/opencode)
+  if [ -d "$CURRENT_OC/node_modules" ]; then
+    cp -a "$CURRENT_OC/node_modules" "$OC_DIR/node_modules" 2>/dev/null || true
+  fi
+  # Also preserve .local runtime data
+  if [ -d "$CURRENT_OC/.local" ]; then
+    cp -a "$CURRENT_OC/.local" "$OC_DIR/.local" 2>/dev/null || true
+  fi
+fi
+
 rsync -a --delete \
   --exclude='node_modules' \
   --exclude='bun.lock' \
   --exclude='.local' \
-  "$PKG_DIR/opencode/" /opt/opencode/
+  "$PKG_DIR/opencode/" "$OC_DIR/"
 
-# Install deps (runs opencode patches via its own postinstall)
-cd /opt/opencode && bun install 2>/dev/null || true
+if ! (cd "$OC_DIR" && bun install 2>/dev/null); then
+  echo "[sandbox-postinstall] ERROR: bun install failed for opencode"
+  [ "$MODE" = "staging" ] && rm -rf "$STAGING"
+  exit 1
+fi
 
 # Re-apply binary patches explicitly (in case postinstall didn't trigger)
 if [ -f "$PKG_DIR/opencode/patches/patch-opencode-streaming.js" ]; then
@@ -57,7 +112,7 @@ if [ -f "$PKG_DIR/opencode/patches/patch-opencode-streaming.js" ]; then
 fi
 
 # ── s6 service scripts ──────────────────────────────────────────────────────
-# s6-overlay v3 uses s6-rc.d (not services.d)
+# These go directly to /etc/ — not symlinked, but services restart after update
 if [ -d "$PKG_DIR/services" ] && [ -d "/etc/s6-overlay/s6-rc.d" ]; then
   echo "[sandbox-postinstall] Updating s6 service scripts..."
   rsync -a "$PKG_DIR/services/" /etc/s6-overlay/s6-rc.d/
@@ -65,6 +120,7 @@ if [ -d "$PKG_DIR/services" ] && [ -d "/etc/s6-overlay/s6-rc.d" ]; then
 fi
 
 # ── Init scripts ─────────────────────────────────────────────────────────────
+# These only run on container boot, not on update — safe to deploy directly
 if [ -d "$PKG_DIR/config" ] && [ -d "/custom-cont-init.d" ]; then
   echo "[sandbox-postinstall] Updating init scripts..."
   cp -f "$PKG_DIR/config/kortix-env-setup.sh" /custom-cont-init.d/98-kortix-env 2>/dev/null || true
@@ -73,9 +129,6 @@ if [ -d "$PKG_DIR/config" ] && [ -d "/custom-cont-init.d" ]; then
 fi
 
 # ── OpenCode CLI binary ──────────────────────────────────────────────────────
-# Update the globally-installed CLI to the version declared in this package.
-# This mirrors the Dockerfile's install logic: install the meta-package, then
-# force-install the musl variant and symlink it over the glibc binary.
 CLI_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').dependencies['opencode-ai'] || '')" 2>/dev/null || echo "")
 if [ -n "$CLI_VERSION" ]; then
   CURRENT_CLI=$(opencode --version 2>/dev/null || echo "none")
@@ -101,11 +154,9 @@ if [ -n "$CLI_VERSION" ]; then
 fi
 
 # ── Agent Browser ────────────────────────────────────────────────────────────
-# Install/update agent-browser globally. Version is declared in package.json dependencies.
 AB_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').dependencies['agent-browser'] || '')" 2>/dev/null || echo "")
 if [ -n "$AB_VERSION" ]; then
   CURRENT_AB=$(npm list -g agent-browser --depth=0 --json 2>/dev/null | node -e "try{const d=require('fs').readFileSync('/dev/stdin','utf8');const j=JSON.parse(d);console.log(j.dependencies['agent-browser']?.version||'none')}catch{console.log('none')}" 2>/dev/null || echo "none")
-  # Strip leading ^ or ~ from version for comparison
   CLEAN_AB_VERSION=$(echo "$AB_VERSION" | sed 's/^[\^~]//')
   if [ "$CURRENT_AB" != "$CLEAN_AB_VERSION" ]; then
     echo "[sandbox-postinstall] Updating agent-browser: $CURRENT_AB -> $AB_VERSION..."
@@ -123,32 +174,24 @@ fi
 
 # ── Agent Browser Viewer ─────────────────────────────────────────────────────
 if [ -d "$PKG_DIR/browser-viewer" ]; then
-  echo "[sandbox-postinstall] Updating agent-browser-viewer..."
-  mkdir -p /opt/agent-browser-viewer
-  rsync -a --delete "$PKG_DIR/browser-viewer/" /opt/agent-browser-viewer/
+  echo "[sandbox-postinstall] Building agent-browser-viewer..."
+  mkdir -p "$BV_DIR"
+  rsync -a --delete "$PKG_DIR/browser-viewer/" "$BV_DIR/"
 fi
 
-# ── Version file ─────────────────────────────────────────────────────────────
-# Read version from package.json (the single source of truth) and write to .version
-mkdir -p /opt/kortix
-PKG_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').version)" 2>/dev/null || echo "0.0.0")
-echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /opt/kortix/.version
-
-# ── Changelog ────────────────────────────────────────────────────────────────
-# Deploy changelog for kortix-master to serve at /kortix/health
-cp "$PKG_DIR/CHANGELOG.json" /opt/kortix/CHANGELOG.json 2>/dev/null || true
+# ── Version file + Changelog ─────────────────────────────────────────────────
+mkdir -p "$KX_DIR"
+echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$KX_DIR/.version"
+cp "$PKG_DIR/CHANGELOG.json" "$KX_DIR/CHANGELOG.json" 2>/dev/null || true
 
 # ── Fix ownership ────────────────────────────────────────────────────────────
-chown -R 1000:1000 /opt/kortix-master /opt/opencode /opt/kortix 2>/dev/null || true
+chown -R 1000:1000 "$KM_DIR" "$OC_DIR" "$KX_DIR" 2>/dev/null || true
+[ -d "$BV_DIR" ] && chown -R 1000:1000 "$BV_DIR" 2>/dev/null || true
 
 # ── pip packages ─────────────────────────────────────────────────────────────
-# Versions are read from sandbox/package.json → kortix.pythonDependencies (single source of truth).
 echo "[sandbox-postinstall] Checking pip packages..."
-
-# Read python dependency versions from package.json
 PY_DEPS_JSON=$(node -e "const p=require('$PKG_DIR/package.json');console.log(JSON.stringify(p.kortix?.pythonDependencies||{}))" 2>/dev/null || echo "{}")
 
-# Build pip install args from the JSON (skip playwright — handled separately)
 PIP_ARGS=$(node -e "
   const deps=JSON.parse('$PY_DEPS_JSON');
   const args=[];
@@ -163,7 +206,7 @@ if [ -n "$PIP_ARGS" ]; then
   pip3 install --break-system-packages -q $PIP_ARGS 2>/dev/null || true
 fi
 
-# playwright: no musl-native wheels — force-install manylinux wheel (Python API is pure Python)
+# playwright: no musl-native wheels — force-install manylinux wheel
 PW_VERSION=$(node -e "const p=require('$PKG_DIR/package.json');console.log(p.kortix?.pythonDependencies?.playwright||'1.58.0')" 2>/dev/null || echo "1.58.0")
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then PW_PLAT=manylinux1_x86_64;
@@ -175,4 +218,11 @@ pip3 install --platform "$PW_PLAT" --only-binary :all: \
   && rm -rf /tmp/pw \
   || true
 
-echo "[sandbox-postinstall] Done."
+# ── Write staging manifest (ACID: marks staging as complete) ─────────────────
+if [ "$MODE" = "staging" ]; then
+  echo "{\"version\":\"$PKG_VERSION\",\"status\":\"staged\",\"stagedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$STAGING/.manifest"
+  echo "[sandbox-postinstall] Staging complete: $STAGING"
+  echo "[sandbox-postinstall] Waiting for update.ts to commit (symlink swap)..."
+else
+  echo "[sandbox-postinstall] Direct deployment complete."
+fi

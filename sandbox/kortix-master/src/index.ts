@@ -13,7 +13,7 @@ import { syncAuthToSecrets, startWatcher as startAuthWatcher } from './services/
 import envRouter from './routes/env'
 import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
-import updateRouter from './routes/update'
+import updateRouter, { recoverFromCrashedUpdate, cleanupStaleStagingDirs } from './routes/update'
 import deployRouter from './routes/deploy'
 import servicesRouter from './routes/services'
 import integrationsRouter from './routes/integrations'
@@ -84,6 +84,16 @@ await syncAuthToSecrets(secretStore).catch(err =>
 )
 // File watcher: auto-sync when auth.json changes at runtime
 startAuthWatcher(secretStore)
+
+// ─── ACID Update: crash recovery + stale staging cleanup ────────────────────
+// If a previous update crashed mid-way, recover (rollback or complete).
+// Also clean up any stale staging dirs left behind by old updates.
+await recoverFromCrashedUpdate().catch(err =>
+  console.error('[Kortix Master] update crash recovery error:', err)
+)
+await cleanupStaleStagingDirs().catch(err =>
+  console.error('[Kortix Master] staging cleanup error:', err)
+)
 
 // Global middleware
 app.use('*', logger())

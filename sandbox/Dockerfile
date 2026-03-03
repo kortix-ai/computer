@@ -193,6 +193,25 @@ RUN mkdir -p /opt/kortix \
     && rm /tmp/sandbox-pkg.json \
     && chown -R 1000:1000 /opt/kortix
 
+# ── ACID Update System: versioned staging dir + symlinks ─────────────────────
+# Move the four updatable directories into a versioned staging dir, then create
+# symlinks at the original paths. This enables atomic updates via symlink swap.
+# postinstall.sh detects the symlinks and stages to a new versioned dir instead
+# of mutating the live system. update.ts atomically swaps the symlinks.
+RUN PKG_VERSION=$(node -e "console.log(require('/opt/kortix/.version').version || '0.0.0')") \
+    && STAGING="/opt/kortix-staging-$PKG_VERSION" \
+    && mkdir -p "$STAGING" \
+    && mv /opt/kortix-master "$STAGING/kortix-master" \
+    && mv /opt/opencode "$STAGING/opencode" \
+    && mv /opt/agent-browser-viewer "$STAGING/agent-browser-viewer" \
+    && mv /opt/kortix "$STAGING/kortix" \
+    && ln -s "$STAGING/kortix-master" /opt/kortix-master \
+    && ln -s "$STAGING/opencode" /opt/opencode \
+    && ln -s "$STAGING/agent-browser-viewer" /opt/agent-browser-viewer \
+    && ln -s "$STAGING/kortix" /opt/kortix \
+    && echo "{\"version\":\"$PKG_VERSION\",\"status\":\"staged\",\"stagedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$STAGING/.manifest" \
+    && chown -R 1000:1000 "$STAGING"
+
 # Legacy /app/secrets path (kept for backward compatibility with older volumes)
 RUN mkdir -p /app/secrets && chmod 700 /app/secrets
 
