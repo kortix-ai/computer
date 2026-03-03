@@ -352,10 +352,10 @@ function ConnectStep({
 
   const apiUrl =
     typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.hostname}:8008`
-      : 'http://localhost:8008';
+      ? `${window.location.protocol}//${window.location.hostname}:8008/v1/tunnel`
+      : 'http://localhost:8008/v1/tunnel';
 
-  const connectCommand = `npx @kortix/tunnel connect --tunnel-id ${result.tunnelId} --token ${result.setupToken} --api-url ${apiUrl}`;
+  const connectCommand = `npx agent-tunnel connect --tunnel-id ${result.tunnelId} --token ${result.setupToken} --api-url ${apiUrl}`;
 
   const copyCommand = useCallback(() => {
     navigator.clipboard.writeText(connectCommand).then(() => {

@@ -53,32 +53,6 @@
         "type": "improvement",
         "text": "Removed legacy channel session strategy, credentials tab, and platform credentials DB table"
       }
-    ],
-    "artifacts": [
-      {
-        "name": "v0.7.7",
-        "target": "github-release"
-      },
-      {
-        "name": "@kortix/sandbox@0.7.7",
-        "target": "npm"
-      },
-      {
-        "name": "kortix/sandbox:0.7.7",
-        "target": "docker-hub"
-      },
-      {
-        "name": "kortix-sandbox-v0.7.7",
-        "target": "daytona"
-      },
-      {
-        "name": "kortix/kortix-api:0.7.7",
-        "target": "docker-hub"
-      },
-      {
-        "name": "kortix/kortix-frontend:0.7.7",
-        "target": "docker-hub"
-      }
     ]
   },
   {

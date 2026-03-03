@@ -1,13 +1,6 @@
-/**
- * AuditLogger — writes immutable audit trail entries for tunnel operations.
- *
- * Every RPC call that passes through the tunnel relay is logged here
- * with operation metadata (no file contents — only summaries).
- */
-
 import { tunnelAuditLogs } from '@kortix/db';
 import { db } from '../../shared/db';
-import type { TunnelCapability } from '../types';
+import type { TunnelCapability } from 'agent-tunnel';
 
 export interface AuditLogEntry {
   tunnelId: string;

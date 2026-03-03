@@ -39,11 +39,11 @@ export function TunnelSetupWizard({ onDone }: TunnelSetupWizardProps) {
   };
 
   const apiUrl = typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:8008`
-    : 'http://localhost:8008';
+    ? `${window.location.protocol}//${window.location.hostname}:8008/v1/tunnel`
+    : 'http://localhost:8008/v1/tunnel';
 
   const connectCommand = created
-    ? `npx @kortix/tunnel connect --tunnel-id ${created.tunnelId} --token ${created.setupToken} --api-url ${apiUrl}`
+    ? `npx agent-tunnel connect --tunnel-id ${created.tunnelId} --token ${created.setupToken} --api-url ${apiUrl}`
     : '';
 
   const copyCommand = () => {

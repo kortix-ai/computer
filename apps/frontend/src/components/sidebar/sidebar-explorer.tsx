@@ -206,8 +206,6 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const folderInputReadyRef = useRef(false);
-  const folderCreateSubmittedRef = useRef(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFile, setIsCreatingFile] = useState(false);
@@ -215,25 +213,17 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
 
   // Auto-focus and select all text when folder input appears
   useEffect(() => {
-    if (!isCreatingFolder) {
-      folderInputReadyRef.current = false;
-      folderCreateSubmittedRef.current = false;
-      return;
-    }
-
-    folderInputReadyRef.current = false;
-    folderCreateSubmittedRef.current = false;
-
-    requestAnimationFrame(() => {
+    if (isCreatingFolder) {
       requestAnimationFrame(() => {
-        const el = folderInputRef.current;
-        if (el) {
-          el.focus();
-          el.setSelectionRange(0, el.value.length);
-          folderInputReadyRef.current = true;
-        }
+        requestAnimationFrame(() => {
+          const el = folderInputRef.current;
+          if (el) {
+            el.focus();
+            el.setSelectionRange(0, el.value.length);
+          }
+        });
       });
-    });
+    }
   }, [isCreatingFolder]);
 
   // Auto-focus for file create input
@@ -412,12 +402,8 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
   );
 
   const handleCreateFolder = useCallback(async () => {
-    if (folderCreateSubmittedRef.current) return;
-    folderCreateSubmittedRef.current = true;
-
     if (!newFolderName.trim()) {
       setIsCreatingFolder(false);
-      setNewFolderName('');
       return;
     }
     const folderPath = normalizedCurrentPath
@@ -659,11 +645,7 @@ export function SidebarFileBrowser({ openFileAsTab = false }: SidebarFileBrowser
                         if (e.key === 'Enter') handleCreateFolder();
                         if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); }
                       }}
-                      onBlur={() => {
-                        if (folderInputReadyRef.current) {
-                          handleCreateFolder();
-                        }
-                      }}
+                      onBlur={handleCreateFolder}
                       className="flex-1 text-sm bg-transparent border border-primary rounded px-1.5 py-0.5 outline-none selection:bg-primary/15 selection:text-foreground"
                     />
                   </div>

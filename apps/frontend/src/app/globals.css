@@ -328,7 +328,6 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.885 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --selection-bg: color-mix(in oklch, var(--primary) 26%, transparent);
 }
 
 .dark {
@@ -364,7 +363,6 @@
   --sidebar-accent-foreground: oklch(0.94 0 0);
   --sidebar-border: oklch(0.27 0 0);
   --sidebar-ring: oklch(0.50 0 0);
-  --selection-bg: color-mix(in oklch, var(--primary) 42%, transparent);
 }
 
 /* ============================================================
@@ -1797,13 +1795,13 @@
 
 @layer base {
   ::selection {
-    background: var(--selection-bg);
-    color: inherit;
+    background: color-mix(in oklch, var(--primary) 72%, transparent);
+    color: var(--primary-foreground);
   }
 
   ::-moz-selection {
-    background: var(--selection-bg);
-    color: inherit;
+    background: color-mix(in oklch, var(--primary) 72%, transparent);
+    color: var(--primary-foreground);
   }
 
   * {

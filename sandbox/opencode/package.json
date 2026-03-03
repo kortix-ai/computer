@@ -6,6 +6,7 @@
     "@mendable/firecrawl-js": "^4.13.0",
     "@opencode-ai/plugin": "1.2.15",
     "@tavily/core": "^0.7.1",
+    "agent-tunnel": "workspace:*",
     "jsonc-parser": "^3.3.1",
     "replicate": "^1.4.0"
   }

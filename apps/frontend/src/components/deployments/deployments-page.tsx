@@ -41,14 +41,10 @@ import { toast } from 'sonner';
 
 // ─── Filter Tabs ────────────────────────────────────────────────────────────
 
-type DeploymentFilter = DeploymentStatus | 'in_progress' | undefined;
-
-const IN_PROGRESS_STATUSES = new Set<DeploymentStatus>(['pending', 'building', 'deploying']);
-
-const filterTabs: Array<{ label: string; value: DeploymentFilter }> = [
+const filterTabs: Array<{ label: string; value: DeploymentStatus | undefined }> = [
   { label: 'All', value: undefined },
   { label: 'Active', value: 'active' },
-  { label: 'In Progress', value: 'in_progress' },
+  { label: 'Pending', value: 'pending' },
   { label: 'Failed', value: 'failed' },
   { label: 'Stopped', value: 'stopped' },
 ];
@@ -91,7 +87,7 @@ const LoadingSkeleton = () => (
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export function DeploymentsPage() {
-  const [statusFilter, setStatusFilter] = useState<DeploymentFilter>(undefined);
+  const [statusFilter, setStatusFilter] = useState<DeploymentStatus | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editDeployment, setEditDeployment] = useState<Deployment | null>(null);
@@ -99,9 +95,7 @@ export function DeploymentsPage() {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Deployment | null>(null);
 
-  const backendStatusFilter = statusFilter === 'in_progress' ? undefined : statusFilter;
-
-  const { data, isLoading, error } = useDeployments(backendStatusFilter);
+  const { data, isLoading, error } = useDeployments(statusFilter);
   const { data: secrets } = useSecrets();
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
@@ -127,23 +121,10 @@ export function DeploymentsPage() {
 
   const deployments = useMemo(() => data?.deployments ?? [], [data?.deployments]);
 
-  const statusFilteredDeployments = useMemo(() => {
-    if (!statusFilter) return deployments;
-    if (statusFilter === 'in_progress') {
-      return deployments.filter((d) => IN_PROGRESS_STATUSES.has(d.status));
-    }
-    return deployments.filter((d) => d.status === statusFilter);
-  }, [deployments, statusFilter]);
-
-  const activeFilterLabel = useMemo(
-    () => filterTabs.find((tab) => tab.value === statusFilter)?.label ?? 'All',
-    [statusFilter],
-  );
-
   const filteredDeployments = useMemo(() => {
-    if (!searchQuery) return statusFilteredDeployments;
+    if (!searchQuery) return deployments;
     const q = searchQuery.toLowerCase();
-    return statusFilteredDeployments.filter(
+    return deployments.filter(
       (d) =>
         d.domains?.some((domain) => domain.toLowerCase().includes(q)) ||
         d.liveUrl?.toLowerCase().includes(q) ||
@@ -151,7 +132,7 @@ export function DeploymentsPage() {
         d.framework?.toLowerCase().includes(q) ||
         d.deploymentId.toLowerCase().includes(q),
     );
-  }, [statusFilteredDeployments, searchQuery]);
+  }, [deployments, searchQuery]);
 
   const groupedDeployments = useMemo(
     () => groupDeploymentsByDomain(filteredDeployments),
@@ -293,7 +274,7 @@ export function DeploymentsPage() {
                 <p className="text-sm text-muted-foreground">
                   {searchQuery
                     ? `No deployments match "${searchQuery}"`
-                    : `No ${activeFilterLabel.toLowerCase()} deployments found`}
+                    : `No ${statusFilter || ''} deployments found`}
                 </p>
               </div>
             )

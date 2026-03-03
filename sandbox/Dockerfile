@@ -136,7 +136,9 @@ COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
 # becomes dangling inside Docker. Replace it with the actual package source.
 RUN rm -f /opt/opencode/plugin/kortix-sys
 COPY --chown=1000:1000 packages/kortix-sys-oc-plugin/ /opt/opencode/plugin/kortix-sys/
-RUN cd /opt/opencode && bun install
+# agent-tunnel SDK is a workspace:* dep — copy it into the container so bun can resolve it.
+COPY --chown=1000:1000 packages/agent-tunnel/ /opt/agent-tunnel/
+RUN cd /opt/opencode && sed -i 's/"agent-tunnel": "workspace:\*"/"agent-tunnel": "file:\/opt\/agent-tunnel"/' package.json && bun install
 
 # ── OpenCode binary patches ─────────────────────────────────────────────────
 # Apply patches to the compiled Bun binary (tool-input streaming, etc.).
@@ -198,7 +200,7 @@ RUN mkdir -p /opt/kortix \
 # symlinks at the original paths. This enables atomic updates via symlink swap.
 # postinstall.sh detects the symlinks and stages to a new versioned dir instead
 # of mutating the live system. update.ts atomically swaps the symlinks.
-RUN PKG_VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/opt/kortix/.version','utf8')).version || '0.0.0')") \
+RUN PKG_VERSION=$(node -e "console.log(require('/opt/kortix/.version').version || '0.0.0')") \
     && STAGING="/opt/kortix-staging-$PKG_VERSION" \
     && mkdir -p "$STAGING" \
     && mv /opt/kortix-master "$STAGING/kortix-master" \

@@ -207,7 +207,6 @@ export function SetupOverlay({ onComplete, existingSessionId }: SetupOverlayProp
     const poll = setInterval(async () => {
       try {
         const instanceUrl = getInstanceUrl();
-        if (!instanceUrl) return; // Sandbox URL not ready yet — skip this poll tick
         const res = await fetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`);
         if (res.ok) {
           const data = await res.json();

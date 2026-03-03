@@ -240,15 +240,8 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
       recalcSpacer();
       const timer = setTimeout(() => {
         const el = scrollRef.current;
-        if (!el) return;
-        if (isNearScrollEnd(el)) {
-          userScrolledRef.current = false;
-          setShowScrollButton(false);
-        } else if (isFarFromBottom(el, spacerValRef.current)) {
-          setShowScrollButton(true);
-        } else {
-          setShowScrollButton(false);
-        }
+        if (el && isFarFromBottom(el, spacerValRef.current)) setShowScrollButton(true);
+        else setShowScrollButton(false);
       }, 400);
       return () => clearTimeout(timer);
     }
@@ -355,16 +348,6 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
     let last = el.scrollTop;
     const handle = () => {
       const cur = el.scrollTop;
-
-      // Always clear the FAB once the viewport reaches the absolute bottom,
-      // even if we got there programmatically (initial load / smooth scroll).
-      if (isNearScrollEnd(el)) {
-        userScrolledRef.current = false;
-        setShowScrollButton(false);
-        last = cur;
-        return;
-      }
-
       // Detect upward scroll (keyboard, scrollbar drag) — but ignore
       // intermediate frames from programmatic smooth-scrolls.
       // Only show FAB if far enough from bottom.

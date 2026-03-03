@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { authenticatedFetch } from '@/lib/auth-token';
-import { isBillingEnabled } from '@/lib/config';
 
 /**
  * SDK client reset callback — set by opencode-sdk.ts to break the circular
@@ -398,9 +397,7 @@ export const useServerStore = create<ServerStore>()(
           // In cloud mode, don't fall back to the local Docker URL —
           // useSandbox will register the real sandbox shortly.
           // Returning '' signals callers to wait / skip the request.
-          // Check both the explicit cloud ID AND billing flag — during rehydration
-          // activeServerId gets cleared to '' but we're still on cloud.
-          if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID || isBillingEnabled()) return '';
+          if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
           // For local mode (empty activeServerId or 'default'), fall back
           // to DEFAULT_SANDBOX_URL so the app works during the rehydration gap.
           return DEFAULT_SANDBOX_URL;
@@ -583,9 +580,7 @@ export function getActiveSandboxId(): string {
   if (server?.sandboxId) return server.sandboxId;
   // In cloud mode, don't fall back to the local Docker container name —
   // return '' until useSandbox registers the real sandbox.
-  // Check both the explicit cloud ID AND billing flag — during rehydration
-  // activeServerId gets cleared to '' but we're still on cloud.
-  if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID || isBillingEnabled()) return '';
+  if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
   // For local mode (empty activeServerId, 'default', or local_docker provider),
   // fall back to 'kortix-sandbox' — the Docker container name that local DNS resolves.
   return 'kortix-sandbox';

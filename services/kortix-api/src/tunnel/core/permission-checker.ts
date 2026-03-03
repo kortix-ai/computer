@@ -1,16 +1,9 @@
-/**
- * Permission Checker — server-side scope validation for tunnel RPC calls.
- *
- * Validates that a tunnel has an active, non-expired permission for the
- * requested capability and that the operation falls within the granted scope.
- */
-
 import { resolve, normalize } from 'path';
 import { eq, and } from 'drizzle-orm';
 import { tunnelPermissions } from '@kortix/db';
 import type { TunnelFilesystemScope, TunnelShellScope, TunnelPermissionScope } from '@kortix/db';
 import { db } from '../../shared/db';
-import type { TunnelCapability } from '../types';
+import type { TunnelCapability } from 'agent-tunnel';
 
 export interface PermissionCheckResult {
   allowed: boolean;

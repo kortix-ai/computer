@@ -613,21 +613,7 @@ export function useExecuteOpenCodeCommand() {
 
 export function useSummarizeOpenCodeSession() {
   const queryClient = useQueryClient();
-  const syncSetStatus = useSyncStore((s) => s.setStatus);
-  const legacySetStatus = useOpenCodeSessionStatusStore((s) => s.setStatus);
   return useMutation({
-    onMutate: async ({ sessionId }) => {
-      // Optimistically mark the session busy so the chat UI immediately enters
-      // active mode (working indicator + recovery polling). Compaction has no
-      // user message, so without this hint a missed early SSE status event can
-      // make the UI look stuck until a manual refresh.
-      const prevSync = useSyncStore.getState().sessionStatus[sessionId];
-      const prevLegacy = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-      const busy = { type: 'busy' as const };
-      syncSetStatus(sessionId, busy);
-      legacySetStatus(sessionId, busy);
-      return { sessionId, prevSync, prevLegacy };
-    },
     mutationFn: async (params: { sessionId: string; providerID?: string; modelID?: string }) => {
       const client = getClient();
 
@@ -707,14 +693,6 @@ export function useSummarizeOpenCodeSession() {
       // SSE session.compacted event handles rehydration of messages and
       // session data. No need to invalidate here — the event handler in
       // use-opencode-events.ts fetches messages + session for that ID.
-    },
-    onError: (_err, _vars, ctx) => {
-      // Roll back optimistic busy status on immediate failure. If compaction
-      // actually started server-side, SSE status events will overwrite this.
-      if (!ctx?.sessionId) return;
-      const fallbackIdle = { type: 'idle' as const };
-      syncSetStatus(ctx.sessionId, (ctx.prevSync as SessionStatus | undefined) ?? fallbackIdle);
-      legacySetStatus(ctx.sessionId, (ctx.prevLegacy as SessionStatus | undefined) ?? fallbackIdle);
     },
   });
 }

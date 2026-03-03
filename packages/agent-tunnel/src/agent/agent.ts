@@ -1,23 +1,9 @@
-/**
- * TunnelAgent — WebSocket client that connects to kortix-api
- * and handles JSON-RPC requests from the cloud sandbox.
- *
- * Responsibilities:
- *   - Maintain persistent WS connection with auto-reconnect
- *   - Respond to heartbeat pings
- *   - Dispatch incoming RPC requests to registered capabilities
- *   - Enforce permissions locally (defense-in-depth)
- *   - Verify HMAC signatures on incoming messages (replay protection)
- *   - Handle permission revocation / sync notifications
- *   - Handle token rotation notifications
- */
-
 import { hostname, platform, arch, release } from 'os';
 import type { TunnelConfig } from './config';
 import { CapabilityRegistry, type RpcHandler } from './capabilities/index';
 import { PermissionGuard } from './security/permission-guard';
 import type { LocalPermission } from './security/permission-guard';
-import { deriveSigningKey, verifyMessageSignature } from './security/signature';
+import { deriveSigningKey, verifyMessageSignature } from '../shared/crypto';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -38,7 +24,6 @@ interface JsonRpcNotification {
 
 type IncomingMessage = JsonRpcRequest | JsonRpcNotification;
 
-// ─── ANSI helpers ────────────────────────────────────────────────────────────
 const c = {
   reset:   '\x1b[0m',
   bold:    '\x1b[1m',
@@ -335,11 +320,12 @@ export class TunnelAgent {
       .replace(/^http:/, 'ws:')
       .replace(/^https:/, 'wss:');
 
+    const wsPath = this.config.wsPath || '/ws';
     const params = new URLSearchParams({
       token: this.config.token,
       tunnelId: this.config.tunnelId,
     });
 
-    return `${base}/v1/tunnel/ws?${params.toString()}`;
+    return `${base}${wsPath}?${params.toString()}`;
   }
 }

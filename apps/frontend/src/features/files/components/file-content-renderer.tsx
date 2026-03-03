@@ -93,24 +93,10 @@ export function getFileCategory(filename: string, mimeType?: string): FileCatego
 export function getLanguageFromExt(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   const fileNameLower = filename.toLowerCase();
-  const baseName = fileNameLower.split('/').pop() || fileNameLower;
   
   // .env files (e.g., .env, .env.local, .env.production)
   if (fileNameLower.includes('.env') || fileNameLower.startsWith('.env')) {
     return 'properties';
-  }
-  if (
-    baseName === '.bashrc' ||
-    baseName === '.bash_profile' ||
-    baseName === '.bash_aliases' ||
-    baseName === '.bash_login' ||
-    baseName === '.profile' ||
-    baseName === '.zshrc' ||
-    baseName === '.zprofile' ||
-    baseName === '.zlogin' ||
-    baseName === '.zshenv'
-  ) {
-    return 'bash';
   }
   
   const map: Record<string, string> = {

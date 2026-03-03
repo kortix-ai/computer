@@ -11,6 +11,7 @@ import { config, PLATFORM_FEE_MARKUP } from '../../config';
 import { checkCredits, deductToolCredits, deductLLMCredits } from '../services/billing';
 import { getModel, type ModelConfig } from '../config/models';
 import { calculateCost, extractUsage } from '../services/llm';
+import { applyAnthropicSessionPruning } from '../services/session-pruning';
 
 const proxy = new Hono();
 
@@ -143,7 +144,22 @@ async function handleKortixPassthrough(
   const headers = buildForwardHeaders(c);
   // Remove X-Kortix-Token from forwarded headers — upstream doesn't need it
   headers.delete('x-kortix-token');
-  const body = await getRequestBody(c, method);
+  let body = await getRequestBody(c, method);
+
+  // Session pruning for Anthropic passthrough (user's own key)
+  const sessionId =
+    c.req.header('X-Session-ID') ??
+    (() => {
+      try {
+        if (body) {
+          const text = typeof body === 'string' ? body : new TextDecoder().decode(body as ArrayBuffer);
+          const parsed = JSON.parse(text);
+          return typeof parsed?.metadata?.session_id === 'string' ? parsed.metadata.session_id : undefined;
+        }
+      } catch { /* ignore */ }
+      return undefined;
+    })();
+  body = maybeApplyAnthropicPruning(service, method, body, headers, sessionId);
 
   const billingToolName = service.billingToolName;
   const isLlm = service.isLlm === true;
@@ -453,6 +469,41 @@ async function tryAuthenticate(c: any): Promise<AuthResult> {
 
   // --- Mode 3: No Kortix token anywhere — pure passthrough, no billing ---
   return { isKortixUser: false };
+}
+
+/**
+ * Parse an Anthropic-format request body, apply session pruning, and
+ * re-serialize. Returns the original body unchanged if parsing fails,
+ * the service is not Anthropic, or the method has no body.
+ *
+ * Updates Content-Length on headers when the body shrinks.
+ */
+function maybeApplyAnthropicPruning(
+  service: ProxyServiceConfig,
+  method: string,
+  body: ArrayBuffer | string | undefined,
+  headers: Headers,
+  sessionId: string | undefined,
+): ArrayBuffer | string | undefined {
+  if (service.name !== 'anthropic') return body;
+  if (!body || method === 'GET' || method === 'HEAD') return body;
+
+  try {
+    const text = typeof body === 'string' ? body : new TextDecoder().decode(body);
+    const parsed: Record<string, unknown> = JSON.parse(text);
+
+    const modelId = typeof parsed.model === 'string' ? parsed.model : 'unknown';
+    const modelConfig = getModel(modelId);
+
+    applyAnthropicSessionPruning(parsed, sessionId, modelConfig.contextWindow);
+
+    const newBody = JSON.stringify(parsed);
+    headers.set('Content-Length', new TextEncoder().encode(newBody).length.toString());
+    return newBody;
+  } catch {
+    // Body not JSON or pruning failed — forward as-is
+    return body;
+  }
 }
 
 function buildForwardHeaders(c: any): Headers {

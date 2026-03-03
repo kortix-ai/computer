@@ -152,8 +152,6 @@ export function FileBrowser() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
-  const folderInputReadyRef = useRef(false);
-  const folderCreateSubmittedRef = useRef(false);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -167,25 +165,17 @@ export function FileBrowser() {
 
   // Auto-focus and select all text when folder input appears
   useEffect(() => {
-    if (!isCreatingFolder) {
-      folderInputReadyRef.current = false;
-      folderCreateSubmittedRef.current = false;
-      return;
-    }
-
-    folderInputReadyRef.current = false;
-    folderCreateSubmittedRef.current = false;
-
-    requestAnimationFrame(() => {
+    if (isCreatingFolder) {
       requestAnimationFrame(() => {
-        const el = folderInputRef.current;
-        if (el) {
-          el.focus();
-          el.setSelectionRange(0, el.value.length);
-          folderInputReadyRef.current = true;
-        }
+        requestAnimationFrame(() => {
+          const el = folderInputRef.current;
+          if (el) {
+            el.focus();
+            el.setSelectionRange(0, el.value.length);
+          }
+        });
       });
-    });
+    }
   }, [isCreatingFolder]);
 
   // Auto-focus and select file name (before extension) when file input appears
@@ -382,12 +372,8 @@ export function FileBrowser() {
 
   // Create folder
   const handleCreateFolder = useCallback(async () => {
-    if (folderCreateSubmittedRef.current) return;
-    folderCreateSubmittedRef.current = true;
-
     if (!newFolderName.trim()) {
       setIsCreatingFolder(false);
-      setNewFolderName('');
       return;
     }
 
@@ -722,9 +708,11 @@ export function FileBrowser() {
                           }
                         }}
                         onBlur={() => {
-                          if (!folderInputReadyRef.current) return;
-                          setIsCreatingFolder(false);
-                          setNewFolderName('');
+                          if (!folderNameExists) handleCreateFolder();
+                          else {
+                            setIsCreatingFolder(false);
+                            setNewFolderName('');
+                          }
                         }}
                         className={cn(
                           'flex-1 text-sm bg-transparent border rounded px-1.5 py-0.5 outline-none selection:bg-primary/15 selection:text-foreground',
@@ -760,8 +748,11 @@ export function FileBrowser() {
                           }
                         }}
                         onBlur={() => {
-                          setIsCreatingFile(false);
-                          setNewFileName('');
+                          if (!fileNameExists) handleCreateFile();
+                          else {
+                            setIsCreatingFile(false);
+                            setNewFileName('');
+                          }
                         }}
                         className={cn(
                           'flex-1 text-sm bg-transparent border rounded px-1.5 py-0.5 outline-none selection:bg-primary/15 selection:text-foreground',

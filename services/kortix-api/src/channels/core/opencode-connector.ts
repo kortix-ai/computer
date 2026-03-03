@@ -1,6 +1,3 @@
-// Import directly from the opencode module to avoid the barrel index.ts
-// which has a CLI entry-point side effect that starts a competing server.
-import { OpenCodeClient } from 'opencode-channels/src/opencode.js';
 import type { SandboxTarget } from '../types';
 import { getProvider } from '../../platform/providers';
 import type { ProviderName } from '../../platform/providers';
@@ -46,11 +43,6 @@ export async function resolveDirectEndpoint(target: SandboxTarget): Promise<Reso
   return { url: target.baseUrl.replace(/\/$/, ''), headers };
 }
 
-export async function createClientForSandbox(target: SandboxTarget): Promise<OpenCodeClient> {
-  const { url, headers } = await resolveDirectEndpoint(target);
-  return new OpenCodeClient({ baseUrl: url, headers });
-}
-
 export async function wakeUpSandbox(target: SandboxTarget): Promise<void> {
   if (!target.externalId) {
     throw new Error('Cannot wake sandbox: no external ID');
@@ -68,35 +60,4 @@ export async function resolveSandboxTarget(sandboxId: string): Promise<SandboxTa
     provider: sandbox.provider,
     externalId: sandbox.externalId,
   };
-}
-
-export async function downloadFile(client: OpenCodeClient, fileUrl: string): Promise<Buffer | null> {
-  try {
-    if (!fileUrl.startsWith('http')) {
-      let filePath = fileUrl;
-      for (const prefix of ['/workspace/', '/home/daytona/', '/home/user/']) {
-        if (filePath.startsWith(prefix)) {
-          filePath = filePath.slice(prefix.length);
-          break;
-        }
-      }
-      if (filePath.startsWith('/')) {
-        filePath = filePath.slice(1);
-      }
-      const result = await client.downloadFileByPath(filePath);
-      if (result) return result;
-
-      const fileName = fileUrl.split('/').pop();
-      if (fileName && fileName !== filePath) {
-        return await client.downloadFileByPath(fileName);
-      }
-      return null;
-    }
-
-    const res = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) });
-    if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer());
-  } catch {
-    return null;
-  }
 }

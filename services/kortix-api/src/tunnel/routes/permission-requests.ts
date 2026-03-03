@@ -1,12 +1,3 @@
-/**
- * Tunnel Permission Requests Routes — real-time permission approval flow.
- *
- * GET  /permission-requests              — list pending requests for account
- * GET  /permission-requests/stream       — SSE stream of new requests
- * POST /permission-requests/:id/approve  — approve a request (creates permission)
- * POST /permission-requests/:id/deny     — deny a request
- */
-
 import { Hono } from 'hono';
 import { eq, and, desc } from 'drizzle-orm';
 import { tunnelPermissionRequests, tunnelPermissions, tunnelConnections } from '@kortix/db';
@@ -14,8 +5,7 @@ import { db } from '../../shared/db';
 import { tunnelRelay } from '../core/relay';
 import { tunnelRateLimiter } from '../core/rate-limiter';
 import { isValidCapability, validateScope as validateScopeInput } from '../core/scope-validator';
-import type { TunnelCapability } from '../types';
-import { TunnelErrorCode } from '../types';
+import { TunnelErrorCode, type TunnelCapability } from 'agent-tunnel';
 
 type SSEWriter = (event: string, data: unknown) => void;
 const sseSubscribers = new Map<string, Set<SSEWriter>>();
@@ -104,14 +94,10 @@ export function createPermissionRequestsRouter(): Hono {
     );
   });
 
-  // ─── Approve Request ───────────────────────────────────────────────
-
   router.post('/:requestId/approve', async (c: any) => {
     const accountId = c.get('userId') as string;
     const requestId = c.req.param('requestId');
     const body = await c.req.json().catch(() => ({}));
-
-    // Rate limit approvals
     const rateCheck = tunnelRateLimiter.check('permGrant', accountId);
     if (!rateCheck.allowed) {
       return c.json({
@@ -121,7 +107,6 @@ export function createPermissionRequestsRouter(): Hono {
       }, 429);
     }
 
-    // Fetch the request
     const [request] = await db
       .select()
       .from(tunnelPermissionRequests)
@@ -140,18 +125,15 @@ export function createPermissionRequestsRouter(): Hono {
       return c.json({ error: `Request already ${request.status}` }, 409);
     }
 
-    // Validate capability
     if (!isValidCapability(request.capability)) {
       return c.json({ error: `Invalid capability: ${request.capability}` }, 400);
     }
 
-    // Mark as approved
     await db
       .update(tunnelPermissionRequests)
       .set({ status: 'approved', updatedAt: new Date() })
       .where(eq(tunnelPermissionRequests.requestId, requestId));
 
-    // Create the permission — validate scope before storing
     const scope = body.scope || request.requestedScope || {};
     if (scope && Object.keys(scope).length > 0) {
       const scopeResult = validateScopeInput(request.capability, scope);
@@ -182,8 +164,6 @@ export function createPermissionRequestsRouter(): Hono {
 
     return c.json({ success: true, permission });
   });
-
-  // ─── Deny Request ──────────────────────────────────────────────────
 
   router.post('/:requestId/deny', async (c: any) => {
     const accountId = c.get('userId') as string;
