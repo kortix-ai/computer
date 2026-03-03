@@ -763,8 +763,22 @@ export function getQuestionForTool(
 // ============================================================================
 
 /**
+ * Platform markup applied to raw provider costs.
+ *
+ * The step-finish parts report raw provider cost (what the LLM vendor charges).
+ * The billing system deducts cost × COST_MARKUP from the user's credits.
+ * We apply the same multiplier here so the UI matches what's actually billed.
+ *
+ * Must stay in sync with KORTIX_MARKUP in services/kortix-api/src/config.ts.
+ */
+export const COST_MARKUP = 1.2;
+
+/**
  * Aggregate cost/token info from step-finish parts in a turn.
  * Returns undefined if no step-finish parts found.
+ *
+ * The cost is multiplied by COST_MARKUP so the displayed value matches
+ * the actual credits deducted (raw provider cost × 1.2).
  */
 export function getTurnCost(parts: PartWithMessage[]): TurnCostInfo | undefined {
   let totalCost = 0;
@@ -789,7 +803,7 @@ export function getTurnCost(parts: PartWithMessage[]): TurnCostInfo | undefined 
   }
 
   if (!found) return undefined;
-  return { cost: totalCost, tokens: { input, output, reasoning, cacheRead, cacheWrite } };
+  return { cost: totalCost * COST_MARKUP, tokens: { input, output, reasoning, cacheRead, cacheWrite } };
 }
 
 /** Format cost in USD (e.g. "$0.0032") */

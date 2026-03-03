@@ -1355,7 +1355,7 @@ function InlineSessionMessagesList({
 						</span>
 						{msg.cost > 0 && (
 							<span className="text-[10px] text-muted-foreground/50">
-								${msg.cost.toFixed(4)}
+								${(msg.cost * 1.2).toFixed(4)}
 							</span>
 						)}
 					</div>

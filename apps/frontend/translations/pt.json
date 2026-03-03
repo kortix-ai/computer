@@ -541,9 +541,9 @@
           "content": "Diferentes modelos de IA têm custos diferentes com base em suas capacidades e uso de tokens. Os créditos são consumidos para tokens de entrada (teus prompts e contexto), tokens de saída (respostas do agente) e variam por nível do modelo (Claude, GPT, etc.)."
         },
         "pricingModel": {
-          "title": "Modelo de Preços",
-          "description": "Margem de 20% sobre os custos do modelo de IA",
-          "content": "Aplicamos uma margem de 20% em todos os custos de API e modelo para cobrir infraestrutura da plataforma, segurança e desenvolvimento contínuo. Este preço transparente garante que saibas exatamente pelo que estás pagando."
+          "title": "Preços",
+          "description": "As taxas variam por tipo de serviço",
+          "content": "Aplicamos uma margem sobre os custos dos fornecedores para cobrir infraestrutura da plataforma, segurança e desenvolvimento contínuo. Modelos de IA têm margem de 20%, uso de ferramentas (pesquisa web, scraping, etc.) tem margem de 50%, pesquisa de imagens tem margem de 100%, e se usares a tua própria chave API, aplica-se uma taxa fixa de 10%."
         }
       },
       "gettingMoreCredits": {

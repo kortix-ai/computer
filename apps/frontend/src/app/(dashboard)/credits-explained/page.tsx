@@ -1,6 +1,6 @@
 'use client';
 
-import { Zap, Clock, Sparkles, Info, RotateCcw, Infinity } from 'lucide-react';
+import { Zap, Clock, Sparkles, Info, RotateCcw, Infinity, DollarSign } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -98,6 +98,49 @@ export default function CreditsPage() {
                   If a task fails due to a system error on our side, we'll automatically refund all credits used for that task. We're constantly improving our infrastructure to make credit usage more efficient.
                 </AlertDescription>
               </Alert>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Pricing Model */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">{t('howCreditsWork.pricingModel.title')}</h2>
+          </div>
+          
+          <p className="text-muted-foreground leading-relaxed">
+            We apply a markup on top of provider costs to cover platform infrastructure, security, and ongoing development. Rates vary by service type:
+          </p>
+
+          <Card>
+            <CardContent className="pt-6">
+              <ul className="space-y-3 text-muted-foreground">
+                <li className="flex items-start gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium text-foreground">AI models (20% markup):</span> Applied to all LLM API costs including input tokens, output tokens, and prompt caching.
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium text-foreground">Tool usage (50% markup):</span> Applied to web search, web scraping, and other third-party tool calls.
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium text-foreground">Image search (100% markup):</span> Applied to image search queries.
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium text-foreground">Bring your own key (10% platform fee):</span> If you use your own API key, a flat 10% fee applies instead of the standard AI model markup.
+                  </div>
+                </li>
+              </ul>
             </CardContent>
           </Card>
         </div>
