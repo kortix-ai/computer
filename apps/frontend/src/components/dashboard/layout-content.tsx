@@ -469,7 +469,15 @@ export default function DashboardLayoutContent({
 	})();
 
 	if (isLoading || !onboardingChecked) {
-		return <DashboardSkeleton />;
+		return (
+			<>
+				{/* SandboxInitProvider must mount even while checking onboarding —
+				    the onboarding check polls getActiveServerUrl() which only returns
+				    a real URL after useSandbox() registers the sandbox. */}
+				<SandboxInitProvider />
+				<DashboardSkeleton />
+			</>
+		);
 	}
 
 	if (!user) {
