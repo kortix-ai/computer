@@ -1,40 +1,101 @@
 [
   {
     "version": "0.7.6",
-    "date": "2026-02-28",
-    "title": "OpenCode Channels — connect Slack (and more) to your sandbox agent",
-    "description": "Introduces the OpenCode Channels service: a new sidecar running inside the sandbox that bridges external messaging platforms to your agent. Slack is the first supported adapter — install via OAuth, and your sandbox agent receives and responds to Slack messages in real time with streaming, typing indicators, and thread support.",
+    "date": "2026-03-01",
+    "title": "Kortix-only provider routing, cloud billing auto-setup & channels",
+    "description": "Cloud sandboxes now show only the Kortix provider with 8 real models — no more 'Anthropic API key missing' errors. New users are automatically initialized on the free (Basic) plan. OpenCode Channels adds Slack integration. Multiple cloud stability fixes for sandbox startup race conditions, Docker builds, and VPS deployments.",
     "changes": [
       {
         "type": "feature",
-        "text": "OpenCode Channels sidecar service — runs on port 3456 inside the sandbox, bridging messaging platforms to the agent via Chat SDK adapters"
+        "text": "OpenCode Channels sidecar service — bridges messaging platforms to the agent via Chat SDK adapters, with Slack as first adapter"
       },
       {
         "type": "feature",
-        "text": "Slack adapter with full OAuth install flow — one-click 'Add to Slack' from the Channels page creates the bot, pushes credentials, and hot-reloads the service"
+        "text": "Slack adapter with full OAuth install flow, webhook proxy, hot-reload, and guided setup wizard"
       },
       {
         "type": "feature",
-        "text": "Platform credentials management — securely store Slack app client ID, client secret, and signing secret per account or per sandbox"
-      },
-      {
-        "type": "feature",
-        "text": "Slack webhook proxy on kortix-api forwards events/commands/interactivity to the sandbox channels service for processing"
-      },
-      {
-        "type": "feature",
-        "text": "Hot-reload support — credential changes push to the sandbox and reload adapters without restarting the service"
-      },
-      {
-        "type": "improvement",
-        "text": "Channels UI with guided Slack setup wizard — walks through app creation, OAuth scopes, and event subscriptions"
+        "text": "Agent Memory Protocol — agents can save and search long-term memories across sessions via ltm_save/ltm_search"
       },
       {
         "type": "fix",
-        "text": "Sandbox env API merge conflict resolved — keeps OpenAPI-decorated routes with no-restart policy"
+        "text": "Kortix-only provider in cloud mode — removed passthrough provider overrides (anthropic, openai, etc.) so only Kortix models show when no user API keys are set"
+      },
+      {
+        "type": "fix",
+        "text": "Model routing through Kortix provider — agent frontmatter uses kortix/model-id format so parseModel() routes through Kortix token, not built-in providers"
+      },
+      {
+        "type": "fix",
+        "text": "Default model set to Claude Sonnet 4.6 via root-level config.model field and agent frontmatter"
+      },
+      {
+        "type": "fix",
+        "text": "Frontend config.model.split bug — correctly parses 3-segment model refs (kortix/vendor/model)"
+      },
+      {
+        "type": "fix",
+        "text": "New cloud users auto-initialized on free plan — buildAccountState returns tier='none' for uninitialized users, triggering /setting-up auto-setup flow"
+      },
+      {
+        "type": "fix",
+        "text": "Setup error fallback redirects to /subscription plan picker instead of /dashboard"
+      },
+      {
+        "type": "fix",
+        "text": "Cloud startup race condition — getActiveServerUrl() returns empty string during rehydration instead of stale 'kortix-sandbox' fallback"
+      },
+      {
+        "type": "fix",
+        "text": "getClient() throws on empty URL so React Query retries instead of sending requests to invalid endpoints"
+      },
+      {
+        "type": "fix",
+        "text": "Pipedream integration env vars made optional — INTEGRATION_AUTH_PROVIDER no longer defaults to 'pipedream'"
+      },
+      {
+        "type": "fix",
+        "text": "Docker build for opencode-channels submodule — 5 fixes: Dockerfile COPY, .dockerignore, pnpm filter, import subpath, and TS source symlink"
+      },
+      {
+        "type": "fix",
+        "text": "VPS deploy — docker compose down before up, git submodule init in CI"
+      },
+      {
+        "type": "fix",
+        "text": "Vercel build — switched from dead npx nx build to next build"
+      },
+      {
+        "type": "fix",
+        "text": "SANDBOX_VERSION mismatch — reverted to 0.7.5 after 0.7.6 snapshot was never created"
       }
     ],
-    "artifacts": []
+    "artifacts": [
+      {
+        "name": "@kortix/sandbox@0.7.6",
+        "target": "npm"
+      },
+      {
+        "name": "v0.7.6",
+        "target": "github-release"
+      },
+      {
+        "name": "kortix/sandbox:0.7.6",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.6",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.6",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.6",
+        "target": "docker-hub"
+      }
+    ]
   },
   {
     "version": "0.7.5",

@@ -1,108 +1,104 @@
 'use client';
 
-import { useEffect, useState, Suspense, lazy, useRef } from 'react';
+import { useEffect, useState, Suspense, lazy, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { useInitializeAccount } from '@/hooks/account';
 import { billingApi } from '@/lib/api/billing';
+import { backendApi } from '@/lib/api-client';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 // Lazy load heavy components
 const AnimatedBg = lazy(() => import('@/components/ui/animated-bg').then(mod => ({ default: mod.AnimatedBg })));
-const KortixLoader = lazy(() => import('@/components/ui/kortix-loader').then(mod => ({ default: mod.KortixLoader })));
+
+type SetupStep = 'checking' | 'subscription' | 'sandbox' | 'success' | 'error';
+
+interface StepInfo {
+  label: string;
+  detail: string;
+}
+
+const STEP_INFO: Record<Exclude<SetupStep, 'success' | 'error'>, StepInfo> = {
+  checking:     { label: 'Checking account',         detail: 'Verifying your account status...' },
+  subscription: { label: 'Creating subscription',    detail: 'Setting up your free plan...' },
+  sandbox:      { label: 'Preparing workspace',      detail: 'Provisioning your cloud sandbox...' },
+};
 
 export default function SettingUpPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [status, setStatus] = useState<'checking' | 'initializing' | 'success' | 'error'>('checking');
-  const initializeMutation = useInitializeAccount();
-  const hasAttemptedInit = useRef(false);
-  const isInitializing = useRef(false);
+  const [step, setStep] = useState<SetupStep>('checking');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const isRunning = useRef(false);
+
+  const runSetup = useCallback(async () => {
+    if (!user || isRunning.current) return;
+    isRunning.current = true;
+    setErrorMessage('');
+
+    try {
+      // Step 1: Check if account is already fully set up
+      setStep('checking');
+      const accountState = await billingApi.getAccountState(true);
+      const tierKey = accountState?.subscription?.tier_key || accountState?.tier?.name || '';
+      const hasSubscription = tierKey && tierKey !== 'none';
+
+      if (hasSubscription && accountState?.subscription?.subscription_id) {
+        // Already initialized — go to dashboard
+        console.log('[setting-up] Account already initialized, redirecting');
+        setStep('success');
+        setTimeout(() => router.push('/dashboard'), 500);
+        return;
+      }
+
+      // Step 2: Initialize subscription + sandbox (one-shot backend call)
+      setStep('subscription');
+      const response = await backendApi.post<{
+        status: string;
+        tier: string;
+        sandbox: 'created' | 'exists' | 'skipped' | 'failed';
+        sandbox_error?: string;
+      }>('/billing/setup/initialize');
+
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Failed to initialize account');
+      }
+
+      const data = response.data!;
+
+      // Step 3: Show sandbox status
+      if (data.sandbox === 'created' || data.sandbox === 'exists') {
+        setStep('sandbox');
+        // Brief pause so user sees the step
+        await new Promise(r => setTimeout(r, 800));
+      } else if (data.sandbox === 'failed') {
+        // Sandbox failed but subscription succeeded — warn but continue.
+        // useSandbox() on dashboard will auto-retry.
+        console.warn('[setting-up] Sandbox creation failed, will retry on dashboard:', data.sandbox_error);
+      }
+
+      // Done — redirect to dashboard
+      setStep('success');
+      setTimeout(() => router.push('/dashboard'), 1000);
+    } catch (err) {
+      console.error('[setting-up] Setup error:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setStep('error');
+    } finally {
+      isRunning.current = false;
+    }
+  }, [user, router]);
 
   useEffect(() => {
-    if (!user) return;
-    if (hasAttemptedInit.current) return;
-    if (status !== 'checking') return;
-    if (isInitializing.current) return;
+    runSetup();
+  }, [runSetup]);
 
-    // Mark as attempted immediately to prevent multiple calls
-    hasAttemptedInit.current = true;
-    isInitializing.current = true;
-
-    // Check if account was already initialized via webhook
-    const checkSubscription = async () => {
-      try {
-        // Check subscription via backend API (has direct DB access, no PostgREST schema issues)
-        const accountState = await billingApi.getAccountState(true);
-        const tierKey = accountState?.subscription?.tier_key || accountState?.tier?.name || '';
-        const hasSubscription = tierKey && tierKey !== 'none';
-
-        if (hasSubscription && accountState?.subscription?.subscription_id) {
-          console.log('✅ Account already initialized via webhook, redirecting to dashboard');
-          isInitializing.current = false;
-          setStatus('success');
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 500);
-          return;
-        }
-
-        // No subscription found - initialize manually (fallback)
-        console.log('⚠️ No subscription detected - initializing manually (fallback)');
-        setStatus('initializing');
-        // Double-check mutation isn't already pending before calling
-        if (!initializeMutation.isPending) {
-          initializeMutation.mutate(undefined, {
-            onSuccess: () => {
-              isInitializing.current = false;
-              setStatus('success');
-              setTimeout(() => {
-                router.push('/dashboard');
-              }, 1500);
-            },
-            onError: (error) => {
-              console.error('Setup error:', error);
-              isInitializing.current = false;
-              setStatus('error');
-            },
-          });
-        } else {
-          // Mutation already in progress, reset flag
-          isInitializing.current = false;
-        }
-      } catch (error) {
-        console.error('Error checking subscription:', error);
-        // If check fails, try initialization anyway
-        setStatus('initializing');
-        // Double-check mutation isn't already pending before calling
-        if (!initializeMutation.isPending) {
-          initializeMutation.mutate(undefined, {
-            onSuccess: () => {
-              isInitializing.current = false;
-              setStatus('success');
-              setTimeout(() => {
-                router.push('/dashboard');
-              }, 1500);
-            },
-            onError: (err) => {
-              console.error('Setup error:', err);
-              isInitializing.current = false;
-              setStatus('error');
-            },
-          });
-        } else {
-          // Mutation already in progress, reset flag
-          isInitializing.current = false;
-        }
-      }
-    };
-
-    checkSubscription();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, status]);
+  const handleRetry = () => {
+    setStep('checking');
+    runSetup();
+  };
 
   return (
     <div className="w-full relative overflow-hidden min-h-screen">
@@ -114,7 +110,7 @@ export default function SettingUpPage() {
         <div className="relative z-10 w-full max-w-[456px] flex flex-col items-center gap-8">
           <KortixLogo size={32} />
 
-          {(status === 'checking' || status === 'initializing') && (
+          {step !== 'success' && step !== 'error' && (
             <>
               <h1 className="text-[43px] font-normal tracking-tight text-foreground leading-none text-center">
                 Setting Up Your Account
@@ -124,30 +120,43 @@ export default function SettingUpPage() {
                 We're creating your workspace and preparing everything you need to get started.
               </p>
 
-              <Card className="w-full h-24 bg-card border border-border">
-                <CardContent className="p-6 h-full">
-                  <div className="flex items-center justify-between h-full">
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col gap-1">
-                        <div className='flex items-center gap-2'>
-                          <div className="h-2.5 w-2.5 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-base font-medium text-blue-400">Initializing</span>
+              <Card className="w-full bg-card border border-border">
+                <CardContent className="p-6">
+                  <div className="flex flex-col gap-4">
+                    {(['checking', 'subscription', 'sandbox'] as const).map((s) => {
+                      const info = STEP_INFO[s];
+                      const isActive = s === step;
+                      const isDone = getStepOrder(step) > getStepOrder(s);
+
+                      return (
+                        <div key={s} className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                            {isDone ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            ) : isActive ? (
+                              <div className="h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <div className="h-3 w-3 rounded-full bg-foreground/15" />
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-medium ${isActive ? 'text-blue-400' : isDone ? 'text-green-400' : 'text-foreground/30'}`}>
+                              {info.label}
+                            </span>
+                            {isActive && (
+                              <span className="text-xs text-foreground/40">{info.detail}</span>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-base text-gray-400">Setting up your account...</p>
-                      </div>
-                    </div>
-                    <div className="h-12 w-12 flex items-center justify-center">
-                      <Suspense fallback={<KortixLoader size="small" />}>
-                        <KortixLoader size="small" customSize={24} />
-                      </Suspense>
-                    </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
             </>
           )}
 
-          {status === 'success' && (
+          {step === 'success' && (
             <>
               <h1 className="text-[43px] font-normal tracking-tight text-foreground leading-none text-center">
                 You're All Set!
@@ -178,16 +187,14 @@ export default function SettingUpPage() {
             </>
           )}
 
-          {status === 'error' && (
+          {step === 'error' && (
             <>
               <h1 className="text-[43px] font-normal tracking-tight text-foreground leading-none text-center">
                 Setup Issue
               </h1>
 
               <p className="text-[16px] text-foreground/60 text-center leading-relaxed">
-                {initializeMutation.error instanceof Error 
-                  ? initializeMutation.error.message 
-                  : 'An error occurred during setup. You can still continue to your dashboard.'}
+                {errorMessage || 'An error occurred during setup.'}
               </p>
 
               <Card className="w-full min-h-24 bg-card border border-border">
@@ -199,20 +206,30 @@ export default function SettingUpPage() {
                           <div className="h-2.5 w-2.5 bg-red-500 rounded-full"></div>
                           <span className="text-base font-medium text-red-400">Setup Error</span>
                         </div>
-                        <p className="text-base text-gray-400">Don't worry, you can choose a plan manually.</p>
+                        <p className="text-base text-gray-400">Please try again or choose a plan manually.</p>
                       </div>
                     </div>
                     <div className="h-12 w-12 flex items-center justify-center">
                       <AlertCircle className="h-6 w-6 text-red-500" />
                     </div>
                   </div>
-                  <Button
-                    onClick={() => router.push('/subscription')}
-                    className="w-full mt-4"
-                    variant="default"
-                  >
-                    Choose a Plan
-                  </Button>
+                  <div className="flex gap-3 mt-4">
+                    <Button
+                      onClick={handleRetry}
+                      className="flex-1"
+                      variant="default"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Try Again
+                    </Button>
+                    <Button
+                      onClick={() => router.push('/subscription')}
+                      className="flex-1"
+                      variant="outline"
+                    >
+                      Choose a Plan
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </>
@@ -230,4 +247,16 @@ export default function SettingUpPage() {
       </div>
     </div>
   );
+}
+
+/** Order for step-completion checks. */
+function getStepOrder(s: SetupStep): number {
+  switch (s) {
+    case 'checking': return 0;
+    case 'subscription': return 1;
+    case 'sandbox': return 2;
+    case 'success': return 3;
+    case 'error': return -1;
+    default: return -1;
+  }
 }

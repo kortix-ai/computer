@@ -21,9 +21,31 @@ export async function getBalance(accountId: string) {
 }
 
 export async function getCreditSummary(accountId: string) {
-  const account = await getCreditAccount(accountId);
+  let account = await getCreditAccount(accountId);
   if (!account) {
     return { total: 0, daily: 0, monthly: 0, extra: 0, canRun: false };
+  }
+
+  // Lazy daily refresh + zero-balance fix.
+  if (account.tier) {
+    try {
+      const bal = Number(account.balance) || 0;
+      const daily = Number(account.dailyCreditsBalance) || 0;
+
+      if (bal < MINIMUM_CREDIT_FOR_RUN && daily > 0) {
+        // Balance is empty but daily credits exist — sync balance immediately.
+        // This handles accounts initialized before the balance-init fix.
+        await updateCreditAccount(accountId, { balance: account.dailyCreditsBalance } as any);
+        account = (await getCreditAccount(accountId)) ?? account;
+      } else {
+        const result = await refreshDailyCredits(accountId, account.tier);
+        if (result) {
+          account = (await getCreditAccount(accountId)) ?? account;
+        }
+      }
+    } catch (err) {
+      console.warn('[getCreditSummary] Daily refresh failed:', err);
+    }
   }
 
   const daily = Number(account.dailyCreditsBalance) || 0;
