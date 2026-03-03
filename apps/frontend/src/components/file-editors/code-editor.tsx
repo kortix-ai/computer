@@ -575,6 +575,59 @@ export function CodeEditor({
   // Theme selection
   const theme = mounted && resolvedTheme === 'dark' ? vscodeDark : xcodeLight;
 
+  // Match VS Code-like line-number gutter spacing so code text doesn't feel cramped
+  // against the gutter edge on small/2-digit files.
+  const lineNumberGutterTheme = useMemo(
+    () => {
+      const selectionBg =
+        resolvedTheme === 'dark'
+          ? 'rgba(148, 163, 184, 0.22)'
+          : 'rgba(148, 163, 184, 0.26)';
+
+      return EditorView.theme({
+        '.cm-gutters': {
+          minWidth: '0',
+          width: 'auto',
+          paddingLeft: '0',
+        },
+        '.cm-lineNumbers': {
+          minWidth: '3.1rem',
+          width: '3.1rem',
+        },
+        '.cm-lineNumbers .cm-gutterElement': {
+          width: '100%',
+          boxSizing: 'border-box',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          textAlign: 'right',
+          padding: '0 10px 0 8px',
+        },
+        '.cm-content': {
+          paddingLeft: '6px',
+        },
+        '.cm-content ::selection': {
+          backgroundColor: `${selectionBg} !important`,
+          color: 'currentColor !important',
+        },
+        '.cm-content ::-moz-selection': {
+          backgroundColor: `${selectionBg} !important`,
+          color: 'currentColor !important',
+        },
+        '.cm-line::selection': {
+          backgroundColor: `${selectionBg} !important`,
+          color: 'currentColor !important',
+        },
+        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+          backgroundColor: selectionBg,
+        },
+        '.cm-selectionLayer .cm-selectionBackground': {
+          backgroundColor: selectionBg,
+        },
+      });
+    },
+    [resolvedTheme],
+  );
+
   // Build the diagnostics CodeMirror extension from the diagnostics prop
   const diagExt = useMemo(() => {
     if (!diagnostics || diagnostics.length === 0) return null;
@@ -596,6 +649,7 @@ export function CodeEditor({
     // Always add these core extensions
     exts.push(
       EditorView.lineWrapping,
+      lineNumberGutterTheme,
       keymap.of([indentWithTab])
     );
 
@@ -605,7 +659,7 @@ export function CodeEditor({
     }
     
     return exts;
-  }, [langExtension, diagExt]);
+  }, [langExtension, diagExt, lineNumberGutterTheme]);
 
   const SaveButton = () => {
     if (readOnly || !onSave) return null;
@@ -751,7 +805,7 @@ export function CodeEditor({
               lineNumbers: showLineNumbers,
               highlightActiveLine: !readOnly,
               highlightActiveLineGutter: !readOnly,
-              foldGutter: true,
+              foldGutter: !readOnly,
               dropCursor: true,
               allowMultipleSelections: true,
               indentOnInput: true,
@@ -779,4 +833,3 @@ export function CodeEditor({
     </div>
   );
 }
-
