@@ -620,7 +620,8 @@ export default {
         const authHeader = req.headers.get('Authorization');
         const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
         const cookieToken = extractCookieToken(req);
-        const token = bearerToken || cookieToken;
+        const queryToken = isWsUpgrade ? url.searchParams.get('token') : null;
+        const token = bearerToken || cookieToken || queryToken;
 
         if (!token || !(await validatePreviewToken(token))) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -796,7 +797,8 @@ export default {
         const wsAuthHeader = req.headers.get('Authorization');
         const wsBearerToken = wsAuthHeader?.startsWith('Bearer ') ? wsAuthHeader.slice(7) : null;
         const wsCookieToken = extractCookieToken(req);
-        const wsToken = wsBearerToken || wsCookieToken;
+        const wsQueryToken = url.searchParams.get('token');
+        const wsToken = wsBearerToken || wsCookieToken || wsQueryToken;
 
         if (wsToken && (await validatePreviewToken(wsToken))) {
           const targetUrl = buildWsTargetUrl(wsSandboxId, wsPort, wsRemainingPath, url.searchParams);
