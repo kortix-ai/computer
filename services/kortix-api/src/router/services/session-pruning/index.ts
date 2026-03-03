@@ -8,8 +8,10 @@
 
 import { sessionTracker } from './session-tracker';
 import { pruneMessages } from './pruner';
+import { pruneAnthropicMessages } from './anthropic-pruner';
 import { DEFAULT_SETTINGS, PRUNING_ENABLED } from './settings';
 import type { OpenAIMessage } from './settings';
+import type { AnthropicMessage } from './anthropic-pruner';
 
 /**
  * Apply session pruning to the request body's messages array.
@@ -50,7 +52,49 @@ export function applySessionPruning(
   }
 }
 
+/**
+ * Apply session pruning to an Anthropic-format request body.
+ *
+ * Anthropic messages use content blocks (tool_result / tool_use) rather than
+ * the OpenAI tool/function role pattern. Delegates to pruneAnthropicMessages
+ * which handles tool_result blocks inside user messages.
+ */
+export function applyAnthropicSessionPruning(
+  body: Record<string, unknown>,
+  sessionId: string | undefined,
+  contextWindowTokens: number,
+): void {
+  if (!PRUNING_ENABLED) return;
+  if (!sessionId) return;
+
+  sessionTracker.ensureTracked(sessionId);
+  if (!sessionTracker.isExpired(sessionId, DEFAULT_SETTINGS.ttlMs)) return;
+
+  const messages = body.messages;
+  if (!Array.isArray(messages) || messages.length === 0) return;
+
+  const result = pruneAnthropicMessages(
+    messages as AnthropicMessage[],
+    contextWindowTokens,
+    DEFAULT_SETTINGS,
+  );
+
+  if (result.pruned) {
+    body.messages = result.messages;
+    sessionTracker.touch(sessionId);
+
+    console.log(
+      `[LLM][Pruning][Anthropic] session=${sessionId.slice(0, 12)}...: ` +
+        `soft-trimmed=${result.stats.softTrimmed}, ` +
+        `hard-cleared=${result.stats.hardCleared}, ` +
+        `chars-saved=${result.stats.charsSaved}`,
+    );
+  }
+}
+
 export { pruneMessages } from './pruner';
+export { pruneAnthropicMessages } from './anthropic-pruner';
+export type { AnthropicMessage } from './anthropic-pruner';
 export { sessionTracker } from './session-tracker';
 export { DEFAULT_SETTINGS, PRUNING_ENABLED } from './settings';
 export type { OpenAIMessage, PruningSettings, PruningResult } from './settings';
