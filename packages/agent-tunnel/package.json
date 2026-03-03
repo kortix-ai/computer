@@ -1,0 +1,27 @@
+{
+  "name": "agent-tunnel",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Tunnel relay between cloud AI agents and local machines — server relay, local agent, JSON-RPC, HMAC signing",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "bin": {
+    "agent-tunnel": "src/cli.ts"
+  },
+  "files": [
+    "src/"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.9",
+    "typescript": "^5.4.0"
+  },
+  "keywords": ["tunnel", "relay", "websocket", "json-rpc", "hmac", "agent"],
+  "license": "MIT"
+}

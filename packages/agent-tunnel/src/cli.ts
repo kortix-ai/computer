@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 /**
- * @kortix/tunnel CLI — local agent for Kortix reverse-tunnel.
+ * agent-tunnel CLI — local agent that bridges your machine to cloud sandboxes.
  *
  * Usage:
- *   npx @kortix/tunnel connect --token <token> --tunnel-id <id> [--api-url <url>]
- *   npx @kortix/tunnel status  --token <token> --tunnel-id <id> [--api-url <url>]
- *   npx @kortix/tunnel permissions --token <token> --tunnel-id <id> [--api-url <url>]
+ *   npx agent-tunnel connect --token <token> --tunnel-id <id> [--api-url <url>]
+ *   npx agent-tunnel status  --token <token> --tunnel-id <id> [--api-url <url>]
+ *   npx agent-tunnel permissions --token <token> --tunnel-id <id> [--api-url <url>]
  */
 
 import { loadConfig } from './config';
@@ -62,12 +62,8 @@ function printBanner(config: { tunnelId: string; apiUrl: string }, capabilities:
     : config.tunnelId;
 
   console.log('');
-  console.log(`${c.bold}${c.cyan}   _  __         _   _      ${c.reset}`);
-  console.log(`${c.bold}${c.cyan}  | |/ /___  _ _| |_(_)_ __ ${c.reset} ${c.dim}Tunnel Agent${c.reset}`);
-  console.log(`${c.bold}${c.cyan}  | ' </ _ \\| '_|  _| \\ \\ / ${c.reset} ${c.dim}v${version}${c.reset}`);
-  console.log(`${c.bold}${c.cyan}  |_|\\_\\___/|_|  \\__|_/_\\_\\ ${c.reset}`);
-  console.log('');
-  console.log(`${c.gray}  ── Session ─────────────────────────────────────────${c.reset}`);
+  console.log(`${c.gray}  ── Agent Tunnel ────────────────────────────────────${c.reset}`);
+  console.log(`${c.gray}  version  ${c.reset}${c.white}v${version}${c.reset}`);
   console.log(`${c.gray}  tunnel   ${c.reset}${c.white}${tunnelShort}${c.reset}`);
   console.log(`${c.gray}  api      ${c.reset}${c.white}${config.apiUrl}${c.reset}`);
   console.log(`${c.gray}  machine  ${c.reset}${c.white}${machine}${c.reset} ${c.dim}(${plat})${c.reset}`);
@@ -138,37 +134,7 @@ async function commandStatus(flags: Record<string, string>): Promise<void> {
   }
 
   try {
-    const res = await fetch(`${config.apiUrl}/v1/tunnel/connections/${config.tunnelId}`, {
-      headers: { Authorization: `Bearer ${config.token}` },
-    });
-
-    if (!res.ok) {
-      console.error(`Error: ${res.status} ${await res.text()}`);
-      process.exit(1);
-    }
-
-    const data = await res.json();
-    console.log(JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error('Error:', err);
-    process.exit(1);
-  }
-}
-
-async function commandPermissions(flags: Record<string, string>): Promise<void> {
-  const config = loadConfig({
-    token: flags.token,
-    tunnelId: flags['tunnel-id'],
-    apiUrl: flags['api-url'],
-  });
-
-  if (!config.token || !config.tunnelId) {
-    console.error('Error: --token and --tunnel-id are required');
-    process.exit(1);
-  }
-
-  try {
-    const res = await fetch(`${config.apiUrl}/v1/tunnel/permissions/${config.tunnelId}`, {
+    const res = await fetch(`${config.apiUrl}/connections/${config.tunnelId}`, {
       headers: { Authorization: `Bearer ${config.token}` },
     });
 
@@ -187,25 +153,21 @@ async function commandPermissions(flags: Record<string, string>): Promise<void> 
 
 function showHelp(): void {
   console.log('');
-  console.log(`${c.bold}${c.cyan}   _  __         _   _      ${c.reset}`);
-  console.log(`${c.bold}${c.cyan}  | |/ /___  _ _| |_(_)_ __ ${c.reset} ${c.dim}Tunnel Agent${c.reset}`);
-  console.log(`${c.bold}${c.cyan}  | ' </ _ \\| '_|  _| \\ \\ / ${c.reset} ${c.dim}v0.1.0${c.reset}`);
-  console.log(`${c.bold}${c.cyan}  |_|\\_\\___/|_|  \\__|_/_\\_\\ ${c.reset}`);
+  console.log(`${c.gray}  ── Agent Tunnel ────────────────────────────────────${c.reset}`);
   console.log('');
-  console.log(`  ${c.bold}Usage${c.reset}   ${c.dim}npx @kortix/tunnel <command> [options]${c.reset}`);
+  console.log(`  ${c.bold}Usage${c.reset}   ${c.dim}npx agent-tunnel <command> [options]${c.reset}`);
   console.log('');
   console.log(`${c.gray}  ── Commands ────────────────────────────────────────${c.reset}`);
   console.log(`  ${c.cyan}connect${c.reset}       Connect and start handling RPC requests`);
   console.log(`  ${c.cyan}status${c.reset}        Check tunnel connection status`);
-  console.log(`  ${c.cyan}permissions${c.reset}   List active permissions for this tunnel`);
   console.log(`  ${c.cyan}help${c.reset}          Show this help message`);
   console.log('');
   console.log(`${c.gray}  ── Options ─────────────────────────────────────────${c.reset}`);
-  console.log(`  ${c.white}--token${c.reset} ${c.dim}<token>${c.reset}       API token ${c.dim}(or KORTIX_TUNNEL_TOKEN)${c.reset}`);
-  console.log(`  ${c.white}--tunnel-id${c.reset} ${c.dim}<id>${c.reset}     Tunnel ID ${c.dim}(or KORTIX_TUNNEL_ID)${c.reset}`);
-  console.log(`  ${c.white}--api-url${c.reset} ${c.dim}<url>${c.reset}       API URL ${c.dim}(default: http://localhost:8008)${c.reset}`);
+  console.log(`  ${c.white}--token${c.reset} ${c.dim}<token>${c.reset}       API token ${c.dim}(or TUNNEL_TOKEN)${c.reset}`);
+  console.log(`  ${c.white}--tunnel-id${c.reset} ${c.dim}<id>${c.reset}     Tunnel ID ${c.dim}(or TUNNEL_ID)${c.reset}`);
+  console.log(`  ${c.white}--api-url${c.reset} ${c.dim}<url>${c.reset}       API URL ${c.dim}(default: http://localhost:8080)${c.reset}`);
   console.log('');
-  console.log(`  ${c.dim}Config: ~/.kortix-tunnel/config.json${c.reset}`);
+  console.log(`  ${c.dim}Config: ~/.agent-tunnel/config.json${c.reset}`);
   console.log('');
 }
 
@@ -217,9 +179,6 @@ switch (command) {
     break;
   case 'status':
     commandStatus(flags);
-    break;
-  case 'permissions':
-    commandPermissions(flags);
     break;
   case 'help':
   default:

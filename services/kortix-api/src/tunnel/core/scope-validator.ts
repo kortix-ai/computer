@@ -1,12 +1,3 @@
-/**
- * Scope Validator — validates scope JSON structure before DB storage.
- *
- * Ensures that capability names are valid and scope objects conform to
- * their expected structure. Returns sanitized scope (strips unknown keys).
- */
-
-import type { TunnelCapability } from '../types';
-
 const VALID_CAPABILITIES = new Set<string>([
   'filesystem',
   'shell',

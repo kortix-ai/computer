@@ -1,5 +1,5 @@
 /**
- * Kortix Tunnel Plugin — standalone OpenCode plugin that registers
+ * Agent Tunnel Plugin — standalone OpenCode plugin that registers
  * all tunnel tools for interacting with the user's local machine.
  */
 

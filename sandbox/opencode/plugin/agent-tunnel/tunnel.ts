@@ -1,8 +1,8 @@
 /**
  * Tunnel Tools — OpenCode sandbox tools for interacting with user's local machine
- * via the Kortix reverse-tunnel infrastructure.
+ * via Agent Tunnel.
  *
- * Each tool calls POST /v1/tunnel/rpc/:tunnelId on kortix-api,
+ * Each tool calls POST /v1/tunnel/rpc/:tunnelId on the API server,
  * which relays the request to the user's local agent over WebSocket.
  *
  * Tools:
@@ -19,7 +19,7 @@ import { tunnelRpc, resolveTunnelId, getTunnelBase, getToken } from "./rpc"
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
 export const tunnelStatusTool = tool({
-	description: `Check the status of all Kortix Tunnel connections to the user's local machine. Lists every registered tunnel with its live/offline status, capabilities, and machine info. Use this to verify a tunnel is connected before attempting local operations.`,
+	description: `Check the status of all Agent Tunnel connections to the user's local machine. Lists every registered tunnel with its live/offline status, capabilities, and machine info. Use this to verify a tunnel is connected before attempting local operations.`,
 	args: {},
 	async execute() {
 		const token = getToken()
@@ -35,7 +35,7 @@ export const tunnelStatusTool = tool({
 		const connections = (await res.json()) as Array<Record<string, unknown>>
 
 		if (connections.length === 0) {
-			return "No tunnel connections found. The user needs to set up Kortix Tunnel first:\n1. Go to the Tunnel page in Kortix dashboard\n2. Create a new connection\n3. Run `npx @kortix/tunnel connect` on their local machine"
+			return "No tunnel connections found. The user needs to set up Agent Tunnel first:\n1. Create a tunnel connection\n2. Run `npx agent-tunnel connect` on their local machine"
 		}
 
 		const sections: string[] = []
@@ -61,7 +61,7 @@ export const tunnelStatusTool = tool({
 		}
 
 		if (!hasOnline) {
-			sections.push("\nNo tunnel is currently online. Ask the user to run `npx @kortix/tunnel connect` on their local machine.")
+			sections.push("\nNo tunnel is currently online. Ask the user to run `npx agent-tunnel connect` on their local machine.")
 		}
 
 		return sections.join("\n\n")
@@ -69,9 +69,9 @@ export const tunnelStatusTool = tool({
 })
 
 export const tunnelFsReadTool = tool({
-	description: `Read a file from the user's local machine via Kortix Tunnel. The file content is transferred securely through the tunnel relay. Requires filesystem permission — if not granted, a permission request will be sent to the user for approval.`,
+	description: `Read a file from the user's local machine via Agent Tunnel. The file content is transferred securely through the tunnel relay. Requires filesystem permission — if not granted, a permission request will be sent to the user for approval.`,
 	args: {
-		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (defaults to KORTIX_TUNNEL_ID env var)"),
+		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (auto-discovered if omitted)"),
 		path: tool.schema.string().describe("Absolute path to the file on the user's local machine"),
 		encoding: tool.schema.string().optional().describe("File encoding (default: utf-8)"),
 	},
@@ -90,9 +90,9 @@ export const tunnelFsReadTool = tool({
 })
 
 export const tunnelFsWriteTool = tool({
-	description: `Write a file to the user's local machine via Kortix Tunnel. Creates parent directories if needed. Requires filesystem write permission — if not granted, a permission request will be sent to the user.`,
+	description: `Write a file to the user's local machine via Agent Tunnel. Creates parent directories if needed. Requires filesystem write permission — if not granted, a permission request will be sent to the user.`,
 	args: {
-		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (defaults to KORTIX_TUNNEL_ID env var)"),
+		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (auto-discovered if omitted)"),
 		path: tool.schema.string().describe("Absolute path for the file on the user's local machine"),
 		content: tool.schema.string().describe("File content to write"),
 		encoding: tool.schema.string().optional().describe("File encoding (default: utf-8)"),
@@ -113,9 +113,9 @@ export const tunnelFsWriteTool = tool({
 })
 
 export const tunnelFsListTool = tool({
-	description: `List directory contents on the user's local machine via Kortix Tunnel. Returns file names, types (file/directory/symlink), and paths. Requires filesystem permission.`,
+	description: `List directory contents on the user's local machine via Agent Tunnel. Returns file names, types (file/directory/symlink), and paths. Requires filesystem permission.`,
 	args: {
-		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (defaults to KORTIX_TUNNEL_ID env var)"),
+		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (auto-discovered if omitted)"),
 		path: tool.schema.string().describe("Absolute path to the directory on the user's local machine"),
 		recursive: tool.schema.boolean().optional().describe("Include subdirectory contents (default: false)"),
 	},
@@ -145,9 +145,9 @@ export const tunnelFsListTool = tool({
 })
 
 export const tunnelShellExecTool = tool({
-	description: `Execute a command on the user's local machine via Kortix Tunnel. Commands are executed without shell interpolation (array args) for security. Requires shell permission — if not granted, a permission request will be sent to the user.`,
+	description: `Execute a command on the user's local machine via Agent Tunnel. Commands are executed without shell interpolation (array args) for security. Requires shell permission — if not granted, a permission request will be sent to the user.`,
 	args: {
-		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (defaults to KORTIX_TUNNEL_ID env var)"),
+		tunnel_id: tool.schema.string().optional().describe("Tunnel connection ID (auto-discovered if omitted)"),
 		command: tool.schema.string().describe("Command executable name (e.g., 'ls', 'git', 'python')"),
 		args: tool.schema.array(tool.schema.string()).optional().describe("Command arguments as separate strings (no shell interpolation)"),
 		cwd: tool.schema.string().optional().describe("Working directory for the command"),

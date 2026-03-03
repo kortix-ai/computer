@@ -43,7 +43,7 @@ export function TunnelSetupWizard({ onDone }: TunnelSetupWizardProps) {
     : 'http://localhost:8008';
 
   const connectCommand = created
-    ? `npx @kortix/tunnel connect --tunnel-id ${created.tunnelId} --token ${created.setupToken} --api-url ${apiUrl}`
+    ? `npx agent-tunnel connect --tunnel-id ${created.tunnelId} --token ${created.setupToken} --api-url ${apiUrl}`
     : '';
 
   const copyCommand = () => {

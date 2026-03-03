@@ -7,7 +7,7 @@ import { tunnelRpc, resolveTunnelId } from "./rpc"
 
 function saveImage(base64: string, format: string): string {
 	const ext = format === "jpeg" || format === "jpg" ? "jpg" : "png"
-	const dir = join(tmpdir(), "kortix-screenshots")
+	const dir = join(tmpdir(), "tunnel-screenshots")
 	mkdirSync(dir, { recursive: true })
 	const path = join(dir, `screenshot-${randomBytes(4).toString("hex")}.${ext}`)
 	writeFileSync(path, Buffer.from(base64, "base64"))
@@ -17,7 +17,7 @@ function saveImage(base64: string, format: string): string {
 const tunnelIdArg = tool.schema.string().optional().describe("Tunnel connection ID (auto-discovered if omitted)")
 
 export const tunnelScreenshotTool = tool({
-	description: `Take a screenshot of the user's screen via Kortix Tunnel. Saves the image to a temp file and returns the path. Use the Read tool on the returned path to view the screenshot.`,
+	description: `Take a screenshot of the user's screen via Agent Tunnel. Saves the image to a temp file and returns the path. Use the Read tool on the returned path to view the screenshot.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		x: tool.schema.number().optional().describe("Region X coordinate"),
@@ -49,7 +49,7 @@ export const tunnelScreenshotTool = tool({
 })
 
 export const tunnelClickTool = tool({
-	description: `Click at a specific screen coordinate on the user's machine via Kortix Tunnel. Supports left/right/middle click, double-click, and modifier keys.`,
+	description: `Click at a specific screen coordinate on the user's machine via Agent Tunnel. Supports left/right/middle click, double-click, and modifier keys.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		x: tool.schema.number().describe("X coordinate to click"),
@@ -73,7 +73,7 @@ export const tunnelClickTool = tool({
 })
 
 export const tunnelTypeTool = tool({
-	description: `Type text into the currently focused application on the user's machine via Kortix Tunnel. The text is typed character by character as if from a keyboard.`,
+	description: `Type text into the currently focused application on the user's machine via Agent Tunnel. The text is typed character by character as if from a keyboard.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		text: tool.schema.string().describe("Text to type"),
@@ -91,7 +91,7 @@ export const tunnelTypeTool = tool({
 })
 
 export const tunnelKeyTool = tool({
-	description: `Press a key combination on the user's machine via Kortix Tunnel. Use for keyboard shortcuts like cmd+s, ctrl+c, enter, tab, etc.`,
+	description: `Press a key combination on the user's machine via Agent Tunnel. Use for keyboard shortcuts like cmd+s, ctrl+c, enter, tab, etc.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		keys: tool.schema.array(tool.schema.string()).describe("Keys to press simultaneously. Examples: ['cmd', 's'] for save, ['enter'] for enter, ['ctrl', 'shift', 'p'] for command palette"),
@@ -105,7 +105,7 @@ export const tunnelKeyTool = tool({
 })
 
 export const tunnelWindowListTool = tool({
-	description: `List all visible windows on the user's machine via Kortix Tunnel. Returns window IDs, app names, titles, positions, and sizes. Use window IDs with other window tools.`,
+	description: `List all visible windows on the user's machine via Agent Tunnel. Returns window IDs, app names, titles, positions, and sizes. Use window IDs with other window tools.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 	},
@@ -128,7 +128,7 @@ export const tunnelWindowListTool = tool({
 })
 
 export const tunnelWindowFocusTool = tool({
-	description: `Bring a window to the front on the user's machine via Kortix Tunnel. Use tunnel_window_list to find window IDs.`,
+	description: `Bring a window to the front on the user's machine via Agent Tunnel. Use tunnel_window_list to find window IDs.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		windowId: tool.schema.number().describe("Window ID from tunnel_window_list"),
@@ -142,7 +142,7 @@ export const tunnelWindowFocusTool = tool({
 })
 
 export const tunnelAppLaunchTool = tool({
-	description: `Launch an application on the user's machine via Kortix Tunnel. On macOS, use the app name (e.g., "Calculator", "Safari"). On Linux, use the executable name or desktop file.`,
+	description: `Launch an application on the user's machine via Agent Tunnel. On macOS, use the app name (e.g., "Calculator", "Safari"). On Linux, use the executable name or desktop file.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		app: tool.schema.string().describe("Application name to launch"),
@@ -156,7 +156,7 @@ export const tunnelAppLaunchTool = tool({
 })
 
 export const tunnelAppQuitTool = tool({
-	description: `Quit an application on the user's machine via Kortix Tunnel.`,
+	description: `Quit an application on the user's machine via Agent Tunnel.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		app: tool.schema.string().describe("Application name to quit"),
@@ -170,7 +170,7 @@ export const tunnelAppQuitTool = tool({
 })
 
 export const tunnelClipboardReadTool = tool({
-	description: `Read the clipboard contents from the user's machine via Kortix Tunnel.`,
+	description: `Read the clipboard contents from the user's machine via Agent Tunnel.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 	},
@@ -186,7 +186,7 @@ export const tunnelClipboardReadTool = tool({
 })
 
 export const tunnelClipboardWriteTool = tool({
-	description: `Write text to the clipboard on the user's machine via Kortix Tunnel.`,
+	description: `Write text to the clipboard on the user's machine via Agent Tunnel.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		text: tool.schema.string().describe("Text to write to clipboard"),
@@ -200,7 +200,7 @@ export const tunnelClipboardWriteTool = tool({
 })
 
 export const tunnelCursorImageTool = tool({
-	description: `Take a small screenshot around the current cursor position on the user's machine via Kortix Tunnel. Saves the image to a temp file and returns the path. Use the Read tool on the returned path to view the image.`,
+	description: `Take a small screenshot around the current cursor position on the user's machine via Agent Tunnel. Saves the image to a temp file and returns the path. Use the Read tool on the returned path to view the image.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		radius: tool.schema.number().optional().describe("Radius in pixels around cursor (default: 50)"),
@@ -219,7 +219,7 @@ export const tunnelCursorImageTool = tool({
 })
 
 export const tunnelMouseMoveTool = tool({
-	description: `Move the mouse cursor to a specific position on the user's screen via Kortix Tunnel.`,
+	description: `Move the mouse cursor to a specific position on the user's screen via Agent Tunnel.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		x: tool.schema.number().describe("Target X coordinate"),
@@ -234,7 +234,7 @@ export const tunnelMouseMoveTool = tool({
 })
 
 export const tunnelMouseDragTool = tool({
-	description: `Drag from one point to another on the user's screen via Kortix Tunnel. Useful for drag-and-drop, resizing, or drawing.`,
+	description: `Drag from one point to another on the user's screen via Agent Tunnel. Useful for drag-and-drop, resizing, or drawing.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		fromX: tool.schema.number().describe("Start X coordinate"),
@@ -258,7 +258,7 @@ export const tunnelMouseDragTool = tool({
 })
 
 export const tunnelMouseScrollTool = tool({
-	description: `Scroll the mouse wheel at a specific position on the user's screen via Kortix Tunnel.`,
+	description: `Scroll the mouse wheel at a specific position on the user's screen via Agent Tunnel.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		x: tool.schema.number().describe("X coordinate to scroll at"),
@@ -280,7 +280,7 @@ export const tunnelMouseScrollTool = tool({
 })
 
 export const tunnelScreenInfoTool = tool({
-	description: `Get screen resolution and scale factor from the user's machine via Kortix Tunnel.`,
+	description: `Get screen resolution and scale factor from the user's machine via Agent Tunnel.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 	},
@@ -330,7 +330,7 @@ function formatAXTree(el: AXElement, indent: number = 0): string {
 }
 
 export const tunnelAxTreeTool = tool({
-	description: `Get the accessibility tree of an application on the user's machine via Kortix Tunnel. Returns a structured tree of UI elements with roles, labels, states, and available actions. Much faster and cheaper than screenshots for understanding UI state. Use pid to target a specific application.`,
+	description: `Get the accessibility tree of an application on the user's machine via Agent Tunnel. Returns a structured tree of UI elements with roles, labels, states, and available actions. Much faster and cheaper than screenshots for understanding UI state. Use pid to target a specific application.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		pid: tool.schema.number().optional().describe("Process ID of the target application (omit for all apps)"),
@@ -356,7 +356,7 @@ export const tunnelAxTreeTool = tool({
 })
 
 export const tunnelAxActionTool = tool({
-	description: `Perform an accessibility action on a UI element via Kortix Tunnel. Returns before/after state to verify the action actually worked. Use tunnel_ax_tree first to discover element IDs and available actions. Common actions: AXPress, AXConfirm, AXCancel, AXRaise, AXShowMenu. Check stateChanged in the response to verify success.`,
+	description: `Perform an accessibility action on a UI element via Agent Tunnel. Returns before/after state to verify the action actually worked. Use tunnel_ax_tree first to discover element IDs and available actions. Common actions: AXPress, AXConfirm, AXCancel, AXRaise, AXShowMenu. Check stateChanged in the response to verify success.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		elementId: tool.schema.string().describe("Element ID from the accessibility tree (e.g., '0.3.1')"),
@@ -449,7 +449,7 @@ export const tunnelAxFocusTool = tool({
 })
 
 export const tunnelAxSearchTool = tool({
-	description: `Search the accessibility tree for UI elements matching a query via Kortix Tunnel. Performs case-insensitive substring match on element titles, values, and descriptions. Faster than walking the full tree when you know what you're looking for.`,
+	description: `Search the accessibility tree for UI elements matching a query via Agent Tunnel. Performs case-insensitive substring match on element titles, values, and descriptions. Faster than walking the full tree when you know what you're looking for.`,
 	args: {
 		tunnel_id: tunnelIdArg,
 		query: tool.schema.string().describe("Search text (matches against title, value, description)"),

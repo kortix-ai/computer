@@ -29,10 +29,7 @@ import { serversApp } from './servers';
 import { supabaseAuth, combinedAuth } from './middleware/auth';
 import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
-import { tunnelApp, startTunnelService, stopTunnelService, getTunnelServiceStatus } from './tunnel';
-import { tunnelRelay } from './tunnel/core/relay';
-import { heartbeatManager } from './tunnel/core/heartbeat';
-import { notifyTunnelEvent } from './tunnel/routes/permission-requests';
+import { tunnelApp, wsHandlers as tunnelWsHandlers, startTunnelService, stopTunnelService, getTunnelServiceStatus } from './tunnel';
 import { startSandboxHealthMonitor, stopSandboxHealthMonitor } from './platform/services/sandbox-health';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
@@ -826,50 +823,8 @@ export default {
 
     open(ws: { data: any; send: (data: any) => void; close: (code?: number, reason?: string) => void }) {
       if (ws.data?.type === 'tunnel-agent') {
-        const { tunnelId, accountId, signingKey } = ws.data;
-        tunnelRelay.registerAgent(tunnelId, ws as any, signingKey, accountId);
-        heartbeatManager.register(tunnelId);
-
-        notifyTunnelEvent(accountId, 'tunnel_connected', { tunnelId });
-
-        import('drizzle-orm').then(({ eq, and: andOp }) =>
-          import('@kortix/db').then(({ tunnelConnections, tunnelPermissions }) =>
-            import('./shared/db').then(async ({ db }) => {
-              db.update(tunnelConnections)
-                .set({ status: 'online', lastHeartbeatAt: new Date(), updatedAt: new Date() })
-                .where(eq(tunnelConnections.tunnelId, tunnelId))
-                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err));
-
-              try {
-                const activePerms = await db
-                  .select({
-                    permissionId: tunnelPermissions.permissionId,
-                    capability: tunnelPermissions.capability,
-                    scope: tunnelPermissions.scope,
-                    expiresAt: tunnelPermissions.expiresAt,
-                  })
-                  .from(tunnelPermissions)
-                  .where(
-                    andOp(
-                      eq(tunnelPermissions.tunnelId, tunnelId),
-                      eq(tunnelPermissions.status, 'active'),
-                    ),
-                  );
-
-                tunnelRelay.sendNotification(tunnelId, 'tunnel.permissions.sync', {
-                  permissions: activePerms.map((p) => ({
-                    permissionId: p.permissionId,
-                    capability: p.capability,
-                    scope: p.scope,
-                    expiresAt: p.expiresAt?.toISOString() ?? undefined,
-                  })),
-                });
-              } catch (err) {
-                console.warn(`[tunnel-ws] Permission sync failed:`, err);
-              }
-            })
-          )
-        );
+        const { tunnelId, signingKey, accountId } = ws.data;
+        tunnelWsHandlers.onOpen(tunnelId, ws as any, signingKey, { accountId });
         return;
       }
 
@@ -923,35 +878,7 @@ export default {
 
     message(ws: { data: any; close: (code?: number, reason?: string) => void }, message: string | Buffer) {
       if (ws.data?.type === 'tunnel-agent') {
-        const { tunnelId } = ws.data;
-
-        const msgSize = typeof message === 'string' ? message.length : (message as Buffer).byteLength;
-        if (msgSize > config.TUNNEL_MAX_WS_MESSAGE_SIZE) {
-          console.warn(`[tunnel-ws] Oversized message from ${tunnelId}: ${msgSize} bytes (limit: ${config.TUNNEL_MAX_WS_MESSAGE_SIZE})`);
-          return;
-        }
-        try {
-          const parsed = JSON.parse(typeof message === 'string' ? message : message.toString('utf-8'));
-          if (parsed.method === 'tunnel.pong') {
-            heartbeatManager.recordPong(tunnelId);
-            const mi = parsed.params?.machineInfo;
-            if (mi && typeof mi === 'object' && mi.hostname) {
-              import('drizzle-orm').then(({ eq }) =>
-                import('@kortix/db').then(({ tunnelConnections }) =>
-                  import('./shared/db').then(({ db }) =>
-                    db.update(tunnelConnections)
-                      .set({ machineInfo: mi, updatedAt: new Date() })
-                      .where(eq(tunnelConnections.tunnelId, tunnelId))
-                      .catch(() => {})
-                  )
-                )
-              );
-            }
-            return;
-          }
-        } catch {}
-
-        tunnelRelay.handleAgentMessage(tunnelId, message);
+        tunnelWsHandlers.onMessage(ws.data.tunnelId, message);
         return;
       }
 
@@ -973,24 +900,7 @@ export default {
 
     close(ws: { data: any }) {
       if (ws.data?.type === 'tunnel-agent') {
-        const { tunnelId, accountId } = ws.data;
-        tunnelRelay.unregisterAgent(tunnelId);
-        heartbeatManager.unregister(tunnelId);
-
-        if (accountId) {
-          notifyTunnelEvent(accountId, 'tunnel_disconnected', { tunnelId });
-        }
-
-        import('drizzle-orm').then(({ eq }) =>
-          import('@kortix/db').then(({ tunnelConnections }) =>
-            import('./shared/db').then(({ db }) =>
-              db.update(tunnelConnections)
-                .set({ status: 'offline', updatedAt: new Date() })
-                .where(eq(tunnelConnections.tunnelId, tunnelId))
-                .catch((err: any) => console.warn(`[tunnel-ws] DB update failed:`, err))
-            )
-          )
-        );
+        tunnelWsHandlers.onClose(ws.data.tunnelId);
         return;
       }
 

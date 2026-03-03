@@ -1,6 +1,6 @@
 /**
- * TunnelAgent — WebSocket client that connects to kortix-api
- * and handles JSON-RPC requests from the cloud sandbox.
+ * TunnelAgent — WebSocket client that connects to a tunnel relay
+ * and handles JSON-RPC requests from the cloud.
  *
  * Responsibilities:
  *   - Maintain persistent WS connection with auto-reconnect
@@ -17,7 +17,7 @@ import type { TunnelConfig } from './config';
 import { CapabilityRegistry, type RpcHandler } from './capabilities/index';
 import { PermissionGuard } from './security/permission-guard';
 import type { LocalPermission } from './security/permission-guard';
-import { deriveSigningKey, verifyMessageSignature } from './security/signature';
+import { deriveSigningKey, verifyMessageSignature } from './crypto';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -335,11 +335,12 @@ export class TunnelAgent {
       .replace(/^http:/, 'ws:')
       .replace(/^https:/, 'wss:');
 
+    const wsPath = this.config.wsPath || '/ws';
     const params = new URLSearchParams({
       token: this.config.token,
       tunnelId: this.config.tunnelId,
     });
 
-    return `${base}/v1/tunnel/ws?${params.toString()}`;
+    return `${base}${wsPath}?${params.toString()}`;
   }
 }

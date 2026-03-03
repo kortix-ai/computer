@@ -1,12 +1,3 @@
-/**
- * Configuration loader for kortix-tunnel local agent.
- *
- * Config sources (highest priority first):
- *   1. CLI flags (--token, --tunnel-id, --api-url)
- *   2. Environment variables (KORTIX_TUNNEL_TOKEN, etc.)
- *   3. Config file (~/.kortix-tunnel/config.json)
- */
-
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -15,17 +6,20 @@ export interface TunnelConfig {
   token: string;
   tunnelId: string;
   apiUrl: string;
+  /** WS path on the server (default: '/ws'). Override for custom server mounts. */
+  wsPath: string;
   maxFileSize: number;
   allowedPaths: string[];
   allowedCommands: string[];
   workingDir: string;
 }
 
-const CONFIG_DIR = join(homedir(), '.kortix-tunnel');
+const CONFIG_DIR = join(homedir(), '.agent-tunnel');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
 const DEFAULTS: Partial<TunnelConfig> = {
-  apiUrl: 'http://localhost:8008',
+  apiUrl: 'http://localhost:8080',
+  wsPath: '/ws',
   maxFileSize: 10 * 1024 * 1024,
   allowedPaths: [homedir()],
   allowedCommands: [],
@@ -43,10 +37,11 @@ export function loadConfig(overrides: Partial<TunnelConfig> = {}): TunnelConfig 
   }
 
   const envConfig: Partial<TunnelConfig> = {};
-  if (process.env.KORTIX_TUNNEL_TOKEN) envConfig.token = process.env.KORTIX_TUNNEL_TOKEN;
-  if (process.env.KORTIX_TUNNEL_ID) envConfig.tunnelId = process.env.KORTIX_TUNNEL_ID;
-  if (process.env.KORTIX_API_URL) envConfig.apiUrl = process.env.KORTIX_API_URL;
-  if (process.env.KORTIX_TUNNEL_MAX_FILE_SIZE) envConfig.maxFileSize = parseInt(process.env.KORTIX_TUNNEL_MAX_FILE_SIZE, 10);
+  if (process.env.TUNNEL_TOKEN) envConfig.token = process.env.TUNNEL_TOKEN;
+  if (process.env.TUNNEL_ID) envConfig.tunnelId = process.env.TUNNEL_ID;
+  if (process.env.TUNNEL_API_URL) envConfig.apiUrl = process.env.TUNNEL_API_URL;
+  if (process.env.TUNNEL_WS_PATH) envConfig.wsPath = process.env.TUNNEL_WS_PATH;
+  if (process.env.TUNNEL_MAX_FILE_SIZE) envConfig.maxFileSize = parseInt(process.env.TUNNEL_MAX_FILE_SIZE, 10);
 
   const merged = {
     ...DEFAULTS,

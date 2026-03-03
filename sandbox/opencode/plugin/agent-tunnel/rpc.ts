@@ -1,7 +1,7 @@
 /**
  * Shared RPC infrastructure for tunnel tools.
  *
- * Auth: KORTIX_API_URL + KORTIX_TOKEN via the shared getEnv() helper.
+ * Auth: KORTIX_API_URL + KORTIX_TOKEN env vars via the shared getEnv() helper.
  * Resolution order: process.env → s6 env dir → .env file fallback.
  */
 
@@ -43,7 +43,7 @@ export async function tunnelRpc(
 		if (res.status === 404) cachedTunnelId = null
 
 		if (res.status === 403 && data.requestId) {
-			return `Permission required. A permission request (${data.requestId}) has been sent to the user for approval. The user needs to approve this request in the Kortix dashboard before you can access their local machine. Please inform the user and try again after they approve.`
+			return `Permission required. A permission request (${data.requestId}) has been sent to the user for approval. The user needs to approve this request before you can access their local machine. Please inform the user and try again after they approve.`
 		}
 
 		throw new Error(`Tunnel RPC failed: ${data.error || `HTTP ${res.status}`} (code: ${data.code || -1})`)
@@ -86,9 +86,8 @@ export async function resolveTunnelId(args: { tunnel_id?: string }): Promise<str
 
 	cachedTunnelId = null
 	throw new Error(
-		"No tunnel connection found. The user needs to set up Kortix Tunnel first:\n" +
-		"1. Go to the Tunnel page in Kortix dashboard\n" +
-		"2. Create a new connection\n" +
-		"3. Run `npx @kortix/tunnel connect` on their local machine"
+		"No tunnel connection found. The user needs to set up Agent Tunnel first:\n" +
+		"1. Create a tunnel connection\n" +
+		"2. Run `npx agent-tunnel connect` on their local machine"
 	)
 }

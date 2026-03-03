@@ -15,7 +15,7 @@
     "test:cli": "bash scripts/tests/run-all.sh"
   },
   "devDependencies": {
-    "@kortix/tunnel": "workspace:*"
+    "agent-tunnel": "workspace:*"
   },
   "pnpm": {
     "overrides": {

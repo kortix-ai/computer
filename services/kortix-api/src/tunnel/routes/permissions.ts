@@ -1,11 +1,3 @@
-/**
- * Tunnel Permissions Routes — manage granted permissions for tunnel connections.
- *
- * GET    /permissions/:tunnelId        — list permissions for a tunnel
- * POST   /permissions/:tunnelId        — grant a new permission
- * DELETE /permissions/:tunnelId/:permId — revoke a permission
- */
-
 import { Hono } from 'hono';
 import { eq, and, desc } from 'drizzle-orm';
 import { tunnelPermissions, tunnelConnections } from '@kortix/db';
@@ -13,8 +5,7 @@ import { db } from '../../shared/db';
 import { tunnelRelay } from '../core/relay';
 import { tunnelRateLimiter } from '../core/rate-limiter';
 import { isValidCapability, validateScope as validateScopeInput } from '../core/scope-validator';
-import type { TunnelCapability } from '../types';
-import { TunnelErrorCode } from '../types';
+import { TunnelErrorCode, type TunnelCapability } from 'agent-tunnel';
 
 export function createPermissionsRouter(): Hono {
   const router = new Hono();

@@ -1,12 +1,3 @@
-/**
- * Tunnel sub-service type definitions.
- *
- * JSON-RPC 2.0 protocol types, capability scopes, and error codes
- * for the reverse-tunnel relay between kortix-api and the local agent.
- */
-
-// ─── JSON-RPC 2.0 Protocol ──────────────────────────────────────────────────
-
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
   id: string;
@@ -116,14 +107,6 @@ export interface PendingRPC {
   startedAt: number;
 }
 
-export interface TunnelAgentWsData {
-  type: 'tunnel-agent';
-  tunnelId: string;
-  accountId: string;
-  capabilities: string[];
-  signingKey: string;
-}
-
 export interface SignedJsonRpcRequest extends JsonRpcRequest {
   _sig: string;
   _nonce: number;
@@ -143,4 +126,39 @@ export interface TunnelRpcParams {
 
 export interface RelayRpcOptions {
   timeoutMs?: number;
+}
+
+export interface AgentInfo {
+  tunnelId: string;
+  signingKey: string;
+  connectedAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TunnelRelayEvents {
+  'agent:connect': { tunnelId: string; metadata?: Record<string, unknown> };
+  'agent:disconnect': { tunnelId: string };
+  'agent:timeout': { tunnelId: string };
+  'rpc:request': { tunnelId: string; method: string; requestId: string };
+  'rpc:response': { tunnelId: string; method: string; requestId: string; durationMs: number };
+  'rpc:error': { tunnelId: string; method: string; requestId: string; error: Error };
+  'connection:replaced': { tunnelId: string };
+  'message:pong': { tunnelId: string; params?: Record<string, unknown> };
+  'message:raw': { tunnelId: string; message: unknown };
+}
+
+export interface TunnelRelayConfig {
+  rpcTimeoutMs?: number;
+  maxWsMessageSize?: number;
+}
+
+export interface HeartbeatConfig {
+  intervalMs?: number;
+  maxMissed?: number;
+}
+
+export interface TunnelServerConfig {
+  port?: number;
+  relay?: TunnelRelayConfig;
+  heartbeat?: HeartbeatConfig;
 }

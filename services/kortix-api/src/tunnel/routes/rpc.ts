@@ -1,28 +1,12 @@
-/**
- * Tunnel RPC Route — relays RPC calls from sandbox tools to local agents.
- *
- * POST /rpc/:tunnelId — sandbox-initiated RPC call
- *
- * Flow:
- *   1. Auth check (combinedAuth — already applied)
- *   2. Validate tunnel belongs to account
- *   3. Check permission (capability + scope)
- *   4. If no permission → create permission request, return 403
- *   5. If permission exists → relay via TunnelRelay
- *   6. Log to audit trail
- *   7. Return result
- */
-
 import { Hono } from 'hono';
 import { eq, and, or } from 'drizzle-orm';
 import { tunnelConnections, tunnelPermissionRequests } from '@kortix/db';
 import { db } from '../../shared/db';
-import { tunnelRelay, TunnelRelayError } from '../core/relay';
+import { TunnelRelayError, TunnelMethods, TunnelErrorCode, type TunnelCapability } from 'agent-tunnel';
+import { tunnelRelay } from '../core/relay';
 import { checkPermission } from '../core/permission-checker';
 import { writeAuditLog, buildRequestSummary } from '../core/audit-logger';
 import { notifyPermissionRequest } from './permission-requests';
-import { TunnelMethods, TunnelErrorCode } from '../types';
-import type { TunnelCapability } from '../types';
 import { tunnelRateLimiter } from '../core/rate-limiter';
 import { isValidCapability, validateScope as validateScopeInput } from '../core/scope-validator';
 import { resolveAccountId } from '../../shared/resolve-account';
@@ -51,7 +35,6 @@ export function createRpcRouter(): Hono {
       return c.json({ error: 'method is required' }, 400);
     }
 
-    // Match tunnel by accountId or raw userId (for tunnels created before resolution was added)
     const ownerClause = accountId !== userId
       ? or(eq(tunnelConnections.accountId, accountId), eq(tunnelConnections.accountId, userId))
       : eq(tunnelConnections.accountId, accountId);
