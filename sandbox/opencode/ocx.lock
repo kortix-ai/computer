@@ -28,6 +28,578 @@
         ".opencode/plugin/worktree/terminal.ts"
       ],
       "installedAt": "2026-02-10T21:58:44.216Z"
+    },
+    "kortix/kortix-agent": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "07e02063ba1a8644453c286727bc3f960ad9a882db58ba73b9e9b341ecf86688",
+      "files": [
+        ".opencode/agent/kortix.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.929Z"
+    },
+    "kortix/onboarding": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "418613857cd4da95382fd302fa6e5ba233d7a68ed012ecc8a17bbb1813e7c3f5",
+      "files": [
+        ".opencode/command/onboarding.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.929Z"
+    },
+    "kortix/kortix-memory": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "d9d184222f55481d374531becac7bd2b15c8bdd42cc7d2fed192aaa8b615fc74",
+      "files": [
+        ".opencode/plugin/kortix-sys/src/index.ts",
+        ".opencode/plugin/kortix-sys/src/extract.ts",
+        ".opencode/plugin/kortix-sys/src/types.ts",
+        ".opencode/plugin/kortix-sys/src/llm.ts",
+        ".opencode/plugin/kortix-sys/src/search.ts",
+        ".opencode/plugin/kortix-sys/src/db.ts",
+        ".opencode/plugin/kortix-sys/src/enrich.ts",
+        ".opencode/plugin/kortix-sys/src/consolidate.ts",
+        ".opencode/plugin/kortix-sys/src/context.ts",
+        ".opencode/plugin/kortix-sys/src/session.ts",
+        ".opencode/plugin/kortix-sys/src/lss.ts",
+        ".opencode/plugin/kortix-sys/skills/session-search/SKILL.md",
+        ".opencode/plugin/kortix-sys/skills/memory-context-management/SKILL.md",
+        ".opencode/plugin/kortix-sys/package.json",
+        ".opencode/plugin/kortix-sys/tsconfig.json"
+      ],
+      "installedAt": "2026-02-27T21:22:13.931Z"
+    },
+    "kortix/kortix-tunnel": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "751c12a56792737c229e2a010096cd22ba31a46cf5f0b32d66ecaa8fc00f39e3",
+      "files": [
+        ".opencode/plugin/kortix-tunnel/index.ts",
+        ".opencode/plugin/kortix-tunnel/rpc.ts",
+        ".opencode/plugin/kortix-tunnel/tunnel.ts",
+        ".opencode/plugin/kortix-tunnel/tunnel-desktop.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.931Z"
+    },
+    "kortix/deep-research": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "48c7b689cda13cc3878349d42dd17282b85ac57e9b858a4ebfc3d3158b2c0092",
+      "files": [
+        ".opencode/skills/deep-research/SKILL.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.932Z"
+    },
+    "kortix/openalex-paper-search": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "ad201d5aba555e8101798cc1456ab8833f08bcc498cf4f723767bbd048e0d80e",
+      "files": [
+        ".opencode/skills/openalex-paper-search/SKILL.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.932Z"
+    },
+    "kortix/paper-creator": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "909cc9fd36e3ead402e069e0b72001a24eae8e775421b3b01f9f4967f62a77fc",
+      "files": [
+        ".opencode/skills/paper-creator/SKILL.md",
+        ".opencode/skills/paper-creator/assets/template.tex",
+        ".opencode/skills/paper-creator/scripts/compile.sh",
+        ".opencode/skills/paper-creator/scripts/openalex_to_bibtex.py",
+        ".opencode/skills/paper-creator/scripts/verify.sh"
+      ],
+      "installedAt": "2026-02-27T21:22:13.933Z"
+    },
+    "kortix/web-search": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "c0b03a531a884179551e3d60ecfd32cc10e242f4106d5fd0dfc86b03a09ba4e5",
+      "files": [
+        ".opencode/tool/web-search.ts",
+        ".opencode/tool/tests/web-search.test.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.933Z"
+    },
+    "kortix/scrape-webpage": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "ed6436a7ec258b8cf102fa3ed327e792d0ef37712e040f05ba29158643192e15",
+      "files": [
+        ".opencode/tool/scrape-webpage.ts",
+        ".opencode/tool/tests/scrape-webpage.test.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.934Z"
+    },
+    "kortix/research": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files": [],
+      "installedAt": "2026-02-27T21:22:13.934Z"
+    },
+    "kortix/docx": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "ab88b4dce795fc46662a47835b4dbe57f8ce6e73f2260d372128702155c69c2c",
+      "files": [
+        ".opencode/skills/docx/SKILL.md",
+        ".opencode/skills/docx/scripts/__init__.py",
+        ".opencode/skills/docx/scripts/accept_changes.py",
+        ".opencode/skills/docx/scripts/comment.py",
+        ".opencode/skills/docx/scripts/render_docx.py",
+        ".opencode/skills/docx/scripts/office/pack.py",
+        ".opencode/skills/docx/scripts/office/soffice.py",
+        ".opencode/skills/docx/scripts/office/unpack.py",
+        ".opencode/skills/docx/scripts/office/validate.py",
+        ".opencode/skills/docx/scripts/office/helpers/__init__.py",
+        ".opencode/skills/docx/scripts/office/helpers/merge_runs.py",
+        ".opencode/skills/docx/scripts/office/helpers/simplify_redlines.py",
+        ".opencode/skills/docx/scripts/office/validators/__init__.py",
+        ".opencode/skills/docx/scripts/office/validators/base.py",
+        ".opencode/skills/docx/scripts/office/validators/docx.py",
+        ".opencode/skills/docx/scripts/office/validators/pptx.py",
+        ".opencode/skills/docx/scripts/office/validators/redlining.py",
+        ".opencode/skills/docx/scripts/templates/comments.xml",
+        ".opencode/skills/docx/scripts/templates/commentsExtended.xml",
+        ".opencode/skills/docx/scripts/templates/commentsExtensible.xml",
+        ".opencode/skills/docx/scripts/templates/commentsIds.xml",
+        ".opencode/skills/docx/scripts/templates/people.xml"
+      ],
+      "installedAt": "2026-02-27T21:22:13.937Z"
+    },
+    "kortix/xlsx": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "8cacdb0f7fd889971687564ed319608a7e82d68289f09eabcad7cdfa12bdfa72",
+      "files": [
+        ".opencode/skills/xlsx/SKILL.md",
+        ".opencode/skills/xlsx/LICENSE.txt",
+        ".opencode/skills/xlsx/scripts/recalc.py",
+        ".opencode/skills/xlsx/scripts/office/pack.py",
+        ".opencode/skills/xlsx/scripts/office/soffice.py",
+        ".opencode/skills/xlsx/scripts/office/unpack.py",
+        ".opencode/skills/xlsx/scripts/office/validate.py",
+        ".opencode/skills/xlsx/scripts/office/helpers/__init__.py",
+        ".opencode/skills/xlsx/scripts/office/helpers/merge_runs.py",
+        ".opencode/skills/xlsx/scripts/office/helpers/simplify_redlines.py",
+        ".opencode/skills/xlsx/scripts/office/validators/__init__.py",
+        ".opencode/skills/xlsx/scripts/office/validators/base.py",
+        ".opencode/skills/xlsx/scripts/office/validators/docx.py",
+        ".opencode/skills/xlsx/scripts/office/validators/pptx.py",
+        ".opencode/skills/xlsx/scripts/office/validators/redlining.py",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/mce/mc.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/microsoft/wml-2010.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/microsoft/wml-2012.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/microsoft/wml-2018.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/microsoft/wml-cex-2018.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/microsoft/wml-cid-2016.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd",
+        ".opencode/skills/xlsx/scripts/office/schemas/microsoft/wml-symex-2015.xsd"
+      ],
+      "installedAt": "2026-02-27T21:22:13.943Z"
+    },
+    "kortix/pdf": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "880ab24a56e6558a8d7336ef11a8ba6faed65d777bf9b2ce5579401199ddb430",
+      "files": [
+        ".opencode/skills/pdf/SKILL.md",
+        ".opencode/skills/pdf/forms.md",
+        ".opencode/skills/pdf/reference.md",
+        ".opencode/skills/pdf/scripts/check_bounding_boxes.py",
+        ".opencode/skills/pdf/scripts/check_fillable_fields.py",
+        ".opencode/skills/pdf/scripts/convert_pdf_to_images.py",
+        ".opencode/skills/pdf/scripts/create_validation_image.py",
+        ".opencode/skills/pdf/scripts/extract_form_field_info.py",
+        ".opencode/skills/pdf/scripts/extract_form_structure.py",
+        ".opencode/skills/pdf/scripts/fill_fillable_fields.py",
+        ".opencode/skills/pdf/scripts/fill_pdf_form_with_annotations.py"
+      ],
+      "installedAt": "2026-02-27T21:22:13.944Z"
+    },
+    "kortix/presentation-gen": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "d21a4eb6c71db3e7cc0b1f88fdd3e25df86d8c607c3653eddfaacd66768cd67c",
+      "files": [
+        ".opencode/tool/presentation-gen.ts",
+        ".opencode/tool/scripts/.python-version",
+        ".opencode/tool/scripts/pyproject.toml",
+        ".opencode/tool/scripts/uv.lock",
+        ".opencode/tool/scripts/convert_pdf.py",
+        ".opencode/tool/scripts/convert_pptx.py",
+        ".opencode/tool/scripts/validate_slide.py",
+        ".opencode/tool/tests/presentation-gen.test.ts",
+        ".opencode/tool/tests/e2e-presentation-fix.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.945Z"
+    },
+    "kortix/presentations": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "c65b1b87269f882186b875e96a79bb6102dca09d4b7df4ceed50cb03a70e706a",
+      "files": [
+        ".opencode/skills/presentations/SKILL.md",
+        ".opencode/skills/presentations/serve.ts",
+        ".opencode/skills/presentations/viewer.html"
+      ],
+      "installedAt": "2026-02-27T21:22:13.945Z"
+    },
+    "kortix/legal-writer": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "46d059c9a996eb7559933aa764082a2d5d3f188f8103d31ecb1b2984f41fce49",
+      "files": [
+        ".opencode/skills/legal-writer/SKILL.md",
+        ".opencode/skills/legal-writer/references/bluebook.md",
+        ".opencode/skills/legal-writer/references/document-types.md",
+        ".opencode/skills/legal-writer/scripts/courtlistener.py",
+        ".opencode/skills/legal-writer/scripts/ecfr_lookup.py",
+        ".opencode/skills/legal-writer/scripts/verify-legal.py"
+      ],
+      "installedAt": "2026-02-27T21:22:13.946Z"
+    },
+    "kortix/documents": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files": [],
+      "installedAt": "2026-02-27T21:22:13.946Z"
+    },
+    "kortix/image-gen": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "7b6a90c0a34cefd89634d33021a3ec45fa83751471707ded666e343d363036ab",
+      "files": [
+        ".opencode/tool/image-gen.ts",
+        ".opencode/tool/tests/image-gen.test.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.946Z"
+    },
+    "kortix/image-search": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "2a8f0b46f0482c7a68df0eedd73bb0c93ae14383dfbb90aa8388e3b3bb7de755",
+      "files": [
+        ".opencode/tool/image-search.ts",
+        ".opencode/tool/tests/image-search.test.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.946Z"
+    },
+    "kortix/video-gen": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "520e544c55e122f68c5fc0d1bc34a90f4b8eee3fe1a196e1bb81d17d63cf18a7",
+      "files": [
+        ".opencode/tool/video-gen.ts",
+        ".opencode/tool/tests/video-gen.test.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.947Z"
+    },
+    "kortix/logo-creator": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "4ad0c8ff71df2f4ab8f8f296fbae021ebf220d0392111ecff1ed49f7c03f55dc",
+      "files": [
+        ".opencode/skills/logo-creator/SKILL.md",
+        ".opencode/skills/logo-creator/references/prompt-patterns.md",
+        ".opencode/skills/logo-creator/scripts/compose_logo.py",
+        ".opencode/skills/logo-creator/scripts/create_logo_sheet.py",
+        ".opencode/skills/logo-creator/scripts/remove_bg.py"
+      ],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/elevenlabs": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "f7111394891928d88fc6908c68ee2777030b3fb476fb8805d7858c9018f7ddd2",
+      "files": [
+        ".opencode/skills/elevenlabs/SKILL.md",
+        ".opencode/skills/elevenlabs/scripts/tts.py"
+      ],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/media": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files": [],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/integration-search": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "a7926e9381b4248b0cf89f95ae46212a71ad944b74d5c067a0ce3f848335f6e3",
+      "files": [
+        ".opencode/tool/integration-search.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/integration-connect": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "88212ec49c652a71d83c5c8abc16512e330d3ca4f771974ab36f627714b46a9f",
+      "files": [
+        ".opencode/tool/integration-connect.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/integration-list": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "59e3b067b82cb17d91a7e8c151fbaf4d1f9ba2a003e683be7e09df0e5d1f7bc2",
+      "files": [
+        ".opencode/tool/integration-list.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/integration-actions": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "7f041408e5aafeeb3f6bbd2c880dc196ec494cdd24de33c033d9ccdef860cbe2",
+      "files": [
+        ".opencode/tool/integration-actions.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/integration-run": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "6d4f0dcb7dfd1184994b8c25b07dc0902e8e36df66083d7b0a189eb88bd4130f",
+      "files": [
+        ".opencode/tool/integration-run.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.948Z"
+    },
+    "kortix/integration-exec": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "bcbf3c8e4710d0eb553d36e719e3fe1e8b53c77f52f769c3b8ea55467b67ab0a",
+      "files": [
+        ".opencode/tool/integration-exec.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.949Z"
+    },
+    "kortix/integration-request": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "c11bfbddc51ddaec9a3042a307e457e14c7bb1f57129656f767e043f826f913c",
+      "files": [
+        ".opencode/tool/integration-request.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.949Z"
+    },
+    "kortix/integrations": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files": [],
+      "installedAt": "2026-02-27T21:22:13.949Z"
+    },
+    "kortix/show": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "923e950e32f415bf773d7ca0668afe600b5d20f1e126ecb10197a371c2781d55",
+      "files": [
+        ".opencode/tool/show.ts",
+        ".opencode/tool/tests/show.test.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.949Z"
+    },
+    "kortix/cron-triggers": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "a065822b8902ff0e64f5ddaa94b66d3d6ce49c2fee3635ef2f5c9655fa469009",
+      "files": [
+        ".opencode/tool/cron-triggers.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.949Z"
+    },
+    "kortix/kortix-system": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "2926ed206cbf604c3d4f44e099738a7ef4df4b1367aa6efd234c062788b3cc0d",
+      "files": [
+        ".opencode/skills/kortix-system/SKILL.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.949Z"
+    },
+    "kortix/email": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "0879eac9317f9e7e1c0b4f10bb9ecfe2c04aabf279987aea4cb94c8f227eae81",
+      "files": [
+        ".opencode/skills/email/SKILL.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.949Z"
+    },
+    "kortix/domain-research": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "1c73ef0b83ae215ebd494261ed198a389824e9707dfcd41476683c5fa01fe558",
+      "files": [
+        ".opencode/skills/domain-research/SKILL.md",
+        ".opencode/skills/domain-research/scripts/domain-lookup.py"
+      ],
+      "installedAt": "2026-02-27T21:22:13.950Z"
+    },
+    "kortix/fullstack-vite-convex": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "785d775eb90acc007fea84187a0d1085c5642a5be1cc3547c95df3dca6a0e249",
+      "files": [
+        ".opencode/skills/fullstack-vite-convex/SKILL.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.950Z"
+    },
+    "kortix/agent-browser": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "c0c6138a0c3f651e81484582c882748c2ce5795f822342f2297a2e8a23c5ebe7",
+      "files": [
+        ".opencode/skills/agent-browser/SKILL.md",
+        ".opencode/skills/agent-browser/references/authentication.md",
+        ".opencode/skills/agent-browser/references/commands.md",
+        ".opencode/skills/agent-browser/references/profiling.md",
+        ".opencode/skills/agent-browser/references/proxy-support.md",
+        ".opencode/skills/agent-browser/references/session-management.md",
+        ".opencode/skills/agent-browser/references/snapshot-refs.md",
+        ".opencode/skills/agent-browser/references/video-recording.md",
+        ".opencode/skills/agent-browser/templates/authenticated-session.sh",
+        ".opencode/skills/agent-browser/templates/capture-workflow.sh",
+        ".opencode/skills/agent-browser/templates/form-automation.sh"
+      ],
+      "installedAt": "2026-02-27T21:22:13.951Z"
+    },
+    "kortix/remotion": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "554ed2798167fd0b513250543ca832bbfa0995d03f6e1a58a51fcb1b129e6bc4",
+      "files": [
+        ".opencode/skills/remotion/SKILL.md",
+        ".opencode/skills/remotion/rules/3d.md",
+        ".opencode/skills/remotion/rules/animations.md",
+        ".opencode/skills/remotion/rules/assets.md",
+        ".opencode/skills/remotion/rules/audio.md",
+        ".opencode/skills/remotion/rules/audio-visualization.md",
+        ".opencode/skills/remotion/rules/calculate-metadata.md",
+        ".opencode/skills/remotion/rules/can-decode.md",
+        ".opencode/skills/remotion/rules/charts.md",
+        ".opencode/skills/remotion/rules/compositions.md",
+        ".opencode/skills/remotion/rules/display-captions.md",
+        ".opencode/skills/remotion/rules/extract-frames.md",
+        ".opencode/skills/remotion/rules/ffmpeg.md",
+        ".opencode/skills/remotion/rules/fonts.md",
+        ".opencode/skills/remotion/rules/get-audio-duration.md",
+        ".opencode/skills/remotion/rules/get-video-dimensions.md",
+        ".opencode/skills/remotion/rules/get-video-duration.md",
+        ".opencode/skills/remotion/rules/gifs.md",
+        ".opencode/skills/remotion/rules/images.md",
+        ".opencode/skills/remotion/rules/import-srt-captions.md",
+        ".opencode/skills/remotion/rules/light-leaks.md",
+        ".opencode/skills/remotion/rules/lottie.md",
+        ".opencode/skills/remotion/rules/maps.md",
+        ".opencode/skills/remotion/rules/measuring-dom-nodes.md",
+        ".opencode/skills/remotion/rules/measuring-text.md",
+        ".opencode/skills/remotion/rules/parameters.md",
+        ".opencode/skills/remotion/rules/sequencing.md",
+        ".opencode/skills/remotion/rules/subtitles.md",
+        ".opencode/skills/remotion/rules/tailwind.md",
+        ".opencode/skills/remotion/rules/text-animations.md",
+        ".opencode/skills/remotion/rules/timing.md",
+        ".opencode/skills/remotion/rules/transcribe-captions.md",
+        ".opencode/skills/remotion/rules/transitions.md",
+        ".opencode/skills/remotion/rules/transparent-videos.md",
+        ".opencode/skills/remotion/rules/trimming.md",
+        ".opencode/skills/remotion/rules/videos.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.954Z"
+    },
+    "kortix/opencode-reference": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "66a8a95be2adbe1d0a811bb141e177679fbfa49fca722c4732fa42e9601414fc",
+      "files": [
+        ".opencode/skills/opencode/SKILL.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.954Z"
+    },
+    "kortix/woa-find": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "757f483fe124b3567baf28835bafc5a7d27443ce64a4aff2316373ce1fa56994",
+      "files": [
+        ".opencode/tool/woa-find.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.955Z"
+    },
+    "kortix/woa-create": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "2696b84ad62079921f5b700373376b9981188017e91be4b5c20e8c571f410118",
+      "files": [
+        ".opencode/tool/woa-create.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.955Z"
+    },
+    "kortix/woa": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "aef3ba54c2576dbb1f2606d8ea3272e84280946bd2f609041cd24e1b377138ce",
+      "files": [
+        ".opencode/skills/woa/SKILL.md"
+      ],
+      "installedAt": "2026-02-27T21:22:13.955Z"
+    },
+    "kortix/kortix-primitives": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "c3e16cb27f007f178339cb046786d8455f1e51a534744332f98c96a7b3bdb1d0",
+      "files": [
+        ".opencode/tool/lib/get-env.ts"
+      ],
+      "installedAt": "2026-02-27T21:22:13.955Z"
+    },
+    "kortix/sandbox": {
+      "registry": "kortix",
+      "version": "1.0.0",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files": [],
+      "installedAt": "2026-02-27T21:22:13.955Z"
     }
   }
 }

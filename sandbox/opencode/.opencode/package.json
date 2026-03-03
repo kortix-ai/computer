@@ -1,0 +1,11 @@
+{
+  "name": "opencode-plugins",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@anthropic-ai/sdk": "0.52.0",
+    "@tavily/core": "0.0.7",
+    "@mendable/firecrawl-js": "1.25.2",
+    "replicate": "1.0.1"
+  }
+}

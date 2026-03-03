@@ -1,3 +1,6 @@
 [submodule "services/lss"]
 	path = services/lss
 	url = https://github.com/kortix-ai/lss.git
+[submodule "services/registry"]
+	path = services/registry
+	url = https://github.com/kortix-ai/kortix-registry.git

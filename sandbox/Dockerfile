@@ -131,11 +131,21 @@ RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');con
 # ── OpenCode (agents, tools, skills) ────────────────────────────────────────
 # Use --chown on COPY to avoid a separate chown layer (saves ~320MB duplication).
 # UID 1000 matches PUID=1000 set in docker-compose (init-adduser remaps abc to this).
+#
+# All components are installed via OCX from the Kortix registry (https://registry.kortix.com)
+# and live in sandbox/opencode/.opencode/ (the OCX component directory).
+# Config files (opencode.jsonc, ocx.jsonc, ocx.lock, package.json, patches/) are at the root.
+# The registry is the single source of truth — `ocx add kortix/sandbox` installs everything.
 COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
-# The local dev symlink plugin/kortix-sys → ../../../packages/kortix-sys-oc-plugin
-# becomes dangling inside Docker. Replace it with the actual package source.
-RUN rm -f /opt/opencode/plugin/kortix-sys
-COPY --chown=1000:1000 packages/kortix-sys-oc-plugin/ /opt/opencode/plugin/kortix-sys/
+# OCX uses singular dirs (tool/, agent/, command/) but OpenCode expects plural (tools/, agents/,
+# commands/). Skills is plural in both. Create symlinks for the singular→plural mapping.
+RUN ln -s /opt/opencode/.opencode/tool   /opt/opencode/tools  \
+ && ln -s /opt/opencode/.opencode/agent  /opt/opencode/agents \
+ && ln -s /opt/opencode/.opencode/command /opt/opencode/commands \
+ && ln -s /opt/opencode/.opencode/skills /opt/opencode/skills
+# Install npm deps (tools need @tavily/core, @mendable/firecrawl-js, replicate, etc.)
+# Root package.json has the canonical dependency versions; tools in .opencode/tool/ resolve
+# modules via Node's upward node_modules walk, so a single install at root suffices.
 RUN cd /opt/opencode && bun install
 
 # ── OpenCode binary patches ─────────────────────────────────────────────────
