@@ -240,10 +240,9 @@ export function useOpenCodeEventStream() {
 		// Quick reconnects (<5s) don't need to re-fetch permissions/questions/status
 		// because no events were missed or only a few were (SSE will catch up).
 		let lastEventTime = Date.now();
-		// Track when the stream connected — used to decide whether to reset retryCount.
-		// Only reset backoff if the connection was stable (>10s). Brief connections
-		// (connect → immediate drop) should NOT reset backoff, as that causes a
-		// reconnection storm with 100ms retries.
+		// Track when the stream connected and whether it delivered any events.
+		// We reset reconnect backoff only after a healthy connection (events received
+		// or sustained >10s). Brief connect→drop loops keep backoff growth.
 		let streamConnectedAt = 0;
 
 		// Event coalescing queue (like the SolidJS reference)
@@ -297,6 +296,8 @@ export function useOpenCodeEventStream() {
 		(async () => {
 			let retryCount = 0;
 			while (!abortController.signal.aborted) {
+				let streamHadEvents = false;
+				let stableConnection = false;
 				try {
 					const result = await client.global.event({
 						signal: abortController.signal,
@@ -318,18 +319,12 @@ export function useOpenCodeEventStream() {
 						hydrateCore({ refetchSessions: true, rehydrateMessages: true });
 					}
 				}
-					// Only reset backoff if connection was stable (>10s).
-					// Brief connections (connect → immediate drop) keep incrementing
-					// retryCount so backoff grows, preventing reconnection storms.
-					if (Date.now() - streamConnectedAt > 10_000) {
-						retryCount = 0;
-					}
-
 					// Consume stream exactly like OpenCode global-sdk.tsx:
 					// queue + coalesce + 16ms flush + yield every 8ms
 					let yieldedAt = Date.now();
 					for await (const event of stream) {
 						if (abortController.signal.aborted) break;
+						streamHadEvents = true;
 						const raw = event as any;
 						const e = (
 							raw && typeof raw === "object" && "payload" in raw
@@ -353,6 +348,10 @@ export function useOpenCodeEventStream() {
 						yieldedAt = Date.now();
 						await new Promise<void>((resolve) => setTimeout(resolve, 0));
 					}
+
+					// Healthy stream if it delivered events, or if it stayed open for >10s.
+					stableConnection =
+						streamHadEvents || Date.now() - streamConnectedAt > 10_000;
 				} catch (err) {
 					if (abortController.signal.aborted) break;
 					const errStr = String(err);
@@ -391,11 +390,18 @@ export function useOpenCodeEventStream() {
 			// Minimum 1s delay even on first retry to avoid reconnection storms
 			// when the server is flapping (connect → immediate disconnect loops).
 			if (abortController.signal.aborted) break;
-			retryCount++;
-			if (retryCount > 1) {
-				logger.warn("SSE event stream reconnecting", { retryCount });
+			if (stableConnection) {
+				// Fast reconnect after healthy streams so live streaming resumes immediately.
+				retryCount = 0;
+			} else {
+				retryCount++;
+				if (retryCount > 1) {
+					logger.warn("SSE event stream reconnecting", { retryCount });
+				}
 			}
-			const delay = Math.min(1000 * 2 ** Math.min(retryCount - 1, 5), 30000);
+			const delay = stableConnection
+				? 250
+				: Math.min(1000 * 2 ** Math.min(retryCount - 1, 5), 30000);
 				await new Promise<void>((resolve) => {
 					const timer = setTimeout(resolve, delay);
 					const onAbort = () => {

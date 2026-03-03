@@ -252,11 +252,20 @@ export function useAutoScroll({ working, hasContent = false }: UseAutoScrollOpti
       if (!active) return;
       const el = scrollRef.current;
       if (el && !userScrolledRef.current) {
+        // Safety guard: if we're no longer near the end, stop auto-follow.
+        // This catches cases where wheel/touch intent didn't get captured
+        // (e.g. nested scrollable content consuming the gesture).
+        if (!isNearScrollEnd(el)) {
+          userScrolledRef.current = true;
+          if (isFarFromBottom(el, spacerValRef.current)) {
+            setShowScrollButton(true);
+          }
+        }
         // Only scroll when the spacer has hit 0 and content overflows.
         const contentH = el.scrollHeight - spacerValRef.current;
         const viewportBottom = el.scrollTop + el.clientHeight;
         const overflow = contentH - viewportBottom;
-        if (overflow > 0) {
+        if (!userScrolledRef.current && overflow > 0) {
           el.scrollTop += overflow;
         }
       }
