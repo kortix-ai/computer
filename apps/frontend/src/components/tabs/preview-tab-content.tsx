@@ -66,7 +66,8 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   // Subdomain URL options for proxy URL generation
   const subdomainOpts = useMemo(() => {
     if (activeServer?.provider === 'daytona') return undefined;
-    const sandboxId = activeServer?.sandboxId || 'kortix-sandbox';
+    const sandboxId = activeServer?.sandboxId;
+    if (!sandboxId) return undefined; // No sandbox ID yet — wait for useSandbox to register
     try {
       const url = new URL(serverUrl);
       const backendPort = parseInt(url.port, 10) || 8008;

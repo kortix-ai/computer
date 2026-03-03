@@ -394,10 +394,14 @@ export const useServerStore = create<ServerStore>()(
         const state = get();
         const active = state.servers.find((s) => s.id === state.activeServerId);
         if (!active) {
-          // In cloud mode, don't fall back to the local Docker URL —
-          // useSandbox will register the real sandbox shortly.
-          // Returning '' signals callers to wait / skip the request.
-          if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
+          // No matching server found. This happens during the gap between
+          // rehydration (which strips managed entries) and useSandbox
+          // re-registering them. Return '' so callers wait / skip.
+          // Only fall back to DEFAULT_SANDBOX_URL if we have a 'default'
+          // entry as activeServerId (explicit local mode).
+          if (!state.activeServerId || state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
+          // If activeServerId is set but not found, the server was removed —
+          // don't blindly fall back to kortix-sandbox in cloud.
           return DEFAULT_SANDBOX_URL;
         }
         // Sandbox entries: always derive URL fresh (never stale)
@@ -576,10 +580,14 @@ export function getActiveSandboxId(): string {
   const state = useServerStore.getState();
   const server = state.servers.find((s) => s.id === state.activeServerId) ?? null;
   if (server?.sandboxId) return server.sandboxId;
-  // In cloud mode, don't fall back to the local Docker container name —
-  // return '' until useSandbox registers the real sandbox.
-  if (state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
-  return 'kortix-sandbox';
+  // Don't fall back to 'kortix-sandbox' unless we know we're in local mode.
+  // During rehydration, activeServerId may be '' or the server may not be
+  // registered yet — returning 'kortix-sandbox' in cloud mode causes 403s.
+  if (!state.activeServerId || state.activeServerId === CLOUD_SANDBOX_SERVER_ID) return '';
+  // Only fall back to Docker container name for local_docker servers.
+  if (server?.provider === 'local_docker') return 'kortix-sandbox';
+  // Any other provider with no sandboxId — return empty, don't guess.
+  return '';
 }
 
 /**
@@ -621,8 +629,12 @@ export function deriveSubdomainOpts(
   server: ServerEntry | null | undefined,
 ): { sandboxId: string; backendPort: number } | undefined {
   if (server?.provider === 'daytona') return undefined;
+  // For local_docker without a sandboxId yet, fall back to the container name.
+  const sandboxId = server?.sandboxId || (server?.provider === 'local_docker' ? 'kortix-sandbox' : '');
+  // Don't return opts with empty sandboxId — callers need a real ID.
+  if (!sandboxId) return undefined;
   return {
-    sandboxId: server?.sandboxId || 'kortix-sandbox',
+    sandboxId,
     backendPort: getBackendPort(),
   };
 }

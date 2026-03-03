@@ -62,10 +62,20 @@ interface ShareData {
 // Data fetching — uses the standard OpenCode session & message APIs
 // ============================================================================
 
-const OPENCODE_BASE_URL = `${(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '')}/p/kortix-sandbox/8000`;
+import { getActiveOpenCodeUrl } from '@/stores/server-store';
+
+const FALLBACK_BASE_URL = `${(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1').replace(/\/+$/, '')}/p/kortix-sandbox/8000`;
+
+function getOpenCodeBaseUrl(): string {
+  // Use the active server URL if available (resolves correct sandboxId).
+  // Only fall back to the local default for self-hosted / local mode.
+  const active = getActiveOpenCodeUrl();
+  return active || FALLBACK_BASE_URL;
+}
 
 async function fetchShareData(shareId: string): Promise<ShareData> {
-  const sessionsRes = await fetch(`${OPENCODE_BASE_URL}/session`, {
+  const baseUrl = getOpenCodeBaseUrl();
+  const sessionsRes = await fetch(`${baseUrl}/session`, {
     headers: { 'Accept': 'application/json' },
   });
   if (!sessionsRes.ok) throw new Error('Failed to load sessions');
@@ -76,7 +86,7 @@ async function fetchShareData(shareId: string): Promise<ShareData> {
   const session = sessions.find((s) => s.id.endsWith(shareId) && s.share?.url);
   if (!session) throw new Error('Share not found');
 
-  const messagesRes = await fetch(`${OPENCODE_BASE_URL}/session/${session.id}/message`, {
+  const messagesRes = await fetch(`${baseUrl}/session/${session.id}/message`, {
     headers: { 'Accept': 'application/json' },
   });
   if (!messagesRes.ok) throw new Error('Failed to load messages');
