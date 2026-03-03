@@ -28,7 +28,7 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-KORTIX_VERSION="0.7.6"
+KORTIX_VERSION="0.7.7"
 FRONTEND_IMAGE="kortix/kortix-frontend:${KORTIX_VERSION}"
 API_IMAGE="kortix/kortix-api:${KORTIX_VERSION}"
 SANDBOX_IMAGE="kortix/computer:${KORTIX_VERSION}"
@@ -1055,7 +1055,7 @@ cd "$DIR"
 
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-VERSION="0.7.6"
+VERSION="0.7.7"
 
 _open() {
   if command -v open &>/dev/null; then open "$1" 2>/dev/null

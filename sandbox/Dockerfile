@@ -198,7 +198,7 @@ RUN mkdir -p /opt/kortix \
 # symlinks at the original paths. This enables atomic updates via symlink swap.
 # postinstall.sh detects the symlinks and stages to a new versioned dir instead
 # of mutating the live system. update.ts atomically swaps the symlinks.
-RUN PKG_VERSION=$(node -e "console.log(require('/opt/kortix/.version').version || '0.0.0')") \
+RUN PKG_VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/opt/kortix/.version','utf8')).version || '0.0.0')") \
     && STAGING="/opt/kortix-staging-$PKG_VERSION" \
     && mkdir -p "$STAGING" \
     && mv /opt/kortix-master "$STAGING/kortix-master" \
