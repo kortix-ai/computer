@@ -132,6 +132,43 @@ const optimisticIds = new Set<string>();
 // double-render the user's text).
 const bridgedPartIds = new Set<string>();
 
+function writeStreamCache(
+	sessionID: string,
+	messageID: string,
+	partID: string,
+	text: string,
+	parentID?: string,
+) {
+	if (typeof window === "undefined") return;
+	if (!sessionID || !messageID || !partID || !text) return;
+	const key = `opencode_stream_cache:${sessionID}`;
+	try {
+		const raw = sessionStorage.getItem(key);
+		const prev = raw ? (JSON.parse(raw) as { messageID?: string; partID?: string; text?: string } | null) : null;
+		if (
+			prev &&
+			prev.messageID === messageID &&
+			prev.partID === partID &&
+			typeof prev.text === "string" &&
+			prev.text.length >= text.length
+		) {
+			return;
+		}
+		sessionStorage.setItem(
+			key,
+			JSON.stringify({
+				messageID,
+				parentID,
+				partID,
+				text,
+				updatedAt: Date.now(),
+			}),
+		);
+	} catch {
+		// ignore storage issues
+	}
+}
+
 // ============================================================================
 
 export const useSyncStore = create<SyncState>()((set, get) => ({
@@ -605,6 +642,18 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				}
 
 				store.upsertPart(part.messageID, part);
+				if ((part as any).type === "text" && typeof (part as any).text === "string") {
+					const msgInfo = get().messages[part.sessionID]?.find(
+						(m) => m.id === part.messageID,
+					) as any;
+					writeStreamCache(
+						part.sessionID,
+						part.messageID,
+						part.id,
+						(part as any).text,
+						msgInfo?.parentID,
+					);
+				}
 				return;
 			}
 			case "message.part.removed": {
@@ -670,6 +719,23 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 					props.field,
 					props.delta,
 				);
+				if (props.field === "text") {
+					const updated = get().parts[props.messageID]?.find(
+						(p) => p.id === props.partID,
+					) as any;
+					if (typeof updated?.text === "string" && updated.text.length > 0) {
+						const msgInfo = get().messages[props.sessionID]?.find(
+							(m) => m.id === props.messageID,
+						) as any;
+						writeStreamCache(
+							props.sessionID,
+							props.messageID,
+							props.partID,
+							updated.text,
+							msgInfo?.parentID,
+						);
+					}
+				}
 				return;
 			}
 			case "session.status": {

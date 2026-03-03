@@ -41,6 +41,7 @@ import {
 import { SessionContextModal } from "@/components/session/session-context-modal";
 import { TurnErrorDisplay } from "@/components/session/session-error-banner";
 import { SessionSiteHeader } from "@/components/session/session-site-header";
+import { QuestionPrompt } from "@/components/session/question-prompt";
 import { SessionWelcome } from "@/components/session/session-welcome";
 import {
 	OcPatchPartView,
@@ -2904,68 +2905,6 @@ export function SessionChat({
 
 	const streamCacheKey = `opencode_stream_cache:${sessionId}`;
 
-	// Persist latest assistant text during active streaming so a hard refresh can
-	// restore the already-generated prefix even if the backend snapshot lags.
-	useEffect(() => {
-		if (typeof window === "undefined") return;
-		if (!messages || messages.length === 0) return;
-
-		// Cache only the ACTIVE assistant response (incomplete message).
-		// Never overwrite cache with the previous completed turn while waiting
-		// for a new assistant message to appear.
-		let activeAssistant: (typeof messages)[number] | null = null;
-		for (let i = messages.length - 1; i >= 0; i--) {
-			const msg = messages[i];
-			if (msg.info.role !== "assistant") continue;
-			const completed = !!(msg.info as any).time?.completed;
-			if (!completed) {
-				activeAssistant = msg;
-				break;
-			}
-		}
-		if (!activeAssistant) return;
-
-		let bestPart: { id: string; text: string } | null = null;
-		for (const p of activeAssistant.parts) {
-			if ((p as any)?.type !== "text") continue;
-			const text = typeof (p as any)?.text === "string" ? (p as any).text : "";
-			if (!text) continue;
-			if (!bestPart || text.length > bestPart.text.length) {
-				bestPart = { id: (p as any).id, text };
-			}
-		}
-		if (!bestPart) return;
-
-		try {
-			let existing: { messageID?: string; partID?: string; text?: string } | null = null;
-			const raw = sessionStorage.getItem(streamCacheKey);
-			existing = raw ? JSON.parse(raw) : null;
-			// Monotonic cache: never overwrite with shorter text for the same part.
-			if (
-				existing &&
-				existing.messageID === activeAssistant.info.id &&
-				existing.partID === bestPart.id &&
-				typeof existing.text === "string" &&
-				existing.text.length >= bestPart.text.length
-			) {
-				return;
-			}
-
-			sessionStorage.setItem(
-				streamCacheKey,
-				JSON.stringify({
-					messageID: activeAssistant.info.id,
-					parentID: (activeAssistant.info as any).parentID,
-					partID: bestPart.id,
-					text: bestPart.text,
-					updatedAt: Date.now(),
-				}),
-			);
-		} catch {
-			// ignore storage failures
-		}
-	}, [messages, streamCacheKey]);
-
 	// Restore cached streaming prefix after refresh when SSE resumes from the
 	// current point but backend hydrate has not yet returned the in-progress text.
 	useEffect(() => {
@@ -4343,8 +4282,17 @@ export function SessionChat({
 				replyTo={replyTo}
 				onClearReply={handleClearReply}
 				inputSlot={
-					queuedMessages.length > 0 ? (
-						<div className="rounded-xl bg-muted/50 overflow-hidden">
+					pendingQuestions.length > 0 || queuedMessages.length > 0 ? (
+						<>
+							{pendingQuestions.length > 0 && (
+								<QuestionPrompt
+									request={pendingQuestions[0]}
+									onReply={handleQuestionReply}
+									onReject={handleQuestionReject}
+								/>
+							)}
+							{queuedMessages.length > 0 && (
+								<div className="rounded-xl bg-muted/50 overflow-hidden">
 							{/* Compact header row */}
 							<button
 								type="button"
@@ -4451,12 +4399,11 @@ export function SessionChat({
 								</div>
 							</div>
 						)}
-						</div>
+								</div>
+							)}
+						</>
 					) : undefined
 				}
-				activeQuestion={pendingQuestions.length > 0 ? pendingQuestions[0] : undefined}
-				onQuestionReply={handleQuestionReply}
-				onQuestionReject={handleQuestionReject}
 			/>
 			)}
 		</div>
