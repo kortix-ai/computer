@@ -8,9 +8,18 @@
  *   tool.execute.before        — capture tool args by callID
  *   tool.execute.after         — extract observations from tool results
  *   chat.message               — track session + prompt count
- *   event                      — session lifecycle (created, deleted)
+ *   event                      — session lifecycle + consolidation triggers:
+ *                                  session.created  — init session, sweep unconsolidated previous sessions
+ *                                  session.deleted  — mark session completed
+ *                                  session.idle     — incremental consolidation of current session
  *   messages.transform         — inject LTM index as synthetic message at position 1
  *   session.compacting         — consolidate observations → LTM, inject into compaction context
+ *
+ * Consolidation fires in 4 places (ensuring no session's observations are lost):
+ *   1. Plugin startup          — sweep orphaned sessions from previous runs
+ *   2. session.created         — sweep previous sessions not yet consolidated
+ *   3. session.idle            — incremental consolidation of current session (cooldown-gated)
+ *   4. session.compacting      — full consolidation during context window compression
  *
  * Tools:
  *   ltm_search                 — hybrid search across long-term memories
@@ -23,7 +32,7 @@
 
 import { type Plugin, tool } from "@opencode-ai/plugin"
 import type { Session, Todo } from "@opencode-ai/sdk"
-import { initDb, insertObservation, ensureSession, incrementPromptCount, completeSession, insertLTM, getObservationById, getLTMById, getLTMByIds, getObservationsByIds } from "./db"
+import { initDb, insertObservation, ensureSession, incrementPromptCount, completeSession, insertLTM, getObservationById, getLTMById, getLTMByIds, getObservationsByIds, getUnconsolidatedSessions, getNewObservationCount, updateSessionTitle } from "./db"
 import { extractObservation } from "./extract"
 import { generateContextBlock } from "./context"
 import { consolidateMemories } from "./consolidate"
@@ -46,7 +55,7 @@ function isAnthropicModel(modelId: string | null): boolean {
 	return lower.includes("anthropic") || lower.includes("claude") || lower.startsWith("kortix/")
 }
 
-export const KortixMemoryPlugin: Plugin = async ({ client }) => {
+export const KortixMemoryPlugin: Plugin = async ({ client, project, directory }) => {
 	// ── State ──────────────────────────────────────────────────────────
 	let db: ReturnType<typeof initDb>
 	try {
@@ -65,6 +74,11 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 	} catch (err) {
 		console.error(`[kortix-memory] LSS dir init failed (non-fatal): ${err}`)
 	}
+
+	// Project context — used for scoping search results and session tracking
+	const projectId: string | null = project?.id ?? null
+	const projectDir: string | null = directory ?? null
+
 	let currentSessionId: string | null = null
 	let currentModel: string | null = null
 	let promptCount = 0
@@ -81,14 +95,17 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 		}
 	}
 
-	// Cache the LTM block — regenerated on session start and after consolidation
+	// Cache the context block — regenerated on session start and after consolidation
 	let cachedContextBlock = ""
 
 	function refreshContextCache(): void {
 		try {
-			cachedContextBlock = generateContextBlock(db)
+			cachedContextBlock = generateContextBlock(db, {
+				projectId: projectId ?? undefined,
+				currentSessionId: currentSessionId ?? undefined,
+			})
 		} catch (err) {
-			log("warn", `[memory] LTM cache refresh failed: ${err}`)
+			log("warn", `[memory] Context cache refresh failed: ${err}`)
 		}
 	}
 
@@ -123,6 +140,90 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 
 	// Initialize hybrid search engine
 	initSearch(log)
+
+	// ── Background Consolidation ──────────────────────────────────────
+	// Consolidate sessions that were never processed (or have new observations).
+	// Runs in the background without blocking the main hook flow.
+	let consolidationInProgress = false
+	let lastConsolidationAttempt = 0
+	const CONSOLIDATION_COOLDOWN_MS = 60_000 // Don't attempt consolidation more than once per minute
+
+	/**
+	 * Consolidate unconsolidated sessions in the background.
+	 * Called on session.created (sweep previous sessions) and session.idle
+	 * (incremental consolidation of the current session).
+	 *
+	 * @param excludeSessionId - Skip this session (e.g., the current active one on startup sweep)
+	 * @param specificSessionId - If set, only consolidate this specific session
+	 */
+	async function backgroundConsolidate(
+		excludeSessionId?: string,
+		specificSessionId?: string,
+	): Promise<void> {
+		if (consolidationInProgress) return
+
+		// Cooldown: don't spam consolidation attempts (session.idle fires often)
+		const now = Date.now()
+		if (now - lastConsolidationAttempt < CONSOLIDATION_COOLDOWN_MS) return
+		lastConsolidationAttempt = now
+
+		consolidationInProgress = true
+
+		try {
+			let sessionsToConsolidate: { id: string }[] = []
+
+			if (specificSessionId) {
+				// Check if this specific session has new observations worth consolidating
+				const newObs = getNewObservationCount(db, specificSessionId)
+				if (newObs >= 3) {
+					sessionsToConsolidate = [{ id: specificSessionId }]
+				}
+			} else {
+				// Sweep: find all sessions with unconsolidated observations
+				sessionsToConsolidate = getUnconsolidatedSessions(db, excludeSessionId)
+			}
+
+			if (sessionsToConsolidate.length === 0) {
+				return
+			}
+
+			log("info", `[memory] Background consolidation: ${sessionsToConsolidate.length} session(s) to process`)
+
+			for (const session of sessionsToConsolidate) {
+				try {
+					const result = await consolidateMemories(db, session.id, log,
+						currentModel ? { model: currentModel } : undefined,
+					)
+
+					// Write LSS files for new LTM entries
+					if (memDir && result.newMemories.length > 0) {
+						for (const mem of result.newMemories) {
+							try {
+								// Re-read latest LTM to get the ID
+								// (insertLTM was called inside consolidateMemories)
+								writeLTMFile(memDir, 0, mem.type, mem.content, mem.tags ?? [])
+							} catch { /* non-fatal */ }
+						}
+					}
+
+					log("info", `[memory] Consolidated session ${session.id}: ${result.newMemories.length} new memories`)
+				} catch (err) {
+					log("warn", `[memory] Background consolidation failed for ${session.id}: ${err}`)
+				}
+			}
+
+			// Refresh cache after all consolidations
+			refreshContextCache()
+		} finally {
+			consolidationInProgress = false
+		}
+	}
+
+	// ── Startup sweep: consolidate any orphaned sessions from previous runs ──
+	// Fire-and-forget — runs async without blocking plugin init
+	backgroundConsolidate().catch((err) => {
+		log("warn", `[memory] Startup consolidation sweep failed: ${err}`)
+	})
 
 	// ── Return hooks ──────────────────────────────────────────────────
 	return {
@@ -204,7 +305,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 			try {
 				if (input.sessionID && input.sessionID !== currentSessionId) {
 					currentSessionId = input.sessionID
-					ensureSession(db, currentSessionId)
+					ensureSession(db, currentSessionId, projectId ?? undefined)
 					refreshContextCache()
 				}
 				if (currentSessionId) {
@@ -228,9 +329,15 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					const sessionId = (event as any).properties?.info?.id
 					if (sessionId) {
 						currentSessionId = sessionId
-						ensureSession(db, sessionId)
+						ensureSession(db, sessionId, projectId ?? undefined)
 						promptCount = 0
 						refreshContextCache()
+
+						// Cache session title from OpenCode metadata
+						const sessionTitle = (event as any).properties?.info?.title
+						if (sessionTitle) {
+							try { updateSessionTitle(db, sessionId, sessionTitle) } catch { /* non-fatal */ }
+						}
 
 						// Cleanup stale tool output files (>24h old)
 						try {
@@ -243,6 +350,12 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 								}
 							}
 						} catch { /* non-fatal */ }
+
+						// Sweep: consolidate any previous sessions that were never processed.
+						// Excludes the just-created session (it has no observations yet).
+						backgroundConsolidate(sessionId).catch((err) => {
+							log("warn", `[memory] Session-created consolidation sweep failed: ${err}`)
+						})
 					}
 				}
 
@@ -250,6 +363,26 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					const sessionId = (event as any).properties?.info?.id
 					if (sessionId) {
 						completeSession(db, sessionId)
+					}
+				}
+
+				// Cache session title when OpenCode updates it (title often set after creation)
+				if (event.type === "session.updated") {
+					const info = (event as any).properties?.info
+					if (info?.id && info?.title) {
+						try { updateSessionTitle(db, info.id, info.title) } catch { /* non-fatal */ }
+					}
+				}
+
+				// ── session.idle: Incremental consolidation of current session ──
+				// Fires when the agent finishes responding. If the current session has
+				// accumulated enough new observations since last consolidation, process them.
+				if (event.type === "session.idle") {
+					const sessionId = (event as any).properties?.sessionID ?? currentSessionId
+					if (sessionId) {
+						backgroundConsolidate(undefined, sessionId).catch((err) => {
+							log("warn", `[memory] Session-idle consolidation failed: ${err}`)
+						})
 					}
 				}
 			} catch (err) {
@@ -337,11 +470,12 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 				)
 
 				// 2. Write LSS files for new LTM entries
-				for (const mem of result.newMemories) {
-					try {
-						// We need the ID — re-read from DB by content match
-						// (insertLTM was called inside consolidateMemories)
-					} catch { /* non-fatal */ }
+				if (memDir) {
+					for (const mem of result.newMemories) {
+						try {
+							writeLTMFile(memDir, 0, mem.type, mem.content, mem.tags ?? [])
+						} catch { /* non-fatal */ }
+					}
 				}
 
 				// 3. Refresh the LTM cache
@@ -378,6 +512,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 					const ranked = await hybridSearchLTM(db, args.query, {
 						limit,
 						type: args.type,
+						projectId: projectId ?? undefined,
 					})
 
 					if (ranked.length === 0) return `No long-term memories found for "${args.query}".`
@@ -420,6 +555,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client }) => {
 						concepts,
 						toolName: args.tool_name,
 						sessionId: args.session_id,
+						projectId: projectId ?? undefined,
 					})
 
 					if (ranked.length === 0) return `No observations found for "${args.query}".`

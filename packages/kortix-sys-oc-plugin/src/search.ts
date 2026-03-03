@@ -20,6 +20,8 @@ import type { Database } from "bun:sqlite"
 import {
 	searchObservationsFtsRanked,
 	searchLTMFtsRanked,
+	getObservationProjectMap,
+	getLTMProjectMap,
 } from "./db"
 import type { LogFn } from "./types"
 
@@ -59,6 +61,7 @@ const HALF_LIFE_DAYS = 30
 const CANDIDATE_MULTIPLIER = 3
 const LSS_TIMEOUT_MS = 5000
 const LSS_MEM_PATH = "/workspace/.lss/kortix-mem"
+const PROJECT_AFFINITY_BOOST = 1.2
 
 let lssBaseUrl = "http://localhost:8000/lss"
 let log: LogFn = () => {}
@@ -79,7 +82,7 @@ export function initSearch(logFn: LogFn, lssUrl?: string): void {
 export async function hybridSearchLTM(
 	db: Database,
 	query: string,
-	opts?: { limit?: number; type?: string; tags?: string[] },
+	opts?: { limit?: number; type?: string; tags?: string[]; projectId?: string },
 ): Promise<RankedResult[]> {
 	const limit = opts?.limit ?? 10
 	const fetchLimit = limit * CANDIDATE_MULTIPLIER
@@ -100,7 +103,10 @@ export async function hybridSearchLTM(
 	}
 
 	// Merge and rank
-	return mergeAndRank(bm25Map, vectorMap, "ltm", limit)
+	const projectMap = opts?.projectId
+		? getLTMProjectMap(db, [...new Set([...bm25Map.keys(), ...vectorMap.keys()])])
+		: undefined
+	return mergeAndRank(bm25Map, vectorMap, "ltm", limit, opts?.projectId, projectMap)
 }
 
 /**
@@ -115,6 +121,7 @@ export async function hybridSearchObservations(
 		concepts?: string[]
 		toolName?: string
 		sessionId?: string
+		projectId?: string
 	},
 ): Promise<RankedResult[]> {
 	const limit = opts?.limit ?? 10
@@ -139,7 +146,10 @@ export async function hybridSearchObservations(
 	}
 
 	// Merge and rank
-	return mergeAndRank(bm25Map, vectorMap, "observation", limit)
+	const projectMap = opts?.projectId
+		? getObservationProjectMap(db, [...new Set([...bm25Map.keys(), ...vectorMap.keys()])])
+		: undefined
+	return mergeAndRank(bm25Map, vectorMap, "observation", limit, opts?.projectId, projectMap)
 }
 
 // ─── LSS HTTP Client ─────────────────────────────────────────────────────────
@@ -244,6 +254,8 @@ function mergeAndRank(
 	vectorMap: Map<number, { score: number; createdAt: string }>,
 	source: "observation" | "ltm",
 	limit: number,
+	projectId?: string,
+	projectMap?: Map<number, string | null>,
 ): RankedResult[] {
 	// Union all candidate IDs
 	const allIds = new Set([...bm25Map.keys(), ...vectorMap.keys()])
@@ -259,7 +271,11 @@ function mergeAndRank(
 
 		const rawScore = TEXT_WEIGHT * textScore + VECTOR_WEIGHT * vectorScore
 		const decay = temporalDecay(createdAt)
-		const finalScore = rawScore * decay
+		let finalScore = rawScore * decay
+
+		if (projectId && projectMap?.get(id) === projectId) {
+			finalScore *= PROJECT_AFFINITY_BOOST
+		}
 
 		results.push({ id, source, finalScore })
 	}

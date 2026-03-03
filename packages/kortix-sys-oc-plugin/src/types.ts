@@ -97,6 +97,9 @@ export interface SessionMeta {
 	promptCount: number
 	observationCount: number
 	lastConsolidatedAt: string | null
+	lastConsolidatedObsCount: number
+	projectId: string | null
+	title: string | null
 	status: "active" | "completed"
 	startedAt: string
 	completedAt: string | null
