@@ -12,29 +12,41 @@ import { useState, useRef, useEffect } from 'react';
  */
 export function useThrottledValue<T>(value: T, intervalMs = 100): T {
   const [throttled, setThrottled] = useState(value);
-  const lastUpdateRef = useRef(Date.now());
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const lastUpdateRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const frameRef = useRef<number | null>(null);
+  const pendingRef = useRef(false);
   const latestRef = useRef(value);
 
   useEffect(() => {
     latestRef.current = value;
-    const elapsed = Date.now() - lastUpdateRef.current;
+    pendingRef.current = true;
 
-    if (elapsed >= intervalMs) {
-      // Enough time has passed — update immediately
-      setThrottled(value);
-      lastUpdateRef.current = Date.now();
-      clearTimeout(timerRef.current);
-    } else {
-      // Schedule a flush for the remaining time
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
+    if (frameRef.current !== null) return;
+
+    const tick = () => {
+      if (!pendingRef.current) {
+        frameRef.current = null;
+        return;
+      }
+
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (now - lastUpdateRef.current >= intervalMs) {
+        pendingRef.current = false;
+        lastUpdateRef.current = now;
         setThrottled(latestRef.current);
-        lastUpdateRef.current = Date.now();
-      }, intervalMs - elapsed);
-    }
+      }
 
-    return () => clearTimeout(timerRef.current);
+      frameRef.current = requestAnimationFrame(tick);
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
   }, [value, intervalMs]);
 
   return throttled;

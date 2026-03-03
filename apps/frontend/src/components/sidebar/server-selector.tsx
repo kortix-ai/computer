@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/auth-token';
-import { createSandbox, ensureSandbox, extractMappedPorts, removeSandbox, setupSSH, type SandboxProviderName, type ChangelogEntry, type SSHSetupResult } from '@/lib/platform-client';
+import { createSandbox, ensureSandbox, extractMappedPorts, removeSandbox, setupSSH, type SandboxCreateProgress, type SandboxProviderName, type ChangelogEntry, type SSHSetupResult } from '@/lib/platform-client';
 import { toast } from '@/lib/toast';
 import { isBillingEnabled } from '@/lib/config';
 
@@ -406,7 +406,9 @@ export function InstanceManagerDialog({
   const [mode, setMode] = React.useState<'list' | 'add' | 'edit' | 'ssh' | 'custom'>('list');
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [isCreatingSandbox, setIsCreatingSandbox] = React.useState(false);
+  const [creatingProvider, setCreatingProvider] = React.useState<SandboxProviderName | null>(null);
   const [sandboxError, setSandboxError] = React.useState<string | null>(null);
+  const [sandboxProgress, setSandboxProgress] = React.useState<SandboxCreateProgress | null>(null);
   // Track the cloud sandbox's current version (from /kortix/health, fetched by DialogInstanceRow)
   const [sandboxVersion, setSandboxVersion] = React.useState<string | null>(null);
 
@@ -449,6 +451,7 @@ export function InstanceManagerDialog({
       setFormUrl('');
       setFormLabel('');
       setSandboxError(null);
+      setSandboxProgress(null);
       setSSHResult(null);
       setSSHError(null);
       setShowAdvanced(false);
@@ -490,13 +493,23 @@ export function InstanceManagerDialog({
 
   async function handleCreateSandbox(provider: SandboxProviderName) {
     setIsCreatingSandbox(true);
+    setCreatingProvider(provider);
     setSandboxError(null);
+    setSandboxProgress(null);
     try {
       // In cloud mode (billing), use ensureSandbox (idempotent — handles archived → reactivate → create).
       // In self-hosted mode, use createSandbox (explicit creation).
       const { sandbox } = isBillingEnabled() && provider === 'daytona'
         ? await ensureSandbox({ provider })
-        : await createSandbox({ provider });
+        : await createSandbox({
+          provider,
+          onProgress: provider === 'local_docker'
+            ? (progress) => {
+              setSandboxProgress(progress);
+              setSandboxError(null);
+            }
+            : undefined,
+        });
 
       const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
       const isLocal = sandbox.provider === 'local_docker';
@@ -522,9 +535,26 @@ export function InstanceManagerDialog({
       router.push('/dashboard');
       onOpenChange(false);
     } catch (err: any) {
-      setSandboxError(err?.message || 'Failed to create sandbox');
+      let message = err?.message || 'Failed to create sandbox';
+      try {
+        const parsed = JSON.parse(message) as Partial<SandboxCreateProgress>;
+        if (parsed?.status === 'pulling') {
+          setSandboxProgress({
+            status: 'pulling',
+            progress: Math.max(0, Math.min(100, Number(parsed.progress) || 0)),
+            message: parsed.message || 'Pulling sandbox image...',
+          });
+          message = '';
+        } else if (parsed?.message) {
+          message = parsed.message;
+        }
+      } catch {
+        // ignore non-JSON error payloads
+      }
+      setSandboxError(message || null);
     } finally {
       setIsCreatingSandbox(false);
+      setCreatingProvider(null);
     }
   }
 
@@ -738,6 +768,21 @@ export function InstanceManagerDialog({
               <p className="text-xs text-destructive">{sandboxError}</p>
             )}
 
+            {sandboxProgress && (
+              <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">{sandboxProgress.message}</p>
+                  <span className="text-[11px] tabular-nums text-muted-foreground/80">{Math.round(sandboxProgress.progress)}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary/90 transition-all duration-1000 ease-out"
+                    style={{ width: `${Math.max(sandboxProgress.progress, 2)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               {/* Cloud (Daytona) */}
               {hasDaytona && (
@@ -753,7 +798,7 @@ export function InstanceManagerDialog({
                   )}
                 >
                   <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-violet-500/10 flex-shrink-0 mt-0.5">
-                    {isCreatingSandbox ? (
+                    {isCreatingSandbox && creatingProvider === 'daytona' ? (
                       <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
                     ) : (
                       <Cloud className="h-4 w-4 text-violet-500" />
@@ -779,7 +824,7 @@ export function InstanceManagerDialog({
                   className="flex items-start gap-3 w-full p-3.5 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-blue-500/10 flex-shrink-0 mt-0.5">
-                    {isCreatingSandbox ? (
+                    {isCreatingSandbox && creatingProvider === 'local_docker' ? (
                       <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
                     ) : (
                       <Container className="h-4 w-4 text-blue-500" />
@@ -788,7 +833,9 @@ export function InstanceManagerDialog({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">Local Docker</p>
                     <p className="text-xs text-muted-foreground/70 mt-0.5">
-                      Runs on your machine via Docker
+                      {isCreatingSandbox && creatingProvider === 'local_docker' && sandboxProgress
+                        ? sandboxProgress.message
+                        : 'Runs on your machine via Docker'}
                     </p>
                   </div>
                 </button>
@@ -798,7 +845,8 @@ export function InstanceManagerDialog({
               <button
                 type="button"
                 onClick={() => { setFormUrl(''); setFormLabel(''); setMode('custom'); }}
-                className="flex items-start gap-3 w-full p-3.5 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 text-left transition-all cursor-pointer"
+                disabled={isCreatingSandbox}
+                className="flex items-start gap-3 w-full p-3.5 rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-muted/60 flex-shrink-0 mt-0.5">
                   <Globe className="h-4 w-4 text-muted-foreground" />
@@ -816,7 +864,7 @@ export function InstanceManagerDialog({
             <button
               type="button"
               className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer self-start"
-              onClick={() => { setMode('list'); setSandboxError(null); }}
+              onClick={() => { setMode('list'); setSandboxError(null); setSandboxProgress(null); }}
             >
               Back
             </button>

@@ -88,7 +88,6 @@ import {
 } from "@/hooks/opencode/use-opencode-sessions";
 import { useSessionSync } from "@/hooks/opencode/use-session-sync";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
-import { useThrottledValue } from "@/hooks/use-throttled-value";
 import { getClient } from "@/lib/opencode-sdk";
 // billingApi / invalidateAccountState / useQueryClient removed — billing is handled server-side by the router
 import { playSound } from "@/lib/sounds";
@@ -1493,8 +1492,7 @@ function ThrottledMarkdown({
 	content: string;
 	isStreaming: boolean;
 }) {
-	const throttled = useThrottledValue(content, 33);
-	const displayContent = isStreaming ? trimIncompleteTableRow(throttled) : content;
+	const displayContent = isStreaming ? trimIncompleteTableRow(content) : content;
 	return (
 		<UnifiedMarkdown
 			content={displayContent}
@@ -3234,79 +3232,9 @@ export function SessionChat({
 		};
 	}, [isServerBusy, sessionId]);
 
-	// Streaming recovery poll (active session only): while active or likely
-	// active, periodically
-	// fetch messages when assistant text appears stalled or missing. This covers
-	// transient SSE drops and refresh timing races where deltas arrive but the
-	// initial in-progress text snapshot is not present yet.
-	useEffect(() => {
-		if (!shouldRecoveryPoll) return;
-
-		let cancelled = false;
-		let inFlight = false;
-		let lastLen = 0;
-		let lastProgressAt = Date.now();
-
-		const getLastAssistantTextLen = () => {
-			const current = useSyncStore.getState().getMessages(sessionId);
-			if (!current || current.length === 0) return 0;
-			for (let i = current.length - 1; i >= 0; i--) {
-				const msg = current[i];
-				if (msg.info.role !== "assistant") continue;
-				let maxLen = 0;
-				for (const part of msg.parts) {
-					if ((part as any)?.type === "text" && typeof (part as any)?.text === "string") {
-						maxLen = Math.max(maxLen, (part as any).text.length);
-					}
-				}
-				return maxLen;
-			}
-			return 0;
-		};
-
-		const tick = async () => {
-			if (cancelled || inFlight) return;
-
-			const len = getLastAssistantTextLen();
-			if (len > lastLen) {
-				lastLen = len;
-				lastProgressAt = Date.now();
-				return;
-			}
-
-			const stalledMs = Date.now() - lastProgressAt;
-			// Poll when text hasn't advanced for a short period or when no text
-			// has appeared yet during busy state.
-			if (stalledMs < 1500 && len > 0) return;
-
-			inFlight = true;
-			try {
-				const res = await getClient().session.messages({ sessionID: sessionId });
-				if (!cancelled && res.data) {
-					useSyncStore.getState().hydrate(sessionId, res.data as any);
-					// Reset progress marker using post-hydrate length.
-					const nextLen = getLastAssistantTextLen();
-					if (nextLen > lastLen) {
-						lastLen = nextLen;
-						lastProgressAt = Date.now();
-					}
-				}
-			} catch {
-				// ignore — interval retries
-			} finally {
-				inFlight = false;
-			}
-		};
-
-		const t0 = setTimeout(tick, 400);
-		const interval = setInterval(tick, 1200);
-
-		return () => {
-			cancelled = true;
-			clearTimeout(t0);
-			clearInterval(interval);
-		};
-	}, [shouldRecoveryPoll, sessionId]);
+	// SSE is the source of truth for in-progress assistant text.
+	// Avoid periodic /messages recovery polling to prevent large snapshot
+	// hydrates from clobbering incremental streaming cadence.
 
 	// Message-based idle detection: if the last assistant message has
 	// time.completed set, the server marked the message as completed but we never got the
@@ -3502,13 +3430,9 @@ export function SessionChat({
 	);
 	const questionHydrationInFlightRef = useRef(false);
 	const lastQuestionHydrationAtRef = useRef(0);
-
-	// Self-heal missed question events: if we see a question tool part running
-	// but no pending question request in the store, rehydrate question.list().
-	useEffect(() => {
-		if (!messages || pendingQuestions.length > 0) return;
-
-		const hasRunningQuestionTool = messages.some((m) => {
+	const hasRunningQuestionTool = useMemo(() => {
+		if (!messages) return false;
+		return messages.some((m) => {
 			if (m.info.role !== "assistant") return false;
 			return m.parts.some((p) => {
 				if (p.type !== "tool") return false;
@@ -3520,26 +3444,45 @@ export function SessionChat({
 				);
 			});
 		});
+	}, [messages]);
 
-		if (!hasRunningQuestionTool) return;
-		if (questionHydrationInFlightRef.current) return;
-		const now = Date.now();
-		if (now - lastQuestionHydrationAtRef.current < 1500) return;
+	// Self-heal missed question events: if we see a question tool part running
+	// but no pending question request in the store, rehydrate question.list().
+	// Keep polling while the tool is running because the first list() call can
+	// race with backend request creation and return an empty list.
+	useEffect(() => {
+		if (!hasRunningQuestionTool || pendingQuestions.length > 0) return;
 
-		questionHydrationInFlightRef.current = true;
-		lastQuestionHydrationAtRef.current = now;
 		const client = getClient();
-		void client.question
-			.list()
-			.then((res) => {
-				if (res.data) {
+		let cancelled = false;
+
+		const hydrateQuestions = () => {
+			if (questionHydrationInFlightRef.current || cancelled) return;
+			const now = Date.now();
+			if (now - lastQuestionHydrationAtRef.current < 1500) return;
+
+			questionHydrationInFlightRef.current = true;
+			lastQuestionHydrationAtRef.current = now;
+
+			void client.question
+				.list()
+				.then((res) => {
+					if (!res.data || cancelled) return;
 					(res.data as any[]).forEach((q) => addQuestion(q));
-				}
-			})
-			.finally(() => {
-				questionHydrationInFlightRef.current = false;
-			});
-	}, [messages, pendingQuestions.length, addQuestion]);
+				})
+				.finally(() => {
+					questionHydrationInFlightRef.current = false;
+				});
+		};
+
+		hydrateQuestions();
+		const timer = setInterval(hydrateQuestions, 2000);
+
+		return () => {
+			cancelled = true;
+			clearInterval(timer);
+		};
+	}, [hasRunningQuestionTool, pendingQuestions.length, addQuestion]);
 
 	// ---- Permission/question reply handlers ----
 	const removePermission = useOpenCodePendingStore((s) => s.removePermission);

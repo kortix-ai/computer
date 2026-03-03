@@ -75,6 +75,12 @@ const PLATFORM_URL = getPlatformUrl();
 
 export type SandboxProviderName = 'daytona' | 'local_docker';
 
+export interface SandboxCreateProgress {
+  status: 'pulling';
+  progress: number;
+  message: string;
+}
+
 export interface SandboxInfo {
   sandbox_id: string;
   external_id: string;
@@ -252,14 +258,86 @@ export async function getSandbox(): Promise<SandboxInfo | null> {
 export async function createSandbox(opts?: {
   provider?: SandboxProviderName;
   name?: string;
+  onProgress?: (progress: SandboxCreateProgress) => void;
 }): Promise<{ sandbox: SandboxInfo }> {
-  // local_docker uses /platform/init/local (handles image pull + token sync).
-  // Everything else uses /platform/sandbox (cloud provisioning).
-  const endpoint = opts?.provider === 'local_docker'
-    ? '/platform/init/local'
-    : '/platform/sandbox';
+  if (opts?.provider === 'local_docker') {
+    const token = await getSupabaseAccessToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
 
-  const result = await platformFetch<SandboxInfo>(endpoint, {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+
+    const initRes = await fetch(`${PLATFORM_URL}/platform/init/local`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ...(opts?.name ? { name: opts.name } : {}),
+      }),
+    });
+
+    const initData = await initRes.json();
+    if (!initRes.ok) {
+      throw new Error(initData?.error || initData?.message || `Platform API error ${initRes.status}`);
+    }
+
+    if (initData.status === 'ready' && initData.data) {
+      return { sandbox: initData.data as SandboxInfo };
+    }
+
+    if (initData.status === 'error') {
+      throw new Error(initData.message || initData.error || 'Failed to create sandbox');
+    }
+
+    if (initData.status === 'pulling') {
+      const reportProgress = (data: { progress?: number; message?: string }) => {
+        opts?.onProgress?.({
+          status: 'pulling',
+          progress: Math.max(0, Math.min(100, Number(data.progress) || 0)),
+          message: data.message || 'Pulling sandbox image...',
+        });
+      };
+
+      reportProgress(initData);
+
+      for (let attempt = 0; attempt < 360; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const statusRes = await fetch(`${PLATFORM_URL}/platform/init/local/status`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const statusData = await statusRes.json();
+
+        if (!statusRes.ok) {
+          throw new Error(statusData?.error || statusData?.message || `Platform API error ${statusRes.status}`);
+        }
+
+        if (statusData.status === 'ready' && statusData.data) {
+          return { sandbox: statusData.data as SandboxInfo };
+        }
+
+        if (statusData.status === 'error') {
+          throw new Error(statusData.message || statusData.error || 'Failed to create sandbox');
+        }
+
+        reportProgress(statusData);
+      }
+
+      throw new Error('Timed out while pulling sandbox image');
+    }
+
+    if (initData.success && initData.data) {
+      return { sandbox: initData.data as SandboxInfo };
+    }
+
+    throw new Error(initData.error || initData.message || 'Failed to create sandbox');
+  }
+
+  const result = await platformFetch<SandboxInfo>('/platform/sandbox', {
     method: 'POST',
     body: JSON.stringify({
       ...(opts?.provider ? { provider: opts.provider } : {}),
