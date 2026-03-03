@@ -392,6 +392,8 @@ export default function DashboardLayoutContent({
 			return;
 		}
 
+		let cancelled = false;
+
 		const checkOnboarding = async (instanceUrl: string) => {
 			try {
 				const { authenticatedFetch } = await import("@/lib/auth-token");
@@ -400,22 +402,22 @@ export default function DashboardLayoutContent({
 				if (res.ok) {
 					const data = await res.json();
 					if (data.ONBOARDING_COMPLETE !== "true") {
-						router.replace("/onboarding");
+						if (!cancelled) router.replace("/onboarding");
 						return;
 					}
 					// Cache the successful result for this browser session
 					sessionStorage.setItem("onboarding_complete", "true");
 				} else if (res.status >= 500) {
 					// Server error — treat as not onboarded
-					router.replace("/onboarding");
+					if (!cancelled) router.replace("/onboarding");
 					return;
 				}
 			} catch {
 				// Sandbox not reachable — treat as not onboarded
-				router.replace("/onboarding");
+				if (!cancelled) router.replace("/onboarding");
 				return;
 			}
-			setOnboardingChecked(true);
+			if (!cancelled) setOnboardingChecked(true);
 		};
 
 		// Try immediately — if URL is ready, check now
@@ -425,16 +427,17 @@ export default function DashboardLayoutContent({
 			return;
 		}
 
-		// URL not ready (cloud rehydration gap) — subscribe to store and
-		// check as soon as useSandbox registers the sandbox URL.
-		const unsub = useServerStore.subscribe((state) => {
-			const serverUrl = state.getActiveServerUrl();
+		// URL not ready (cloud rehydration gap) — poll until useSandbox
+		// registers the sandbox and getActiveServerUrl() returns a real URL.
+		// Polls every 500ms. useSandbox typically resolves within 1-2s.
+		const interval = setInterval(() => {
+			const serverUrl = useServerStore.getState().getActiveServerUrl();
 			if (serverUrl) {
-				unsub();
+				clearInterval(interval);
 				checkOnboarding(serverUrl);
 			}
-		});
-		return () => unsub();
+		}, 500);
+		return () => { cancelled = true; clearInterval(interval); };
 	}, [router]);
 
 	const isMaintenanceActive = (() => {
