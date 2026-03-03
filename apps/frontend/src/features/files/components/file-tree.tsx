@@ -71,6 +71,7 @@ interface CreatingInDir {
 interface TreeNodeProps {
   node: FileNode;
   depth: number;
+  activeDirPath: string;
   gitStatusMap: Map<string, GitStatusType>;
   diagnosticCountsMap: Map<string, { errors: number; warnings: number }>;
   onRename: (node: FileNode, newName: string) => void;
@@ -78,6 +79,7 @@ interface TreeNodeProps {
   onCopy: (node: FileNode) => void;
   onCut: (node: FileNode) => void;
   onDropMove: (sourcePath: string, targetDirPath: string) => void;
+  onDirectoryClick: (dirPath: string) => void;
   onCreateInDir: (dirPath: string, type: 'file' | 'folder') => void;
   creatingInDir: CreatingInDir | null;
   onCreatingInDirSubmit: (name: string) => void;
@@ -105,6 +107,7 @@ const gitStatusLabel: Record<GitStatusType, string> = {
 function TreeNode({
   node,
   depth,
+  activeDirPath,
   gitStatusMap,
   diagnosticCountsMap,
   onRename,
@@ -112,6 +115,7 @@ function TreeNode({
   onCopy,
   onCut,
   onDropMove,
+  onDirectoryClick,
   onCreateInDir,
   creatingInDir,
   onCreatingInDirSubmit,
@@ -126,6 +130,7 @@ function TreeNode({
   const isDir = node.type === 'directory';
   const isExpanded = isDir && expandedDirs.has(node.path);
   const isSelected = selectedFilePath === node.path;
+  const isActiveDir = isDir && activeDirPath === node.path;
   const isCut = clipboard?.operation === 'cut' && clipboard.path === node.path;
   const gitStatus = gitStatusMap.get(node.path);
   const diagCounts = diagnosticCountsMap.get(node.path);
@@ -165,10 +170,11 @@ function TreeNode({
   const handleClick = useCallback(() => {
     if (isDir) {
       toggleDir(node.path);
+      onDirectoryClick(node.path);
     } else {
       openFile(node.path);
     }
-  }, [isDir, node.path, toggleDir, openFile]);
+  }, [isDir, node.path, toggleDir, openFile, onDirectoryClick]);
 
   // DnD handlers
   const handleDragStart = useCallback((e: React.DragEvent) => {
@@ -249,6 +255,7 @@ function TreeNode({
       className={cn(
         'flex items-center gap-1.5 w-full py-1 text-sm text-left transition-colors cursor-pointer',
         'hover:bg-muted/50',
+        isActiveDir && 'bg-muted/50',
         isSelected && 'bg-primary/[0.08] text-primary',
         isCut && 'opacity-40',
         isDragging && 'opacity-30',
@@ -393,6 +400,7 @@ function TreeNode({
         <TreeNodeChildren
           dirPath={node.path}
           depth={depth + 1}
+          activeDirPath={activeDirPath}
           gitStatusMap={gitStatusMap}
           diagnosticCountsMap={diagnosticCountsMap}
           onRename={onRename}
@@ -400,6 +408,7 @@ function TreeNode({
           onCopy={onCopy}
           onCut={onCut}
           onDropMove={onDropMove}
+          onDirectoryClick={onDirectoryClick}
           onCreateInDir={onCreateInDir}
           creatingInDir={creatingInDir}
           onCreatingInDirSubmit={onCreatingInDirSubmit}
@@ -415,6 +424,7 @@ function TreeNode({
 interface TreeNodeChildrenProps {
   dirPath: string;
   depth: number;
+  activeDirPath: string;
   gitStatusMap: Map<string, GitStatusType>;
   diagnosticCountsMap: Map<string, { errors: number; warnings: number }>;
   onRename: (node: FileNode, newName: string) => void;
@@ -422,6 +432,7 @@ interface TreeNodeChildrenProps {
   onCopy: (node: FileNode) => void;
   onCut: (node: FileNode) => void;
   onDropMove: (sourcePath: string, targetDirPath: string) => void;
+  onDirectoryClick: (dirPath: string) => void;
   onCreateInDir: (dirPath: string, type: 'file' | 'folder') => void;
   creatingInDir: CreatingInDir | null;
   onCreatingInDirSubmit: (name: string) => void;
@@ -431,11 +442,13 @@ interface TreeNodeChildrenProps {
 function InlineCreateInput({
   type,
   depth,
+  siblingNames,
   onSubmit,
   onCancel,
 }: {
   type: 'file' | 'folder';
   depth: number;
+  siblingNames: string[];
   onSubmit: (name: string) => void;
   onCancel: () => void;
 }) {
@@ -446,6 +459,13 @@ function InlineCreateInput({
   // immediately submits the default name before the user can type.
   const readyRef = useRef(false);
   const submittedRef = useRef(false);
+
+  const nameExists = useMemo(() => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const lowered = trimmed.toLowerCase();
+    return siblingNames.some((n) => n.toLowerCase() === lowered);
+  }, [name, siblingNames]);
 
   useEffect(() => {
     // Triple-rAF to ensure the context menu portal has fully unmounted
@@ -473,43 +493,63 @@ function InlineCreateInput({
     if (submittedRef.current) return;
     submittedRef.current = true;
     const trimmed = name.trim();
-    if (trimmed) {
-      onSubmit(trimmed);
-    } else {
+    if (!trimmed) {
       onCancel();
+      return;
     }
-  }, [name, onSubmit, onCancel]);
+    if (nameExists) {
+      submittedRef.current = false;
+      return;
+    }
+    onSubmit(trimmed);
+  }, [name, nameExists, onSubmit, onCancel]);
 
   const handleBlur = useCallback(() => {
-    // Only treat blur as a submit once the input is truly active
+    // Only react to blur once input is truly active.
+    // For context-menu create, blur should CANCEL (not auto-submit),
+    // otherwise the default name gets created immediately when focus is
+    // stolen while the menu closes.
     if (!readyRef.current) return;
-    handleSubmit();
-  }, [handleSubmit]);
+    onCancel();
+  }, [onCancel]);
 
   return (
     <div
-      className="flex items-center gap-1.5 py-1"
+      className="flex flex-col gap-0.5 py-1"
       style={{ paddingLeft: 8 + depth * 16 }}
     >
-      {/* Spacer matching the chevron width in TreeNode rows */}
-      <span className="w-3.5 shrink-0" />
-      {type === 'file' ? (
-        <FilePlus className="h-4 w-4 text-green-400 shrink-0" />
-      ) : (
-        <FolderPlus className="h-4 w-4 text-blue-400 shrink-0" />
+      <div className="flex items-center gap-1.5">
+        {/* Spacer matching the chevron width in TreeNode rows */}
+        <span className="w-3.5 shrink-0" />
+        {type === 'file' ? (
+          <FilePlus className="h-4 w-4 text-green-400 shrink-0" />
+        ) : (
+          <FolderPlus className="h-4 w-4 text-blue-400 shrink-0" />
+        )}
+        <input
+          type="text"
+          ref={inputRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !nameExists) handleSubmit();
+            if (e.key === 'Escape') onCancel();
+          }}
+          onBlur={handleBlur}
+          className={cn(
+            'flex-1 text-sm bg-transparent border rounded px-1.5 py-0.5 outline-none min-w-0 selection:bg-primary/25 selection:text-foreground transition-colors',
+            nameExists
+              ? 'border-red-500/70 bg-red-500/5'
+              : 'border-primary/50',
+          )}
+        />
+      </div>
+      {nameExists && (
+        <p className="ml-5 inline-flex items-center gap-1 text-[11px] text-red-500/90">
+          <CircleAlert className="h-3 w-3" />
+          Name already exists
+        </p>
       )}
-      <input
-        type="text"
-        ref={inputRef}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSubmit();
-          if (e.key === 'Escape') onCancel();
-        }}
-        onBlur={handleBlur}
-        className="flex-1 text-sm bg-transparent border border-primary/50 rounded px-1.5 py-0.5 outline-none min-w-0 selection:bg-primary/25 selection:text-foreground"
-      />
     </div>
   );
 }
@@ -517,6 +557,7 @@ function InlineCreateInput({
 function TreeNodeChildren({
   dirPath,
   depth,
+  activeDirPath,
   gitStatusMap,
   diagnosticCountsMap,
   onRename,
@@ -524,6 +565,7 @@ function TreeNodeChildren({
   onCopy,
   onCut,
   onDropMove,
+  onDirectoryClick,
   onCreateInDir,
   creatingInDir,
   onCreatingInDirSubmit,
@@ -566,6 +608,7 @@ function TreeNodeChildren({
         <InlineCreateInput
           type={creatingInDir.type}
           depth={depth}
+          siblingNames={sorted.map((n) => n.name)}
           onSubmit={onCreatingInDirSubmit}
           onCancel={onCreatingInDirCancel}
         />
@@ -575,6 +618,7 @@ function TreeNodeChildren({
           key={node.path}
           node={node}
           depth={depth}
+          activeDirPath={activeDirPath}
           gitStatusMap={gitStatusMap}
           diagnosticCountsMap={diagnosticCountsMap}
           onRename={onRename}
@@ -582,6 +626,7 @@ function TreeNodeChildren({
           onCopy={onCopy}
           onCut={onCut}
           onDropMove={onDropMove}
+          onDirectoryClick={onDirectoryClick}
           onCreateInDir={onCreateInDir}
           creatingInDir={creatingInDir}
           onCreatingInDirSubmit={onCreatingInDirSubmit}
@@ -596,6 +641,7 @@ function TreeNodeChildren({
 
 export function FileTree() {
   const currentPath = useFilesStore((s) => s.currentPath);
+  const selectedFilePath = useFilesStore((s) => s.selectedFilePath);
   const clipboard = useFilesStore((s) => s.clipboard);
   const copyToClipboard = useFilesStore((s) => s.copyToClipboard);
   const cutToClipboard = useFilesStore((s) => s.cutToClipboard);
@@ -603,6 +649,7 @@ export function FileTree() {
   const toggleSearch = useFilesStore((s) => s.toggleSearch);
 
   const { data: health } = useServerHealth();
+  const { data: rootFiles } = useFileList('/workspace');
 
   // Git status
   const { data: gitStatuses } = useGitStatus({ enabled: health?.healthy === true });
@@ -659,6 +706,15 @@ export function FileTree() {
 
   // Inline create states (inside a specific folder via context menu)
   const [creatingInDir, setCreatingInDir] = useState<CreatingInDir | null>(null);
+  // Last directory explicitly selected from the tree (used by header actions).
+  const [activeDirPath, setActiveDirPath] = useState('/workspace');
+
+  useEffect(() => {
+    if (!selectedFilePath) return;
+    const idx = selectedFilePath.lastIndexOf('/');
+    const parent = idx > 0 ? selectedFilePath.slice(0, idx) : '/workspace';
+    setActiveDirPath(parent || '/workspace');
+  }, [selectedFilePath]);
 
   useEffect(() => {
     if (isCreatingFile) {
@@ -768,8 +824,26 @@ export function FileTree() {
   const isRootPath = currentPath === '/' || currentPath === '.' || currentPath === '';
   const normalizedCurrentPath = isRootPath ? '' : currentPath.replace(/\/$/, '');
 
+  const rootSiblingNames = useMemo(
+    () => (rootFiles ?? []).map((f) => f.name),
+    [rootFiles],
+  );
+
+  const fileNameExists = useMemo(() => {
+    if (!isCreatingFile || !newFileName.trim()) return false;
+    const lowered = newFileName.trim().toLowerCase();
+    return rootSiblingNames.some((n) => n.toLowerCase() === lowered);
+  }, [isCreatingFile, newFileName, rootSiblingNames]);
+
+  const folderNameExists = useMemo(() => {
+    if (!isCreatingFolder || !newFolderName.trim()) return false;
+    const lowered = newFolderName.trim().toLowerCase();
+    return rootSiblingNames.some((n) => n.toLowerCase() === lowered);
+  }, [isCreatingFolder, newFolderName, rootSiblingNames]);
+
   const handleCreateFile = useCallback(async () => {
     if (!newFileName.trim()) { setIsCreatingFile(false); return; }
+    if (fileNameExists) return;
     const filePath = normalizedCurrentPath ? `${normalizedCurrentPath}/${newFileName.trim()}` : newFileName.trim();
     try {
       await createMutation.mutateAsync({ filePath });
@@ -780,13 +854,17 @@ export function FileTree() {
       setIsCreatingFile(false);
       setNewFileName('');
     }
-  }, [createMutation, normalizedCurrentPath, newFileName]);
+  }, [createMutation, normalizedCurrentPath, newFileName, fileNameExists]);
 
   const handleCreateFolder = useCallback(async () => {
     if (folderCreateSubmittedRef.current) return;
     folderCreateSubmittedRef.current = true;
 
     if (!newFolderName.trim()) { setIsCreatingFolder(false); return; }
+    if (folderNameExists) {
+      folderCreateSubmittedRef.current = false;
+      return;
+    }
     const folderPath = normalizedCurrentPath ? `${normalizedCurrentPath}/${newFolderName.trim()}` : newFolderName.trim();
     try {
       await mkdirMutation.mutateAsync({ dirPath: folderPath });
@@ -797,12 +875,13 @@ export function FileTree() {
       setIsCreatingFolder(false);
       setNewFolderName('');
     }
-  }, [mkdirMutation, normalizedCurrentPath, newFolderName]);
+  }, [mkdirMutation, normalizedCurrentPath, newFolderName, folderNameExists]);
 
   // Handlers for creating inside a specific folder (via context menu)
   const expandDir = useFilesStore((s) => s.expandDir);
   
   const handleCreateInDir = useCallback((dirPath: string, type: 'file' | 'folder') => {
+    setActiveDirPath(dirPath || '/workspace');
     // Expand the folder so the inline input is visible
     expandDir(dirPath);
     // Use setTimeout to let the context menu close and folder expand first
@@ -871,10 +950,22 @@ export function FileTree() {
           Explorer
         </span>
         <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setNewFileName('untitled.txt'); setIsCreatingFile(true); }} title="New file">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => handleCreateInDir(activeDirPath || '/workspace', 'file')}
+            title="New file"
+          >
             <FilePlus className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setNewFolderName('New Folder'); setIsCreatingFolder(true); }} title="New folder">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => handleCreateInDir(activeDirPath || '/workspace', 'folder')}
+            title="New folder"
+          >
             <FolderPlus className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleUpload} title="Upload">
@@ -896,35 +987,70 @@ export function FileTree() {
         <div className="py-0.5">
           {/* Inline create inputs */}
           {isCreatingFile && (
-            <div className="flex items-center gap-1.5 px-3 py-1">
-              <FilePlus className="h-4 w-4 text-green-400 shrink-0" />
-              <input
-                type="text"
-                ref={fileCreateInputRef}
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFile(); if (e.key === 'Escape') { setIsCreatingFile(false); setNewFileName(''); } }}
-                onBlur={() => handleCreateFile()}
-                className="flex-1 text-sm bg-transparent border border-primary/50 rounded px-1.5 py-0.5 outline-none min-w-0"
-              />
+            <div className="flex flex-col gap-0.5 px-3 py-1">
+              <div className="flex items-center gap-1.5">
+                <FilePlus className="h-4 w-4 text-green-400 shrink-0" />
+                <input
+                  type="text"
+                  ref={fileCreateInputRef}
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !fileNameExists) handleCreateFile();
+                    if (e.key === 'Escape') { setIsCreatingFile(false); setNewFileName(''); }
+                  }}
+                  onBlur={() => {
+                    if (!fileNameExists) handleCreateFile();
+                  }}
+                  className={cn(
+                    'flex-1 text-sm bg-transparent border rounded px-1.5 py-0.5 outline-none min-w-0 transition-colors',
+                    fileNameExists
+                      ? 'border-red-500/70 bg-red-500/5'
+                      : 'border-primary/50',
+                  )}
+                />
+              </div>
+              {fileNameExists && (
+                <p className="text-[11px] text-red-500/90 pl-6 inline-flex items-center gap-1">
+                  <CircleAlert className="h-3 w-3" />
+                  Name already exists
+                </p>
+              )}
             </div>
           )}
           {isCreatingFolder && (
-            <div className="flex items-center gap-1.5 px-3 py-1">
-              <FolderPlus className="h-4 w-4 text-blue-400 shrink-0" />
-              <input
-                type="text"
-                ref={folderCreateInputRef}
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); } }}
-                onBlur={() => {
-                  if (folderInputReadyRef.current) {
-                    handleCreateFolder();
-                  }
-                }}
-                className="flex-1 text-sm bg-transparent border border-primary/50 rounded px-1.5 py-0.5 outline-none min-w-0"
-              />
+            <div className="flex flex-col gap-0.5 px-3 py-1">
+              <div className="flex items-center gap-1.5">
+                <FolderPlus className="h-4 w-4 text-blue-400 shrink-0" />
+                <input
+                  type="text"
+                  ref={folderCreateInputRef}
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !folderNameExists) handleCreateFolder();
+                    if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); }
+                  }}
+                  onBlur={() => {
+                    if (!folderInputReadyRef.current) return;
+                    if (!folderNameExists) {
+                      handleCreateFolder();
+                    }
+                  }}
+                  className={cn(
+                    'flex-1 text-sm bg-transparent border rounded px-1.5 py-0.5 outline-none min-w-0 transition-colors',
+                    folderNameExists
+                      ? 'border-red-500/70 bg-red-500/5'
+                      : 'border-primary/50',
+                  )}
+                />
+              </div>
+              {folderNameExists && (
+                <p className="text-[11px] text-red-500/90 pl-6 inline-flex items-center gap-1">
+                  <CircleAlert className="h-3 w-3" />
+                  Name already exists
+                </p>
+              )}
             </div>
           )}
 
@@ -932,6 +1058,7 @@ export function FileTree() {
           <TreeNodeChildren
             dirPath="/workspace"
             depth={0}
+            activeDirPath={activeDirPath}
             gitStatusMap={gitStatusMap}
             diagnosticCountsMap={diagnosticCountsMap}
             onRename={handleRename}
@@ -939,6 +1066,7 @@ export function FileTree() {
             onCopy={handleCopy}
             onCut={handleCut}
             onDropMove={handleDropMove}
+            onDirectoryClick={setActiveDirPath}
             onCreateInDir={handleCreateInDir}
             creatingInDir={creatingInDir}
             onCreatingInDirSubmit={handleCreatingInDirSubmit}
