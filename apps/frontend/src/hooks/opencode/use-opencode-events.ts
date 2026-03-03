@@ -281,6 +281,12 @@ export function useOpenCodeEventStream() {
 			lastFlush = Date.now();
 			lastEventTime = Date.now();
 
+			// Debug: log event types being flushed (remove after debugging)
+			const types = events.filter(Boolean).map((e) => e!.type);
+			if (types.some((t) => t.startsWith("message.part"))) {
+				console.log("[sse-flush]", types.filter((t) => t.startsWith("message.part")));
+			}
+
 			for (const item of events) {
 				if (!item) continue;
 				handleEvent(item.event);

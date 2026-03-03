@@ -234,9 +234,15 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 	applyPartDelta: (messageID, partID, field, delta) =>
 		set((s) => {
 			const list = s.parts[messageID];
-			if (!list) return s;
+			if (!list) {
+				console.warn("[sync-store] applyPartDelta: no parts list for message", messageID);
+				return s;
+			}
 			const result = Binary.search(list, partID, (p) => p.id);
-			if (!result.found) return s;
+			if (!result.found) {
+				console.warn("[sync-store] applyPartDelta: part not found", { messageID, partID, field });
+				return s;
+			}
 			const next = [...list];
 			const part = { ...next[result.index] };
 			const existing = (part as Record<string, unknown>)[field] as
@@ -372,6 +378,21 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 
 	hydrate: (sessionID, msgs) =>
 		set((s) => {
+			// Debug: log what the server returned (remove after debugging)
+			console.log("[sync-store] hydrate", {
+				sessionID,
+				msgCount: msgs.length,
+				messages: msgs.map((m) => ({
+					id: m.info?.id,
+					role: m.info?.role,
+					partCount: m.parts?.length,
+					parts: m.parts?.map((p) => ({
+						id: p?.id,
+						type: p?.type,
+						textLen: typeof (p as any)?.text === "string" ? (p as any).text.length : undefined,
+					})),
+				})),
+			});
 			const cmp = (a: string, b: string) =>
 				a < b ? -1 : a > b ? 1 : 0;
 			const incoming = msgs
@@ -597,10 +618,53 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				const props = event.properties as {
 					messageID: string;
 					partID: string;
+					sessionID: string;
 					field: string;
 					delta: string;
 				};
 				if (!props.messageID || !props.partID || !props.field) return;
+
+				// Ensure the part exists before applying the delta.
+				// message.part.delta can arrive before message.part.updated
+				// (which normally creates the message + part). Without a
+				// stub part, deltas are silently dropped by applyPartDelta,
+				// causing the streamed text to never appear.
+				const partList = get().parts[props.messageID];
+				const partExists = partList && partList.some((p) => p.id === props.partID);
+				if (!partExists) {
+					// Auto-create the assistant message so the part can
+					// render, BUT only if the session already has a user
+					// message. On page refresh, hydrate() may not have
+					// completed yet — creating a stub assistant message
+					// before the user message exists causes turn grouping
+					// to attach streaming text to the wrong bubble.
+					// In that case, the part is stored as an orphan and
+					// will be picked up once hydrate() or
+					// message.part.updated creates the real message.
+					if (props.sessionID) {
+						const existingMsgs = get().messages[props.sessionID];
+						const hasUserMsg = existingMsgs?.some(
+							(m) => m.role === "user",
+						);
+						const msgExists = existingMsgs?.some(
+							(m) => m.id === props.messageID,
+						);
+						if (!msgExists && hasUserMsg) {
+							store.upsertMessage(props.sessionID, {
+								id: props.messageID,
+								sessionID: props.sessionID,
+								role: "assistant",
+							} as Message);
+						}
+					}
+					store.upsertPart(props.messageID, {
+						id: props.partID,
+						messageID: props.messageID,
+						type: "text",
+						[props.field]: "",
+					} as unknown as Part);
+				}
+
 				store.applyPartDelta(
 					props.messageID,
 					props.partID,
