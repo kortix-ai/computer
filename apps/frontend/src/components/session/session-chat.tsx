@@ -3483,6 +3483,7 @@ export function SessionChat({
 	// ---- Pending permissions & questions ----
 	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
 	const allQuestions = useOpenCodePendingStore((s) => s.questions);
+	const addQuestion = useOpenCodePendingStore((s) => s.addQuestion);
 	const pendingPermissions = useMemo(
 		() =>
 			Object.values(allPermissions).filter((p) => p.sessionID === sessionId),
@@ -3492,6 +3493,46 @@ export function SessionChat({
 		() => Object.values(allQuestions).filter((q) => q.sessionID === sessionId),
 		[allQuestions, sessionId],
 	);
+	const questionHydrationInFlightRef = useRef(false);
+	const lastQuestionHydrationAtRef = useRef(0);
+
+	// Self-heal missed question events: if we see a question tool part running
+	// but no pending question request in the store, rehydrate question.list().
+	useEffect(() => {
+		if (!messages || pendingQuestions.length > 0) return;
+
+		const hasRunningQuestionTool = messages.some((m) => {
+			if (m.info.role !== "assistant") return false;
+			return m.parts.some((p) => {
+				if (p.type !== "tool") return false;
+				const tool = p as ToolPart;
+				if (tool.tool !== "question") return false;
+				return (
+					tool.state.status === "running" ||
+					tool.state.status === "pending"
+				);
+			});
+		});
+
+		if (!hasRunningQuestionTool) return;
+		if (questionHydrationInFlightRef.current) return;
+		const now = Date.now();
+		if (now - lastQuestionHydrationAtRef.current < 1500) return;
+
+		questionHydrationInFlightRef.current = true;
+		lastQuestionHydrationAtRef.current = now;
+		const client = getClient();
+		void client.question
+			.list()
+			.then((res) => {
+				if (res.data) {
+					(res.data as any[]).forEach((q) => addQuestion(q));
+				}
+			})
+			.finally(() => {
+				questionHydrationInFlightRef.current = false;
+			});
+	}, [messages, pendingQuestions.length, addQuestion]);
 
 	// ---- Permission/question reply handlers ----
 	const removePermission = useOpenCodePendingStore((s) => s.removePermission);
