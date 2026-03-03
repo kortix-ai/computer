@@ -93,14 +93,19 @@ export const useKortixComputerStore = create<KortixComputerState>()(
       },
       
       openFileInComputer: (filePath: string, _filePathList?: string[], targetLine?: number) => {
+        const raw = (filePath || '').trim();
+        if (!raw) return;
+        const normalizedPath = raw.startsWith('/')
+          ? raw
+          : `/workspace/${raw.replace(/^\.?\//, '')}`;
         // Open the file as a new tab (same as clicking a file in the explorer)
-        const fileName = filePath.split('/').pop() || filePath;
-        const tabId = `file:${filePath}`;
+        const fileName = normalizedPath.split('/').pop() || normalizedPath;
+        const tabId = `file:${normalizedPath}`;
         openTabAndNavigate({
           id: tabId,
           title: fileName,
           type: 'file',
-          href: `/files/${encodeURIComponent(filePath)}`,
+          href: `/files/${encodeURIComponent(normalizedPath)}`,
           // Store targetLine in tab metadata so the file viewer can scroll to it
           ...(targetLine ? { metadata: { targetLine } } : {}),
         });

@@ -653,6 +653,8 @@ export function FileTree() {
   const [newFolderName, setNewFolderName] = useState('');
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
   const folderCreateInputRef = useRef<HTMLInputElement>(null);
+  const folderInputReadyRef = useRef(false);
+  const folderCreateSubmittedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Inline create states (inside a specific folder via context menu)
@@ -670,14 +672,25 @@ export function FileTree() {
   }, [isCreatingFile]);
 
   useEffect(() => {
-    if (isCreatingFolder) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const el = folderCreateInputRef.current;
-          if (el) { el.focus(); el.setSelectionRange(0, el.value.length); }
-        });
-      });
+    if (!isCreatingFolder) {
+      folderInputReadyRef.current = false;
+      folderCreateSubmittedRef.current = false;
+      return;
     }
+
+    folderInputReadyRef.current = false;
+    folderCreateSubmittedRef.current = false;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = folderCreateInputRef.current;
+        if (el) {
+          el.focus();
+          el.setSelectionRange(0, el.value.length);
+          folderInputReadyRef.current = true;
+        }
+      });
+    });
   }, [isCreatingFolder]);
 
   const handleRename = useCallback(async (node: FileNode, newName: string) => {
@@ -770,6 +783,9 @@ export function FileTree() {
   }, [createMutation, normalizedCurrentPath, newFileName]);
 
   const handleCreateFolder = useCallback(async () => {
+    if (folderCreateSubmittedRef.current) return;
+    folderCreateSubmittedRef.current = true;
+
     if (!newFolderName.trim()) { setIsCreatingFolder(false); return; }
     const folderPath = normalizedCurrentPath ? `${normalizedCurrentPath}/${newFolderName.trim()}` : newFolderName.trim();
     try {
@@ -902,7 +918,11 @@ export function FileTree() {
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); } }}
-                onBlur={() => handleCreateFolder()}
+                onBlur={() => {
+                  if (folderInputReadyRef.current) {
+                    handleCreateFolder();
+                  }
+                }}
                 className="flex-1 text-sm bg-transparent border border-primary/50 rounded px-1.5 py-0.5 outline-none min-w-0"
               />
             </div>

@@ -152,6 +152,8 @@ export function FileBrowser() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const fileCreateInputRef = useRef<HTMLInputElement>(null);
+  const folderInputReadyRef = useRef(false);
+  const folderCreateSubmittedRef = useRef(false);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -165,17 +167,25 @@ export function FileBrowser() {
 
   // Auto-focus and select all text when folder input appears
   useEffect(() => {
-    if (isCreatingFolder) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const el = folderInputRef.current;
-          if (el) {
-            el.focus();
-            el.setSelectionRange(0, el.value.length);
-          }
-        });
-      });
+    if (!isCreatingFolder) {
+      folderInputReadyRef.current = false;
+      folderCreateSubmittedRef.current = false;
+      return;
     }
+
+    folderInputReadyRef.current = false;
+    folderCreateSubmittedRef.current = false;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = folderInputRef.current;
+        if (el) {
+          el.focus();
+          el.setSelectionRange(0, el.value.length);
+          folderInputReadyRef.current = true;
+        }
+      });
+    });
   }, [isCreatingFolder]);
 
   // Auto-focus and select file name (before extension) when file input appears
@@ -372,8 +382,12 @@ export function FileBrowser() {
 
   // Create folder
   const handleCreateFolder = useCallback(async () => {
+    if (folderCreateSubmittedRef.current) return;
+    folderCreateSubmittedRef.current = true;
+
     if (!newFolderName.trim()) {
       setIsCreatingFolder(false);
+      setNewFolderName('');
       return;
     }
 
@@ -708,6 +722,7 @@ export function FileBrowser() {
                           }
                         }}
                         onBlur={() => {
+                          if (!folderInputReadyRef.current) return;
                           if (!folderNameExists) handleCreateFolder();
                           else {
                             setIsCreatingFolder(false);
