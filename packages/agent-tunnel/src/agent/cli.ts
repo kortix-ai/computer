@@ -44,32 +44,73 @@ function clearScreen(): void {
   process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
 }
 
-function printBanner(config: { tunnelId: string; apiUrl: string }, capabilities: string[], version: string): void {
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+async function printStartup(config: { tunnelId: string; apiUrl: string }, capabilities: string[], version: string): Promise<void> {
   const machine = hostname();
-  const plat = `${platform()} ${arch()} ${release().split('.').slice(0, 2).join('.')}`;
-  const tunnelShort = config.tunnelId.length > 36
-    ? config.tunnelId.slice(0, 36) + '…'
-    : config.tunnelId;
+  const plat = `${platform()} ${arch()}`;
 
-  console.log('');
-  console.log(`${c.gray}  ── Agent Tunnel ────────────────────────────────────${c.reset}`);
-  console.log(`${c.gray}  version  ${c.reset}${c.white}v${version}${c.reset}`);
-  console.log(`${c.gray}  tunnel   ${c.reset}${c.white}${tunnelShort}${c.reset}`);
-  console.log(`${c.gray}  api      ${c.reset}${c.white}${config.apiUrl}${c.reset}`);
-  console.log(`${c.gray}  machine  ${c.reset}${c.white}${machine}${c.reset} ${c.dim}(${plat})${c.reset}`);
-  console.log('');
-  console.log(`${c.gray}  ── Capabilities ────────────────────────────────────${c.reset}`);
+  const truncate = (s: string, max: number) => s.length > max ? s.slice(0, max) + '…' : s;
+  const tunnelDisplay = truncate(config.tunnelId, 40);
+  const apiDisplay = truncate(config.apiUrl, 40);
+  const machineDisplay = truncate(machine, 28);
 
-  const capIcons: Record<string, string> = {
-    filesystem: `${c.green}●${c.reset} filesystem`,
-    shell:      `${c.green}●${c.reset} shell`,
-    desktop:    `${c.green}●${c.reset} desktop`,
+  // ── ASCII art ───────────────────────────────────────────
+  console.log('');
+  console.log(`      ${c.cyan}▄▀█ █▀▀ █▀▀ █▄ █ ▀█▀${c.reset}   ${c.cyan}▀█▀ █ █ █▄ █ █▄ █ █▀▀ █  ${c.reset}`);
+  console.log(`      ${c.cyan}█▀█ █▄█ ██▄ █ ▀█  █${c.reset}    ${c.cyan} █  █▄█ █ ▀█ █ ▀█ ██▄ █▄▄${c.reset}`);
+  console.log('');
+
+  // ── Tunnel connection animation ─────────────────────────
+  const barW = 50;
+  const frames = 14;
+
+  for (let i = 0; i <= frames; i++) {
+    const filled = Math.round((i / frames) * barW);
+    const empty = barW - filled;
+    process.stdout.write(
+      `\r      ${c.cyan}◇${c.reset} ${c.cyan}${'═'.repeat(filled)}${c.reset}${c.gray}${'─'.repeat(empty)}${c.reset}  `,
+    );
+    await sleep(20);
+  }
+  process.stdout.write(`\r      ${c.cyan}◇ ${'═'.repeat(barW)} ◆${c.reset}  \n`);
+  await sleep(120);
+
+  // ── Info box ────────────────────────────────────────────
+  const W = 60;
+  const vLen = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '').length;
+
+  const row = (content: string) => {
+    const pad = Math.max(0, W - vLen(content));
+    console.log(`  ${c.gray}│${c.reset}${content}${' '.repeat(pad)}${c.gray}│${c.reset}`);
   };
 
-  for (const cap of capabilities) {
-    console.log(`${c.gray}  ${c.reset}${capIcons[cap] || `${c.green}●${c.reset} ${cap}`}`);
-  }
+  const blank = () => console.log(`  ${c.gray}│${c.reset}${' '.repeat(W)}${c.gray}│${c.reset}`);
 
+  const titleL = `   ${c.cyan}◆${c.reset}  ${c.bold}${c.white}Agent Tunnel${c.reset}`;
+  const titleR = `${c.dim}v${version}${c.reset}   `;
+  const titleLLen = 18;
+  const titleRLen = 1 + version.length + 3;
+  const titlePad = Math.max(1, W - titleLLen - titleRLen);
+
+  const capStr = capabilities
+    .map(name => `${c.green}●${c.reset} ${c.white}${name}${c.reset}`)
+    .join('   ');
+
+  const brand = 'created by kortix';
+  const brandFill = W - brand.length - 3;
+
+  console.log('');
+  console.log(`  ${c.gray}╭${'─'.repeat(W)}╮${c.reset}`);
+  blank();
+  row(`${titleL}${' '.repeat(titlePad)}${titleR}`);
+  row(`   ${c.dim}Bridge between AI agents & local machines${c.reset}`);
+  blank();
+  row(`   ${c.dim}tunnel${c.reset}    ${c.white}${tunnelDisplay}${c.reset}`);
+  row(`   ${c.dim}relay${c.reset}     ${c.white}${apiDisplay}${c.reset}`);
+  row(`   ${c.dim}machine${c.reset}   ${c.white}${machineDisplay}${c.reset} ${c.dim}(${plat})${c.reset}`);
+  blank();
+  console.log(`  ${c.gray}╰${'─'.repeat(brandFill)} ${c.dim}created by ${c.cyan}kortix${c.reset} ${c.gray}─╯${c.reset}`);
   console.log('');
 }
 
@@ -96,7 +137,7 @@ async function commandConnect(flags: Record<string, string>): Promise<void> {
   registry.register(createDesktopCapability());
 
   clearScreen();
-  printBanner(config, registry.getCapabilityNames(), '0.1.0');
+  await printStartup(config, registry.getCapabilityNames(), '0.1.0');
 
   const agent = new TunnelAgent(config, registry);
   agent.connect();
@@ -143,7 +184,10 @@ async function commandStatus(flags: Record<string, string>): Promise<void> {
 
 function showHelp(): void {
   console.log('');
-  console.log(`${c.gray}  ── Agent Tunnel ────────────────────────────────────${c.reset}`);
+  console.log(`  ${c.cyan}▄▀█ █▀▀ █▀▀ █▄ █ ▀█▀${c.reset}   ${c.cyan}▀█▀ █ █ █▄ █ █▄ █ █▀▀ █  ${c.reset}`);
+  console.log(`  ${c.cyan}█▀█ █▄█ ██▄ █ ▀█  █${c.reset}    ${c.cyan} █  █▄█ █ ▀█ █ ▀█ ██▄ █▄▄${c.reset}`);
+  console.log('');
+  console.log(`  ${c.dim}Secure bridge between AI agents & local machines${c.reset}`);
   console.log('');
   console.log(`  ${c.bold}Usage${c.reset}   ${c.dim}npx agent-tunnel <command> [options]${c.reset}`);
   console.log('');
@@ -158,6 +202,7 @@ function showHelp(): void {
   console.log(`  ${c.white}--api-url${c.reset} ${c.dim}<url>${c.reset}       API URL ${c.dim}(default: http://localhost:8080)${c.reset}`);
   console.log('');
   console.log(`  ${c.dim}Config: ~/.agent-tunnel/config.json${c.reset}`);
+  console.log(`  ${c.dim}powered by ${c.cyan}kortix${c.reset}`);
   console.log('');
 }
 
