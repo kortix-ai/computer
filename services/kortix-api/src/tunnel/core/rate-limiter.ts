@@ -1,12 +1,5 @@
-/**
- * Tunnel Rate Limiter — token-bucket rate limiter for tunnel endpoints.
- *
- * Configurable per endpoint with different keys, limits, and windows.
- * Modeled on channels/core/rate-limiter.ts.
- */
-
 import { config } from '../../config';
-import { TunnelErrorCode } from '../types';
+import { TunnelErrorCode } from 'agent-tunnel';
 
 interface Bucket {
   tokens: number;

@@ -1,6 +1,16 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, timingSafeEqual, randomBytes } from 'crypto';
 
 const SIGNING_KEY_CONTEXT = 'kortix-tunnel-signing-v1';
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+function randomAlphanumeric(length: number): string {
+  const bytes = randomBytes(length);
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += CHARS[bytes[i]! % CHARS.length];
+  }
+  return result;
+}
 
 export function deriveSigningKey(token: string): string {
   return createHmac('sha256', SIGNING_KEY_CONTEXT)
@@ -29,4 +39,20 @@ export function verifyMessageSignature(
   } catch {
     return false;
   }
+}
+
+export function generateToken(prefix = 'tnl_'): string {
+  return `${prefix}${randomAlphanumeric(32)}`;
+}
+
+export function hashToken(token: string, secret: string): string {
+  return createHmac('sha256', secret)
+    .update(token)
+    .digest('hex');
+}
+
+export function timingSafeStringEqual(a: string, b: string): boolean {
+  const hashA = createHash('sha256').update(a).digest();
+  const hashB = createHash('sha256').update(b).digest();
+  return timingSafeEqual(hashA, hashB);
 }

@@ -2,6 +2,7 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'services/*'
+  - 'sandbox/*'
 
 catalog:
   '@tsconfig/bun': ^1.0.7
