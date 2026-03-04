@@ -77,6 +77,21 @@ if ! (cd "$KM_DIR" && bun install 2>/dev/null); then
   exit 1
 fi
 
+# ── Agent Tunnel (opencode dependency) ───────────────────────────────────────
+if [ -d "$PKG_DIR/agent-tunnel" ]; then
+  echo "[sandbox-postinstall] Deploying agent-tunnel..."
+  if [ "$MODE" = "staging" ]; then
+    AT_DIR="$STAGING/agent-tunnel"
+  else
+    AT_DIR="/opt/agent-tunnel"
+  fi
+  mkdir -p "$AT_DIR"
+  rsync -a --delete \
+    --exclude='node_modules' \
+    --exclude='bun.lock' \
+    "$PKG_DIR/agent-tunnel/" "$AT_DIR/"
+fi
+
 # ── OpenCode config/agents/tools/skills ──────────────────────────────────────
 echo "[sandbox-postinstall] Building opencode..."
 mkdir -p "$OC_DIR"
@@ -185,8 +200,14 @@ echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%S
 cp "$PKG_DIR/CHANGELOG.json" "$KX_DIR/CHANGELOG.json" 2>/dev/null || true
 
 # ── Fix ownership ────────────────────────────────────────────────────────────
-chown -R 1000:1000 "$KM_DIR" "$OC_DIR" "$KX_DIR" 2>/dev/null || true
-[ -d "$BV_DIR" ] && chown -R 1000:1000 "$BV_DIR" 2>/dev/null || true
+# Use abc user if it exists (sandbox), otherwise fall back to UID 1000
+if id abc &>/dev/null; then
+  SANDBOX_USER="abc"
+else
+  SANDBOX_USER="1000"
+fi
+chown -R "$SANDBOX_USER:$SANDBOX_USER" "$KM_DIR" "$OC_DIR" "$KX_DIR" 2>/dev/null || true
+[ -d "$BV_DIR" ] && chown -R "$SANDBOX_USER:$SANDBOX_USER" "$BV_DIR" 2>/dev/null || true
 
 # ── pip packages ─────────────────────────────────────────────────────────────
 echo "[sandbox-postinstall] Checking pip packages..."

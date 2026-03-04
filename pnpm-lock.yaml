@@ -14,7 +14,7 @@ importers:
     devDependencies:
       agent-tunnel:
         specifier: workspace:*
-        version: link:packages/agent-tunnel
+        version: link:sandbox/agent-tunnel
 
   apps/frontend:
     dependencies:
@@ -774,19 +774,19 @@ importers:
     dependencies:
       '@chat-adapter/discord':
         specifier: ^4.15.0
-        version: 4.15.0
+        version: 4.16.0
       '@chat-adapter/slack':
         specifier: ^4.14.0
-        version: 4.15.0
+        version: 4.16.0
       '@chat-adapter/state-memory':
         specifier: ^4.14.0
-        version: 4.15.0
+        version: 4.16.0
       '@hono/node-server':
         specifier: ^1.13.0
-        version: 1.19.9(hono@4.12.3)
+        version: 1.19.10(hono@4.12.3)
       chat:
         specifier: ^4.14.0
-        version: 4.15.0
+        version: 4.16.0
       hono:
         specifier: ^4.12.0
         version: 4.12.3
@@ -805,6 +805,19 @@ importers:
     devDependencies:
       typescript:
         specifier: ^5.0.0
+        version: 5.9.3
+
+  sandbox/agent-tunnel:
+    dependencies:
+      hono:
+        specifier: ^4.4.0
+        version: 4.12.3
+    devDependencies:
+      '@types/bun':
+        specifier: ^1.3.9
+        version: 1.3.10
+      typescript:
+        specifier: ^5.4.0
         version: 5.9.3
 
   sandbox/kortix-master:
@@ -847,8 +860,11 @@ importers:
         specifier: ^0.7.1
         version: 0.7.2
       agent-tunnel:
-        specifier: workspace:*
-        version: link:../../packages/agent-tunnel
+        specifier: file:../agent-tunnel
+        version: file:sandbox/agent-tunnel
+      envsitter-guard:
+        specifier: latest
+        version: 0.0.4
       jsonc-parser:
         specifier: ^3.3.1
         version: 3.3.1
@@ -884,7 +900,7 @@ importers:
         version: 2.95.3
       agent-tunnel:
         specifier: workspace:*
-        version: link:../../packages/agent-tunnel
+        version: link:../../sandbox/agent-tunnel
       ai:
         specifier: ^6.0.77
         version: 6.0.78(zod@3.25.76)
@@ -1781,11 +1797,11 @@ packages:
       '@calcom/embed-core': 1.5.3
     dev: false
 
-  /@chat-adapter/discord@4.15.0:
-    resolution: {integrity: sha512-vOe3Cy47D0reCy1ZAA+UCBA4619zXy9kVsLt2j4bIylKfPEfTnhVBhjtsNyixl+z6Bq65VxLllqvd9N6oS8reA==}
+  /@chat-adapter/discord@4.16.0:
+    resolution: {integrity: sha512-PJ9oFUbapM2jNOPputx0RVQUn7Tm6x8VbT73BL6IoMg+1HLDRTP48nOFsIUgTlvoxbaQ3j/qgsdcjqkG+v7faQ==}
     dependencies:
-      '@chat-adapter/shared': 4.15.0
-      chat: 4.15.0
+      '@chat-adapter/shared': 4.16.0
+      chat: 4.16.0
       discord-api-types: 0.37.120
       discord-interactions: 4.4.0
       discord.js: 14.25.1
@@ -1795,29 +1811,29 @@ packages:
       - utf-8-validate
     dev: false
 
-  /@chat-adapter/shared@4.15.0:
-    resolution: {integrity: sha512-otIS9zf0wY3DMc5WGK1sOJiASSeMHcdEqmuxDWW/6tK7gdRE7FOVE+dfo/74ykj9QZwv+a9cByh1cimaeHbiAw==}
+  /@chat-adapter/shared@4.16.0:
+    resolution: {integrity: sha512-J/YaclwyB02+oXFKhueM5tu0qHIO1pvl0U7D1SYl8ZgoptyhLwfdG1/kEmh1o80dSwenqCF7j9Vvc/FuEYK0BA==}
     dependencies:
-      chat: 4.15.0
+      chat: 4.16.0
     transitivePeerDependencies:
       - supports-color
     dev: false
 
-  /@chat-adapter/slack@4.15.0:
-    resolution: {integrity: sha512-DE2puxMXitt2AVLBvMAldZ4KKUKpKWxSd62nWLDX6xXtOo6z9uXAggZD3FnMOGITqw+oQypdFopvm/Wu6OxeFg==}
+  /@chat-adapter/slack@4.16.0:
+    resolution: {integrity: sha512-5/E6GAzbx3UENZFn2Q3hz5eNScML6sJlCiKTKDEjQmRDFOgg3mBdNlk/Gy7hK5GbuoEIA9BJwyCpkPKMmV2aLA==}
     dependencies:
-      '@chat-adapter/shared': 4.15.0
+      '@chat-adapter/shared': 4.16.0
       '@slack/web-api': 7.14.1
-      chat: 4.15.0
+      chat: 4.16.0
     transitivePeerDependencies:
       - debug
       - supports-color
     dev: false
 
-  /@chat-adapter/state-memory@4.15.0:
-    resolution: {integrity: sha512-I/p6dA8fl8peZH9utKOsO8raFttUSyIQwyhB/uP6cR9d07hZVcG/SF30t4RjKDgegnq8+euqPFj3lCssIaYhoA==}
+  /@chat-adapter/state-memory@4.16.0:
+    resolution: {integrity: sha512-OF1+ncPOGbHP0lplTvlfKkNizzOT6shsBt1GmJQCciyqAjoAIrj8o+Oh4RxkwI7vGEYpzgHDHz5hvn6UKAeHbA==}
     dependencies:
-      chat: 4.15.0
+      chat: 4.16.0
     transitivePeerDependencies:
       - supports-color
     dev: false
@@ -3420,8 +3436,8 @@ packages:
       yargs: 17.7.2
     dev: false
 
-  /@hono/node-server@1.19.9(hono@4.12.3):
-    resolution: {integrity: sha512-vHL6w3ecZsky+8P5MD+eFfaGTyCeOHUIFYMGpQGbrBTSmNNoxv0if69rEZ5giu36weC5saFuznL411gRX7bJDw==}
+  /@hono/node-server@1.19.10(hono@4.12.3):
+    resolution: {integrity: sha512-hZ7nOssGqRgyV3FVVQdfi+U4q02uB23bpnYpdvNXkYTRRyWx84b7yf1ans+dnJ/7h41sGL3CeQTfO+ZGxuO+Iw==}
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
@@ -10644,14 +10660,15 @@ packages:
       '@kurkle/color': 0.3.4
     dev: false
 
-  /chat@4.15.0:
-    resolution: {integrity: sha512-fE1m3UEiKQoiYkhXWT0rpH1+ZhKqJGZYkS+1gNCZWNkLv0QWTZhzdzBM5qYWe5A/Y0wJ8yLVjaqvGO4zZFxZqg==}
+  /chat@4.16.0:
+    resolution: {integrity: sha512-rO3lA8SX+qPYiQW41/6ft7yTHeovr4BK3kZYAuI8lxiO1XkKD7EgrUPvJp9IWzpXVrhjfUhzJxY8VgHvoy0QYA==}
     dependencies:
       '@workflow/serde': 4.1.0-beta.2
       mdast-util-to-string: 4.0.0
       remark-gfm: 4.0.1
       remark-parse: 11.0.0
       remark-stringify: 11.0.0
+      remend: 1.2.1
       unified: 11.0.5
     transitivePeerDependencies:
       - supports-color
@@ -11757,6 +11774,18 @@ packages:
   /entities@6.0.1:
     resolution: {integrity: sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==}
     engines: {node: '>=0.12'}
+    dev: false
+
+  /envsitter-guard@0.0.4:
+    resolution: {integrity: sha512-CaWK/T6uAY6rvNnqCuumuvqfdTBhC+p5vsy0SssB+AtCN4prV5A9ZuAD1nVTA6LdREiS1g1V4Mz96pjXiLjkHg==}
+    dependencies:
+      '@opencode-ai/plugin': 1.2.15
+      envsitter: 0.0.4
+    dev: false
+
+  /envsitter@0.0.4:
+    resolution: {integrity: sha512-Uxy5XpYQ9B6+70cQrIOKQMxaitKjMDxaK1uPaivhtVbYxQMRhJzdvx+6AgSrRrZBcnuPlLbnVPXrn7PXpi+veg==}
+    hasBin: true
     dev: false
 
   /error-ex@1.3.4:
@@ -16201,6 +16230,10 @@ packages:
     resolution: {integrity: sha512-152puVH0qMoRJQFnaMG+rVDdf01Jq/CaED+MBuXExurJgdbkLp0c3TIe4R12o28Klx8uyGsjvFNG05aFG69G9w==}
     dev: false
 
+  /remend@1.2.1:
+    resolution: {integrity: sha512-4wC12bgXsfKAjF1ewwkNIQz5sqewz/z1xgIgjEMb3r1pEytQ37F0Cm6i+OhbTWEvguJD7lhOUJhK5fSasw9f0w==}
+    dev: false
+
   /replicate@1.4.0:
     resolution: {integrity: sha512-1ufKejfUVz/azy+5TnzQP7U1+MHVWZ6psnQ06az8byUUnRhT+DZ/MvewzB1NQYBVMgNKR7xPDtTwlcP5nv/5+w==}
     engines: {git: '>=2.11.0', node: '>=18.0.0', npm: '>=7.19.0', yarn: '>=1.7.0'}
@@ -17909,3 +17942,11 @@ packages:
 
   /zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
+
+  file:sandbox/agent-tunnel:
+    resolution: {directory: sandbox/agent-tunnel, type: directory}
+    name: agent-tunnel
+    hasBin: true
+    dependencies:
+      hono: 4.12.3
+    dev: false

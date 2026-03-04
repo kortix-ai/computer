@@ -197,9 +197,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 					if (memDir && result.newMemories.length > 0) {
 						for (const mem of result.newMemories) {
 							try {
-								// Re-read latest LTM to get the ID
-								// (insertLTM was called inside consolidateMemories)
-								writeLTMFile(memDir, 0, mem.type, mem.content, mem.tags ?? [])
+																writeLTMFile(memDir, mem.id, mem.type, mem.content, mem.tags ?? [])
 							} catch { /* non-fatal */ }
 						}
 					}
@@ -451,7 +449,7 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 				if (memDir) {
 					for (const mem of result.newMemories) {
 						try {
-							writeLTMFile(memDir, 0, mem.type, mem.content, mem.tags ?? [])
+							writeLTMFile(memDir, mem.id, mem.type, mem.content, mem.tags ?? [])
 						} catch { /* non-fatal */ }
 					}
 				}

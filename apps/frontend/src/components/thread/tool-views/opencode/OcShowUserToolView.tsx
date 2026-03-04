@@ -26,6 +26,7 @@ import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { useAuthenticatedPreviewUrl } from '@/hooks/use-authenticated-preview-url';
 import {
+  isAppRouteUrl,
   isProxiableLocalhostUrl,
   parseLocalhostUrl,
   proxyLocalhostUrl,
@@ -305,7 +306,7 @@ export function OcShowUserToolView({
   const Icon = isCarousel ? typeIcon(items![0].type || '') : typeIcon(type);
 
   const isError = type === 'error' || toolResult?.success === false || !!toolResult?.error;
-  const hasLocalhostUrl = !!parseLocalhostUrl(url);
+  const hasLocalhostUrl = !!parseLocalhostUrl(url) && !isAppRouteUrl(url);
 
   // ── Server/proxy state (for header subtitle) ──
   const activeServer = useServerStore((s) => {

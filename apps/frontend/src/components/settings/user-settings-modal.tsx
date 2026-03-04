@@ -92,12 +92,12 @@ import { useTranslations } from 'next-intl';
 import { ReferralsTab } from '@/components/referrals/referrals-tab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Keyboard, CheckCircle2, HelpCircle, ShieldCheck, Volume2, EyeOff, Globe } from 'lucide-react';
-import { useUserPreferencesStore, type TabSwitchModifier } from '@/stores/user-preferences-store';
 import CreditTransactions from '@/components/billing/credit-transactions';
 import { useWebNotificationStore } from '@/stores/web-notification-store';
 import { isNotificationSupported, sendWebNotification } from '@/lib/web-notifications';
 import { useSoundStore, type SoundPack, type SoundEvent } from '@/stores/sound-store';
 import { previewSound } from '@/lib/sounds';
+import { AppearanceTab } from './appearance-tab';
 import {
     getPreferenceTabs,
     getAccountTabs,
@@ -218,6 +218,7 @@ export function UserSettingsModal({
                         <div className="flex-1 overflow-x-hidden overflow-y-auto">
                             <div className="w-full max-w-full">
                                 {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
+                                {activeTab === 'appearance' && <AppearanceTab />}
                                 {activeTab === 'sounds' && <SoundsTab />}
                                 {activeTab === 'notifications' && <NotificationsTab />}
                                 {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
@@ -281,6 +282,7 @@ export function UserSettingsModal({
                         {/* Desktop Content */}
                         <div className="flex-1 overflow-y-auto min-h-0 w-full max-w-full">
                             {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
+                            {activeTab === 'appearance' && <AppearanceTab />}
                             {activeTab === 'sounds' && <SoundsTab />}
                             {activeTab === 'notifications' && <NotificationsTab />}
                             {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
@@ -800,35 +802,22 @@ function GeneralTab({ onClose }: { onClose: () => void }) {
 // Keyboard Shortcuts Tab
 // ============================================================================
 
-const isMacPlatform = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-
 function KeyboardShortcutsTab() {
-    const { preferences, setKeyboardPreferences, getModifierLabel } = useUserPreferencesStore();
-    const { tabSwitchModifier } = preferences.keyboard;
-    const modLabel = getModifierLabel();
-
     const shortcuts = [
-        { label: 'New tab', keys: `${modLabel}+T` },
-        { label: 'Close active tab', keys: `${modLabel}+W` },
-        { label: 'Reopen closed tab', keys: `${modLabel}+Shift+T` },
-        { label: 'Next tab', keys: `${modLabel}+Shift+]` },
-        { label: 'Previous tab', keys: `${modLabel}+Shift+[` },
-        { label: 'Next tab (alt)', keys: `${modLabel}+${isMacPlatform ? 'Option' : 'Alt'}+→` },
-        { label: 'Previous tab (alt)', keys: `${modLabel}+${isMacPlatform ? 'Option' : 'Alt'}+←` },
-        { label: 'Switch to tab 1-8', keys: `${modLabel}+1 ... ${modLabel}+8` },
-        { label: 'Switch to last tab', keys: `${modLabel}+9` },
-        { label: 'New session', keys: `${isMacPlatform ? 'Cmd' : 'Ctrl'}+J` },
-        { label: 'Command palette', keys: `${isMacPlatform ? 'Cmd' : 'Ctrl'}+K` },
-        { label: 'Toggle left sidebar', keys: `${isMacPlatform ? 'Cmd' : 'Ctrl'}+B` },
-        { label: 'Toggle right sidebar', keys: `${isMacPlatform ? 'Cmd' : 'Ctrl'}+Shift+B` },
+        { label: 'New tab', keys: 'Ctrl+T' },
+        { label: 'Close active tab', keys: 'Ctrl+W' },
+        { label: 'Reopen closed tab', keys: 'Ctrl+Shift+T' },
+        { label: 'Next tab', keys: 'Ctrl+Shift+]' },
+        { label: 'Previous tab', keys: 'Ctrl+Shift+[' },
+        { label: 'Next tab (alt)', keys: 'Ctrl+Alt+→' },
+        { label: 'Previous tab (alt)', keys: 'Ctrl+Alt+←' },
+        { label: 'Switch to tab 1-8', keys: 'Ctrl+1 ... Ctrl+8' },
+        { label: 'Switch to last tab', keys: 'Ctrl+9' },
+        { label: 'New session', keys: 'Ctrl+J' },
+        { label: 'Command palette', keys: 'Ctrl+K' },
+        { label: 'Toggle left sidebar', keys: 'Ctrl+B' },
+        { label: 'Toggle right sidebar', keys: 'Ctrl+Shift+B' },
     ];
-
-    const handleModifierChange = (value: TabSwitchModifier) => {
-        setKeyboardPreferences({
-            tabSwitchModifier: value,
-            closeTabModifier: value,
-        });
-    };
 
     return (
         <div className="p-4 sm:p-6 pb-12 sm:pb-6 space-y-5 sm:space-y-6 min-w-0 max-w-full overflow-x-hidden">
@@ -837,44 +826,6 @@ function KeyboardShortcutsTab() {
                 <p className="text-sm text-muted-foreground">
                     View and customize keyboard shortcuts for tab navigation.
                 </p>
-            </div>
-
-            {/* Modifier preference */}
-            <div className="space-y-3">
-                <Label className="text-sm font-medium">Tab switching modifier key</Label>
-                <p className="text-xs text-muted-foreground">
-                    Choose which modifier key to use for switching between tabs (1-9) and closing tabs (W).
-                </p>
-                <RadioGroup
-                    value={tabSwitchModifier}
-                    onValueChange={(v) => handleModifierChange(v as TabSwitchModifier)}
-                    className="flex flex-col gap-2"
-                >
-                    <div className="flex items-center gap-3 rounded-md border p-3">
-                        <RadioGroupItem value="meta" id="mod-meta" />
-                        <Label htmlFor="mod-meta" className="cursor-pointer flex-1">
-                            <span className="font-medium">{isMacPlatform ? 'Cmd' : 'Win'} + 1-9</span>
-                            <span className="block text-xs text-muted-foreground mt-0.5">
-                                {isMacPlatform ? 'Standard macOS convention' : 'Windows/Super key'}
-                            </span>
-                        </Label>
-                        <kbd className="hidden sm:inline-flex h-6 items-center rounded border bg-muted px-2 text-[10px] font-mono text-muted-foreground">
-                            {isMacPlatform ? '\u2318' : 'Win'}+1
-                        </kbd>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-md border p-3">
-                        <RadioGroupItem value="ctrl" id="mod-ctrl" />
-                        <Label htmlFor="mod-ctrl" className="cursor-pointer flex-1">
-                            <span className="font-medium">Ctrl + 1-9</span>
-                            <span className="block text-xs text-muted-foreground mt-0.5">
-                                {isMacPlatform ? 'Linux/Windows style' : 'Standard Control key'}
-                            </span>
-                        </Label>
-                        <kbd className="hidden sm:inline-flex h-6 items-center rounded border bg-muted px-2 text-[10px] font-mono text-muted-foreground">
-                            Ctrl+1
-                        </kbd>
-                    </div>
-                </RadioGroup>
             </div>
 
             {/* All shortcuts reference */}
@@ -1686,7 +1637,5 @@ function TransactionsTab() {
         </div>
     );
 }
-
-
 
 

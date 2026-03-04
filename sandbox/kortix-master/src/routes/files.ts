@@ -33,9 +33,10 @@ const ALLOWED_ROOTS = ['/workspace', '/opt', '/tmp', '/home']
 /**
  * Resolve and validate a file path. Returns the absolute path.
  * Prevents directory traversal and restricts access to allowed roots.
+ * Relative paths are resolved relative to /workspace (sandbox default).
  */
 function resolvePath(raw: string): string {
-  const resolved = path.resolve(raw)
+  const resolved = path.isAbsolute(raw) ? path.resolve(raw) : path.resolve('/workspace', raw)
   if (!ALLOWED_ROOTS.some((root) => resolved.startsWith(root))) {
     throw new Error('Access denied: path outside allowed directories')
   }

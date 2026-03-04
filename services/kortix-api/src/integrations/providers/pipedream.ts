@@ -42,6 +42,22 @@ export class PipedreamProvider implements AuthProvider {
     this.environment = cfg.environment;
   }
 
+  private getFrontendOriginAndBase(): { origin: string; base: string } {
+    const raw = process.env.FRONTEND_URL || 'http://localhost:3000';
+    try {
+      const url = new URL(raw);
+      return {
+        origin: url.origin,
+        base: url.origin,
+      };
+    } catch {
+      return {
+        origin: 'http://localhost:3000',
+        base: 'http://localhost:3000',
+      };
+    }
+  }
+
   private async getApiToken(): Promise<string> {
     if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) {
       return this.accessToken;
@@ -93,11 +109,12 @@ export class PipedreamProvider implements AuthProvider {
   }
 
   async createConnectToken(accountId: string, app?: string): Promise<ConnectTokenResult> {
+    const { origin, base } = this.getFrontendOriginAndBase();
     const body: Record<string, unknown> = {
       external_user_id: accountId,
-      allowed_origins: ['http://localhost:3000'],
-      success_redirect_uri: 'http://localhost:3000/integrations?connected=true',
-      error_redirect_uri: 'http://localhost:3000/integrations?error=true',
+      allowed_origins: [origin],
+      success_redirect_uri: `${base}/integrations?connected=true`,
+      error_redirect_uri: `${base}/integrations?error=true`,
     };
     if (app) {
       body.app_slug = app;

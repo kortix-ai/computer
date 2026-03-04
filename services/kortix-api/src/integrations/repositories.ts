@@ -93,6 +93,7 @@ export async function getSandboxAppConflict(sandboxId: string, integrationId: st
       and(
         eq(sandboxIntegrations.sandboxId, sandboxId),
         eq(integrations.app, app),
+        eq(integrations.status, 'active'),
       ),
     )
     .limit(1);

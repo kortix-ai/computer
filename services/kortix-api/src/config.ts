@@ -6,7 +6,7 @@ export type SandboxProviderName = 'daytona' | 'local_docker';
 export type InternalKortixEnv = 'dev' | 'staging' | 'prod';
 
 /** Single source of truth for the sandbox version. Update on each release. */
-export const SANDBOX_VERSION = '0.7.8';
+export const SANDBOX_VERSION = '0.7.11';
 
 // ─── Zod Helpers ────────────────────────────────────────────────────────────
 

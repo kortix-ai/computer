@@ -138,7 +138,15 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 };
 
 export function PageTabContent({ href }: { href: string }) {
-	const Component = PAGE_COMPONENTS[href];
+	let routeKey = href;
+	try {
+		const parsed = new URL(href, window.location.origin);
+		routeKey = parsed.pathname;
+	} catch {
+		routeKey = href.split('?')[0]?.split('#')[0] || href;
+	}
+
+	const Component = PAGE_COMPONENTS[routeKey];
 
 	if (!Component) {
 		return (

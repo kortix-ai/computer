@@ -116,22 +116,22 @@ export async function consolidateMemories(
 		if (!parsed) return empty
 
 		// 7. Store new LTM entries
-		const newMemories: CreateLTMInput[] = []
+		const newMemories: Array<CreateLTMInput & { id: number }> = []
 
 		for (const entry of parsed.episodic) {
 			const input = toLTMInput("episodic", entry, sessionId)
-			newMemories.push(input)
-			insertLTM(db, input)
+			const id = insertLTM(db, input)
+			newMemories.push({ ...input, id })
 		}
 		for (const entry of parsed.semantic) {
 			const input = toLTMInput("semantic", entry, sessionId)
-			newMemories.push(input)
-			insertLTM(db, input)
+			const id = insertLTM(db, input)
+			newMemories.push({ ...input, id })
 		}
 		for (const entry of parsed.procedural) {
 			const input = toLTMInput("procedural", entry, sessionId)
-			newMemories.push(input)
-			insertLTM(db, input)
+			const id = insertLTM(db, input)
+			newMemories.push({ ...input, id })
 		}
 
 		// 8. Mark session as consolidated

@@ -47,6 +47,7 @@ import {
   Key,
 
   // Preferences
+  Palette,
   Volume2,
   Bell,
   Keyboard,
@@ -106,6 +107,7 @@ export type MenuItemKind =
 
 export type SettingsTabId =
   | 'general'
+  | 'appearance'
   | 'sounds'
   | 'notifications'
   | 'plan'
@@ -215,7 +217,7 @@ export const menuRegistry: MenuItemDef[] = [
     showIn: ['commandPalette', 'leftSidebar'],
     kind: 'action',
     actionId: 'newSession',
-    shortcut: '⌘J',
+    shortcut: 'Ctrl+J',
   },
   {
     id: 'search',
@@ -225,7 +227,7 @@ export const menuRegistry: MenuItemDef[] = [
     showIn: ['leftSidebar'],
     kind: 'action',
     actionId: 'openSearch',
-    shortcut: '⌘K',
+    shortcut: 'Ctrl+K',
   },
   {
     id: 'open-terminal',
@@ -476,6 +478,16 @@ export const menuRegistry: MenuItemDef[] = [
     settingsTab: 'general',
     keywords: 'settings preferences general profile name email language',
   },
+  {
+    id: 'pref-appearance',
+    label: 'Appearance',
+    icon: Palette,
+    group: 'preferences',
+    showIn: ['commandPalette'],
+    kind: 'settings',
+    settingsTab: 'appearance',
+    keywords: 'appearance theme color mode wallpaper',
+  },
 
   {
     id: 'pref-sounds',
@@ -600,7 +612,7 @@ export const menuRegistry: MenuItemDef[] = [
     showIn: ['commandPalette'],
     kind: 'action',
     actionId: 'toggleSidebar',
-    shortcut: '⌘B',
+    shortcut: 'Ctrl+B',
   },
   {
     id: 'logout',
@@ -773,7 +785,7 @@ export interface SettingsTab {
 
 /** Preference tabs for the settings modal */
 export function getPreferenceTabs(): SettingsTab[] {
-  const preferenceIds: SettingsTabId[] = ['general', 'sounds', 'notifications', 'shortcuts'];
+  const preferenceIds: SettingsTabId[] = ['general', 'appearance', 'sounds', 'notifications', 'shortcuts'];
   return preferenceIds.map((tabId) => {
     const item = menuRegistry.find(
       (i) => i.kind === 'settings' && i.settingsTab === tabId,

@@ -30,7 +30,7 @@ You are loading the presentation creation skill. Follow these instructions for A
   - `validate_slide` — Check dimensions via Playwright (must fit 1920x1080)
   - `export_pdf` — Render all slides to merged PDF via Playwright
   - `export_pptx` — 3-layer PPTX (background + visual elements + editable text) via Playwright + python-pptx
-  - `preview` — Start local HTTP server at `http://localhost:3210` with keyboard nav, fullscreen, thumbnails
+  - `preview` — Returns the viewer URL for this presentation at `http://localhost:3210/presentations/<name>/`. The viewer service runs persistently — no server is started.
 - **`image-search`** — Search Google Images. Batch queries with `|||` separator.
 - **`image-gen`** — Generate images via Replicate (Flux Schnell). Actions: `generate`, `edit`, `upscale`, `remove_bg`.
 - **`web-search`** — Search the web via Tavily. Batch queries with `|||` separator.
@@ -148,7 +148,7 @@ Only start after Phase 3 is complete with all images downloaded and verified.
 
 1. **Validate** — `presentation-gen` with `action: "validate_slide"` on each slide. Fix any overflows (content exceeding 1920x1080).
 
-2. **Preview** — `presentation-gen` with `action: "preview"` to launch viewer at `http://localhost:3210`.
+2. **Preview** — `presentation-gen` with `action: "preview"` to get the viewer URL: `http://localhost:3210/presentations/<name>/`.
 
 3. **Export** — both formats:
    - `action: "export_pdf"` — merged PDF via Playwright
@@ -160,7 +160,7 @@ Only start after Phase 3 is complete with all images downloaded and verified.
 
 Review all slides for visual consistency, then report:
 - What was created (topic, slide count, theme)
-- Viewer URL: `http://localhost:3210`
+- Viewer URL: `http://localhost:3210/presentations/<presentation-name>/`
 - Paths to exported PDF and PPTX files
 
 ---
@@ -347,32 +347,28 @@ new Chart(document.getElementById('myChart'), {
 
 # Presentation Viewer
 
-A polished slide viewer and preview server for HTML presentations (1920x1080).
+A polished slide viewer for HTML presentations (1920x1080).
 
 ## Architecture
 
-The viewer consists of two parts:
+The viewer is a **single persistent service** running in the sandbox on port 3210. One service handles every presentation — no per-deck server spawn needed.
 
-1. **`viewer.html`** — a self-contained HTML template that renders slides in scaled iframes with keyboard navigation, fullscreen, and a thumbnail strip.
-2. **`serve.ts`** — a lightweight Bun HTTP server that serves the presentation folder and injects the viewer at `/`.
+URL scheme:
+- `http://localhost:3210/` — index listing all presentations
+- `http://localhost:3210/presentations/<name>/` — viewer for that deck (keyboard nav, thumbnails, fullscreen)
+- `http://localhost:3210/presentations/<name>/slide_01.html` — raw slide file
 
-Both files live in `skills/presentations/` alongside this SKILL.md.
-
-## Why a Server (Not Just a Static HTML File)?
-
-Standalone 1920x1080 HTML slides opened directly in a browser are an unscaled, scrollable mess. The viewer fixes this by loading slides into iframes and CSS-scaling them to fit any viewport.
-
-The problem: **loading `<iframe src="slide_XX.html">` does not work reliably over `file://`**. Browsers enforce CORS/sandboxing restrictions on `file://` origins. An HTTP server on `localhost` eliminates all of this.
+The viewer template (`viewer.html`) is embedded at the `/presentations/<name>/` path and scales 1920×1080 iframes to fit any viewport.
 
 ## In the Sandbox (Container)
 
-**The viewer is already running as a service inside the sandbox container.** It starts automatically on boot via s6-overlay and listens on **port 3210**.
+**The viewer is already running as a persistent service.** It starts on boot via s6-overlay and listens on **port 3210**. No waiting, no polling — it serves immediately.
 
-- The service watches `/workspace/presentations/` for any presentation with a `metadata.json`
-- It serves the most recently created/updated presentation at `http://localhost:3210`
-- Port 3210 is exposed in docker-compose and mapped to the host
+- Serves any presentation created under `/workspace/presentations/`
+- Each deck gets its own URL: `http://localhost:3210/presentations/<name>/`
+- Port 3210 is exposed in docker-compose
 
-**The agent does not need to start the server manually.** After creating slides, tell the user to open `http://localhost:3210`.
+**The agent does not need to start the server.** After creating slides, call `preview` to get the URL, then show it to the user.
 
 | Item | Value |
 |------|-------|
@@ -385,6 +381,10 @@ The problem: **loading `<iframe src="slide_XX.html">` does not work reliably ove
 ## Local Development (Outside Container)
 
 ```bash
+# Serve all presentations from ./presentations/
+bun run .opencode/skills/presentations/serve.ts
+
+# Serve a specific deck (legacy, redirects to /presentations/<name>/)
 bun run .opencode/skills/presentations/serve.ts presentations/my-deck
 ```
 
@@ -392,6 +392,7 @@ Or via the `presentation-gen` tool:
 
 ```
 presentation-gen(action: "preview", presentation_name: "my-deck")
+# Returns: http://localhost:3210/presentations/mydeck/
 ```
 
 ## Viewer Controls

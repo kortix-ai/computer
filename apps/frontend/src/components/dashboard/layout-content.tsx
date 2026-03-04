@@ -371,9 +371,16 @@ export default function DashboardLayoutContent({
 	// Checks the sandbox instance directly via /env/ONBOARDING_COMPLETE
 	// Skip with ?skip_onboarding query param
 	//
-	// FAST PATH: If wasConnected is true (persisted in sessionStorage), the user
-	// has previously connected successfully — they're already onboarded. Skip the
-	// network call entirely so the dashboard renders instantly on hard refresh.
+	// FAST PATH: sessionStorage cache eliminates redundant requests per session.
+	// The cache is cleared on tab close so a reinstall + new tab works fine.
+	//
+	// CLOUD RACE FIX: In cloud mode getActiveServerUrl() returns '' before
+	// useSandbox registers the real sandbox. We subscribe to activeServerId +
+	// serverVersion so the effect re-runs once the sandbox is registered, rather
+	// than firing immediately with an empty URL (which would hit the Next.js
+	// frontend at /env/ONBOARDING_COMPLETE and get a 404).
+	const activeServerId = useServerStore((s) => s.activeServerId);
+	const serverVersion = useServerStore((s) => s.serverVersion);
 	const [onboardingChecked, setOnboardingChecked] = useState(false);
 	useEffect(() => {
 		const params = new URLSearchParams(window.location.search);
@@ -384,8 +391,7 @@ export default function DashboardLayoutContent({
 
 		// Fast path: if we've already confirmed onboarding is complete this browser
 		// session, skip the network call entirely. This eliminates ~50 requests to
-		// /env/ONBOARDING_COMPLETE per session. The cache is cleared on tab close
-		// (sessionStorage), so a reinstall + new tab works fine.
+		// /env/ONBOARDING_COMPLETE per session.
 		const cached = sessionStorage.getItem("onboarding_complete");
 		if (cached === "true") {
 			setOnboardingChecked(true);
@@ -393,8 +399,13 @@ export default function DashboardLayoutContent({
 		}
 
 		const checkOnboarding = async () => {
+			const instanceUrl = useServerStore.getState().getActiveServerUrl();
+
+			// Sandbox not registered yet (cloud mode race) — wait for the store
+			// to update (activeServerId/serverVersion change) before retrying.
+			if (!instanceUrl) return;
+
 			try {
-				const instanceUrl = useServerStore.getState().getActiveServerUrl();
 				const { authenticatedFetch } = await import("@/lib/auth-token");
 				const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, undefined, { retryOnAuthError: false });
 
@@ -419,7 +430,7 @@ export default function DashboardLayoutContent({
 			setOnboardingChecked(true);
 		};
 		checkOnboarding();
-	}, [router]);
+	}, [router, activeServerId, serverVersion]);
 
 	const isMaintenanceActive = (() => {
 		if (

@@ -928,11 +928,13 @@ function safeJsonArray(val: unknown): string[] {
 
 /**
  * Escape a user query for FTS5 MATCH syntax.
- * Wraps each word in quotes, passes through AND/OR/NOT operators.
+ * Joins terms with OR so BM25 ranking handles relevance instead of
+ * requiring every word to appear (implicit AND kills recall for memory search).
+ * Explicit AND/OR/NOT operators in the query are passed through as-is.
  */
 function escapeFts5(query: string): string {
 	const operators = new Set(["AND", "OR", "NOT"])
-	return query
+	const tokens = query
 		.split(/\s+/)
 		.filter(Boolean)
 		.map((token) => {
@@ -940,5 +942,8 @@ function escapeFts5(query: string): string {
 			if (token.startsWith('"') && token.endsWith('"')) return token
 			return `"${token.replace(/"/g, "")}"`
 		})
-		.join(" ")
+	// If the query already contains explicit boolean operators, respect them.
+	// Otherwise join with OR for high recall + BM25-ranked results.
+	const hasExplicitOp = tokens.some(t => operators.has(t))
+	return tokens.join(hasExplicitOp ? " " : " OR ")
 }

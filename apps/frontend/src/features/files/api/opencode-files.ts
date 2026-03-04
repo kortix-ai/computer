@@ -42,8 +42,16 @@ function unwrap<T>(result: { data?: T; error?: unknown }): T {
  */
 export async function listFiles(dirPath: string): Promise<FileNode[]> {
   const client = getClient();
-  const result = await client.file.list({ path: dirPath });
+  const result = await client.file.list({ path: normalizePath(dirPath) });
   return unwrap(result) as FileNode[];
+}
+
+/**
+ * Normalize a file path to absolute. Relative paths are resolved against /workspace.
+ */
+function normalizePath(filePath: string): string {
+  if (filePath.startsWith('/')) return filePath;
+  return `/workspace/${filePath}`;
 }
 
 /**
@@ -52,7 +60,7 @@ export async function listFiles(dirPath: string): Promise<FileNode[]> {
  */
 export async function readFile(filePath: string): Promise<FileContent> {
   const client = getClient();
-  const result = await client.file.read({ path: filePath });
+  const result = await client.file.read({ path: normalizePath(filePath) });
   return unwrap(result) as FileContent;
 }
 
@@ -73,11 +81,12 @@ export async function readFile(filePath: string): Promise<FileContent> {
  */
 export async function readFileAsBlob(filePath: string): Promise<Blob> {
   const baseUrl = getActiveOpenCodeUrl();
+  const absolutePath = normalizePath(filePath);
 
   // ── Primary: /file/raw (binary stream) ──
   let fallThroughToSdk = false;
   try {
-    const rawUrl = `${baseUrl}/file/raw?path=${encodeURIComponent(filePath)}`;
+    const rawUrl = `${baseUrl}/file/raw?path=${encodeURIComponent(absolutePath)}`;
     const response = await authenticatedFetch(rawUrl);
 
     if (response.ok) {

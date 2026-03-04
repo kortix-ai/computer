@@ -1,10 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Check, Monitor, Sun, Moon, Palette, ImageIcon } from 'lucide-react';
+import { Check, Monitor, Sun, Moon, Palette, ImageIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Image from 'next/image';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUserPreferencesStore } from '@/stores/user-preferences-store';
@@ -148,7 +147,6 @@ const BASE_MODES = [
 ] as const;
 
 export function AppearanceTab() {
-  const [search, setSearch] = React.useState('');
   const { theme: baseMode, setTheme: setBaseMode } = useTheme();
   const themeId = useUserPreferencesStore((s) => s.preferences.themeId);
   const setThemeId = useUserPreferencesStore((s) => s.setThemeId);
@@ -162,36 +160,29 @@ export function AppearanceTab() {
     setMounted(true);
   }, []);
 
-  const filteredThemes = React.useMemo(() => {
-    if (!search.trim()) return THEMES;
-    const q = search.toLowerCase();
-    return THEMES.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q)
-    );
-  }, [search]);
+  React.useEffect(() => {
+    if (!THEMES.some((theme) => theme.id === themeId)) {
+      setThemeId(DEFAULT_THEME_ID);
+    }
+  }, [themeId, setThemeId]);
 
   const hasCustomSettings =
     themeId !== DEFAULT_THEME_ID || wallpaperId !== DEFAULT_WALLPAPER_ID;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-1 pb-4">
+    <div className="p-4 sm:p-6 pb-12 sm:pb-6 space-y-5 sm:space-y-6 min-w-0 max-w-full overflow-x-hidden">
+      <div>
         <div className="flex items-center gap-2 mb-1">
           <Palette className="size-5 text-muted-foreground" />
-          <h3 className="text-base font-semibold">Appearance</h3>
+          <h3 className="text-lg font-semibold">Appearance</h3>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Choose a theme, color mode, and wallpaper.
         </p>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto -mx-1 px-1 min-h-0">
-        {/* Base mode selector */}
-        <div className="pb-4">
+      <div className="space-y-5 sm:space-y-6">
+        <div>
           <label className="text-xs font-medium text-muted-foreground mb-2 block">
             Color Mode
           </label>
@@ -219,8 +210,7 @@ export function AppearanceTab() {
           </div>
         </div>
 
-        {/* ── Wallpaper Section ── */}
-        <div className="pb-5">
+        <div>
           <div className="flex items-center gap-2 mb-2">
             <ImageIcon className="size-4 text-muted-foreground" />
             <label className="text-xs font-medium text-muted-foreground">
@@ -239,44 +229,29 @@ export function AppearanceTab() {
           </div>
         </div>
 
-        {/* ── Theme Section ── */}
         <div className="border-t pt-4">
-          {/* Search */}
-          <div className="pb-3">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search themes..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-8 text-sm"
-              />
-            </div>
+          <div className="flex items-center gap-2 mb-2">
+            <Palette className="size-4 text-muted-foreground" />
+            <label className="text-xs font-medium text-muted-foreground">
+              Theme Palette
+            </label>
           </div>
 
-          {/* Theme list */}
           <div className="flex flex-col gap-0.5">
-            {filteredThemes.length === 0 ? (
-              <div className="text-center py-8 text-sm text-muted-foreground">
-                No themes match &ldquo;{search}&rdquo;
-              </div>
-            ) : (
-              filteredThemes.map((theme) => (
-                <ThemeItem
-                  key={theme.id}
-                  theme={theme}
-                  isActive={themeId === theme.id}
-                  onSelect={() => setThemeId(theme.id)}
-                />
-              ))
-            )}
+            {THEMES.map((theme) => (
+              <ThemeItem
+                key={theme.id}
+                theme={theme}
+                isActive={themeId === theme.id}
+                onSelect={() => setThemeId(theme.id)}
+              />
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Reset to defaults */}
       {hasCustomSettings && (
-        <div className="pt-3 px-1 border-t">
+        <div className="pt-3 border-t">
           <Button
             variant="ghost"
             size="sm"

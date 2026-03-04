@@ -1,8 +1,8 @@
 # Releasing a New Version
 
-## Next Version: `0.7.8`
+## Next Version: `0.7.11`
 
-Current released version is `0.7.7`. The next release should be `0.7.8`.
+Current released version is `0.7.10`. The next release should be `0.7.11`.
 
 Update this section after every release so the next person knows what version to use.
 

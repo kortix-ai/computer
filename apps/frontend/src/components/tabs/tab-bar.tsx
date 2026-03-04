@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTabStore, type Tab, type TabType, DASHBOARD_TAB_ID } from '@/stores/tab-store';
-import { useUserPreferencesStore } from '@/stores/user-preferences-store';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
 import { useOpenCodeSessions, opencodeKeys } from '@/hooks/opencode/use-opencode-sessions';
@@ -199,7 +198,7 @@ function TabContextMenu({ tab, position, onAction, onClose }: ContextMenuProps) 
         : item('Pin tab', 'pin', <Pin className="h-3.5 w-3.5 text-muted-foreground" />)
       }
       <div className="my-1 h-px bg-border/60" />
-      {!tab.pinned && item('Close', 'close', <X className="h-3.5 w-3.5 text-muted-foreground" />, `${useUserPreferencesStore.getState().getModifierLabel()}+W`)}
+      {!tab.pinned && item('Close', 'close', <X className="h-3.5 w-3.5 text-muted-foreground" />, 'Ctrl+W')}
       {item('Close others', 'closeOthers', <XCircle className="h-3.5 w-3.5 text-muted-foreground" />)}
       {item('Close to the right', 'closeRight', <ArrowRightToLine className="h-3.5 w-3.5 text-muted-foreground" />)}
       <div className="my-1 h-px bg-border/60" />
@@ -924,7 +923,7 @@ export function TabBar() {
 
   // ---------------------------------------------------------------------------
   // Keyboard shortcuts — full browser-style tab keybinds
-  // Respects user preference for modifier key (Cmd vs Ctrl)
+  // Uses Ctrl-based tab keybinds
   // ---------------------------------------------------------------------------
   useEffect(() => {
     /** Navigate to a tab — all types are pre-mounted, so always use pushState */
@@ -945,15 +944,8 @@ export function TabBar() {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const { keyboard } = useUserPreferencesStore.getState().preferences;
-      const tabMod = keyboard.tabSwitchModifier;
-      const closeMod = keyboard.closeTabModifier;
-
-      // Resolve which modifier the user chose
-      const modHeld = tabMod === 'meta' ? e.metaKey : e.ctrlKey;
-      const modOther = tabMod === 'meta' ? e.ctrlKey : e.metaKey;
-      const closeModHeld = closeMod === 'meta' ? e.metaKey : e.ctrlKey;
-      const closeModOther = closeMod === 'meta' ? e.ctrlKey : e.metaKey;
+      const modHeld = e.ctrlKey;
+      const modOther = e.metaKey;
 
       // ── New tab: Modifier + T ────────────────────────────────────────
       if (modHeld && !modOther && !e.shiftKey && !e.altKey && e.code === 'KeyT') {
@@ -972,7 +964,7 @@ export function TabBar() {
       }
 
       // ── Close tab: Modifier + W ─────────────────────────────────────
-      if (closeModHeld && !closeModOther && !e.shiftKey && !e.altKey && e.code === 'KeyW') {
+      if (modHeld && !modOther && !e.shiftKey && !e.altKey && e.code === 'KeyW') {
         e.preventDefault();
         const { activeTabId: active, tabs: allTabs } = useTabStore.getState();
         if (active && allTabs[active] && !allTabs[active].pinned) {

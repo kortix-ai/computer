@@ -1,5 +1,51 @@
 [
   {
+    "version": "0.7.11",
+    "date": "2026-03-04",
+    "title": "Fix ACID update on Daytona — agent-tunnel bundling & ownership",
+    "description": "Fixes two bugs that prevented the ACID sandbox update from completing on Daytona sandboxes: the workspace-only agent-tunnel dependency that couldn't resolve outside the monorepo, and a UID mismatch where postinstall hardcoded UID 1000 but the sandbox user is UID 911.",
+    "changes": [
+      {
+        "type": "fix",
+        "text": "Bundle agent-tunnel into the sandbox npm package and reference it as file:../agent-tunnel instead of workspace:* — fixes bun install failure during ACID staging"
+      },
+      {
+        "type": "fix",
+        "text": "Deploy agent-tunnel to staging directory during ACID updates so the file: reference resolves after rsync"
+      },
+      {
+        "type": "fix",
+        "text": "postinstall.sh chown now detects the abc user dynamically instead of hardcoding UID 1000 — fixes EACCES on Daytona where abc is UID 911"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "v0.7.11",
+        "target": "github-release"
+      },
+      {
+        "name": "@kortix/sandbox@0.7.11",
+        "target": "npm"
+      },
+      {
+        "name": "kortix/sandbox:0.7.11",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.11",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.11",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.11",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.7.8",
     "date": "2026-03-04",
     "title": "Release roll-forward for latest production version",

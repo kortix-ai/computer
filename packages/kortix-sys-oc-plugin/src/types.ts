@@ -110,7 +110,7 @@ export interface SessionMeta {
 // ─── Consolidation Types ─────────────────────────────────────────────────────
 
 export interface ConsolidationResult {
-	newMemories: CreateLTMInput[]
+	newMemories: Array<CreateLTMInput & { id: number }>
 }
 
 // ─── Logging ─────────────────────────────────────────────────────────────────

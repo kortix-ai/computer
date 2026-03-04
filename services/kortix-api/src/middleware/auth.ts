@@ -23,10 +23,8 @@ const PREVIEW_SESSION_COOKIE = '__preview_session';
 
 /**
  * API key auth for search, LLM, and router routes.
- *
- * In local mode: any bearer token is accepted (no DB validation).
- * In cloud mode: all Kortix tokens (kortix_, kortix_sb_) go through
- * validateSecretKey() against the api_keys table.
+ * Always validates Kortix tokens (kortix_, kortix_sb_) via validateSecretKey()
+ * against the api_keys table.
  */
 export async function apiKeyAuth(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');
@@ -43,12 +41,6 @@ export async function apiKeyAuth(c: Context, next: Next) {
     throw new HTTPException(401, {
       message: 'Missing token in Authorization header',
     });
-  }
-
-  // Local mode: skip token format/DB validation — accept any bearer token
-  if (config.isLocal()) {
-    await next();
-    return;
   }
 
   if (!isKortixToken(token)) {
@@ -162,13 +154,6 @@ export async function combinedAuth(c: Context, next: Next) {
 
   if (!token) {
     throw new HTTPException(401, { message: 'Missing authentication token' });
-  }
-
-  if (config.isLocal()) {
-    c.set('userId', '00000000-0000-0000-0000-000000000000');
-    c.set('userEmail', '');
-    await next();
-    return;
   }
 
   // Determine if this is a preview proxy route (for cookie management)

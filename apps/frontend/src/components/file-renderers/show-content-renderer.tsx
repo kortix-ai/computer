@@ -43,7 +43,7 @@ import { cn } from '@/lib/utils';
 import { useFileContent } from '@/features/files/hooks/use-file-content';
 import { useBinaryBlob } from '@/features/files/hooks/use-binary-blob';
 import { CodeHighlight, UnifiedMarkdown } from '@/components/markdown/unified-markdown';
-import { parseLocalhostUrl } from '@/lib/utils/sandbox-url';
+import { isAppRouteUrl, parseLocalhostUrl } from '@/lib/utils/sandbox-url';
 import { TextWithPaths } from '@/components/common/clickable-path';
 import { ImageRenderer } from './image-renderer';
 import { VideoRenderer } from './video-renderer';
@@ -199,7 +199,7 @@ export function ShowContentRenderer({
   const isMarkdown = effectiveType === 'markdown';
   const isText = effectiveType === 'text';
   const isHtml = effectiveType === 'html';
-  const hasLocalhostUrl = !!parseLocalhostUrl(url);
+  const hasLocalhostUrl = !!parseLocalhostUrl(url) && !isAppRouteUrl(url);
 
   // ── Sandbox file path normalization ──
   // The show tool backend resolves paths to absolute (e.g. /workspace/foo.png).

@@ -139,6 +139,24 @@ function extractLocalhostCandidate(text: string): string | null {
 const KORTIX_MASTER_PROXY_REGEX = /^\/proxy\/(\d{1,5})(\/.*)?$/;
 
 /**
+ * Known frontend app route prefixes. URLs with these pathnames on
+ * localhost/127.0.0.1 are same-app navigations, NOT sandbox services
+ * to proxy. They should render as plain clickable links.
+ */
+const APP_ROUTE_PREFIXES = /^\/(integrations|settings|dashboard|projects|agents|skills|tools|commands|deployments|support|changelog|files)(\/|$|\?)/;
+
+export function isAppRouteUrl(rawUrl: string | undefined): boolean {
+  if (!rawUrl) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') return false;
+    return APP_ROUTE_PREFIXES.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Parse a localhost URL in one place so all consumers share identical rules.
  *
  * Handles a special case: `http://localhost:8000/proxy/{port}/{path}` URLs
@@ -350,11 +368,13 @@ export function isProxiableLocalhostUrl(url: string): boolean {
 
   if (EXCLUDED_PORTS.has(parsed.port)) return false;
 
-  // NOTE: We intentionally do NOT check if the URL matches the app's own origin.
-  // All localhost URLs in agent output originate from inside the sandbox container,
-  // even if they happen to use the same port as the frontend (e.g. both on :3000).
-  // The EXCLUDED_PORTS set above already handles infrastructure ports that should
-  // not be rewritten.
+  // If the URL is a known frontend app route (e.g. /integrations?connect=...,
+  // /settings, /dashboard) it must NOT be proxied — it is a navigation link to
+  // the local frontend, not a sandbox service.  This is critical for the
+  // integration-connect flow which generates http://localhost:3000/integrations?...
+  // URLs that should open in the same browser tab, not go through the p3000-...
+  // subdomain proxy.
+  if (isAppRouteUrl(url)) return false;
 
   return true;
 }
