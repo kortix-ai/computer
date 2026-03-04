@@ -109,14 +109,34 @@ export function useIntegrationsPage(): any {
                 label = `${app.name} Account ${existing.length + 1}`;
               }
 
-              await saveConnection.mutateAsync({
+              const saveResult = await saveConnection.mutateAsync({
                 app: app.slug,
                 app_name: app.name,
                 provider_account_id: providerAccountId,
                 label,
                 sandbox_id: sandboxIdForConnect,
               });
-              toast.success(`${app.name} connected successfully!`);
+
+              if (saveResult.link?.attempted && !saveResult.link.linked) {
+                const reason = saveResult.link.reason;
+                if (reason === 'sandbox_not_owned') {
+                  toast.error(
+                    `${app.name} connected, but it could not be linked to this sandbox. ` +
+                    'Make sure you are in the same account/workspace that owns this sandbox.',
+                  );
+                } else if (reason === 'sandbox_conflict') {
+                  toast.error(
+                    `${app.name} connected, but this sandbox already has another active ${app.name} profile linked. ` +
+                    'Unlink the existing profile first, then reconnect.',
+                  );
+                } else {
+                  toast.error(
+                    `${app.name} connected, but sandbox linking failed. Check Integrations settings to relink manually.`,
+                  );
+                }
+              } else {
+                toast.success(`${app.name} connected successfully!`);
+              }
             } catch {
               toast.error('Connected but failed to save. Please refresh.');
             }

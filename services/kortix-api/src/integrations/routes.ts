@@ -131,19 +131,37 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
         label: parsed.data.label,
       });
 
+      const link = {
+        attempted: false,
+        linked: false,
+        reason: null as string | null,
+      };
+
       if (parsed.data.sandbox_id && row) {
+        link.attempted = true;
         const sandboxOwned = await verifySandboxOwnership(parsed.data.sandbox_id, accountId);
         if (sandboxOwned) {
           const conflict = await getSandboxAppConflict(parsed.data.sandbox_id, row.integrationId, row.app);
           if (!conflict) {
             await linkSandboxIntegration(parsed.data.sandbox_id, row.integrationId);
             console.log(`[INTEGRATIONS] Auto-linked: ${parsed.data.app} → sandbox ${parsed.data.sandbox_id}`);
+            link.linked = true;
+          } else {
+            console.warn(
+              `[INTEGRATIONS] Auto-link skipped due active conflict: app=${parsed.data.app} sandbox=${parsed.data.sandbox_id} existingIntegration=${conflict.integrationId}`,
+            );
+            link.reason = 'sandbox_conflict';
           }
+        } else {
+          console.warn(
+            `[INTEGRATIONS] Auto-link skipped: sandbox not owned by account. app=${parsed.data.app} sandbox=${parsed.data.sandbox_id} account=${accountId}`,
+          );
+          link.reason = 'sandbox_not_owned';
         }
       }
 
       console.log(`[INTEGRATIONS] Saved: ${parsed.data.app} for account ${accountId}`);
-      return c.json({ success: true, integration: row });
+      return c.json({ success: true, integration: row, link });
     } catch (err) {
       console.error('[INTEGRATIONS] Error saving connection:', err);
       return c.json({ error: 'Failed to save connection' }, 500);
@@ -361,6 +379,39 @@ export function createIntegrationsRouter(): Hono<AppEnv> {
 
 export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
   const app = new Hono<SandboxEnv>();
+
+  async function ensureSandboxIntegrationForApp(sandboxId: string, accountId: string, appSlug: string) {
+    const linked = await getIntegrationForSandbox(sandboxId, appSlug, accountId);
+    if (linked) return linked;
+
+    const accountIntegrations = await listIntegrationsByAccount(accountId);
+    const candidates = accountIntegrations
+      .filter((row) => row.app === appSlug && row.status === 'active')
+      .sort((a, b) => {
+        const aTime = new Date(a.updatedAt ?? a.createdAt).getTime();
+        const bTime = new Date(b.updatedAt ?? b.createdAt).getTime();
+        return bTime - aTime;
+      });
+
+    const selected = candidates[0];
+    if (!selected) return null;
+
+    const conflict = await getSandboxAppConflict(sandboxId, selected.integrationId, appSlug);
+    if (conflict) {
+      console.warn(
+        `[INTEGRATIONS] Auto-heal skipped for ${appSlug}: sandbox=${sandboxId} has active conflicting integration=${conflict.integrationId}`,
+      );
+      return null;
+    }
+
+    await linkSandboxIntegration(sandboxId, selected.integrationId);
+    console.log(
+      `[INTEGRATIONS] Auto-healed sandbox link: app=${appSlug} sandbox=${sandboxId} integration=${selected.integrationId}`,
+    );
+
+    return await getIntegrationForSandbox(sandboxId, appSlug, accountId);
+  }
+
   app.post('/token', async (c) => {
     const sandboxId = c.get('sandboxId') as string;
     const accountId = c.get('accountId') as string;
@@ -377,7 +428,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
 
     const { app: appSlug } = parsed.data;
 
-    const linked = await getIntegrationForSandbox(sandboxId, appSlug, accountId);
+    const linked = await ensureSandboxIntegrationForApp(sandboxId, accountId, appSlug);
     if (!linked) {
       throw new HTTPException(403, {
         message: `No connected integration for "${appSlug}" linked to this sandbox`,
@@ -419,7 +470,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
 
     const { app: appSlug, method, url, headers, body: reqBody } = parsed.data;
 
-    const linked = await getIntegrationForSandbox(sandboxId, appSlug, accountId);
+    const linked = await ensureSandboxIntegrationForApp(sandboxId, accountId, appSlug);
     if (!linked) {
       throw new HTTPException(403, {
         message: `No connected integration for "${appSlug}" linked to this sandbox`,
@@ -457,7 +508,40 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
       throw new HTTPException(403, { message: 'This endpoint requires a sandbox token (kortix_sb_)' });
     }
 
-    const linked = await listSandboxIntegrations(sandboxId, accountId);
+    let linked = await listSandboxIntegrations(sandboxId, accountId);
+
+    if (linked.length === 0) {
+      const accountIntegrations = await listIntegrationsByAccount(accountId);
+      const activeByApp = new Map<string, (typeof accountIntegrations)[number]>();
+
+      for (const row of accountIntegrations) {
+        if (row.status !== 'active') continue;
+        const existing = activeByApp.get(row.app);
+        if (!existing) {
+          activeByApp.set(row.app, row);
+          continue;
+        }
+        const existingTime = new Date(existing.updatedAt ?? existing.createdAt).getTime();
+        const rowTime = new Date(row.updatedAt ?? row.createdAt).getTime();
+        if (rowTime > existingTime) {
+          activeByApp.set(row.app, row);
+        }
+      }
+
+      for (const row of activeByApp.values()) {
+        const conflict = await getSandboxAppConflict(sandboxId, row.integrationId, row.app);
+        if (conflict) continue;
+        await linkSandboxIntegration(sandboxId, row.integrationId);
+      }
+
+      linked = await listSandboxIntegrations(sandboxId, accountId);
+      if (linked.length > 0) {
+        console.log(
+          `[INTEGRATIONS] Auto-healed sandbox links from account integrations: sandbox=${sandboxId} count=${linked.length}`,
+        );
+      }
+    }
+
     return c.json({
       integrations: linked.map((l) => ({
         app: l.integration.app,
@@ -563,7 +647,7 @@ export function createIntegrationsTokenRouter(): Hono<SandboxEnv> {
 
     const { app: appSlug, action_key, props } = parsed.data;
 
-    const linked = await getIntegrationForSandbox(sandboxId, appSlug, accountId);
+    const linked = await ensureSandboxIntegrationForApp(sandboxId, accountId, appSlug);
     if (!linked) {
       throw new HTTPException(403, {
         message: `No connected integration for "${appSlug}" linked to this sandbox`,

@@ -147,11 +147,12 @@ const saveConnection = async (data: {
   provider_account_id: string;
   label?: string;
   sandbox_id?: string;
-}): Promise<void> => {
-  const response = await backendApi.post('/integrations/connections/save', data);
+}): Promise<{ success: boolean; integration?: IntegrationConnection; link?: { attempted: boolean; linked: boolean; reason: string | null } }> => {
+  const response = await backendApi.post<{ success: boolean; integration?: IntegrationConnection; link?: { attempted: boolean; linked: boolean; reason: string | null } }>('/integrations/connections/save', data);
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to save connection');
   }
+  return response.data!;
 };
 
 const renameIntegration = async ({
