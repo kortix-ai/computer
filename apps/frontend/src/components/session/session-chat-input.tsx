@@ -23,6 +23,7 @@ import {
   ListTodo,
   MessageSquare,
   Terminal,
+  Reply,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -714,7 +715,7 @@ function SlashCommandPopover({
 export interface MentionItem {
   kind: 'file' | 'agent' | 'session';
   label: string;
-  value: string;
+  value?: string;
   description?: string;
 }
 
@@ -977,6 +978,11 @@ export interface SessionChatInputProps {
 
   /** Slot rendered inside the input card, above the textarea (e.g. queue chip) */
   inputSlot?: React.ReactNode;
+
+  /** Reply context — shows a banner in the input indicating what's being replied to */
+  replyTo?: { text: string } | null;
+  /** Callback to clear the reply context */
+  onClearReply?: () => void;
 }
 
 export function SessionChatInput({
@@ -1005,6 +1011,8 @@ export function SessionChatInput({
   threadContext,
   onContextClick,
   inputSlot,
+  replyTo,
+  onClearReply,
 }: SessionChatInputProps) {
   const placeholderVariants = useMemo(
     () => [
@@ -1622,18 +1630,35 @@ export function SessionChatInput({
           )}
 
           {/* Inline chips: thread context, todos, queue — unified spacing */}
-          {(threadContext || sessionId || inputSlot) && (
+          {(threadContext || sessionId || inputSlot || replyTo) && (
             <div className="flex flex-col gap-1.5 mx-3 mt-2.5 empty:hidden">
+              {replyTo && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/10">
+                  <Reply className="size-3 text-primary/60 flex-shrink-0" />
+                  <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">
+                    {replyTo.text.length > 120 ? `${replyTo.text.slice(0, 120)}…` : replyTo.text}
+                  </span>
+                  {onClearReply && (
+                    <button
+                      type="button"
+                      onClick={onClearReply}
+                      className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                      aria-label="Clear reply"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              )}
               {threadContext && (
                 <button
                   onClick={threadContext.onBackToParent}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-xl',
-                    'bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer group',
+                    'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer',
                   )}
                 >
                   <ArrowUpLeft className="size-3.5 text-muted-foreground group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
-                  <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate text-left">
+                  <span className="flex-1 min-w-0 truncate text-left">
                     {threadContext.variant === 'fork' ? 'Fork of' : 'Sub-session of'}
                     {' '}
                     <span className="text-foreground/80 font-medium">{threadContext.parentTitle}</span>
