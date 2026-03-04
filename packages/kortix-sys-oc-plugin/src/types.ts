@@ -15,6 +15,7 @@ export type ObservationType =
 export interface Observation {
 	id: number
 	sessionId: string
+	callID: string | null
 	type: ObservationType
 	title: string
 	narrative: string
@@ -29,6 +30,7 @@ export interface Observation {
 
 export interface CreateObservationInput {
 	sessionId: string
+	callID?: string | null
 	type: ObservationType
 	title: string
 	narrative: string

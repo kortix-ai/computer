@@ -51,6 +51,7 @@ export function initDb(dbPath?: string): Database {
 		CREATE TABLE IF NOT EXISTS observations (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			session_id TEXT NOT NULL,
+			call_id TEXT,
 			type TEXT NOT NULL,
 			title TEXT NOT NULL,
 			narrative TEXT NOT NULL DEFAULT '',
@@ -67,6 +68,15 @@ export function initDb(dbPath?: string): Database {
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_session ON observations(session_id)`)
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_type ON observations(type)`)
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_created ON observations(created_at DESC)`)
+
+	// Migration: add call_id column if missing (existing DBs won't have it)
+	try {
+		db.exec(`ALTER TABLE observations ADD COLUMN call_id TEXT`)
+	} catch {
+		// Column already exists — ignore
+	}
+
+	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_call_id ON observations(call_id)`)
 
 	// Observations FTS5
 	db.exec(`
@@ -198,10 +208,11 @@ export function initDb(dbPath?: string): Database {
 
 export function insertObservation(db: Database, input: CreateObservationInput): number {
 	const result = db.run(
-		`INSERT INTO observations (session_id, type, title, narrative, facts, concepts, files_read, files_modified, tool_name, prompt_number)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO observations (session_id, call_id, type, title, narrative, facts, concepts, files_read, files_modified, tool_name, prompt_number)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			input.sessionId,
+			input.callID ?? null,
 			input.type,
 			input.title,
 			input.narrative,
@@ -875,6 +886,7 @@ function rowToObservation(row: Record<string, unknown>): Observation {
 	return {
 		id: row.id as number,
 		sessionId: row.session_id as string,
+		callID: (row.call_id as string) ?? null,
 		type: row.type as Observation["type"],
 		title: row.title as string,
 		narrative: (row.narrative as string) ?? "",
