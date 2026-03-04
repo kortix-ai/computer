@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.7.8",
+    "date": "2026-03-04",
+    "title": "Release roll-forward for latest production version",
+    "description": "Publishes the next sandbox release and aligned container artifacts so production and version tracking stay in sync after the 0.7.7 rollout.",
+    "changes": [
+      {
+        "type": "improvement",
+        "text": "Roll release metadata forward to 0.7.8 and publish refreshed sandbox and container artifacts as a coordinated full release"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "v0.7.8",
+        "target": "github-release"
+      },
+      {
+        "name": "@kortix/sandbox@0.7.8",
+        "target": "npm"
+      },
+      {
+        "name": "kortix/sandbox:0.7.8",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix-sandbox-v0.7.8",
+        "target": "daytona"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.8",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.8",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.7.7",
     "date": "2026-03-03",
     "title": "ACID sandbox updates, cloud 403 fix & release safety",
