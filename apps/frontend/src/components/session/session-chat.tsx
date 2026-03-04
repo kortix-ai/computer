@@ -3083,9 +3083,12 @@ export function SessionChat({
 		expectAssistantResponse;
 
 	const streamCacheKey = `opencode_stream_cache:${sessionId}`;
+	const streamCacheRestoredRef = useRef<string | null>(null);
 
 	// Restore cached streaming prefix after refresh when SSE resumes from the
 	// current point but backend hydrate has not yet returned the in-progress text.
+	// Runs at most once per cache key to prevent re-triggering when the store
+	// update causes `messages` to change (which would re-fire this effect).
 	useEffect(() => {
 		if (typeof window === "undefined") return;
 		if (!shouldRecoveryPoll) return;
@@ -3107,6 +3110,9 @@ export function SessionChat({
 		if (!cached || !cached.messageID || !cached.partID || !cached.text) return;
 		// Ignore stale cache entries.
 		if (Date.now() - (cached.updatedAt || 0) > 30 * 60 * 1000) return;
+		// Prevent re-running after a successful restore for this exact cache entry.
+		const cacheFingerprint = `${cached.messageID}:${cached.partID}:${cached.text.length}`;
+		if (streamCacheRestoredRef.current === cacheFingerprint) return;
 
 		const store = useSyncStore.getState();
 		const currentMsgs = store.getMessages(sessionId);
@@ -3149,8 +3155,13 @@ export function SessionChat({
 		const currentParts = store.parts[cached.messageID] ?? [];
 		const existing = currentParts.find((p) => p.id === cached!.partID) as any;
 		const existingText = typeof existing?.text === "string" ? existing.text : "";
-		if (cached.text.length <= existingText.length) return;
+		if (cached.text.length <= existingText.length) {
+			// Already restored or surpassed — mark as done.
+			streamCacheRestoredRef.current = cacheFingerprint;
+			return;
+		}
 
+		streamCacheRestoredRef.current = cacheFingerprint;
 		store.upsertPart(cached.messageID, {
 			...(existing ?? {}),
 			id: cached.partID,

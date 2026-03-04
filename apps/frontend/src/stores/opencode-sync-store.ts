@@ -237,16 +237,17 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 			// If this message had bridged (optimistic) parts, clear them now
 			// that a real part has arrived — prevents double-rendering.
 			let list: Part[];
+			let bridgeCleared = false;
 			if (bridgedPartIds.has(messageID)) {
 				bridgedPartIds.delete(messageID);
 				list = [];
+				bridgeCleared = true;
 			} else {
 				list = s.parts[messageID] ?? [];
 			}
 			const result = Binary.search(list, part.id, (p) => p.id);
-			const next = [...list];
 			if (result.found) {
-				const prev = next[result.index] as any;
+				const prev = list[result.index] as any;
 				const incoming = part as any;
 				const prevText = typeof prev?.text === "string" ? prev.text : null;
 				const incomingText =
@@ -256,8 +257,9 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				// the stream to jump or start from the middle.
 				// For existing text parts, only accept full-text replacements that
 				// are monotonic prefix growth (incoming starts with previous).
-				// Otherwise keep the existing streamed text and let delta events
-				// continue appending naturally.
+				// Otherwise keep the existing part as-is — returning `s` avoids
+				// creating a new state reference which would cause infinite
+				// re-render loops in consuming components.
 				if (
 					prevText !== null &&
 					incomingText !== null &&
@@ -265,13 +267,20 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				) {
 					const isPrefixGrowth = incomingText.startsWith(prevText);
 					if (!isPrefixGrowth) {
-						next[result.index] = { ...part, text: prevText } as Part;
-					} else {
-						next[result.index] = part;
+						// Incoming text is not a prefix extension — reject the update
+						// entirely. Returning `s` preserves referential equality and
+						// prevents downstream selectors from re-firing.
+						if (!bridgeCleared) return s;
+						// Bridge was cleared but we still need to keep the existing part.
+						const next = [...list];
+						next[result.index] = prev;
+						return { parts: { ...s.parts, [messageID]: next } };
 					}
-				} else {
-					next[result.index] = part;
 				}
+			}
+			const next = [...list];
+			if (result.found) {
+				next[result.index] = part;
 			} else {
 				next.splice(result.index, 0, part);
 			}
