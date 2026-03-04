@@ -1042,6 +1042,8 @@ export function SessionChatInput({
   const [slashIndex, setSlashIndex] = useState(0);
   const [stagedCommand, setStagedCommand] = useState<Command | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
 
   // File search: use provided callback or fall back to the SDK directly
   const fileSearchFn = useMemo(() => {
@@ -1173,17 +1175,58 @@ export function SessionChatInput({
     return () => observer.disconnect();
   }, [shouldAutoFocus]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const appendAttachedFiles = useCallback((files: Iterable<File>) => {
     const newFiles: AttachedFile[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       const localUrl = URL.createObjectURL(file);
       newFiles.push({ file, localUrl, isImage: isImageFile(file) });
     }
+    if (newFiles.length === 0) return;
     setAttachedFiles((prev) => [...prev, ...newFiles]);
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    appendAttachedFiles(Array.from(files));
     e.target.value = '';
   };
+
+  const dragHasFiles = useCallback((e: React.DragEvent<HTMLElement>) => {
+    return Array.from(e.dataTransfer?.types ?? []).includes('Files');
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLElement>) => {
+    if (disabled || !dragHasFiles(e)) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  }, [disabled, dragHasFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLElement>) => {
+    if (disabled || !dragHasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, [disabled, dragHasFiles]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLElement>) => {
+    if (!dragHasFiles(e)) return;
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, [dragHasFiles]);
+
+  const handleDropFiles = useCallback((e: React.DragEvent<HTMLElement>) => {
+    if (disabled || !dragHasFiles(e)) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+    const dropped = e.dataTransfer.files;
+    if (!dropped || dropped.length === 0) return;
+    appendAttachedFiles(Array.from(dropped));
+  }, [appendAttachedFiles, disabled, dragHasFiles]);
 
   const removeAttachedFile = (index: number) => {
     setAttachedFiles((prev) => {
@@ -1605,8 +1648,25 @@ export function SessionChatInput({
   return (
     <div className="mx-auto w-full max-w-4xl relative shrink-0 px-2 sm:px-4 pb-6">
       {/* Todo panel removed — now inline inside the card as TodoChip */}
-      <div ref={cardRef} className="w-full bg-card border border-border rounded-[24px] overflow-visible relative z-10">
+      <div
+        ref={cardRef}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDropFiles}
+        className={cn(
+          'w-full bg-card border border-border rounded-[24px] overflow-visible relative z-10 transition-colors',
+          isDragOver && 'border-primary',
+        )}
+      >
         <div className="relative flex flex-col w-full gap-2 overflow-visible">
+          {isDragOver && (
+            <div className="absolute inset-0 z-30 rounded-[24px] border-2 border-dashed border-primary/70 bg-primary/5 pointer-events-none flex items-center justify-center">
+              <span className="px-3 py-1 rounded-md bg-background/90 text-xs font-medium text-foreground">
+                Drop files to attach
+              </span>
+            </div>
+          )}
           {/* Slash command popover (portalled to body to escape overflow-hidden ancestors) */}
           {slashFilter !== null && filteredCommands.length > 0 && (
             <SlashCommandPopover
