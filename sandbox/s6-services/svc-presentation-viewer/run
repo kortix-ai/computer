@@ -1,33 +1,190 @@
 #!/usr/bin/with-contenv bash
-# Presentation Viewer — watches for and serves slide decks on port 3210
+# Presentation Viewer — persistent single-service that serves any presentation by path on port 3210
+# URL scheme: http://localhost:3210/presentations/<name>/   → viewer for that presentation
+#             http://localhost:3210/presentations/<name>/<file.html>  → raw slide file
 
-PRES_ROOT="/workspace/presentations"
-VIEWER="/opt/opencode/skills/presentations/serve.ts"
-PORT=3210
+echo "[presentation-viewer] Starting persistent viewer on port 3210"
 
-wait_for_presentation() {
-    while true; do
-        if [ -d "$PRES_ROOT" ]; then
-            LATEST=$(find "$PRES_ROOT" -maxdepth 2 -name "metadata.json" -newer /tmp/.pv-last-check 2>/dev/null | head -1)
-            if [ -z "$LATEST" ]; then
-                LATEST=$(find "$PRES_ROOT" -maxdepth 2 -name "metadata.json" 2>/dev/null | head -1)
-            fi
-            if [ -n "$LATEST" ]; then
-                dirname "$LATEST"
-                return 0
-            fi
-        fi
-        sleep 3
-    done
+mkdir -p /workspace/presentations
+chown -R abc:users /workspace/presentations >/dev/null 2>&1 || true
+
+# Write the server script to a temp file to avoid quoting issues
+SCRIPT=/tmp/pres-viewer-server.js
+cat > "$SCRIPT" << 'ENDOFSCRIPT'
+const fs = require("fs");
+const path = require("path");
+
+const PRES_ROOT = "/workspace/presentations";
+const VIEWER_TEMPLATE = "/opt/opencode/skills/presentations/viewer.html";
+
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".pdf": "application/pdf",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
+
+function getMime(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  return MIME_TYPES[ext] || "application/octet-stream";
 }
 
-touch /tmp/.pv-last-check
+function serveFile(filePath) {
+  try {
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      return new Response("Not found: " + filePath, { status: 404 });
+    }
+    const data = fs.readFileSync(filePath);
+    return new Response(data, {
+      headers: { "Content-Type": getMime(filePath), "Cache-Control": "no-cache" },
+    });
+  } catch (e) {
+    return new Response("Error reading file: " + e.message, { status: 500 });
+  }
+}
 
-echo "[KORTIX-pv] Waiting for a presentation in $PRES_ROOT ..."
-PRES_DIR=$(wait_for_presentation)
-echo "[KORTIX-pv] Serving: $PRES_DIR on port $PORT"
+function buildViewerHtml(presDir, metadata) {
+  if (!fs.existsSync(VIEWER_TEMPLATE)) {
+    return "<html><body><p>Viewer template not found</p></body></html>";
+  }
+  const slides = Object.entries(metadata.slides || {})
+    .map(([num, data]) => ({
+      number: parseInt(num),
+      title: data.title || "Slide " + num,
+      filename: data.filename || "slide_" + String(num).padStart(2, "0") + ".html",
+    }))
+    .sort((a, b) => a.number - b.number);
 
-touch /tmp/.pv-last-check
+  const presData = JSON.stringify({
+    title: metadata.title || metadata.presentation_name || "Presentation",
+    slides,
+  });
 
-exec s6-setuidgid abc \
-    /usr/local/bin/bun run "$VIEWER" "$PRES_DIR"
+  const template = fs.readFileSync(VIEWER_TEMPLATE, "utf-8");
+  return template
+    .replace("{{TITLE}}", metadata.title || "Presentation")
+    .replace("{{PRESENTATION_DATA}}", presData);
+}
+
+function listPresentations() {
+  if (!fs.existsSync(PRES_ROOT)) return [];
+  return fs.readdirSync(PRES_ROOT, { withFileTypes: true })
+    .filter(function(d) { return d.isDirectory() && !d.name.startsWith(".") && d.name !== "images"; })
+    .map(function(d) {
+      const metaPath = path.join(PRES_ROOT, d.name, "metadata.json");
+      let meta = { title: d.name, total_slides: 0 };
+      try {
+        if (fs.existsSync(metaPath)) {
+          const m = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+          meta = { title: m.title || d.name, total_slides: Object.keys(m.slides || {}).length };
+        }
+      } catch (e) {}
+      return { name: d.name, title: meta.title, total_slides: meta.total_slides };
+    });
+}
+
+function buildIndexHtml(pres) {
+  const items = pres.map(function(p) {
+    return '<li><a href="/presentations/' + p.name + '/"><span>' + p.title + '</span><span class="count">' + p.total_slides + ' slides</span></a></li>';
+  }).join("");
+  const empty = pres.length === 0 ? '<p class="empty">No presentations yet. Create one with the presentation-gen tool.</p>' : "";
+  return '<!DOCTYPE html><html><head><title>Presentations</title>' +
+    '<style>body{font-family:sans-serif;padding:2rem;max-width:800px;margin:0 auto}' +
+    'h1{font-size:1.5rem;margin-bottom:1.5rem}' +
+    'ul{list-style:none;padding:0}' +
+    'li{margin:0.5rem 0}' +
+    'a{display:flex;align-items:center;gap:0.5rem;padding:0.75rem 1rem;border:1px solid #e5e7eb;border-radius:0.5rem;text-decoration:none;color:inherit}' +
+    'a:hover{background:#f9fafb}' +
+    '.count{font-size:0.75rem;color:#6b7280;margin-left:auto}' +
+    '.empty{color:#6b7280}' +
+    '</style></head><body>' +
+    '<h1>Presentations (' + pres.length + ')</h1>' +
+    '<ul>' + items + '</ul>' +
+    empty +
+    '</body></html>';
+}
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Cache-Control": "no-cache",
+};
+
+Bun.serve({
+  port: 3210,
+  hostname: "0.0.0.0",
+  fetch: function(req) {
+    const url = new URL(req.url);
+    const pathname = decodeURIComponent(url.pathname);
+
+    // Root: list all presentations
+    if (pathname === "/" || pathname === "/index.html") {
+      const pres = listPresentations();
+      const html = buildIndexHtml(pres);
+      return new Response(html, { headers: Object.assign({ "Content-Type": "text/html; charset=utf-8" }, corsHeaders) });
+    }
+
+    // /presentations/<name>[/...]
+    const presMatch = pathname.match(/^\/presentations\/([^\/]+)\/?(.*)$/);
+    if (presMatch) {
+      const presName = presMatch[1];
+      const rest = presMatch[2] || "";
+      const presDir = path.join(PRES_ROOT, presName);
+
+      if (!fs.existsSync(presDir)) {
+        return new Response("Presentation not found: " + presName, { status: 404, headers: corsHeaders });
+      }
+
+      const metaPath = path.join(presDir, "metadata.json");
+      let metadata = { slides: {}, title: presName, presentation_name: presName };
+      try {
+        if (fs.existsSync(metaPath)) {
+          metadata = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        }
+      } catch (e) {}
+
+      // Serve viewer for root/viewer paths
+      if (rest === "" || rest === "viewer" || rest === "viewer.html" || rest === "index.html") {
+        const html = buildViewerHtml(presDir, metadata);
+        return new Response(html, { headers: Object.assign({ "Content-Type": "text/html; charset=utf-8" }, corsHeaders) });
+      }
+
+      // Handle ../images/ references from within slides
+      if (rest.indexOf("../images/") === 0 || rest.indexOf("%2E%2E/images/") === 0) {
+        const imgName = rest.replace(/^(\.\.\/|%2E%2E\/)images\//, "");
+        return serveFile(path.join(PRES_ROOT, "images", imgName));
+      }
+
+      if (rest.indexOf("images/") === 0) {
+        return serveFile(path.join(PRES_ROOT, "images", rest.slice("images/".length)));
+      }
+
+      // Any file in the presentation dir
+      return serveFile(path.join(presDir, rest));
+    }
+
+    // /images/<name>
+    if (pathname.indexOf("/images/") === 0) {
+      return serveFile(path.join(PRES_ROOT, "images", pathname.slice("/images/".length)));
+    }
+
+    return new Response("Not found", { status: 404, headers: corsHeaders });
+  },
+});
+
+console.log("[presentation-viewer] Ready at http://0.0.0.0:3210");
+console.log("[presentation-viewer] URL scheme: /presentations/<name>/");
+ENDOFSCRIPT
+
+exec s6-setuidgid abc bun run "$SCRIPT"

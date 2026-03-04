@@ -422,32 +422,16 @@ function doPreview(base: string, presentationName: string): string {
   const metadata = loadMetadata(presPath);
   generateViewer(presPath, metadata);
 
-  const serverScript = join(SKILLS_DIR, "serve.ts");
-  if (!existsSync(serverScript))
-    return JSON.stringify({
-      success: false,
-      error: "Viewer server script not found. Check .opencode/skills/presentations/serve.ts",
-    });
-
-  try {
-    execSync(`bun run "${serverScript}" "${presPath}" &`, {
-      cwd: base,
-      timeout: 5000,
-      stdio: "ignore",
-      detached: true,
-    });
-  } catch {
-    /* the detached process continues running, the timeout is expected */
-  }
+  const viewerUrl = `http://localhost:3210/presentations/${safeName}/`;
 
   return JSON.stringify(
     {
       success: true,
       action: "preview",
       presentation_name: presentationName,
-      viewer_url: "http://localhost:3210",
+      viewer_url: viewerUrl,
       viewer_file: `${PRESENTATIONS_DIR}/${safeName}/viewer.html`,
-      message: "Preview server started at http://localhost:3210 — browser should open automatically. Press Ctrl+C in terminal to stop.",
+      message: `Presentation viewer is always running at http://localhost:3210 — open ${viewerUrl} to view this presentation.`,
     },
     null,
     2,
@@ -628,7 +612,7 @@ export default tool({
     "Actions: 'create_slide', 'list_slides', 'delete_slide', 'list_presentations', 'delete_presentation', " +
     "'validate_slide' (check dimensions via Playwright), 'export_pdf' (render to PDF via Playwright), " +
     "'export_pptx' (3-layer PPTX with editable text via Playwright + python-pptx), " +
-    "'preview' (starts local HTTP server with polished slide viewer at http://localhost:3210). " +
+    "'preview' (returns viewer URL for the presentation at http://localhost:3210/presentations/<name>/; the viewer service runs persistently in the sandbox). " +
     "Each slide is a standalone HTML file with Inter font, D3.js, and Chart.js pre-loaded. " +
     "Images go to presentations/images/ and are referenced as ../images/filename from slides. " +
     "A viewer.html is auto-generated in each presentation folder on every create/delete.",
