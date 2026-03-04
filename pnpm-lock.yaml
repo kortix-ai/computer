@@ -841,8 +841,8 @@ importers:
         specifier: ^4.13.0
         version: 4.15.2
       '@opencode-ai/plugin':
-        specifier: 1.2.15
-        version: 1.2.15
+        specifier: 1.2.16
+        version: 1.2.16
       '@tavily/core':
         specifier: ^0.7.1
         version: 0.7.2
@@ -4522,12 +4522,23 @@ packages:
       zod: 4.1.8
     dev: false
 
+  /@opencode-ai/plugin@1.2.16:
+    resolution: {integrity: sha512-9Kb7BQIC2P3oKCvI8K3thP5YP0vE7yLvcmBmgyACUIqc3e5UL6U+4umLpTvgQa2eQdjxtOXznuGTNwgcGMHUHg==}
+    dependencies:
+      '@opencode-ai/sdk': 1.2.16
+      zod: 4.1.8
+    dev: false
+
   /@opencode-ai/sdk@1.2.10:
     resolution: {integrity: sha512-SyXcVqry2hitPVvQtvXOhqsWyFhSycG/+LTLYXrcq8AFmd9FR7dyBSDB3f5Ol6IPkYOegk8P2Eg2kKPNSNiKGw==}
     dev: false
 
   /@opencode-ai/sdk@1.2.15:
     resolution: {integrity: sha512-NUJNlyBCdZ4R0EBLjJziEQOp2XbRPJosaMcTcWSWO5XJPKGUpz0u8ql+5cR8K+v2RJ+hp2NobtNwpjEYfe6BRQ==}
+    dev: false
+
+  /@opencode-ai/sdk@1.2.16:
+    resolution: {integrity: sha512-y9ae9VnCcuog0GaI4DveX1HB6DBoZgGN3EuJVlRFbBCPwhzkls6fCfHSb5+VnTS6Fy0OWFUL28VBCmixL/D+/Q==}
     dev: false
 
   /@opentelemetry/api-logs@0.207.0:
