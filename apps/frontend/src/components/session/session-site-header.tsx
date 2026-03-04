@@ -24,13 +24,14 @@ import {
   MoreHorizontal,
   GitCompareArrows,
   Layers,
+  CircleAlert,
 } from 'lucide-react';
 import { ExportTranscriptDialog } from '@/components/session/export-transcript-dialog';
 import { DiffDialog } from '@/components/session/diff-dialog';
 import { CompactDialog } from '@/components/session/compact-dialog';
 
 
-import { DiagnosticsBadge } from '@/components/session/diagnostics-panel';
+import { DiagnosticsDialog } from '@/components/session/diagnostics-panel';
 // Worktree indicator — disabled for now
 // import { useOpenCodeSession, useOpenCodeCurrentProject } from '@/hooks/opencode/use-opencode-sessions';
 
@@ -57,6 +58,7 @@ export function SessionSiteHeader({
   const [exportOpen, setExportOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
   const [compactOpen, setCompactOpen] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
 
   const isMobile = useIsMobile() || isMobileView;
@@ -92,9 +94,6 @@ export function SessionSiteHeader({
           {/* Right: actions */}
           <div className="flex items-center gap-0.5 pointer-events-auto">
             <TooltipProvider delayDuration={300}>
-              {/* LSP Diagnostics badge */}
-              <DiagnosticsBadge />
-
               {/* Worktree indicator — disabled for now */}
 
               {/* More actions dropdown */}
@@ -117,6 +116,11 @@ export function SessionSiteHeader({
                 </Tooltip>
 
                 <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => setDiagnosticsOpen(true)}>
+                    <CircleAlert className="mr-2 h-4 w-4" />
+                    Diagnostics
+                  </DropdownMenuItem>
+
                   {/* View Changes */}
                   <DropdownMenuItem onClick={() => setDiffOpen(true)}>
                     <GitCompareArrows className="mr-2 h-4 w-4" />
@@ -191,6 +195,10 @@ export function SessionSiteHeader({
         sessionId={sessionId}
         open={compactOpen}
         onOpenChange={setCompactOpen}
+      />
+      <DiagnosticsDialog
+        open={diagnosticsOpen}
+        onOpenChange={setDiagnosticsOpen}
       />
     </>
   );

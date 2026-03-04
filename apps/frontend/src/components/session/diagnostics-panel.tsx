@@ -16,6 +16,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -60,6 +66,22 @@ function getDirectory(path: string): string | undefined {
   const parts = path.split('/');
   if (parts.length <= 1) return undefined;
   return parts.slice(0, -1).join('/');
+}
+
+function getDisplayPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+
+  if (normalized.startsWith('@computer/apps/frontend/')) {
+    return normalized.slice('@computer/apps/frontend/'.length);
+  }
+
+  const workspaceMarker = '/computer/apps/frontend/';
+  const workspaceMarkerIndex = normalized.indexOf(workspaceMarker);
+  if (workspaceMarkerIndex !== -1) {
+    return normalized.slice(workspaceMarkerIndex + workspaceMarker.length);
+  }
+
+  return normalized;
 }
 
 // ============================================================================
@@ -148,8 +170,9 @@ function FileGroupSection({
   onDiagnosticClick: (diagnostic: LspDiagnostic) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const filename = getFilename(group.file);
-  const directory = getDirectory(group.file);
+  const displayPath = getDisplayPath(group.file);
+  const filename = getFilename(displayPath);
+  const directory = getDirectory(displayPath);
 
   return (
     <div>
@@ -319,5 +342,87 @@ export function DiagnosticsBadge() {
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+interface DiagnosticsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function DiagnosticsDialog({ open, onOpenChange }: DiagnosticsDialogProps) {
+  const byFile = useDiagnosticsStore((s) => s.byFile);
+  const openFileInComputer = useKortixComputerStore((s) => s.openFileInComputer);
+
+  const allDiagnostics = useMemo(() => {
+    const all: LspDiagnostic[] = [];
+    for (const diags of Object.values(byFile)) {
+      all.push(...diags);
+    }
+    return all;
+  }, [byFile]);
+
+  const errorCount = useMemo(
+    () => allDiagnostics.filter((d) => d.severity === 1).length,
+    [allDiagnostics],
+  );
+  const warningCount = useMemo(
+    () => allDiagnostics.filter((d) => d.severity === 2).length,
+    [allDiagnostics],
+  );
+
+  const groups = useMemo(() => groupByFile(allDiagnostics), [allDiagnostics]);
+
+  const handleDiagnosticClick = useCallback(
+    (diagnostic: LspDiagnostic) => {
+      openFileInComputer(diagnostic.file, undefined, diagnostic.line + 1);
+      onOpenChange(false);
+    },
+    [openFileInComputer, onOpenChange],
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
+        <DialogHeader className="px-4 py-3 border-b border-border/40">
+          <DialogTitle className="text-base">Diagnostics</DialogTitle>
+        </DialogHeader>
+
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-2 py-2.5">
+            {errorCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-500">
+                {errorCount} error{errorCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            {warningCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/10 text-yellow-500">
+                {warningCount} warning{warningCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            {errorCount === 0 && warningCount === 0 && (
+              <span className="text-xs text-muted-foreground">No diagnostics</span>
+            )}
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto min-h-0 p-1.5">
+            {groups.length > 0 ? (
+              groups.map((group) => (
+                <FileGroupSection
+                  key={group.file}
+                  group={group}
+                  defaultExpanded={groups.length <= 3}
+                  onDiagnosticClick={handleDiagnosticClick}
+                />
+              ))
+            ) : (
+              <div className="text-xs text-center py-6 text-muted-foreground">
+                No diagnostics
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
