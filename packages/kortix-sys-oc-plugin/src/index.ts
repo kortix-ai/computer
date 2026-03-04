@@ -39,13 +39,11 @@ import { consolidateMemories } from "./consolidate"
 import { initEnrichment, enqueueEnrichment, updateEnrichmentOpts } from "./enrich"
 import { initSearch, hybridSearchLTM, hybridSearchObservations } from "./search"
 import { ensureMemDir, writeObservationFile, writeLTMFile } from "./lss"
-import { existsSync, writeFileSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs"
+import { existsSync, writeFileSync, mkdirSync } from "node:fs"
 import { getEnv, shortTs, changeSummary, formatMessages, ttcCompress, STORAGE_BASE, DB_PATH } from "./session"
 import type { LogFn, CreateLTMInput, LTMType } from "./types"
 
 // ─── Plugin Entry ────────────────────────────────────────────────────────────
-
-const TOOL_OUTPUTS_DIR = "/workspace/.kortix/tool-outputs"
 
 /** Session pruning only applies to Anthropic models (prompt cache cost optimization) */
 function isAnthropicModel(modelId: string | null): boolean {
@@ -258,7 +256,10 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 
 				if (result) {
 					const { observation: obs, rawOutput } = result
-					const id = insertObservation(db, obs)
+					const id = insertObservation(db, {
+						...obs,
+						callID: input.callID,
+					})
 
 					// Write LSS companion file (fire-and-forget)
 					if (memDir) try {
@@ -283,17 +284,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 						args: args as Record<string, unknown>,
 						rawOutput,
 					})
-
-					// Store full raw output for get_tool_output retrieval (Anthropic only — pruning is Anthropic-specific)
-					if (isAnthropicModel(currentModel)) {
-						try {
-							const fullOutput = output.output ?? ""
-							if (fullOutput.length > 200) {
-								if (!existsSync(TOOL_OUTPUTS_DIR)) mkdirSync(TOOL_OUTPUTS_DIR, { recursive: true })
-								writeFileSync(`${TOOL_OUTPUTS_DIR}/${id}.txt`, fullOutput.slice(0, 512_000), "utf-8")
-							}
-						} catch { /* non-fatal */ }
-					}
 				}
 			} catch (err) {
 				log("warn", `[memory] Observation extraction failed: ${err}`)
@@ -338,18 +328,6 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 						if (sessionTitle) {
 							try { updateSessionTitle(db, sessionId, sessionTitle) } catch { /* non-fatal */ }
 						}
-
-						// Cleanup stale tool output files (>24h old)
-						try {
-							if (existsSync(TOOL_OUTPUTS_DIR)) {
-								const cutoff = Date.now() - 24 * 60 * 60 * 1000
-								for (const file of readdirSync(TOOL_OUTPUTS_DIR)) {
-									const fp = `${TOOL_OUTPUTS_DIR}/${file}`
-									const st = statSync(fp)
-									if (st.mtimeMs < cutoff) unlinkSync(fp)
-								}
-							}
-						} catch { /* non-fatal */ }
 
 						// Sweep: consolidate any previous sessions that were never processed.
 						// Excludes the just-created session (it has no observations yet).
@@ -623,21 +601,45 @@ export const KortixMemoryPlugin: Plugin = async ({ client, project, directory })
 					observation_id: tool.schema.number().describe("Observation ID from observation_search results (e.g., the #123 from search output)"),
 				},
 				async execute(args) {
-					const filePath = `${TOOL_OUTPUTS_DIR}/${args.observation_id}.txt`
+					const obs = getObservationById(db, args.observation_id)
+					if (!obs) return `Observation #${args.observation_id} not found.`
 
-					if (!existsSync(filePath)) {
-						const obs = getObservationById(db, args.observation_id)
-						if (!obs) return `Observation #${args.observation_id} not found.`
-						return `Full output for observation #${args.observation_id} is not available. Output was either too small to store (<200 chars) or has been cleaned up (>24h old).`
+					let matchedOutput: string | null = null
+					let fallbackOutput: string | null = null
+
+					try {
+						const messagesRes = await client.session.messages({ path: { id: obs.sessionId } })
+						const messages = messagesRes.data ?? []
+
+						for (const msg of messages as any[]) {
+							for (const part of (msg.parts ?? []) as any[]) {
+								if (part.type !== "tool") continue
+								if (part?.state?.status !== "completed") continue
+								const output = typeof part?.state?.output === "string" ? part.state.output : ""
+								if (!output) continue
+
+								const partCallID = (part.callID ?? part.callId ?? part.id) as string | undefined
+								if (!fallbackOutput && part.tool === obs.toolName) {
+									fallbackOutput = output
+								}
+								if (obs.callID && partCallID === obs.callID) {
+									matchedOutput = output
+									break
+								}
+							}
+							if (matchedOutput) break
+						}
+					} catch (err) {
+						log("warn", `[memory] get_tool_output source lookup failed: ${err}`)
 					}
 
-					const content = readFileSync(filePath, "utf-8")
-					const obs = getObservationById(db, args.observation_id)
-					const header = obs
-						? `=== Full Output: Observation #${obs.id} [${obs.type}] — ${obs.title} ===
+					const content = matchedOutput ?? fallbackOutput
+					if (!content) {
+						return `Full output for observation #${args.observation_id} is not available from session source data.`
+					}
+
+					const header = `=== Full Output: Observation #${obs.id} [${obs.type}] — ${obs.title} ===
 Tool: ${obs.toolName} | Session: ${obs.sessionId} | Prompt #${obs.promptNumber ?? "?"}
-`
-						: `=== Full Output: Observation #${args.observation_id} ===
 `
 
 					return `${header}
