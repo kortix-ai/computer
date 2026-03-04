@@ -123,6 +123,14 @@ export async function unlinkSandboxIntegration(sandboxId: string, integrationId:
 }
 
 export async function listSandboxIntegrations(sandboxId: string, _accountId?: string) {
+  const conditions = [
+    eq(sandboxIntegrations.sandboxId, sandboxId),
+    eq(integrations.status, 'active'),
+  ];
+  if (_accountId) {
+    conditions.push(eq(integrations.accountId, _accountId));
+  }
+
   const rows = await db
     .select({
       id: sandboxIntegrations.id,
@@ -141,32 +149,39 @@ export async function listSandboxIntegrations(sandboxId: string, _accountId?: st
     })
     .from(sandboxIntegrations)
     .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
-    .where(
-      and(
-        eq(sandboxIntegrations.sandboxId, sandboxId),
-        eq(integrations.status, 'active'),
-      ),
-    );
+    .where(and(...conditions));
   return rows;
 }
 
 export async function hasSandboxIntegration(sandboxId: string, app: string, _accountId?: string): Promise<boolean> {
+  const conditions = [
+    eq(sandboxIntegrations.sandboxId, sandboxId),
+    eq(integrations.app, app),
+    eq(integrations.status, 'active'),
+  ];
+  if (_accountId) {
+    conditions.push(eq(integrations.accountId, _accountId));
+  }
+
   const [row] = await db
     .select({ id: sandboxIntegrations.id })
     .from(sandboxIntegrations)
     .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
-    .where(
-      and(
-        eq(sandboxIntegrations.sandboxId, sandboxId),
-        eq(integrations.app, app),
-        eq(integrations.status, 'active'),
-      ),
-    )
+    .where(and(...conditions))
     .limit(1);
   return !!row;
 }
 
 export async function getIntegrationForSandbox(sandboxId: string, app: string, _accountId?: string) {
+  const conditions = [
+    eq(sandboxIntegrations.sandboxId, sandboxId),
+    eq(integrations.app, app),
+    eq(integrations.status, 'active'),
+  ];
+  if (_accountId) {
+    conditions.push(eq(integrations.accountId, _accountId));
+  }
+
   const [row] = await db
     .select({
       integrationId: integrations.integrationId,
@@ -186,13 +201,7 @@ export async function getIntegrationForSandbox(sandboxId: string, app: string, _
     })
     .from(sandboxIntegrations)
     .innerJoin(integrations, eq(sandboxIntegrations.integrationId, integrations.integrationId))
-    .where(
-      and(
-        eq(sandboxIntegrations.sandboxId, sandboxId),
-        eq(integrations.app, app),
-        eq(integrations.status, 'active'),
-      ),
-    )
+    .where(and(...conditions))
     .limit(1);
   return row ?? null;
 }
