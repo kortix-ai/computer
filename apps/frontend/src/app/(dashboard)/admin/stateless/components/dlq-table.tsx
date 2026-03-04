@@ -353,7 +353,7 @@ export function DLQTable({
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
             </div>
           ) : filteredEntries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">

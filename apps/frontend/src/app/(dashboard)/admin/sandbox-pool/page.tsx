@@ -274,7 +274,7 @@ export default function SandboxPoolAdminPage() {
                   >
                     <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
                       {replenishMutation.isPending ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-secondary" />
+                        <Loader2 className="w-4 h-4 animate-spin text-secondary" />
                       ) : (
                         <RefreshCw className="w-5 h-5 text-secondary" />
                       )}
@@ -289,7 +289,7 @@ export default function SandboxPoolAdminPage() {
                   >
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                       {cleanupMutation.isPending ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                       ) : (
                         <Trash2 className="w-5 h-5 text-muted-foreground" />
                       )}
@@ -304,7 +304,7 @@ export default function SandboxPoolAdminPage() {
                   >
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                       {restartMutation.isPending ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                       ) : (
                         <Play className="w-5 h-5 text-muted-foreground" />
                       )}
@@ -407,7 +407,7 @@ export default function SandboxPoolAdminPage() {
             <CardContent>
               {sandboxesLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
               ) : sandboxes?.sandboxes && sandboxes.sandboxes.length > 0 ? (
                 <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-2">

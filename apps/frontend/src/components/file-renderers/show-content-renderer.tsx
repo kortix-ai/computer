@@ -122,7 +122,7 @@ const BLOB_TYPES = new Set(['image', 'video', 'audio', 'pdf', 'docx', 'pptx']);
 function RendererFallback() {
   return (
     <div className="flex items-center justify-center h-[420px]">
-      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/30" />
+      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/40" />
     </div>
   );
 }

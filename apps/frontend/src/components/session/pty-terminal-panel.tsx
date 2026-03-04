@@ -201,7 +201,7 @@ export function PtyTerminalPanel({ className, serverId, hidden }: PtyTerminalPan
   if (isLoading) {
     return (
       <div className={cn('h-full flex flex-col items-center justify-center', className)}>
-        <CircleDashed className="h-6 w-6 text-muted-foreground animate-spin" />
+        <CircleDashed className="h-4 w-4 text-muted-foreground animate-spin" />
         <span className="text-xs text-muted-foreground mt-2">Loading terminals...</span>
       </div>
     );

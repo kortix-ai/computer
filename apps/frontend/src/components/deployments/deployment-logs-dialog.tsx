@@ -61,7 +61,7 @@ export function DeploymentLogsDialog({
         >
           {isLoading && (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">Loading logs...</span>
             </div>
           )}

@@ -763,7 +763,7 @@ function McpServersSection() {
 
         {authStartMutation.isPending && !authUrl && (
           <div className="flex items-center gap-3 py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Starting authorization...</span>
           </div>
         )}
@@ -995,7 +995,7 @@ function McpServersSection() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       ) : servers.length > 0 ? (
         <div className="space-y-2">
@@ -1180,7 +1180,7 @@ export function OpenCodeSettingsDialog({
 
         {isLoading || !config ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0">

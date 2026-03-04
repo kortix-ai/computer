@@ -416,7 +416,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               <p className="text-xs">Loading preview...</p>
             </div>
           </div>

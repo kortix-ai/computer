@@ -75,7 +75,7 @@ export function TodoDialog({ sessionId, open, onOpenChange }: TodoDialogProps) {
           <div className="px-6 pb-5 space-y-0.5">
             {isLoading && (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             )}
 

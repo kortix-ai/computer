@@ -52,9 +52,9 @@ interface KortixLoaderProps {
 
 const SIZE_MAP = {
   small: 20,
-  medium: 40,
-  large: 80,
-  xlarge: 120,
+  medium: 24,
+  large: 32,
+  xlarge: 40,
 } as const;
 
 /**

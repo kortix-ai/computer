@@ -153,7 +153,7 @@ export function SystemHealthPanel({ health, backpressure, isLoading }: SystemHea
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
     );

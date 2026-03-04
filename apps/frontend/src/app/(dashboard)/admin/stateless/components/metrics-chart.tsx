@@ -217,7 +217,7 @@ export function MetricsChart({
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center" style={{ height }}>
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           </div>
         ) : data.length === 0 ? (
           <div className="flex items-center justify-center text-muted-foreground" style={{ height }}>
@@ -278,7 +278,7 @@ export function DonutChart({
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center" style={{ height }}>
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           </div>
         ) : data.length === 0 || total === 0 ? (
           <div className="flex items-center justify-center text-muted-foreground" style={{ height }}>

@@ -160,7 +160,7 @@ export function PageTabContent({ href }: { href: string }) {
 		<Suspense
 			fallback={
 				<div className="flex-1 flex items-center justify-center">
-					<KortixLoader size="large" />
+					<KortixLoader size="medium" />
 				</div>
 			}
 		>

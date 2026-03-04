@@ -39,7 +39,7 @@ export default function ConnectCallbackPage() {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           Completing connection...
         </p>

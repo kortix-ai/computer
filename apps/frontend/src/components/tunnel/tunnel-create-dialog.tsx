@@ -451,7 +451,7 @@ function ConnectStep({
 function CreatingStep() {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-10">
-      <Loader2 className="h-6 w-6 text-primary animate-spin" />
+      <Loader2 className="h-4 w-4 text-primary animate-spin" />
       <div className="text-center">
         <p className="text-sm font-medium">Creating connection...</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">Setting up permissions</p>

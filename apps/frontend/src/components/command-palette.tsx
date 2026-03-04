@@ -772,7 +772,7 @@ export function CommandPalette() {
               {showGlobalLoading && (
                 <CommandEmpty>
                   <div className="flex flex-col items-center justify-center gap-2 py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/50" />
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
                     <span className="text-[13px] text-muted-foreground/60">Searching...</span>
                   </div>
                 </CommandEmpty>
