@@ -3424,9 +3424,25 @@ export function SessionChat({
 			Object.values(allPermissions).filter((p) => p.sessionID === sessionId),
 		[allPermissions, sessionId],
 	);
+	const suppressedQuestionIdsRef = useRef<Map<string, number>>(new Map());
+	const suppressQuestionFor = useCallback((requestId: string, ms = 15000) => {
+		suppressedQuestionIdsRef.current.set(requestId, Date.now() + ms);
+	}, []);
+	const isQuestionSuppressed = useCallback((requestId: string) => {
+		const expiresAt = suppressedQuestionIdsRef.current.get(requestId);
+		if (!expiresAt) return false;
+		if (expiresAt <= Date.now()) {
+			suppressedQuestionIdsRef.current.delete(requestId);
+			return false;
+		}
+		return true;
+	}, []);
 	const pendingQuestions = useMemo(
-		() => Object.values(allQuestions).filter((q) => q.sessionID === sessionId),
-		[allQuestions, sessionId],
+		() =>
+			Object.values(allQuestions).filter(
+				(q) => q.sessionID === sessionId && !isQuestionSuppressed(q.id),
+			),
+		[allQuestions, sessionId, isQuestionSuppressed],
 	);
 	const questionHydrationInFlightRef = useRef(false);
 	const lastQuestionHydrationAtRef = useRef(0);
@@ -3468,7 +3484,10 @@ export function SessionChat({
 				.list()
 				.then((res) => {
 					if (!res.data || cancelled) return;
-					(res.data as any[]).forEach((q) => addQuestion(q));
+					(res.data as any[]).forEach((q) => {
+						if (!q?.id || isQuestionSuppressed(q.id)) return;
+						addQuestion(q);
+					});
 				})
 				.finally(() => {
 					questionHydrationInFlightRef.current = false;
@@ -3482,7 +3501,7 @@ export function SessionChat({
 			cancelled = true;
 			clearInterval(timer);
 		};
-	}, [hasRunningQuestionTool, pendingQuestions.length, addQuestion]);
+	}, [hasRunningQuestionTool, pendingQuestions.length, addQuestion, isQuestionSuppressed]);
 
 	// ---- Permission/question reply handlers ----
 	const removePermission = useOpenCodePendingStore((s) => s.removePermission);
@@ -3506,6 +3525,7 @@ export function SessionChat({
 			// answer against the tool part's ID.
 			const questionReq = useOpenCodePendingStore.getState().questions[requestId];
 
+			suppressQuestionFor(requestId);
 			// Optimistically remove the question so the textarea shows immediately
 			removeQuestion(requestId);
 
@@ -3538,11 +3558,12 @@ export function SessionChat({
 				// ignore — SSE "question.replied" event will also remove it
 			}
 		},
-		[removeQuestion],
+		[removeQuestion, suppressQuestionFor],
 	);
 
 	const handleQuestionReject = useCallback(
 		async (requestId: string) => {
+			suppressQuestionFor(requestId);
 			// Optimistically remove the question so the textarea shows immediately
 			removeQuestion(requestId);
 			try {
@@ -3555,7 +3576,7 @@ export function SessionChat({
 				abortSession.mutate(sessionId);
 			}
 		},
-		[removeQuestion, abortSession, sessionId],
+		[removeQuestion, abortSession, sessionId, suppressQuestionFor],
 	);
 
 	// ---- Group messages into turns ----
