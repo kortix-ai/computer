@@ -84,6 +84,7 @@ export function useIntegrationsPage(): any {
 
   const handleConnect = useCallback(
     async (app: IntegrationApp) => {
+      const sandboxIdForConnect = autoConnectSandboxId.current || undefined;
       setConnectingApp(app.slug);
       try {
         const result = await createToken.mutateAsync(app.slug);
@@ -113,7 +114,7 @@ export function useIntegrationsPage(): any {
                 app_name: app.name,
                 provider_account_id: providerAccountId,
                 label,
-                sandbox_id: autoConnectSandboxId.current || undefined,
+                sandbox_id: sandboxIdForConnect,
               });
               toast.success(`${app.name} connected successfully!`);
             } catch {
