@@ -74,6 +74,14 @@ COPY --from=deps /app/packages/opencode-channels/src ./services/${SERVICE}/node_
 COPY --from=deps /app/packages/opencode-channels/package.json ./services/${SERVICE}/node_modules/opencode-channels/package.json
 RUN sed -i 's|"main": "dist/index.js"|"main": "src/index.ts"|;s|"types": "dist/index.d.ts"|"types": "src/index.ts"|' services/${SERVICE}/node_modules/opencode-channels/package.json
 
+# Fix agent-tunnel resolution.
+# pnpm may resolve agent-tunnel to a workspace/file symlink target that does not
+# exist in the runtime image layout. Replace it with a direct source copy.
+RUN rm -f services/${SERVICE}/node_modules/agent-tunnel 2>/dev/null; \
+    mkdir -p services/${SERVICE}/node_modules/agent-tunnel
+COPY --from=deps /app/packages/agent-tunnel/src ./services/${SERVICE}/node_modules/agent-tunnel/src
+COPY --from=deps /app/packages/agent-tunnel/package.json ./services/${SERVICE}/node_modules/agent-tunnel/package.json
+
 WORKDIR /app/services/${SERVICE}
 
 # Non-root user (bun image ships with 'bun' user)
