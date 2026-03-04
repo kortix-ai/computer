@@ -6,7 +6,7 @@ import { ErrorResponse, UpdateResponse } from '../schemas/common';
 
 const VERSION_FILE = '/opt/kortix/.version';
 const CHANGELOG_FILE = '/opt/kortix/CHANGELOG.json';
-const UPDATE_LOCK_FILE = '/opt/kortix/.update-lock';
+const UPDATE_LOCK_FILE = '/tmp/.kortix-update-lock';
 
 // Directories managed by symlinks (atomic swap targets)
 const SYMLINK_DIRS = ['kortix-master', 'opencode', 'agent-browser-viewer', 'kortix'] as const;

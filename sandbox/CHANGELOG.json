@@ -1,5 +1,31 @@
 [
   {
+    "version": "0.7.13",
+    "date": "2026-03-04",
+    "title": "Fix EACCES permission error blocking sandbox self-update",
+    "description": "Moves the ACID update lock file from /opt/kortix/.update-lock to /tmp/.kortix-update-lock so the update flow can start even when /opt/kortix/ is root-owned (Daytona sandboxes).",
+    "changes": [
+      {
+        "type": "fix",
+        "text": "Moved update lock file to /tmp so sandbox self-update works on Daytona where /opt/kortix/ is root-owned and the process runs as user abc (UID 911)"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "v0.7.13",
+        "target": "github-release"
+      },
+      {
+        "name": "@kortix/sandbox@0.7.13",
+        "target": "npm"
+      },
+      {
+        "name": "kortixai/computer:0.7.13",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.7.12",
     "date": "2026-03-04",
     "title": "DNS-first provider routing with passthrough billing headers",
