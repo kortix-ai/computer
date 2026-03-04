@@ -549,6 +549,147 @@ function looksLikeError(text: string): boolean {
 	return false;
 }
 
+interface ParsedJsonFailure {
+	errorSummary: string;
+	hint?: string;
+	status?: number;
+	nestedMessage?: string;
+	nestedError?: boolean;
+}
+
+function parseJsonFailure(output: string): ParsedJsonFailure | null {
+	const trimmed = output.trim();
+	if (!trimmed) return null;
+
+	let parsed: Record<string, unknown>;
+	try {
+		parsed = JSON.parse(trimmed) as Record<string, unknown>;
+	} catch {
+		return null;
+	}
+
+	if (parsed.success !== false || typeof parsed.error !== "string") return null;
+
+	const result: ParsedJsonFailure = {
+		errorSummary: parsed.error.trim(),
+		hint: typeof parsed.hint === "string" ? parsed.hint.trim() : undefined,
+	};
+
+	const nestedMatch = result.errorSummary.match(/:\s*(\{[\s\S]*\})\s*$/);
+	if (!nestedMatch) return result;
+
+	try {
+		const nested = JSON.parse(nestedMatch[1]) as Record<string, unknown>;
+		if (typeof nested.message === "string" && nested.message.trim()) {
+			result.nestedMessage = nested.message.trim();
+		}
+		if (typeof nested.status === "number") {
+			result.status = nested.status;
+		}
+		if (typeof nested.error === "boolean") {
+			result.nestedError = nested.error;
+		}
+	} catch {
+		// keep base parsed shape only
+	}
+
+	return result;
+}
+
+function JsonFailureOutputCard({
+	failure,
+	toolName,
+}: {
+	failure: ParsedJsonFailure;
+	toolName?: string;
+}) {
+	return (
+		<div className="rounded-lg border border-rose-500/20 bg-rose-500/5 overflow-hidden text-xs">
+			<div className="flex items-center gap-2 px-3 py-2 border-b border-rose-500/20">
+				<CircleAlert className="size-3.5 text-rose-500/80 flex-shrink-0" />
+				<span className="font-medium text-rose-600 dark:text-rose-400">
+					Integration request failed
+				</span>
+				{typeof failure.status === "number" && (
+					<span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 font-mono">
+						HTTP {failure.status}
+					</span>
+				)}
+			</div>
+			<div className="px-3 py-2.5 space-y-2">
+				<p className="text-[11px] leading-relaxed text-foreground/85 break-words">
+					{failure.errorSummary}
+				</p>
+				{failure.nestedMessage && (
+					<div className="rounded-md border border-border/40 bg-background/60 px-2 py-1.5">
+						<div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-1">
+							Details
+						</div>
+						<p className="text-[11px] text-foreground/80 break-words">
+							{failure.nestedMessage}
+						</p>
+					</div>
+				)}
+				{failure.hint && (
+					<div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5">
+						<div className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-1">
+							Hint
+						</div>
+						<p className="text-[11px] text-foreground/80 break-words">
+							{failure.hint}
+						</p>
+					</div>
+				)}
+				{toolName && (
+					<div className="text-[10px] text-muted-foreground/60 font-mono">
+						Tool: {toolName}
+					</div>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function formatJsonFailureOutput(output: string): string | null {
+	const trimmed = output.trim();
+	if (!trimmed) return null;
+
+	let parsed: Record<string, unknown>;
+	try {
+		parsed = JSON.parse(trimmed) as Record<string, unknown>;
+	} catch {
+		return null;
+	}
+
+	const success = parsed.success;
+	const error = parsed.error;
+	const hint = parsed.hint;
+
+	if (success !== false || typeof error !== "string") return null;
+
+	const lines: string[] = [];
+	lines.push(error.trim());
+
+	const nestedMatch = error.match(/:\s*(\{[\s\S]*\})\s*$/);
+	if (nestedMatch) {
+		try {
+			const nested = JSON.parse(nestedMatch[1]) as Record<string, unknown>;
+			const nestedMessage = nested.message;
+			if (typeof nestedMessage === "string" && nestedMessage.trim()) {
+				lines.push(`Details: ${nestedMessage.trim()}`);
+			}
+		} catch {
+			// ignore malformed nested JSON in error string
+		}
+	}
+
+	if (typeof hint === "string" && hint.trim()) {
+		lines.push(`Hint: ${hint.trim()}`);
+	}
+
+	return lines.join("\n\n");
+}
+
 function ToolOutputFallback({
 	output,
 	isStreaming = false,
@@ -558,6 +699,27 @@ function ToolOutputFallback({
 	isStreaming?: boolean;
 	toolName?: string;
 }) {
+	const parsedJsonFailure = !isStreaming ? parseJsonFailure(output) : null;
+	if (parsedJsonFailure) {
+		return (
+			<div className="p-0">
+				<JsonFailureOutputCard
+					failure={parsedJsonFailure}
+					toolName={toolName}
+				/>
+			</div>
+		);
+	}
+
+	const jsonFailure = !isStreaming ? formatJsonFailureOutput(output) : null;
+	if (jsonFailure) {
+		return (
+			<div className="p-0">
+				<ToolError error={jsonFailure} toolName={toolName} />
+			</div>
+		);
+	}
+
 	if (!isStreaming && looksLikeError(output)) {
 		return (
 			<div className="p-0">

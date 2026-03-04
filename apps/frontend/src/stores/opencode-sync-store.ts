@@ -650,29 +650,47 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 			}
 			case "message.part.updated": {
 				const part = (event.properties as { part: Part }).part;
-				if (!part?.messageID || !part?.sessionID) return;
+				if (!part?.messageID) return;
 
-				const existingMsgs = get().messages[part.sessionID];
+				const eventSessionID =
+					(event.properties as { sessionID?: string })?.sessionID;
+				let resolvedSessionID =
+					(part as any).sessionID ?? eventSessionID;
+
+				if (!resolvedSessionID) {
+					const sessionsById = get().messages;
+					for (const [sid, msgs] of Object.entries(sessionsById)) {
+						if (msgs?.some((m) => m.id === part.messageID)) {
+							resolvedSessionID = sid;
+							break;
+						}
+					}
+				}
+
+				const existingMsgs = resolvedSessionID
+					? get().messages[resolvedSessionID]
+					: undefined;
 				const bsResult = existingMsgs && Binary.search(existingMsgs, part.messageID, (m) => m.id);
 				const exists = existingMsgs && (
 					(bsResult && bsResult.found && existingMsgs[bsResult.index]?.id === part.messageID) ||
 					existingMsgs.some((m) => m.id === part.messageID)
 				);
-				if (!exists) {
-					store.upsertMessage(part.sessionID, {
+				if (!exists && resolvedSessionID) {
+					store.upsertMessage(resolvedSessionID, {
 						id: part.messageID,
-						sessionID: part.sessionID,
+						sessionID: resolvedSessionID,
 						role: "assistant",
 					} as Message);
 				}
 
 				store.upsertPart(part.messageID, part);
 				if ((part as any).type === "text" && typeof (part as any).text === "string") {
-					const msgInfo = get().messages[part.sessionID]?.find(
+					if (!resolvedSessionID) return;
+					const msgInfo = get().messages[resolvedSessionID]?.find(
 						(m) => m.id === part.messageID,
 					) as any;
 					writeStreamCache(
-						part.sessionID,
+						resolvedSessionID,
 						part.messageID,
 						part.id,
 						(part as any).text,
