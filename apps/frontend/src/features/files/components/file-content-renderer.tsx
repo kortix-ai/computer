@@ -181,7 +181,9 @@ export function FileContentRenderer({
   const fileName = filePath.split('/').pop() || '';
   const language = getLanguageFromExt(fileName);
   const fileCategory = getFileCategory(fileName, fileContent?.mimeType);
-  const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
+  const isMarkdownFile = language === 'markdown';
+  const isJsonFile = language === 'json';
+  const [isMarkdownPreview, setIsMarkdownPreview] = useState(isMarkdownFile);
   const [isJsonTreeView, setIsJsonTreeView] = useState(false);
 
   // LSP diagnostics for this file from the global diagnostics store
@@ -200,9 +202,6 @@ export function FileContentRenderer({
     [fileDiagnostics],
   );
 
-  const isMarkdownFile = language === 'markdown';
-  const isJsonFile = language === 'json';
-
   // Binary blob for PDF, DOCX, video, audio, PPTX
   const blobPath = isBlobCategory(fileCategory) ? filePath : null;
   const { blobUrl, blob: rawBlob, isLoading: blobLoading, error: blobError } = useBinaryBlob(blobPath);
@@ -218,11 +217,11 @@ export function FileContentRenderer({
 
   // Reset state when file changes
   useEffect(() => {
-    setIsMarkdownPreview(false);
+    setIsMarkdownPreview(isMarkdownFile);
     setIsJsonTreeView(false);
     setHasUnsavedChanges(false);
     latestContentRef.current = '';
-  }, [filePath]);
+  }, [filePath, isMarkdownFile]);
 
   // Notify parent of unsaved state changes
   useEffect(() => {
