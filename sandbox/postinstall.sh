@@ -181,6 +181,19 @@ if [ -n "$AB_VERSION" ]; then
   fi
 fi
 
+# ── Portless ─────────────────────────────────────────────────────────────────
+PORTLESS_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').kortix?.globalNpmTools?.portless || '')" 2>/dev/null || echo "")
+if [ -n "$PORTLESS_VERSION" ]; then
+  CURRENT_PORTLESS=$(npm list -g portless --depth=0 --json 2>/dev/null | node -e "try{const d=require('fs').readFileSync('/dev/stdin','utf8');const j=JSON.parse(d);console.log(j.dependencies['portless']?.version||'none')}catch{console.log('none')}" 2>/dev/null || echo "none")
+  CLEAN_PORTLESS_VERSION=$(echo "$PORTLESS_VERSION" | sed 's/^[\^~]//')
+  if [ "$CURRENT_PORTLESS" != "$CLEAN_PORTLESS_VERSION" ]; then
+    echo "[sandbox-postinstall] Updating portless: $CURRENT_PORTLESS -> $PORTLESS_VERSION..."
+    npm install -g "portless@$PORTLESS_VERSION" 2>/dev/null || true
+  else
+    echo "[sandbox-postinstall] portless already at $CURRENT_PORTLESS, skipping"
+  fi
+fi
+
 # Apply agent-browser patches (always re-apply — patches are idempotent)
 if [ -f "$PKG_DIR/patch-agent-browser.js" ]; then
   echo "[sandbox-postinstall] Applying agent-browser patches..."

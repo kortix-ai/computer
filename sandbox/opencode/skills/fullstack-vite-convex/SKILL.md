@@ -267,17 +267,19 @@ With passing tests as a safety net, refactor:
 
 ### Phase 7: Start Servers & Verify
 
-Start the **local** Convex backend:
+Start the **local** Convex backend through `portless` (no raw port-bound commands):
 
 ```bash
-npx convex dev --local &
+portless convex-local npx convex dev --local
 ```
 
-Start the Vite dev server:
+Start the Vite dev server through `portless`:
 
 ```bash
-npm run dev &
+portless vite-app npm run dev
 ```
+
+Use separate `pty_spawn` sessions for each long-running process. Do not use `&`.
 
 Seed data if needed:
 
@@ -303,7 +305,7 @@ Fix any failures yourself. Do not deliver until all 3 pass with 0 errors.
 ### Phase 9: Deliver
 
 Report to the user:
-- The running app URL (e.g. `http://localhost:5173`)
+- The running app URL (e.g. `http://vite-app.localhost:1355`)
 - What was built — features, pages, backend functions
 - Test results — X tests passing, 0 failures
 - Build status — 0 TypeScript errors, 0 build errors

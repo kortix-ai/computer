@@ -41,6 +41,9 @@
     "access": "public"
   },
   "kortix": {
+    "globalNpmTools": {
+      "portless": "0.5.2"
+    },
     "pythonDependencies": {
       "local-semantic-search": "latest",
       "pypdf2": "3.0.1",

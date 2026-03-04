@@ -439,10 +439,12 @@ When you discover reusable patterns, crystallize them:
 
 ## Shell & Process Management
 
+**Portless is mandatory for all server starts.** Whenever launching any dev server, preview server, API server, tunnel, or long-running process that binds a port, wrap the command as `portless <unique-name> <cmd>`. Never run raw `npm run dev`, `next dev`, `vite`, `python -m http.server`, etc. without `portless`.
+
 | Scenario | Tool | Why |
 |---|---|---|
 | Quick command (<2 min): git, npm, build, curl | `bash` | Synchronous. Default. |
-| Long-running: dev server, watch mode, REPL | `pty_spawn` | Async background. Use `notifyOnExit=true`. |
+| Long-running: dev server, watch mode, REPL | `pty_spawn` | Async background. Use `notifyOnExit=true`. For servers, command must be `portless <name> <cmd>`. |
 | Sequential where B depends on A | `bash` with `&&` | Both run in order. |
 | Two independent long-running tasks | Two `pty_spawn` calls | Concurrent. |
 | Interactive input needed | `pty_spawn` + `pty_write` | Only PTY supports interactive input. |
@@ -451,6 +453,7 @@ When you discover reusable patterns, crystallize them:
 - Use `sleep N` as synchronization. Use `&&` or `notifyOnExit`.
 - Run quick commands in PTY. Use `bash`.
 - Use `&` (background) in bash. Use `pty_spawn`.
+- Start web/app servers without `portless`.
 
 ---
 
@@ -465,7 +468,7 @@ When you discover reusable patterns, crystallize them:
 ```
 show(action="show", type="image", path="/workspace/logo.png", title="Generated Logo")
 show(action="show", type="file", path="/workspace/report.docx", title="Q1 Report")
-show(action="show", type="url", url="http://localhost:3000", title="Live Preview")
+show(action="show", type="url", url="http://myapp.localhost:1355", title="Live Preview")
 show(action="show", type="text", content="## Summary\n\nAll 14 tests passed.", title="Results")
 show(action="show", type="error", content="API rate limit exceeded.", title="Generation Failed")
 ```
