@@ -4,7 +4,7 @@
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.13.0",
-    "@opencode-ai/plugin": "1.2.15",
+    "@opencode-ai/plugin": "1.2.17",
     "@tavily/core": "^0.7.1",
     "agent-tunnel": "file:../agent-tunnel",
     "jsonc-parser": "^3.3.1",
