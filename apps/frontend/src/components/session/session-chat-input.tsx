@@ -1075,6 +1075,41 @@ export function SessionChatInput({
     setText('');
   }, [lockForQuestion]);
 
+  // ChatGPT-like behavior: if the user starts typing while the textarea is not
+  // focused, redirect the keystroke into this textarea and focus it.
+  useEffect(() => {
+    const isTextEditingElement = (el: Element | null) => {
+      if (!el) return false;
+      const htmlEl = el as HTMLElement;
+      if (htmlEl.isContentEditable) return true;
+      const tag = htmlEl.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    };
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (disabled || lockForQuestion) return;
+      if (e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key.length !== 1) return; // printable characters only
+
+      const ta = textareaRef.current;
+      if (!ta || ta.offsetParent === null) return;
+      if (document.activeElement === ta) return;
+      if (isTextEditingElement(document.activeElement)) return;
+
+      e.preventDefault();
+      ta.focus();
+
+      const start = ta.selectionStart ?? ta.value.length;
+      const end = ta.selectionEnd ?? ta.value.length;
+      ta.setRangeText(e.key, start, end, 'end');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [disabled, lockForQuestion]);
+
   // Sessions for @ mention search
   const { data: allSessions } = useOpenCodeSessions();
 
