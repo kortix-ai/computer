@@ -89,11 +89,17 @@ async function handleKortixProxy(
     });
   }
 
-  const targetUrl = `${service.targetBaseUrl}${subPath}${queryString}`;
+  // Use alternate target/key injection for Kortix-managed if configured (e.g. OpenRouter)
+  const baseUrl = service.kortixTargetBaseUrl || service.targetBaseUrl;
+  const targetUrl = `${baseUrl}${subPath}${queryString}`;
   const headers = buildForwardHeaders(c);
+  // Strip Kortix-specific and auth headers — upstream gets injected key only
+  headers.delete('x-kortix-token');
+  headers.delete('x-api-key');
+  headers.delete('authorization');
   let body = await getRequestBody(c, method);
 
-  body = injectApiKey(service, headers, body);
+  body = injectApiKey(service, headers, body, /* useKortixInjection */ true);
 
   // Route-specific billing overrides service default
   const billingToolName = matchedRoute.billingToolName || service.billingToolName;
@@ -446,6 +452,22 @@ async function tryAuthenticate(c: any): Promise<AuthResult> {
     throw new HTTPException(401, { message: 'Invalid Kortix token' });
   }
 
+  // --- Mode 1b: Kortix token in x-api-key header (Anthropic SDK) ---
+  // The Anthropic SDK sends the API key via x-api-key instead of Authorization.
+  // If the value is a Kortix token, treat it as Mode 1 (Kortix-managed).
+  const xApiKey = c.req.header('x-api-key');
+  if (xApiKey && isKortixToken(xApiKey) && config.DATABASE_URL) {
+    try {
+      const result = await validateSecretKey(xApiKey);
+      if (result.isValid && result.accountId) {
+        return { isKortixUser: true, accountId: result.accountId };
+      }
+    } catch {
+      // Fall through to reject below
+    }
+    throw new HTTPException(401, { message: 'Invalid Kortix token in x-api-key' });
+  }
+
   // --- Mode 2: User's own key + Kortix token in X-Kortix-Token ---
   // The user's own API key is in Authorization (Bearer) or a provider-specific
   // header (e.g. Anthropic's x-api-key). The Kortix token rides in
@@ -524,9 +546,10 @@ async function getRequestBody(c: any, method: string): Promise<ArrayBuffer | str
 function injectApiKey(
   service: ProxyServiceConfig,
   headers: Headers,
-  body: ArrayBuffer | string | undefined
+  body: ArrayBuffer | string | undefined,
+  useKortixInjection = false,
 ): ArrayBuffer | string | undefined {
-  const injection = service.keyInjection;
+  const injection = (useKortixInjection && service.kortixKeyInjection) || service.keyInjection;
   const key = service.getKortixApiKey();
 
   switch (injection.type) {
