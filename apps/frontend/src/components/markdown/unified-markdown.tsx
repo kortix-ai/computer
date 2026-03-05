@@ -475,6 +475,8 @@ const COMMON_NON_FILES = new Set(['e.g.', 'i.e.', 'etc.', 'vs.', 'v1.', 'v2.']);
 function looksLikeFilePath(text: string): boolean {
   if (!text || text.length < 3 || text.length > 300) return false;
   if (text.includes(' ') || text.includes('\n')) return false;
+  // Never treat URLs as file paths.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return false;
   if (COMMON_NON_FILES.has(text.toLowerCase())) return false;
   // Must contain at least one slash and have a file extension
   if (!text.includes('/')) return false;
