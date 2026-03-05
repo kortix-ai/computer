@@ -32,8 +32,14 @@ const ALLOWED_SERVER_TYPE_PREFIXES = ['cx', 'ccx', 'cpx', 'cax'];
 /** Timeout for Hetzner API calls (ms). */
 const API_TIMEOUT_MS = 30_000;
 
-/** Max wait for server to reach "running" state (ms). */
-const PROVISION_TIMEOUT_MS = 120_000;
+/**
+ * Max wait for server to reach "running" state (ms).
+ *
+ * Snapshot-backed boots on Hetzner can occasionally take >2 minutes
+ * (image attach + first boot + cloud-init), so 120s causes false failures
+ * even when the server comes up shortly after. Use a safer 10-minute window.
+ */
+const PROVISION_TIMEOUT_MS = 600_000;
 
 /** Poll interval when waiting for server state (ms). */
 const POLL_INTERVAL_MS = 3_000;
