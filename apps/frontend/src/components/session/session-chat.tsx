@@ -3682,6 +3682,37 @@ export function SessionChat({
 	}, []);
 	const questionHydrationInFlightRef = useRef(false);
 	const lastQuestionHydrationAtRef = useRef(0);
+	const hasAnyMessages = !!messages && messages.length > 0;
+	const hasChatContent = hasAnyMessages || (!!optimisticPrompt && !hasAnyMessages);
+	const WELCOME_FADE_MS = 900;
+	const [welcomeFadeActive, setWelcomeFadeActive] = useState(false);
+	const welcomeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const prevHasChatContentRef = useRef(hasChatContent);
+	useEffect(() => {
+		const hadContent = prevHasChatContentRef.current;
+		if (!hadContent && hasChatContent) {
+			setWelcomeFadeActive(true);
+			if (welcomeFadeTimerRef.current) {
+				clearTimeout(welcomeFadeTimerRef.current);
+			}
+			welcomeFadeTimerRef.current = setTimeout(() => {
+				setWelcomeFadeActive(false);
+				welcomeFadeTimerRef.current = null;
+			}, WELCOME_FADE_MS + 120);
+		}
+		if (!hasChatContent) {
+			setWelcomeFadeActive(false);
+		}
+		prevHasChatContentRef.current = hasChatContent;
+	}, [hasChatContent]);
+
+	useEffect(() => {
+		return () => {
+			if (welcomeFadeTimerRef.current) {
+				clearTimeout(welcomeFadeTimerRef.current);
+			}
+		};
+	}, []);
 	const hasRunningQuestionTool = useMemo(() => {
 		if (!messages) return false;
 		return messages.some((m) => {
@@ -4266,6 +4297,9 @@ export function SessionChat({
 
 	const hasMessages = messages && messages.length > 0;
 	const showOptimistic = !!optimisticPrompt && !hasMessages;
+	const isTransitioningFromWelcome = !prevHasChatContentRef.current && hasChatContent;
+	const shouldShowWelcomeOverlay =
+		!hasChatContent || welcomeFadeActive || isTransitioningFromWelcome;
 
 	return (
 		<div className="relative flex flex-col h-full bg-background">
@@ -4309,8 +4343,19 @@ export function SessionChat({
 				<div className="flex-1 flex items-center justify-center min-h-0 text-sm text-muted-foreground">
 					Session not found
 				</div>
-			) : hasMessages || showOptimistic ? (
+			) : (
 				<div ref={chatAreaRef} className="relative flex-1 min-h-0">
+					{shouldShowWelcomeOverlay && (
+						<div
+							className={cn(
+								"absolute inset-0 z-20 pointer-events-none transition-opacity ease-out",
+								hasChatContent ? "opacity-0" : "opacity-100",
+							)}
+							style={{ transitionDuration: `${WELCOME_FADE_MS}ms` }}
+						>
+							<SessionWelcome />
+						</div>
+					)}
 					<div
 						ref={scrollContainerCallbackRef}
 						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 bg-background h-full [scroll-behavior:auto]"
@@ -4536,8 +4581,6 @@ export function SessionChat({
 						</Button>
 					</div>
 				</div>
-			) : (
-				<SessionWelcome />
 			)}
 
 			{/* Input — hidden in read-only mode (sub-session modal) */}

@@ -23,6 +23,7 @@ import { useOpenCodeConfig } from '@/hooks/opencode/use-opencode-config';
 import { Menu } from 'lucide-react';
 import type { Command } from '@/hooks/opencode/use-opencode-sessions';
 import { playSound } from '@/lib/sounds';
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // Dashboard Content — identical to the session empty state
@@ -30,6 +31,8 @@ import { playSound } from '@/lib/sounds';
 
 export function DashboardContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFadingOutWelcome, setIsFadingOutWelcome] = useState(false);
+  const DASHBOARD_WELCOME_FADE_MS = 700;
 
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -51,8 +54,13 @@ export function DashboardContent() {
       if (!text.trim() || isSubmitting) return;
       playSound('send');
       setIsSubmitting(true);
+      setIsFadingOutWelcome(true);
       let createdSessionId: string | null = null;
       try {
+        const fadeDelay = new Promise<void>((resolve) => {
+          setTimeout(resolve, DASHBOARD_WELCOME_FADE_MS);
+        });
+
         // Build options from selections
         const options: Record<string, unknown> = {};
         if (local.agent.current) options.agent = local.agent.current.name;
@@ -61,6 +69,7 @@ export function DashboardContent() {
 
         // Step 1: Create the session
         const session = await createSession.mutateAsync();
+        await fadeDelay;
         createdSessionId = session.id;
 
         // Step 2: Open tab and navigate immediately (optimistic)
@@ -83,6 +92,9 @@ export function DashboardContent() {
         }
         // Reset submitting since the dashboard stays mounted (hidden) with pushState
         setIsSubmitting(false);
+        // Reset fade state after navigation so returning to the dashboard
+        // shows wallpaper + suggestions again.
+        setTimeout(() => setIsFadingOutWelcome(false), 0);
         // Focus the textarea in the newly visible session tab
         requestAnimationFrame(() => {
           window.dispatchEvent(new CustomEvent('focus-session-textarea'));
@@ -92,6 +104,7 @@ export function DashboardContent() {
           sessionStorage.removeItem(`opencode_pending_prompt:${createdSessionId}`);
           sessionStorage.removeItem(`opencode_pending_options:${createdSessionId}`);
         }
+        setIsFadingOutWelcome(false);
         setIsSubmitting(false);
         toast.warning('Failed to create session');
       }
@@ -151,7 +164,14 @@ export function DashboardContent() {
       )}
 
       {/* Wallpaper + personalised suggestions (dashboard only) */}
-      <div className="flex-1 relative overflow-hidden">
+      <div
+        className={cn(
+          "flex-1 relative overflow-hidden transition-[opacity,transform] ease-out",
+          isFadingOutWelcome
+            ? "opacity-0 scale-[0.995] duration-700"
+            : "opacity-100 scale-100 duration-300",
+        )}
+      >
         <WallpaperBackground />
         <PersonalisedSuggestions onSuggestionClick={handleSend} />
       </div>
