@@ -78,12 +78,16 @@ export function TunnelScopeToggles({ tunnelId }: TunnelScopeTogglesProps) {
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">New grants expire in:</span>
         <Select value={expiryValue} onValueChange={setExpiryValue}>
-          <SelectTrigger className="w-[120px] h-8 text-xs">
+          <SelectTrigger className="w-[120px] h-8 text-xs cursor-pointer hover:bg-muted/50 transition-colors">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {EXPIRY_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
+              <SelectItem
+                key={opt.value}
+                value={opt.value}
+                className="cursor-pointer transition-colors data-[highlighted]:bg-muted/70"
+              >
                 {opt.label}
               </SelectItem>
             ))}
