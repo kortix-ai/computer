@@ -5,6 +5,7 @@
   "license": "Elastic-2.0",
   "private": false,
   "scripts": {
+    "prepack": "bash ../scripts/sync-registry-opencode.sh --sync",
     "postinstall": "bash postinstall.sh"
   },
   "files": [

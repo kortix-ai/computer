@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGISTRY_DIR="${KORTIX_REGISTRY_DIR:-$REPO_ROOT/registry/files}"
 TARGET_DIR="$REPO_ROOT/sandbox/opencode"
+SYNC_META_FILE="$TARGET_DIR/.registry-sync.json"
 MODE="sync"
 
 if [ "${1:-}" = "--check" ]; then
@@ -98,5 +99,21 @@ if [ "$MODE" = "check" ]; then
   fi
   echo "Registry and sandbox/opencode are in sync."
 else
+  REGISTRY_REV="unknown"
+  if [ -d "$REPO_ROOT/registry/.git" ]; then
+    REGISTRY_REV="$(git -C "$REPO_ROOT/registry" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  fi
+  TMP_META="$(mktemp)"
+  cat > "$TMP_META" <<EOF
+{
+  "source": "registry/files",
+  "registryRevision": "$REGISTRY_REV"
+}
+EOF
+  if [ ! -f "$SYNC_META_FILE" ] || ! cmp -s "$TMP_META" "$SYNC_META_FILE"; then
+    mv "$TMP_META" "$SYNC_META_FILE"
+  else
+    rm -f "$TMP_META"
+  fi
   echo "Synced registry files into sandbox/opencode."
 fi

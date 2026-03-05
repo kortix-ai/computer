@@ -311,19 +311,21 @@ You do NOT need to manually edit versions in these files.
 Kortix capability components are sourced from the registry submodule at `registry/files/`.
 The runtime snapshot remains in `sandbox/opencode/` for deterministic startup and remote updates.
 
-Use this sync command before release:
+The sync is now automatic in both paths:
+
+```bash
+sandbox/release.sh ...          # runs --sync then --check
+npm pack --prefix sandbox       # runs prepack sync
+```
+
+Manual commands are still available:
 
 ```bash
 scripts/sync-registry-opencode.sh --sync
-```
-
-`sandbox/release.sh` now enforces parity with a preflight check:
-
-```bash
 scripts/sync-registry-opencode.sh --check
 ```
 
-If drift exists, release exits early until files are re-synced.
+If drift still exists after sync, release exits early.
 
 ## Upstream OpenCode Version Control
 

@@ -197,6 +197,8 @@ fi
 
 # Registry -> sandbox/opencode parity check
 if [ -x "$REGISTRY_SYNC_SCRIPT" ]; then
+  info "Syncing registry snapshot (registry/files -> sandbox/opencode)..."
+  "$REGISTRY_SYNC_SCRIPT" --sync
   info "Checking registry sync (registry/files -> sandbox/opencode)..."
   if ! "$REGISTRY_SYNC_SCRIPT" --check; then
     fail "Registry and sandbox/opencode drift detected"
