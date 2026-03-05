@@ -24,12 +24,16 @@ export interface AllowedRoute {
 export interface ProxyServiceConfig {
   /** Service name / route prefix (e.g. "tavily") */
   name: string;
-  /** Real upstream base URL (e.g. "https://api.tavily.com") */
+  /** Real upstream base URL (e.g. "https://api.tavily.com") — used for passthrough (Mode 2/3) */
   targetBaseUrl: string;
+  /** Alternate upstream base URL for Kortix-managed requests (Mode 1). Falls back to targetBaseUrl. */
+  kortixTargetBaseUrl?: string;
   /** Kortix-owned API key for this upstream service */
   getKortixApiKey: () => string;
-  /** How to inject the API key into upstream requests */
+  /** How to inject the API key into upstream requests (passthrough) */
   keyInjection: KeyInjectionMethod;
+  /** Alternate key injection for Kortix-managed requests (Mode 1). Falls back to keyInjection. */
+  kortixKeyInjection?: KeyInjectionMethod;
   /** Only these routes are allowed when using Kortix's key (prevents cost abuse) */
   allowedRoutes: AllowedRoute[];
   /** Default tool name for billing attribution (can be overridden per-route) */
@@ -119,67 +123,81 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
       billingToolName: 'proxy_context7',
     },
 
-    // ─── LLM Providers (passthrough-only, no Kortix key injection) ────────
+    // ─── LLM Providers ─────────────────────────────────────────────────────
     //
-    // These exist so that user-owned LLM API keys can be proxied through
-    // Kortix for usage metering and billing at the platform fee rate.
-    // Kortix does NOT provide keys for these — the Kortix LLM routes
-    // (/chat/completions, /messages) handle Kortix-key traffic via OpenRouter.
-
-    // LLM provider targetBaseUrl matches the SDK's expected baseURL
-    // (including /v1 suffix). The SDK strips the proxy prefix and appends
-    // just the endpoint path (e.g. /messages), so:
-    //   SDK calls: KORTIX_API_URL/anthropic/messages
-    //   Proxy subPath: /messages
-    //   Target: https://api.anthropic.com/v1/messages ✓
+    // Dual-mode: Kortix-managed (Mode 1) routes through OpenRouter with
+    // Kortix's own key. Passthrough (Mode 2) forwards the user's own API
+    // key to the real upstream provider for platform-fee billing.
+    //
+    // Mode 1 (Kortix token in auth): inject OPENROUTER_API_KEY, target OpenRouter
+    // Mode 2 (user key + X-Kortix-Token): passthrough to real provider
+    //
+    // The proxy handler picks targetBaseUrl for Mode 2/3 and
+    // kortixTargetBaseUrl for Mode 1 (when present).
 
     anthropic: {
       name: 'anthropic',
       targetBaseUrl: config.ANTHROPIC_API_URL,   // https://api.anthropic.com/v1
-      getKortixApiKey: () => '',  // No Kortix key — passthrough only
+      kortixTargetBaseUrl: config.OPENROUTER_API_URL, // https://openrouter.ai/api/v1
+      getKortixApiKey: () => config.OPENROUTER_API_KEY,
       keyInjection: { type: 'header', headerName: 'x-api-key' },
-      allowedRoutes: [],  // No routes allowed with Kortix's key (we don't provide one)
-      billingToolName: 'llm_anthropic_passthrough',
+      kortixKeyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
+      allowedRoutes: [
+        { path: '/messages', methods: ['POST'] },
+      ],
+      billingToolName: 'llm_anthropic',
       isLlm: true,
     },
 
     openai: {
       name: 'openai',
       targetBaseUrl: config.OPENAI_API_URL,      // https://api.openai.com/v1
-      getKortixApiKey: () => '',
+      kortixTargetBaseUrl: config.OPENROUTER_API_URL,
+      getKortixApiKey: () => config.OPENROUTER_API_KEY,
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
-      allowedRoutes: [],
-      billingToolName: 'llm_openai_passthrough',
+      allowedRoutes: [
+        { path: '/chat/completions', methods: ['POST'] },
+      ],
+      billingToolName: 'llm_openai',
       isLlm: true,
     },
 
     xai: {
       name: 'xai',
       targetBaseUrl: config.XAI_API_URL,         // https://api.x.ai/v1
-      getKortixApiKey: () => '',
+      kortixTargetBaseUrl: config.OPENROUTER_API_URL,
+      getKortixApiKey: () => config.OPENROUTER_API_KEY,
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
-      allowedRoutes: [],
-      billingToolName: 'llm_xai_passthrough',
+      allowedRoutes: [
+        { path: '/chat/completions', methods: ['POST'] },
+      ],
+      billingToolName: 'llm_xai',
       isLlm: true,
     },
 
     gemini: {
       name: 'gemini',
       targetBaseUrl: config.GEMINI_API_URL,      // https://generativelanguage.googleapis.com/v1beta
-      getKortixApiKey: () => '',
+      kortixTargetBaseUrl: config.OPENROUTER_API_URL,
+      getKortixApiKey: () => config.OPENROUTER_API_KEY,
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
-      allowedRoutes: [],
-      billingToolName: 'llm_gemini_passthrough',
+      allowedRoutes: [
+        { path: '/chat/completions', methods: ['POST'] },
+      ],
+      billingToolName: 'llm_gemini',
       isLlm: true,
     },
 
     groq: {
       name: 'groq',
       targetBaseUrl: config.GROQ_API_URL,        // https://api.groq.com/openai/v1
-      getKortixApiKey: () => '',
+      kortixTargetBaseUrl: config.OPENROUTER_API_URL,
+      getKortixApiKey: () => config.OPENROUTER_API_KEY,
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
-      allowedRoutes: [],
-      billingToolName: 'llm_groq_passthrough',
+      allowedRoutes: [
+        { path: '/chat/completions', methods: ['POST'] },
+      ],
+      billingToolName: 'llm_groq',
       isLlm: true,
     },
   };

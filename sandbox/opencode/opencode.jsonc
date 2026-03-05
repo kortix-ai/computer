@@ -11,15 +11,15 @@
     // compaction, title, summary are hidden infra agents -- leave them
   },
   // ── LLM Providers ────────────────────────────────────────────────────────
-  // Real providers shown by name. Routing is DNS-driven: SDKs use normal
-  // provider endpoints and infrastructure DNS/network rules redirect traffic
-  // to the Kortix proxy when enabled.
+  // In cloud mode, kortix-env-setup.sh redirects SDK traffic to the Kortix
+  // router by setting *_BASE_URL env vars (Anthropic/OpenAI) and patching
+  // this file to add baseURL for providers without env var support
+  // (xAI/Gemini/Groq). API keys are set to KORTIX_TOKEN so the router
+  // recognises Mode 1 (Kortix-managed) requests.
   //
   // X-Kortix-Token enables passthrough billing (0.1× platform fee) when the
   // user connects their own API key. Empty token (local mode) is harmless —
   // the proxy ignores it and falls through to pure passthrough.
-  //
-  // No explicit baseURL overrides are set here.
   "provider": {
     "anthropic": {
       "options": {
