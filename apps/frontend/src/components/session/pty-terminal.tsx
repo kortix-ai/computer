@@ -101,6 +101,9 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
   const wsRef = useRef<WebSocket | null>(null);
   const connectionIdRef = useRef<number>(0);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const disposedRef = useRef(false);
   const hadErrorRef = useRef(false);
 
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
@@ -131,7 +134,12 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
 
   // Disconnect WebSocket
   const disconnect = useCallback(() => {
+    disposedRef.current = true;
     connectionIdRef.current = 0;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
     if (wsRef.current) {
       wsRef.current.onopen = null;
       wsRef.current.onmessage = null;
@@ -157,6 +165,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
     if (!terminalRef.current) return;
 
     const container = terminalRef.current;
+    disposedRef.current = false;
     hadErrorRef.current = false;
 
     const term = new XTerm({
@@ -200,33 +209,64 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
     });
     resizeObserver.observe(container);
 
-    // Delay fit + WS connect to ensure the container has real dimensions
-    const initTimer = setTimeout(async () => {
-      safeFit(fitAddon, container);
+    const scheduleReconnect = (reason?: string) => {
+      if (disposedRef.current) return;
+      if (reconnectTimeoutRef.current) return;
+
+      reconnectAttemptsRef.current += 1;
+      const delay = Math.min(1000 * 2 ** (reconnectAttemptsRef.current - 1), 15000);
+      const suffix = reason ? ` (${reason})` : '';
+
+      term.writeln(`\r\n\x1b[33mReconnecting in ${Math.ceil(delay / 1000)}s${suffix}...\x1b[0m`);
+      updateStatus('connecting');
+
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connectWebSocket();
+      }, delay);
+    };
+
+    const connectWebSocket = async () => {
+      if (disposedRef.current) return;
 
       // --- WebSocket connect ---
       globalPtyConnectionId++;
       const myConnectionId = globalPtyConnectionId;
       connectionIdRef.current = myConnectionId;
+      hadErrorRef.current = false;
 
-      updateStatus('connecting');
-      term.writeln('\x1b[33mConnecting to terminal...\x1b[0m');
+      if (reconnectAttemptsRef.current === 0) {
+        updateStatus('connecting');
+        term.writeln('\x1b[33mConnecting to terminal...\x1b[0m');
+      }
 
-      const wsUrl = await getPtyWebSocketUrl(pty.id, serverUrl);
+      let wsUrl = '';
+      try {
+        wsUrl = await getPtyWebSocketUrl(pty.id, serverUrl);
+      } catch (err) {
+        console.error('[PtyTerminal] Failed to resolve WebSocket URL:', err);
+        hadErrorRef.current = true;
+        term.writeln('\r\n\x1b[31mFailed to resolve terminal connection URL.\x1b[0m');
+        updateStatus('error');
+        scheduleReconnect('URL error');
+        return;
+      }
+
       // Bail out if a newer connection was requested while we were resolving the URL
-      if (connectionIdRef.current !== myConnectionId) return;
+      if (connectionIdRef.current !== myConnectionId || disposedRef.current) return;
       console.log('[PtyTerminal] Connecting WebSocket:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (connectionIdRef.current !== myConnectionId) {
+        if (connectionIdRef.current !== myConnectionId || disposedRef.current) {
           ws.close();
           return;
         }
         console.log('[PtyTerminal] WebSocket connected');
-        term.reset(); // Clear the "Connecting..." message
+        reconnectAttemptsRef.current = 0;
+        term.reset(); // Clear prior connection/reconnect messages
         term.options.theme = terminalTheme; // Re-apply after reset
         updateStatus('connected');
 
@@ -261,7 +301,7 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
       };
 
       ws.onerror = (err) => {
-        if (connectionIdRef.current !== myConnectionId) return;
+        if (connectionIdRef.current !== myConnectionId || disposedRef.current) return;
         console.error('[PtyTerminal] WebSocket error:', err);
         hadErrorRef.current = true;
         term.writeln('\r\n\x1b[31mFailed to connect to terminal.\x1b[0m');
@@ -270,14 +310,31 @@ export const PtyTerminal = forwardRef<PtyTerminalHandle, PtyTerminalProps>(funct
       };
 
       ws.onclose = (event) => {
-        if (connectionIdRef.current !== myConnectionId) return;
+        if (connectionIdRef.current !== myConnectionId || disposedRef.current) return;
         console.log('[PtyTerminal] WebSocket closed:', event.code, event.reason);
         wsRef.current = null;
+
+        const reason = (event.reason || '').toLowerCase();
+        const closedByIdleTimeout = event.code === 1000 && reason.includes('idle timeout');
+        const shouldReconnect = closedByIdleTimeout || event.code !== 1000;
+
         if (!hadErrorRef.current) {
           term.writeln(`\r\n\x1b[33mConnection closed${event.code ? ` (${event.code})` : ''}${event.reason ? ': ' + event.reason : ''}\x1b[0m`);
         }
-        updateStatus('disconnected');
+
+        if (shouldReconnect) {
+          scheduleReconnect(closedByIdleTimeout ? 'idle timeout' : `code ${event.code}`);
+        } else {
+          reconnectAttemptsRef.current = 0;
+          updateStatus('disconnected');
+        }
       };
+    };
+
+    // Delay fit + initial WS connect to ensure the container has real dimensions
+    const initTimer = setTimeout(() => {
+      safeFit(fitAddon, container);
+      connectWebSocket();
     }, 80);
 
     return () => {

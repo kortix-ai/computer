@@ -116,7 +116,26 @@ export function useUpdatePty() {
 
 export async function getPtyWebSocketUrl(ptyId: string, serverUrl?: string): Promise<string> {
   const baseUrl = serverUrl || getActiveOpenCodeUrl();
-  const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+  const wsUrl = (() => {
+    try {
+      const parsed = new URL(baseUrl);
+      if (parsed.protocol === 'https:') {
+        parsed.protocol = 'wss:';
+      } else if (parsed.protocol === 'http:') {
+        parsed.protocol = 'ws:';
+      }
+
+      // Browsers block ws:// from an https page (mixed content).
+      // Force secure WS in that scenario to avoid deployment-only failures.
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:' && parsed.protocol === 'ws:') {
+        parsed.protocol = 'wss:';
+      }
+
+      return parsed.toString().replace(/\/+$/, '');
+    } catch {
+      return baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+    }
+  })();
   const url = `${wsUrl}/pty/${ptyId}/connect`;
   // Browser WebSocket API doesn't support custom headers, so inject the
   // auth token as a query parameter for the backend proxy to authenticate.
