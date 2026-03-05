@@ -48,6 +48,15 @@ fi
 
 # ─── Set target directories based on mode ────────────────────────────────────
 if [ "$MODE" = "staging" ]; then
+  # Guard: if this exact version is already active, don't wipe the live staging dir.
+  # Reinstalling the same version (for example via npm install -g on a local tarball)
+  # must be a no-op, not a destructive rebuild.
+  CURRENT_KM="$(readlink -f /opt/kortix-master 2>/dev/null || true)"
+  if [ "$CURRENT_KM" = "$STAGING/kortix-master" ]; then
+    echo "[sandbox-postinstall] Version $PKG_VERSION is already active, skipping redeploy"
+    exit 0
+  fi
+
   # Clean any previous failed staging attempt for this version
   rm -rf "$STAGING"
   mkdir -p "$STAGING"
