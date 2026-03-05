@@ -64,7 +64,7 @@ export function createTunnelTools(client: TunnelClient): TunnelToolDefinition[] 
         const connections = (await client.getConnections()) as Array<Record<string, unknown>>;
 
         if (connections.length === 0) {
-          return 'No tunnel connections found. The user needs to set up Agent Tunnel first:\n1. Create a tunnel connection\n2. Run `npx agent-tunnel connect` on their local machine';
+          return 'No tunnel connections found. The user needs to set up Agent Tunnel first:\n1. Create a tunnel connection\n2. Run `npx @kortix/agent-tunnel connect` on their local machine';
         }
 
         const sections: string[] = [];
@@ -90,7 +90,7 @@ export function createTunnelTools(client: TunnelClient): TunnelToolDefinition[] 
         }
 
         if (!hasOnline) {
-          sections.push('\nNo tunnel is currently online. Ask the user to run `npx agent-tunnel connect` on their local machine.');
+          sections.push('\nNo tunnel is currently online. Ask the user to run `npx @kortix/agent-tunnel connect` on their local machine.');
         }
 
         return sections.join('\n\n');

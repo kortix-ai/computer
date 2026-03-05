@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Download,
   Globe,
+  Server,
 } from 'lucide-react';
 import { useServerStore, resolveServerUrl, type ServerEntry } from '@/stores/server-store';
 import { useTabStore } from '@/stores/tab-store';
@@ -28,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/auth-token';
-import { createSandbox, ensureSandbox, extractMappedPorts, removeSandbox, setupSSH, type SandboxCreateProgress, type SandboxProviderName, type ChangelogEntry, type SSHSetupResult } from '@/lib/platform-client';
+import { createSandbox, ensureSandbox, extractMappedPorts, getSandboxUrl, removeSandbox, setupSSH, type SandboxCreateProgress, type SandboxProviderName, type HetznerServerTypeOption, type ChangelogEntry, type SSHSetupResult } from '@/lib/platform-client';
 import { toast } from '@/lib/toast';
 import { isBillingEnabled } from '@/lib/config';
 
@@ -313,6 +314,8 @@ function DialogInstanceRow({
             <Container className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
           ) : server.provider === 'daytona' ? (
             <Cloud className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
+          ) : server.provider === 'hetzner' ? (
+            <Server className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
           ) : (
             <Box className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/60')} />
           )}
@@ -329,9 +332,11 @@ function DialogInstanceRow({
               'px-1.5 py-px text-[9px] font-medium rounded-full uppercase tracking-wider leading-none flex-shrink-0',
               server.provider === 'local_docker'
                 ? 'text-blue-500/70 bg-blue-500/10'
-                : 'text-violet-500/70 bg-violet-500/10',
+                : server.provider === 'hetzner'
+                  ? 'text-orange-500/70 bg-orange-500/10'
+                  : 'text-violet-500/70 bg-violet-500/10',
             )}>
-              {server.provider === 'local_docker' ? 'local' : 'cloud'}
+              {server.provider === 'local_docker' ? 'local' : server.provider === 'hetzner' ? 'vps' : 'cloud'}
             </span>
           )}
           {server.isDefault && (
@@ -481,7 +486,7 @@ export function InstanceManagerDialog({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = React.useState('');
-  const [mode, setMode] = React.useState<'list' | 'add' | 'edit' | 'ssh' | 'custom'>('list');
+  const [mode, setMode] = React.useState<'list' | 'add' | 'hetzner' | 'edit' | 'ssh' | 'custom'>('list');
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [isCreatingSandbox, setIsCreatingSandbox] = React.useState(false);
   const [creatingProvider, setCreatingProvider] = React.useState<SandboxProviderName | null>(null);
@@ -506,9 +511,10 @@ export function InstanceManagerDialog({
   const availableProviders = providersInfo?.providers ?? ['local_docker'];
   const hasDaytona = availableProviders.includes('daytona');
   const hasLocalDocker = availableProviders.includes('local_docker');
+  const hasHetzner = availableProviders.includes('hetzner');
 
   // Derived: does the user already have a managed sandbox?
-  const hasActiveSandbox = servers.some((s) => s.provider === 'daytona' || s.provider === 'local_docker');
+  const hasActiveSandbox = servers.some((s) => s.provider === 'daytona' || s.provider === 'local_docker' || s.provider === 'hetzner');
 
   // Form state (for custom URL / edit)
   const [formUrl, setFormUrl] = React.useState('');
@@ -586,18 +592,52 @@ export function InstanceManagerDialog({
     }
   }
 
-  async function handleCreateSandbox(provider: SandboxProviderName) {
+  async function handleCreateSandbox(provider: SandboxProviderName, hetznerServerType?: HetznerServerTypeOption) {
     setIsCreatingSandbox(true);
     setCreatingProvider(provider);
     setSandboxError(null);
     setSandboxProgress(null);
+    let hetznerProgressTimer: ReturnType<typeof setInterval> | null = null;
+    if (provider === 'hetzner') {
+      const startedAt = Date.now();
+      const tick = () => {
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+        let progress = 8;
+        let message = 'Allocating Hetzner VPS...';
+
+        if (elapsedSec < 20) {
+          progress = 8 + (elapsedSec / 20) * 12;
+          message = 'Allocating Hetzner VPS...';
+        } else if (elapsedSec < 90) {
+          progress = 20 + ((elapsedSec - 20) / 70) * 35;
+          message = 'Provisioning from snapshot (cold starts usually 2-3 min)...';
+        } else if (elapsedSec < 150) {
+          progress = 55 + ((elapsedSec - 90) / 60) * 30;
+          message = 'Booting sandbox services...';
+        } else {
+          progress = Math.min(95, 85 + ((elapsedSec - 150) / 120) * 10);
+          message = 'Running final health checks...';
+        }
+
+        setSandboxProgress({
+          status: 'pulling',
+          progress: Math.max(2, Math.min(95, progress)),
+          message,
+        });
+      };
+
+      tick();
+      hetznerProgressTimer = setInterval(tick, 1000);
+    }
     try {
       // In cloud mode (billing), use ensureSandbox (idempotent — handles archived → reactivate → create).
       // In self-hosted mode, use createSandbox (explicit creation).
-      const { sandbox } = isBillingEnabled() && provider === 'daytona'
-        ? await ensureSandbox({ provider })
+      const isCloudProvider = provider === 'daytona' || provider === 'hetzner';
+      const { sandbox } = isBillingEnabled() && isCloudProvider
+        ? await ensureSandbox({ provider, hetznerServerType })
         : await createSandbox({
           provider,
+          hetznerServerType,
           onProgress: provider === 'local_docker'
             ? (progress) => {
               setSandboxProgress(progress);
@@ -606,7 +646,61 @@ export function InstanceManagerDialog({
             : undefined,
         });
 
-      const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : 'Cloud Sandbox');
+      // Hetzner can report as active before services are actually ready.
+      // Do not route to dashboard until /kortix/health returns a real version.
+      if (provider === 'hetzner') {
+        if (hetznerProgressTimer) {
+          clearInterval(hetznerProgressTimer);
+          hetznerProgressTimer = null;
+        }
+
+        const sandboxUrl = getSandboxUrl(sandbox);
+        const readyDeadline = Date.now() + 180_000;
+        let readyVersion = '';
+
+        while (Date.now() < readyDeadline) {
+          const remaining = Math.max(0, readyDeadline - Date.now());
+          const elapsed = 180_000 - remaining;
+          const progress = Math.min(99, 90 + (elapsed / 180_000) * 9);
+          setSandboxProgress({
+            status: 'pulling',
+            progress,
+            message: 'Provisioning Hetzner sandbox services and waiting for health... ',
+          });
+
+          try {
+            const res = await authenticatedFetch(
+              `${sandboxUrl}/kortix/health`,
+              { signal: AbortSignal.timeout(5000) },
+              { retryOnAuthError: false },
+            );
+            if (res.ok) {
+              const health = await res.json().catch(() => null) as { version?: string } | null;
+              const version = typeof health?.version === 'string' ? health.version : '';
+              if (version && version !== '0.0.0') {
+                readyVersion = version;
+                break;
+              }
+            }
+          } catch {
+            // keep polling until ready or timeout
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+
+        if (!readyVersion) {
+          throw new Error('Hetzner VPS created but not ready yet. Please wait a bit and try again.');
+        }
+
+        setSandboxProgress({
+          status: 'pulling',
+          progress: 100,
+          message: `Provisioning Hetzner sandbox... Connected (${readyVersion})`,
+        });
+      }
+
+      const label = sandbox.name || (provider === 'local_docker' ? 'Local Sandbox' : provider === 'hetzner' ? 'Hetzner VPS' : 'Cloud Sandbox');
       const isLocal = sandbox.provider === 'local_docker';
 
       const store = useServerStore.getState();
@@ -648,6 +742,9 @@ export function InstanceManagerDialog({
       }
       setSandboxError(message || null);
     } finally {
+      if (hetznerProgressTimer) {
+        clearInterval(hetznerProgressTimer);
+      }
       setIsCreatingSandbox(false);
       setCreatingProvider(null);
     }
@@ -667,7 +764,7 @@ export function InstanceManagerDialog({
     const server = servers.find((s) => s.id === id);
 
     // Cloud or Docker sandbox → destroy the actual VM/container via backend, then remove from store
-    if (server && (server.provider === 'daytona' || server.provider === 'local_docker')) {
+    if (server && (server.provider === 'daytona' || server.provider === 'local_docker' || server.provider === 'hetzner')) {
       setIsRemovingSandbox(true);
       try {
         await removeSandbox();
@@ -754,6 +851,7 @@ export function InstanceManagerDialog({
   const modeDescription: Record<string, string> = {
     list: 'Manage your Kortix instances.',
     add: 'Choose how to connect.',
+    hetzner: 'Choose a Hetzner VPS tier.',
     custom: 'Connect to a Kortix instance by entering its address.',
     edit: 'Update the connection details for this instance.',
     ssh: 'Connect via SSH or VS Code Remote SSH.',
@@ -780,7 +878,7 @@ export function InstanceManagerDialog({
                 <KeyRound className="h-4 w-4 text-muted-foreground" />
                 SSH Access
               </>
-            ) : mode === 'add' ? (
+            ) : mode === 'add' || mode === 'hetzner' ? (
               <>
                 <Plus className="h-4 w-4 text-muted-foreground" />
                 New Instance
@@ -966,6 +1064,38 @@ export function InstanceManagerDialog({
                 </button>
               )}
 
+              {/* Hetzner (VPS) */}
+              {hasHetzner && (
+                <button
+                  type="button"
+                  onClick={() => setMode('hetzner')}
+                  disabled={isCreatingSandbox || (isBillingEnabled() && hasActiveSandbox)}
+                  className={cn(
+                    'flex items-start gap-3 w-full p-3.5 rounded-xl border text-left transition-all',
+                    isBillingEnabled() && hasActiveSandbox
+                      ? 'border-border/30 bg-muted/20 opacity-50 cursor-not-allowed'
+                      : 'border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+                  )}
+                >
+                  <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-orange-500/10 flex-shrink-0 mt-0.5">
+                    {isCreatingSandbox && creatingProvider === 'hetzner' ? (
+                      <Loader2 className="h-4 w-4 text-orange-500 animate-spin" />
+                    ) : (
+                      <Server className="h-4 w-4 text-orange-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">Hetzner VPS</p>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">
+                      {isBillingEnabled() && hasActiveSandbox
+                        ? 'Limit: 1 sandbox per account'
+                        : 'Choose tier on next screen'}
+                    </p>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground mt-1 -rotate-90" />
+                </button>
+              )}
+
               {/* Local Docker */}
               {hasLocalDocker && (
                 <button
@@ -1015,7 +1145,75 @@ export function InstanceManagerDialog({
             <button
               type="button"
               className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer self-start"
-              onClick={() => { setMode('list'); setSandboxError(null); setSandboxProgress(null); }}
+              onClick={() => {
+                setMode('list');
+                setSandboxError(null);
+                setSandboxProgress(null);
+              }}
+            >
+              Back
+            </button>
+          </div>
+        )}
+
+        {/* ──── Hetzner tier view ──── */}
+        {mode === 'hetzner' && (
+          <div className="flex flex-col gap-3 px-5 pb-5">
+            {sandboxError && (
+              <p className="text-xs text-destructive">{sandboxError}</p>
+            )}
+
+            {sandboxProgress && creatingProvider === 'hetzner' && (
+              <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">{sandboxProgress.message}</p>
+                  <span className="text-[11px] tabular-nums text-muted-foreground/80">{Math.round(sandboxProgress.progress)}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary/90 transition-all duration-1000 ease-out"
+                    style={{ width: `${Math.max(sandboxProgress.progress, 2)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5">
+              <p className="text-[11px] text-muted-foreground">
+                Snapshot cold starts usually take 2-3 minutes.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => handleCreateSandbox('hetzner', 'cpx22')}
+                disabled={isCreatingSandbox || (isBillingEnabled() && hasActiveSandbox)}
+                className="rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 text-left transition-all px-3.5 py-3.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <p className="text-sm font-medium text-foreground">Regular (C2)</p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">Lower cost, solid performance</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCreateSandbox('hetzner', 'cpx32')}
+                disabled={isCreatingSandbox || (isBillingEnabled() && hasActiveSandbox)}
+                className="rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 text-left transition-all px-3.5 py-3.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <p className="text-sm font-medium text-foreground">Fast CPU (C3)</p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">More compute for heavier workloads</p>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer self-start"
+              onClick={() => {
+                setMode('add');
+                setSandboxError(null);
+                setSandboxProgress(null);
+              }}
             >
               Back
             </button>

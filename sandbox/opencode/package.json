@@ -6,7 +6,7 @@
     "@mendable/firecrawl-js": "^4.13.0",
     "@opencode-ai/plugin": "1.2.16",
     "@tavily/core": "^0.7.1",
-    "agent-tunnel": "file:../agent-tunnel",
+    "agent-tunnel": "npm:@kortix/agent-tunnel@^0.1.0",
     "jsonc-parser": "^3.3.1",
     "envsitter-guard": "latest",
     "opencode-pty": "0.2.3",

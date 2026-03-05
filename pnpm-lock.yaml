@@ -13,7 +13,7 @@ importers:
   .:
     devDependencies:
       agent-tunnel:
-        specifier: workspace:*
+        specifier: workspace:@kortix/agent-tunnel@*
         version: link:packages/agent-tunnel
 
   apps/frontend:
@@ -94,8 +94,8 @@ importers:
         specifier: ^0.5.7
         version: 0.5.11(react-dom@18.3.1)(react@18.3.1)
       '@opencode-ai/sdk':
-        specifier: ^1.2.10
-        version: 1.2.10
+        specifier: ^1.2.17
+        version: 1.2.17
       '@pipedream/sdk':
         specifier: ^2.3.7
         version: 2.3.7
@@ -518,7 +518,7 @@ importers:
         version: 11.12.2
       next:
         specifier: ^15.3.8
-        version: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+        version: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
       next-intl:
         specifier: ^4.5.3
         version: 4.8.2(next@15.5.12)(react@18.3.1)(typescript@5.9.3)
@@ -667,6 +667,9 @@ importers:
       '@eslint/eslintrc':
         specifier: ^3
         version: 3.3.3
+      '@playwright/test':
+        specifier: ^1.57.0
+        version: 1.58.2
       '@tailwindcss/postcss':
         specifier: ^4.1.4
         version: 4.1.18
@@ -757,11 +760,11 @@ importers:
   packages/kortix-sys-oc-plugin:
     dependencies:
       '@opencode-ai/plugin':
-        specifier: ^1.2.11
-        version: 1.2.15
+        specifier: ^1.2.16
+        version: 1.2.16
       '@opencode-ai/sdk':
-        specifier: ^1.2.11
-        version: 1.2.15
+        specifier: ^1.2.17
+        version: 1.2.17
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -847,8 +850,8 @@ importers:
         specifier: ^0.7.1
         version: 0.7.2
       agent-tunnel:
-        specifier: file:../agent-tunnel
-        version: file:sandbox/agent-tunnel
+        specifier: npm:@kortix/agent-tunnel@^0.1.0
+        version: link:../../packages/agent-tunnel
       envsitter-guard:
         specifier: latest
         version: 0.0.4
@@ -889,7 +892,7 @@ importers:
         specifier: ^2.95.3
         version: 2.95.3
       agent-tunnel:
-        specifier: workspace:*
+        specifier: workspace:@kortix/agent-tunnel@*
         version: link:../../packages/agent-tunnel
       ai:
         specifier: ^6.0.77
@@ -4370,7 +4373,7 @@ packages:
       next: ^13.0.0 || ^14.0.0 || ^15.0.0
       react: ^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0
     dependencies:
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
       third-party-capital: 1.0.20
     dev: false
@@ -4439,7 +4442,7 @@ packages:
         optional: true
     dependencies:
       '@novu/react': 3.13.0(react-dom@18.3.1)(react@18.3.1)
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     transitivePeerDependencies:
@@ -4518,13 +4521,6 @@ packages:
       react-dom: 18.3.1(react@18.3.1)
     dev: false
 
-  /@opencode-ai/plugin@1.2.15:
-    resolution: {integrity: sha512-mh9S05W+CZZmo6q3uIEBubS66QVgiev7fRafX7vemrCfz+3pEIkSwipLjU/sxIewC9yLiDWLqS73DH/iEQzVDw==}
-    dependencies:
-      '@opencode-ai/sdk': 1.2.15
-      zod: 4.1.8
-    dev: false
-
   /@opencode-ai/plugin@1.2.16:
     resolution: {integrity: sha512-9Kb7BQIC2P3oKCvI8K3thP5YP0vE7yLvcmBmgyACUIqc3e5UL6U+4umLpTvgQa2eQdjxtOXznuGTNwgcGMHUHg==}
     dependencies:
@@ -4532,16 +4528,12 @@ packages:
       zod: 4.1.8
     dev: false
 
-  /@opencode-ai/sdk@1.2.10:
-    resolution: {integrity: sha512-SyXcVqry2hitPVvQtvXOhqsWyFhSycG/+LTLYXrcq8AFmd9FR7dyBSDB3f5Ol6IPkYOegk8P2Eg2kKPNSNiKGw==}
-    dev: false
-
-  /@opencode-ai/sdk@1.2.15:
-    resolution: {integrity: sha512-NUJNlyBCdZ4R0EBLjJziEQOp2XbRPJosaMcTcWSWO5XJPKGUpz0u8ql+5cR8K+v2RJ+hp2NobtNwpjEYfe6BRQ==}
-    dev: false
-
   /@opencode-ai/sdk@1.2.16:
     resolution: {integrity: sha512-y9ae9VnCcuog0GaI4DveX1HB6DBoZgGN3EuJVlRFbBCPwhzkls6fCfHSb5+VnTS6Fy0OWFUL28VBCmixL/D+/Q==}
+    dev: false
+
+  /@opencode-ai/sdk@1.2.17:
+    resolution: {integrity: sha512-HdeLeyJ2/Yl/NBHqw9pGFBnkIXuf0Id1kX1GMXDcnZwbJROUJ6TtrW/wLngTYW478E4CCm1jwknjxxmDuxzVMQ==}
     dev: false
 
   /@opentelemetry/api-logs@0.207.0:
@@ -5147,6 +5139,13 @@ packages:
     resolution: {integrity: sha512-kr3qbP650P8d7nS+NWT9GK7jCtilLMcvhoEigqkgcJepwWPWdcg7vryHUli4JCgoMTXW7eO49Pgz0ZckOY6gVw==}
     engines: {node: '>=18.0.0'}
     dev: false
+
+  /@playwright/test@1.58.2:
+    resolution: {integrity: sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA==}
+    engines: {node: '>=18'}
+    hasBin: true
+    dependencies:
+      playwright: 1.58.2
 
   /@posthog/core@1.21.0:
     resolution: {integrity: sha512-0a2JUIX1vhduP2El/6/J8s5AeYAurIoufQGFgMiGnJE5ajd63o9LFocu2vFYYBnIOmy75y4ADNeW8zSl1keEQQ==}
@@ -10053,7 +10052,7 @@ packages:
       vue-router:
         optional: true
     dependencies:
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
     dev: false
 
@@ -10075,7 +10074,7 @@ packages:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@vercel/edge-config-fs': 0.1.0
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
     dev: false
 
   /@vercel/oidc@3.1.0:
@@ -10106,7 +10105,7 @@ packages:
       vue-router:
         optional: true
     dependencies:
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
     dev: false
 
@@ -11810,7 +11809,7 @@ packages:
   /envsitter-guard@0.0.4:
     resolution: {integrity: sha512-CaWK/T6uAY6rvNnqCuumuvqfdTBhC+p5vsy0SssB+AtCN4prV5A9ZuAD1nVTA6LdREiS1g1V4Mz96pjXiLjkHg==}
     dependencies:
-      '@opencode-ai/plugin': 1.2.15
+      '@opencode-ai/plugin': 1.2.16
       envsitter: 0.0.4
     dev: false
 
@@ -12554,7 +12553,7 @@ packages:
       '@edge-runtime/cookies': 5.0.2
       '@opentelemetry/api': 1.9.0
       jose: 5.10.0
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     dev: false
@@ -12665,7 +12664,6 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
     requiresBuild: true
-    dev: false
     optional: true
 
   /fsevents@2.3.3:
@@ -12700,7 +12698,7 @@ packages:
     peerDependencies:
       next: '>=13.2.0'
     dependencies:
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
     dev: false
 
   /generator-function@2.0.1:
@@ -14778,7 +14776,7 @@ packages:
       '@swc/core': 1.15.11
       icu-minify: 4.8.2
       negotiator: 1.0.0
-      next: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1)
+      next: 15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1)
       next-intl-swc-plugin-extractor: 4.8.2
       po-parser: 2.1.1
       react: 18.3.1
@@ -14798,7 +14796,7 @@ packages:
       react-dom: 18.3.1(react@18.3.1)
     dev: false
 
-  /next@15.5.12(@opentelemetry/api@1.9.0)(react-dom@18.3.1)(react@18.3.1):
+  /next@15.5.12(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@18.3.1)(react@18.3.1):
     resolution: {integrity: sha512-Fi/wQ4Etlrn60rz78bebG1i1SR20QxvV8tVp6iJspjLUSHcZoeUXCt+vmWoEcza85ElZzExK/jJ/F6SvtGktjA==}
     engines: {node: ^18.18.0 || ^19.8.0 || >= 20.0.0}
     hasBin: true
@@ -14821,6 +14819,7 @@ packages:
     dependencies:
       '@next/env': 15.5.12
       '@opentelemetry/api': 1.9.0
+      '@playwright/test': 1.58.2
       '@swc/helpers': 0.5.15
       caniuse-lite: 1.0.30001769
       postcss: 8.4.31
@@ -15057,7 +15056,7 @@ packages:
       typescript: ^5
     dependencies:
       '@opencode-ai/plugin': 1.2.16
-      '@opencode-ai/sdk': 1.2.16
+      '@opencode-ai/sdk': 1.2.17
       bun-pty: 0.4.8
       moment: 2.30.1
       open: 11.0.0
@@ -15278,7 +15277,6 @@ packages:
     resolution: {integrity: sha512-yZkEtftgwS8CsfYo7nm0KE8jsvm6i/PTgVtB8DL726wNf6H2IMsDuxCpJj59KDaxCtSnrWan2AeDqM7JBaultg==}
     engines: {node: '>=18'}
     hasBin: true
-    dev: false
 
   /playwright@1.58.2:
     resolution: {integrity: sha512-vA30H8Nvkq/cPBnNw4Q8TWz1EJyqgpuinBcHET0YVJVFldr8JDNiU9LaWAE1KqSkRYazuaBhTpB5ZzShOezQ6A==}
@@ -15288,7 +15286,6 @@ packages:
       playwright-core: 1.58.2
     optionalDependencies:
       fsevents: 2.3.2
-    dev: false
 
   /po-parser@2.1.1:
     resolution: {integrity: sha512-ECF4zHLbUItpUgE3OTtLKlPjeBN+fKEczj2zYjDfCGOzicNs0GK3Vg2IoAYwx7LH/XYw43fZQP6xnZ4TkNxSLQ==}
@@ -18046,11 +18043,3 @@ packages:
 
   /zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
-
-  file:sandbox/agent-tunnel:
-    resolution: {directory: sandbox/agent-tunnel, type: directory}
-    name: agent-tunnel
-    hasBin: true
-    dependencies:
-      hono: 4.12.3
-    dev: false

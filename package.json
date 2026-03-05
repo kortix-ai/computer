@@ -10,12 +10,14 @@
     "build": "pnpm -r run build",
     "build:frontend": "pnpm --filter Kortix-Computer-Frontend build",
     "typecheck": "pnpm -r run typecheck",
+    "test:e2e:frontend": "pnpm --dir apps/frontend test:e2e",
+    "test:e2e:frontend:full": "pnpm --dir apps/frontend test:e2e:full",
     "stripe": "stripe listen --forward-to http://localhost:8008/v1/billing/webhooks/stripe",
     "setup": "echo 'Run: bash scripts/get-kortix.sh'",
     "test:cli": "bash scripts/tests/run-all.sh"
   },
   "devDependencies": {
-    "agent-tunnel": "workspace:*"
+    "agent-tunnel": "workspace:@kortix/agent-tunnel@*"
   },
   "pnpm": {
     "overrides": {

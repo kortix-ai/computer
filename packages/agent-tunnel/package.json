@@ -1,5 +1,5 @@
 {
-  "name": "agent-tunnel",
+  "name": "@kortix/agent-tunnel",
   "version": "0.1.0",
   "private": false,
   "type": "module",
@@ -30,5 +30,8 @@
     "typescript": "^5.4.0"
   },
   "keywords": ["tunnel", "relay", "websocket", "json-rpc", "hmac", "agent", "sdk"],
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
 }

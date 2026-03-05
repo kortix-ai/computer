@@ -3,7 +3,6 @@ packages:
   - 'packages/*'
   - 'services/*'
   - 'sandbox/*'
-  - '!sandbox/agent-tunnel'
 
 catalog:
   '@tsconfig/bun': ^1.0.7

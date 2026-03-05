@@ -1,7 +1,6 @@
 import type { SandboxTarget } from '../types';
 import { getProvider } from '../../platform/providers';
 import type { ProviderName } from '../../platform/providers';
-import { getDaytona, isDaytonaConfigured } from '../../shared/daytona';
 import { config } from '../../config';
 import { db } from '../../shared/db';
 import { sandboxes } from '@kortix/db';
@@ -13,29 +12,17 @@ export interface ResolvedEndpoint {
 }
 
 export async function resolveDirectEndpoint(target: SandboxTarget): Promise<ResolvedEndpoint> {
-  if (target.externalId && isDaytonaConfigured()) {
+  // Use the provider interface's resolveEndpoint() — works for all providers
+  if (target.externalId && target.provider) {
     try {
-      const daytona = getDaytona();
-      const sandbox = await daytona.get(target.externalId);
-      const link = await (sandbox as any).getPreviewLink(8000);
-      const url = (link.url || String(link)).replace(/\/$/, '');
-      const token = link.token || null;
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Daytona-Skip-Preview-Warning': 'true',
-        'X-Daytona-Disable-CORS': 'true',
-      };
-      if (token) {
-        headers['X-Daytona-Preview-Token'] = token;
-      }
-
-      return { url, headers };
+      const provider = getProvider(target.provider as ProviderName);
+      return await provider.resolveEndpoint(target.externalId);
     } catch (err) {
-      console.warn(`[OPENCODE-CONNECTOR] Failed to resolve direct URL, falling back to baseUrl:`, err);
+      console.warn(`[OPENCODE-CONNECTOR] Failed to resolve via provider, falling back to baseUrl:`, err);
     }
   }
 
+  // Fallback: use the stored baseUrl with service key auth
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (config.INTERNAL_SERVICE_KEY) {
     headers['Authorization'] = `Bearer ${config.INTERNAL_SERVICE_KEY}`;

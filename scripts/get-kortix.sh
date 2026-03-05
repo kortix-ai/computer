@@ -28,10 +28,78 @@ fatal()   { error "$*"; exit 1; }
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
-KORTIX_VERSION="0.7.14"
-FRONTEND_IMAGE="kortix/kortix-frontend:${KORTIX_VERSION}"
-API_IMAGE="kortix/kortix-api:${KORTIX_VERSION}"
-SANDBOX_IMAGE="kortix/computer:${KORTIX_VERSION}"
+KORTIX_VERSION="${KORTIX_VERSION:-latest}"
+
+parse_query_param() {
+  local raw="$1"
+  local qs="${raw#*\?}"
+  IFS='&' read -r -a pairs <<< "$qs"
+  for pair in "${pairs[@]}"; do
+    local key="${pair%%=*}"
+    local value="${pair#*=}"
+    case "$key" in
+      v|version|tag)
+        [ -n "$value" ] && KORTIX_VERSION="$value"
+        ;;
+    esac
+  done
+}
+
+parse_args() {
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --version)
+        [ "$#" -ge 2 ] || fatal "--version requires a value"
+        KORTIX_VERSION="$2"
+        shift 2
+        ;;
+      --version=*)
+        KORTIX_VERSION="${1#*=}"
+        shift
+        ;;
+      --query)
+        [ "$#" -ge 2 ] || fatal "--query requires a value"
+        parse_query_param "$2"
+        shift 2
+        ;;
+      --query=*)
+        parse_query_param "${1#*=}"
+        shift
+        ;;
+      \?*|*'?'*)
+        parse_query_param "$1"
+        shift
+        ;;
+      -h|--help)
+        cat <<'EOF'
+Usage: get-kortix.sh [options]
+
+Options:
+  --version <tag>     Install a specific image tag (default: latest)
+  --version=<tag>     Same as above
+  --query "v=<tag>"   Query-style version override
+  --query "version=<tag>"
+
+Examples:
+  bash get-kortix.sh
+  bash get-kortix.sh --version 0.7.14
+  bash get-kortix.sh --query "v=0.7.14"
+  KORTIX_VERSION=0.7.14 bash get-kortix.sh
+EOF
+        exit 0
+        ;;
+      *)
+        fatal "Unknown option: $1"
+        ;;
+    esac
+  done
+}
+
+parse_args "$@"
+
+FRONTEND_IMAGE="${KORTIX_FRONTEND_IMAGE:-kortix/kortix-frontend:${KORTIX_VERSION}}"
+API_IMAGE="${KORTIX_API_IMAGE:-kortix/kortix-api:${KORTIX_VERSION}}"
+SANDBOX_IMAGE="${KORTIX_SANDBOX_IMAGE:-kortix/sandbox:${KORTIX_VERSION}}"
 SUPABASE_POSTGRES_IMAGE="supabase/postgres:15.8.1.085"
 SUPABASE_GOTRUE_IMAGE="supabase/gotrue:v2.186.0"
 SUPABASE_KONG_IMAGE="kong:2.8.1"
@@ -66,6 +134,7 @@ PUBLIC_URL=""
 API_PUBLIC_URL=""
 
 # Optional integrations
+INTEGRATION_AUTH_PROVIDER="disabled"
 PIPEDREAM_CLIENT_ID=""
 PIPEDREAM_CLIENT_SECRET=""
 PIPEDREAM_PROJECT_ID=""
@@ -74,7 +143,6 @@ SLACK_CLIENT_ID=""
 SLACK_CLIENT_SECRET=""
 SLACK_SIGNING_SECRET=""
 FREESTYLE_API_KEY=""
-SLACK_SETUP_INSTRUCTIONS=""
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 open_browser() {
@@ -273,18 +341,8 @@ prompt_security() {
   echo "  ${BOLD}Security Options${NC}"
   echo ""
 
-  printf "  Password protection ${DIM}[${NC}${GREEN}Y${NC}${DIM}/n]${NC}: "
-  read -r auth_choice
-  case "${auth_choice:-y}" in
-    [nN]*)
-      ENABLE_AUTH="no"
-      warn "No password protection — anyone can access Kortix."
-      printf "  Are you sure? [y/N]: "
-      read -r auth_confirm
-      echo "${auth_confirm:-n}" | grep -qi '^y' || ENABLE_AUTH="yes"
-      ;;
-    *) ENABLE_AUTH="yes" ;;
-  esac
+  ENABLE_AUTH="no"
+  info "Password protection disabled (app auth handles access control)"
 
   if command -v ufw &>/dev/null; then
     printf "  Firewall (UFW: allow SSH, HTTP, HTTPS only) ${DIM}[${NC}${GREEN}Y${NC}${DIM}/n]${NC}: "
@@ -322,70 +380,17 @@ prompt_integrations() {
       PIPEDREAM_ENVIRONMENT="${pd_env:-production}"
 
       if [ -n "$PIPEDREAM_CLIENT_ID" ] && [ -n "$PIPEDREAM_CLIENT_SECRET" ] && [ -n "$PIPEDREAM_PROJECT_ID" ]; then
+        INTEGRATION_AUTH_PROVIDER="pipedream"
         success "Pipedream configured"
       else
         warn "Incomplete — integrations will not be available"
+        INTEGRATION_AUTH_PROVIDER="disabled"
         PIPEDREAM_CLIENT_ID=""; PIPEDREAM_CLIENT_SECRET=""; PIPEDREAM_PROJECT_ID=""; PIPEDREAM_ENVIRONMENT=""
       fi
       ;;
     *)
+      INTEGRATION_AUTH_PROVIDER="disabled"
       info "Skipping — add later in ${DIM}~/.kortix/.env${NC}"
-      ;;
-  esac
-
-  echo ""
-}
-
-# ─── Channels (Slack) ───────────────────────────────────────────────────────
-prompt_channels() {
-  echo "  ${BOLD}Channels — Slack ${DIM}(optional)${NC}"
-  echo ""
-  printf "  Configure Slack? ${DIM}[y/${NC}${GREEN}N${NC}${DIM}]${NC}: "
-  read -r slack_choice
-
-  case "${slack_choice:-n}" in
-    [yY]*)
-      local webhook_url="${API_PUBLIC_URL}"
-      if [ "$DEPLOY_MODE" = "local" ]; then
-        echo "  ${YELLOW}Slack requires a public HTTPS URL.${NC}"
-        echo "  ${DIM}Use ngrok: ngrok http 13738${NC}"
-        printf "  Public URL ${DIM}(or blank to set later)${NC}: "
-        read -r custom_url
-        [ -n "$custom_url" ] && webhook_url="${custom_url%/}"
-      fi
-
-      echo ""
-      printf "    Client ID: "
-      read -r SLACK_CLIENT_ID
-      printf "    Client Secret: "
-      read -r SLACK_CLIENT_SECRET
-      printf "    Signing Secret: "
-      read -r SLACK_SIGNING_SECRET
-
-      if [ -n "$SLACK_CLIENT_ID" ] && [ -n "$SLACK_CLIENT_SECRET" ] && [ -n "$SLACK_SIGNING_SECRET" ]; then
-        success "Slack configured"
-        SLACK_SETUP_INSTRUCTIONS="
-  ${BOLD}━━━ Slack App Configuration ━━━${NC}
-
-  ${BOLD}OAuth Redirect URL:${NC}
-    ${CYAN}${webhook_url}/webhooks/slack/oauth_callback${NC}
-
-  ${BOLD}Event Subscriptions URL:${NC}
-    ${CYAN}${webhook_url}/webhooks/slack/events${NC}
-
-  ${BOLD}Slash Command (/kortix) URL:${NC}
-    ${CYAN}${webhook_url}/webhooks/slack/commands${NC}
-
-  ${BOLD}Interactivity URL:${NC}
-    ${CYAN}${webhook_url}/webhooks/slack/interactivity${NC}
-"
-      else
-        warn "Incomplete — Slack will not be available"
-        SLACK_CLIENT_ID=""; SLACK_CLIENT_SECRET=""; SLACK_SIGNING_SECRET=""
-      fi
-      ;;
-    *)
-      info "Skipping"
       ;;
   esac
 
@@ -977,6 +982,7 @@ write_env() {
 # ─── Mode ────────────────────────────────────────────────────────────────────
 DEPLOY_MODE=${DEPLOY_MODE}
 DB_MODE=${DB_MODE}
+KORTIX_VERSION=${KORTIX_VERSION}
 
 # ─── URLs ────────────────────────────────────────────────────────────────────
 PUBLIC_URL=${PUBLIC_URL}
@@ -998,7 +1004,7 @@ CHANNELS_CREDENTIAL_KEY=${CHANNELS_CREDENTIAL_KEY}
 API_KEY_SECRET=${API_KEY_SECRET}
 
 # ─── Integrations (Pipedream) ────────────────────────────────────────────────
-INTEGRATION_AUTH_PROVIDER=pipedream
+INTEGRATION_AUTH_PROVIDER=${INTEGRATION_AUTH_PROVIDER}
 PIPEDREAM_CLIENT_ID=${PIPEDREAM_CLIENT_ID}
 PIPEDREAM_CLIENT_SECRET=${PIPEDREAM_CLIENT_SECRET}
 PIPEDREAM_PROJECT_ID=${PIPEDREAM_PROJECT_ID}
@@ -1055,7 +1061,7 @@ cd "$DIR"
 
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-VERSION="0.7.14"
+VERSION=$(grep -m1 '^KORTIX_VERSION=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "latest")
 
 _open() {
   if command -v open &>/dev/null; then open "$1" 2>/dev/null
@@ -1283,8 +1289,6 @@ pull_and_start() {
   echo ""
   echo "  ${BOLD}Next:${NC} Create your account in the setup wizard."
 
-  [ -n "$SLACK_SETUP_INSTRUCTIONS" ] && echo "$SLACK_SETUP_INSTRUCTIONS"
-
   echo ""
   echo "  ${DIM}Commands:${NC}"
   echo "    ${CYAN}kortix start${NC}    Start services"
@@ -1387,7 +1391,6 @@ main() {
   echo ""
 
   prompt_integrations
-  prompt_channels
   prompt_deployments
   generate_secrets
 

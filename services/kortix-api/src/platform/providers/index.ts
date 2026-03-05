@@ -8,10 +8,11 @@
 import { config } from '../../config';
 import { DaytonaProvider } from './daytona';
 import { LocalDockerProvider } from './local-docker';
+import { HetznerProvider } from './hetzner';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ProviderName = 'daytona' | 'local_docker';
+export type ProviderName = 'daytona' | 'local_docker' | 'hetzner';
 // Re-export from config for convenience — same type
 export type { SandboxProviderName } from '../../config';
 
@@ -20,6 +21,7 @@ export interface CreateSandboxOpts {
   userId: string;
   name: string;
   envVars?: Record<string, string>;
+  hetznerServerType?: 'cpx22' | 'cpx32';
 }
 
 export interface ProvisionResult {
@@ -89,6 +91,13 @@ export function getProvider(name: ProviderName): SandboxProvider {
       provider = new LocalDockerProvider();
       break;
 
+    case 'hetzner':
+      if (!config.HETZNER_API_KEY) {
+        throw new Error('Hetzner provider is allowed but not configured. Set HETZNER_API_KEY.');
+      }
+      provider = new HetznerProvider();
+      break;
+
     default:
       throw new Error(`Unknown sandbox provider: ${name}`);
   }
@@ -113,5 +122,6 @@ export function getAvailableProviders(): ProviderName[] {
   const available: ProviderName[] = [];
   if (config.isDaytonaEnabled()) available.push('daytona');
   if (config.isLocalDockerEnabled()) available.push('local_docker');
+  if (config.isHetznerEnabled()) available.push('hetzner');
   return available;
 }

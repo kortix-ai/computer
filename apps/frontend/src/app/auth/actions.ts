@@ -354,6 +354,7 @@ export async function installOwner(_prevState: any, formData: FormData) {
   return {
     success: true,
     accessToken: signInData.session?.access_token || null,
+    refreshToken: signInData.session?.refresh_token || null,
   };
 }
 
@@ -376,7 +377,7 @@ export async function selfHostedSignIn(_prevState: any, formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: email.trim().toLowerCase(),
     password,
   });
@@ -388,6 +389,8 @@ export async function selfHostedSignIn(_prevState: any, formData: FormData) {
   return {
     success: true,
     redirectTo: returnUrl || '/dashboard',
+    accessToken: data.session?.access_token || null,
+    refreshToken: data.session?.refresh_token || null,
   };
 }
 

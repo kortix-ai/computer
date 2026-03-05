@@ -77,21 +77,6 @@ if ! (cd "$KM_DIR" && bun install 2>/dev/null); then
   exit 1
 fi
 
-# ── Agent Tunnel (opencode dependency) ───────────────────────────────────────
-if [ -d "$PKG_DIR/agent-tunnel" ]; then
-  echo "[sandbox-postinstall] Deploying agent-tunnel..."
-  if [ "$MODE" = "staging" ]; then
-    AT_DIR="$STAGING/agent-tunnel"
-  else
-    AT_DIR="/opt/agent-tunnel"
-  fi
-  mkdir -p "$AT_DIR"
-  rsync -a --delete \
-    --exclude='node_modules' \
-    --exclude='bun.lock' \
-    "$PKG_DIR/agent-tunnel/" "$AT_DIR/"
-fi
-
 # ── OpenCode config/agents/tools/skills ──────────────────────────────────────
 echo "[sandbox-postinstall] Building opencode..."
 mkdir -p "$OC_DIR"

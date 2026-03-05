@@ -18,7 +18,7 @@
     "@ai-sdk/openai-compatible": "^2.0.28",
     "@ai-sdk/xai": "^3.0.48",
     "@daytonaio/sdk": "^0.143.0",
-    "agent-tunnel": "workspace:*",
+    "agent-tunnel": "workspace:@kortix/agent-tunnel@*",
     "@kortix/db": "workspace:*",
     "drizzle-kit": "^0.31.0",
     "@supabase/supabase-js": "^2.95.3",

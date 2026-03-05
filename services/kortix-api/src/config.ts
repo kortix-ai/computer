@@ -402,7 +402,7 @@ export const config = {
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: env.KORTIX_URL,
   ALLOWED_SANDBOX_PROVIDERS: allowedProviders,
-  SANDBOX_IMAGE: `kortix/sandbox:${SANDBOX_VERSION}`,
+  SANDBOX_IMAGE: env.SANDBOX_IMAGE || `kortix/sandbox:${SANDBOX_VERSION}`,
   DOCKER_HOST: env.DOCKER_HOST,
   SANDBOX_NETWORK: env.SANDBOX_NETWORK,
   SANDBOX_PORT_BASE: env.SANDBOX_PORT_BASE,

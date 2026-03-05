@@ -1,6 +1,7 @@
 'use server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { KORTIX_SUPABASE_AUTH_COOKIE } from './constants'
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -17,6 +18,11 @@ export async function createClient() {
     supabaseUrl,
     supabaseAnonKey,
     {
+      cookieOptions: {
+        name: KORTIX_SUPABASE_AUTH_COOKIE,
+        path: '/',
+        sameSite: 'lax',
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()

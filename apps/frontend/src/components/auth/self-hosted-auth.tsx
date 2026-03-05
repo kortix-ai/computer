@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Search, Globe, Image, Mic, BookOpen, Flame } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Search, Globe, Image, Mic, BookOpen, Flame, Server } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -11,10 +11,12 @@ import { ProviderSettings } from '@/components/providers/provider-settings';
 import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import { resetClient } from '@/lib/opencode-sdk';
 import { invalidateTokenCache } from '@/lib/auth-token';
+import { setBootstrapAuthToken } from '@/lib/auth-token';
+import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client';
 
 /* ─── Install Status Hook ──────────────────────────────────────────────────── */
 
-export type SandboxProviderName = 'local_docker' | 'daytona';
+export type SandboxProviderName = 'local_docker' | 'daytona' | 'hetzner';
 
 export function useInstallStatus() {
   const [installed, setInstalled] = useState<boolean | null>(null);
@@ -298,7 +300,7 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
 
     const registeredId = store.registerOrUpdateSandbox(
       {
-        label: sandbox.name || (isLocal ? 'Local Sandbox' : 'Cloud Sandbox'),
+        label: sandbox.name || (isLocal ? 'Local Sandbox' : sandbox.provider === 'hetzner' ? 'Hetzner VPS' : 'Cloud Sandbox'),
         provider: sandbox.provider,
         sandboxId: sandbox.external_id,
         mappedPorts: sandbox.metadata?.mappedPorts,
@@ -475,6 +477,19 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
         // Store the JWT for sandbox provisioning in subsequent steps.
         const jwt = result.accessToken;
         jwtRef.current = jwt || null;
+        setBootstrapAuthToken(jwt || null);
+
+        if (result.accessToken && result.refreshToken) {
+          try {
+            const supabase = createBrowserSupabaseClient();
+            await supabase.auth.setSession({
+              access_token: result.accessToken,
+              refresh_token: result.refreshToken,
+            });
+          } catch {
+            // Keep bootstrap token fallback for onboarding API auth.
+          }
+        }
 
         // Invalidate the token cache so subsequent calls (e.g. ProviderSettings)
         // pick up the fresh session instead of stale null.
@@ -497,7 +512,30 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
 
         setPending(false);
       } else {
-        // Returning user: use server action for sign-in
+        // Returning user: prefer direct client sign-in so session state is
+        // immediately available to middleware + AuthProvider.
+        try {
+          const supabase = createBrowserSupabaseClient();
+          await supabase.auth.signOut({ scope: 'local' });
+          const { data: clientSignInData, error: clientSignInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (!clientSignInError && clientSignInData.session) {
+            invalidateTokenCache();
+            setBootstrapAuthToken(clientSignInData.session.access_token);
+            window.location.href = returnUrl || '/dashboard';
+            return;
+          }
+        } catch {
+          // Best-effort cleanup of stale local auth state.
+        }
+
+        // Fallback: server action sign-in (runtime env on server)
+        invalidateTokenCache();
+        setBootstrapAuthToken(null);
+
         const formData = new FormData();
         formData.set('email', email);
         formData.set('password', password);
@@ -509,6 +547,21 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
           setErrorMessage(result.message);
           setPending(false);
           return;
+        }
+
+        // Ensure browser session is established immediately in addition to
+        // server-set cookies. This avoids rare cases where middleware doesn't
+        // see a fresh session on the first navigation after login.
+        if (result.accessToken && result.refreshToken) {
+          try {
+            const supabase = createBrowserSupabaseClient();
+            await supabase.auth.setSession({
+              access_token: result.accessToken,
+              refresh_token: result.refreshToken,
+            });
+          } catch {
+            // Fallback to server cookies + full reload below.
+          }
         }
 
         // Hard redirect — router.push() does a soft navigation that doesn't
@@ -596,6 +649,23 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
                   <span className="text-sm font-medium text-foreground">Daytona (Cloud)</span>
                   <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                     Run the sandbox on Daytona cloud infrastructure. No local Docker required.
+                  </p>
+                </div>
+              </button>
+            )}
+            {sandboxProviders.includes('hetzner') && (
+              <button
+                type="button"
+                onClick={() => handleSandboxProviderSelect('hetzner')}
+                className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-card/50 hover:border-primary/40 hover:bg-card transition-all text-left"
+              >
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <Server className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground">Hetzner VPS</span>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    Dedicated VPS on Hetzner Cloud. Best performance with full isolation.
                   </p>
                 </div>
               </button>

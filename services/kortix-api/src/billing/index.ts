@@ -91,17 +91,48 @@ billingApp.post('/setup/initialize', async (c: any) => {
   }
 
   // ── Step 2: Ensure sandbox exists (best-effort) ──────────────────────
-  // Sandbox creation can be slow (Daytona provisioning). We attempt it here
-  // so new users get everything in one shot, but if it fails the frontend
-  // useSandbox() hook on /dashboard will retry automatically.
+  // Sandbox creation can be slow (especially Hetzner cold starts). This route
+  // is called from the browser behind CDN/proxy timeouts, so we must avoid
+  // blocking too long. We timebox provisioning and let frontend continue
+  // polling readiness when needed.
   let sandboxStatus: 'created' | 'exists' | 'skipped' | 'failed' = 'skipped';
   let sandboxError: string | undefined;
 
   try {
     const { ensureSandbox } = await import('../platform/services/ensure-sandbox');
-    const { row, created } = await ensureSandbox({ accountId, userId });
-    sandboxStatus = created ? 'created' : 'exists';
-    console.log(`[setup/initialize] Sandbox ${row.sandboxId} ${sandboxStatus} for account ${accountId}`);
+
+    const ensurePromise = ensureSandbox({ accountId, userId })
+      .then(({ row, created }) => ({ kind: 'done' as const, row, created }))
+      .catch((err) => ({ kind: 'error' as const, err }));
+
+    const timedResult = await Promise.race([
+      ensurePromise,
+      // Keep this short to avoid CDN/proxy/browser request ceilings during setup.
+      // Frontend continues with explicit sandbox readiness polling.
+      new Promise<{ kind: 'timeout' }>((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), 20_000)),
+    ]);
+
+    if (timedResult.kind === 'done') {
+      sandboxStatus = timedResult.created ? 'created' : 'exists';
+      console.log(`[setup/initialize] Sandbox ${timedResult.row.sandboxId} ${sandboxStatus} for account ${accountId}`);
+    } else if (timedResult.kind === 'timeout') {
+      sandboxStatus = 'skipped';
+      sandboxError = 'Sandbox provisioning is still running in the background';
+      console.warn(`[setup/initialize] Sandbox provisioning timed out for account ${accountId}; continuing setup response`);
+
+      void ensurePromise.then((eventual) => {
+        if (eventual.kind === 'done') {
+          console.log(`[setup/initialize] Sandbox ${eventual.row.sandboxId} became ready after timeout for account ${accountId}`);
+        } else {
+          const msg = eventual.err instanceof Error ? eventual.err.message : String(eventual.err);
+          console.error(`[setup/initialize] Background sandbox provisioning failed for account ${accountId}:`, msg);
+        }
+      });
+    } else {
+      sandboxStatus = 'failed';
+      sandboxError = timedResult.err instanceof Error ? timedResult.err.message : String(timedResult.err);
+      console.error(`[setup/initialize] Sandbox creation failed for account ${accountId}:`, sandboxError);
+    }
   } catch (err) {
     sandboxStatus = 'failed';
     sandboxError = err instanceof Error ? err.message : String(err);

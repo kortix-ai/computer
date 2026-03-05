@@ -65,7 +65,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
 
   // Subdomain URL options for proxy URL generation
   const subdomainOpts = useMemo(() => {
-    if (activeServer?.provider === 'daytona') return undefined;
+    if (activeServer?.provider === 'daytona' || activeServer?.provider === 'hetzner') return undefined;
     const sandboxId = activeServer?.sandboxId;
     if (!sandboxId) return undefined; // No sandbox ID yet — wait for useSandbox to register
     try {

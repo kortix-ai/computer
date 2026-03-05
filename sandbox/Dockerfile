@@ -143,9 +143,7 @@ COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
 # becomes dangling inside Docker. Replace it with the actual package source.
 RUN rm -f /opt/opencode/plugin/kortix-sys
 COPY --chown=1000:1000 packages/kortix-sys-oc-plugin/ /opt/opencode/plugin/kortix-sys/
-# agent-tunnel SDK is a workspace:* dep — copy it into the container so bun can resolve it.
-COPY --chown=1000:1000 packages/agent-tunnel/ /opt/agent-tunnel/
-RUN cd /opt/opencode && sed -i 's/"agent-tunnel": "workspace:\*"/"agent-tunnel": "file:\/opt\/agent-tunnel"/' package.json && bun install
+RUN cd /opt/opencode && bun install
 
 # ── OpenCode binary patches ─────────────────────────────────────────────────
 # Apply patches to the compiled Bun binary (tool-input streaming, etc.).

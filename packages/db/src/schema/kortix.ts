@@ -43,6 +43,7 @@ export const sessionModeEnum = kortixSchema.enum('session_mode', [
 export const sandboxProviderEnum = kortixSchema.enum('sandbox_provider', [
   'daytona',
   'local_docker',
+  'hetzner',
 ]);
 
 export const deploymentStatusEnum = kortixSchema.enum('deployment_status', [

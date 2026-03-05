@@ -126,7 +126,7 @@ export class TunnelClient {
       -1,
       'No tunnel connection found. The user needs to set up Agent Tunnel first:\n' +
       '1. Create a tunnel connection\n' +
-      '2. Run `npx agent-tunnel connect` on their local machine',
+      '2. Run `npx @kortix/agent-tunnel connect` on their local machine',
     );
   }
 }

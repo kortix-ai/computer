@@ -25,15 +25,13 @@
     "services/",
     "config/",
     "browser-viewer/",
-    "agent-tunnel/src/",
-    "agent-tunnel/package.json",
     "postinstall.sh",
     "patch-agent-browser.js",
     "CHANGELOG.json",
     "LICENSE"
   ],
   "dependencies": {
-    "opencode-ai": "1.2.10",
+    "opencode-ai": "1.2.17",
     "agent-browser": "^0.10.0"
   },
   "peerDependencies": {},

@@ -189,7 +189,7 @@ function showHelp(): void {
   console.log('');
   console.log(`  ${c.dim}Secure bridge between AI agents & local machines${c.reset}`);
   console.log('');
-  console.log(`  ${c.bold}Usage${c.reset}   ${c.dim}npx agent-tunnel <command> [options]${c.reset}`);
+  console.log(`  ${c.bold}Usage${c.reset}   ${c.dim}npx @kortix/agent-tunnel <command> [options]${c.reset}`);
   console.log('');
   console.log(`${c.gray}  ── Commands ────────────────────────────────────────${c.reset}`);
   console.log(`  ${c.cyan}connect${c.reset}       Connect and start handling RPC requests`);

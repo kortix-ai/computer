@@ -16,8 +16,8 @@
     "typecheck": "bun x tsc --noEmit"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "^1.2.11",
-    "@opencode-ai/sdk": "^1.2.11"
+    "@opencode-ai/plugin": "^1.2.16",
+    "@opencode-ai/sdk": "^1.2.17"
   },
   "devDependencies": {
     "@types/bun": "latest",

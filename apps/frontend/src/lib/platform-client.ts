@@ -73,7 +73,8 @@ const PLATFORM_URL = getPlatformUrl();
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type SandboxProviderName = 'daytona' | 'local_docker';
+export type SandboxProviderName = 'daytona' | 'local_docker' | 'hetzner';
+export type HetznerServerTypeOption = 'cpx22' | 'cpx32';
 
 export interface SandboxCreateProgress {
   status: 'pulling';
@@ -208,10 +209,16 @@ export async function getProviders(): Promise<ProvidersInfo> {
  */
 export async function ensureSandbox(opts?: {
   provider?: SandboxProviderName;
+  hetznerServerType?: HetznerServerTypeOption;
 }): Promise<{ sandbox: SandboxInfo; created: boolean }> {
   const result = await platformFetch<SandboxInfo>('/platform/init', {
     method: 'POST',
-    body: opts?.provider ? JSON.stringify({ provider: opts.provider }) : undefined,
+    body: opts
+      ? JSON.stringify({
+          ...(opts.provider ? { provider: opts.provider } : {}),
+          ...(opts.hetznerServerType ? { hetznerServerType: opts.hetznerServerType } : {}),
+        })
+      : undefined,
   });
 
   if (!result.success || !result.data) {
@@ -257,6 +264,7 @@ export async function getSandbox(): Promise<SandboxInfo | null> {
  */
 export async function createSandbox(opts?: {
   provider?: SandboxProviderName;
+  hetznerServerType?: HetznerServerTypeOption;
   name?: string;
   onProgress?: (progress: SandboxCreateProgress) => void;
 }): Promise<{ sandbox: SandboxInfo }> {
@@ -341,6 +349,7 @@ export async function createSandbox(opts?: {
     method: 'POST',
     body: JSON.stringify({
       ...(opts?.provider ? { provider: opts.provider } : {}),
+      ...(opts?.hetznerServerType ? { hetznerServerType: opts.hetznerServerType } : {}),
       ...(opts?.name ? { name: opts.name } : {}),
     }),
   });

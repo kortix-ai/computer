@@ -189,12 +189,23 @@ function getAdminKeySchema(): Record<string, KeyGroup> {
       ],
     },
     cloud: {
-      title: 'Cloud Provider',
+      title: 'Cloud Provider (Daytona)',
       description: 'Daytona cloud sandbox provisioning.',
       keys: [
         { key: 'DAYTONA_API_KEY', label: 'Daytona API Key', secret: true },
         { key: 'DAYTONA_SERVER_URL', label: 'Daytona Server URL' },
         { key: 'DAYTONA_TARGET', label: 'Daytona Target' },
+      ],
+    },
+    hetzner: {
+      title: 'Cloud Provider (Hetzner)',
+      description: 'Hetzner VPS sandbox provisioning.',
+      keys: [
+        { key: 'HETZNER_API_KEY', label: 'Hetzner API Key', secret: true },
+        { key: 'HETZNER_SNAPSHOT_ID', label: 'Snapshot ID' },
+        { key: 'HETZNER_DEFAULT_LOCATION', label: 'Default Location' },
+        { key: 'HETZNER_DEFAULT_SERVER_TYPE', label: 'Default Server Type' },
+        { key: 'HETZNER_SSH_KEY_ID', label: 'SSH Key ID' },
       ],
     },
     sandbox: {

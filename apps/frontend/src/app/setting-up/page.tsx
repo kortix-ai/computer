@@ -9,6 +9,9 @@ import { backendApi } from '@/lib/api-client';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useProviders } from '@/hooks/platform/use-sandbox';
+import { getSandbox, getSandboxUrl } from '@/lib/platform-client';
+import { authenticatedFetch } from '@/lib/auth-token';
 
 // Lazy load heavy components
 const AnimatedBg = lazy(() => import('@/components/ui/animated-bg').then(mod => ({ default: mod.AnimatedBg })));
@@ -29,38 +32,124 @@ const STEP_INFO: Record<Exclude<SetupStep, 'success' | 'error'>, StepInfo> = {
 export default function SettingUpPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { data: providersInfo } = useProviders();
   const [step, setStep] = useState<SetupStep>('checking');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [sandboxProgress, setSandboxProgress] = useState(0);
   const isRunning = useRef(false);
+  const runSeqRef = useRef(0);
+  const autoStartedRef = useRef(false);
+
+  const isHetznerDefault = providersInfo?.default === 'hetzner';
+  const stepInfo = {
+    ...STEP_INFO,
+    sandbox: {
+      label: isHetznerDefault ? 'Preparing Hetzner VPS' : STEP_INFO.sandbox.label,
+      detail: isHetznerDefault
+        ? 'Provisioning from snapshot (cold starts usually 2-3 minutes)...'
+        : STEP_INFO.sandbox.detail,
+    },
+  };
+
+  const getHetznerProvisioningProgress = useCallback((elapsedSec: number): number => {
+    if (elapsedSec < 20) return 8 + (elapsedSec / 20) * 12;
+    if (elapsedSec < 90) return 20 + ((elapsedSec - 20) / 70) * 35;
+    if (elapsedSec < 150) return 55 + ((elapsedSec - 90) / 60) * 30;
+    return Math.min(96, 85 + ((elapsedSec - 150) / 120) * 11);
+  }, []);
+
+  const waitForHetznerSandboxReady = useCallback(async (timeoutMs = 240000): Promise<string | null> => {
+    const started = Date.now();
+    const deadline = started + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const elapsedSec = Math.floor((Date.now() - started) / 1000);
+      setSandboxProgress(Math.max(2, Math.min(96, getHetznerProvisioningProgress(elapsedSec))));
+
+      try {
+        const sandbox = await getSandbox();
+        if (sandbox?.external_id) {
+          const sandboxUrl = getSandboxUrl(sandbox);
+          const res = await authenticatedFetch(
+            `${sandboxUrl}/kortix/health`,
+            { signal: AbortSignal.timeout(5000) },
+            { retryOnAuthError: false },
+          );
+          if (res.ok) {
+            const health = await res.json().catch(() => null) as { version?: string } | null;
+            const version = typeof health?.version === 'string' ? health.version : '';
+            if (version && version !== '0.0.0') {
+              setSandboxProgress(100);
+              return version;
+            }
+          }
+        }
+      } catch {
+        // Keep polling while sandbox is provisioning.
+      }
+
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+
+    return null;
+  }, [getHetznerProvisioningProgress]);
 
   const runSetup = useCallback(async () => {
     if (!user || isRunning.current) return;
     isRunning.current = true;
+    const runSeq = ++runSeqRef.current;
+    const isCurrentRun = () => runSeqRef.current === runSeq;
     setErrorMessage('');
+    let sandboxStepTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      // Step 1: Check if account is already fully set up
-      setStep('checking');
-      const accountState = await billingApi.getAccountState(true);
-      const tierKey = accountState?.subscription?.tier_key || accountState?.tier?.name || '';
-      const hasSubscription = tierKey && tierKey !== 'none';
+      let providerIsHetzner = isHetznerDefault;
 
-      if (hasSubscription && accountState?.subscription?.subscription_id) {
-        // Already initialized — go to dashboard
-        console.log('[setting-up] Account already initialized, redirecting');
-        setStep('success');
-        setTimeout(() => router.push('/dashboard'), 500);
-        return;
+      if (!providerIsHetzner) {
+        const providersRes = await backendApi.get<{ providers: string[]; default: string }>(
+          '/platform/providers',
+          { showErrors: false, timeout: 10000 },
+        );
+        providerIsHetzner = providersRes.success && providersRes.data?.default === 'hetzner';
       }
 
+      // Step 1: Check account status
+      if (!isCurrentRun()) return;
+      setStep('checking');
+      await billingApi.getAccountState(true);
+
       // Step 2: Initialize subscription + sandbox (one-shot backend call)
+      if (!isCurrentRun()) return;
       setStep('subscription');
-      const response = await backendApi.post<{
+      sandboxStepTimer = setTimeout(() => setStep('sandbox'), 1200);
+      setSandboxProgress(0);
+      const initializeSetup = async () => backendApi.post<{
         status: string;
         tier: string;
         sandbox: 'created' | 'exists' | 'skipped' | 'failed';
         sandbox_error?: string;
-      }>('/billing/setup/initialize');
+      }>('/billing/setup/initialize', undefined, {
+        // Hetzner provisioning can take 2-3 minutes on first create.
+        timeout: 240000,
+      });
+
+      let response = await initializeSetup();
+      // Handle transient edge/network failures (common with cold starts + proxies)
+      for (let attempt = 1; attempt <= 2 && !response.success; attempt++) {
+        const status = (response.error as any)?.status;
+        const message = (response.error as any)?.message || '';
+        const isRetriable = status === 502 || /failed to fetch|network|gateway/i.test(String(message));
+        if (!isRetriable) break;
+        await new Promise((r) => setTimeout(r, attempt * 1200));
+        response = await initializeSetup();
+      }
+
+      if (!isCurrentRun()) return;
+
+      if (sandboxStepTimer) {
+        clearTimeout(sandboxStepTimer);
+        sandboxStepTimer = null;
+      }
 
       if (!response.success) {
         throw new Error(response.error?.message || 'Failed to initialize account');
@@ -69,31 +158,51 @@ export default function SettingUpPage() {
       const data = response.data!;
 
       // Step 3: Show sandbox status
-      if (data.sandbox === 'created' || data.sandbox === 'exists') {
+      if (data.sandbox === 'created' || data.sandbox === 'exists' || (providerIsHetzner && data.sandbox === 'skipped')) {
         setStep('sandbox');
-        // Brief pause so user sees the step
-        await new Promise(r => setTimeout(r, 800));
+        if (providerIsHetzner) {
+          const version = await waitForHetznerSandboxReady(240000);
+          if (!version) {
+            throw new Error('Hetzner sandbox is still provisioning. Please wait and try again.');
+          }
+        } else {
+          // Brief pause so user sees the step
+          await new Promise(r => setTimeout(r, 800));
+        }
       } else if (data.sandbox === 'failed') {
-        // Sandbox failed but subscription succeeded — warn but continue.
-        // useSandbox() on dashboard will auto-retry.
+        if (providerIsHetzner) {
+          throw new Error(data.sandbox_error || 'Failed to create Hetzner sandbox');
+        }
+        // Non-Hetzner fallback: let dashboard auto-retry.
         console.warn('[setting-up] Sandbox creation failed, will retry on dashboard:', data.sandbox_error);
       }
 
       // Done — redirect to dashboard
+      if (!isCurrentRun()) return;
       setStep('success');
-      setTimeout(() => router.push('/dashboard'), 1000);
+      setTimeout(() => {
+        if (isCurrentRun()) router.push('/dashboard');
+      }, 1000);
     } catch (err) {
+      if (sandboxStepTimer) {
+        clearTimeout(sandboxStepTimer);
+      }
+      if (!isCurrentRun()) return;
       console.error('[setting-up] Setup error:', err);
       setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
       setStep('error');
     } finally {
-      isRunning.current = false;
+      if (isCurrentRun()) {
+        isRunning.current = false;
+      }
     }
-  }, [user, router]);
+  }, [user, router, isHetznerDefault, waitForHetznerSandboxReady]);
 
   useEffect(() => {
+    if (!user || autoStartedRef.current) return;
+    autoStartedRef.current = true;
     runSetup();
-  }, [runSetup]);
+  }, [user, runSetup]);
 
   const handleRetry = () => {
     setStep('checking');
@@ -124,7 +233,7 @@ export default function SettingUpPage() {
                 <CardContent className="p-6">
                   <div className="flex flex-col gap-4">
                     {(['checking', 'subscription', 'sandbox'] as const).map((s) => {
-                      const info = STEP_INFO[s];
+                      const info = stepInfo[s];
                       const isActive = s === step;
                       const isDone = getStepOrder(step) > getStepOrder(s);
 
@@ -144,12 +253,26 @@ export default function SettingUpPage() {
                               {info.label}
                             </span>
                             {isActive && (
-                              <span className="text-xs text-foreground/40">{info.detail}</span>
+                              <span className="text-xs text-foreground/40">
+                                {s === 'sandbox' && isHetznerDefault
+                                  ? `${info.detail} ${Math.round(sandboxProgress)}%`
+                                  : info.detail}
+                              </span>
                             )}
                           </div>
                         </div>
                       );
                     })}
+                    {step === 'sandbox' && isHetznerDefault && (
+                      <div className="pt-1">
+                        <div className="h-1.5 w-full rounded-full bg-foreground/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-blue-500/90 transition-all duration-1000 ease-out"
+                            style={{ width: `${Math.max(sandboxProgress, 2)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

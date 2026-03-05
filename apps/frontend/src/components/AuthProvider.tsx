@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
+import { setBootstrapAuthToken } from '@/lib/auth-token';
 // Auth tracking moved to AuthEventTracker component (handles OAuth redirects)
 
 type AuthContextType = {
@@ -54,6 +55,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        if (currentSession?.access_token) {
+          setBootstrapAuthToken(null);
+        }
 
         // Track user ID for cross-account localStorage cleanup
         if (currentSession?.user?.id) {
@@ -80,6 +84,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (isLoading) setIsLoading(false);
         switch (event) {
           case 'SIGNED_IN': {
+            if (newSession?.access_token) {
+              setBootstrapAuthToken(null);
+            }
             // Clear stale sandbox/server state if a different user signs in
             // (e.g. signup in same browser without explicit logout first)
             const prevUserId = localStorage.getItem('kortix-last-user-id');
@@ -94,6 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             break;
           }
           case 'SIGNED_OUT':
+            setBootstrapAuthToken(null);
             clearUserLocalStorage();
             localStorage.removeItem('kortix-last-user-id');
             break;
