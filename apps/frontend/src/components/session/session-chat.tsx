@@ -3643,6 +3643,43 @@ export function SessionChat({
 			),
 		[allQuestions, sessionId, isQuestionSuppressed],
 	);
+	const QUESTION_PROMPT_ANIMATION_MS = 320;
+	const activePendingQuestion = pendingQuestions[0] ?? null;
+	const [renderedQuestion, setRenderedQuestion] = useState<QuestionRequest | null>(
+		null,
+	);
+	const [questionPromptVisible, setQuestionPromptVisible] = useState(false);
+	const questionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
+	useEffect(() => {
+		const nextQuestion = activePendingQuestion;
+
+		if (questionPromptTimerRef.current) {
+			clearTimeout(questionPromptTimerRef.current);
+			questionPromptTimerRef.current = null;
+		}
+
+		if (nextQuestion) {
+			setRenderedQuestion(nextQuestion);
+			requestAnimationFrame(() => setQuestionPromptVisible(true));
+			return;
+		}
+
+		setQuestionPromptVisible(false);
+		questionPromptTimerRef.current = setTimeout(() => {
+			setRenderedQuestion(null);
+			questionPromptTimerRef.current = null;
+		}, QUESTION_PROMPT_ANIMATION_MS);
+	}, [activePendingQuestion]);
+
+	useEffect(() => {
+		return () => {
+			if (questionPromptTimerRef.current) {
+				clearTimeout(questionPromptTimerRef.current);
+			}
+		};
+	}, []);
 	const questionHydrationInFlightRef = useRef(false);
 	const lastQuestionHydrationAtRef = useRef(0);
 	const hasRunningQuestionTool = useMemo(() => {
@@ -4530,15 +4567,25 @@ export function SessionChat({
 				onContextClick={() => setContextModalOpen(true)}
 				replyTo={replyTo}
 				onClearReply={handleClearReply}
+				lockForQuestion={!!renderedQuestion}
 				inputSlot={
-					pendingQuestions.length > 0 || queuedMessages.length > 0 ? (
+					renderedQuestion || queuedMessages.length > 0 ? (
 						<>
-							{pendingQuestions.length > 0 && (
-								<QuestionPrompt
-									request={pendingQuestions[0]}
-									onReply={handleQuestionReply}
-									onReject={handleQuestionReject}
-								/>
+							{renderedQuestion && (
+								<div
+									className={cn(
+										"overflow-hidden transition-[max-height,opacity,transform] ease-in-out",
+										questionPromptVisible
+											? "max-h-[520px] opacity-100 translate-y-0 duration-300"
+											: "max-h-0 opacity-0 -translate-y-1 duration-320 pointer-events-none",
+									)}
+								>
+									<QuestionPrompt
+										request={renderedQuestion}
+										onReply={handleQuestionReply}
+										onReject={handleQuestionReject}
+									/>
+								</div>
 							)}
 							{queuedMessages.length > 0 && (
 								<div className="rounded-xl bg-muted/50 overflow-hidden">

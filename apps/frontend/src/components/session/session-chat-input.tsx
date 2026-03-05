@@ -983,6 +983,8 @@ export interface SessionChatInputProps {
   replyTo?: { text: string } | null;
   /** Callback to clear the reply context */
   onClearReply?: () => void;
+  /** When true, hide freeform composer while a structured question is active */
+  lockForQuestion?: boolean;
 }
 
 export function SessionChatInput({
@@ -1013,6 +1015,7 @@ export function SessionChatInput({
   inputSlot,
   replyTo,
   onClearReply,
+  lockForQuestion = false,
 }: SessionChatInputProps) {
   const placeholderVariants = useMemo(
     () => [
@@ -1066,6 +1069,11 @@ export function SessionChatInput({
   // never loses results even if the API returns empty for the longer query.
   const fileResultsCache = useRef<Set<string>>(new Set());
   const placeholderFadeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (!lockForQuestion) return;
+    setText('');
+  }, [lockForQuestion]);
 
   // Sessions for @ mention search
   const { data: allSessions } = useOpenCodeSessions();
@@ -1186,6 +1194,10 @@ export function SessionChatInput({
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled || lockForQuestion) {
+      e.target.value = '';
+      return;
+    }
     const files = e.target.files;
     if (!files) return;
     appendAttachedFiles(Array.from(files));
@@ -1197,17 +1209,17 @@ export function SessionChatInput({
   }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLElement>) => {
-    if (disabled || !dragHasFiles(e)) return;
+    if (disabled || lockForQuestion || !dragHasFiles(e)) return;
     e.preventDefault();
     dragDepthRef.current += 1;
     setIsDragOver(true);
-  }, [disabled, dragHasFiles]);
+  }, [disabled, lockForQuestion, dragHasFiles]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLElement>) => {
-    if (disabled || !dragHasFiles(e)) return;
+    if (disabled || lockForQuestion || !dragHasFiles(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-  }, [disabled, dragHasFiles]);
+  }, [disabled, lockForQuestion, dragHasFiles]);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLElement>) => {
     if (!dragHasFiles(e)) return;
@@ -1219,14 +1231,14 @@ export function SessionChatInput({
   }, [dragHasFiles]);
 
   const handleDropFiles = useCallback((e: React.DragEvent<HTMLElement>) => {
-    if (disabled || !dragHasFiles(e)) return;
+    if (disabled || lockForQuestion || !dragHasFiles(e)) return;
     e.preventDefault();
     dragDepthRef.current = 0;
     setIsDragOver(false);
     const dropped = e.dataTransfer.files;
     if (!dropped || dropped.length === 0) return;
     appendAttachedFiles(Array.from(dropped));
-  }, [appendAttachedFiles, disabled, dragHasFiles]);
+  }, [appendAttachedFiles, disabled, lockForQuestion, dragHasFiles]);
 
   const removeAttachedFile = (index: number) => {
     setAttachedFiles((prev) => {
@@ -1754,7 +1766,16 @@ export function SessionChatInput({
             </div>
           )}
 
-          <div className="flex flex-col gap-1 px-3.5">
+          <div
+            aria-hidden={lockForQuestion}
+            className={cn(
+              "flex flex-col gap-1 px-3.5 overflow-hidden transition-[max-height,opacity,transform] ease-in-out",
+              lockForQuestion ? "duration-500" : "duration-800 delay-75",
+              lockForQuestion
+                ? "max-h-0 opacity-0 -translate-y-1 pointer-events-none"
+                : "max-h-[320px] opacity-100 translate-y-0",
+            )}
+          >
             <div className="relative w-full">
               {/* Add to queue button — floats top-right of textarea when busy and text is typed */}
               {isBusy && text.trim() && (
@@ -1826,7 +1847,7 @@ export function SessionChatInput({
                 }}
                 placeholder=""
                 rows={1}
-                disabled={disabled}
+                disabled={disabled || lockForQuestion}
                 className={cn(
                   'relative w-full bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 min-h-[72px] max-h-[200px] overflow-y-auto resize-none rounded-[24px] text-[16px] sm:text-[15px] outline-none placeholder:text-muted-foreground disabled:opacity-50',
                   highlightSegments && 'caret-foreground text-transparent',
@@ -1852,14 +1873,23 @@ export function SessionChatInput({
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    disabled={lockForQuestion}
+                    onClick={() => {
+                      if (lockForQuestion) return;
+                      fileInputRef.current?.click();
+                    }}
+                    className={cn(
+                      "inline-flex items-center justify-center h-8 w-8 rounded-xl transition-colors",
+                      lockForQuestion
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer",
+                    )}
                   >
                     <Paperclip className="h-4 w-4" strokeWidth={2} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p>Attach files</p>
+                  <p>{lockForQuestion ? 'File upload disabled while answering question' : 'Attach files'}</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -1895,7 +1925,7 @@ export function SessionChatInput({
 
               <VoiceRecorder
                 onTranscription={handleTranscription}
-                disabled={disabled || isBusy}
+                disabled={disabled || isBusy || lockForQuestion}
               />
 
               {isBusy && onStop && (
@@ -1913,18 +1943,27 @@ export function SessionChatInput({
                 </Tooltip>
               )}
               {!isBusy && (
-                <Button
-                  size="sm"
-                  disabled={!text.trim() || disabled}
-                  onClick={handleSubmit}
-                  className="flex-shrink-0 h-8 w-8 rounded-full p-0"
-                >
-                  {disabled ? (
-                    <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <ArrowUp className="size-4" />
+                <div
+                  aria-hidden={lockForQuestion}
+                  className={cn(
+                    "transition-[width,opacity] ease-in-out overflow-hidden",
+                    lockForQuestion ? "duration-500" : "duration-800 delay-75",
+                    lockForQuestion ? "w-0 opacity-0 pointer-events-none" : "w-8 opacity-100",
                   )}
-                </Button>
+                >
+                  <Button
+                    size="sm"
+                    disabled={!text.trim() || disabled || lockForQuestion}
+                    onClick={handleSubmit}
+                    className="flex-shrink-0 h-8 w-8 rounded-full p-0"
+                  >
+                    {disabled ? (
+                      <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <ArrowUp className="size-4" />
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
           </div>
