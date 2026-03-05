@@ -4,3 +4,6 @@
 [submodule "packages/opencode-channels"]
 	path = packages/opencode-channels
 	url = https://github.com/kortix-ai/opencode-channels.git
+[submodule "registry"]
+	path = registry
+	url = https://github.com/kortix-ai/kortix-registry.git

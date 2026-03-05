@@ -3,6 +3,9 @@
   "registries": {
     "kdco": {
       "url": "https://registry.kdco.dev"
+    },
+    "kortix": {
+      "url": "https://registry.kortix.com"
     }
   },
   "lockRegistries": false,

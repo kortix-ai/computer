@@ -306,6 +306,25 @@ The release script auto-stamps these files:
 
 You do NOT need to manually edit versions in these files.
 
+## Registry Source of Truth
+
+Kortix capability components are sourced from the registry submodule at `registry/files/`.
+The runtime snapshot remains in `sandbox/opencode/` for deterministic startup and remote updates.
+
+Use this sync command before release:
+
+```bash
+scripts/sync-registry-opencode.sh --sync
+```
+
+`sandbox/release.sh` now enforces parity with a preflight check:
+
+```bash
+scripts/sync-registry-opencode.sh --check
+```
+
+If drift exists, release exits early until files are re-synced.
+
 ## Upstream OpenCode Version Control
 
 The OpenCode CLI and SDK are **upstream packages** published by anomalyco — we do not

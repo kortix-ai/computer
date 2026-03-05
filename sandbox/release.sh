@@ -28,6 +28,7 @@ CHANGELOG="$SANDBOX_DIR/CHANGELOG.json"
 PACKAGE_JSON="$SANDBOX_DIR/package.json"
 GET_KORTIX="$REPO_ROOT/scripts/get-kortix.sh"
 FRONTEND_DIR="$REPO_ROOT/apps/frontend"
+REGISTRY_SYNC_SCRIPT="$REPO_ROOT/scripts/sync-registry-opencode.sh"
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[1;33m'
@@ -192,6 +193,17 @@ fi
 # Clean working tree (warn only)
 if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then
   warn "Working tree has uncommitted changes"
+fi
+
+# Registry -> sandbox/opencode parity check
+if [ -x "$REGISTRY_SYNC_SCRIPT" ]; then
+  info "Checking registry sync (registry/files -> sandbox/opencode)..."
+  if ! "$REGISTRY_SYNC_SCRIPT" --check; then
+    fail "Registry and sandbox/opencode drift detected"
+    fail "Run: scripts/sync-registry-opencode.sh --sync"
+    exit 1
+  fi
+  ok "Registry sync: clean"
 fi
 
 # ─── Step 1: Validate changelog ─────────────────────────────────────────────

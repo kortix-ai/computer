@@ -51,7 +51,6 @@ export function initDb(dbPath?: string): Database {
 		CREATE TABLE IF NOT EXISTS observations (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			session_id TEXT NOT NULL,
-			call_id TEXT,
 			type TEXT NOT NULL,
 			title TEXT NOT NULL,
 			narrative TEXT NOT NULL DEFAULT '',
@@ -68,15 +67,6 @@ export function initDb(dbPath?: string): Database {
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_session ON observations(session_id)`)
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_type ON observations(type)`)
 	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_created ON observations(created_at DESC)`)
-
-	// Migration: add call_id column if missing (existing DBs won't have it)
-	try {
-		db.exec(`ALTER TABLE observations ADD COLUMN call_id TEXT`)
-	} catch {
-		// Column already exists — ignore
-	}
-
-	db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_call_id ON observations(call_id)`)
 
 	// Observations FTS5
 	db.exec(`
@@ -175,30 +165,6 @@ export function initDb(dbPath?: string): Database {
 		)
 	`)
 
-	// Migration: add last_consolidated_obs_count column if missing
-	try {
-		db.exec(`ALTER TABLE session_meta ADD COLUMN last_consolidated_obs_count INTEGER NOT NULL DEFAULT 0`)
-	} catch {
-		// Column already exists — ignore
-	}
-
-	// Migration: add project_id column if missing (for project-scoped search)
-	try {
-		db.exec(`ALTER TABLE session_meta ADD COLUMN project_id TEXT`)
-	} catch {
-		// Column already exists — ignore
-	}
-
-	// Migration: add title column if missing (cached from OpenCode session)
-	try {
-		db.exec(`ALTER TABLE session_meta ADD COLUMN title TEXT`)
-	} catch {
-		// Column already exists — ignore
-	}
-
-	// Index for project-based queries
-	db.exec(`CREATE INDEX IF NOT EXISTS idx_session_project ON session_meta(project_id)`)
-
 	return db
 }
 
@@ -208,11 +174,10 @@ export function initDb(dbPath?: string): Database {
 
 export function insertObservation(db: Database, input: CreateObservationInput): number {
 	const result = db.run(
-		`INSERT INTO observations (session_id, call_id, type, title, narrative, facts, concepts, files_read, files_modified, tool_name, prompt_number)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO observations (session_id, type, title, narrative, facts, concepts, files_read, files_modified, tool_name, prompt_number)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			input.sessionId,
-			input.callID ?? null,
 			input.type,
 			input.title,
 			input.narrative,
@@ -619,42 +584,6 @@ export function getLTMByIds(db: Database, ids: number[]): LTMEntry[] {
 	return rows.map(rowToLTM)
 }
 
-/**
- * Project affinity map for observation IDs.
- * Returns observation id -> project_id (or null if unknown).
- */
-export function getObservationProjectMap(db: Database, ids: number[]): Map<number, string | null> {
-	const out = new Map<number, string | null>()
-	if (ids.length === 0) return out
-	const placeholders = ids.map(() => "?").join(",")
-	const rows = db.query(
-		`SELECT o.id AS id, s.project_id AS project_id
-		 FROM observations o
-		 LEFT JOIN session_meta s ON s.id = o.session_id
-		 WHERE o.id IN (${placeholders})`,
-	).all(...ids) as Array<{ id: number; project_id: string | null }>
-	for (const row of rows) out.set(Number(row.id), row.project_id ?? null)
-	return out
-}
-
-/**
- * Project affinity map for LTM IDs.
- * Returns LTM id -> project_id based on source_session_id.
- */
-export function getLTMProjectMap(db: Database, ids: number[]): Map<number, string | null> {
-	const out = new Map<number, string | null>()
-	if (ids.length === 0) return out
-	const placeholders = ids.map(() => "?").join(",")
-	const rows = db.query(
-		`SELECT l.id AS id, s.project_id AS project_id
-		 FROM long_term_memories l
-		 LEFT JOIN session_meta s ON s.id = l.source_session_id
-		 WHERE l.id IN (${placeholders})`,
-	).all(...ids) as Array<{ id: number; project_id: string | null }>
-	for (const row of rows) out.set(Number(row.id), row.project_id ?? null)
-	return out
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
 // OBSERVATION ENRICHMENT UPDATE
 // ═════════════════════════════════════════════════════════════════════════════
@@ -693,8 +622,8 @@ export function updateObservationEnrichment(
 // SESSION META
 // ═════════════════════════════════════════════════════════════════════════════
 
-export function ensureSession(db: Database, sessionId: string, projectId?: string): void {
-	db.run(`INSERT OR IGNORE INTO session_meta (id, project_id) VALUES (?, ?)`, [sessionId, projectId ?? null])
+export function ensureSession(db: Database, sessionId: string): void {
+	db.run(`INSERT OR IGNORE INTO session_meta (id) VALUES (?)`, [sessionId])
 }
 
 export function incrementPromptCount(db: Database, sessionId: string): number {
@@ -716,177 +645,33 @@ export function completeSession(db: Database, sessionId: string): void {
 
 export function markConsolidated(db: Database, sessionId: string): void {
 	db.run(
-		`UPDATE session_meta SET last_consolidated_at = datetime('now'), last_consolidated_obs_count = observation_count WHERE id = ?`,
+		`UPDATE session_meta SET last_consolidated_at = datetime('now') WHERE id = ?`,
 		[sessionId],
 	)
-}
-
-/**
- * Find sessions that have observations but were never consolidated (or have
- * new observations since last consolidation). Used by startup sweep and
- * session-created hook to catch orphaned sessions.
- *
- * @param excludeSessionId - Optionally exclude the current active session
- * @param minObservations - Minimum observation count to be worth consolidating (default 3)
- */
-export function getUnconsolidatedSessions(
-	db: Database,
-	excludeSessionId?: string,
-	minObservations = 3,
-): SessionMeta[] {
-	let sql = `
-		SELECT * FROM session_meta
-		WHERE observation_count >= ?
-		  AND (last_consolidated_at IS NULL OR observation_count > last_consolidated_obs_count)
-	`
-	const params: (string | number)[] = [minObservations]
-
-	if (excludeSessionId) {
-		sql += ` AND id != ?`
-		params.push(excludeSessionId)
-	}
-
-	sql += ` ORDER BY started_at DESC LIMIT 20`
-
-	const rows = db.query(sql).all(...params) as Record<string, unknown>[]
-	return rows.map(rowToSessionMeta)
-}
-
-/**
- * Check if a specific session has new observations since its last consolidation.
- * Returns the count of new (unconsolidated) observations.
- */
-export function getNewObservationCount(db: Database, sessionId: string): number {
-	const row = db.query(
-		`SELECT observation_count, last_consolidated_obs_count FROM session_meta WHERE id = ?`,
-	).get(sessionId) as { observation_count: number; last_consolidated_obs_count: number } | null
-	if (!row) return 0
-	return Math.max(0, row.observation_count - row.last_consolidated_obs_count)
 }
 
 export function getSessionMeta(db: Database, sessionId: string): SessionMeta | null {
 	const row = db.query(`SELECT * FROM session_meta WHERE id = ?`).get(sessionId) as Record<string, unknown> | null
 	if (!row) return null
-	return rowToSessionMeta(row)
-}
-
-/**
- * Update session title (cached from OpenCode session metadata).
- */
-export function updateSessionTitle(db: Database, sessionId: string, title: string): void {
-	db.run(`UPDATE session_meta SET title = ? WHERE id = ?`, [title, sessionId])
-}
-
-/**
- * Get recent sessions for context timeline.
- * Optionally filter by project_id for project-scoped context.
- */
-export function getRecentSessions(
-	db: Database,
-	opts?: { projectId?: string; limit?: number; excludeSessionId?: string },
-): SessionMeta[] {
-	const limit = opts?.limit ?? 10
-	let sql = `SELECT * FROM session_meta WHERE observation_count > 0`
-	const params: (string | number)[] = []
-
-	if (opts?.projectId) {
-		sql += ` AND project_id = ?`
-		params.push(opts.projectId)
-	}
-	if (opts?.excludeSessionId) {
-		sql += ` AND id != ?`
-		params.push(opts.excludeSessionId)
-	}
-
-	sql += ` ORDER BY started_at DESC LIMIT ?`
-	params.push(limit)
-
-	let rows = db.query(sql).all(...params) as Record<string, unknown>[]
-
-	// Backward compatibility: older sessions may not have project_id.
-	// If project-scoped query returns nothing, fall back to global recent sessions.
-	if (rows.length === 0 && opts?.projectId) {
-		let fallbackSql = `SELECT * FROM session_meta WHERE observation_count > 0`
-		const fallbackParams: (string | number)[] = []
-		if (opts?.excludeSessionId) {
-			fallbackSql += ` AND id != ?`
-			fallbackParams.push(opts.excludeSessionId)
-		}
-		fallbackSql += ` ORDER BY started_at DESC LIMIT ?`
-		fallbackParams.push(limit)
-		rows = db.query(fallbackSql).all(...fallbackParams) as Record<string, unknown>[]
-	}
-
-	return rows.map(rowToSessionMeta)
-}
-
-/**
- * Get compact LTM entries for context injection.
- * Returns the most recent entries, optionally scoped to a project's sessions.
- */
-export function getRecentLTMCompact(
-	db: Database,
-	opts?: { limit?: number; projectId?: string },
-): LTMEntry[] {
-	const limit = opts?.limit ?? 20
-
-	if (opts?.projectId) {
-		// LTM entries from sessions belonging to this project
-		const rows = db.query(`
-			SELECT l.* FROM long_term_memories l
-			WHERE l.source_session_id IN (
-				SELECT id FROM session_meta WHERE project_id = ?
-			)
-			ORDER BY l.updated_at DESC, l.id DESC LIMIT ?
-		`).all(opts.projectId, limit) as Record<string, unknown>[]
-
-		// If not enough project-scoped results, fill with global
-		if (rows.length < limit) {
-			const existingIds = rows.map(r => r.id as number)
-			const placeholders = existingIds.length > 0
-				? `AND id NOT IN (${existingIds.join(",")})`
-				: ""
-			const more = db.query(`
-				SELECT * FROM long_term_memories
-				WHERE 1=1 ${placeholders}
-				ORDER BY updated_at DESC, id DESC LIMIT ?
-			`).all(limit - rows.length) as Record<string, unknown>[]
-			rows.push(...more)
-		}
-
-		return rows.map(rowToLTM)
-	}
-
-	const rows = db.query(
-		`SELECT * FROM long_term_memories ORDER BY updated_at DESC, id DESC LIMIT ?`,
-	).all(limit) as Record<string, unknown>[]
-	return rows.map(rowToLTM)
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// HELPERS
-// ═════════════════════════════════════════════════════════════════════════════
-
-function rowToSessionMeta(row: Record<string, unknown>): SessionMeta {
 	return {
 		id: row.id as string,
 		promptCount: row.prompt_count as number,
 		observationCount: row.observation_count as number,
 		lastConsolidatedAt: row.last_consolidated_at as string | null,
-		lastConsolidatedObsCount: (row.last_consolidated_obs_count as number) ?? 0,
-		projectId: (row.project_id as string) ?? null,
-		title: (row.title as string) ?? null,
 		status: row.status as "active" | "completed",
 		startedAt: row.started_at as string,
 		completedAt: row.completed_at as string | null,
 	}
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═════════════════════════════════════════════════════════════════════════════
+
 function rowToObservation(row: Record<string, unknown>): Observation {
 	return {
 		id: row.id as number,
 		sessionId: row.session_id as string,
-		callID: (row.call_id as string) ?? null,
 		type: row.type as Observation["type"],
 		title: row.title as string,
 		narrative: (row.narrative as string) ?? "",
@@ -928,13 +713,11 @@ function safeJsonArray(val: unknown): string[] {
 
 /**
  * Escape a user query for FTS5 MATCH syntax.
- * Joins terms with OR so BM25 ranking handles relevance instead of
- * requiring every word to appear (implicit AND kills recall for memory search).
- * Explicit AND/OR/NOT operators in the query are passed through as-is.
+ * Wraps each word in quotes, passes through AND/OR/NOT operators.
  */
 function escapeFts5(query: string): string {
 	const operators = new Set(["AND", "OR", "NOT"])
-	const tokens = query
+	return query
 		.split(/\s+/)
 		.filter(Boolean)
 		.map((token) => {
@@ -942,8 +725,5 @@ function escapeFts5(query: string): string {
 			if (token.startsWith('"') && token.endsWith('"')) return token
 			return `"${token.replace(/"/g, "")}"`
 		})
-	// If the query already contains explicit boolean operators, respect them.
-	// Otherwise join with OR for high recall + BM25-ranked results.
-	const hasExplicitOp = tokens.some(t => operators.has(t))
-	return tokens.join(hasExplicitOp ? " " : " OR ")
+		.join(" ")
 }

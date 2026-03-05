@@ -1,6 +1,6 @@
 ---
 name: kortix-system
-description: "Complete Kortix sandbox system reference. Covers: container image, s6 services, filesystem layout, persistence model, environment variables, secrets management (API for setting/getting/deleting env vars), ports, runtimes, init scripts, cloud mode, desktop environment, cron triggers (scheduled agent execution), semantic search (lss), session search & management (API + on-disk queries), skill creation guide, and all installed tooling. Load this skill when you need to: understand the sandbox, debug services, configure the environment, set API keys/secrets, schedule cron jobs, search files semantically, query session data, or create new skills."
+description: "Complete Kortix sandbox system reference. Covers: container image, s6 services, filesystem layout, persistence model, environment variables, secrets management (API for setting/getting/deleting env vars), ports, runtimes, init scripts, cloud mode, desktop environment, deployments (deploy apps to live *.style.dev URLs), cron triggers (scheduled agent execution), semantic search (lss), session search & management (API + on-disk queries), skill creation guide, and all installed tooling. Load this skill when you need to: understand the sandbox, debug services, configure the environment, set API keys/secrets, deploy web apps/APIs/static sites, schedule cron jobs, search files semantically, query session data, or create new skills."
 ---
 
 # Kortix Sandbox System Architecture
@@ -18,7 +18,7 @@ The Kortix sandbox is a Docker container running Alpine Linux with a full XFCE d
 
 - `/workspace/` — Docker volume. **ONLY thing that persists across restarts.** All user files live here.
 - `/opt/opencode/` — OpenCode config: agents, tools, skills, plugins, commands, `opencode.jsonc`.
-- `/opt/kortix-master/` — Kortix Master proxy + secret store server.
+- `/opt/kortix-master/` — Kortix Master proxy + secret store + deployer server.
 - `/app/secrets/` — Docker volume. Encrypted secret storage.
 
 ## Persistence Model
@@ -88,35 +88,14 @@ All services are managed by s6-rc.d as longruns. Service scripts live at `/etc/s
 
 | Service | Script | Internal Port | Host Port | Description |
 |---|---|---|---|---|
-| Kortix Master | `svc-kortix-master` | 8000 | 14000 | Reverse proxy + secret store. Entry point for API access. |
+| Kortix Master | `svc-kortix-master` | 8000 | 14000 | Reverse proxy + secret store + deployer. Entry point for API access. |
 | OpenCode Web | `svc-opencode-web` | 3111 | 14001 | Web UI (SolidJS app from `opencode-ai` npm package) |
 | OpenCode Serve | `svc-opencode-serve` | 4096 | (proxied via 8000) | Backend API server. Not exposed directly — proxied by Kortix Master. |
 | Desktop (noVNC) | (base image) | 6080 / 6081 | 14002 / 14003 | XFCE desktop via VNC. HTTP / HTTPS. |
 | Presentation Viewer | `svc-presentation-viewer` | 3210 | 14004 | Serves generated slide decks |
-| Static Web Server | `svc-static-web` | 3211 | 14008 | Serves standalone HTML/assets from absolute file paths |
 | Agent Browser Stream | (agent-browser) | 9223 | 14005 | Playwright browser automation WebSocket |
 | Agent Browser Viewer | `svc-agent-browser-viewer` | 9224 | 14006 | Browser session viewer UI (HTML + SSE bridge) |
 | lss-sync | `svc-lss-sync` | — | — | File watcher daemon for semantic search indexing |
-
-### Portless Policy (Mandatory for User-Started Servers)
-
-When starting any dev/app server manually, use `portless` every time. Never run raw port-bound commands.
-
-```bash
-# Good
-portless myapp pnpm dev
-portless api npm run start
-portless docs python -m http.server
-
-# Bad
-pnpm dev
-npm run start
-python -m http.server
-```
-
-- Format: `portless <unique-name> <cmd>`
-- Use unique, descriptive names (especially in worktrees)
-- Share URLs in `http://<name>.localhost:1355` format
 
 ### Kortix Master Details
 
@@ -126,6 +105,7 @@ Kortix Master (`/opt/kortix-master/src/index.ts`, runs via Bun on port 8000) is 
 |---|---|---|
 | `/env/*` | Local (SecretStore) | Secret/env var management (GET/POST/PUT/DELETE) |
 | `/api/integrations/*` | Kortix API (proxied) | OAuth integration tools (7 routes including internal /token) |
+| `/kortix/deploy/*` | Local (Deployer) | Local app deployment (start/stop/status/logs) |
 | `/kortix/health` | Local | Health check (includes version, OpenCode readiness) |
 | `/kortix/ports` | Local | Container→host port mappings |
 | `/kortix/update` | Local | Self-update mechanism (POST only) |
@@ -148,7 +128,7 @@ Two tokens exist with **opposite directions**:
 | Token | Direction | Purpose |
 |---|---|---|
 | `INTERNAL_SERVICE_KEY` | external → sandbox | How kortix-api authenticates TO the sandbox. Required for external requests to port 8000 (mapped to host port 14000). |
-| `KORTIX_TOKEN` | sandbox → external | How the sandbox authenticates TO kortix-api. Used for outbound requests (cron, integrations, LLM proxy). Also used as the SecretStore encryption key. |
+| `KORTIX_TOKEN` | sandbox → external | How the sandbox authenticates TO kortix-api. Used for outbound requests (cron, integrations, LLM proxy, deployments). Also used as the SecretStore encryption key. |
 
 **Unauthenticated routes** (always open, even externally): `/kortix/health`, `/docs`, `/docs/openapi.json`.
 
@@ -192,7 +172,7 @@ curl http://127.0.0.1:14000/env \
 |---|---|
 | `ENV_MODE` | `local` (Docker) or `cloud` (Kortix platform) |
 | `KORTIX_API_URL` | Base URL of the Kortix API (e.g. `http://localhost:8008`). Consumers append service paths (`/v1/router`, `/v1/cron`, etc.) |
-| `KORTIX_TOKEN` | Auth token for **outbound** requests (sandbox → kortix-api). Used for cron, integrations, LLM proxy. |
+| `KORTIX_TOKEN` | Auth token for **outbound** requests (sandbox → kortix-api). Used for cron, integrations, deployments, LLM proxy. |
 | `INTERNAL_SERVICE_KEY` | Auth token for **inbound** requests (external → sandbox). Required by external callers to port 8000. Not needed from localhost. |
 | `SANDBOX_ID` | Sandbox identifier |
 | `PROJECT_ID` | Project identifier |
@@ -338,6 +318,192 @@ const res = await proxyFetch('https://gmail.googleapis.com/gmail/v1/users/me/lab
 const data = await res.json();
 console.log(data);
 ```
+
+---
+
+## Deployments
+
+The sandbox has **two deployment systems** depending on the mode:
+
+### Cloud Deployments — Kortix Deployments API (*.style.dev)
+
+In cloud mode, deploy to live URLs via the Kortix Deployments API. The API handles everything server-side — no SDK, no user-facing API keys.
+
+**Capabilities:**
+- **4 source types**: Git repo, inline code, local files, tar URL
+- **Auto-detects** Next.js, Vite, Expo — TypeScript works out of the box
+- **Free `*.style.dev` subdomains** with instant SSL
+- **Node.js only** — no Python, Ruby, Go
+- **Port 3000** — all servers must listen on port 3000
+
+#### API Call Pattern
+
+```bash
+curl -X POST "$KORTIX_API_URL/v1/deployments" \
+  -H "Authorization: Bearer $KORTIX_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+#### Deploy Examples
+
+**Git repo:**
+```json
+{
+  "source_type": "git",
+  "source_ref": "https://github.com/user/repo",
+  "domains": ["my-app-x7k2.style.dev"],
+  "build": true
+}
+```
+
+**Inline code (Express API):**
+```json
+{
+  "source_type": "code",
+  "code": "import express from 'express';\nconst app = express();\napp.get('/', (req, res) => res.json({ status: 'ok' }));\napp.listen(3000);",
+  "node_modules": { "express": "^4.18.2" },
+  "domains": ["api-e5f6.style.dev"]
+}
+```
+
+**Local files (pre-built):**
+```typescript
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join, relative } from 'path';
+
+function readFilesRecursive(dir: string, base?: string): Array<{path: string, content: string, encoding: string}> {
+  const result: Array<{path: string, content: string, encoding: string}> = [];
+  base = base ?? dir;
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules') continue;
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) result.push(...readFilesRecursive(full, base));
+    else result.push({ path: relative(base, full), content: readFileSync(full).toString('base64'), encoding: 'base64' });
+  }
+  return result;
+}
+// POST body: { source_type: 'files', files: readFilesRecursive('./dist'), entrypoint: 'server.js', domains: ['my-site.style.dev'] }
+```
+
+#### Cloud Deployments API Request Schema
+
+```typescript
+{
+  source_type: 'git' | 'code' | 'files' | 'tar',
+  source_ref?: string,       // Git repo URL (git)
+  branch?: string,           // Git branch (git)
+  root_path?: string,        // Monorepo sub-path (git)
+  code?: string,             // Inline JS/TS (code)
+  files?: Array<{ path: string, content: string, encoding?: string }>,  // (files)
+  tar_url?: string,          // Archive URL (tar)
+  domains: string[],         // Required. Use "slug.style.dev"
+  build?: boolean | { command?: string, outDir?: string, envVars?: Record<string, string> },
+  env_vars?: Record<string, string>,     // Runtime env vars
+  node_modules?: Record<string, string>, // Only for 'code' deploys
+  entrypoint?: string,
+  static_only?: boolean,
+  public_dir?: string,
+  clean_urls?: boolean,
+  framework?: string,        // Hint: 'nextjs', 'vite', 'static'
+}
+```
+
+#### Other Cloud API Endpoints
+
+```bash
+# List / Get / Logs / Stop / Redeploy / Delete
+curl "$KORTIX_API_URL/v1/deployments" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl "$KORTIX_API_URL/v1/deployments/{id}" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl "$KORTIX_API_URL/v1/deployments/{id}/logs" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl -X POST "$KORTIX_API_URL/v1/deployments/{id}/stop" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl -X POST "$KORTIX_API_URL/v1/deployments/{id}/redeploy" -H "Authorization: Bearer $KORTIX_TOKEN"
+curl -X DELETE "$KORTIX_API_URL/v1/deployments/{id}" -H "Authorization: Bearer $KORTIX_TOKEN"
+```
+
+#### Cloud Deploy Hard-Won Lessons
+
+1. **Runtime is Node.js**: `Deno.serve()` and `app.fire()` do NOT work.
+2. **Port 3000**: All servers must listen on port 3000.
+3. **Static sites need a server OR `static_only: true`**.
+4. **`env_vars` are runtime-only**: Use `build.envVars` for build-time variables.
+5. **Include your lockfile**: Never include `node_modules`.
+6. **Cold starts**: First request may take 10-15 seconds.
+7. **Next.js requires `output: "standalone"`** and `images: { unoptimized: true }`.
+
+### Local Deployments — Kortix Master Deployer
+
+In local mode (or for preview), the Kortix Master has a built-in deployer at `/kortix/deploy`. It runs apps as local processes on random ports (10000-60000) inside the container, accessible via the dynamic port proxy.
+
+**Capabilities:**
+- **Auto-detects** Next.js, Vite, CRA, Node.js, Python, static HTML
+- **Runs locally** — no external infrastructure needed
+- **Random ports** — each deployment gets an available port
+- **Accessible via** `http://localhost:8000/proxy/{port}/`
+
+#### Local Deploy API (no auth needed from inside sandbox)
+
+```bash
+MASTER_URL="http://localhost:8000"
+
+# Deploy an app (auto-detects framework)
+curl -X POST "$MASTER_URL/kortix/deploy" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deploymentId": "my-app",
+    "sourceType": "files",
+    "sourcePath": "/workspace/my-app"
+  }'
+# Returns: { success, port, pid, framework, logs }
+
+# With git source
+curl -X POST "$MASTER_URL/kortix/deploy" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deploymentId": "my-app",
+    "sourceType": "git",
+    "sourceRef": "https://github.com/user/repo",
+    "sourcePath": "/workspace/my-app"
+  }'
+
+# List running deployments
+curl "$MASTER_URL/kortix/deploy"
+
+# Get status / logs
+curl "$MASTER_URL/kortix/deploy/my-app/status"
+curl "$MASTER_URL/kortix/deploy/my-app/logs"
+
+# Stop
+curl -X POST "$MASTER_URL/kortix/deploy/my-app/stop"
+```
+
+#### Local Deploy Config
+
+```typescript
+{
+  deploymentId: string,      // Required — unique identifier
+  sourceType: 'git' | 'code' | 'files' | 'tar',
+  sourceRef?: string,        // Git URL (for sourceType: 'git')
+  sourcePath: string,        // Path on filesystem (default: /workspace)
+  framework?: string,        // Auto-detected if not provided
+  envVarKeys?: string[],     // Env var names to pass to the app
+  buildConfig?: Record<string, unknown>,
+  entrypoint?: string,       // Custom start command
+}
+```
+
+#### Framework Detection (Local)
+
+| Detected | Install | Build | Start | Default Port |
+|---|---|---|---|---|
+| `nextjs` | `npm install` | `npm run build` | `npm start` | 3000 |
+| `vite` | `npm install` | `npm run build` | `npx vite preview --host 0.0.0.0 --port {PORT}` | 4173 |
+| `cra` | `npm install` | `npm run build` | `npx serve -s build -l {PORT}` | 3000 |
+| `node` | `npm install` | — | `npm start` | 3000 |
+| `python` | `pip install -r requirements.txt` | — | `python app.py` | 8080 |
+| `static` | — | — | `npx serve -s . -l {PORT}` | 3000 |
+
+After deploy, the app is accessible at `http://localhost:8000/proxy/{port}/` which Kortix Master proxies to the local port.
 
 ---
 
@@ -650,6 +816,7 @@ curl http://localhost:8000/lss/status
 | Secrets not in env | Set via `curl localhost:8000/env` with `restart: true` |
 | Cloud SDK calls fail | Check `KORTIX_API_URL` is set |
 | Integration tools fail | Check `KORTIX_TOKEN` is set and integrations are connected |
+| Local deploy fails | Check `curl localhost:8000/kortix/deploy` for running deploys |
 
 ## Docker Compose
 

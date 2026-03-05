@@ -385,50 +385,6 @@ agent-browser --session agent1 close   # Close specific session
 
 If a previous session was not closed properly, the daemon may still be running. Use `agent-browser close` to clean it up before starting new work.
 
-## Live Viewer URL (Required in Kortix)
-
-When you start or switch to a new agent-browser session, always run the browser in headed mode and share the live viewer URL with the human immediately, with the session preselected via query param.
-
-Mandatory launch policy in Kortix:
-
-1. Always include `--headed`
-2. Always set `AGENT_BROWSER_STREAM_PORT=9223`
-3. Always use a named session (`--session <name>`)
-
-Canonical launch command:
-
-```bash
-AGENT_BROWSER_STREAM_PORT=9223 agent-browser --session <session_name> --headed open <url>
-```
-
-Required behavior:
-
-1. Determine active session name (prefer explicit `--session`, otherwise run `agent-browser session`)
-2. Construct viewer URL with `?session=<name>`
-3. Return that URL to the human right away after session init/open
-
-Viewer URL format (Kortix sandbox):
-
-```text
-http://p9224-kortix-sandbox.localhost:8008/?session=<session_name>
-```
-
-Fallback (direct local viewer):
-
-```text
-http://localhost:9224/?session=<session_name>
-```
-
-Example:
-
-```bash
-AGENT_BROWSER_STREAM_PORT=9223 agent-browser --session hetzner --headed open https://console.hetzner.com
-# Then share:
-# http://p9224-kortix-sandbox.localhost:8008/?session=hetzner
-```
-
-Do not wait for the human to ask for the viewer link. Provide it automatically whenever a new browser session is initialized.
-
 ## Ref Lifecycle (Important)
 
 Refs (`@e1`, `@e2`, etc.) are invalidated when the page changes. Always re-snapshot after:

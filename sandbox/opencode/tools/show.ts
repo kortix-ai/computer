@@ -190,10 +190,6 @@ export default tool({
     "ALWAYS call this after generating ANY deliverable so the human can see and interact with it. " +
     "Without calling this tool, the user cannot see your output.\n\n" +
     "Types: file, image, url, text, error, video, audio, code, markdown, pdf, html, csv, xlsx, docx, pptx.\n" +
-    "IMPORTANT HTML NOTE: type='html' renders INLINE HTML from the 'content' field only. " +
-    "If you have a standalone .html file on disk, it is NOT auto-hosted or auto-opened by a viewer. " +
-    "Use type='url' and point to a running web server URL that serves that file. " +
-    "A default static server runs at http://localhost:3211 (for example: http://localhost:3211/open?path=/workspace/site/index.html).\n" +
     "Variants (display hints): compact, full, gallery, detail — controls layout. " +
     "Defaults are smart per type but can be overridden.\n" +
     "aspect_ratio: auto, 1:1, 16:9, 9:16, 4:3, 3:2, 21:9 — for visual content.\n" +
@@ -237,8 +233,7 @@ export default tool({
       .optional()
       .describe(
         "Absolute file path. Required when type is 'file', 'image', 'video', 'audio', 'pdf', 'csv', 'xlsx', 'docx', or 'pptx'. " +
-          "E.g. '/workspace/output/logo.png'. Note: passing a .html path as type='file' does not host/execute it; " +
-          "serve it via a web server and use type='url' for live HTML pages (default: http://localhost:3211/open?path=/absolute/file.html).",
+          "E.g. '/workspace/output/logo.png'.",
       ),
 
     url: tool.schema
@@ -246,7 +241,7 @@ export default tool({
       .optional()
       .describe(
         "URL to show. Required when type is 'url'. Use for localhost previews (e.g. 'http://localhost:3000') " +
-          "or external links. For standalone HTML files, first serve them via a web server, then pass the served URL here.",
+          "or external links.",
       ),
 
     content: tool.schema
@@ -254,8 +249,8 @@ export default tool({
       .optional()
       .describe(
         "Inline content. Required when type is 'text', 'error', 'code', 'markdown', or 'html'. " +
-        "For 'code', this is the code string. For 'markdown', full markdown text. " +
-          "For 'html', INLINE HTML text rendered in a sandboxed iframe (not a file path).",
+          "For 'code', this is the code string. For 'markdown', full markdown text. " +
+          "For 'html', the HTML to render in a sandboxed iframe.",
       ),
 
     variant: tool.schema
