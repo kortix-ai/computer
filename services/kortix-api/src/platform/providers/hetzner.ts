@@ -158,8 +158,8 @@ export class HetznerProvider implements SandboxProvider {
     const serverType = config.HETZNER_DEFAULT_SERVER_TYPE;
     const location = config.HETZNER_DEFAULT_LOCATION;
 
-    // Use KORTIX_TOKEN as INTERNAL_SERVICE_KEY (same pattern as Daytona).
-    const serviceKey = opts.envVars?.KORTIX_TOKEN || '';
+    const sandboxToken = opts.envVars?.KORTIX_TOKEN || '';
+    const internalServiceKey = config.INTERNAL_SERVICE_KEY || '';
 
     const serverName = `kortix-sandbox-${opts.accountId.slice(0, 8)}-${Date.now().toString(36)}`;
 
@@ -170,7 +170,8 @@ export class HetznerProvider implements SandboxProvider {
     const envVars: Record<string, string> = {
       KORTIX_API_URL: config.KORTIX_URL.replace(/\/v1\/router\/?$/, ''),
       ENV_MODE: 'cloud',
-      INTERNAL_SERVICE_KEY: serviceKey,
+      INTERNAL_SERVICE_KEY: internalServiceKey,
+      KORTIX_TOKEN: sandboxToken,
       ...opts.envVars,
     };
 
@@ -186,7 +187,44 @@ export class HetznerProvider implements SandboxProvider {
       `cat > /etc/kortix/env <<\'ENVEOF\'`,
       envLines,
       'ENVEOF',
-      '# Start the sandbox container',
+      '# Ensure startup script runs sandbox with required kernel capabilities',
+      // startup.sh inside the sandbox image calls `unshare --pid --fork /init`.
+      // Without SYS_ADMIN + unconfined seccomp, unshare fails with EPERM.
+      "cat > /usr/local/bin/kortix-start.sh <<'STARTEOF'",
+      '#!/bin/bash',
+      'set -e',
+      '',
+      'ENV_FILE="/etc/kortix/env"',
+      'for i in $(seq 1 60); do',
+      '  [ -s "$ENV_FILE" ] && break',
+      '  sleep 1',
+      'done',
+      'if [ ! -s "$ENV_FILE" ]; then',
+      '  echo "[kortix] No env file at $ENV_FILE - starting with defaults"',
+      '  touch "$ENV_FILE"',
+      'fi',
+      '',
+      'docker rm -f kortix-sandbox 2>/dev/null || true',
+      'exec docker run --rm --name kortix-sandbox \\',
+      '  --env-file "$ENV_FILE" \\',
+      '  --cap-add SYS_ADMIN \\',
+      '  --security-opt seccomp=unconfined \\',
+      '  --shm-size 2g \\',
+      '  -p 8000:8000 \\',
+      '  -p 6080:6080 \\',
+      '  -p 6081:6081 \\',
+      '  -p 3456:3456 \\',
+      '  -p 3111:3111 \\',
+      '  -p 3210:3210 \\',
+      '  -p 9223:9223 \\',
+      '  -p 9224:9224 \\',
+      '  -p 22222:22 \\',
+      '  -v kortix-workspace:/workspace \\',
+      `  kortix/sandbox:${SANDBOX_VERSION}`,
+      'STARTEOF',
+      'chmod +x /usr/local/bin/kortix-start.sh',
+      'systemctl daemon-reload',
+      '# Start (or restart) the sandbox container',
       'systemctl start kortix-sandbox.service',
     ].join('\n');
 
