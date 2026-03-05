@@ -143,7 +143,7 @@ const KORTIX_MASTER_PROXY_REGEX = /^\/proxy\/(\d{1,5})(\/.*)?$/;
  * localhost/127.0.0.1 are same-app navigations, NOT sandbox services
  * to proxy. They should render as plain clickable links.
  */
-const APP_ROUTE_PREFIXES = /^\/(integrations|settings|dashboard|projects|agents|skills|tools|commands|deployments|support|changelog|files)(\/|$|\?)/;
+const APP_ROUTE_PREFIXES = /^\/(integrations|settings|dashboard|projects|agents|skills|tools|commands|deployments|support|changelog|files|marketplace)(\/|$|\?)/;
 
 export function isAppRouteUrl(rawUrl: string | undefined): boolean {
   if (!rawUrl) return false;

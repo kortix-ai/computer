@@ -76,6 +76,7 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     '/skills': { title: 'Skills Browser', type: 'page' },
     '/tools': { title: 'Tools', type: 'page' },
     '/commands': { title: 'Commands', type: 'page' },
+    '/marketplace': { title: 'Marketplace', type: 'page' },
     '/projects': { title: 'Workspace', type: 'page' },
     '/files': { title: 'Files', type: 'page' },
     '/configuration': { title: 'Workspace', type: 'page' },
@@ -113,6 +114,16 @@ function resolveRouteTab(pathname: string): Omit<Tab, 'openedAt'> | null {
     return {
       id: `page:${pathname}`,
       title: 'Agent',
+      type: 'page',
+      href: pathname,
+    };
+  }
+
+  const marketplaceMatch = pathname.match(/^\/marketplace\/([^/]+)$/);
+  if (marketplaceMatch) {
+    return {
+      id: `page:${pathname}`,
+      title: `Marketplace: ${marketplaceMatch[1]}`,
       type: 'page',
       href: pathname,
     };

@@ -54,6 +54,18 @@ const IntegrationsPage = lazy(() =>
 	})),
 );
 
+const MarketplacePage = lazy(() =>
+	import('@/components/marketplace/marketplace-page').then((m) => ({
+		default: m.MarketplacePage,
+	})),
+);
+
+const MarketplaceDetailPage = lazy(() =>
+	import('@/components/marketplace/marketplace-detail-page').then((m) => ({
+		default: m.MarketplaceDetailPage,
+	})),
+);
+
 const TunnelOverviewPage = lazy(() =>
 	import('@/components/tunnel/tunnel-overview').then((m) => ({
 		default: m.TunnelOverview,
@@ -123,6 +135,8 @@ const PAGE_COMPONENTS: Record<string, ComponentType> = {
 	'/scheduled-tasks': ScheduledTasksPage,
 	'/channels': ChannelsPage,
 	'/integrations': IntegrationsPage,
+	'/marketplace': MarketplacePage,
+	'/marketplace/[slug]': MarketplaceDetailPage,
 	'/files': FilesPage,
 	'/tunnel': TunnelOverviewPage,
 	'/memory': MemoryPage,
@@ -148,7 +162,13 @@ export function PageTabContent({ href }: { href: string }) {
 
 	const Component = PAGE_COMPONENTS[routeKey];
 
-	if (!Component) {
+	const dynamicMarketplaceComponent = routeKey.startsWith('/marketplace/')
+		? PAGE_COMPONENTS['/marketplace/[slug]']
+		: undefined;
+
+	const ResolvedComponent = Component || dynamicMarketplaceComponent;
+
+	if (!ResolvedComponent) {
 		return (
 			<div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
 				Page not found
@@ -164,7 +184,7 @@ export function PageTabContent({ href }: { href: string }) {
 				</div>
 			}
 		>
-			<Component />
+			<ResolvedComponent />
 		</Suspense>
 	);
 }
