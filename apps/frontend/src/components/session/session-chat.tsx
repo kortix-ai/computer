@@ -1133,11 +1133,15 @@ function detectCommandFromText(
 	rawText: string,
 	commands?: Command[],
 ): { name: string; args?: string } | undefined {
-	if (!commands || !rawText || rawText.length < 50) return undefined;
+	if (!commands || !rawText) return undefined;
+
+	const trimmedRawText = rawText.trim();
+	const escapeRegExp = (value: string) =>
+		value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 	for (const cmd of commands) {
 		if (!cmd.template) continue;
-		const tpl = cmd.template;
+		const tpl = cmd.template.trim();
 
 		// Find the first placeholder position ($1, $2, ..., $ARGUMENTS)
 		const placeholderMatch = tpl.match(/\$(\d+|\bARGUMENTS\b)/);
@@ -1149,12 +1153,12 @@ function detectCommandFromText(
 		// Require a meaningful prefix (at least 20 chars) to avoid false positives
 		if (prefix.length < 20) continue;
 
-		if (rawText.startsWith(prefix)) {
+		if (trimmedRawText.startsWith(prefix)) {
 			// Extract the user's arguments: text after the template prefix (approximate)
 			// For templates ending with the placeholder, the args are what comes after the prefix
 			let args: string | undefined;
 			if (placeholderMatch) {
-				const afterPrefix = rawText.slice(prefix.length).trim();
+				const afterPrefix = trimmedRawText.slice(prefix.length).trim();
 				// The args are at the end; try to extract the last meaningful section
 				const lastNewlineBlock = afterPrefix.split("\n\n").pop()?.trim();
 				if (lastNewlineBlock && lastNewlineBlock.length < 200) {
@@ -1163,6 +1167,41 @@ function detectCommandFromText(
 			}
 			return { name: cmd.name, args };
 		}
+
+		// Fallback: robust full-template match where placeholders are wildcards.
+		// This handles commands whose template begins with a placeholder.
+		const placeholderRegex = /\$(\d+|\bARGUMENTS\b)/g;
+		const placeholderOrder: string[] = [];
+		let regexSource = "^";
+		let lastIndex = 0;
+		let match: RegExpExecArray | null;
+
+		while ((match = placeholderRegex.exec(tpl)) !== null) {
+			regexSource += escapeRegExp(tpl.slice(lastIndex, match.index));
+			regexSource += "([\\s\\S]*?)";
+			placeholderOrder.push(match[1]);
+			lastIndex = match.index + match[0].length;
+		}
+
+		regexSource += escapeRegExp(tpl.slice(lastIndex));
+		regexSource += "$";
+
+		const fullTemplateMatch = trimmedRawText.match(new RegExp(regexSource));
+		if (!fullTemplateMatch) continue;
+
+		let args: string | undefined;
+		const captures = fullTemplateMatch.slice(1).map((value) => value?.trim() ?? "");
+		const argumentsIndex = placeholderOrder.findIndex(
+			(name) => name.toUpperCase() === "ARGUMENTS",
+		);
+		const bestCapture =
+			(argumentsIndex >= 0 ? captures[argumentsIndex] : undefined) ||
+			captures.find((value) => value.length > 0);
+		if (bestCapture && bestCapture.length < 200) {
+			args = bestCapture;
+		}
+
+		return { name: cmd.name, args };
 	}
 	return undefined;
 }
@@ -2095,6 +2134,13 @@ function SessionTurn({
 			.trim();
 	}, [turn.userMessage.parts]);
 
+	const commandForTurn = useMemo(() => {
+		const mapped = commandMessages?.get(turn.userMessage.info.id);
+		if (mapped) return mapped;
+		if (!userMessageText) return undefined;
+		return detectCommandFromText(userMessageText, commands);
+	}, [commandMessages, turn.userMessage.info.id, userMessageText, commands]);
+
 	const handleCopyUser = async () => {
 		if (!userMessageText) return;
 		await navigator.clipboard.writeText(userMessageText);
@@ -2546,9 +2592,24 @@ function SessionTurn({
 				<>
 					{/* Response section for text-only turns (no tools/steps content) */}
 					{!working && !hasSteps && response && (
-						<div className="text-sm">
-							<SandboxUrlDetector content={response} isStreaming={false} />
-						</div>
+						commandForTurn ? (
+							<div className="rounded-2xl border border-border/60 bg-gradient-to-b from-muted/15 to-background overflow-hidden">
+								<div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/25">
+									<Terminal className="size-3.5 text-muted-foreground shrink-0" />
+									<span className="font-mono text-xs text-foreground">/{commandForTurn.name}</span>
+									{commandForTurn.args && (
+										<span className="text-[11px] text-muted-foreground truncate">{commandForTurn.args}</span>
+									)}
+								</div>
+								<div className="px-3 py-2.5 text-sm">
+									<SandboxUrlDetector content={response} isStreaming={false} />
+								</div>
+							</div>
+						) : (
+							<div className="text-sm">
+								<SandboxUrlDetector content={response} isStreaming={false} />
+							</div>
+						)
 					)}
 
 				{/* Answered question parts — shown after the response text only when
