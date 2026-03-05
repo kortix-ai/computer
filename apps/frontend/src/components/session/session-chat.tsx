@@ -43,6 +43,7 @@ import { TurnErrorDisplay } from "@/components/session/session-error-banner";
 import { SessionSiteHeader } from "@/components/session/session-site-header";
 import { QuestionPrompt } from "@/components/session/question-prompt";
 import { SessionWelcome } from "@/components/session/session-welcome";
+import { FileCard } from "@/components/file-previews/FileCard";
 import {
 	OcPatchPartView,
 	OcSnapshotPartView,
@@ -96,6 +97,7 @@ import { useKortixComputerStore } from "@/stores/kortix-computer-store";
 import { useMessageQueueStore } from "@/stores/message-queue-store";
 import { useOpenCodePendingStore } from "@/stores/opencode-pending-store";
 import { useOpenCodeCompactionStore } from "@/stores/opencode-compaction-store";
+import { useFilePreviewStore } from "@/stores/file-preview-store";
 import { useOpenCodeSessionStatusStore } from "@/stores/opencode-session-status-store";
 import { useSyncStore } from "@/stores/opencode-sync-store";
 import { useServerStore } from "@/stores/server-store";
@@ -1179,6 +1181,7 @@ function UserMessageRow({
 	const openFileInComputer = useKortixComputerStore(
 		(s) => s.openFileInComputer,
 	);
+	const openPreview = useFilePreviewStore((s) => s.openPreview);
 	const { attachments, stickyParts } = useMemo(
 		() => splitUserParts(message.parts),
 		[message.parts],
@@ -1485,12 +1488,12 @@ function UserMessageRow({
 						{uploadedFiles.map((f, i) => (
 							<div
 								key={i}
-								className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30"
+								onClick={(e) => e.stopPropagation()}
 							>
-								<FileText className="size-4 text-muted-foreground shrink-0" />
-								<span className="text-xs text-muted-foreground truncate max-w-[200px]">
-									{f.filename}
-								</span>
+								<FileCard
+									filepath={f.path}
+									onClick={() => openPreview(f.path)}
+								/>
 							</div>
 						))}
 					</div>
@@ -2796,6 +2799,7 @@ export function SessionChat({
 	// ---- KortixComputer side panel ----
 	const { isSidePanelOpen, setIsSidePanelOpen, openFileInComputer } =
 		useKortixComputerStore();
+	const openPreview = useFilePreviewStore((s) => s.openPreview);
 	const handleTogglePanel = useCallback(() => {
 		setIsSidePanelOpen(!isSidePanelOpen);
 	}, [isSidePanelOpen, setIsSidePanelOpen]);
@@ -4453,19 +4457,19 @@ export function SessionChat({
 															)}
 															{files.length > 0 && (
 																<div className="flex gap-2 p-3 pb-0 flex-wrap">
-																	{files.map((f, i) => (
-																		<div
-																			key={i}
-																			className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30"
-																		>
-																			<FileText className="size-4 text-muted-foreground shrink-0" />
-																			<span className="text-xs text-muted-foreground truncate max-w-[200px]">
-																				{f.filename}
-																			</span>
-																		</div>
-																	))}
-																</div>
-															)}
+											{files.map((f, i) => (
+												<div
+													key={i}
+													onClick={(e) => e.stopPropagation()}
+												>
+													<FileCard
+														filepath={f.path}
+														onClick={() => openPreview(f.path)}
+													/>
+												</div>
+											))}
+										</div>
+									)}
 															{cleanText && (
 																<p className="text-sm leading-relaxed whitespace-pre-wrap px-4 py-3">
 																	<HighlightMentions
