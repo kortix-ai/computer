@@ -26,6 +26,16 @@ interface SSHKeyDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const SSH_META_STORAGE_KEY = 'kortix:ssh-access-meta:v1';
+
+type SSHAccessMeta = {
+  ssh_command: string;
+  host: string;
+  port: number;
+  username: string;
+  updatedAt: number;
+};
+
 function highlightShellToken(token: string) {
   if (/^(ssh|mkdir|cat|chmod)$/.test(token)) return 'text-emerald-300';
   if (/^(-[A-Za-z]|--[A-Za-z-]+)/.test(token)) return 'text-amber-300';
@@ -87,12 +97,32 @@ function renderSshConfigHighlighted(config: string) {
   });
 }
 
+const copyButtonBaseClass =
+  'inline-flex items-center justify-center gap-1.5 h-7 px-2.5 text-[11px] font-medium rounded-md border border-border/70 bg-background/80 text-foreground/90 transition-all hover:bg-background hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer';
+const copyIconButtonBaseClass =
+  'inline-flex items-center justify-center h-7 w-7 rounded-md border border-border/70 bg-background/80 text-muted-foreground shadow-sm transition-all hover:bg-background hover:text-foreground hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer';
+const codeCopyButtonClass =
+  'absolute top-2.5 right-2.5 z-10 inline-flex items-center justify-center h-5 w-5 p-0 rounded-md border border-white/30 bg-slate-950/55 text-white backdrop-blur-sm transition-all hover:bg-slate-950/80 hover:border-white/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 cursor-pointer';
+
 export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [sshResult, setSSHResult] = useState<SSHSetupResult | null>(null);
+  const [sshMeta, setSSHMeta] = useState<SSHAccessMeta | null>(null);
   const [sshError, setSSHError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  React.useEffect(() => {
+    if (!open) return;
+    try {
+      const raw = localStorage.getItem(SSH_META_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SSHAccessMeta;
+      if (parsed?.ssh_command && parsed?.host && parsed?.username && parsed?.port) {
+        setSSHMeta(parsed);
+      }
+    } catch {}
+  }, [open]);
 
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
@@ -101,6 +131,17 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
     try {
       const result = await setupSSH();
       setSSHResult(result);
+      const meta: SSHAccessMeta = {
+        ssh_command: result.ssh_command,
+        host: result.host,
+        port: result.port,
+        username: result.username,
+        updatedAt: Date.now(),
+      };
+      setSSHMeta(meta);
+      try {
+        localStorage.setItem(SSH_META_STORAGE_KEY, JSON.stringify(meta));
+      } catch {}
       toast.success('SSH keys generated successfully');
     } catch (err: any) {
       setSSHError(err?.message || 'Failed to generate SSH keys');
@@ -144,7 +185,7 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[min(92vw,760px)] sm:max-w-2xl max-h-[88vh] p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent className="w-[min(92vw,620px)] sm:max-w-xl max-h-[88vh] p-0 gap-0 overflow-hidden flex flex-col">
         <DialogHeader className="px-5 pt-5 pb-3">
           <DialogTitle className="flex items-center gap-2 text-base">
             <Key className="h-4 w-4" />
@@ -178,41 +219,84 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
             <p className="text-[10px] text-muted-foreground/50 text-center">
               Generates an ed25519 keypair and configures SSH access to the sandbox.
             </p>
+
+            {sshMeta && (
+              <div className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-2">
+                <p className="text-[11px] font-medium text-foreground/80">Last known reconnect command</p>
+                <pre className="max-w-full text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-md px-2.5 py-2 overflow-x-hidden whitespace-pre-wrap break-all text-zinc-200">
+                  {renderShellHighlighted(sshMeta.ssh_command)}
+                </pre>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-muted-foreground/60">Saved {new Date(sshMeta.updatedAt).toLocaleString()}</p>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(sshMeta.ssh_command, 'quick-connect')}
+                    className={copyButtonBaseClass}
+                  >
+                    {copiedField === 'quick-connect' ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                    {copiedField === 'quick-connect' ? 'Copied' : 'Copy command'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ---- SSH result view ---- */}
         {sshResult && (() => {
           const pk = sshResult.private_key.trim();
-          const connectScript = `mkdir -p ~/.ssh && cat > ~/.ssh/kortix_sandbox << 'KORTIX_KEY'\n${pk}\nKORTIX_KEY\nchmod 600 ~/.ssh/kortix_sandbox && ${sshResult.ssh_command}`;
+          const setupScript = `mkdir -p ~/.ssh && cat > ~/.ssh/kortix_sandbox << 'KORTIX_KEY'\n${pk}\nKORTIX_KEY\nchmod 600 ~/.ssh/kortix_sandbox`;
+          const connectCommand = sshResult.ssh_command;
+          const oneLiner = `${setupScript} && ${connectCommand}`;
           const sshConfigBlock = `Host kortix-sandbox\n  HostName ${sshResult.host}\n  Port ${sshResult.port}\n  User ${sshResult.username}\n  IdentityFile ~/.ssh/kortix_sandbox\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  ServerAliveInterval 15\n  ServerAliveCountMax 4`;
+          const installConfigCommand = `mkdir -p ~/.ssh && touch ~/.ssh/config && chmod 600 ~/.ssh/config && cat >> ~/.ssh/config << 'KORTIX_SSH_CONFIG'\n${sshConfigBlock}\nKORTIX_SSH_CONFIG`;
 
           return (
             <div className="flex flex-col min-h-0 flex-1 px-5 pb-5 gap-4 overflow-y-auto overflow-x-hidden">
 
-              {/* Primary action: copy connect script */}
+              {/* Step 1: setup key */}
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  Run this in your terminal to connect:
+                  1) Save the SSH key on your machine:
                 </p>
                 <div className="relative group">
                   <pre className="max-w-full text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-lg px-3 py-2.5 pr-16 max-h-[96px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all select-all text-zinc-200 shadow-inner">
-                    {renderShellHighlighted(connectScript)}
+                    {renderShellHighlighted(setupScript)}
                   </pre>
                   <button
                     type="button"
-                    onClick={() => copyToClipboard(connectScript, 'connect')}
-                    className="absolute top-2 right-2 flex items-center gap-1.5 h-6 px-2 text-[10px] font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer"
+                    onClick={() => copyToClipboard(setupScript, 'setup')}
+                    className={codeCopyButtonClass}
+                    aria-label="Copy setup command"
                   >
-                    {copiedField === 'connect' ? (
-                      <><Check className="h-3 w-3" /> Copied</>
-                    ) : (
-                      <><Copy className="h-3 w-3" /> Copy</>
-                    )}
+                    {copiedField === 'setup' ? <Check className="h-3 w-3 text-emerald-300" /> : <Copy className="h-3 w-3" />}
                   </button>
                 </div>
                 <p className="text-[10px] text-muted-foreground/40">
-                  Saves key to ~/.ssh/kortix_sandbox, sets permissions, and opens an SSH session.
+                  This only writes <span className="font-mono">~/.ssh/kortix_sandbox</span> and sets safe permissions.
+                </p>
+              </div>
+
+              {/* Step 2: connect */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  2) Connect when you are ready:
+                </p>
+                <div className="relative group">
+                  <pre className="max-w-full text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-lg px-3 py-2.5 pr-16 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all select-all text-zinc-200 shadow-inner">
+                    {renderShellHighlighted(connectCommand)}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(connectCommand, 'connect')}
+                    className={codeCopyButtonClass}
+                    aria-label="Copy connect command"
+                  >
+                    {copiedField === 'connect' ? <Check className="h-3 w-3 text-emerald-300" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground/40">
+                  Use this command later any time to reconnect.
                 </p>
               </div>
 
@@ -246,14 +330,48 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
                   <button
                     type="button"
                     onClick={() => copyToClipboard(sshConfigBlock, 'config')}
-                    className="absolute top-1.5 right-1.5 p-1 rounded-md hover:bg-muted/60 cursor-pointer transition-colors"
+                    className={codeCopyButtonClass}
+                    aria-label="Copy ssh config"
                   >
-                    {copiedField === 'config' ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3 text-muted-foreground/30" />}
+                    {copiedField === 'config' ? <Check className="h-3 w-3 text-emerald-300" /> : <Copy className="h-3 w-3" />}
                   </button>
                 </div>
-                <p className="text-[10px] text-muted-foreground/40 mt-1.5">
-                  Then open VS Code/Cursor &gt; Remote-SSH &gt; Connect to Host &gt; <span className="font-mono">kortix-sandbox</span>
+                <p className="text-[10px] text-muted-foreground/40 mt-1.5 leading-relaxed">
+                  In VS Code or Cursor: click the green remote indicator in the bottom-left corner (or press <span className="font-mono">Cmd/Ctrl+Shift+P</span>) -&gt; run <span className="font-mono">Remote-SSH: Connect to Host...</span> -&gt; select <span className="font-mono">kortix-sandbox</span>.
                 </p>
+              </div>
+
+              <div className="rounded-lg border border-border/30 bg-muted/15 px-3 py-2.5 space-y-2">
+                <p className="text-[11px] font-medium text-foreground/70">Shortcut host (recommended)</p>
+                <p className="text-[10px] text-muted-foreground/50 leading-relaxed">
+                  Add the host config once, then connect anytime with <span className="font-mono text-foreground/70">ssh kortix-sandbox</span>.
+                </p>
+                <div className="relative">
+                  <pre className="max-w-full text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-md px-2.5 py-2 pr-14 whitespace-pre-wrap break-all select-all text-zinc-200 overflow-x-hidden shadow-inner">
+                    {renderShellHighlighted(installConfigCommand)}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(installConfigCommand, 'cfg-install')}
+                    className={codeCopyButtonClass}
+                    aria-label="Copy config install command"
+                  >
+                    {copiedField === 'cfg-install' ? <Check className="h-3 w-3 text-emerald-300" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <pre className="max-w-full text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-md px-2.5 py-2 pr-14 whitespace-pre-wrap break-all select-all text-zinc-200 overflow-x-hidden shadow-inner">
+                    {renderShellHighlighted('ssh kortix-sandbox')}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('ssh kortix-sandbox', 'ssh-short')}
+                    className={codeCopyButtonClass}
+                    aria-label="Copy ssh shortcut command"
+                  >
+                    {copiedField === 'ssh-short' ? <Check className="h-3 w-3 text-emerald-300" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                </div>
               </div>
 
               {/* Advanced */}
@@ -269,14 +387,14 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
 
                 {showAdvanced && (
                   <div className="mt-3 space-y-3">
-                    {/* SSH Command */}
+                    {/* Combined one-liner */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">SSH Command</label>
+                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">One-liner (Setup + Connect)</label>
                       <div className="flex items-center gap-1.5">
                         <code className="flex-1 min-w-0 text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-all select-all text-zinc-200 shadow-inner">
-                          {renderShellHighlighted(sshResult.ssh_command)}
+                          {renderShellHighlighted(oneLiner)}
                         </code>
-                        <button type="button" onClick={() => copyToClipboard(sshResult.ssh_command, 'cmd')} className="p-1.5 rounded-md hover:bg-muted/50 cursor-pointer flex-shrink-0 transition-colors">
+                        <button type="button" onClick={() => copyToClipboard(oneLiner, 'cmd')} className={copyIconButtonBaseClass}>
                           {copiedField === 'cmd' ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3 text-muted-foreground/30" />}
                         </button>
                       </div>
@@ -290,10 +408,10 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
                           {pk}
                         </pre>
                         <div className="absolute top-1.5 right-1.5 flex gap-1">
-                          <button type="button" onClick={() => copyToClipboard(pk, 'pk')} className="p-1 rounded-md hover:bg-muted/60 cursor-pointer transition-colors" title="Copy key">
+                          <button type="button" onClick={() => copyToClipboard(pk, 'pk')} className={copyIconButtonBaseClass} title="Copy key">
                             {copiedField === 'pk' ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3 text-muted-foreground/30" />}
                           </button>
-                          <button type="button" onClick={savePrivateKey} className="p-1 rounded-md hover:bg-muted/60 cursor-pointer transition-colors" title="Download key file">
+                          <button type="button" onClick={savePrivateKey} className={copyIconButtonBaseClass} title="Download key file">
                             <Download className="h-3 w-3 text-muted-foreground/30" />
                           </button>
                         </div>
@@ -307,7 +425,7 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
                         <code className="flex-1 min-w-0 text-[10px] font-mono bg-muted/30 border border-border/40 rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-all select-all text-foreground/70">
                           {sshResult.public_key}
                         </code>
-                        <button type="button" onClick={() => copyToClipboard(sshResult.public_key, 'pub')} className="p-1.5 rounded-md hover:bg-muted/50 cursor-pointer flex-shrink-0 transition-colors">
+                        <button type="button" onClick={() => copyToClipboard(sshResult.public_key, 'pub')} className={copyIconButtonBaseClass}>
                           {copiedField === 'pub' ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3 text-muted-foreground/30" />}
                         </button>
                       </div>
