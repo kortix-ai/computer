@@ -31,6 +31,7 @@ export { OcMemSearchToolView } from './OcMemSearchToolView';
 export { OcMemSaveToolView } from './OcMemSaveToolView';
 export { OcSessionListToolView } from './OcSessionListToolView';
 export { OcSessionGetToolView } from './OcSessionGetToolView';
+export { OcGetMemToolView } from './OcGetMemToolView';
 
 import type { ToolViewComponent } from '../wrapper/ToolViewRegistry';
 import { OcBashToolView } from './OcBashToolView';
@@ -59,6 +60,7 @@ import { OcMemSearchToolView } from './OcMemSearchToolView';
 import { OcMemSaveToolView } from './OcMemSaveToolView';
 import { OcSessionListToolView } from './OcSessionListToolView';
 import { OcSessionGetToolView } from './OcSessionGetToolView';
+import { OcGetMemToolView } from './OcGetMemToolView';
 
 /**
  * Registry entries for OpenCode tools.
@@ -165,6 +167,12 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   'oc-session-list': OcSessionListToolView,
   'oc-session_get': OcSessionGetToolView,
   'oc-session-get': OcSessionGetToolView,
+
+  // Legacy / compatibility memory retrieval tool
+  'oc-get_mem': OcGetMemToolView,
+  'oc-get-mem': OcGetMemToolView,
+  'get_mem': OcGetMemToolView,
+  'get-mem': OcGetMemToolView,
 
   // MCP tools and other unknown tools will fall through to the
   // registry's default (GenericToolView). The OcGenericToolView

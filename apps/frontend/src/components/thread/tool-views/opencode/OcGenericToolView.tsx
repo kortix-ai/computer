@@ -11,6 +11,11 @@ import {
   AlertTriangle,
   Ban,
   Braces,
+  CalendarClock,
+  ClipboardList,
+  FileText,
+  Fingerprint,
+  Tags,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolViewProps } from '../types';
@@ -72,6 +77,89 @@ function detectLang(key: string, val: string): string {
 function isAbsolutePath(val: unknown): boolean {
   if (typeof val !== 'string') return false;
   return val.startsWith('/') && !val.includes('\n') && val.length < 500;
+}
+
+interface ObservationReport {
+  id: string;
+  type: string;
+  title: string;
+  narrative: string;
+  tool: string | null;
+  prompt: string | null;
+  session: string | null;
+  created: string | null;
+  facts: string[];
+  concepts: string[];
+  filesRead: string[];
+}
+
+function parseObservationReport(text: string): ObservationReport | null {
+  if (!text.includes('Observation #') || !text.includes('Facts:')) return null;
+
+  const normalized = text.replace(/\r\n?/g, '\n').trim();
+  const headerMatch = normalized.match(
+    /===\s*Observation\s*#(\d+)\s*\[([^\]]+)\]\s*===\s*Title:\s*(.+?)\s*Narrative:\s*([\s\S]+?)\s*Facts:\s*([\s\S]*)$/,
+  );
+
+  if (!headerMatch) return null;
+
+  const [, id, type, title, narrativeAndMeta, factsAndMore] = headerMatch;
+  const metaMatch = narrativeAndMeta.match(
+    /([\s\S]*?)\s*Tool:\s*([^|\n]+?)\s*\|\s*Prompt\s*#([^\s\n]+)\s*Session:\s*([^\s\n]+)\s*Created:\s*([^\n]+)$/,
+  );
+
+  const narrative = (metaMatch?.[1] ?? narrativeAndMeta).trim();
+  const tool = metaMatch?.[2]?.trim() || null;
+  const prompt = metaMatch?.[3]?.trim() || null;
+  const session = metaMatch?.[4]?.trim() || null;
+  const created = metaMatch?.[5]?.trim() || null;
+
+  const facts: string[] = [];
+  let concepts: string[] = [];
+  let filesRead: string[] = [];
+
+  for (const line of factsAndMore.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+      facts.push(trimmed.slice(2).trim());
+      continue;
+    }
+
+    if (trimmed.startsWith('Concepts:')) {
+      const rawConcepts = trimmed.replace(/^Concepts:\s*/i, '');
+      concepts = rawConcepts
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      continue;
+    }
+
+    if (trimmed.startsWith('Files read:')) {
+      const rawFiles = trimmed.replace(/^Files read:\s*/i, '');
+      filesRead = rawFiles
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+
+  if (!title.trim() || !narrative || facts.length === 0) return null;
+
+  return {
+    id,
+    type,
+    title: title.trim(),
+    narrative,
+    tool,
+    prompt,
+    session,
+    created,
+    facts,
+    concepts,
+    filesRead,
+  };
 }
 
 export function OcGenericToolView({
@@ -320,6 +408,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
 function OutputSection({ output }: { output: unknown }) {
   const text = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
   const isJson = typeof output !== 'string';
+  const observationReport = useMemo(() => (isJson ? null : parseObservationReport(text)), [isJson, text]);
 
   // Try structured rendering for string output with warnings/tracebacks
   const structuredSections = useMemo(() => {
@@ -333,11 +422,104 @@ function OutputSection({ output }: { output: unknown }) {
     return <StructuredOutputDisplay sections={structuredSections} />;
   }
 
+  if (observationReport) {
+    return <ObservationReportCard report={observationReport} />;
+  }
+
   return isJson ? (
     <UnifiedMarkdown content={`\`\`\`json\n${text}\n\`\`\``} isStreaming={false} />
   ) : (
     <div className="px-1">
       <UnifiedMarkdown content={text} isStreaming={false} />
+    </div>
+  );
+}
+
+function ObservationReportCard({ report }: { report: ObservationReport }) {
+  return (
+    <div className="rounded-xl border border-border/70 overflow-hidden bg-gradient-to-b from-card to-muted/20">
+      <div className="px-4 py-3 border-b border-border/60 bg-muted/30">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="h-6 bg-background/80">
+            <Fingerprint className="h-3.5 w-3.5" />
+            Observation #{report.id}
+          </Badge>
+          <Badge variant="outline" className="h-6 bg-background/80 uppercase tracking-wide text-[10px]">
+            {report.type}
+          </Badge>
+          {report.created && (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <CalendarClock className="h-3.5 w-3.5" />
+              {report.created}
+            </span>
+          )}
+        </div>
+        <h3 className="mt-3 text-base font-semibold leading-snug text-foreground">{report.title}</h3>
+      </div>
+
+      <div className="px-4 py-3 space-y-3">
+        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+          <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            Narrative
+          </span>
+          <p className="text-sm leading-relaxed text-foreground/85">{report.narrative}</p>
+        </div>
+
+        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+          <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+            <ClipboardList className="h-3.5 w-3.5" />
+            Facts
+          </span>
+          <ul className="space-y-1.5">
+            {report.facts.map((fact, idx) => (
+              <li key={`${report.id}-${idx}`} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
+                <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-primary/70 flex-shrink-0" />
+                <span>{fact}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {report.concepts.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground mr-1">
+              <Tags className="h-3.5 w-3.5" />
+              Concepts
+            </span>
+            {report.concepts.map((concept) => (
+              <Badge key={concept} variant="secondary" className="h-6 px-2 text-[11px] font-normal">
+                {concept}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {(report.tool || report.prompt || report.session || report.filesRead.length > 0) && (
+          <div className="rounded-lg border border-border/60 bg-background/70 p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              {report.tool && <Badge variant="outline" className="h-5 px-1.5 font-normal">Tool: {report.tool}</Badge>}
+              {report.prompt && <Badge variant="outline" className="h-5 px-1.5 font-normal">Prompt #{report.prompt}</Badge>}
+              {report.session && <Badge variant="outline" className="h-5 px-1.5 font-normal">{report.session}</Badge>}
+            </div>
+            {report.filesRead.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Files read</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {report.filesRead.map((file) => (
+                    <span
+                      key={file}
+                      className="px-2 py-1 rounded-md bg-muted/60 border border-border/60 text-[11px] font-mono text-foreground/75 break-all"
+                    >
+                      {file}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
