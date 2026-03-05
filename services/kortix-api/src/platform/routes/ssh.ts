@@ -16,10 +16,52 @@ import { execSync } from 'child_process';
 import { readFileSync, unlinkSync, mkdirSync, rmdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import Docker from 'dockerode';
 import { config } from '../../config';
 import type { AuthVariables } from '../../types';
 
 const sshRouter = new Hono<{ Variables: AuthVariables }>();
+
+function getDockerClient(): Docker {
+  if (!config.DOCKER_HOST) return new Docker();
+
+  if (config.DOCKER_HOST.startsWith('tcp://') || config.DOCKER_HOST.startsWith('http://')) {
+    const url = new URL(config.DOCKER_HOST);
+    return new Docker({ host: url.hostname, port: parseInt(url.port || '2375', 10) });
+  }
+
+  const socketPath = config.DOCKER_HOST.replace(/^unix:\/\//, '');
+  return new Docker({ socketPath });
+}
+
+async function runContainerCommand(container: Docker.Container, cmd: string): Promise<void> {
+  const exec = await container.exec({
+    Cmd: ['sh', '-c', cmd],
+    AttachStdout: true,
+    AttachStderr: true,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    exec.start((err) => {
+      if (err) return reject(err);
+      return resolve();
+    });
+  });
+
+  const startedAt = Date.now();
+  let result = await exec.inspect();
+  while (result.Running) {
+    if (Date.now() - startedAt > 15_000) {
+      throw new Error('Timed out waiting for container command to finish');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    result = await exec.inspect();
+  }
+
+  if (result.ExitCode && result.ExitCode !== 0) {
+    throw new Error(`Container command failed with exit code ${result.ExitCode}`);
+  }
+}
 
 sshRouter.post('/setup', async (c) => {
   try {
@@ -56,18 +98,15 @@ sshRouter.post('/setup', async (c) => {
     }
 
     // Verify container is running
-    const hostArg = config.DOCKER_HOST ? `-H unix://${config.DOCKER_HOST}` : '';
+    const docker = getDockerClient();
+    const container = docker.getContainer(containerName);
     try {
-      const running = execSync(
-        `docker ${hostArg} inspect --format '{{.State.Running}}' ${containerName}`,
-        { stdio: 'pipe', timeout: 5_000 },
-      ).toString().trim();
-      if (running !== 'true') {
+      const containerInfo = await container.inspect();
+      if (!containerInfo.State?.Running) {
         return c.json({ success: false, error: 'Sandbox is not running.' }, 400);
       }
     } catch (e: any) {
-      const msg = e?.stderr?.toString() || '';
-      if (msg.includes('No such object')) {
+      if (e?.statusCode === 404 || String(e?.message || '').includes('No such container')) {
         return c.json({ success: false, error: 'No sandbox container found. Start your Local Docker sandbox first.' }, 404);
       }
       throw e;
@@ -94,9 +133,9 @@ sshRouter.post('/setup', async (c) => {
 
     // Inject public key into container
     const escapedPubKey = publicKey.replace(/'/g, "'\\''");
-    execSync(
-      `docker ${hostArg} exec ${containerName} sh -c "mkdir -p /workspace/.ssh && echo '${escapedPubKey}' >> /workspace/.ssh/authorized_keys && sort -u -o /workspace/.ssh/authorized_keys /workspace/.ssh/authorized_keys && chmod 700 /workspace/.ssh && chmod 600 /workspace/.ssh/authorized_keys && chown -R abc:abc /workspace/.ssh"`,
-      { stdio: 'pipe', timeout: 10_000 },
+    await runContainerCommand(
+      container,
+      `mkdir -p /workspace/.ssh && echo '${escapedPubKey}' >> /workspace/.ssh/authorized_keys && sort -u -o /workspace/.ssh/authorized_keys /workspace/.ssh/authorized_keys && chmod 700 /workspace/.ssh && chmod 600 /workspace/.ssh/authorized_keys && chown -R abc:abc /workspace/.ssh`,
     );
     console.log(`[SSH] Public key injected into container ${containerName}`);
 

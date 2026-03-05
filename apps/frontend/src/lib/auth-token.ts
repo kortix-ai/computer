@@ -33,6 +33,7 @@ const TOKEN_CACHE_TTL = 30_000;
 // ── Token cache ──
 let cachedToken: string | null = null;
 let cachedAt = 0;
+let bootstrapToken: string | null = null;
 
 // ── Inflight deduplication ──
 let inflight: Promise<string | null> | null = null;
@@ -44,6 +45,13 @@ let inflight: Promise<string | null> | null = null;
  * Slow path: deduplicates concurrent calls into a single auth roundtrip.
  */
 export async function getSupabaseAccessToken(): Promise<string | null> {
+	// Installer/bootstrap flow: server actions may set auth cookies without a
+	// client-side Supabase session yet. Use an injected token until the client
+	// session hydrates.
+	if (bootstrapToken) {
+		return bootstrapToken;
+	}
+
 	// Fast path: return cached token if still fresh
 	if (cachedToken && Date.now() - cachedAt < TOKEN_CACHE_TTL) {
 		return cachedToken;
@@ -70,6 +78,18 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
 export function invalidateTokenCache(): void {
 	cachedToken = null;
 	cachedAt = 0;
+}
+
+/**
+ * Seed auth for setup/install flows that receive a JWT from server actions
+ * before the browser Supabase client has established local session state.
+ */
+export function setBootstrapAuthToken(token: string | null): void {
+	bootstrapToken = token;
+	if (token) {
+		cachedToken = token;
+		cachedAt = Date.now();
+	}
 }
 
 /** Internal: actually fetch the token from Supabase with retries. */

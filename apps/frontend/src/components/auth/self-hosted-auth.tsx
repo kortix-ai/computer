@@ -512,7 +512,30 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
 
         setPending(false);
       } else {
-        // Returning user: use server action for sign-in
+        // Returning user: prefer direct client sign-in so session state is
+        // immediately available to middleware + AuthProvider.
+        try {
+          const supabase = createBrowserSupabaseClient();
+          await supabase.auth.signOut({ scope: 'local' });
+          const { data: clientSignInData, error: clientSignInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (!clientSignInError && clientSignInData.session) {
+            invalidateTokenCache();
+            setBootstrapAuthToken(clientSignInData.session.access_token);
+            window.location.href = returnUrl || '/dashboard';
+            return;
+          }
+        } catch {
+          // Best-effort cleanup of stale local auth state.
+        }
+
+        // Fallback: server action sign-in (runtime env on server)
+        invalidateTokenCache();
+        setBootstrapAuthToken(null);
+
         const formData = new FormData();
         formData.set('email', email);
         formData.set('password', password);

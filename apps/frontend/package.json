@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.ts",
+    "test:e2e:ui": "playwright test -c tests/e2e/playwright.config.ts --ui",
+    "test:e2e:full": "bash tests/e2e/scripts/run-full-self-hosted-e2e.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "postinstall": "cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/pdf.worker.min.mjs 2>/dev/null || true"
@@ -37,7 +40,7 @@
     "@novu/nextjs": "^3.11.0",
     "@novu/notification-center": "^2.0.0",
     "@number-flow/react": "^0.5.7",
-    "@opencode-ai/sdk": "^1.2.10",
+    "@opencode-ai/sdk": "^1.2.17",
     "@pipedream/sdk": "^2.3.7",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.11",
@@ -229,6 +232,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/canvas-confetti": "^1.9.0",

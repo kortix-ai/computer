@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useGetAAL } from '@/hooks/auth';
 import { useAuth } from '@/components/AuthProvider';
+import { isSelfHosted } from '@/lib/config';
 
 interface BackgroundAALCheckerProps {
   children: React.ReactNode;
@@ -34,6 +35,10 @@ export function BackgroundAALChecker({
   const { data: aalData } = useGetAAL();
 
   useEffect(() => {
+    if (isSelfHosted()) {
+      return;
+    }
+
     // Only check if user is authenticated, not loading, and checks are enabled
     if (!authLoading && user && enabled && aalData) {
       const { action_required, current_level, next_level, verification_required } = aalData;
