@@ -1,5 +1,55 @@
 [
   {
+    "version": "0.7.14",
+    "date": "2026-03-05",
+    "title": "LLM provider routing through Kortix proxy",
+    "description": "Routes all LLM SDK traffic (Anthropic, OpenAI, xAI, Gemini, Groq) through the Kortix router in cloud mode. API keys are set to the sandbox's Kortix token so the router can authenticate and inject its own upstream key (OpenRouter). Base URLs are redirected via env vars for Anthropic/OpenAI and runtime config patching for xAI/Gemini/Groq. Fixes 'API key is missing' errors that occurred because native SDKs validated keys client-side before any network request.",
+    "changes": [
+      {
+        "type": "fix",
+        "text": "LLM provider routing — sandbox env setup now sets API keys to KORTIX_TOKEN and redirects base URLs to the Kortix router, eliminating 'API key is missing' SDK errors in cloud mode"
+      },
+      {
+        "type": "fix",
+        "text": "Router proxy now recognises Kortix tokens in x-api-key header (Anthropic SDK compatibility) for Mode 1 Kortix-managed auth"
+      },
+      {
+        "type": "fix",
+        "text": "Router proxy injectApiKey supports alternate key injection method (kortixKeyInjection) for Kortix-managed LLM requests routed through OpenRouter"
+      },
+      {
+        "type": "improvement",
+        "text": "LLM proxy services configured with dual-target: OpenRouter for Kortix-managed (Mode 1), real upstream for passthrough (Mode 2/3)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed GOOGLE_GENERATIVE_AI_API_KEY env var name (was incorrectly GEMINI_API_KEY) in cloud env setup"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "v0.7.14",
+        "target": "github-release"
+      },
+      {
+        "name": "@kortix/sandbox@0.7.14",
+        "target": "npm"
+      },
+      {
+        "name": "kortix/sandbox:0.7.14",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-api:0.7.14",
+        "target": "docker-hub"
+      },
+      {
+        "name": "kortix/kortix-frontend:0.7.14",
+        "target": "docker-hub"
+      }
+    ]
+  },
+  {
     "version": "0.7.13",
     "date": "2026-03-04",
     "title": "Fix EACCES permission error blocking sandbox self-update",
