@@ -4,13 +4,11 @@ import { useEffect, useState, Suspense, lazy, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { billingApi } from '@/lib/api/billing';
 import { backendApi } from '@/lib/api-client';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useProviders } from '@/hooks/platform/use-sandbox';
-import { getSandbox, getSandboxUrl } from '@/lib/platform-client';
 import { authenticatedFetch } from '@/lib/auth-token';
 
 // Lazy load heavy components
@@ -28,6 +26,12 @@ const STEP_INFO: Record<Exclude<SetupStep, 'success' | 'error'>, StepInfo> = {
   subscription: { label: 'Creating subscription',    detail: 'Setting up your free plan...' },
   sandbox:      { label: 'Preparing workspace',      detail: 'Provisioning your cloud sandbox...' },
 };
+
+interface SetupStatusResponse {
+  subscription: 'ready' | 'pending';
+  sandbox: 'none' | 'provisioning' | 'ready';
+  sandbox_url?: string;
+}
 
 export default function SettingUpPage() {
   const router = useRouter();
@@ -58,41 +62,58 @@ export default function SettingUpPage() {
     return Math.min(96, 85 + ((elapsedSec - 150) / 120) * 11);
   }, []);
 
-  const waitForHetznerSandboxReady = useCallback(async (timeoutMs = 240000): Promise<string | null> => {
+  /** Poll GET /billing/setup/status until sandbox is ready, then health-check it. */
+  const pollSandboxReady = useCallback(async (
+    isCurrentRun: () => boolean,
+    timeoutMs = 240000,
+  ): Promise<boolean> => {
     const started = Date.now();
     const deadline = started + timeoutMs;
 
-    while (Date.now() < deadline) {
+    while (Date.now() < deadline && isCurrentRun()) {
       const elapsedSec = Math.floor((Date.now() - started) / 1000);
-      setSandboxProgress(Math.max(2, Math.min(96, getHetznerProvisioningProgress(elapsedSec))));
+      if (isHetznerDefault) {
+        setSandboxProgress(Math.max(2, Math.min(96, getHetznerProvisioningProgress(elapsedSec))));
+      } else {
+        // For non-Hetzner, use a simple indeterminate progress
+        setSandboxProgress(Math.min(90, 10 + elapsedSec * 2));
+      }
 
       try {
-        const sandbox = await getSandbox();
-        if (sandbox?.external_id) {
-          const sandboxUrl = getSandboxUrl(sandbox);
-          const res = await authenticatedFetch(
-            `${sandboxUrl}/kortix/health`,
-            { signal: AbortSignal.timeout(5000) },
-            { retryOnAuthError: false },
-          );
-          if (res.ok) {
-            const health = await res.json().catch(() => null) as { version?: string } | null;
-            const version = typeof health?.version === 'string' ? health.version : '';
-            if (version && version !== '0.0.0') {
-              setSandboxProgress(100);
-              return version;
+        const statusRes = await backendApi.get<SetupStatusResponse>(
+          '/billing/setup/status',
+          { showErrors: false, timeout: 10000 },
+        );
+
+        if (statusRes.success && statusRes.data?.sandbox === 'ready' && statusRes.data.sandbox_url) {
+          // Sandbox is ready in DB — verify it's actually responding
+          try {
+            const healthRes = await authenticatedFetch(
+              `${statusRes.data.sandbox_url}/kortix/health`,
+              { signal: AbortSignal.timeout(5000) },
+              { retryOnAuthError: false },
+            );
+            if (healthRes.ok) {
+              const health = await healthRes.json().catch(() => null) as { version?: string } | null;
+              const version = typeof health?.version === 'string' ? health.version : '';
+              if (version && version !== '0.0.0') {
+                setSandboxProgress(100);
+                return true;
+              }
             }
+          } catch {
+            // Sandbox URL not reachable yet — keep polling
           }
         }
       } catch {
-        // Keep polling while sandbox is provisioning.
+        // Network error polling status — keep trying
       }
 
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 2500));
     }
 
-    return null;
-  }, [getHetznerProvisioningProgress]);
+    return false;
+  }, [isHetznerDefault, getHetznerProvisioningProgress]);
 
   const runSetup = useCallback(async () => {
     if (!user || isRunning.current) return;
@@ -100,56 +121,41 @@ export default function SettingUpPage() {
     const runSeq = ++runSeqRef.current;
     const isCurrentRun = () => runSeqRef.current === runSeq;
     setErrorMessage('');
-    let sandboxStepTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      let providerIsHetzner = isHetznerDefault;
-
-      if (!providerIsHetzner) {
-        const providersRes = await backendApi.get<{ providers: string[]; default: string }>(
-          '/platform/providers',
-          { showErrors: false, timeout: 10000 },
-        );
-        providerIsHetzner = providersRes.success && providersRes.data?.default === 'hetzner';
-      }
-
       // Step 1: Check account status
       if (!isCurrentRun()) return;
       setStep('checking');
-      await billingApi.getAccountState(true);
 
-      // Step 2: Initialize subscription + sandbox (one-shot backend call)
+      // Step 2: Call initialize — returns fast, kicks off sandbox in background
       if (!isCurrentRun()) return;
       setStep('subscription');
-      sandboxStepTimer = setTimeout(() => setStep('sandbox'), 1200);
-      setSandboxProgress(0);
-      const initializeSetup = async () => backendApi.post<{
+
+      const initResponse = await backendApi.post<{
         status: string;
         tier: string;
-        sandbox: 'created' | 'exists' | 'skipped' | 'failed';
-        sandbox_error?: string;
+        sandbox: 'created' | 'exists' | 'provisioning' | 'failed';
       }>('/billing/setup/initialize', undefined, {
-        // Hetzner provisioning can take 2-3 minutes on first create.
-        timeout: 240000,
+        timeout: 30000, // Should return in <2s now, but generous timeout
       });
 
-      let response = await initializeSetup();
-      // Handle transient edge/network failures (common with cold starts + proxies)
-      for (let attempt = 1; attempt <= 2 && !response.success; attempt++) {
+      // Retry once on transient failure
+      let response = initResponse;
+      if (!response.success) {
         const status = (response.error as any)?.status;
         const message = (response.error as any)?.message || '';
         const isRetriable = status === 502 || /failed to fetch|network|gateway/i.test(String(message));
-        if (!isRetriable) break;
-        await new Promise((r) => setTimeout(r, attempt * 1200));
-        response = await initializeSetup();
+        if (isRetriable) {
+          await new Promise((r) => setTimeout(r, 1500));
+          response = await backendApi.post<{
+            status: string;
+            tier: string;
+            sandbox: 'created' | 'exists' | 'provisioning' | 'failed';
+          }>('/billing/setup/initialize', undefined, { timeout: 30000 });
+        }
       }
 
       if (!isCurrentRun()) return;
-
-      if (sandboxStepTimer) {
-        clearTimeout(sandboxStepTimer);
-        sandboxStepTimer = null;
-      }
 
       if (!response.success) {
         throw new Error(response.error?.message || 'Failed to initialize account');
@@ -157,24 +163,31 @@ export default function SettingUpPage() {
 
       const data = response.data!;
 
-      // Step 3: Show sandbox status
-      if (data.sandbox === 'created' || data.sandbox === 'exists' || (providerIsHetzner && data.sandbox === 'skipped')) {
-        setStep('sandbox');
-        if (providerIsHetzner) {
-          const version = await waitForHetznerSandboxReady(240000);
-          if (!version) {
-            throw new Error('Hetzner sandbox is still provisioning. Please wait and try again.');
-          }
-        } else {
-          // Brief pause so user sees the step
-          await new Promise(r => setTimeout(r, 800));
+      // Step 3: Poll for sandbox readiness
+      if (!isCurrentRun()) return;
+      setStep('sandbox');
+      setSandboxProgress(0);
+
+      if (data.sandbox === 'exists') {
+        // Sandbox already existed — just verify it's healthy
+        setSandboxProgress(80);
+        const ready = await pollSandboxReady(isCurrentRun, 30000);
+        if (!ready && isCurrentRun()) {
+          // Already exists but not responding — let dashboard handle it
+          console.warn('[setting-up] Existing sandbox not responding, proceeding to dashboard');
+        }
+      } else if (data.sandbox === 'provisioning' || data.sandbox === 'created') {
+        // Provisioning in progress — poll until ready
+        const ready = await pollSandboxReady(isCurrentRun, 240000);
+        if (!ready && isCurrentRun()) {
+          throw new Error(
+            isHetznerDefault
+              ? 'Hetzner sandbox is still provisioning. Please wait and try again.'
+              : 'Sandbox is still being prepared. Please wait and try again.'
+          );
         }
       } else if (data.sandbox === 'failed') {
-        if (providerIsHetzner) {
-          throw new Error(data.sandbox_error || 'Failed to create Hetzner sandbox');
-        }
-        // Non-Hetzner fallback: let dashboard auto-retry.
-        console.warn('[setting-up] Sandbox creation failed, will retry on dashboard:', data.sandbox_error);
+        throw new Error('Failed to create sandbox. Please try again.');
       }
 
       // Done — redirect to dashboard
@@ -184,9 +197,6 @@ export default function SettingUpPage() {
         if (isCurrentRun()) router.push('/dashboard');
       }, 1000);
     } catch (err) {
-      if (sandboxStepTimer) {
-        clearTimeout(sandboxStepTimer);
-      }
       if (!isCurrentRun()) return;
       console.error('[setting-up] Setup error:', err);
       setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -196,7 +206,7 @@ export default function SettingUpPage() {
         isRunning.current = false;
       }
     }
-  }, [user, router, isHetznerDefault, waitForHetznerSandboxReady]);
+  }, [user, router, isHetznerDefault, pollSandboxReady]);
 
   useEffect(() => {
     if (!user || autoStartedRef.current) return;

@@ -42,6 +42,8 @@ billingApp.use('*', async (c, next) => {
 });
 
 // Setup initialize endpoint (requires billing — creates Stripe subscription + sandbox)
+// DESIGN: Returns fast (<2s). Kicks off sandbox provisioning in the background.
+// Frontend polls GET /setup/status for sandbox readiness.
 billingApp.post('/setup/initialize', async (c: any) => {
   const userId = c.get('userId') as string;
   const email = c.get('userEmail') as string;
@@ -90,62 +92,86 @@ billingApp.post('/setup/initialize', async (c: any) => {
     });
   }
 
-  // ── Step 2: Ensure sandbox exists (best-effort) ──────────────────────
-  // Sandbox creation can be slow (especially Hetzner cold starts). This route
-  // is called from the browser behind CDN/proxy timeouts, so we must avoid
-  // blocking too long. We timebox provisioning and let frontend continue
-  // polling readiness when needed.
-  let sandboxStatus: 'created' | 'exists' | 'skipped' | 'failed' = 'skipped';
-  let sandboxError: string | undefined;
+  // ── Step 2: Fire-and-forget sandbox provisioning ──────────────────────
+  // Sandbox creation can take minutes (Hetzner cold starts). Never block
+  // the HTTP response — just kick it off. Frontend polls GET /setup/status.
+  let sandboxStatus: 'created' | 'exists' | 'provisioning' | 'failed' = 'provisioning';
 
   try {
     const { ensureSandbox } = await import('../platform/services/ensure-sandbox');
 
-    const ensurePromise = ensureSandbox({ accountId, userId })
-      .then(({ row, created }) => ({ kind: 'done' as const, row, created }))
-      .catch((err) => ({ kind: 'error' as const, err }));
+    // Quick check: does an active sandbox already exist?
+    const { db } = await import('../shared/db');
+    const { sandboxes } = await import('@kortix/db');
+    const { eq, and } = await import('drizzle-orm');
 
-    const timedResult = await Promise.race([
-      ensurePromise,
-      // Keep this short to avoid CDN/proxy/browser request ceilings during setup.
-      // Frontend continues with explicit sandbox readiness polling.
-      new Promise<{ kind: 'timeout' }>((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), 20_000)),
-    ]);
+    const [active] = await db
+      .select()
+      .from(sandboxes)
+      .where(and(eq(sandboxes.accountId, accountId), eq(sandboxes.status, 'active')))
+      .limit(1);
 
-    if (timedResult.kind === 'done') {
-      sandboxStatus = timedResult.created ? 'created' : 'exists';
-      console.log(`[setup/initialize] Sandbox ${timedResult.row.sandboxId} ${sandboxStatus} for account ${accountId}`);
-    } else if (timedResult.kind === 'timeout') {
-      sandboxStatus = 'skipped';
-      sandboxError = 'Sandbox provisioning is still running in the background';
-      console.warn(`[setup/initialize] Sandbox provisioning timed out for account ${accountId}; continuing setup response`);
-
-      void ensurePromise.then((eventual) => {
-        if (eventual.kind === 'done') {
-          console.log(`[setup/initialize] Sandbox ${eventual.row.sandboxId} became ready after timeout for account ${accountId}`);
-        } else {
-          const msg = eventual.err instanceof Error ? eventual.err.message : String(eventual.err);
-          console.error(`[setup/initialize] Background sandbox provisioning failed for account ${accountId}:`, msg);
-        }
-      });
+    if (active?.externalId) {
+      sandboxStatus = 'exists';
+      console.log(`[setup/initialize] Sandbox ${active.sandboxId} already active for account ${accountId}`);
     } else {
-      sandboxStatus = 'failed';
-      sandboxError = timedResult.err instanceof Error ? timedResult.err.message : String(timedResult.err);
-      console.error(`[setup/initialize] Sandbox creation failed for account ${accountId}:`, sandboxError);
+      // Kick off provisioning in background — don't await
+      void ensureSandbox({ accountId, userId })
+        .then(({ row, created }) => {
+          console.log(`[setup/initialize] Background: sandbox ${row.sandboxId} ${created ? 'created' : 'exists'} for account ${accountId}`);
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[setup/initialize] Background: sandbox provisioning failed for account ${accountId}:`, msg);
+        });
+      console.log(`[setup/initialize] Kicked off sandbox provisioning for account ${accountId}`);
     }
   } catch (err) {
     sandboxStatus = 'failed';
-    sandboxError = err instanceof Error ? err.message : String(err);
-    console.error(`[setup/initialize] Sandbox creation failed for account ${accountId}:`, sandboxError);
-    // Don't fail the whole request — subscription was created successfully.
-    // Frontend useSandbox() will retry on dashboard load.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[setup/initialize] Failed to start sandbox provisioning for account ${accountId}:`, msg);
   }
 
   return c.json({
     status: subscriptionStatus,
     tier: 'free',
     sandbox: sandboxStatus,
-    ...(sandboxError ? { sandbox_error: sandboxError } : {}),
+  });
+});
+
+// Setup status endpoint — frontend polls this to check sandbox readiness.
+// Returns instantly with the current sandbox state from the DB.
+billingApp.get('/setup/status', async (c: any) => {
+  const userId = c.get('userId') as string;
+  const { resolveAccountId } = await import('../shared/resolve-account');
+  const { getCreditAccount } = await import('./repositories/credit-accounts');
+  const accountId = await resolveAccountId(userId);
+
+  // Subscription status
+  const account = await getCreditAccount(accountId);
+  const subscriptionReady = !!account?.stripeSubscriptionId;
+
+  // Sandbox status
+  const { db } = await import('../shared/db');
+  const { sandboxes } = await import('@kortix/db');
+  const { eq, and, inArray } = await import('drizzle-orm');
+
+  const [sandbox] = await db
+    .select()
+    .from(sandboxes)
+    .where(and(eq(sandboxes.accountId, accountId), inArray(sandboxes.status, ['active', 'provisioning'])))
+    .limit(1);
+
+  let sandboxState: 'none' | 'provisioning' | 'ready' = 'none';
+  if (sandbox) {
+    sandboxState = sandbox.status === 'active' && sandbox.externalId ? 'ready' : 'provisioning';
+  }
+
+  return c.json({
+    subscription: subscriptionReady ? 'ready' : 'pending',
+    sandbox: sandboxState,
+    // Include sandbox URL when ready so frontend can health-check it
+    ...(sandboxState === 'ready' && sandbox?.baseUrl ? { sandbox_url: sandbox.baseUrl } : {}),
   });
 });
 
