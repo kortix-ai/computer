@@ -518,6 +518,14 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				const inParts = m.parts
 					.filter((p) => !!p?.id)
 					.sort((a, b) => cmp(a.id, b.id));
+				// If this message still carries bridged optimistic parts, a hydrate
+				// snapshot with real parts should replace them immediately. Otherwise
+				// reconcile-by-extras can keep both copies and duplicate user text.
+				if (bridgedPartIds.has(mid) && inParts.length > 0) {
+					bridgedPartIds.delete(mid);
+					newParts[mid] = inParts;
+					continue;
+				}
 				const exParts = newParts[mid];
 				if (!exParts || exParts.length === 0) {
 					newParts[mid] = inParts;
