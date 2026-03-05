@@ -1404,6 +1404,7 @@ export function SessionChatInput({
   }, [mentionItems.length]);
 
   const enqueue = useMessageQueueStore((s) => s.enqueue);
+  const canSubmit = text.trim().length > 0 || attachedFiles.length > 0;
 
   const handleSubmit = useCallback(async () => {
     // If a command is staged, execute it with the current text as args
@@ -1417,10 +1418,10 @@ export function SessionChatInput({
     }
 
     const trimmed = text.trim();
-    if (!trimmed || disabled) return;
+    if ((!trimmed && attachedFiles.length === 0) || disabled) return;
 
     // Push to prompt history (persisted to localStorage)
-    pushHistory(trimmed);
+    if (trimmed) pushHistory(trimmed);
 
     // Snapshot files and mentions before clearing
     const filesToSend = attachedFiles.length > 0 ? [...attachedFiles] : undefined;
@@ -1811,7 +1812,7 @@ export function SessionChatInput({
           >
             <div className="relative w-full">
               {/* Add to queue button — floats top-right of textarea when busy and text is typed */}
-              {isBusy && text.trim() && (
+              {isBusy && canSubmit && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -1986,7 +1987,7 @@ export function SessionChatInput({
                 >
                   <Button
                     size="sm"
-                    disabled={!text.trim() || disabled || lockForQuestion}
+                    disabled={!canSubmit || disabled || lockForQuestion}
                     onClick={handleSubmit}
                     className="flex-shrink-0 h-8 w-8 rounded-full p-0"
                   >
