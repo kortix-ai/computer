@@ -248,6 +248,7 @@ setupApp.get('/sandbox-providers', async (c) => {
   const available: string[] = [];
   if (config.isLocalDockerEnabled()) available.push('local_docker');
   if (config.isDaytonaEnabled()) available.push('daytona');
+  if (config.isHetznerEnabled()) available.push('hetzner');
 
   return c.json({
     providers: available,

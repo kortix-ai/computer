@@ -21,6 +21,8 @@ import {
   getDefaultProviderName,
   type ProviderName,
 } from '../providers';
+import { config } from '../../config';
+import { checkCredits } from '../../router/services/billing';
 
 export interface EnsureSandboxResult {
   /** The raw sandbox DB row (callers serialize as needed). */
@@ -41,6 +43,7 @@ export async function ensureSandbox(opts: {
   accountId: string;
   userId: string;
   provider?: ProviderName;
+  hetznerServerType?: 'cpx22' | 'cpx32';
 }): Promise<EnsureSandboxResult> {
   const { accountId, userId } = opts;
   const providerName = opts.provider || getDefaultProviderName();
@@ -102,6 +105,15 @@ export async function ensureSandbox(opts: {
   }
 
   // 4. No sandbox — provision a new one
+
+  // Credit check for paid providers (Hetzner VPS costs money immediately)
+  if (providerName === 'hetzner' && config.KORTIX_BILLING_INTERNAL_ENABLED) {
+    const creditCheck = await checkCredits(accountId, 0.10); // ~$0.10 min (covers ~1hr cheapest VPS)
+    if (!creditCheck.hasCredits) {
+      throw new Error(`Insufficient credits to provision Hetzner VPS: ${creditCheck.message}`);
+    }
+  }
+
   const provider = getProvider(providerName);
 
   const [sandbox] = await db
@@ -129,6 +141,7 @@ export async function ensureSandbox(opts: {
     accountId,
     userId,
     name: `sandbox-${accountId.slice(0, 8)}`,
+    hetznerServerType: opts.hetznerServerType,
     envVars: {
       KORTIX_TOKEN: sandboxKey.secretKey,
     },

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Search, Globe, Image, Mic, BookOpen, Flame } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Search, Globe, Image, Mic, BookOpen, Flame, Server } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -14,7 +14,7 @@ import { invalidateTokenCache } from '@/lib/auth-token';
 
 /* ─── Install Status Hook ──────────────────────────────────────────────────── */
 
-export type SandboxProviderName = 'local_docker' | 'daytona';
+export type SandboxProviderName = 'local_docker' | 'daytona' | 'hetzner';
 
 export function useInstallStatus() {
   const [installed, setInstalled] = useState<boolean | null>(null);
@@ -298,7 +298,7 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
 
     const registeredId = store.registerOrUpdateSandbox(
       {
-        label: sandbox.name || (isLocal ? 'Local Sandbox' : 'Cloud Sandbox'),
+        label: sandbox.name || (isLocal ? 'Local Sandbox' : sandbox.provider === 'hetzner' ? 'Hetzner VPS' : 'Cloud Sandbox'),
         provider: sandbox.provider,
         sandboxId: sandbox.external_id,
         mappedPorts: sandbox.metadata?.mappedPorts,
@@ -596,6 +596,23 @@ export function SelfHostedForm({ returnUrl, installed, sandboxProviders = ['loca
                   <span className="text-sm font-medium text-foreground">Daytona (Cloud)</span>
                   <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                     Run the sandbox on Daytona cloud infrastructure. No local Docker required.
+                  </p>
+                </div>
+              </button>
+            )}
+            {sandboxProviders.includes('hetzner') && (
+              <button
+                type="button"
+                onClick={() => handleSandboxProviderSelect('hetzner')}
+                className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-card/50 hover:border-primary/40 hover:bg-card transition-all text-left"
+              >
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <Server className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground">Hetzner VPS</span>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    Dedicated VPS on Hetzner Cloud. Best performance with full isolation.
                   </p>
                 </div>
               </button>

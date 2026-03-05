@@ -20,7 +20,7 @@ function resetSDKClient(): void {
   _resetClient?.();
 }
 
-export type SandboxProvider = 'daytona' | 'local_docker';
+export type SandboxProvider = 'daytona' | 'local_docker' | 'hetzner';
 
 export interface ServerEntry {
   id: string;
@@ -593,7 +593,7 @@ export function getActiveSandboxId(): string {
  */
 export function isCloudMode(): boolean {
   const server = getActiveServer();
-  return server?.provider === 'daytona';
+  return server?.provider === 'daytona' || server?.provider === 'hetzner';
 }
 
 /**
@@ -625,7 +625,7 @@ export function getSubdomainOpts(): { sandboxId: string; backendPort: number } |
 export function deriveSubdomainOpts(
   server: ServerEntry | null | undefined,
 ): { sandboxId: string; backendPort: number } | undefined {
-  if (server?.provider === 'daytona') return undefined;
+  if (server?.provider === 'daytona' || server?.provider === 'hetzner') return undefined;
   // For local_docker without a sandboxId yet, fall back to the container name.
   const sandboxId = server?.sandboxId || (server?.provider === 'local_docker' ? 'kortix-sandbox' : '');
   // Don't return opts with empty sandboxId — callers need a real ID.

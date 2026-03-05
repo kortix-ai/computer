@@ -24,6 +24,8 @@ import {
   type ProviderName,
   type SandboxProvider,
 } from '../providers';
+import { config } from '../../config';
+import { listServerTypes } from '../providers/hetzner';
 import type { AuthVariables } from '../../types';
 import { resolveAccountId as defaultResolveAccountId } from '../../shared/resolve-account';
 
@@ -120,6 +122,7 @@ export function createCloudSandboxRouter(
     try {
       const body = await c.req.json().catch(() => ({}));
       const requestedProvider = (body?.provider as ProviderName) || undefined;
+      const requestedHetznerServerType = (body?.hetznerServerType as 'cpx22' | 'cpx32' | undefined) || undefined;
       const providerName = requestedProvider || getDefaultProviderName();
       const customName = body?.name as string | undefined;
 
@@ -182,6 +185,7 @@ export function createCloudSandboxRouter(
         accountId,
         userId,
         name: sandboxName,
+        hetznerServerType: requestedHetznerServerType,
         envVars: {
           KORTIX_TOKEN: sandboxKey.secretKey,
         },
@@ -388,6 +392,22 @@ export function createCloudSandboxRouter(
     } catch (err) {
       console.error('[SANDBOX-CLOUD] remove error:', err);
       return c.json({ success: false, error: 'Failed to remove sandbox' }, 500);
+    }
+  });
+
+  // ── Hetzner server types (public, no auth needed — frontend uses it for tier selection) ──
+
+  router.get('/hetzner/server-types', async (c) => {
+    if (!config.isHetznerEnabled()) {
+      return c.json({ error: 'Hetzner provider is not enabled' }, 404);
+    }
+    try {
+      const location = c.req.query('location') || config.HETZNER_DEFAULT_LOCATION;
+      const types = await listServerTypes(location);
+      return c.json({ serverTypes: types, location });
+    } catch (err: any) {
+      console.error('[SANDBOX-CLOUD] hetzner server-types error:', err);
+      return c.json({ error: 'Failed to fetch server types' }, 500);
     }
   });
 

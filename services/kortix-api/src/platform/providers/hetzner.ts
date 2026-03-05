@@ -155,7 +155,11 @@ export class HetznerProvider implements SandboxProvider {
       throw new Error('HETZNER_SNAPSHOT_ID is not configured — set it to the Hetzner snapshot ID');
     }
 
-    const serverType = config.HETZNER_DEFAULT_SERVER_TYPE;
+    const requestedServerType = opts.hetznerServerType;
+    const serverType = requestedServerType || config.HETZNER_DEFAULT_SERVER_TYPE;
+    if (requestedServerType && requestedServerType !== 'cpx22' && requestedServerType !== 'cpx32') {
+      throw new Error(`Invalid Hetzner server type: ${requestedServerType}. Allowed: cpx22, cpx32`);
+    }
     const location = config.HETZNER_DEFAULT_LOCATION;
 
     // Match Daytona behavior: one sandbox-scoped token for both directions.

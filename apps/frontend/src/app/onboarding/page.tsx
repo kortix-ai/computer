@@ -21,7 +21,7 @@ import { useServerStore } from '@/stores/server-store';
 import { Button } from '@/components/ui/button';
 import { WallpaperBackground } from '@/components/ui/wallpaper-background';
 import { authenticatedFetch } from '@/lib/auth-token';
-import { useSandbox } from '@/hooks/platform/use-sandbox';
+import { useSandbox, useProviders } from '@/hooks/platform/use-sandbox';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -164,18 +164,58 @@ export default function OnboardingPage() {
 
   // Ensure sandbox is registered in server store (same as dashboard layout).
   // This makes getInstanceUrl() return the correct sandbox URL.
-  useSandbox();
+  const { sandbox } = useSandbox();
+  const { data: providersInfo } = useProviders();
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState<BootPhase>('power');
   const [visibleLines, setVisibleLines] = useState(0);
   const [progressFill, setProgressFill] = useState(false);
   const [sessionError, setSessionError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
+  const [onboardingWaitSec, setOnboardingWaitSec] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const bootTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const createSessionRef = useRef(createSession);
   createSessionRef.current = createSession;
+
+  const isHetznerOnboarding =
+    sandbox?.provider === 'hetzner' || (!sandbox && providersInfo?.default === 'hetzner');
+
+  const getHetznerProvisioningMessage = useCallback((elapsedSec: number) => {
+    if (elapsedSec < 20) return 'Allocating Hetzner VPS...';
+    if (elapsedSec < 90) return 'Provisioning from snapshot...';
+    if (elapsedSec < 150) return 'Booting sandbox services...';
+    return 'Running health checks...';
+  }, []);
+
+  const waitForSandboxHealthVersion = useCallback(async (timeoutMs = 180_000): Promise<string | null> => {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const instanceUrl = getInstanceUrl();
+      if (instanceUrl) {
+        try {
+          const res = await authenticatedFetch(
+            `${instanceUrl}/kortix/health`,
+            { signal: AbortSignal.timeout(5000) },
+            { retryOnAuthError: false },
+          );
+          if (res.ok) {
+            const health = await res.json().catch(() => null) as { version?: string } | null;
+            const version = typeof health?.version === 'string' ? health.version : '';
+            if (version && version !== '0.0.0') return version;
+          }
+        } catch {
+          // keep waiting; service may still be starting
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    return null;
+  }, []);
 
   useEffect(() => setMounted(true), []);
   const isDark = !mounted || resolvedTheme !== 'light';
@@ -243,6 +283,18 @@ export default function OnboardingPage() {
     check();
   }, [router]);
 
+  // ── Onboarding wait timer (for Hetzner-specific provisioning copy) ──
+  useEffect(() => {
+    if (phase !== 'onboarding') {
+      setOnboardingWaitSec(0);
+      return;
+    }
+
+    setOnboardingWaitSec(0);
+    const id = setInterval(() => setOnboardingWaitSec((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
   // ── Redirect to auth if not logged in ─────────────────────────
   useEffect(() => {
     if (!isLoading && !user) {
@@ -273,6 +325,15 @@ export default function OnboardingPage() {
       try {
         let finalSessionId: string | null = null;
         let needsCommand = false;
+
+        // Hetzner cold starts can take 2-3 minutes; wait for real health/version
+        // before starting onboarding session flow.
+        if (isHetznerOnboarding) {
+          const version = await waitForSandboxHealthVersion(180_000);
+          if (!version) {
+            throw new Error('Hetzner sandbox is still provisioning. Please wait and retry.');
+          }
+        }
 
         // 1. Check if the command was already fired (persisted flag survives
         //    page refresh, unlike the in-memory commandFiredRef).
@@ -364,7 +425,7 @@ export default function OnboardingPage() {
     })();
 
     return () => clearTimeout(retryTimer);
-  }, [phase, sessionError, retryTick, router]);
+  }, [phase, sessionError, retryTick, router, isHetznerOnboarding, waitForSandboxHealthVersion]);
 
   // ── Liveness fallback: if session is mounted but assistant never starts ──
   // This recovers from transient command delivery failures that can leave the
@@ -651,7 +712,14 @@ export default function OnboardingPage() {
               ) : (
                 <div className="flex flex-col items-center gap-3">
                   <LoadingDots />
-                  <p className="text-xs text-muted-foreground">Setting up your workspace…</p>
+                  {isHetznerOnboarding ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">{getHetznerProvisioningMessage(onboardingWaitSec)}</p>
+                      <p className="text-[11px] text-muted-foreground/70">Provisioning Hetzner sandbox... Connected when health is ready.</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Setting up your workspace…</p>
+                  )}
                 </div>
               )}
             </div>
