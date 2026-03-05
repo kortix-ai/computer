@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type SandboxProviderName = 'daytona' | 'local_docker';
+export type SandboxProviderName = 'daytona' | 'local_docker' | 'hetzner';
 export type InternalKortixEnv = 'dev' | 'staging' | 'prod';
 
 /** Single source of truth for the sandbox version. Update on each release. */
@@ -120,6 +120,13 @@ const envSchema = z.object({
   DAYTONA_SERVER_URL:          optStr,
   DAYTONA_TARGET:              optStr,
 
+  // ── Hetzner — Sandbox provisioning (conditional: required if hetzner provider enabled) ──
+  HETZNER_API_KEY:             optStr,
+  HETZNER_DEFAULT_LOCATION:    optStrDefault('nbg1'),  // Nuremberg (cheapest EU)
+  HETZNER_SNAPSHOT_ID:         optStr,                 // pre-built sandbox snapshot ID
+  HETZNER_SSH_KEY_ID:          optStr,                 // SSH key ID registered in Hetzner
+  HETZNER_DEFAULT_SERVER_TYPE: optStrDefault('cpx22'),   // 2 vCPU / 4 GB shared (cx22 deprecated)
+
   // ── Sandbox Platform (optional) ──────────────────────────────────────────
   KORTIX_URL:                  optStr,
   ALLOWED_SANDBOX_PROVIDERS:   optStrDefault('local_docker'),
@@ -203,7 +210,7 @@ function parseAllowedProviders(raw: string): SandboxProviderName[] {
   const names = raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   const valid: SandboxProviderName[] = [];
   for (const n of names) {
-    if (n === 'daytona' || n === 'local_docker') {
+    if (n === 'daytona' || n === 'local_docker' || n === 'hetzner') {
       if (!valid.includes(n)) valid.push(n);
     } else {
       console.warn(`[config] Unknown sandbox provider "${n}" in ALLOWED_SANDBOX_PROVIDERS - ignored`);
@@ -239,6 +246,12 @@ function validateEnv(): z.infer<typeof envSchema> {
   // ── Conditional: local_docker → need DOCKER_HOST ───────────────────────
   if (providers.includes('local_docker')) {
     if (!raw.DOCKER_HOST) issues.push({ var: 'DOCKER_HOST', message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "local_docker"', level: 'error' });
+  }
+
+  // ── Conditional: hetzner → need Hetzner keys ──────────────────────────
+  if (providers.includes('hetzner')) {
+    if (!raw.HETZNER_API_KEY)     issues.push({ var: 'HETZNER_API_KEY',     message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
+    if (!raw.HETZNER_SNAPSHOT_ID) issues.push({ var: 'HETZNER_SNAPSHOT_ID', message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
   }
 
   // ── Conditional: Pipedream integration → need credentials ──────────────
@@ -378,6 +391,13 @@ export const config = {
   DAYTONA_SERVER_URL: env.DAYTONA_SERVER_URL,
   DAYTONA_TARGET: env.DAYTONA_TARGET,
   DAYTONA_SNAPSHOT: `kortix-sandbox-v${SANDBOX_VERSION}`,
+
+  // ─── Hetzner (VPS Sandbox provisioning) ──────────────────────────────────
+  HETZNER_API_KEY: env.HETZNER_API_KEY,
+  HETZNER_DEFAULT_LOCATION: env.HETZNER_DEFAULT_LOCATION,
+  HETZNER_SNAPSHOT_ID: env.HETZNER_SNAPSHOT_ID,
+  HETZNER_SSH_KEY_ID: env.HETZNER_SSH_KEY_ID,
+  HETZNER_DEFAULT_SERVER_TYPE: env.HETZNER_DEFAULT_SERVER_TYPE,
 
   // ─── Sandbox Provisioning (Platform) ──────────────────────────────────────
   KORTIX_URL: env.KORTIX_URL,
@@ -519,6 +539,10 @@ export const config = {
 
   isLocalDockerEnabled(): boolean {
     return this.ALLOWED_SANDBOX_PROVIDERS.includes('local_docker');
+  },
+
+  isHetznerEnabled(): boolean {
+    return this.ALLOWED_SANDBOX_PROVIDERS.includes('hetzner') && !!this.HETZNER_API_KEY;
   },
 
   /** The first provider in ALLOWED_SANDBOX_PROVIDERS is the default. */
