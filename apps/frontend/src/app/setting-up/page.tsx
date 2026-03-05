@@ -37,6 +37,8 @@ export default function SettingUpPage() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [sandboxProgress, setSandboxProgress] = useState(0);
   const isRunning = useRef(false);
+  const runSeqRef = useRef(0);
+  const autoStartedRef = useRef(false);
 
   const isHetznerDefault = providersInfo?.default === 'hetzner';
   const stepInfo = {
@@ -95,6 +97,8 @@ export default function SettingUpPage() {
   const runSetup = useCallback(async () => {
     if (!user || isRunning.current) return;
     isRunning.current = true;
+    const runSeq = ++runSeqRef.current;
+    const isCurrentRun = () => runSeqRef.current === runSeq;
     setErrorMessage('');
     let sandboxStepTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -110,10 +114,12 @@ export default function SettingUpPage() {
       }
 
       // Step 1: Check account status
+      if (!isCurrentRun()) return;
       setStep('checking');
       await billingApi.getAccountState(true);
 
       // Step 2: Initialize subscription + sandbox (one-shot backend call)
+      if (!isCurrentRun()) return;
       setStep('subscription');
       sandboxStepTimer = setTimeout(() => setStep('sandbox'), 1200);
       setSandboxProgress(0);
@@ -137,6 +143,8 @@ export default function SettingUpPage() {
         await new Promise((r) => setTimeout(r, attempt * 1200));
         response = await initializeSetup();
       }
+
+      if (!isCurrentRun()) return;
 
       if (sandboxStepTimer) {
         clearTimeout(sandboxStepTimer);
@@ -170,23 +178,31 @@ export default function SettingUpPage() {
       }
 
       // Done — redirect to dashboard
+      if (!isCurrentRun()) return;
       setStep('success');
-      setTimeout(() => router.push('/dashboard'), 1000);
+      setTimeout(() => {
+        if (isCurrentRun()) router.push('/dashboard');
+      }, 1000);
     } catch (err) {
       if (sandboxStepTimer) {
         clearTimeout(sandboxStepTimer);
       }
+      if (!isCurrentRun()) return;
       console.error('[setting-up] Setup error:', err);
       setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
       setStep('error');
     } finally {
-      isRunning.current = false;
+      if (isCurrentRun()) {
+        isRunning.current = false;
+      }
     }
   }, [user, router, isHetznerDefault, waitForHetznerSandboxReady]);
 
   useEffect(() => {
+    if (!user || autoStartedRef.current) return;
+    autoStartedRef.current = true;
     runSetup();
-  }, [runSetup]);
+  }, [user, runSetup]);
 
   const handleRetry = () => {
     setStep('checking');
