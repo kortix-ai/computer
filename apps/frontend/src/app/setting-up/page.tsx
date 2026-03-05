@@ -149,7 +149,7 @@ export default function SettingUpPage() {
       const data = response.data!;
 
       // Step 3: Show sandbox status
-      if (data.sandbox === 'created' || data.sandbox === 'exists') {
+      if (data.sandbox === 'created' || data.sandbox === 'exists' || (providerIsHetzner && data.sandbox === 'skipped')) {
         setStep('sandbox');
         if (providerIsHetzner) {
           const version = await waitForHetznerSandboxReady(240000);
