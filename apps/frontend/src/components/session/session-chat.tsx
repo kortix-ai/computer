@@ -4050,6 +4050,18 @@ export function SessionChat({
 			// (not duplicate) the optimistic parts. This matches OpenCode's
 			// SolidJS approach where part IDs are sent with the prompt request.
 			const textPartId = ascendingId("prt");
+			const uploadBatchTs = Date.now();
+			const uploadPlans = (files ?? []).map((af, index) => {
+				const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+				const uniqueName = `${uploadBatchTs}-${index}-${safeName}`;
+				return {
+					file: af.file,
+					filename: af.file.name,
+					mime: af.file.type || "application/octet-stream",
+					uniqueName,
+					optimisticPath: `/workspace/uploads/${uniqueName}`,
+				};
+			});
 
 			// Build optimistic text that includes session ref XML so that
 			// HighlightMentions / UserMessageRow can detect multi-word session
@@ -4058,6 +4070,15 @@ export function SessionChat({
 				(m) => m.kind === "session" && m.value,
 			);
 			let optimisticText = text;
+			if (uploadPlans.length > 0) {
+				const optimisticFileRefs = uploadPlans
+					.map(
+						(f) =>
+							`<file path="${f.optimisticPath}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
+					)
+					.join("\n");
+				optimisticText = `${optimisticText}\n\n${optimisticFileRefs}`;
+			}
 			if (
 				sessionMentionsForOptimistic &&
 				sessionMentionsForOptimistic.length > 0
@@ -4065,7 +4086,7 @@ export function SessionChat({
 				const refs = sessionMentionsForOptimistic
 					.map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
 					.join("\n");
-				optimisticText = `${text}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
+				optimisticText = `${optimisticText}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
 			}
 
 			// Optimistic: show message immediately in sync store + set busy
@@ -4088,44 +4109,34 @@ export function SessionChat({
 
 			// Build parts: text first, then upload attached files to /workspace/uploads/
 			// and send as XML text references (agent reads from disk on demand, not loaded into context)
-			const parts: Array<
-				| { id: string; type: "text"; text: string }
-				| {
-						id: string;
-						type: "file";
-						mime: string;
-						url: string;
-						filename?: string;
-				  }
-			> = [{ id: textPartId, type: "text", text }];
+			const parts: Array<{ id: string; type: "text"; text: string }> = [
+				{ id: textPartId, type: "text", text },
+			];
 
-			if (files && files.length > 0) {
+			if (uploadPlans.length > 0) {
 				const uploadResults = await Promise.all(
-					files.map(async (af) => {
-						const timestamp = Date.now();
-						const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-						const uniqueName = `${timestamp}-${safeName}`;
-						const uploadBlob = new File([af.file], uniqueName, {
-							type: af.file.type,
+					uploadPlans.map(async (plan) => {
+						const uploadBlob = new File([plan.file], plan.uniqueName, {
+							type: plan.file.type,
 						});
 						const results = await uploadFile(uploadBlob, "/workspace/uploads");
 						if (!results || results.length === 0) {
-							throw new Error(`Failed to upload file: ${af.file.name}`);
+							throw new Error(`Failed to upload file: ${plan.filename}`);
 						}
 						return {
 							path: results[0].path,
-							mime: af.file.type || "application/octet-stream",
-							filename: af.file.name,
+							mime: plan.mime,
+							filename: plan.filename,
 						};
 					}),
 				);
-				for (const f of uploadResults) {
-					parts.push({
-						id: ascendingId("prt"),
-						type: "text",
-						text: `<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
-					});
-				}
+				const uploadedFileRefs = uploadResults
+					.map(
+						(f) =>
+							`<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
+					)
+					.join("\n");
+				parts[0].text = `${parts[0].text}\n\n${uploadedFileRefs}`;
 			}
 
 			// Append session reference hints for @session mentions
@@ -4136,11 +4147,7 @@ export function SessionChat({
 				const refs = sessionMentions
 					.map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
 					.join("\n");
-				parts.push({
-					id: ascendingId("prt"),
-					type: "text",
-					text: `\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`,
-				});
+				parts[0].text = `${parts[0].text}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
 			}
 
 			// Fire-and-forget via session.prompt (matching OpenCode app's approach).
@@ -4706,9 +4713,28 @@ export function SessionChat({
 								{queuedMessages.length !== 1 ? "s" : ""} queued
 								{!queueExpanded && queuedMessages.length > 0 && (
 									<span className="text-foreground/80 font-medium">
-										{" "}
-										· {queuedMessages[0].text.slice(0, 50)}
-										{queuedMessages[0].text.length > 50 ? "…" : ""}
+										{(() => {
+											const previewText = queuedMessages[0].text.trim();
+											if (previewText.length > 0) {
+												return (
+													<>
+											{" "}
+														· {previewText.slice(0, 50)}
+														{previewText.length > 50 ? "…" : ""}
+													</>
+												);
+											}
+											const fileCount = queuedMessages[0].files?.length ?? 0;
+											if (fileCount > 0) {
+												return (
+													<>
+														{" "}
+														· {fileCount} file{fileCount > 1 ? "s" : ""}
+													</>
+												);
+											}
+											return null;
+										})()}
 									</span>
 								)}
 							</span>
@@ -4752,7 +4778,7 @@ export function SessionChat({
 												{idx + 1}
 											</span>
 											<p className="flex-1 text-xs text-muted-foreground truncate min-w-0">
-												{qm.text}
+												{qm.text || `${qm.files?.length ?? 0} file${(qm.files?.length ?? 0) === 1 ? "" : "s"}`}
 											</p>
 											<div className="flex items-center gap-0.5 opacity-0 group-hover/q:opacity-100 transition-opacity shrink-0">
 												<Tooltip>
