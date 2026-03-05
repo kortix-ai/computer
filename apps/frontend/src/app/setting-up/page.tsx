@@ -9,6 +9,7 @@ import { backendApi } from '@/lib/api-client';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useProviders } from '@/hooks/platform/use-sandbox';
 
 // Lazy load heavy components
 const AnimatedBg = lazy(() => import('@/components/ui/animated-bg').then(mod => ({ default: mod.AnimatedBg })));
@@ -29,14 +30,27 @@ const STEP_INFO: Record<Exclude<SetupStep, 'success' | 'error'>, StepInfo> = {
 export default function SettingUpPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { data: providersInfo } = useProviders();
   const [step, setStep] = useState<SetupStep>('checking');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const isRunning = useRef(false);
+
+  const isHetznerDefault = providersInfo?.default === 'hetzner';
+  const stepInfo = {
+    ...STEP_INFO,
+    sandbox: {
+      label: isHetznerDefault ? 'Preparing Hetzner VPS' : STEP_INFO.sandbox.label,
+      detail: isHetznerDefault
+        ? 'Provisioning from snapshot (cold starts usually 2-3 minutes)...'
+        : STEP_INFO.sandbox.detail,
+    },
+  };
 
   const runSetup = useCallback(async () => {
     if (!user || isRunning.current) return;
     isRunning.current = true;
     setErrorMessage('');
+    let sandboxStepTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
       // Step 1: Check if account is already fully set up
@@ -55,12 +69,21 @@ export default function SettingUpPage() {
 
       // Step 2: Initialize subscription + sandbox (one-shot backend call)
       setStep('subscription');
+      sandboxStepTimer = setTimeout(() => setStep('sandbox'), 1200);
       const response = await backendApi.post<{
         status: string;
         tier: string;
         sandbox: 'created' | 'exists' | 'skipped' | 'failed';
         sandbox_error?: string;
-      }>('/billing/setup/initialize');
+      }>('/billing/setup/initialize', undefined, {
+        // Hetzner provisioning can take 2-3 minutes on first create.
+        timeout: 240000,
+      });
+
+      if (sandboxStepTimer) {
+        clearTimeout(sandboxStepTimer);
+        sandboxStepTimer = null;
+      }
 
       if (!response.success) {
         throw new Error(response.error?.message || 'Failed to initialize account');
@@ -83,6 +106,9 @@ export default function SettingUpPage() {
       setStep('success');
       setTimeout(() => router.push('/dashboard'), 1000);
     } catch (err) {
+      if (sandboxStepTimer) {
+        clearTimeout(sandboxStepTimer);
+      }
       console.error('[setting-up] Setup error:', err);
       setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
       setStep('error');
@@ -124,7 +150,7 @@ export default function SettingUpPage() {
                 <CardContent className="p-6">
                   <div className="flex flex-col gap-4">
                     {(['checking', 'subscription', 'sandbox'] as const).map((s) => {
-                      const info = STEP_INFO[s];
+                      const info = stepInfo[s];
                       const isActive = s === step;
                       const isDone = getStepOrder(step) > getStepOrder(s);
 
