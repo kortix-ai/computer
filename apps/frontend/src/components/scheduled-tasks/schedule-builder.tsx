@@ -237,10 +237,10 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
             type="button"
             onClick={() => update({ frequency: freq })}
             className={cn(
-              "flex-1 px-1 py-1.5 rounded-lg text-xs font-medium transition-all text-center",
+              "flex-1 px-1 py-1.5 rounded-lg text-xs font-medium transition-all text-center cursor-pointer",
               state.frequency === freq
                 ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
             )}
           >
             {label}
@@ -258,7 +258,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
               value={String(state.interval)}
               onValueChange={(v) => update({ interval: Number(v) })}
             >
-              <SelectTrigger className="w-20 h-8 text-sm">
+              <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -266,7 +266,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                   ? [1, 2, 3, 5, 10, 15, 20, 30, 45]
                   : [1, 2, 3, 4, 6, 8, 12]
                 ).map(n => (
-                  <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                  <SelectItem key={n} value={String(n)} className="cursor-pointer data-[highlighted]:bg-muted/70">{n}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -284,12 +284,12 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
               value={String(state.monthDay)}
               onValueChange={(v) => update({ monthDay: Number(v) })}
             >
-              <SelectTrigger className="w-20 h-8 text-sm">
+              <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                  <SelectItem key={d} value={String(d)}>{d}</SelectItem>
+                  <SelectItem key={d} value={String(d)} className="cursor-pointer data-[highlighted]:bg-muted/70">{d}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -306,7 +306,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                 type="button"
                 onClick={() => toggleWeekday(day)}
                 className={cn(
-                  "flex-1 h-8 rounded-lg text-xs font-medium transition-all",
+                  "flex-1 h-8 rounded-lg text-xs font-medium transition-all cursor-pointer",
                   state.weekdays.includes(day)
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "bg-background text-muted-foreground border border-border hover:border-foreground/30 hover:text-foreground"
@@ -329,12 +329,12 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                   value={String(state.minute)}
                   onValueChange={(v) => update({ minute: Number(v) })}
                 >
-                  <SelectTrigger className="w-20 h-8 text-sm">
+                  <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {MINUTE_OPTIONS.map(m => (
-                      <SelectItem key={m} value={String(m)}>
+                      <SelectItem key={m} value={String(m)} className="cursor-pointer data-[highlighted]:bg-muted/70">
                         :{String(m).padStart(2, '0')}
                       </SelectItem>
                     ))}
@@ -348,12 +348,12 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                   value={String(state.hour)}
                   onValueChange={(v) => update({ hour: Number(v) })}
                 >
-                  <SelectTrigger className="w-20 h-8 text-sm">
+                  <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {HOURS.map(h => (
-                      <SelectItem key={h} value={String(h)}>
+                      <SelectItem key={h} value={String(h)} className="cursor-pointer data-[highlighted]:bg-muted/70">
                         {String(h).padStart(2, '0')}
                       </SelectItem>
                     ))}
@@ -364,12 +364,12 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
                   value={String(state.minute)}
                   onValueChange={(v) => update({ minute: Number(v) })}
                 >
-                  <SelectTrigger className="w-20 h-8 text-sm">
+                  <SelectTrigger className="w-20 h-8 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {MINUTE_OPTIONS.map(m => (
-                      <SelectItem key={m} value={String(m)}>
+                      <SelectItem key={m} value={String(m)} className="cursor-pointer data-[highlighted]:bg-muted/70">
                         {String(m).padStart(2, '0')}
                       </SelectItem>
                     ))}
@@ -391,7 +391,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
         <button
           type="button"
           onClick={() => setShowCron(!showCron)}
-          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           <ChevronDown className={cn("h-3 w-3 transition-transform", showCron && "rotate-180")} />
           {showCron ? 'Hide' : 'Edit'} cron expression

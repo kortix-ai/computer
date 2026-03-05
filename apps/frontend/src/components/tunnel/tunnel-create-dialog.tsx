@@ -196,8 +196,8 @@ function ScopeToggle({
     <button
       onClick={onToggle}
       className={cn(
-        'flex items-center gap-2.5 w-full rounded-md px-2.5 py-1.5 text-left transition-colors',
-        enabled ? 'bg-primary/5' : 'hover:bg-muted/50',
+        'flex items-center gap-2.5 w-full rounded-md px-2.5 py-1.5 text-left transition-all cursor-pointer',
+        enabled ? 'bg-primary/8 border border-primary/15' : 'hover:bg-muted/60 border border-transparent',
       )}
     >
       <div
@@ -252,7 +252,7 @@ function PermissionsStep({
             <div key={category}>
               <button
                 onClick={() => onToggleCategory(category)}
-                className="flex items-center gap-2 w-full mb-0.5 px-0.5 group"
+                className="flex items-center gap-2 w-full mb-0.5 px-0.5 py-1 rounded-md group cursor-pointer hover:bg-muted/40 transition-colors"
               >
                 <div
                   className={cn(

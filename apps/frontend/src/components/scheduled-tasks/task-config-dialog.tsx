@@ -206,12 +206,12 @@ export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDi
               <div className="space-y-2">
                 <Label>Timezone</Label>
                 <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger>
+                  <SelectTrigger className="cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {TIMEZONES.map((tz) => (
-                      <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                      <SelectItem key={tz} value={tz} className="cursor-pointer data-[highlighted]:bg-muted/70">{tz}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -219,12 +219,12 @@ export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDi
               <div className="space-y-2">
                 <Label>Session Mode</Label>
                 <Select value={sessionMode} onValueChange={(v) => setSessionMode(v as SessionMode)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="cursor-pointer hover:bg-muted/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new">New Session</SelectItem>
-                    <SelectItem value="reuse">Reuse Session</SelectItem>
+                    <SelectItem value="new" className="cursor-pointer data-[highlighted]:bg-muted/70">New Session</SelectItem>
+                    <SelectItem value="reuse" className="cursor-pointer data-[highlighted]:bg-muted/70">Reuse Session</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -260,13 +260,13 @@ export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDi
                     value={modelSelection || DEFAULT_VALUE}
                     onValueChange={(v) => setModelSelection(v === DEFAULT_VALUE ? '' : v)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-pointer hover:bg-muted/40 transition-colors">
                       <SelectValue placeholder="Default (Sonnet)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={DEFAULT_VALUE}>Default (Sonnet)</SelectItem>
+                      <SelectItem value={DEFAULT_VALUE} className="cursor-pointer data-[highlighted]:bg-muted/70">Default (Sonnet)</SelectItem>
                       {modelOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        <SelectItem key={opt.value} value={opt.value} className="cursor-pointer data-[highlighted]:bg-muted/70">{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -289,13 +289,13 @@ export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDi
                     value={agentName || DEFAULT_VALUE}
                     onValueChange={(v) => setAgentName(v === DEFAULT_VALUE ? '' : v)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-pointer hover:bg-muted/40 transition-colors">
                       <SelectValue placeholder="Default agent" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={DEFAULT_VALUE}>Default agent</SelectItem>
+                      <SelectItem value={DEFAULT_VALUE} className="cursor-pointer data-[highlighted]:bg-muted/70">Default agent</SelectItem>
                       {agents?.map((agent) => (
-                        <SelectItem key={agent.name} value={agent.name}>
+                        <SelectItem key={agent.name} value={agent.name} className="cursor-pointer data-[highlighted]:bg-muted/70">
                           {agent.name}
                           {agent.description ? ` — ${agent.description}` : ''}
                         </SelectItem>

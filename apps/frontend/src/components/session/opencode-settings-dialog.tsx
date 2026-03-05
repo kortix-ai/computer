@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Settings,
   Shield,
@@ -26,7 +26,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -136,7 +136,7 @@ function GeneralSection({
   const snapshot = (draft.snapshot as boolean | undefined) ?? config.snapshot ?? false;
 
   return (
-    <div className="space-y-6 overflow-y-auto pr-1">
+    <div className="space-y-6">
       {/* Custom Instructions */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -168,13 +168,13 @@ function GeneralSection({
           value={model || '__auto__'}
           onValueChange={(v) => onDraft('model', v === '__auto__' ? undefined : v)}
         >
-          <SelectTrigger className="w-full font-mono text-sm rounded-xl">
+          <SelectTrigger className="w-full font-mono text-sm rounded-xl cursor-pointer hover:bg-muted/40 transition-colors">
             <SelectValue placeholder="Auto-detect" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__auto__">Auto-detect</SelectItem>
+            <SelectItem value="__auto__" className="cursor-pointer data-[highlighted]:bg-muted/70">Auto-detect</SelectItem>
             {allModels.map((m) => (
-              <SelectItem key={m.label} value={m.label}>
+              <SelectItem key={m.label} value={m.label} className="cursor-pointer data-[highlighted]:bg-muted/70">
                 {m.label}
               </SelectItem>
             ))}
@@ -425,7 +425,7 @@ function PermissionsSection({
   };
 
   return (
-    <div className="space-y-6 overflow-y-auto pr-1">
+    <div className="space-y-6">
       {/* Global permission mode */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -1132,6 +1132,9 @@ export function OpenCodeSettingsDialog({
   const { data: config, isLoading } = useOpenCodeConfig();
   const updateMutation = useUpdateOpenCodeConfig();
   const [draft, setDraft] = useState<Record<string, unknown>>({});
+  const [activeTab, setActiveTab] = useState<'general' | 'providers' | 'permissions' | 'mcp'>('general');
+  const contentInnerRef = useRef<HTMLDivElement | null>(null);
+  const [contentHeight, setContentHeight] = useState<number>(0);
 
   const onDraft = useCallback((key: string, value: unknown) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -1150,16 +1153,52 @@ export function OpenCodeSettingsDialog({
 
   const handleDiscard = useCallback(() => setDraft({}), []);
 
+  const measureContentHeight = useCallback(() => {
+    const el = contentInnerRef.current;
+    if (!el) return;
+    setContentHeight(Math.ceil(el.getBoundingClientRect().height));
+  }, []);
+
+  const handleTabChange = useCallback((value: string) => {
+    const el = contentInnerRef.current;
+    if (el) {
+      setContentHeight(Math.ceil(el.getBoundingClientRect().height));
+    }
+    setActiveTab(value as 'general' | 'providers' | 'permissions' | 'mcp');
+  }, []);
+
   // Reset draft when dialog closes
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
         setDraft({});
+        setActiveTab('general');
+        setContentHeight(0);
       }
       onOpenChange(nextOpen);
     },
     [onOpenChange],
   );
+
+  useEffect(() => {
+    if (!open || isLoading || !config) return;
+    const raf = requestAnimationFrame(() => {
+      measureContentHeight();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, isLoading, config, activeTab, measureContentHeight]);
+
+  useEffect(() => {
+    const el = contentInnerRef.current;
+    if (!el || isLoading || !config) return;
+
+    const observer = new ResizeObserver(() => {
+      measureContentHeight();
+    });
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [activeTab, isLoading, config, measureContentHeight]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -1183,7 +1222,7 @@ export function OpenCodeSettingsDialog({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <div className="px-6 pt-3 flex-shrink-0">
               <TabsList className="w-full">
                 <TabsTrigger value="general" className="flex-1 gap-1.5">
@@ -1205,30 +1244,43 @@ export function OpenCodeSettingsDialog({
               </TabsList>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-              <TabsContent value="general" className="mt-0 h-full">
-                <GeneralSection
-                  draft={draft}
-                  config={config}
-                  onDraft={onDraft}
-                />
-              </TabsContent>
+            <div
+              className="overflow-hidden transition-[height] duration-300 ease-out"
+              style={contentHeight ? { height: contentHeight } : undefined}
+            >
+              <div ref={contentInnerRef} className="px-6 py-4">
+                {activeTab === 'general' && (
+                  <div className="max-h-[56vh] overflow-y-auto pr-1">
+                    <GeneralSection
+                      draft={draft}
+                      config={config}
+                      onDraft={onDraft}
+                    />
+                  </div>
+                )}
 
-              <TabsContent value="providers" className="mt-0 h-full">
-                <ProvidersSection onDirty={() => {}} />
-              </TabsContent>
+                {activeTab === 'providers' && (
+                  <div className="max-h-[56vh] overflow-y-auto pr-1">
+                    <ProvidersSection onDirty={() => {}} />
+                  </div>
+                )}
 
-              <TabsContent value="permissions" className="mt-0 h-full">
-                <PermissionsSection
-                  draft={draft}
-                  config={config}
-                  onDraft={onDraft}
-                />
-              </TabsContent>
+                {activeTab === 'permissions' && (
+                  <div className="max-h-[56vh] overflow-y-auto pr-1">
+                    <PermissionsSection
+                      draft={draft}
+                      config={config}
+                      onDraft={onDraft}
+                    />
+                  </div>
+                )}
 
-              <TabsContent value="mcp" className="mt-0 h-full">
-                <McpServersSection />
-              </TabsContent>
+                {activeTab === 'mcp' && (
+                  <div className="max-h-[56vh] overflow-y-auto pr-1">
+                    <McpServersSection />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Save / Discard footer */}
