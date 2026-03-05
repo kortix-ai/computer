@@ -212,13 +212,22 @@ export function TunnelOverview() {
   return (
     <div className="min-h-[100dvh]">
       <div className="container mx-auto max-w-7xl px-3 sm:px-4 pt-6 sm:pt-8 pb-2 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl border bg-primary/10 border-primary/20">
-            <Cable className="h-5 w-5 text-primary" />
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl border bg-primary/10 border-primary/20">
+              <Cable className="h-5 w-5 text-primary" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">Tunnel</h1>
           </div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">Tunnel</h1>
-          <Button variant="ghost" className="bg-muted rounded-full hover:bg-muted/80" size="icon" onClick={() => setCreateDialogOpen(true)}>
+          <Button
+            variant="default"
+            size="sm"
+            className="h-9 px-3 sm:px-4 rounded-xl gap-1.5 sm:gap-2 text-sm"
+            onClick={() => setCreateDialogOpen(true)}
+          >
             <Plus className="h-4 w-4" />
+            <span className="hidden xs:inline">Add Connection</span>
+            <span className="xs:hidden">Add</span>
           </Button>
         </div>
       </div>

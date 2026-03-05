@@ -29,7 +29,7 @@ export const SearchFilterBar = ({
           {searchQuery && (
             <button
               onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md p-0.5 transition-colors cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -41,10 +41,10 @@ export const SearchFilterBar = ({
           <button
             key={filter}
             onClick={() => onAuthFilterChange(filter)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all cursor-pointer ${
               authFilter === filter
-                ? 'bg-background text-foreground border border-border/50'
-                : 'text-muted-foreground hover:text-foreground border border-transparent'
+                ? 'bg-background text-foreground border border-border/50 shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/70 border border-transparent'
             }`}
           >
             {filter === 'oauth' ? 'OAuth' : filter === 'keys' ? 'API Key' : 'All'}
