@@ -471,6 +471,10 @@ function KaTeXBlock({ math }: { math: string }) {
 const FILE_EXTENSION_RE = /\.\w{1,10}$/;
 const COMMON_NON_FILES = new Set(['e.g.', 'i.e.', 'etc.', 'vs.', 'v1.', 'v2.']);
 
+function looksLikeUrl(text: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(text);
+}
+
 /** Heuristic: does this inline code text look like a file path? */
 function looksLikeFilePath(text: string): boolean {
   if (!text || text.length < 3 || text.length > 300) return false;
@@ -488,8 +492,23 @@ function looksLikeFilePath(text: string): boolean {
 /** Inline code that opens file preview modal when it looks like a file path */
 function ClickableInlineCode({ children }: { children: React.ReactNode }) {
   const openPreview = useFilePreviewStore((s) => s.openPreview);
-  const text = String(children);
+  const text = String(children).trim();
+  const isUrl = looksLikeUrl(text);
   const isFile = looksLikeFilePath(text);
+
+  if (isUrl) {
+    return (
+      <a
+        href={text}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block px-1.5 py-0.5 rounded-md text-[13px] font-mono bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/50 text-foreground cursor-pointer hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:border-blue-700/50 dark:hover:text-blue-400 transition-colors"
+        title={`Open ${text} in a new tab`}
+      >
+        {children}
+      </a>
+    );
+  }
 
   if (isFile) {
     return (
