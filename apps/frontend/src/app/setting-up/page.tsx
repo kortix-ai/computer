@@ -9,6 +9,7 @@ import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useProviders } from '@/hooks/platform/use-sandbox';
+import { getSandbox, getSandboxUrl } from '@/lib/platform-client';
 import { authenticatedFetch } from '@/lib/auth-token';
 
 // Lazy load heavy components
@@ -30,7 +31,6 @@ const STEP_INFO: Record<Exclude<SetupStep, 'success' | 'error'>, StepInfo> = {
 interface SetupStatusResponse {
   subscription: 'ready' | 'pending';
   sandbox: 'none' | 'provisioning' | 'ready';
-  sandbox_url?: string;
 }
 
 export default function SettingUpPage() {
@@ -85,24 +85,28 @@ export default function SettingUpPage() {
           { showErrors: false, timeout: 10000 },
         );
 
-        if (statusRes.success && statusRes.data?.sandbox === 'ready' && statusRes.data.sandbox_url) {
-          // Sandbox is ready in DB — verify it's actually responding
+        if (statusRes.success && statusRes.data?.sandbox === 'ready') {
+          // Sandbox is ready in DB — get it via platform API and health-check via proxy route
           try {
-            const healthRes = await authenticatedFetch(
-              `${statusRes.data.sandbox_url}/kortix/health`,
-              { signal: AbortSignal.timeout(5000) },
-              { retryOnAuthError: false },
-            );
-            if (healthRes.ok) {
-              const health = await healthRes.json().catch(() => null) as { version?: string } | null;
-              const version = typeof health?.version === 'string' ? health.version : '';
-              if (version && version !== '0.0.0') {
-                setSandboxProgress(100);
-                return true;
+            const sandbox = await getSandbox();
+            if (sandbox?.external_id) {
+              const sandboxUrl = getSandboxUrl(sandbox);
+              const healthRes = await authenticatedFetch(
+                `${sandboxUrl}/kortix/health`,
+                { signal: AbortSignal.timeout(5000) },
+                { retryOnAuthError: false },
+              );
+              if (healthRes.ok) {
+                const health = await healthRes.json().catch(() => null) as { version?: string } | null;
+                const version = typeof health?.version === 'string' ? health.version : '';
+                if (version && version !== '0.0.0') {
+                  setSandboxProgress(100);
+                  return true;
+                }
               }
             }
           } catch {
-            // Sandbox URL not reachable yet — keep polling
+            // Sandbox not reachable yet — keep polling
           }
         }
       } catch {

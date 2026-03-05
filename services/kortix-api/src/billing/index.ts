@@ -170,8 +170,6 @@ billingApp.get('/setup/status', async (c: any) => {
   return c.json({
     subscription: subscriptionReady ? 'ready' : 'pending',
     sandbox: sandboxState,
-    // Include sandbox URL when ready so frontend can health-check it
-    ...(sandboxState === 'ready' && sandbox?.baseUrl ? { sandbox_url: sandbox.baseUrl } : {}),
   });
 });
 
