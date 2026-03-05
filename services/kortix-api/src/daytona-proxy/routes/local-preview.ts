@@ -111,8 +111,12 @@ export async function proxyToSandbox(
   incomingBody: ArrayBuffer | undefined,
   acceptsSSE: boolean,
   origin: string,
+  /** Override the sandbox base URL (used by Hetzner provider — public IP). */
+  baseUrlOverride?: string,
+  /** Override per-sandbox service key (used by Hetzner). */
+  serviceKeyOverride?: string,
 ): Promise<Response> {
-  const sandboxBaseUrl = getSandboxBaseUrl(sandboxId);
+  const sandboxBaseUrl = baseUrlOverride || getSandboxBaseUrl(sandboxId);
   const targetUrl = port === KORTIX_MASTER_PORT
     ? `${sandboxBaseUrl}${path}${queryString}`
     : `${sandboxBaseUrl}/proxy/${port}${path}${queryString}`;
@@ -124,8 +128,9 @@ export async function proxyToSandbox(
     headers.set(key, value);
   }
   headers.set('Host', new URL(sandboxBaseUrl).host);
-  if (config.INTERNAL_SERVICE_KEY) {
-    headers.set('Authorization', `Bearer ${config.INTERNAL_SERVICE_KEY}`);
+  const serviceKey = serviceKeyOverride || config.INTERNAL_SERVICE_KEY;
+  if (serviceKey) {
+    headers.set('Authorization', `Bearer ${serviceKey}`);
   }
 
   // Tell the sandbox what the public proxy base URL is so it can set the
@@ -238,4 +243,3 @@ export async function proxyToSandbox(
     headers: respHeaders,
   });
 }
-

@@ -158,8 +158,10 @@ export class HetznerProvider implements SandboxProvider {
     const serverType = config.HETZNER_DEFAULT_SERVER_TYPE;
     const location = config.HETZNER_DEFAULT_LOCATION;
 
-    const sandboxToken = opts.envVars?.KORTIX_TOKEN || '';
-    const internalServiceKey = config.INTERNAL_SERVICE_KEY || '';
+    // Match Daytona behavior: one sandbox-scoped token for both directions.
+    // KORTIX_TOKEN: sandbox -> API auth
+    // INTERNAL_SERVICE_KEY: API proxy -> sandbox auth
+    const serviceKey = opts.envVars?.KORTIX_TOKEN || '';
 
     const serverName = `kortix-sandbox-${opts.accountId.slice(0, 8)}-${Date.now().toString(36)}`;
 
@@ -170,8 +172,8 @@ export class HetznerProvider implements SandboxProvider {
     const envVars: Record<string, string> = {
       KORTIX_API_URL: config.KORTIX_URL.replace(/\/v1\/router\/?$/, ''),
       ENV_MODE: 'cloud',
-      INTERNAL_SERVICE_KEY: internalServiceKey,
-      KORTIX_TOKEN: sandboxToken,
+      INTERNAL_SERVICE_KEY: serviceKey,
+      KORTIX_TOKEN: serviceKey,
       ...opts.envVars,
     };
 
