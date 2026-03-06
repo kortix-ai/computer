@@ -10,7 +10,7 @@ import { installOwner, selfHostedSignIn } from '@/app/auth/actions';
 import { ProviderSettings } from '@/components/providers/provider-settings';
 import { useServerStore, getActiveOpenCodeUrl } from '@/stores/server-store';
 import { resetClient } from '@/lib/opencode-sdk';
-import { invalidateTokenCache } from '@/lib/auth-token';
+import { invalidateTokenCache, authenticatedFetch } from '@/lib/auth-token';
 import { setBootstrapAuthToken } from '@/lib/auth-token';
 import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client';
 
@@ -146,7 +146,7 @@ function ToolSecretsStep({ onContinue, onSkip }: { onContinue: () => void; onSki
 
     try {
       for (const [key, value] of toSave) {
-        const res = await fetch(`${baseUrl}/env/${encodeURIComponent(key)}`, {
+        const res = await authenticatedFetch(`${baseUrl}/env/${encodeURIComponent(key)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ value: value.trim() }),
@@ -502,7 +502,21 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
 
   // ── Tool keys done (step 3 → navigate to onboarding) ──
   const handleToolKeysContinue = useCallback(() => {
-    router.push(returnUrl || '/onboarding');
+    const target = returnUrl || '/onboarding';
+
+    if (target.startsWith('/onboarding')) {
+      try {
+        const url = new URL(target, window.location.origin);
+        url.searchParams.set('redo', '1');
+        router.push(`${url.pathname}${url.search}`);
+        return;
+      } catch {
+        router.push('/onboarding?redo=1');
+        return;
+      }
+    }
+
+    router.push(target);
   }, [router, returnUrl]);
 
   // ── Early return: loading state ──
