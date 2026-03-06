@@ -4,6 +4,7 @@ import {
 	ArrowDown,
 	ArrowUp,
 	ArrowUpLeft,
+	Brain,
 	Check,
 	ChevronDown,
 	ChevronRight,
@@ -51,6 +52,11 @@ import {
 import { ToolPartRenderer } from "@/components/session/tool-renderers";
 import { SandboxUrlDetector } from "@/components/thread/content/sandbox-url-detector";
 import { Button } from "@/components/ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
 	Dialog,
 	DialogContent,
@@ -140,6 +146,7 @@ import {
 	type PatchPart,
 	type PermissionRequest,
 	type QuestionRequest,
+	type ReasoningPart,
 	type RetryInfo,
 	type SnapshotPart,
 	shouldShowToolPart,
@@ -1718,6 +1725,84 @@ function ThrottledMarkdown({
 	);
 }
 
+function ReasoningPartCard({
+	part,
+	isStreaming,
+}: {
+	part: ReasoningPart;
+	isStreaming: boolean;
+}) {
+	const [open, setOpen] = useState(false);
+	const [streamSeconds, setStreamSeconds] = useState(0);
+	const start = (part as any).time?.start;
+	const end = (part as any).time?.end;
+	const reasoningStreaming = isStreaming && !(typeof end === "number" && end > 0);
+
+	useEffect(() => {
+		if (!reasoningStreaming) {
+			setStreamSeconds(0);
+			return;
+		}
+		if (typeof start !== "number") {
+			setStreamSeconds(0);
+			return;
+		}
+		const update = () => {
+			setStreamSeconds(Math.max(0, Math.round((Date.now() - start) / 1000)));
+		};
+		update();
+		const timer = setInterval(update, 1000);
+		return () => clearInterval(timer);
+	}, [reasoningStreaming, start]);
+
+	const text = part.text?.trim();
+	if (!text) return null;
+
+	const hasDuration = typeof start === "number" && typeof end === "number" && end > start;
+	const duration = hasDuration ? formatDuration(end - start) : null;
+
+	return (
+		<Collapsible open={open} onOpenChange={setOpen}>
+			<div className="overflow-hidden">
+				<CollapsibleTrigger asChild>
+					<button
+						type="button"
+						className="w-full flex items-start gap-2 py-1 text-left group cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+					>
+						<Brain className={cn("size-3.5 mt-[1px] text-muted-foreground/65", reasoningStreaming && "animate-pulse-heartbeat")} />
+						<div className="min-w-0 flex-1">
+							<div className="flex items-center gap-2">
+								{reasoningStreaming ? (
+									<>
+										<span className="relative flex size-2.5">
+											<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/40" />
+											<span className="relative inline-flex rounded-full size-2.5 bg-muted-foreground/60" />
+										</span>
+										<span className="text-xs font-medium text-muted-foreground/90 animate-text-shimmer">Reasoning</span>
+									</>
+								) : (
+									<span className="text-xs font-medium text-muted-foreground/90">Reasoning</span>
+								)}
+								{reasoningStreaming ? (
+									<span className="text-[10px] text-muted-foreground/70">{streamSeconds}s</span>
+								) : duration ? (
+									<span className="text-[10px] text-muted-foreground/70">{duration}</span>
+								) : null}
+								<ChevronRight className={cn("size-3.5 text-muted-foreground/60 transition-transform group-hover:text-muted-foreground/80", open && "rotate-90")} />
+							</div>
+						</div>
+					</button>
+				</CollapsibleTrigger>
+				<CollapsibleContent className="pl-[1.45rem] pr-1 pb-1">
+					<div className="text-muted-foreground/65 [&_.kortix-markdown]:italic [&_.kortix-markdown_div]:!text-[13px] [&_.kortix-markdown_div]:!leading-[1.45] [&_.kortix-markdown_div]:!text-muted-foreground/65 [&_.kortix-markdown_li]:!text-[13px] [&_.kortix-markdown_li]:!leading-[1.45] [&_.kortix-markdown_li]:!text-muted-foreground/65 [&_.kortix-markdown_strong]:!text-muted-foreground/70 [&_.kortix-markdown_em]:!text-muted-foreground/70">
+						<ThrottledMarkdown content={part.text} isStreaming={false} />
+					</div>
+				</CollapsibleContent>
+			</div>
+		</Collapsible>
+	);
+}
+
 // ============================================================================
 // Session Turn — core turn component
 // ============================================================================
@@ -1799,6 +1884,10 @@ function SessionTurn({
 			return false;
 		});
 	}, [allParts]);
+	const hasReasoning = useMemo(
+		() => allParts.some(({ part }) => isReasoningPart(part) && !!part.text?.trim()),
+		[allParts],
+	);
 	const isLast = useMemo(
 		() => isLastUserMessage(turn.userMessage.info.id, allMessages),
 		[turn.userMessage.info.id, allMessages],
@@ -2286,7 +2375,7 @@ function SessionTurn({
 	//   1. User message + actions
 	//   2. Kortix logo
 	//   3. Steps trigger (spinner/chevron + status + duration) — if working || hasSteps
-	//   4. Collapsible steps (if expanded): all parts EXCEPT response part + reasoning when done
+	//   4. Collapsible steps (if expanded): all parts EXCEPT response part
 	//   5. Answered question parts (if collapsed + has answered questions)
 	//   6. Response section (ONLY when NOT working) — the extracted last text part
 	//   7. Error (when steps collapsed)
@@ -2353,7 +2442,7 @@ function SessionTurn({
 			)}
 
 			{/* Kortix logo header */}
-			{(working || hasSteps) && (
+			{(working || hasSteps || hasReasoning) && (
 				<div className="flex items-center gap-2 mt-3">
 					{/* eslint-disable-next-line @next/next/no-img-element */}
 					<img
@@ -2412,9 +2501,8 @@ function SessionTurn({
 			{/* ── Assistant parts content ──
 			  Renders ALL parts from all assistant messages,
 			  EXCEPT: the response part (last text) is hidden when not working
-			  (it renders separately below as the Response section).
-			  Reasoning is hidden when not working (matches SolidJS hideReasoning). */}
-			{(working || hasSteps) && turn.assistantMessages.length > 0 && (
+			  (it renders separately below as the Response section). */}
+			{(working || hasSteps || hasReasoning) && turn.assistantMessages.length > 0 && (
 				<div className="space-y-2">
 					{allParts.map(({ part, message }) => {
 
@@ -2425,11 +2513,9 @@ function SessionTurn({
 						// Text parts (intermediate + streaming response while working)
 						if (isTextPart(part)) {
 							if (!part.text?.trim()) return null;
-							// For text-only streaming turns, render a single aggregated
-							// stream block below from the active assistant message only.
-							if (working && !hasSteps) {
-								return null;
-							}
+							// Text response rendering for no-step turns is handled below in
+							// the dedicated response section to avoid duplicate output.
+							if (!hasSteps) return null;
 							return (
 								<div key={part.id} className="text-sm">
 									<ThrottledMarkdown
@@ -2440,18 +2526,10 @@ function SessionTurn({
 							);
 						}
 
-						// Reasoning — only while working
+						// Reasoning
 						if (isReasoningPart(part)) {
-							if (!working) return null;
 							if (!part.text?.trim()) return null;
-							return (
-								<div
-									key={part.id}
-									className="text-sm text-muted-foreground italic"
-								>
-									<ThrottledMarkdown content={part.text} isStreaming={true} />
-								</div>
-							);
+							return <ReasoningPartCard key={part.id} part={part} isStreaming={working} />;
 						}
 
 						// Compaction indicator
@@ -2534,7 +2612,7 @@ function SessionTurn({
 			)}
 
 			{/* Kortix logo — shown when there are no steps and not working (otherwise logo is already above the steps trigger) */}
-			{!hasSteps && !working && (response || answeredQuestionParts.length > 0 || turnError) && (
+			{!hasSteps && !hasReasoning && !working && (response || answeredQuestionParts.length > 0 || turnError) && (
 				<div className="flex items-center gap-2 mt-3 mb-3">
 					{/* eslint-disable-next-line @next/next/no-img-element */}
 					<img

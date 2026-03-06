@@ -249,6 +249,9 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 			if (result.found) {
 				const prev = list[result.index] as any;
 				const incoming = part as any;
+				const tracksStreamingText =
+					(prev?.type === "text" || prev?.type === "reasoning") &&
+					(incoming?.type === "text" || incoming?.type === "reasoning");
 				const prevText = typeof prev?.text === "string" ? prev.text : null;
 				const incomingText =
 					typeof incoming?.text === "string" ? incoming.text : null;
@@ -261,6 +264,7 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				// creating a new state reference which would cause infinite
 				// re-render loops in consuming components.
 				if (
+					tracksStreamingText &&
 					prevText !== null &&
 					incomingText !== null &&
 					prevText.length > 0
@@ -532,7 +536,7 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 					continue;
 				}
 				// Reconcile by key: incoming parts are generally authoritative,
-				// but for text parts during active streaming, SSE-accumulated
+				// but for text/reasoning parts during active streaming, SSE-accumulated
 				// parts may have MORE content than the server snapshot (the
 				// server may return empty/stale text for in-progress parts).
 				// In that case, prefer the existing (SSE) version.
@@ -542,12 +546,16 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
 				const reconciled = inParts.map((inP) => {
 					const exP = exById.get(inP.id);
 					if (!exP) return inP;
-					// For text parts: prefer whichever has more text content.
-					// This prevents hydrate from clobbering SSE-streamed text
+					// For text/reasoning parts: prefer whichever has more text content.
+					// This prevents hydrate from clobbering SSE-streamed content
 					// with an empty/stale server snapshot during active streaming.
 					const inText = (inP as any).text;
 					const exText = (exP as any).text;
+					const isTextLike =
+						(inP as any)?.type === "text" ||
+						(inP as any)?.type === "reasoning";
 					if (
+						isTextLike &&
 						typeof exText === "string" &&
 						typeof inText === "string" &&
 						exText.length > inText.length
