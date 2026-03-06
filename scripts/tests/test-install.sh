@@ -68,12 +68,24 @@ else
   fail "supports local and VPS deploy modes"
 fi
 
+if grep -q -- '--local' "$SCRIPT" && grep -q 'KORTIX_LOCAL_IMAGES' "$SCRIPT"; then
+  pass "supports local installer image mode"
+else
+  fail "supports local installer image mode"
+fi
+
+if grep -q -- '--build-local' "$SCRIPT" && grep -q 'build-local-images.sh' "$SCRIPT"; then
+  pass "supports rebuilding local images from source"
+else
+  fail "supports rebuilding local images from source"
+fi
+
 # ── Compose generation ──
 
-if grep -q 'write_compose_local()' "$SCRIPT" && grep -q 'write_compose_vps()' "$SCRIPT"; then
-  pass "has separate compose templates (local + VPS)"
+if grep -q 'write_compose()' "$SCRIPT"; then
+  pass "has compose generation function"
 else
-  fail "has separate compose templates (local + VPS)"
+  fail "has compose generation function"
 fi
 
 if grep -q 'docker-compose.yml' "$SCRIPT"; then
@@ -108,10 +120,10 @@ else
   fail "generates CRON_TICK_SECRET"
 fi
 
-if grep -q 'postgres-data' "$SCRIPT"; then
-  pass "compose has postgres-data volume"
+if grep -q 'supabase-db-data' "$SCRIPT"; then
+  pass "compose has persistent database volume"
 else
-  fail "compose has postgres-data volume"
+  fail "compose has persistent database volume"
 fi
 
 # ── VPS features ──
@@ -154,10 +166,10 @@ else
   fail "has secret generation function"
 fi
 
-if grep -q 'KORTIX_TOKEN' "$SCRIPT"; then
-  pass "generates KORTIX_TOKEN for secret encryption"
+if grep -q 'API_KEY_SECRET' "$SCRIPT" && grep -q 'CHANNELS_CREDENTIAL_KEY' "$SCRIPT"; then
+  pass "generates service secrets for local install"
 else
-  fail "generates KORTIX_TOKEN for secret encryption"
+  fail "generates service secrets for local install"
 fi
 
 if grep -q 'INTERNAL_SERVICE_KEY' "$SCRIPT"; then
@@ -204,10 +216,10 @@ else
   fail "VPS compose restricts CORS origins"
 fi
 
-if grep -q 'KORTIX_PUBLIC_URL' "$SCRIPT"; then
-  pass "VPS compose sets KORTIX_PUBLIC_URL for frontend"
+if grep -q 'PUBLIC_URL=' "$SCRIPT" && grep -q 'FRONTEND_URL=' "$SCRIPT"; then
+  pass "VPS compose wires public URL into services"
 else
-  fail "VPS compose sets KORTIX_PUBLIC_URL for frontend"
+  fail "VPS compose wires public URL into services"
 fi
 
 # ── CLI features ──
@@ -225,12 +237,6 @@ for cmd in start stop restart logs status update setup; do
     fail "CLI has '${cmd}' command"
   fi
 done
-
-if grep -q 'reconfigure)' "$SCRIPT"; then
-  pass "CLI has 'reconfigure' command"
-else
-  fail "CLI has 'reconfigure' command"
-fi
 
 if grep -q 'credentials)' "$SCRIPT"; then
   pass "CLI has 'credentials' command"

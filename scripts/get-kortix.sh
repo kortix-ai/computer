@@ -29,6 +29,12 @@ fatal()   { error "$*"; exit 1; }
 # ─── Config ──────────────────────────────────────────────────────────────────
 INSTALL_DIR="${KORTIX_HOME:-$HOME/.kortix}"
 KORTIX_VERSION="0.7.15"
+KORTIX_LOCAL_IMAGES="${KORTIX_LOCAL_IMAGES:-0}"
+KORTIX_LOCAL_TAG="${KORTIX_LOCAL_TAG:-latest}"
+KORTIX_BUILD_LOCAL_IMAGES="${KORTIX_BUILD_LOCAL_IMAGES:-0}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+KORTIX_LOCAL_REPO_ROOT="${KORTIX_LOCAL_REPO_ROOT:-$REPO_ROOT}"
 
 parse_query_param() {
   local raw="$1"
@@ -48,6 +54,26 @@ parse_query_param() {
 parse_args() {
   while [ "$#" -gt 0 ]; do
     case "$1" in
+      --local)
+        KORTIX_LOCAL_IMAGES=1
+        shift
+        ;;
+      --build-local)
+        KORTIX_LOCAL_IMAGES=1
+        KORTIX_BUILD_LOCAL_IMAGES=1
+        shift
+        ;;
+      --local-tag)
+        [ "$#" -ge 2 ] || fatal "--local-tag requires a value"
+        KORTIX_LOCAL_IMAGES=1
+        KORTIX_LOCAL_TAG="$2"
+        shift 2
+        ;;
+      --local-tag=*)
+        KORTIX_LOCAL_IMAGES=1
+        KORTIX_LOCAL_TAG="${1#*=}"
+        shift
+        ;;
       --version)
         [ "$#" -ge 2 ] || fatal "--version requires a value"
         KORTIX_VERSION="$2"
@@ -75,6 +101,10 @@ parse_args() {
 Usage: get-kortix.sh [options]
 
 Options:
+  --local             Use local Docker images instead of pulling from registry
+  --build-local       Rebuild local installer images before starting
+  --local-tag <tag>   Local image tag to use (default: latest)
+  --local-tag=<tag>   Same as above
   --version <tag>     Install a specific image tag (default: latest)
   --version=<tag>     Same as above
   --query "v=<tag>"   Query-style version override
@@ -82,6 +112,9 @@ Options:
 
 Examples:
   bash get-kortix.sh
+  bash get-kortix.sh --local
+  bash get-kortix.sh --local --build-local
+  bash get-kortix.sh --local --local-tag dev
   bash get-kortix.sh --version 0.7.14
   bash get-kortix.sh --query "v=0.7.14"
   KORTIX_VERSION=0.7.14 bash get-kortix.sh
@@ -97,9 +130,16 @@ EOF
 
 parse_args "$@"
 
-FRONTEND_IMAGE="${KORTIX_FRONTEND_IMAGE:-kortix/kortix-frontend:${KORTIX_VERSION}}"
-API_IMAGE="${KORTIX_API_IMAGE:-kortix/kortix-api:${KORTIX_VERSION}}"
-SANDBOX_IMAGE="${KORTIX_SANDBOX_IMAGE:-kortix/sandbox:${KORTIX_VERSION}}"
+IMAGE_TAG="$KORTIX_VERSION"
+SANDBOX_IMAGE_REPO="kortix/sandbox"
+if [ "$KORTIX_LOCAL_IMAGES" = "1" ]; then
+  IMAGE_TAG="$KORTIX_LOCAL_TAG"
+  SANDBOX_IMAGE_REPO="kortix/computer"
+fi
+
+FRONTEND_IMAGE="${KORTIX_FRONTEND_IMAGE:-kortix/kortix-frontend:${IMAGE_TAG}}"
+API_IMAGE="${KORTIX_API_IMAGE:-kortix/kortix-api:${IMAGE_TAG}}"
+SANDBOX_IMAGE="${KORTIX_SANDBOX_IMAGE:-${SANDBOX_IMAGE_REPO}:${IMAGE_TAG}}"
 SUPABASE_POSTGRES_IMAGE="supabase/postgres:15.8.1.085"
 SUPABASE_GOTRUE_IMAGE="supabase/gotrue:v2.186.0"
 SUPABASE_KONG_IMAGE="kong:2.8.1"
@@ -142,7 +182,6 @@ PIPEDREAM_ENVIRONMENT=""
 SLACK_CLIENT_ID=""
 SLACK_CLIENT_SECRET=""
 SLACK_SIGNING_SECRET=""
-FREESTYLE_API_KEY=""
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 open_browser() {
@@ -151,6 +190,27 @@ open_browser() {
   elif command -v xdg-open &>/dev/null; then xdg-open "$url" 2>/dev/null || true
   elif command -v wslview &>/dev/null; then wslview "$url" 2>/dev/null || true
   fi
+}
+
+verify_local_image() {
+  local image="$1"
+  docker image inspect "$image" >/dev/null 2>&1 || fatal "Local image not found: ${image}. Build or tag it first, or run without --local."
+}
+
+ensure_local_build_requirements() {
+  [ -d "$KORTIX_LOCAL_REPO_ROOT/apps/frontend" ] || fatal "Local repo root not found at ${KORTIX_LOCAL_REPO_ROOT}."
+  command -v pnpm &>/dev/null || fatal "pnpm is required for --build-local."
+}
+
+rebuild_local_images() {
+  ensure_local_build_requirements
+  local build_script="$KORTIX_LOCAL_REPO_ROOT/scripts/build-local-images.sh"
+  [ -f "$build_script" ] || fatal "Local build script not found: ${build_script}"
+
+  info "Rebuilding local installer images from ${KORTIX_LOCAL_REPO_ROOT}"
+  echo ""
+  bash "$build_script" --tag "$KORTIX_LOCAL_TAG"
+  success "Local images rebuilt"
 }
 
 generate_password() {
@@ -392,25 +452,6 @@ prompt_integrations() {
       INTEGRATION_AUTH_PROVIDER="disabled"
       info "Skipping — add later in ${DIM}~/.kortix/.env${NC}"
       ;;
-  esac
-
-  echo ""
-}
-
-# ─── Deployments (Freestyle) ────────────────────────────────────────────────
-prompt_deployments() {
-  echo "  ${BOLD}Deployments — Freestyle ${DIM}(optional)${NC}"
-  echo ""
-  printf "  Configure deployments? ${DIM}[y/${NC}${GREEN}N${NC}${DIM}]${NC}: "
-  read -r deploy_choice
-
-  case "${deploy_choice:-n}" in
-    [yY]*)
-      printf "    Freestyle API Key: "
-      read -r FREESTYLE_API_KEY
-      [ -n "$FREESTYLE_API_KEY" ] && success "Freestyle configured" || warn "No key — deployments unavailable"
-      ;;
-    *) info "Skipping" ;;
   esac
 
   echo ""
@@ -983,6 +1024,9 @@ write_env() {
 DEPLOY_MODE=${DEPLOY_MODE}
 DB_MODE=${DB_MODE}
 KORTIX_VERSION=${KORTIX_VERSION}
+KORTIX_LOCAL_IMAGES=${KORTIX_LOCAL_IMAGES}
+KORTIX_LOCAL_TAG=${KORTIX_LOCAL_TAG}
+KORTIX_LOCAL_REPO_ROOT=${KORTIX_LOCAL_REPO_ROOT}
 
 # ─── URLs ────────────────────────────────────────────────────────────────────
 PUBLIC_URL=${PUBLIC_URL}
@@ -1014,9 +1058,6 @@ PIPEDREAM_ENVIRONMENT=${PIPEDREAM_ENVIRONMENT:-production}
 SLACK_CLIENT_ID=${SLACK_CLIENT_ID}
 SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET}
 SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
-
-# ─── Deployments (Freestyle) ────────────────────────────────────────────────
-FREESTYLE_API_KEY=${FREESTYLE_API_KEY}
 
 # ─── Sandbox ─────────────────────────────────────────────────────────────────
 SANDBOX_IMAGE=${SANDBOX_IMAGE}
@@ -1062,6 +1103,9 @@ cd "$DIR"
 G=$'\033[0;32m'; R=$'\033[0;31m'; C=$'\033[0;36m'; Y=$'\033[1;33m'
 B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
 VERSION=$(grep -m1 '^KORTIX_VERSION=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "latest")
+LOCAL_IMAGES=$(grep -m1 '^KORTIX_LOCAL_IMAGES=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "0")
+LOCAL_TAG=$(grep -m1 '^KORTIX_LOCAL_TAG=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "latest")
+LOCAL_REPO_ROOT=$(grep -m1 '^KORTIX_LOCAL_REPO_ROOT=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || echo "")
 
 _open() {
   if command -v open &>/dev/null; then open "$1" 2>/dev/null
@@ -1084,6 +1128,17 @@ _mode() {
   else
     echo "local"
   fi
+}
+
+_using_local_images() {
+  [ "$LOCAL_IMAGES" = "1" ]
+}
+
+_rebuild_local_images() {
+  [ -n "$LOCAL_REPO_ROOT" ] || { echo "  ${R}KORTIX_LOCAL_REPO_ROOT is not set${N}"; exit 1; }
+  local build_script="$LOCAL_REPO_ROOT/scripts/build-local-images.sh"
+  [ -f "$build_script" ] || { echo "  ${R}Build script not found: ${build_script}${N}"; exit 1; }
+  bash "$build_script" --tag "$LOCAL_TAG"
 }
 
 case "${1:-help}" in
@@ -1126,12 +1181,20 @@ case "${1:-help}" in
     echo "  ${D}If it didn't open: ${B}$(_url)/setup${N}"
     ;;
   update)
-    echo "  ${C}Pulling latest images...${N}"
-    docker compose pull
-    # Pull sandbox image (managed by API, not in compose)
-    local sb_img
-    sb_img=$(grep -m1 '^SANDBOX_IMAGE=' "$DIR/.env" 2>/dev/null | cut -d= -f2-)
-    [ -n "$sb_img" ] && docker pull "$sb_img" 2>/dev/null || true
+    shift
+    if [ "${1:-}" = "--build-local" ]; then
+      _rebuild_local_images
+    fi
+    if _using_local_images; then
+      echo "  ${C}Using local Docker images from compose config...${N}"
+    else
+      echo "  ${C}Pulling latest images...${N}"
+      docker compose pull
+      # Pull sandbox image (managed by API, not in compose)
+      local sb_img
+      sb_img=$(grep -m1 '^SANDBOX_IMAGE=' "$DIR/.env" 2>/dev/null | cut -d= -f2-)
+      [ -n "$sb_img" ] && docker pull "$sb_img" 2>/dev/null || true
+    fi
     docker compose --profile vps down 2>/dev/null || docker compose down
     if [ "$(_mode)" = "vps" ]; then
       docker compose --profile vps up -d
@@ -1139,6 +1202,10 @@ case "${1:-help}" in
       docker compose up -d
     fi
     echo "  ${G}Updated.${N}"
+    ;;
+  rebuild)
+    _rebuild_local_images
+    echo "  ${G}Local images rebuilt.${N}"
     ;;
   credentials)
     [ -f "$DIR/.credentials" ] && cat "$DIR/.credentials" || echo "  ${D}No credentials (local mode or auth disabled)${N}"
@@ -1174,6 +1241,7 @@ case "${1:-help}" in
     echo "  ${C}status${N}        Show service status"
     echo "  ${C}setup${N}         Open setup wizard in browser"
     echo "  ${C}update${N}        Pull latest images & restart"
+    echo "  ${C}rebuild${N}       Rebuild local images from source"
     echo "  ${C}open${N}          Open dashboard in browser"
     echo "  ${C}credentials${N}   Show admin credentials (VPS mode)"
     echo "  ${C}uninstall${N}     Remove Kortix completely"
@@ -1227,16 +1295,28 @@ setup_firewall() {
 # ─── Pull & Start ───────────────────────────────────────────────────────────
 pull_and_start() {
   echo ""
-  info "Pulling Docker images..."
-  echo ""
-
   cd "$INSTALL_DIR"
-  docker compose pull
 
-  echo ""
-  info "Pre-pulling sandbox image (${SANDBOX_IMAGE})..."
-  docker pull "${SANDBOX_IMAGE}"
-  success "Sandbox image ready"
+  if [ "$KORTIX_LOCAL_IMAGES" = "1" ]; then
+    if [ "$KORTIX_BUILD_LOCAL_IMAGES" = "1" ]; then
+      rebuild_local_images
+      echo ""
+    fi
+    info "Using local Docker images (skip registry pulls)..."
+    verify_local_image "$FRONTEND_IMAGE"
+    verify_local_image "$API_IMAGE"
+    verify_local_image "$SANDBOX_IMAGE"
+    success "Local installer images found"
+  else
+    info "Pulling Docker images..."
+    echo ""
+    docker compose pull
+
+    echo ""
+    info "Pre-pulling sandbox image (${SANDBOX_IMAGE})..."
+    docker pull "${SANDBOX_IMAGE}"
+    success "Sandbox image ready"
+  fi
 
   echo ""
   info "Starting Kortix..."
@@ -1391,7 +1471,6 @@ main() {
   echo ""
 
   prompt_integrations
-  prompt_deployments
   generate_secrets
 
   mkdir -p "$INSTALL_DIR"
