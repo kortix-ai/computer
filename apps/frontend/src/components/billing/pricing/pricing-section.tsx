@@ -54,6 +54,92 @@ function PricingCard({
   const isCurrent = currentTierKey === tier.tierKey;
   const isProTier = tier.tierKey === 'pro';
 
+  if (isProTier) {
+    return (
+      <div
+        className={cn(
+          'h-full rounded-2xl flex flex-col overflow-hidden relative',
+          'border border-white/[0.08]',
+          'bg-[#111111]',
+          'shadow-none',
+        )}
+      >
+        {/* === TOP HALF: image as background, text overlaid === */}
+        <div className="relative h-56 w-full overflow-hidden shrink-0">
+          {/* The device image sits as the background of this zone */}
+          <Image
+            src="/kortix-computer.png"
+            alt="Kortix Pro cloud computer"
+            fill
+            className="object-contain object-center scale-[1.3] translate-y-3"
+            priority
+          />
+          {/* Seamless fades on all 4 edges so it bleeds into the card color */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#111111] via-transparent to-[#111111]" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#111111] via-transparent to-[#111111]" />
+          {/* Subtle glow in the center behind the device */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="w-48 h-24 rounded-full bg-white/[0.04] blur-2xl" />
+          </div>
+          {/* Title + badge overlaid in top-left corner */}
+          <div className="absolute top-0 left-0 right-0 px-6 pt-6 flex items-start justify-between gap-3 z-20">
+            <div>
+              <h3 className="text-xl font-semibold text-white tracking-tight">{tier.name}</h3>
+              <p className="mt-1 text-sm text-white/40">{tier.description}</p>
+            </div>
+            {tier.isPopular && (
+              <span className="shrink-0 mt-0.5 px-3 py-1 text-xs font-medium rounded-full bg-white/10 text-white/70 border border-white/[0.1]">
+                Most Popular
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* === BOTTOM HALF: pricing, CTA, features === */}
+        <div className="px-6 pb-6 flex flex-col flex-1">
+          <ul className="space-y-2.5">
+            {tier.features.map((feature) => (
+              <li key={feature} className="flex items-start gap-2.5 text-sm text-white/70">
+                <CheckIcon className="h-4 w-4 text-white/50 mt-0.5 shrink-0" />
+                <span>{feature}</span>
+              </li>
+            ))}
+            {(tier.disabledFeatures || []).map((feature) => (
+              <li key={feature} className="flex items-start gap-2.5 text-sm text-white/25">
+                <span className="h-4 w-4 mt-0.5 shrink-0 text-center leading-none">–</span>
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-auto pt-6">
+            <div className="flex items-end gap-1.5 mb-4">
+              <span className="text-4xl font-semibold leading-none text-white">{tier.price}</span>
+              <span className="text-sm text-white/40 mb-1">/month</span>
+            </div>
+
+            <Button
+              className={cn(
+                'w-full font-medium',
+                isCurrent
+                  ? 'bg-white/10 text-white/50 border border-white/10 cursor-default hover:bg-white/10'
+                  : 'bg-white text-black hover:bg-white/90 transition-colors',
+              )}
+              disabled={isCurrent || isLoading}
+              onClick={() => onSelect(tier.tierKey)}
+            >
+              {!isAuthenticated
+                ? 'Upgrade to Pro'
+                : isCurrent
+                  ? 'Current Plan'
+                  : 'Upgrade to Pro'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -72,42 +158,7 @@ function PricingCard({
 
       <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
 
-      {isProTier && (
-        <div className="relative mt-2 h-52 w-[calc(100%+3rem)] -mx-6 overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/20 via-primary/5 to-transparent" />
-          <Image
-            src="/kortix-computer.png"
-            alt="Kortix Pro cloud computer"
-            fill
-            className="object-contain object-top scale-[1.65] -translate-y-8"
-            priority
-          />
-        </div>
-      )}
-
-      <div className="mt-6 flex items-end gap-1">
-        <span className="text-4xl font-medium leading-none">{tier.price}</span>
-        <span className="text-sm text-muted-foreground mb-1">/month</span>
-      </div>
-
-      <Button
-        className="mt-6"
-        variant={tier.isPopular ? 'default' : 'outline'}
-        disabled={isCurrent || isLoading}
-        onClick={() => onSelect(tier.tierKey)}
-      >
-        {!isAuthenticated
-          ? tier.tierKey === 'free'
-            ? 'Get Started'
-            : 'Upgrade to Pro'
-          : isCurrent
-            ? 'Current Plan'
-            : tier.tierKey === 'free'
-              ? 'Downgrade to Free'
-              : 'Upgrade to Pro'}
-      </Button>
-
-      <ul className="mt-6 space-y-2">
+      <ul className="mt-6 space-y-2 flex-1">
         {tier.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2 text-sm text-foreground/90">
             <CheckIcon className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -121,6 +172,30 @@ function PricingCard({
           </li>
         ))}
       </ul>
+
+      <div className="mt-auto pt-6">
+        <div className="flex items-end gap-1 mb-4">
+          <span className="text-4xl font-medium leading-none">{tier.price}</span>
+          <span className="text-sm text-muted-foreground mb-1">/month</span>
+        </div>
+
+        <Button
+          className="w-full"
+          variant={tier.isPopular ? 'default' : 'outline'}
+          disabled={isCurrent || isLoading}
+          onClick={() => onSelect(tier.tierKey)}
+        >
+          {!isAuthenticated
+            ? tier.tierKey === 'free'
+              ? 'Get Started'
+              : 'Upgrade to Pro'
+            : isCurrent
+              ? 'Current Plan'
+              : tier.tierKey === 'free'
+                ? 'Downgrade to Free'
+                : 'Upgrade to Pro'}
+        </Button>
+      </div>
     </div>
   );
 }
