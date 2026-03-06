@@ -390,7 +390,7 @@ export function QuestionPrompt({
 						) : currentQuestion ? (
 							<div className="space-y-1">
 								{/* Question text */}
-							<div className="text-sm md:text-base font-medium text-foreground/95 leading-relaxed max-h-[300px] overflow-y-auto">
+							<div className="text-xs md:text-sm font-medium text-foreground/95 leading-relaxed max-h-[300px] overflow-y-auto">
 								<QuestionMarkdown
 									content={currentQuestion.question + (isMulti ? " *(select multiple)*" : "")}
 								/>
