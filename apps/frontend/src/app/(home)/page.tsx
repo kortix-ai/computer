@@ -135,11 +135,14 @@ export default function Home() {
               Kortix is a computer that runs itself.
             </p>
             <p className="text-sm text-muted-foreground/70 leading-relaxed mb-16">
-              A full Linux machine — real filesystem, real shell, real tools — with an
-              AI cortex wired into it. It connects to every system you use, remembers
-              everything it learns, and runs autonomous workers around the clock. It
-              writes its own code, builds its own tools, creates its own automations.
-              The longer it runs, the smarter it gets.
+              A full Linux machine — real filesystem, real bash, real Chromium
+              browser — with an AI agent wired into every layer. All state lives
+              on the machine itself: every session, every memory, every
+              integration, every agent, every skill, every line of code, every
+              project. Nothing is hidden in a cloud abstraction. Kortix
+              orchestrates it all — memory, scheduling, integrations, agent
+              lifecycle — powered by the OpenCode engine as the core agent
+              framework. Connect your tools once. It runs from there.
             </p>
 
             {/* ── The Stack ── */}
@@ -148,47 +151,104 @@ export default function Home() {
                 The Stack
               </h2>
               <div className="font-mono text-xs text-muted-foreground/70 bg-muted/30 border border-border/50 rounded-lg p-5 leading-relaxed overflow-x-auto">
-                <div className="text-foreground/50 mb-1">{'┌─────────────────────────────────────────────┐'}</div>
-                <div>{'│'}  <span className="text-foreground">Your Agents</span>  {'·'}  Community Agents  {'·'}  Integrations  {'│'}</div>
-                <div className="text-foreground/50">{'├─────────────────────────────────────────────┤'}</div>
-                <div>{'│'}  <span className="text-foreground">Skills</span>  {'·'}  <span className="text-foreground">MCP</span>  {'·'}  Tools  {'·'}  Browser  {'·'}  Shell     {'│'}</div>
-                <div className="text-foreground/50">{'├─────────────────────────────────────────────┤'}</div>
-                <div>{'│'}  <span className="text-foreground">OpenCode Engine</span>                              {'│'}</div>
-                <div>{'│'}  Planning  {'·'}  Execution  {'·'}  Memory  {'·'}  Recovery   {'│'}</div>
-                <div className="text-foreground/50">{'├─────────────────────────────────────────────┤'}</div>
-                <div>{'│'}  <span className="text-foreground">Kortix Runtime</span>                               {'│'}</div>
-                <div>{'│'}  Agent lifecycle  {'·'}  Context  {'·'}  Scheduling      {'│'}</div>
-                <div className="text-foreground/50">{'├─────────────────────────────────────────────┤'}</div>
-                <div>{'│'}  <span className="text-foreground">Filesystem</span>  {'—'}  Your data, your systems         {'│'}</div>
-                <div className="text-foreground/50">{'├─────────────────────────────────────────────┤'}</div>
-                <div>{'│'}  Linux  {'·'}  Docker  {'·'}  Any machine                  {'│'}</div>
-                <div className="text-foreground/50">{'└─────────────────────────────────────────────┘'}</div>
+                <div className="text-foreground/50 mb-1">{'┌─────────────────────────────────────────────────┐'}</div>
+                <div>{'│'}  <span className="text-foreground">Agents</span>  {'·'}  Skills  {'·'}  Tools  {'·'}  MCP  {'·'}  Browser    {'│'}</div>
+                <div>{'│'}  <span className="text-muted-foreground/40">your agents, community agents, 19 skill modules</span>  {'│'}</div>
+                <div className="text-foreground/50">{'├─────────────────────────────────────────────────┤'}</div>
+                <div>{'│'}  <span className="text-foreground">Kortix</span>  {'—'}  Orchestration                         {'│'}</div>
+                <div>{'│'}  Memory  {'·'}  Integrations  {'·'}  Scheduling  {'·'}  Tunnels  {'│'}</div>
+                <div>{'│'}  <span className="text-muted-foreground/40">OAuth, MCP servers, cron triggers, agent tunnel</span> {'│'}</div>
+                <div className="text-foreground/50">{'├─────────────────────────────────────────────────┤'}</div>
+                <div>{'│'}  <span className="text-foreground">OpenCode Engine</span>  {'—'}  Agent Framework              {'│'}</div>
+                <div>{'│'}  Sessions  {'·'}  Tool execution  {'·'}  Context  {'·'}  Recovery {'│'}</div>
+                <div>{'│'}  <span className="text-muted-foreground/40">plugins: memory, pty, worktree, agent-tunnel</span>   {'│'}</div>
+                <div className="text-foreground/50">{'├─────────────────────────────────────────────────┤'}</div>
+                <div>{'│'}  <span className="text-foreground">Linux OS</span>  {'—'}  The Machine                          {'│'}</div>
+                <div>{'│'}  Filesystem  {'·'}  Bash  {'·'}  Chromium  {'·'}  Git  {'·'}  SSH    {'│'}</div>
+                <div>{'│'}  Node  {'·'}  Bun  {'·'}  Python  {'·'}  Docker                    {'│'}</div>
+                <div>{'│'}  <span className="text-muted-foreground/40">all state persisted to /workspace — one volume</span> {'│'}</div>
+                <div className="text-foreground/50">{'└─────────────────────────────────────────────────┘'}</div>
               </div>
             </div>
 
-            {/* ── Everything Is Files ── */}
+            {/* ── Everything Lives On The Machine ── */}
             <div className="mb-16">
               <h2 className="text-xs uppercase tracking-widest text-muted-foreground/40 mb-4">
-                Everything Is Files
+                Everything Lives On The Machine
               </h2>
               <p className="text-sm text-muted-foreground/70 leading-relaxed mb-4">
-                Your entire business context lives in the filesystem. Agents read it,
-                write to it, share it. Human-readable, git-trackable, grep-searchable.
-                No hidden state. No proprietary formats.
+                Sessions, memories, agents, skills, integrations, code projects,
+                credentials, browser profiles — all stored on the Linux filesystem.
+                Human-readable, git-trackable, grep-searchable. No hidden state.
+                No proprietary formats. One persistent volume.
               </p>
               <div className="font-mono text-xs text-muted-foreground/70 bg-muted/30 border border-border/50 rounded-lg p-5 leading-loose overflow-x-auto">
-                <div><span className="text-foreground">/kortix</span></div>
-                <div>{'  ├── '}<span className="text-foreground">/context</span></div>
-                <div>{'  │   ├── /company       '}<span className="text-muted-foreground/40"># org knowledge, docs, processes</span></div>
-                <div>{'  │   ├── /customers     '}<span className="text-muted-foreground/40"># CRM data, conversations, history</span></div>
-                <div>{'  │   ├── /finances      '}<span className="text-muted-foreground/40"># books, invoices, transactions</span></div>
-                <div>{'  │   └── /comms         '}<span className="text-muted-foreground/40"># email, slack, messages</span></div>
-                <div>{'  ├── '}<span className="text-foreground">/agents</span></div>
-                <div>{'  │   ├── /support       '}<span className="text-muted-foreground/40"># support agent + state</span></div>
-                <div>{'  │   ├── /bookkeeper    '}<span className="text-muted-foreground/40"># bookkeeping agent + state</span></div>
-                <div>{'  │   └── /recruiter     '}<span className="text-muted-foreground/40"># recruiting agent + state</span></div>
-                <div>{'  ├── '}<span className="text-foreground">/workflows</span></div>
-                <div>{'  └── '}<span className="text-foreground">/logs</span></div>
+                <div><span className="text-foreground">/workspace</span>                        <span className="text-muted-foreground/40"># persistent volume</span></div>
+                <div>{'  ├── '}<span className="text-foreground">.local/share/opencode/</span></div>
+                <div>{'  │   ├── storage/session/      '}<span className="text-muted-foreground/40"># every AI session</span></div>
+                <div>{'  │   ├── storage/message/       '}<span className="text-muted-foreground/40"># full conversation history</span></div>
+                <div>{'  │   └── storage/memory.db      '}<span className="text-muted-foreground/40"># observations + LTM (SQLite)</span></div>
+                <div>{'  ├── '}<span className="text-foreground">.opencode/</span></div>
+                <div>{'  │   ├── agents/                '}<span className="text-muted-foreground/40"># agent definitions (.md)</span></div>
+                <div>{'  │   ├── skills/                '}<span className="text-muted-foreground/40"># skill modules</span></div>
+                <div>{'  │   └── commands/              '}<span className="text-muted-foreground/40"># slash commands</span></div>
+                <div>{'  ├── '}<span className="text-foreground">.secrets/</span>{'                   '}<span className="text-muted-foreground/40"># API keys, credentials</span></div>
+                <div>{'  ├── '}<span className="text-foreground">.browser-profile/</span>{'           '}<span className="text-muted-foreground/40"># Chromium state</span></div>
+                <div>{'  ├── '}<span className="text-foreground">.lss/</span>{'                       '}<span className="text-muted-foreground/40"># semantic search index</span></div>
+                <div>{'  └── '}<span className="text-foreground">{'<'}your projects{'>'}</span>{'              '}<span className="text-muted-foreground/40"># code, data, anything</span></div>
+              </div>
+            </div>
+
+            {/* ── Connected To Everything ── */}
+            <div className="mb-16">
+              <h2 className="text-xs uppercase tracking-widest text-muted-foreground/40 mb-4">
+                Connected To Everything
+              </h2>
+              <p className="text-sm text-muted-foreground/70 leading-relaxed mb-4">
+                Connect all your data sources, password vaults, credentials, and
+                SaaS tools. Kortix plugs in via OAuth, MCP servers, CLI tools,
+                direct APIs, browser sessions, and the shell — so every agent
+                operates across the full stack.
+              </p>
+              <div className="font-mono text-xs text-muted-foreground/70 bg-muted/30 border border-border/50 rounded-lg p-5 leading-loose overflow-x-auto">
+                <div><span className="text-muted-foreground/40">INTEGRATION       METHOD       STATUS</span></div>
+                <div><span className="text-foreground">Gmail</span>             OAuth        <span className="text-green-500/70">connected</span></div>
+                <div><span className="text-foreground">Slack</span>             OAuth        <span className="text-green-500/70">connected</span></div>
+                <div><span className="text-foreground">Notion</span>            MCP          <span className="text-green-500/70">connected</span></div>
+                <div><span className="text-foreground">Google Drive</span>      API          <span className="text-green-500/70">connected</span></div>
+                <div><span className="text-foreground">GitHub</span>            CLI + API    <span className="text-green-500/70">connected</span></div>
+                <div><span className="text-foreground">Stripe</span>            API          <span className="text-green-500/70">connected</span></div>
+                <div><span className="text-foreground">HubSpot</span>           MCP          <span className="text-green-500/70">connected</span></div>
+                <div><span className="text-foreground">Linear</span>            MCP          <span className="text-green-500/70">connected</span></div>
+                <div className="mt-2"><span className="text-muted-foreground/40">+</span> passwords  {'·'}  env vars  {'·'}  SSH keys  {'·'}  private APIs  {'·'}  2000+ apps</div>
+              </div>
+            </div>
+
+            {/* ── The Memory ── */}
+            <div className="mb-16">
+              <h2 className="text-xs uppercase tracking-widest text-muted-foreground/40 mb-4">
+                The Memory
+              </h2>
+              <p className="text-sm text-muted-foreground/70 leading-relaxed mb-4">
+                Every tool call is recorded as an observation. Observations
+                consolidate into long-term memories — episodic, semantic, and
+                procedural. All stored in SQLite on the machine. Every session,
+                every discovery, every bugfix, every decision. The agent remembers
+                across sessions and gets better over time.
+              </p>
+              <div className="font-mono text-xs text-muted-foreground/70 bg-muted/30 border border-border/50 rounded-lg p-5 leading-relaxed overflow-x-auto">
+                <div className="text-foreground/50 mb-1">{'┌─────────────────────────────────────────────────┐'}</div>
+                <div>{'│'}  <span className="text-foreground">Observations</span>  {'—'}  every tool execution            {'│'}</div>
+                <div>{'│'}  <span className="text-muted-foreground/40">discovery, decision, bugfix, feature, refactor</span>   {'│'}</div>
+                <div className="text-foreground/50">{'├─────────────────────────────────────────────────┤'}</div>
+                <div>{'│'}  <span className="text-foreground">Long-Term Memory</span>  {'—'}  consolidated knowledge      {'│'}</div>
+                <div>{'│'}  Episodic   <span className="text-muted-foreground/40">what happened, when, in what context</span>  {'│'}</div>
+                <div>{'│'}  Semantic   <span className="text-muted-foreground/40">facts, patterns, architecture</span>       {'│'}</div>
+                <div>{'│'}  Procedural <span className="text-muted-foreground/40">how to do things, workflows</span>         {'│'}</div>
+                <div className="text-foreground/50">{'├─────────────────────────────────────────────────┤'}</div>
+                <div>{'│'}  <span className="text-foreground">Sessions</span>  {'—'}  full history, searchable             {'│'}</div>
+                <div>{'│'}  <span className="text-muted-foreground/40">every conversation, every output, resumable</span>     {'│'}</div>
+                <div className="text-foreground/50">{'└─────────────────────────────────────────────────┘'}</div>
               </div>
             </div>
 
@@ -198,7 +258,7 @@ export default function Home() {
                 Always Running
               </h2>
               <p className="text-sm text-muted-foreground/70 leading-relaxed mb-4">
-                Kortix doesn{"'"}t wait for you to type. It runs. Scheduled triggers, event
+                Kortix doesn{"'"}t wait for you to type. Cron triggers, event
                 webhooks, background workers — all continuous. You wake up to a
                 scratchpad that says: here{"'"}s what happened.
               </p>

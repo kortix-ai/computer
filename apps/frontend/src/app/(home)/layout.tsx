@@ -10,16 +10,16 @@ export default function HomeLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const isHomePage = pathname === '/' || pathname === '/color';
+  const isHomePage = pathname === '/';
 
   return (
     <div className="w-full min-h-dvh relative">
-      {/* Home & /color: fixed overlay navbar. Other pages: sticky top with blur. */}
+      {/* Home: fixed overlay navbar. Other pages: sticky top with blur. */}
       <div className={isHomePage ? 'fixed top-0 left-0 right-0 z-50' : 'sticky top-0 z-50 bg-background/80 backdrop-blur-md'}>
         <Navbar isAbsolute={isHomePage} />
       </div>
       {children}
-      {/* Hide footer on home page and /color */}
+      {/* Hide footer on home page */}
       {!isHomePage && <SimpleFooter />}
     </div>
   );

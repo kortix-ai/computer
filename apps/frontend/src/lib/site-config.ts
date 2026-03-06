@@ -7,7 +7,7 @@ export const siteConfig = {
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   nav: {
     links: [
-      { id: 1, name: 'OS', href: '/' },
+      { id: 1, name: 'Computer', href: '/' },
       { id: 2, name: 'About', href: '/about' },
     ],
   },
