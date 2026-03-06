@@ -33,6 +33,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { AnimatePresence, motion } from 'framer-motion';
 import { VoiceRecorder } from '@/components/thread/chat-input/voice-recorder';
 import { ModelSelector } from './model-selector';
 import type {
@@ -1035,7 +1036,6 @@ export function SessionChatInput({
     [placeholder],
   );
   const [text, setText] = useState('');
-  const [showAnimatedPlaceholder, setShowAnimatedPlaceholder] = useState(true);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
@@ -1068,7 +1068,6 @@ export function SessionChatInput({
   // This survives across query changes so that narrowing a query (e.g. "te" → "test")
   // never loses results even if the API returns empty for the longer query.
   const fileResultsCache = useRef<Set<string>>(new Set());
-  const placeholderFadeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (!lockForQuestion) return;
@@ -1114,24 +1113,14 @@ export function SessionChatInput({
   const { data: allSessions } = useOpenCodeSessions();
 
   useEffect(() => {
-    if (text.trim().length > 0) {
-      setShowAnimatedPlaceholder(false);
-      return;
-    }
+    if (text.trim().length > 0) return;
 
-    setShowAnimatedPlaceholder(true);
     const interval = setInterval(() => {
-      setShowAnimatedPlaceholder(false);
-      clearTimeout(placeholderFadeTimer.current);
-      placeholderFadeTimer.current = setTimeout(() => {
-        setPlaceholderIndex((i) => (i + 1) % placeholderVariants.length);
-        setShowAnimatedPlaceholder(true);
-      }, 180);
-    }, 2800);
+      setPlaceholderIndex((i) => (i + 1) % placeholderVariants.length);
+    }, 6000);
 
     return () => {
       clearInterval(interval);
-      clearTimeout(placeholderFadeTimer.current);
     };
   }, [text, placeholderVariants.length]);
 
@@ -1831,12 +1820,27 @@ export function SessionChatInput({
               {text.trim().length === 0 && !stagedCommand && (
                 <div
                   aria-hidden
-                  className={cn(
-                    'absolute left-0.5 top-4 text-[16px] sm:text-[15px] text-muted-foreground pointer-events-none transition-all duration-200',
-                    showAnimatedPlaceholder ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-0.5',
-                  )}
+                  className="absolute left-0.5 top-4 h-6 w-[calc(100%-0.5rem)] text-[16px] sm:text-[15px] text-muted-foreground pointer-events-none overflow-hidden"
                 >
-                  {placeholderVariants[placeholderIndex]}
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={`${placeholderIndex}:${placeholderVariants[placeholderIndex]}`}
+                      className="absolute inset-0"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] },
+                      }}
+                      exit={{
+                        opacity: 0,
+                        y: -8,
+                        transition: { duration: 0.48, ease: [0.2, 0, 0.1, 1] },
+                      }}
+                    >
+                      {placeholderVariants[placeholderIndex]}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
               )}
               {text.trim().length === 0 && stagedCommand && (
