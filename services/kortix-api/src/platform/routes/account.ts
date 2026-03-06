@@ -169,12 +169,24 @@ export function createAccountRouter(
       if (provisioning) {
         const { getImagePullStatus } = await import('../providers/local-docker');
         const pullStatus = getImagePullStatus();
-        return c.json({
-          success: true,
-          status: pullStatus.state === 'done' ? 'creating' : 'pulling',
-          progress: pullStatus.progress,
-          message: pullStatus.message,
-        });
+
+        // Stale provisioning row: nothing is actually pulling (e.g. server restarted
+        // or previous attempt failed). Mark it as error and fall through to reprovision.
+        if (pullStatus.state === 'idle' || pullStatus.state === 'error') {
+          console.warn(`[PLATFORM] Stale provisioning row ${provisioning.sandboxId} with pull state '${pullStatus.state}', cleaning up...`);
+          await db
+            .update(sandboxes)
+            .set({ status: 'error', updatedAt: new Date() })
+            .where(eq(sandboxes.sandboxId, provisioning.sandboxId));
+          // Fall through to provision fresh below
+        } else {
+          return c.json({
+            success: true,
+            status: pullStatus.state === 'done' ? 'creating' : 'pulling',
+            progress: pullStatus.progress,
+            message: pullStatus.message,
+          });
+        }
       }
 
       // Check if image exists locally
