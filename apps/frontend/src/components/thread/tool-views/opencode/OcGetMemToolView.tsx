@@ -19,121 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
-
-interface ObservationReport {
-  id: string;
-  type: string;
-  title: string;
-  narrative: string;
-  tool: string | null;
-  prompt: string | null;
-  session: string | null;
-  created: string | null;
-  facts: string[];
-  concepts: string[];
-  filesRead: string[];
-}
-
-function parseObservationReport(text: string): ObservationReport | null {
-  if (!text.includes('Observation #') || !text.includes('Facts:')) return null;
-
-  const normalized = text.replace(/\r\n?/g, '\n').trim();
-  const headerMatch = normalized.match(
-    /===\s*Observation\s*#(\d+)\s*\[([^\]]+)\]\s*===\s*Title:\s*(.+?)\s*Narrative:\s*([\s\S]+?)\s*Facts:\s*([\s\S]*)$/,
-  );
-  if (!headerMatch) return null;
-
-  const [, id, type, title, narrativeAndMeta, factsAndMore] = headerMatch;
-
-  const lines = narrativeAndMeta
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  let narrative = '';
-  let tool: string | null = null;
-  let prompt: string | null = null;
-  let session: string | null = null;
-  let created: string | null = null;
-
-  for (const line of lines) {
-    if (line.startsWith('Tool:')) {
-      const compactMeta = line
-        .replace(/^Tool:\s*/i, 'Tool: ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const inlineMeta = compactMeta.match(/^Tool:\s*([^|]+?)\s*\|\s*Prompt\s*#([^\s]+)$/i);
-      if (inlineMeta) {
-        tool = inlineMeta[1].trim();
-        prompt = inlineMeta[2].trim();
-      } else {
-        tool = line.replace(/^Tool:\s*/i, '').trim() || null;
-      }
-      continue;
-    }
-    if (line.startsWith('Prompt #')) {
-      prompt = line.replace(/^Prompt\s*#/i, '').trim() || null;
-      continue;
-    }
-    if (line.startsWith('Session:')) {
-      session = line.replace(/^Session:\s*/i, '').trim() || null;
-      continue;
-    }
-    if (line.startsWith('Created:')) {
-      created = line.replace(/^Created:\s*/i, '').trim() || null;
-      continue;
-    }
-
-    narrative = narrative ? `${narrative} ${line}` : line;
-  }
-
-  const facts: string[] = [];
-  let concepts: string[] = [];
-  let filesRead: string[] = [];
-
-  for (const rawLine of factsAndMore.split('\n')) {
-    const line = rawLine.trim();
-    if (!line) continue;
-
-    if (line.startsWith('- ') || line.startsWith('• ')) {
-      facts.push(line.slice(2).trim());
-      continue;
-    }
-
-    if (line.startsWith('Concepts:')) {
-      concepts = line
-        .replace(/^Concepts:\s*/i, '')
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
-      continue;
-    }
-
-    if (line.startsWith('Files read:')) {
-      filesRead = line
-        .replace(/^Files read:\s*/i, '')
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-  }
-
-  if (!title.trim() || !narrative || facts.length === 0) return null;
-
-  return {
-    id,
-    type,
-    title: title.trim(),
-    narrative,
-    tool,
-    prompt,
-    session,
-    created,
-    facts,
-    concepts,
-    filesRead,
-  };
-}
+import { parseMemoryEntryOutput } from '@/lib/utils/memory-entry-output';
 
 export function OcGetMemToolView({
   toolCall,
@@ -149,7 +35,7 @@ export function OcGetMemToolView({
   const output = typeof rawOutput === 'string' ? rawOutput : JSON.stringify(rawOutput, null, 2);
   const isError = toolResult?.success === false || !!toolResult?.error;
 
-  const report = useMemo(() => parseObservationReport(output), [output]);
+  const report = useMemo(() => parseMemoryEntryOutput(output), [output]);
 
   if (isStreaming && !toolResult) {
     return <LoadingState title="Get Memory" subtitle={memoryId ? `#${memoryId}` : source || undefined} />;
@@ -201,6 +87,7 @@ export function OcGetMemToolView({
             )}
 
             {report ? (
+              report.kind === 'observation' ? (
               <div className="rounded-2xl border border-border/70 overflow-hidden bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10 shadow-sm">
                 <div className="px-4 py-3 border-b border-border/60 bg-gradient-to-r from-amber-50/70 to-background dark:from-amber-950/20">
                   <div className="flex flex-wrap items-center gap-2">
@@ -222,31 +109,35 @@ export function OcGetMemToolView({
                 </div>
 
                 <div className="px-4 py-3 space-y-3">
-                  <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background to-muted/10 p-3">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
-                      <FileText className="h-3.5 w-3.5" />
-                      Narrative
-                    </span>
-                    <p className="text-sm leading-relaxed text-foreground/85">{report.narrative}</p>
-                  </div>
-
-                  <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background to-muted/10 p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        <ClipboardList className="h-3.5 w-3.5" />
-                        Facts
+                  {report.narrative && (
+                    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background to-muted/10 p-3">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
+                        <FileText className="h-3.5 w-3.5" />
+                        Narrative
                       </span>
-                      <Badge variant="secondary" className="h-5 text-[10px] font-medium">{report.facts.length}</Badge>
+                      <p className="text-sm leading-relaxed text-foreground/85">{report.narrative}</p>
                     </div>
-                    <ul className="space-y-1.5">
-                      {report.facts.map((fact, idx) => (
-                        <li key={`${report.id}-${idx}`} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
-                          <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-emerald-500/90 flex-shrink-0" />
-                          <span>{fact}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  )}
+
+                  {report.facts.length > 0 && (
+                    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background to-muted/10 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                          <ClipboardList className="h-3.5 w-3.5" />
+                          Facts
+                        </span>
+                        <Badge variant="secondary" className="h-5 text-[10px] font-medium">{report.facts.length}</Badge>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {report.facts.map((fact, idx) => (
+                          <li key={`${report.id}-${idx}`} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
+                            <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-emerald-500/90 flex-shrink-0" />
+                            <span>{fact}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {report.concepts.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 rounded-xl border border-border/60 bg-gradient-to-r from-background to-muted/20 p-2.5">
@@ -289,6 +180,72 @@ export function OcGetMemToolView({
                   )}
                 </div>
               </div>
+              ) : (
+              <div className="rounded-2xl border border-border/70 overflow-hidden bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10 shadow-sm">
+                <div className="px-4 py-3 border-b border-border/60 bg-gradient-to-r from-amber-50/70 to-background dark:from-amber-950/20">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="h-6 bg-background/90 border-amber-200/80 dark:border-amber-800/60">
+                      <Fingerprint className="h-3.5 w-3.5" />
+                      LTM #{report.id}
+                    </Badge>
+                    <Badge variant="outline" className="h-6 bg-amber-100/70 text-amber-900 border-amber-200/80 dark:bg-amber-900/30 dark:text-amber-100 dark:border-amber-800/60 uppercase tracking-wide text-[10px]">
+                      {report.type}
+                    </Badge>
+                    {report.created && (
+                      <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-background/70 border border-border/60 rounded-full px-2 py-1">
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        {report.created}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="px-4 py-3 space-y-3">
+                  {report.caption && (
+                    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background to-muted/10 p-3">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
+                        <FileText className="h-3.5 w-3.5" />
+                        Caption
+                      </span>
+                      <p className="text-sm leading-relaxed text-foreground/85">{report.caption}</p>
+                    </div>
+                  )}
+
+                  {report.content && (
+                    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background to-muted/10 p-3">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
+                        <ClipboardList className="h-3.5 w-3.5" />
+                        Content
+                      </span>
+                      <p className="text-sm leading-relaxed text-foreground/90">{report.content}</p>
+                    </div>
+                  )}
+
+                  {report.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 rounded-xl border border-border/60 bg-gradient-to-r from-background to-muted/20 p-2.5">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground mr-1">
+                        <Tags className="h-3.5 w-3.5" />
+                        Tags
+                      </span>
+                      {report.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="h-6 px-2 text-[11px] font-medium bg-emerald-100/60 text-emerald-800 border-emerald-200/70 dark:bg-emerald-900/25 dark:text-emerald-100 dark:border-emerald-800/60">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {(report.session || report.updated) && (
+                    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-muted/10 to-background p-3 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                        {report.session && <Badge variant="outline" className="h-5 px-1.5 font-medium font-mono bg-background/80">{report.session}</Badge>}
+                        {report.updated && <Badge variant="outline" className="h-5 px-1.5 font-medium bg-background/80">Updated: {report.updated}</Badge>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              )
             ) : isError ? (
               <div className="flex items-start gap-2.5 px-4 py-6 text-muted-foreground">
                 <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />

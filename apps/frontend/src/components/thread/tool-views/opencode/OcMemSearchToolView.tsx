@@ -20,45 +20,11 @@ import { ToolViewIconTitle } from '../shared/ToolViewIconTitle';
 import { ToolViewFooter } from '../shared/ToolViewFooter';
 import { LoadingState } from '../shared/LoadingState';
 import { cn } from '@/lib/utils';
+import { parseMemorySearchOutput } from '@/lib/utils/memory-search-output';
 
 // ============================================================================
 // Types & Parsing
 // ============================================================================
-
-interface MemoryHit {
-  source: 'ltm' | 'obs';
-  type: string;
-  id: string;
-  confidence: number | null;
-  content: string;
-  files: string[];
-}
-
-function parseMemSearchOutput(output: string): { query: string; hits: MemoryHit[] } {
-  if (!output || typeof output !== 'string') return { query: '', hits: [] };
-
-  // Extract query from header: === Memory Search: "query" (N results) ===
-  const headerMatch = output.match(/Memory Search:\s*"([^"]*)"\s*\((\d+)\s*result/);
-  const query = headerMatch?.[1] ?? '';
-
-  const hits: MemoryHit[] = [];
-  // Match blocks:   [LTM/semantic] #42 (confidence: 0.85)\n    content text\n    Files: a, b
-  const blockRe = /\[(LTM|obs)\/(\w+)\]\s*#(\d+)(?:\s*\(confidence:\s*([\d.]+)\))?\s*\n\s{4}(.+?)(?:\n\s{4}Files:\s*(.+?))?(?=\n\s{2}\[|\n*$)/g;  // removed /s flag for ES target compat
-
-  let m;
-  while ((m = blockRe.exec(output)) !== null) {
-    hits.push({
-      source: m[1].toLowerCase() === 'ltm' ? 'ltm' : 'obs',
-      type: m[2],
-      id: m[3],
-      confidence: m[4] ? parseFloat(m[4]) : null,
-      content: m[5].trim(),
-      files: m[6] ? m[6].split(',').map((f) => f.trim()) : [],
-    });
-  }
-
-  return { query, hits };
-}
 
 const TYPE_ICONS: Record<string, typeof Brain> = {
   episodic: BookOpen,
@@ -91,13 +57,15 @@ export function OcMemSearchToolView({
 }: ToolViewProps) {
   const args = toolCall?.arguments || {};
   const ocState = (args as any)._oc_state as any;
-  const query = (args.query as string) || (ocState?.input?.query as string) || '';
   const source = (args.source as string) || 'both';
   const rawOutput = toolResult?.output || ocState?.output || '';
   const output = typeof rawOutput === 'string' ? rawOutput : String(rawOutput);
   const isError = toolResult?.success === false || !!toolResult?.error;
 
-  const { hits } = useMemo(() => parseMemSearchOutput(output), [output]);
+  const parsed = useMemo(() => parseMemorySearchOutput(output), [output]);
+  const query = ((args.query as string) || (ocState?.input?.query as string) || parsed.query || '').trim();
+  const sourceHint = source !== 'both' ? source : parsed.label.toLowerCase().includes('ltm') ? 'ltm' : undefined;
+  const title = parsed.label.toLowerCase().includes('ltm') ? 'LTM Search' : 'Memory Search';
 
   if (isStreaming && !toolResult) {
     return <LoadingState title="Searching memory" subtitle={query} />;
@@ -107,17 +75,17 @@ export function OcMemSearchToolView({
     <Card className="gap-0 flex border-0 shadow-none p-0 py-0 rounded-none flex-col h-full overflow-hidden bg-card">
       <CardHeader className="h-14 bg-muted/50 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
-          <ToolViewIconTitle icon={Brain} title="Memory Search" subtitle={query} />
+          <ToolViewIconTitle icon={Brain} title={title} subtitle={query} />
           <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-            {source !== 'both' && (
+            {sourceHint && (
               <Badge variant="outline" className="h-5 py-0 text-[10px]">
-                {source}
+                {sourceHint}
               </Badge>
             )}
-            {hits.length > 0 && (
+            {parsed.hits.length > 0 && (
               <Badge variant="outline" className="h-6 py-0.5 bg-muted">
                 <Hash className="h-3 w-3 mr-1 opacity-70" />
-                {hits.length} {hits.length === 1 ? 'result' : 'results'}
+                {parsed.hits.length} {parsed.hits.length === 1 ? 'result' : 'results'}
               </Badge>
             )}
           </div>
@@ -125,11 +93,13 @@ export function OcMemSearchToolView({
       </CardHeader>
 
       <CardContent className="p-0 h-full flex-1 overflow-hidden">
-        {hits.length > 0 ? (
+        {parsed.hits.length > 0 ? (
           <ScrollArea className="h-full w-full">
             <div className="p-3 space-y-2">
-              {hits.map((hit) => {
+              {parsed.hits.map((hit) => {
                 const Icon = TYPE_ICONS[hit.type] || Database;
+                const sourceClass = hit.source === 'unknown' ? 'bg-muted text-muted-foreground border-border/60' : SOURCE_COLORS[hit.source];
+                const sourceLabel = hit.source === 'ltm' ? 'LTM' : hit.source === 'obs' ? 'Observation' : 'Memory';
                 return (
                   <div
                     key={`${hit.source}-${hit.id}`}
@@ -139,9 +109,9 @@ export function OcMemSearchToolView({
                       <Icon className="size-3.5 text-muted-foreground/60 flex-shrink-0" />
                       <Badge
                         variant="outline"
-                        className={cn('h-5 py-0 text-[10px] font-normal', SOURCE_COLORS[hit.source])}
+                        className={cn('h-5 py-0 text-[10px] font-normal', sourceClass)}
                       >
-                        {hit.source === 'ltm' ? 'LTM' : 'Observation'} / {hit.type}
+                        {sourceLabel} / {hit.type}
                       </Badge>
                       <span className="text-[10px] text-muted-foreground/50 font-mono">#{hit.id}</span>
                       {hit.confidence != null && (
@@ -167,6 +137,11 @@ export function OcMemSearchToolView({
               })}
             </div>
           </ScrollArea>
+        ) : parsed.matched && !isError ? (
+          <div className="flex flex-col items-center justify-center h-full py-12 px-6">
+            <Brain className="h-8 w-8 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">No memories found</p>
+          </div>
         ) : output && !isError ? (
           <ScrollArea className="h-full w-full">
             <div className="p-3 text-sm text-muted-foreground whitespace-pre-wrap">
@@ -197,10 +172,10 @@ export function OcMemSearchToolView({
               <AlertCircle className="h-3 w-3" />
               Failed
             </Badge>
-          ) : hits.length > 0 ? (
+          ) : parsed.hits.length > 0 ? (
             <Badge variant="outline" className="h-6 py-0.5 bg-muted">
               <CheckCircle className="h-3 w-3 text-muted-foreground" />
-              {hits.length} {hits.length === 1 ? 'memory' : 'memories'}
+              {parsed.hits.length} {parsed.hits.length === 1 ? 'memory' : 'memories'}
             </Badge>
           ) : null
         )}

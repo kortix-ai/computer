@@ -159,6 +159,12 @@ export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   // Memory tools (kortix-sys-oc-plugin)
   'oc-mem_search': OcMemSearchToolView,
   'oc-mem-search': OcMemSearchToolView,
+  'mem_search': OcMemSearchToolView,
+  'mem-search': OcMemSearchToolView,
+  'memory_search': OcMemSearchToolView,
+  'memory-search': OcMemSearchToolView,
+  'ltm_search': OcMemSearchToolView,
+  'ltm-search': OcMemSearchToolView,
   'oc-mem_save': OcMemSaveToolView,
   'oc-mem-save': OcMemSaveToolView,
 

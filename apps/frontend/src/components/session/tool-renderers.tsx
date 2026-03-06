@@ -101,6 +101,8 @@ import { openTabAndNavigate } from "@/stores/tab-store";
 import { enrichPreviewMetadata } from "@/lib/utils/session-context";
 import { PreWithPaths } from "@/components/common/clickable-path";
 import { parseDiagnosticsFromToolOutput, type LspDiagnostic } from "@/stores/diagnostics-store";
+import { parseMemorySearchOutput } from "@/lib/utils/memory-search-output";
+import { parseMemoryEntryOutput } from "@/lib/utils/memory-entry-output";
 
 import {
 	type ApplyPatchFile,
@@ -369,7 +371,46 @@ export const ToolRegistry = {
 		registry.set(name, component);
 	},
 	get(name: string): ToolComponent | undefined {
-		return registry.get(name);
+		const candidates = new Set<string>();
+		const add = (value?: string | null) => {
+			if (!value) return;
+			const cleaned = value.trim();
+			if (!cleaned) return;
+			candidates.add(cleaned);
+			candidates.add(cleaned.toLowerCase());
+		};
+
+		add(name);
+		add(name.replace(/_/g, "-"));
+		add(name.replace(/-/g, "_"));
+
+		const slashIdx = name.lastIndexOf("/");
+		if (slashIdx > 0) {
+			const short = name.slice(slashIdx + 1);
+			add(short);
+			add(short.replace(/_/g, "-"));
+			add(short.replace(/-/g, "_"));
+		}
+
+		for (const key of candidates) {
+			const component = registry.get(key);
+			if (component) return component;
+		}
+
+		const allRegistered = Array.from(registry.keys());
+		for (const candidate of candidates) {
+			for (const key of allRegistered) {
+				if (
+					candidate.endsWith(`/${key}`) ||
+					candidate.endsWith(`-${key}`) ||
+					candidate.endsWith(`_${key}`)
+				) {
+					return registry.get(key);
+				}
+			}
+		}
+
+		return undefined;
 	},
 };
 
@@ -1264,114 +1305,6 @@ function StructuredOutput({ sections }: { sections: OutputSection[] }) {
 	);
 }
 
-interface ObservationReport {
-	id: string;
-	type: string;
-	title: string;
-	narrative: string;
-	tool: string | null;
-	prompt: string | null;
-	session: string | null;
-	created: string | null;
-	facts: string[];
-	concepts: string[];
-	filesRead: string[];
-}
-
-function parseObservationReport(text: string): ObservationReport | null {
-	if (!text.includes("Observation #") || !text.includes("Facts:")) return null;
-
-	const normalized = text.replace(/\r\n?/g, "\n").trim();
-	const headerMatch = normalized.match(
-		/===\s*Observation\s*#(\d+)\s*\[([^\]]+)\]\s*===\s*Title:\s*(.+?)\s*Narrative:\s*([\s\S]+?)\s*Facts:\s*([\s\S]*)$/,
-	);
-	if (!headerMatch) return null;
-
-	const [, id, type, title, narrativeAndMeta, factsAndMore] = headerMatch;
-	const lines = narrativeAndMeta
-		.split("\n")
-		.map((line) => line.trim())
-		.filter(Boolean);
-
-	let narrative = "";
-	let tool: string | null = null;
-	let prompt: string | null = null;
-	let session: string | null = null;
-	let created: string | null = null;
-
-	for (const line of lines) {
-		if (line.startsWith("Tool:")) {
-			const inlineMeta = line
-				.replace(/^Tool:\s*/i, "")
-				.match(/^([^|]+?)\s*\|\s*Prompt\s*#([^\s]+)$/i);
-			if (inlineMeta) {
-				tool = inlineMeta[1].trim();
-				prompt = inlineMeta[2].trim();
-			} else {
-				tool = line.replace(/^Tool:\s*/i, "").trim() || null;
-			}
-			continue;
-		}
-		if (line.startsWith("Prompt #")) {
-			prompt = line.replace(/^Prompt\s*#/i, "").trim() || null;
-			continue;
-		}
-		if (line.startsWith("Session:")) {
-			session = line.replace(/^Session:\s*/i, "").trim() || null;
-			continue;
-		}
-		if (line.startsWith("Created:")) {
-			created = line.replace(/^Created:\s*/i, "").trim() || null;
-			continue;
-		}
-		narrative = narrative ? `${narrative} ${line}` : line;
-	}
-
-	const facts: string[] = [];
-	let concepts: string[] = [];
-	let filesRead: string[] = [];
-
-	for (const rawLine of factsAndMore.split("\n")) {
-		const line = rawLine.trim();
-		if (!line) continue;
-		if (line.startsWith("- ") || line.startsWith("• ")) {
-			facts.push(line.slice(2).trim());
-			continue;
-		}
-		if (line.startsWith("Concepts:")) {
-			concepts = line
-				.replace(/^Concepts:\s*/i, "")
-				.split(",")
-				.map((item) => item.trim())
-				.filter(Boolean);
-			continue;
-		}
-		if (line.startsWith("Files read:")) {
-			filesRead = line
-				.replace(/^Files read:\s*/i, "")
-				.split(",")
-				.map((item) => item.trim())
-				.filter(Boolean);
-		}
-	}
-
-	if (!title.trim() || !narrative || facts.length === 0) return null;
-
-	return {
-		id,
-		type,
-		title: title.trim(),
-		narrative,
-		tool,
-		prompt,
-		session,
-		created,
-		facts,
-		concepts,
-		filesRead,
-	};
-}
-
 // ============================================================================
 // Tool Renderers — self-registering
 // ============================================================================
@@ -1383,7 +1316,7 @@ function GetMemTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 	const running = useContext(ToolRunningContext);
 	const source = (input.source as string) || "";
 	const memoryId = input.id != null ? String(input.id) : "";
-	const report = useMemo(() => parseObservationReport(output), [output]);
+	const report = useMemo(() => parseMemoryEntryOutput(output), [output]);
 	const isStreaming = (status === "pending" && running) || status === "running";
 
 	return (
@@ -1417,94 +1350,157 @@ function GetMemTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
 				)}
 
 				{report ? (
-					<div className="rounded-2xl border border-border/60 bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10 overflow-hidden shadow-sm">
-						<div className="px-3 py-2.5 border-b border-border/50 bg-gradient-to-r from-amber-50/70 to-background dark:from-amber-950/20">
-							<div className="flex flex-wrap items-center gap-1.5">
-								<span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10px] border border-amber-200/80 dark:border-amber-800/60 bg-background/90">
-									<Fingerprint className="size-3" />
-									Observation #{report.id}
-								</span>
-								<span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-amber-200/80 dark:border-amber-800/60 bg-amber-100/70 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100 uppercase tracking-wide">
-									{report.type}
-								</span>
-								{report.created && (
-									<span className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-background/70 border border-border/60 rounded-full px-2 py-1">
-										<CalendarClock className="size-3" />
-										{report.created}
+					report.kind === "observation" ? (
+						<div className="rounded-2xl border border-border/60 bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10 overflow-hidden shadow-sm">
+							<div className="px-3 py-2.5 border-b border-border/50 bg-gradient-to-r from-amber-50/70 to-background dark:from-amber-950/20">
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10px] border border-amber-200/80 dark:border-amber-800/60 bg-background/90">
+										<Fingerprint className="size-3" />
+										Observation #{report.id}
 									</span>
-								)}
-							</div>
-							<h3 className="mt-2 text-[15px] leading-snug font-semibold text-foreground">
-								{report.title}
-							</h3>
-						</div>
-
-						<div className="p-3 space-y-2.5">
-							<div className="rounded-xl border border-border/50 bg-gradient-to-b from-background to-muted/10 p-2.5">
-								<div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
-									<FileText className="size-3" />
-									Narrative
-								</div>
-								<p className="text-[12px] leading-relaxed text-foreground/85">{report.narrative}</p>
-							</div>
-
-							<div className="rounded-xl border border-border/50 bg-gradient-to-b from-background to-muted/10 p-2.5">
-								<div className="flex items-center gap-2 mb-1.5">
-									<div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-									<ListTree className="size-3" />
-									Facts
-									</div>
-									<span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-medium bg-muted/60 border border-border/60">
-										{report.facts.length}
+									<span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-amber-200/80 dark:border-amber-800/60 bg-amber-100/70 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100 uppercase tracking-wide">
+										{report.type}
 									</span>
-								</div>
-								<ul className="space-y-1">
-									{report.facts.map((fact, index) => (
-										<li key={`${report.id}-${index}`} className="flex items-start gap-1.5 text-[12px] leading-relaxed text-foreground/90">
-											<span className="mt-[6px] size-1.5 rounded-full bg-emerald-500/90 flex-shrink-0" />
-											<span>{fact}</span>
-										</li>
-									))}
-								</ul>
-							</div>
-
-							{report.concepts.length > 0 && (
-								<div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/50 bg-gradient-to-r from-background to-muted/20 p-2.5">
-									<span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground mr-0.5">
-										<Tags className="size-3" />
-										Concepts
-									</span>
-									{report.concepts.map((concept) => (
-										<span key={concept} className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-medium bg-emerald-100/60 text-emerald-800 border border-emerald-200/70 dark:bg-emerald-900/25 dark:text-emerald-100 dark:border-emerald-800/60">
-											{concept}
+									{report.created && (
+										<span className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-background/70 border border-border/60 rounded-full px-2 py-1">
+											<CalendarClock className="size-3" />
+											{report.created}
 										</span>
-									))}
-								</div>
-							)}
-
-							{(report.tool || report.prompt || report.session || report.filesRead.length > 0) && (
-								<div className="rounded-xl border border-border/50 bg-gradient-to-b from-muted/10 to-background p-2.5 space-y-1.5">
-									<div className="flex flex-wrap items-center gap-1.5">
-										{report.tool && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-medium">Tool: {report.tool}</span>}
-										{report.prompt && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-medium">Prompt #{report.prompt}</span>}
-										{report.session && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-mono font-medium">{report.session}</span>}
-									</div>
-									{report.filesRead.length > 0 && (
-										<div className="space-y-1">
-											<div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Files read</div>
-											<div className="flex flex-wrap gap-1.5">
-												{report.filesRead.map((file) => (
-													<span key={file} className="inline-flex items-center h-6 px-2 rounded-md text-[10px] font-mono bg-background border border-border/70 text-foreground/75 break-all">
-														{file}
-													</span>
-												))}
-											</div>
-										</div>
 									)}
 								</div>
-							)}
+								<h3 className="mt-2 text-[15px] leading-snug font-semibold text-foreground">
+									{report.title}
+								</h3>
+							</div>
+							<div className="p-3 space-y-2.5">
+								{report.narrative && (
+									<div className="rounded-xl border border-border/50 bg-gradient-to-b from-background to-muted/10 p-2.5">
+										<div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
+											<FileText className="size-3" />
+											Narrative
+										</div>
+										<p className="text-[12px] leading-relaxed text-foreground/85">{report.narrative}</p>
+									</div>
+								)}
+								{report.facts.length > 0 && (
+									<div className="rounded-xl border border-border/50 bg-gradient-to-b from-background to-muted/10 p-2.5">
+										<div className="flex items-center gap-2 mb-1.5">
+											<div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+												<ListTree className="size-3" />
+												Facts
+											</div>
+											<span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-medium bg-muted/60 border border-border/60">
+												{report.facts.length}
+											</span>
+										</div>
+										<ul className="space-y-1">
+											{report.facts.map((fact, index) => (
+												<li key={`${report.id}-${index}`} className="flex items-start gap-1.5 text-[12px] leading-relaxed text-foreground/90">
+													<span className="mt-[6px] size-1.5 rounded-full bg-emerald-500/90 flex-shrink-0" />
+													<span>{fact}</span>
+												</li>
+											))}
+										</ul>
+									</div>
+								)}
+								{report.concepts.length > 0 && (
+									<div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/50 bg-gradient-to-r from-background to-muted/20 p-2.5">
+										<span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground mr-0.5">
+											<Tags className="size-3" />
+											Concepts
+										</span>
+										{report.concepts.map((concept) => (
+											<span key={concept} className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-medium bg-emerald-100/60 text-emerald-800 border border-emerald-200/70 dark:bg-emerald-900/25 dark:text-emerald-100 dark:border-emerald-800/60">
+												{concept}
+											</span>
+										))}
+									</div>
+								)}
+								{(report.tool || report.prompt || report.session || report.filesRead.length > 0) && (
+									<div className="rounded-xl border border-border/50 bg-gradient-to-b from-muted/10 to-background p-2.5 space-y-1.5">
+										<div className="flex flex-wrap items-center gap-1.5">
+											{report.tool && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-medium">Tool: {report.tool}</span>}
+											{report.prompt && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-medium">Prompt #{report.prompt}</span>}
+											{report.session && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-mono font-medium">{report.session}</span>}
+										</div>
+										{report.filesRead.length > 0 && (
+											<div className="space-y-1">
+												<div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Files read</div>
+												<div className="flex flex-wrap gap-1.5">
+													{report.filesRead.map((file) => (
+														<span key={file} className="inline-flex items-center h-6 px-2 rounded-md text-[10px] font-mono bg-background border border-border/70 text-foreground/75 break-all">
+															{file}
+														</span>
+													))}
+												</div>
+											</div>
+										)}
+									</div>
+								)}
+							</div>
 						</div>
-					</div>
+					) : (
+						<div className="rounded-2xl border border-border/60 bg-gradient-to-b from-background via-background to-amber-50/20 dark:to-amber-950/10 overflow-hidden shadow-sm">
+							<div className="px-3 py-2.5 border-b border-border/50 bg-gradient-to-r from-amber-50/70 to-background dark:from-amber-950/20">
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10px] border border-amber-200/80 dark:border-amber-800/60 bg-background/90">
+										<Fingerprint className="size-3" />
+										LTM #{report.id}
+									</span>
+									<span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-amber-200/80 dark:border-amber-800/60 bg-amber-100/70 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100 uppercase tracking-wide">
+										{report.type}
+									</span>
+									{report.created && (
+										<span className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-background/70 border border-border/60 rounded-full px-2 py-1">
+											<CalendarClock className="size-3" />
+											{report.created}
+										</span>
+									)}
+								</div>
+							</div>
+							<div className="p-3 space-y-2.5">
+								{report.caption && (
+									<div className="rounded-xl border border-border/50 bg-gradient-to-b from-background to-muted/10 p-2.5">
+										<div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
+											<FileText className="size-3" />
+											Caption
+										</div>
+										<p className="text-[12px] leading-relaxed text-foreground/85">{report.caption}</p>
+									</div>
+								)}
+								{report.content && (
+									<div className="rounded-xl border border-border/50 bg-gradient-to-b from-background to-muted/10 p-2.5">
+										<div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">
+											<ListTree className="size-3" />
+											Content
+										</div>
+										<p className="text-[12px] leading-relaxed text-foreground/90">{report.content}</p>
+									</div>
+								)}
+								{report.tags.length > 0 && (
+									<div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/50 bg-gradient-to-r from-background to-muted/20 p-2.5">
+										<span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground mr-0.5">
+											<Tags className="size-3" />
+											Tags
+										</span>
+										{report.tags.map((tag) => (
+											<span key={tag} className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-medium bg-emerald-100/60 text-emerald-800 border border-emerald-200/70 dark:bg-emerald-900/25 dark:text-emerald-100 dark:border-emerald-800/60">
+												{tag}
+											</span>
+										))}
+									</div>
+								)}
+								{(report.session || report.updated) && (
+									<div className="rounded-xl border border-border/50 bg-gradient-to-b from-muted/10 to-background p-2.5 space-y-1.5">
+										<div className="flex flex-wrap items-center gap-1.5">
+											{report.session && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-mono font-medium">{report.session}</span>}
+											{report.updated && <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-background/80 font-medium">Updated: {report.updated}</span>}
+										</div>
+									</div>
+								)}
+							</div>
+						</div>
+					)
 				) : output ? (
 					<ToolOutputFallback output={output} isStreaming={isStreaming} toolName="get_mem" />
 				) : (
@@ -1518,6 +1514,138 @@ ToolRegistry.register("get_mem", GetMemTool);
 ToolRegistry.register("get-mem", GetMemTool);
 ToolRegistry.register("oc-get_mem", GetMemTool);
 ToolRegistry.register("oc-get-mem", GetMemTool);
+
+function MemorySearchTool({ part, defaultOpen, forceOpen, locked }: ToolProps) {
+	const input = partInput(part);
+	const output = partOutput(part);
+	const status = partStatus(part);
+	const running = useContext(ToolRunningContext);
+	const parsed = useMemo(() => parseMemorySearchOutput(output), [output]);
+	const query = ((input.query as string) || parsed.query || "").trim();
+	const source = ((input.source as string) || "").trim();
+	const isStreaming = (status === "pending" && running) || status === "running";
+	const triggerTitle = parsed.label.toLowerCase().includes("ltm")
+		? "LTM Search"
+		: "Memory Search";
+	const resultCount = parsed.hits.length;
+
+	return (
+		<BasicTool
+			icon={<Search className="size-3.5 flex-shrink-0" />}
+			trigger={{
+				title: triggerTitle,
+				subtitle: query || undefined,
+				args:
+					status === "completed"
+						? [
+							`${resultCount} ${resultCount === 1 ? "result" : "results"}`,
+						]
+						: undefined,
+			}}
+			defaultOpen={defaultOpen}
+			forceOpen={forceOpen}
+			locked={locked}
+		>
+			<div className="p-2.5 space-y-2.5">
+				{(query || source) && (
+					<div className="rounded-xl border border-sky-200/50 dark:border-sky-900/50 bg-gradient-to-r from-sky-50/60 via-background to-background dark:from-sky-950/20 p-2.5">
+						<div className="text-[10px] font-medium uppercase tracking-[0.18em] text-sky-700/80 dark:text-sky-300/80 mb-1.5">
+							Request
+						</div>
+						<div className="flex flex-wrap items-center gap-1.5">
+							{source && (
+								<span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] font-medium border border-sky-200/70 dark:border-sky-800/50 bg-sky-100/70 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+									Source: {source}
+								</span>
+							)}
+							{query && (
+								<span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] font-mono border border-border/60 bg-background text-foreground/85">
+									{query}
+								</span>
+							)}
+						</div>
+					</div>
+				)}
+
+				{parsed.hits.length > 0 ? (
+					<div className="rounded-xl border border-border/60 bg-gradient-to-b from-background to-muted/10 p-2.5 space-y-2">
+						{parsed.hits.map((hit) => {
+							const sourceLabel =
+								hit.source === "ltm"
+									? "LTM"
+									: hit.source === "obs"
+										? "Observation"
+										: "Memory";
+							return (
+								<div
+									key={`${hit.source}-${hit.id}-${hit.type}`}
+									className="rounded-lg border border-border/60 bg-background/80 px-2.5 py-2"
+								>
+									<div className="flex items-center gap-1.5 mb-1.5">
+										<span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] border border-border/60 bg-muted/30">
+											{sourceLabel} / {hit.type}
+										</span>
+										<span className="text-[10px] text-muted-foreground/60 font-mono">#{hit.id}</span>
+										{hit.confidence != null && (
+											<span className="ml-auto text-[10px] text-muted-foreground/60">
+												{Math.round(hit.confidence * 100)}% conf
+											</span>
+										)}
+									</div>
+									<p className="text-[12px] leading-relaxed text-foreground/90">
+										{hit.content}
+									</p>
+									{hit.files.length > 0 && (
+										<div className="flex flex-wrap gap-1 mt-1.5">
+											{hit.files.map((file) => (
+												<span
+													key={file}
+													className="inline-flex items-center h-5 px-1.5 rounded text-[10px] font-mono bg-muted/50 text-muted-foreground"
+												>
+													{file}
+												</span>
+											))}
+										</div>
+									)}
+								</div>
+							);
+						})}
+					</div>
+				) : parsed.matched ? (
+					<ToolEmptyState
+						message={
+							isStreaming
+								? "Searching memory..."
+								: "No memories found."
+						}
+					/>
+				) : output ? (
+					<ToolOutputFallback
+						output={output}
+						isStreaming={isStreaming}
+						toolName="ltm_search"
+					/>
+				) : (
+					<ToolEmptyState
+						message={
+							isStreaming
+								? "Searching memory..."
+								: "No search output yet."
+						}
+					/>
+				)}
+			</div>
+		</BasicTool>
+	);
+}
+ToolRegistry.register("ltm_search", MemorySearchTool);
+ToolRegistry.register("ltm-search", MemorySearchTool);
+ToolRegistry.register("mem_search", MemorySearchTool);
+ToolRegistry.register("mem-search", MemorySearchTool);
+ToolRegistry.register("memory_search", MemorySearchTool);
+ToolRegistry.register("memory-search", MemorySearchTool);
+ToolRegistry.register("oc-mem_search", MemorySearchTool);
+ToolRegistry.register("oc-mem-search", MemorySearchTool);
 
 // --- Bash ---
 

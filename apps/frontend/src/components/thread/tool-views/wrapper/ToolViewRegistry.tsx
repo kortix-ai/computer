@@ -37,7 +37,46 @@ class ToolViewRegistry {
   }
 
   get(toolName: string): ToolViewComponent {
-    return this.registry[toolName] || this.registry['default'];
+    const candidates = new Set<string>();
+    const add = (value?: string | null) => {
+      if (!value) return;
+      const cleaned = value.trim();
+      if (!cleaned) return;
+      candidates.add(cleaned);
+      candidates.add(cleaned.toLowerCase());
+    };
+
+    add(toolName);
+    add(toolName.replace(/_/g, '-'));
+    add(toolName.replace(/-/g, '_'));
+
+    const slashIdx = toolName.lastIndexOf('/');
+    if (slashIdx > 0) {
+      const short = toolName.slice(slashIdx + 1);
+      add(short);
+      add(short.replace(/_/g, '-'));
+      add(short.replace(/-/g, '_'));
+    }
+
+    for (const key of candidates) {
+      const component = this.registry[key];
+      if (component) return component;
+    }
+
+    const allKeys = Object.keys(this.registry);
+    for (const candidate of candidates) {
+      for (const key of allKeys) {
+        if (
+          candidate.endsWith(`/${key}`) ||
+          candidate.endsWith(`-${key}`) ||
+          candidate.endsWith(`_${key}`)
+        ) {
+          return this.registry[key];
+        }
+      }
+    }
+
+    return this.registry['default'];
   }
 
   has(toolName: string): boolean {
