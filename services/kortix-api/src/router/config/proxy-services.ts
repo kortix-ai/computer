@@ -157,6 +157,7 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
       allowedRoutes: [
         { path: '/chat/completions', methods: ['POST'] },
+        { path: '/responses', methods: ['POST'] },
       ],
       billingToolName: 'llm_openai',
       isLlm: true,
