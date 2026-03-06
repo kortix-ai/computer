@@ -73,7 +73,7 @@ function PricingCard({
       <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
 
       {isProTier && (
-        <div className="relative mt-3 h-44 w-full overflow-hidden">
+        <div className="relative mt-3 h-44 w-[calc(100%+3rem)] -mx-6 overflow-hidden">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/20 via-primary/5 to-transparent" />
           <Image
             src="/kortix-computer.png"
