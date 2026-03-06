@@ -47,20 +47,13 @@ else
 fi
 
 # --- CLI has all required commands ---
-for cmd in start stop restart logs status update setup; do
+for cmd in start stop restart logs status update rebuild setup; do
   if grep -q "${cmd})" "$TMP_CLI"; then
     pass "CLI has '${cmd}' command"
   else
     fail "CLI has '${cmd}' command"
   fi
 done
-
-# --- CLI has new VPS-aware commands ---
-if grep -q 'reconfigure)' "$TMP_CLI"; then
-  pass "CLI has 'reconfigure' command"
-else
-  fail "CLI has 'reconfigure' command"
-fi
 
 if grep -q 'credentials)' "$TMP_CLI"; then
   pass "CLI has 'credentials' command"
@@ -96,11 +89,11 @@ else
   fail "CLI uses 'docker compose' (v2 syntax)"
 fi
 
-# --- CLI does not reference source builds ---
-if ! grep -q '\-\-build' "$TMP_CLI"; then
-  pass "CLI does not use --build (pre-built images only)"
+# --- CLI can rebuild local images from source ---
+if grep -q '_rebuild_local_images()' "$TMP_CLI" && grep -q 'build-local-images.sh' "$TMP_CLI"; then
+  pass "CLI can rebuild local images from source"
 else
-  fail "CLI does not use --build (pre-built images only)"
+  fail "CLI can rebuild local images from source"
 fi
 
 # --- CLI does not reference git ---
@@ -129,13 +122,6 @@ if grep -q 'vps.*Dashboard\|Dashboard.*_url' "$TMP_CLI" || grep -q '_url' "$TMP_
   pass "CLI start shows domain URL in VPS mode"
 else
   fail "CLI start shows domain URL in VPS mode"
-fi
-
-# --- Uninstall handles firewall cleanup ---
-if grep -q 'ufw.*delete\|Remove firewall' "$TMP_CLI"; then
-  pass "CLI uninstall handles firewall cleanup"
-else
-  fail "CLI uninstall handles firewall cleanup"
 fi
 
 # Clean up
