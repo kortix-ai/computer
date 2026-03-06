@@ -103,6 +103,29 @@ export function createAccountRouter(
 
       const accountId = await resolveAccountId(userId);
 
+      // In cloud billing mode, managed Hetzner provisioning is paid-only.
+      // Free/new accounts must complete billing setup first (or connect custom instance).
+      const targetProvider = requestedProvider || getDefaultProviderName();
+      if (config.KORTIX_BILLING_INTERNAL_ENABLED && targetProvider === 'hetzner') {
+        const [{ getCreditAccount }, { isPaidTier }] = await Promise.all([
+          import('../../billing/repositories/credit-accounts'),
+          import('../../billing/services/tiers'),
+        ]);
+
+        const account = await getCreditAccount(accountId);
+        const tier = account?.tier ?? 'none';
+        if (!isPaidTier(tier)) {
+          return c.json(
+            {
+              success: false,
+              error: 'Managed cloud sandbox requires Pro plan. Complete plan setup first.',
+              code: 'PLAN_REQUIRED',
+            },
+            402,
+          );
+        }
+      }
+
       const { ensureSandbox } = await import('../services/ensure-sandbox');
       const { row, created } = await ensureSandbox({
         accountId,
