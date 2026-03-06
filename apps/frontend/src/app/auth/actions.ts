@@ -333,11 +333,17 @@ export async function installOwner(_prevState: any, formData: FormData) {
     password,
   });
 
-  if (signUpError) {
+  // If user already exists, fall through to sign-in instead of erroring
+  const alreadyExists = signUpError &&
+    (signUpError.message?.toLowerCase().includes('already registered') ||
+     signUpError.message?.toLowerCase().includes('already exists') ||
+     signUpError.status === 422);
+
+  if (signUpError && !alreadyExists) {
     return { message: signUpError.message || 'Could not create account' };
   }
 
-  // Immediately sign in to ensure session cookies are set
+  // Sign in (either after fresh signup or if user already existed)
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
     email: email.trim().toLowerCase(),
     password,

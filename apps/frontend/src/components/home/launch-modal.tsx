@@ -64,15 +64,25 @@ export function LaunchModal({ open, onClose }: LaunchModalProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2">
                 {/* ── Left: Product visual ── */}
-                <div className="flex items-center justify-center p-8 sm:p-12 md:p-16 bg-muted/20 md:rounded-l-2xl md:border-r border-border/50">
-                  <div className="relative w-full max-w-[280px] aspect-square flex items-center justify-center">
+                <div className="flex flex-col items-center justify-center p-8 sm:p-10 md:p-12 bg-muted/20 md:rounded-l-2xl md:border-r border-border/50">
+                  <div className="relative w-full max-w-[320px]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src="/kortix-brandmark-bg.svg"
+                      src="/kortixbox.png"
                       alt="Kortix Computer"
-                      className="w-full h-full object-contain select-none invert dark:invert-0 opacity-80"
+                      className="w-full h-auto object-contain select-none"
                       draggable={false}
                     />
+                  </div>
+                  {/* Price anchored beneath the image */}
+                  <div className="mt-6 text-center">
+                    <div className="flex items-baseline justify-center gap-1.5">
+                      <span className="text-4xl font-medium tracking-tight text-foreground">$49</span>
+                      <span className="text-sm text-muted-foreground/50">/month</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/40 mt-1">
+                      Starting price. Scale compute &amp; credits as you grow.
+                    </p>
                   </div>
                 </div>
 
@@ -89,15 +99,6 @@ export function LaunchModal({ open, onClose }: LaunchModalProps) {
                   </h2>
                   <p className="text-sm text-muted-foreground/60 mb-6">
                     Your 24/7 AI machine, managed by us.
-                  </p>
-
-                  {/* Price */}
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-3xl font-medium text-foreground">$49</span>
-                    <span className="text-sm text-muted-foreground/50">/month</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground/40 mb-8">
-                    Starting price. Scale compute & credits as you grow.
                   </p>
 
                   {/* Divider */}
