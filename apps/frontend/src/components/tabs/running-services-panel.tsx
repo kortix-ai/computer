@@ -11,9 +11,11 @@ import {
   FolderOpen,
   Gem,
   Globe,
+  Link2,
   Hexagon,
   Loader2,
   Server,
+  Tag,
   TerminalSquare,
   Zap,
   type LucideIcon,
@@ -97,6 +99,23 @@ function shortenPath(path: string): string {
   return path.replace(/^\/workspace\/?/, '') || '/';
 }
 
+function truncateMiddle(value: string, keepStart = 10, keepEnd = 8): string {
+  if (!value) return '';
+  if (value.length <= keepStart + keepEnd + 1) return value;
+  return `${value.slice(0, keepStart)}...${value.slice(-keepEnd)}`;
+}
+
+function compactUrl(url: string): string {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname === '/' ? '' : parsed.pathname;
+    return `${parsed.host}${path}`;
+  } catch {
+    return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  }
+}
+
 // ============================================================================
 // ServiceCard
 // ============================================================================
@@ -129,9 +148,11 @@ function ServiceCard({ service }: { service: RunningService }) {
 
   const isDeployment = service.kind === 'deployment' || !!service.deploymentId;
   const isTerminal = service.kind === 'terminal';
+  const kindLabel = isTerminal ? 'terminal' : isDeployment ? 'deployment' : 'preview';
   const fwStyle = service.framework && service.framework !== 'unknown' ? getFrameworkStyle(service.framework) : null;
   // If status is unknown but it has an open tab, treat as running
   const isRunning = service.status === 'running' || (service.status === 'unknown' && !!service.hasTab);
+  const statusLabel = isRunning ? 'running' : service.status;
 
   // Pick icon & color based on framework, falling back to generic icons
   const Icon = isTerminal
@@ -212,8 +233,44 @@ function ServiceCard({ service }: { service: RunningService }) {
       </div>
 
       {/* Metadata pills */}
-      {(fwStyle || service.sourcePath || service.startedAt || service.pid || service.managed !== undefined) && (
+      {(fwStyle || service.sourcePath || service.startedAt || service.pid || service.managed !== undefined || service.id || service.deploymentId || service.sessionId || service.tabId || service.proxyUrl) && (
         <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3 pt-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={cn(
+                'inline-flex items-center gap-1 text-[10px] font-medium px-2 py-[3px] rounded-md leading-none',
+                isTerminal
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                  : isDeployment
+                    ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+              )}>
+                {isTerminal ? <TerminalSquare className="h-2.5 w-2.5" /> : isDeployment ? <Server className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
+                {kindLabel}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Service type
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={cn(
+                'inline-flex items-center gap-1 text-[10px] font-medium px-2 py-[3px] rounded-md leading-none',
+                isRunning
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-muted text-muted-foreground',
+              )}>
+                <span className={cn('h-1.5 w-1.5 rounded-full', isRunning ? 'bg-emerald-500' : 'bg-muted-foreground/50')} />
+                {statusLabel}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Service status
+            </TooltipContent>
+          </Tooltip>
+
           {fwStyle && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -226,6 +283,20 @@ function ServiceCard({ service }: { service: RunningService }) {
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
                 Detected framework
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {service.proxyUrl && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 bg-muted/50 px-2 py-[3px] rounded-md leading-none">
+                  <Link2 className="h-2.5 w-2.5 flex-shrink-0" />
+                  <span className="font-mono truncate max-w-[180px]">{compactUrl(service.proxyUrl)}</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-[320px] break-all">
+                {service.proxyUrl}
               </TooltipContent>
             </Tooltip>
           )}
@@ -244,6 +315,59 @@ function ServiceCard({ service }: { service: RunningService }) {
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
                 {service.managed ? 'Started via the deploy system' : 'Started manually (e.g. from a terminal)'}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {service.id && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 bg-muted/40 px-2 py-[3px] rounded-md leading-none font-mono">
+                  <Tag className="h-2.5 w-2.5 flex-shrink-0" />
+                  svc {truncateMiddle(service.id)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-[320px] break-all">
+                Service ID: {service.id}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {service.deploymentId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 bg-muted/40 px-2 py-[3px] rounded-md leading-none font-mono">
+                  deploy {truncateMiddle(service.deploymentId)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-[320px] break-all">
+                Deployment ID: {service.deploymentId}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {service.sessionId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/50 bg-muted/40 px-2 py-[3px] rounded-md leading-none font-mono">
+                  session {truncateMiddle(service.sessionId)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-[320px] break-all">
+                Session ID: {service.sessionId}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {service.tabId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/45 bg-muted/30 px-2 py-[3px] rounded-md leading-none font-mono">
+                  tab {truncateMiddle(service.tabId)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-[320px] break-all">
+                Tab ID: {service.tabId}
               </TooltipContent>
             </Tooltip>
           )}
