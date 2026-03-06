@@ -73,16 +73,15 @@ function PricingCard({
       <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
 
       {isProTier && (
-        <div className="mt-4 rounded-xl border border-primary/20 bg-gradient-to-b from-primary/5 to-transparent p-3">
-          <div className="relative h-36 w-full overflow-hidden rounded-lg bg-black/5">
-            <Image
-              src="/kortix-computer.png"
-              alt="Kortix Pro cloud computer"
-              fill
-              className="object-contain p-1"
-              priority
-            />
-          </div>
+        <div className="relative mt-3 h-44 w-full overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/20 via-primary/5 to-transparent" />
+          <Image
+            src="/kortix-computer.png"
+            alt="Kortix Pro cloud computer"
+            fill
+            className="object-contain object-top scale-110 -translate-y-2"
+            priority
+          />
         </div>
       )}
 
