@@ -440,11 +440,35 @@ export async function verifyOtp(prevState: any, formData: FormData) {
   const isNewUser = data.user && (Date.now() - new Date(data.user.created_at).getTime()) < 60000;
   const authEvent = isNewUser ? 'signup' : 'login';
 
-  // Return success - let the client handle the redirect
+  // For new cloud users with no plan yet, send them to /subscription first.
+  const billingEnabled = process.env.NEXT_PUBLIC_BILLING_ENABLED === 'true';
+  let finalDestination = returnUrl || '/dashboard';
+
+  if (billingEnabled && isNewUser && data.session?.access_token) {
+    try {
+      const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || '').replace(/\/v1\/?$/, '');
+      if (backendUrl) {
+        const accountStateRes = await fetch(`${backendUrl}/v1/billing/account-state`, {
+          headers: { 'Authorization': `Bearer ${data.session.access_token}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (accountStateRes.ok) {
+          const accountState = await accountStateRes.json();
+          const tierKey = accountState?.subscription?.tier_key || accountState?.tier?.name || '';
+          if (!tierKey || tierKey === 'none') {
+            finalDestination = '/subscription';
+          }
+        }
+      }
+    } catch {
+      // If check fails, fall through to default destination
+    }
+  }
+
   return {
     success: true,
     authEvent,
     authMethod: 'email_otp',
-    redirectTo: returnUrl || '/dashboard',
+    redirectTo: finalDestination,
   };
 }
