@@ -2,7 +2,6 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { SimpleFooter } from '@/components/home/simple-footer';
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
 import { useRef, useState, useEffect } from 'react';
 
@@ -11,14 +10,13 @@ type ParagraphItem =
   | { text: string; linkText: string; linkHref: string };
 
 const paragraphs: ParagraphItem[] = [
-  "Most AI tools stop at thinking. We built one that acts.",
-  "Kortix is an AI agent that doesn't just give you answers—it gets things done. Research, code, write, manage projects, execute workflows. The whole job.",
-  "We started with a simple problem: people spend too much time on execution and not enough on the work that actually moves things forward.",
-  "So we built an AI that handles the doing. The research. The drafts. The code. The follow-through. All the stuff that fills your day but doesn't define your value.",
-  "This isn't about replacing people. It's about freeing them. Give the grunt work to AI. Keep the strategy, creativity, and decisions for yourself.",
-  "We're not chasing hype. We're building something reliable enough to trust with real work. Something that ships. Something that works when you need it to.",
-  "The goal is simple: make everyone 10x more capable by giving them an AI teammate that never sleeps, never complains, and always executes.",
-  "That's what we're here for.",
+  "AI should work. Not assist. Not suggest. Not help you draft. Work.",
+  "Every AI tool today is a chat window. You type, it replies, you copy-paste, you forget, you start over. It's a genius with amnesia sitting in an empty room. We thought that was insane.",
+  "So we built something different. Not another assistant. A computer. One that connects to everything, remembers everything, and runs operations on its own — around the clock, without asking.",
+  "We believe the next era of business isn't humans using AI tools. It's AI running on infrastructure that humans oversee. The operating system matters more than the model.",
+  "We're a small team. We work from everywhere. Belgrade, Lisbon, New York, San Francisco, London, Malaga, Bali. We ship fast, we argue about architecture, and we don't do meetings that could be messages.",
+  "We're not chasing hype. We're building infrastructure. The kind of thing that gets more valuable the longer it runs. The kind of thing that outlasts any single model generation.",
+  "Open source because lock-in is the enemy of trust. Apache 2.0 because we mean it.",
   { text: "Want to build it with us? ", linkText: "We're hiring.", linkHref: "/careers" }
 ];
 
@@ -387,8 +385,6 @@ export default function AboutPage() {
         </div>
 
       </article>
-
-      <SimpleFooter />
     </main>
   );
 }

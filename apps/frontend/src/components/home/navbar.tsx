@@ -15,6 +15,7 @@ import { trackCtaSignup } from '@/lib/analytics/gtm';
 import { AppDownloadQR } from '@/components/common/app-download-qr';
 import { isMobileDevice } from '@/lib/utils/is-mobile-device';
 import { Button } from '@/components/ui/button';
+import { useGitHubStars } from '@/hooks/utils/use-github-stars';
 
 // Apple logo SVG
 function AppleLogo({ className }: { className?: string }) {
@@ -98,6 +99,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
   const lastScrollY = useRef(0);
 
   const filteredNavLinks = siteConfig.nav.links;
+  const { formattedStars, loading: starsLoading } = useGitHubStars('kortix-ai', 'kortix');
 
   // Detect if user is on an actual mobile device (iOS/Android)
   // Mobile users clicking "Try Free" will be redirected to /app which then redirects to app stores
@@ -147,96 +149,105 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
 
   return (
     <header className={cn(
-      "flex justify-center px-6 md:px-0 pt-4",
+      "w-full px-5 pt-4",
       isAbsolute ? "" : "sticky top-0 z-50"
     )}>
-      <div className="w-full max-w-4xl">
-        <div className="mx-auto rounded-2xl md:px-6 bg-transparent">
-          <div className="relative flex h-[56px] items-center py-2 md:p-4">
-            {/* Left Section - Logo */}
-            <div className="flex items-center justify-start flex-shrink-0">
-              <Link href="/" className="flex items-center gap-3">
-                <KortixLogo size={18} variant='logomark' />
-              </Link>
-            </div>
+      <div className="grid grid-cols-3 items-center h-[52px]">
+        {/* Left — Logo */}
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center">
+            <KortixLogo size={18} variant='logomark' />
+          </Link>
+        </div>
 
-            {/* Center Section - Nav Links (absolutely centered) */}
-            <nav className="hidden md:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
-              {filteredNavLinks.map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className={cn(
-                    "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
-                    pathname === item.href
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              
-              {/* Mobile App Download with QR Popover */}
-              <div className="relative group">
-                <Link
-                  href="/app"
-                  className={cn(
-                    "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
-                    pathname === '/app'
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Mobile
-                </Link>
-                
-                {/* QR Code Popover - appears on hover */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <div className="relative bg-[#E8E8E8] dark:bg-[#1a1a1a] rounded-2xl border border-border/60 dark:border-[#2a2a2a] p-4 min-w-[200px]">
-                    <AppDownloadQR size={160} logoSize={24} className="rounded-xl p-3 shadow-md" />
-                    <p className="text-xs text-muted-foreground text-center mt-3">
-                      Scan to download
-                    </p>
-                    <div className="flex items-center justify-center gap-1.5 mt-1.5">
-                      <AppleLogo className="h-3 w-3 text-muted-foreground/60" />
-                      <PlayIcon className="h-2.5 w-2.5 text-muted-foreground/60" />
-                    </div>
-                  </div>
+        {/* Center — Nav Links */}
+        <nav className="hidden md:flex items-center justify-center gap-1">
+          {filteredNavLinks.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                pathname === item.href
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {item.name}
+            </Link>
+          ))}
+
+          {/* Mobile App Download with QR Popover — commented out for now
+          <div className="relative group">
+            <Link
+              href="/app"
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                pathname === '/app'
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Mobile
+            </Link>
+            
+            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <div className="relative bg-[#E8E8E8] dark:bg-[#1a1a1a] rounded-2xl border border-border/60 dark:border-[#2a2a2a] p-4 min-w-[200px]">
+                <AppDownloadQR size={160} logoSize={24} className="rounded-xl p-3 shadow-md" />
+                <p className="text-xs text-muted-foreground text-center mt-3">
+                  Scan to download
+                </p>
+                <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                  <AppleLogo className="h-3 w-3 text-muted-foreground/60" />
+                  <PlayIcon className="h-2.5 w-2.5 text-muted-foreground/60" />
                 </div>
               </div>
-            </nav>
-
-            {/* Right Section - Actions */}
-            <div className="flex items-center justify-end gap-2 sm:gap-3 ml-auto">
-              {user ? (
-                <Button asChild size="sm">
-                  <Link href="/dashboard">
-                    Dashboard
-                  </Link>
-                </Button>
-              ) : (
-                <Button asChild size="sm">
-                  <Link
-                    href={ctaLink}
-                    onClick={() => trackCtaSignup()}
-                    suppressHydrationWarning
-                  >
-                    {t('tryFree')}
-                  </Link>
-                </Button>
-              )}
-              
-              {/* Mobile Menu Button */}
-              <button
-                onClick={toggleDrawer}
-                className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors"
-                aria-label="Open menu"
-              >
-                <Menu className="size-5" />
-              </button>
             </div>
           </div>
+          */}
+        </nav>
+
+        {/* Right — Actions */}
+        <div className="flex items-center justify-end gap-2">
+          {/* GitHub stars */}
+          <a
+            href="https://github.com/kortix-ai/suna"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="size-4" fill="currentColor">
+              <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z" />
+            </svg>
+            <span className={cn("font-medium tabular-nums", starsLoading && "opacity-50")}>
+              {formattedStars}
+            </span>
+          </a>
+
+          {user ? (
+            <Button asChild size="sm">
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
+          ) : (
+            <Button asChild size="sm">
+              <Link
+                href={ctaLink}
+                onClick={() => trackCtaSignup()}
+                suppressHydrationWarning
+              >
+                {t('tryFree')}
+              </Link>
+            </Button>
+          )}
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={toggleDrawer}
+            className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="size-5" />
+          </button>
         </div>
       </div>
 
@@ -302,7 +313,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                     </a>
                   </motion.li>
                 ))}
-                {/* Mobile App Link */}
+                {/* Mobile App Link — commented out for now
                 <motion.li variants={drawerMenuVariants}>
                   <Link
                     href="/app"
@@ -316,6 +327,7 @@ export function Navbar({ isAbsolute = false }: NavbarProps) {
                     Mobile
                   </Link>
                 </motion.li>
+                */}
               </ul>
             </motion.nav>
 
