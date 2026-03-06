@@ -1,12 +1,14 @@
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
-import { ErrorResponse, UpdateResponse } from '../schemas/common';
+import { ErrorResponse, UpdateResponse, UpdateStatusResponse } from '../schemas/common';
+import { coreSupervisor } from '../services/core-supervisor';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const VERSION_FILE = '/opt/kortix/.version';
 const CHANGELOG_FILE = '/opt/kortix/CHANGELOG.json';
 const UPDATE_LOCK_FILE = '/tmp/.kortix-update-lock';
+const UPDATE_STATUS_FILE = '/tmp/.kortix-update-status.json';
 
 // Directories managed by symlinks (atomic swap targets)
 const SYMLINK_DIRS = ['kortix-master', 'opencode', 'agent-browser-viewer', 'kortix'] as const;
@@ -21,20 +23,6 @@ async function getChangelog(version: string) {
   } catch {}
   return null;
 }
-
-/**
- * Services to restart after update. Order matters:
- * - opencode first (depends on /opt/opencode/)
- * - then other services
- * - kortix-master LAST (deferred — it's us)
- */
-const SERVICES_TO_RESTART = [
-  'svc-opencode-serve',
-  'svc-opencode-web',
-  'svc-lss-sync',
-  'svc-agent-browser-viewer',
-  'svc-presentation-viewer',
-];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -69,9 +57,10 @@ async function run(cmd: string): Promise<{ ok: boolean; output: string }> {
   }
 }
 
-async function restartService(name: string): Promise<void> {
+async function restartService(name: string): Promise<{ ok: boolean; output: string }> {
   const result = await run(`sudo s6-svc -r /run/service/${name}`);
   console.log(`[Update] restartService(${name}): ok=${result.ok} ${result.output}`);
+  return result;
 }
 
 // ─── ACID Update Lock (Durability) ──────────────────────────────────────────
@@ -83,6 +72,41 @@ interface UpdateLock {
   pid: number;
   startedAt: string;
 }
+
+type UpdatePhase =
+  | 'idle'
+  | 'staging'
+  | 'verifying'
+  | 'committing'
+  | 'restarting'
+  | 'validating'
+  | 'rolling_back'
+  | 'complete'
+  | 'failed';
+
+interface UpdateStatus {
+  inProgress: boolean;
+  phase: UpdatePhase;
+  message: string;
+  targetVersion: string | null;
+  previousVersion: string | null;
+  currentVersion: string;
+  startedAt: string | null;
+  updatedAt: string | null;
+  error: string | null;
+}
+
+const DEFAULT_UPDATE_STATUS: UpdateStatus = {
+  inProgress: false,
+  phase: 'idle',
+  message: 'No update in progress',
+  targetVersion: null,
+  previousVersion: null,
+  currentVersion: '0.0.0',
+  startedAt: null,
+  updatedAt: null,
+  error: null,
+};
 
 async function writeLock(lock: UpdateLock): Promise<void> {
   await Bun.write(UPDATE_LOCK_FILE, JSON.stringify(lock));
@@ -101,6 +125,45 @@ async function deleteLock(): Promise<void> {
     const { unlinkSync } = await import('fs');
     unlinkSync(UPDATE_LOCK_FILE);
   } catch {}
+}
+
+async function readStatus(): Promise<UpdateStatus> {
+  try {
+    const file = Bun.file(UPDATE_STATUS_FILE);
+    if (await file.exists()) {
+      const data = await file.json();
+      return {
+        ...DEFAULT_UPDATE_STATUS,
+        ...data,
+      } as UpdateStatus;
+    }
+  } catch {}
+  return { ...DEFAULT_UPDATE_STATUS };
+}
+
+async function writeStatus(next: UpdateStatus): Promise<void> {
+  await Bun.write(UPDATE_STATUS_FILE, JSON.stringify(next));
+}
+
+async function setStatus(
+  patch: Partial<UpdateStatus> & Pick<UpdateStatus, 'phase' | 'message'>,
+): Promise<void> {
+  const current = await readStatus();
+  const now = new Date().toISOString();
+  const merged: UpdateStatus = {
+    ...current,
+    ...patch,
+    updatedAt: now,
+  };
+  await writeStatus(merged);
+}
+
+async function resetStatus(currentVersion: string): Promise<void> {
+  await writeStatus({
+    ...DEFAULT_UPDATE_STATUS,
+    currentVersion,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 // ─── ACID: Resolve current symlink target version ───────────────────────────
@@ -140,6 +203,40 @@ async function rollbackSymlinks(previousStagingDir: string): Promise<void> {
   }
 }
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForHealthyTargetVersion(
+  targetVersion: string,
+  timeoutMs = 90_000,
+): Promise<{ ok: boolean; output: string }> {
+  const deadline = Date.now() + timeoutMs;
+  let lastOutput = 'Health check did not complete';
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/kortix/health', {
+        signal: AbortSignal.timeout(4_000),
+      });
+      const body = await res.json().catch(() => ({}));
+      const bodyVersion = typeof body?.version === 'string' ? body.version : 'unknown';
+      const bodyStatus = typeof body?.status === 'string' ? body.status : 'unknown';
+      const bodyOpenCode = !!body?.opencode;
+      lastOutput = `http=${res.status} status=${bodyStatus} version=${bodyVersion} opencode=${bodyOpenCode}`;
+
+      if (res.status === 200 && bodyVersion === targetVersion && bodyOpenCode) {
+        return { ok: true, output: lastOutput };
+      }
+    } catch (e) {
+      lastOutput = `health probe error: ${String(e)}`;
+    }
+    await sleep(2_000);
+  }
+
+  return { ok: false, output: lastOutput };
+}
+
 // ─── ACID: Full Update Flow ─────────────────────────────────────────────────
 
 async function performUpdate(targetVersion: string, currentVersion: string): Promise<{
@@ -155,6 +252,16 @@ async function performUpdate(targetVersion: string, currentVersion: string): Pro
     : null;
 
   // Phase 1: STAGING — npm install triggers postinstall.sh which builds staging dir
+  await setStatus({
+    inProgress: true,
+    phase: 'staging',
+    message: `Staging @kortix/sandbox@${targetVersion}`,
+    targetVersion,
+    previousVersion: currentVersion,
+    currentVersion,
+    startedAt: new Date().toISOString(),
+    error: null,
+  });
   console.log(`[Update] Phase 1: Staging @kortix/sandbox@${targetVersion}...`);
   await writeLock({
     version: targetVersion,
@@ -169,36 +276,82 @@ async function performUpdate(targetVersion: string, currentVersion: string): Pro
   if (!installResult.ok) {
     console.error('[Update] npm install failed:', installResult.output);
     // Clean up failed staging
-    await run(`sudo rm -rf ${stagingDir}`);
+    await run(`sudo rm -rf "${stagingDir}"`);
+    await setStatus({
+      inProgress: false,
+      phase: 'failed',
+      message: 'Update failed during package staging',
+      error: installResult.output.slice(0, 1200),
+    });
     await deleteLock();
     return { success: false, output: `npm install failed: ${installResult.output.slice(0, 800)}` };
   }
 
   // Phase 2: VERIFY — check staging manifest exists and is complete
+  await setStatus({
+    phase: 'verifying',
+    message: 'Verifying staged artifacts',
+  });
   console.log('[Update] Phase 2: Verifying staging...');
   try {
     const manifestFile = Bun.file(`${stagingDir}/.manifest`);
     if (!await manifestFile.exists()) {
       console.error('[Update] Staging manifest not found — postinstall may have failed');
-      await run(`sudo rm -rf ${stagingDir}`);
+      await run(`sudo rm -rf "${stagingDir}"`);
+      await setStatus({
+        inProgress: false,
+        phase: 'failed',
+        message: 'Staging verification failed',
+        error: 'Staging incomplete: manifest not found',
+      });
       await deleteLock();
       return { success: false, output: 'Staging incomplete: manifest not found' };
     }
     const manifest = await manifestFile.json();
     if (manifest.status !== 'staged' || manifest.version !== targetVersion) {
       console.error('[Update] Staging manifest invalid:', manifest);
-      await run(`sudo rm -rf ${stagingDir}`);
+      await run(`sudo rm -rf "${stagingDir}"`);
+      await setStatus({
+        inProgress: false,
+        phase: 'failed',
+        message: 'Staging verification failed',
+        error: `Staging incomplete: ${JSON.stringify(manifest)}`,
+      });
       await deleteLock();
       return { success: false, output: `Staging incomplete: ${JSON.stringify(manifest)}` };
     }
+
+    const coreManifestFile = Bun.file(`${stagingDir}/kortix/core/manifest.json`);
+    const serviceSpecFile = Bun.file(`${stagingDir}/kortix/core/service-spec.json`);
+    if (!await coreManifestFile.exists() || !await serviceSpecFile.exists()) {
+      await run(`sudo rm -rf "${stagingDir}"`);
+      await setStatus({
+        inProgress: false,
+        phase: 'failed',
+        message: 'Core manifest/spec verification failed',
+        error: 'Missing core/manifest.json or core/service-spec.json in staged release',
+      });
+      await deleteLock();
+      return { success: false, output: 'Staging incomplete: missing core manifest/spec' };
+    }
   } catch (e) {
     console.error('[Update] Failed to read staging manifest:', e);
-    await run(`sudo rm -rf ${stagingDir}`);
+    await run(`sudo rm -rf "${stagingDir}"`);
+    await setStatus({
+      inProgress: false,
+      phase: 'failed',
+      message: 'Staging verification failed',
+      error: String(e),
+    });
     await deleteLock();
     return { success: false, output: `Staging verification failed: ${String(e)}` };
   }
 
   // Phase 3: COMMIT — atomic symlink swap
+  await setStatus({
+    phase: 'committing',
+    message: 'Committing staged version via atomic symlink swap',
+  });
   console.log('[Update] Phase 3: Committing (atomic symlink swap)...');
   await writeLock({
     version: targetVersion,
@@ -211,24 +364,89 @@ async function performUpdate(targetVersion: string, currentVersion: string): Pro
   const commitResult = await commitSymlinks(stagingDir);
   if (!commitResult.ok) {
     console.error('[Update] Symlink swap failed:', commitResult.output);
+    await setStatus({
+      phase: 'rolling_back',
+      message: 'Commit failed, rolling back symlinks',
+      error: commitResult.output.slice(0, 1200),
+    });
     // Rollback if we have a previous version
     if (prevStagingDir) {
       await rollbackSymlinks(prevStagingDir);
     }
+    await setStatus({
+      inProgress: false,
+      phase: 'failed',
+      message: 'Update failed during commit',
+      error: commitResult.output.slice(0, 1200),
+    });
     await deleteLock();
     return { success: false, output: `Symlink swap failed: ${commitResult.output}` };
   }
 
   // Phase 4: RESTART services (now pointing to new code via symlinks)
-  console.log('[Update] Phase 4: Restarting services...');
-  for (const svc of SERVICES_TO_RESTART) {
-    console.log(`[Update] Restarting: ${svc}`);
-    await restartService(svc);
+  await setStatus({
+    phase: 'restarting',
+    message: 'Restarting services on new version',
+  });
+  console.log('[Update] Phase 4: Reconciling core services...');
+  const reconcileResult = await coreSupervisor.reconcileFromDisk();
+  if (!reconcileResult.ok) {
+    const restartError = `Core reconcile failed: ${reconcileResult.output}`;
+    console.error('[Update]', restartError);
+    await setStatus({
+      phase: 'rolling_back',
+      message: 'Core reconcile failed, rolling back',
+      error: restartError.slice(0, 1200),
+    });
+
+    if (prevStagingDir) {
+      await rollbackSymlinks(prevStagingDir);
+      await coreSupervisor.reconcileFromDisk();
+    }
+
+    await setStatus({
+      inProgress: false,
+      phase: 'failed',
+      message: 'Update rolled back after service reconcile failure',
+      error: restartError.slice(0, 1200),
+    });
+    await deleteLock();
+    return { success: false, output: restartError };
   }
 
-  // Phase 5: CLEANUP — remove old staging (keep current for future rollback)
+  // Phase 5: VALIDATE — ensure new version is healthy before finalizing
+  await setStatus({
+    phase: 'validating',
+    message: 'Validating health of committed version',
+  });
+  const healthResult = await waitForHealthyTargetVersion(targetVersion);
+  if (!healthResult.ok) {
+    const healthError = `Post-commit health check failed: ${healthResult.output}`;
+    console.error('[Update]', healthError);
+    await setStatus({
+      phase: 'rolling_back',
+      message: 'Health check failed, rolling back',
+      error: healthError.slice(0, 1200),
+    });
+
+    if (prevStagingDir) {
+      await rollbackSymlinks(prevStagingDir);
+      await coreSupervisor.reconcileFromDisk();
+    }
+
+    await setStatus({
+      inProgress: false,
+      phase: 'failed',
+      message: 'Update rolled back after health validation failure',
+      error: healthError.slice(0, 1200),
+    });
+    await deleteLock();
+    return { success: false, output: healthError };
+  }
+
+  // Phase 6: CLEANUP — remove old staging (keep current for future rollback)
   if (prevStagingDir && prevStagingDir !== stagingDir) {
-    console.log(`[Update] Phase 5: Cleaning up old staging ${prevStagingDir}...`);
+    console.log(`[Update] Phase 6: Cleaning up old staging ${prevStagingDir}...`);
     await run(`sudo rm -rf "${prevStagingDir}"`);
   }
 
@@ -241,6 +459,16 @@ async function performUpdate(targetVersion: string, currentVersion: string): Pro
     startedAt: new Date().toISOString(),
   });
   await deleteLock();
+
+  await setStatus({
+    inProgress: false,
+    phase: 'complete',
+    message: `Update complete: ${currentVersion} -> ${targetVersion}`,
+    targetVersion,
+    previousVersion: currentVersion,
+    currentVersion: targetVersion,
+    error: null,
+  });
 
   // Self-restart deferred so the HTTP response completes
   console.log('[Update] Scheduling kortix-master restart in 2s...');
@@ -262,6 +490,14 @@ export async function recoverFromCrashedUpdate(): Promise<void> {
     console.warn(`[Update] Cleaning up incomplete staging for ${lock.version}`);
     await run(`sudo rm -rf /opt/kortix-staging-${lock.version}`);
     await deleteLock();
+    await setStatus({
+      inProgress: false,
+      phase: 'failed',
+      message: 'Recovered from interrupted staging update',
+      targetVersion: lock.version,
+      previousVersion: lock.previousVersion,
+      error: 'Recovered interrupted staging update on boot',
+    });
     console.log('[Update] Crash recovery complete — system unchanged');
   } else if (lock.status === 'committing') {
     // Crashed during symlink swap — may be in partial state
@@ -284,6 +520,14 @@ export async function recoverFromCrashedUpdate(): Promise<void> {
       }
     }
     await deleteLock();
+    await setStatus({
+      inProgress: false,
+      phase: 'failed',
+      message: 'Recovered from interrupted commit update',
+      targetVersion: lock.version,
+      previousVersion: lock.previousVersion,
+      error: 'Recovered interrupted commit update on boot',
+    });
     console.log('[Update] Crash recovery complete');
   } else if (lock.status === 'done') {
     // Lock left behind after successful update — just clean it up
@@ -320,6 +564,32 @@ export async function cleanupStaleStagingDirs(): Promise<void> {
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 const updateRouter = new Hono();
+
+updateRouter.get('/status',
+  describeRoute({
+    tags: ['System'],
+    summary: 'Sandbox update status',
+    description: 'Returns current update phase, target/current versions, and last error if any.',
+    responses: {
+      200: {
+        description: 'Current update status',
+        content: { 'application/json': { schema: resolver(UpdateStatusResponse) } },
+      },
+    },
+  }),
+  async (c) => {
+    const currentVersion = await readLocalVersion();
+    const lock = await readLock();
+    const status = await readStatus();
+    const inProgress = !!(lock && lock.status !== 'done') || status.inProgress;
+
+    return c.json({
+      ...status,
+      inProgress,
+      currentVersion,
+    });
+  },
+);
 
 /**
  * POST /kortix/update
@@ -365,6 +635,7 @@ updateRouter.post('/',
       const currentVersion = await readLocalVersion();
 
       if (currentVersion === targetVersion) {
+        await resetStatus(currentVersion);
         return c.json({
           upToDate: true,
           currentVersion,
@@ -385,6 +656,14 @@ updateRouter.post('/',
     } catch (e) {
       console.error('[Update] Error:', e);
       await deleteLock();
+      const currentVersion = await readLocalVersion();
+      await setStatus({
+        inProgress: false,
+        phase: 'failed',
+        message: 'Update failed with unexpected error',
+        currentVersion,
+        error: String(e).slice(0, 1200),
+      });
       return c.json({ error: 'Update failed', details: String(e) }, 500);
     }
   },

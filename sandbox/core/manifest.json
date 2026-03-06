@@ -1,0 +1,12 @@
+{
+  "artifact": "@kortix/sandbox",
+  "formatVersion": 1,
+  "coreSchemaVersion": "1.0.0",
+  "serviceSpecPath": "/opt/kortix/core/service-spec.json",
+  "minBaseImage": "0.7.0",
+  "upgradePolicy": {
+    "allowUpgrade": true,
+    "allowDowngrade": true,
+    "requiresMigration": false
+  }
+}

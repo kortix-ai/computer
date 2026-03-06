@@ -1,15 +1,20 @@
+# syntax=docker/dockerfile:1.7
+
 # ── Stage 1: Build musl-compatible bun-pty Rust library ─────────────────────
 # bun-pty ships glibc-linked .so files, but our sandbox runs Alpine (musl).
 # Rust's musl target doesn't support cdylib directly, so we:
 #   1. Build a staticlib (.a) on Alpine with Rust
 #   2. Wrap it into a shared library (.so) using gcc
 FROM rust:alpine AS rust-pty-builder
-RUN apk add --no-cache musl-dev gcc git
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk add --no-cache musl-dev gcc git
 RUN git clone --depth 1 https://github.com/sursaone/bun-pty.git /build/bun-pty
 WORKDIR /build/bun-pty/rust-pty
 # Change crate-type from cdylib to staticlib for musl compatibility
 RUN sed -i 's/crate-type = \["cdylib"\]/crate-type = ["staticlib"]/' Cargo.toml
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo build --release
 # Wrap the static lib into a shared .so using gcc
 RUN gcc -shared -o /build/librust_pty.so \
     -Wl,--whole-archive target/release/librust_pty.a -Wl,--no-whole-archive \
@@ -30,7 +35,8 @@ COPY sandbox/assets/kortix-symbol-white.svg /usr/share/icons/heyagi/kortix-symbo
 # Alpine XFCE base includes: chromium, xfce4-terminal, python3, git, bash, pillow.
 # Install Node.js + npm from Alpine repos, plus build dependencies needed
 # for pip packages with C extensions (numpy, lxml, greenlet).
-RUN apk update \
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk update \
     && apk add --no-cache \
         nodejs npm \
         python3-dev py3-pip py3-virtualenv \
@@ -51,7 +57,8 @@ RUN for i in 1 2 3; do curl -fsSL https://bun.sh/install | bash && break || slee
 # pip packages — versions read from sandbox/package.json (single source of truth)
 # COPY is done later for agent-browser; we need it now for pip versions too.
 COPY sandbox/package.json /tmp/sandbox-pkg-versions.json
-RUN PIP_ARGS=$(node -e " \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    PIP_ARGS=$(node -e " \
       const p=require('/tmp/sandbox-pkg-versions.json'); \
       const deps=p.kortix?.pythonDependencies||{}; \
       const args=[]; \
@@ -85,9 +92,11 @@ RUN apk del gcc g++ musl-dev linux-headers python3-dev libffi-dev \
 # ── Agent Browser (headless browser automation for AI agents) ────────────────
 # Initial install for Docker image; postinstall.sh handles version updates.
 # /tmp/sandbox-pkg-versions.json already COPY'd above for pip versions.
-RUN AB_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['agent-browser']||'latest')" 2>/dev/null || echo "latest") \
+RUN --mount=type=cache,target=/root/.npm \
+    AB_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['agent-browser']||'latest')" 2>/dev/null || echo "latest") \
     && npm install -g "agent-browser@$AB_VERSION"
-RUN PORTLESS_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.kortix?.globalNpmTools?.portless||'latest')" 2>/dev/null || echo "latest") \
+RUN --mount=type=cache,target=/root/.npm \
+    PORTLESS_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.kortix?.globalNpmTools?.portless||'latest')" 2>/dev/null || echo "latest") \
     && npm install -g --no-audit --no-fund "portless@$PORTLESS_VERSION"
 COPY sandbox/patch-agent-browser.js /tmp/patch-agent-browser.js
 RUN node /tmp/patch-agent-browser.js && rm /tmp/patch-agent-browser.js
@@ -109,7 +118,8 @@ COPY sandbox/browser-viewer/ /opt/agent-browser-viewer/
 # and symlink it over the glibc one so the wrapper script finds it.
 # Falls back to "latest" if the pinned version isn't on npm yet (e.g. Docker
 # build runs before or without CLI publish).
-RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['opencode-ai']||'latest')" 2>/dev/null || echo "latest") \
+RUN --mount=type=cache,target=/root/.npm \
+    CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');console.log(p.dependencies['opencode-ai']||'latest')" 2>/dev/null || echo "latest") \
     && echo "Attempting CLI install opencode-ai@$CLI_VERSION..." \
     && if ! npm view "opencode-ai@$CLI_VERSION" version >/dev/null 2>&1; then \
          echo "Version $CLI_VERSION not on npm — falling back to latest"; \
@@ -121,15 +131,15 @@ RUN CLI_VERSION=$(node -e "const p=require('/tmp/sandbox-pkg-versions.json');con
     && ARCH=$(uname -m) \
     && if [ "$ARCH" = "x86_64" ]; then \
          npm install -g --no-audit --no-fund "opencode-linux-x64-musl@$CLI_VERSION" --force \
-          && MUSL_BIN=$(npm root -g)/opencode-linux-x64-musl/bin/opencode \
-          && GLIBC_BIN=$(npm root -g)/opencode-ai/node_modules/opencode-linux-x64/bin/opencode \
-          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
+          && MUSL_BIN=$(npm root -g)/opencode-linux-x64-musl/bin/opencode; \
         else \
          npm install -g --no-audit --no-fund "opencode-linux-arm64-musl@$CLI_VERSION" --force \
-          && MUSL_BIN=$(npm root -g)/opencode-linux-arm64-musl/bin/opencode \
-          && GLIBC_BIN=$(npm root -g)/opencode-ai/node_modules/opencode-linux-arm64/bin/opencode \
-          && ln -sf "$MUSL_BIN" "$GLIBC_BIN"; \
+          && MUSL_BIN=$(npm root -g)/opencode-linux-arm64-musl/bin/opencode; \
         fi \
+    && OPENCODE_BIN_DIR=$(npm root -g)/opencode-ai/bin \
+    && mkdir -p "$OPENCODE_BIN_DIR" \
+    && ln -sf "$MUSL_BIN" "$OPENCODE_BIN_DIR/.opencode" \
+    && chmod +x "$OPENCODE_BIN_DIR/.opencode" \
     && npm cache clean --force \
     && rm -rf /root/.npm/_cacache /root/.npm/_logs \
     && rm /tmp/sandbox-pkg-versions.json \
@@ -143,7 +153,8 @@ COPY --chown=1000:1000 sandbox/opencode/ /opt/opencode/
 # becomes dangling inside Docker. Replace it with the actual package source.
 RUN rm -f /opt/opencode/plugin/kortix-sys
 COPY --chown=1000:1000 packages/kortix-sys-oc-plugin/ /opt/opencode/plugin/kortix-sys/
-RUN cd /opt/opencode && bun install
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    cd /opt/opencode && bun install
 
 # ── OpenCode binary patches ─────────────────────────────────────────────────
 # Apply patches to the compiled Bun binary (tool-input streaming, etc.).
@@ -182,18 +193,23 @@ RUN chmod -R 777 /opt/bun/install
 
 # ── Kortix Master (proxy to OpenCode + secret store) ────────────────────────
 COPY sandbox/kortix-master/package.json /opt/kortix-master/package.json
-RUN cd /opt/kortix-master && bun install
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    cd /opt/kortix-master && bun install
 COPY sandbox/kortix-master/ /opt/kortix-master/
+COPY sandbox/kortix-master/src/routes/core.ts /opt/kortix-master/src/routes/core.ts
+COPY sandbox/kortix-master/src/services/core-supervisor.ts /opt/kortix-master/src/services/core-supervisor.ts
 
 # ── opencode-channels (Chat SDK Slack/Telegram bot) ──────────────────────────
 COPY packages/opencode-channels/package.json /opt/opencode-channels/package.json
-RUN cd /opt/opencode-channels && bun install
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    cd /opt/opencode-channels && bun install
 COPY packages/opencode-channels/ /opt/opencode-channels/
 
 # ── Version & Changelog (for live update system) ────────────────────────────
 # Read version from sandbox/package.json (single source of truth) and write .version
 COPY sandbox/package.json /tmp/sandbox-pkg.json
 COPY sandbox/CHANGELOG.json /opt/kortix/CHANGELOG.json
+COPY sandbox/core/ /opt/kortix/core/
 RUN mkdir -p /opt/kortix \
     && PKG_VERSION=$(node -e "console.log(require('/tmp/sandbox-pkg.json').version)") \
     && echo "{\"version\":\"$PKG_VERSION\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /opt/kortix/.version \
@@ -242,7 +258,7 @@ ENV KORTIX_WORKSPACE=/workspace
 # Each service is a directory with: run, type (longrun), dependencies.d/init-services
 COPY sandbox/s6-services/ /etc/s6-overlay/s6-rc.d/
 # Register all custom services in the user bundle so s6 starts them
-RUN for svc in svc-opencode-web svc-opencode-serve svc-kortix-master svc-opencode-channels svc-lss-sync svc-agent-browser-viewer svc-presentation-viewer svc-static-web svc-sshd; do \
+RUN for svc in svc-kortix-master svc-sshd; do \
         touch "/etc/s6-overlay/s6-rc.d/user/contents.d/${svc}"; \
     done \
     && chmod +x /etc/s6-overlay/s6-rc.d/svc-*/run

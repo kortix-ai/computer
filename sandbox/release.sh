@@ -84,6 +84,15 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 
+if ! $DRY_RUN && ! $BUILD_DOCKER; then
+  fail "Full releases must include --docker to keep npm/Docker/Daytona in sync"
+  echo ""
+  echo "  Use one of:"
+  echo "    ./sandbox/release.sh --docker $VERSION"
+  echo "    ./sandbox/release.sh --dry-run $VERSION"
+  exit 1
+fi
+
 echo ""
 echo "  ${BOLD}═══════════════════════════════════════════════════${NC}"
 echo "  ${BOLD}  Kortix Computer Release — v${VERSION}${NC}"
@@ -213,6 +222,27 @@ ENTRY_JSON=$(node -e "
 
 TITLE=$(node -e "console.log(JSON.parse(process.argv[1]).title)" "$ENTRY_JSON")
 ok "Changelog: \"$TITLE\""
+
+info "Validating core manifest + service spec..."
+node -e "
+  const fs = require('fs');
+  const manifestPath = '$SANDBOX_DIR/core/manifest.json';
+  const specPath = '$SANDBOX_DIR/core/service-spec.json';
+  if (!fs.existsSync(manifestPath)) throw new Error('Missing core/manifest.json');
+  if (!fs.existsSync(specPath)) throw new Error('Missing core/service-spec.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+  if (manifest.artifact !== '@kortix/sandbox') throw new Error('core/manifest artifact must be @kortix/sandbox');
+  if (!manifest.serviceSpecPath || typeof manifest.serviceSpecPath !== 'string') throw new Error('core/manifest serviceSpecPath missing');
+  if (!Array.isArray(spec.services) || spec.services.length === 0) throw new Error('core/service-spec must contain services[]');
+  const ids = new Set();
+  for (const s of spec.services) {
+    if (!s.id || !s.run) throw new Error('Invalid service entry in core/service-spec');
+    if (ids.has(s.id)) throw new Error('Duplicate service id: ' + s.id);
+    ids.add(s.id);
+  }
+"
+ok "Core manifest/spec valid"
 
 # ─── Step 2: Check availability ─────────────────────────────────────────────
 # The GitHub Release is the version lock — if it exists and we're NOT resuming

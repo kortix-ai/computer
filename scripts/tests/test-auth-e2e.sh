@@ -437,6 +437,29 @@ else
   fail "/kortix/update/status → $result"
 fi
 
+# 3.9 Core supervisor status
+result=$(curl -s -H "$AUTH" "${SANDBOX_URL}/kortix/core/status" 2>/dev/null || echo "")
+core_running=$(echo "$result" | jq -r '.running // empty' 2>/dev/null || true)
+if [ "$core_running" = "true" ]; then
+  pass "/kortix/core/status → running=true"
+else
+  fail "/kortix/core/status → invalid response" "Body: ${result:0:200}"
+fi
+
+# 3.10 Core reconcile endpoint (idempotent)
+result=$(curl -s -o /tmp/core_reconcile_resp.json -w '%{http_code}' -X POST -H "$AUTH" "${SANDBOX_URL}/kortix/core/reconcile" 2>/dev/null || echo "000")
+if [ "$result" = "200" ]; then
+  reconcile_ok=$(jq -r '.success // false' /tmp/core_reconcile_resp.json 2>/dev/null || echo "false")
+  if [ "$reconcile_ok" = "true" ]; then
+    pass "/kortix/core/reconcile → success"
+  else
+    fail "/kortix/core/reconcile → success=false" "Body: $(cat /tmp/core_reconcile_resp.json 2>/dev/null | head -c 200)"
+  fi
+else
+  fail "/kortix/core/reconcile → $result"
+fi
+rm -f /tmp/core_reconcile_resp.json
+
 fi # end routes section
 
 # ╔════════════════════════════════════════════════════════════════════════════╗

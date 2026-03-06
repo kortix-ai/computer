@@ -195,6 +195,28 @@ export const UpdateResponse = z.object({
   output: z.string().optional(),
 })
 
+export const UpdateStatusResponse = z.object({
+  inProgress: z.boolean().describe('Whether an update is currently running'),
+  phase: z.enum([
+    'idle',
+    'staging',
+    'verifying',
+    'committing',
+    'restarting',
+    'validating',
+    'rolling_back',
+    'complete',
+    'failed',
+  ]).describe('Current update phase'),
+  message: z.string().describe('Human-readable status message'),
+  targetVersion: z.string().nullable().describe('Target version being installed'),
+  previousVersion: z.string().nullable().describe('Version before update started'),
+  currentVersion: z.string().describe('Version currently reported by /opt/kortix/.version'),
+  startedAt: z.string().nullable().describe('ISO timestamp when the update started'),
+  updatedAt: z.string().nullable().describe('ISO timestamp when status was last updated'),
+  error: z.string().nullable().describe('Failure details when phase is failed'),
+})
+
 // ─── Integration schemas ────────────────────────────────────────────────────
 
 export const IntegrationTokenBody = z.object({

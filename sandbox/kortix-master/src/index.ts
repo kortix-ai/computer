@@ -18,6 +18,8 @@ import deployRouter from './routes/deploy'
 import servicesRouter from './routes/services'
 import integrationsRouter from './routes/integrations'
 import memoryRouter from './routes/memory'
+import coreRouter from './routes/core'
+import { coreSupervisor } from './services/core-supervisor'
 import { config } from './config'
 import { HealthResponse, PortsResponse } from './schemas/common'
 
@@ -93,6 +95,10 @@ await recoverFromCrashedUpdate().catch(err =>
 )
 await cleanupStaleStagingDirs().catch(err =>
   console.error('[Kortix Master] staging cleanup error:', err)
+)
+
+await coreSupervisor.start().catch(err =>
+  console.error('[Kortix Master] core supervisor start error:', err)
 )
 
 // Global middleware
@@ -293,6 +299,9 @@ if (config.KORTIX_DEPLOYMENTS_ENABLED) {
 
 // Services — unified "what's running" for the frontend
 app.route('/kortix/services', servicesRouter)
+
+// Core supervisor management
+app.route('/kortix/core', coreRouter)
 
 // Integration proxy — /api/integrations/* forwards to kortix-api
 app.route('/api/integrations', integrationsRouter)

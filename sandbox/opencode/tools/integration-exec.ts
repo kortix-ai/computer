@@ -2,6 +2,7 @@ import { tool } from "@opencode-ai/plugin";
 import { writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { spawnSync } from "child_process";
+import { getEnv } from "./lib/get-env";
 
 const PROXY_FETCH_PREAMBLE = `
 // ── Auto-injected proxy fetch ──────────────────────────────────────────────
@@ -38,8 +39,8 @@ globalThis.proxyFetch = async function proxyFetch(url, init = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(process.env.INTERNAL_SERVICE_KEY
-        ? { Authorization: 'Bearer ' + process.env.INTERNAL_SERVICE_KEY }
+      ...(process.env.__INTERNAL_SERVICE_KEY__
+        ? { Authorization: 'Bearer ' + process.env.__INTERNAL_SERVICE_KEY__ }
         : {}),
     },
     body: JSON.stringify({
@@ -126,6 +127,7 @@ export default tool({
           ...process.env,
           __PROXY_URL__: proxyUrl,
           __APP_SLUG__: args.app,
+          __INTERNAL_SERVICE_KEY__: getEnv('INTERNAL_SERVICE_KEY') || '',
         },
         timeout: 30_000,
         maxBuffer: 1024 * 1024, 

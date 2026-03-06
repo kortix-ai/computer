@@ -70,7 +70,9 @@ Every running Kortix sandbox can be updated remotely via a single npm package: `
 | `kortix-master/` | Proxy server + update handler | `/opt/kortix-master/` |
 | `browser-viewer/` | Agent browser viewer (static HTML) | `/opt/agent-browser-viewer/` |
 | `config/` | Container init scripts | `/custom-cont-init.d/` |
-| `services/` | s6 service definitions | `/etc/s6-overlay/s6-rc.d/` |
+| `services/` | Service run scripts (executed by core supervisor) | `/etc/s6-overlay/s6-rc.d/` |
+| `core/manifest.json` | Core artifact contract | `/opt/kortix/core/manifest.json` |
+| `core/service-spec.json` | Declarative service graph for supervisor | `/opt/kortix/core/service-spec.json` |
 | `postinstall.sh` | Deployment script | Runs on `npm install` |
 | `patch-agent-browser.js` | Agent browser patches | Applied during postinstall |
 
@@ -119,7 +121,7 @@ Sandbox (kortix-master/src/routes/update.ts)
 postinstall.sh (runs inside sandbox)
   1. rsync kortix-master/ → /opt/kortix-master/     (+ bun install)
   2. rsync opencode/      → /opt/opencode/           (+ bun install, resolves SDK/plugin/etc.)
-  3. rsync services/      → /etc/s6-overlay/s6-rc.d/ (s6 service scripts)
+  3. rsync services/      → /etc/s6-overlay/s6-rc.d/ (service run scripts)
   4. cp config/           → /custom-cont-init.d/      (init scripts)
   5. npm install -g opencode-ai@{version}              (CLI binary + musl symlink)
   6. npm install -g agent-browser@{version}            (browser automation)
@@ -131,8 +133,8 @@ postinstall.sh (runs inside sandbox)
   12. chown -R 1000:1000 /opt/...                       (fix permissions)
 
 kortix-master (after postinstall completes)
-  → Restarts: svc-opencode-serve, svc-opencode-web, svc-lss-sync,
-              svc-agent-browser-viewer, svc-presentation-viewer
+  → Reconciles core services from /opt/kortix/core/service-spec.json
+    (opencode-serve, opencode-web, lss-sync, channels, viewers, static web)
   → Self-restart: svc-kortix-master (2s delay so HTTP response completes)
 ```
 

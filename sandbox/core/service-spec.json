@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "opencode-serve",
+      "name": "OpenCode API",
+      "run": "/etc/s6-overlay/s6-rc.d/svc-opencode-serve/run",
+      "deps": [],
+      "autoStart": true,
+      "restart": "always",
+      "restartDelayMs": 1500
+    },
+    {
+      "id": "opencode-web",
+      "name": "OpenCode Web",
+      "run": "/etc/s6-overlay/s6-rc.d/svc-opencode-web/run",
+      "deps": [
+        "opencode-serve"
+      ],
+      "autoStart": true,
+      "restart": "always",
+      "restartDelayMs": 1500
+    },
+    {
+      "id": "lss-sync",
+      "name": "LSS Sync",
+      "run": "/etc/s6-overlay/s6-rc.d/svc-lss-sync/run",
+      "deps": [],
+      "autoStart": true,
+      "restart": "always",
+      "restartDelayMs": 3000
+    },
+    {
+      "id": "opencode-channels",
+      "name": "OpenCode Channels",
+      "run": "/etc/s6-overlay/s6-rc.d/svc-opencode-channels/run",
+      "deps": [
+        "opencode-serve"
+      ],
+      "autoStart": true,
+      "restart": "always",
+      "restartDelayMs": 1500
+    },
+    {
+      "id": "agent-browser-viewer",
+      "name": "Agent Browser Viewer",
+      "run": "/etc/s6-overlay/s6-rc.d/svc-agent-browser-viewer/run",
+      "deps": [],
+      "autoStart": true,
+      "restart": "always",
+      "restartDelayMs": 1500
+    },
+    {
+      "id": "presentation-viewer",
+      "name": "Presentation Viewer",
+      "run": "/etc/s6-overlay/s6-rc.d/svc-presentation-viewer/run",
+      "deps": [],
+      "autoStart": true,
+      "restart": "always",
+      "restartDelayMs": 1500
+    },
+    {
+      "id": "static-web",
+      "name": "Static Web",
+      "run": "/etc/s6-overlay/s6-rc.d/svc-static-web/run",
+      "deps": [],
+      "autoStart": true,
+      "restart": "always",
+      "restartDelayMs": 1500
+    }
+  ]
+}
