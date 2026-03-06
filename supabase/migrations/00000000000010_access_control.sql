@@ -1,4 +1,7 @@
-CREATE TYPE IF NOT EXISTS kortix.access_request_status AS ENUM ('pending', 'approved', 'rejected');
+DO $$ BEGIN
+  CREATE TYPE kortix.access_request_status AS ENUM ('pending', 'approved', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS kortix.platform_settings (
   key varchar(255) PRIMARY KEY,

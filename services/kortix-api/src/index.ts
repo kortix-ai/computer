@@ -30,6 +30,8 @@ import { ensureSchema } from './ensure-schema';
 import { initModelPricing, stopModelPricing } from './router/config/model-pricing';
 import { tunnelApp, wsHandlers as tunnelWsHandlers, startTunnelService, stopTunnelService, getTunnelServiceStatus } from './tunnel';
 import { startSandboxHealthMonitor, stopSandboxHealthMonitor } from './platform/services/sandbox-health';
+import { accessControlApp } from './access-control';
+import { startAccessControlCache, stopAccessControlCache } from './shared/access-control-cache';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -229,6 +231,9 @@ if (config.KORTIX_DEPLOYMENTS_ENABLED) {
 app.route('/v1/integrations', integrationsApp); // /v1/integrations/*
 app.route('/', channelsApp);                 // /v1/channels/*, /webhooks/*
 
+// Access control — public endpoints for signup gating
+app.route('/v1/access', accessControlApp); // /v1/access/signup-status, /v1/access/check-email, /v1/access/request-access
+
 // Setup — install-status is public (needed before any user exists), rest requires auth.
 app.route('/v1/setup', setupApp);          // /v1/setup/install-status (public), rest (auth inside router)
 
@@ -415,6 +420,7 @@ export function isSchemaReady() { return schemaReady; }
 ensureSchema()
   .then(async () => {
     schemaReady = true;
+    startAccessControlCache();
     startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
     startChannelService();
     startDrainer();
@@ -433,6 +439,7 @@ ensureSchema()
   .catch(async (err) => {
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
     schemaReady = true; // Tables may already exist — allow requests through
+    startAccessControlCache();
     startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
     startChannelService();
     startDrainer();
@@ -456,6 +463,7 @@ function shutdown(signal: string) {
   stopModelPricing();
   stopTunnelService();
   stopSandboxHealthMonitor();
+  stopAccessControlCache();
   process.exit(0);
 }
 

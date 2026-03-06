@@ -5,19 +5,16 @@ import { areSignupsEnabled, canSignUp } from '../shared/access-control-cache';
 
 export const accessControlApp = new Hono();
 
-// GET /signup-status — public, returns whether signups are open
 accessControlApp.get('/signup-status', (c) => {
   return c.json({ signupsEnabled: areSignupsEnabled() });
 });
 
-// POST /check-email — public, checks if an email can sign up
 accessControlApp.post('/check-email', async (c) => {
   const { email } = await c.req.json<{ email: string }>();
   if (!email) return c.json({ error: 'email required' }, 400);
   return c.json({ allowed: canSignUp(email) });
 });
 
-// POST /request-access — public, submits a waitlist request
 accessControlApp.post('/request-access', async (c) => {
   const body = await c.req.json<{ email: string; company?: string; useCase?: string }>();
   if (!body.email || !body.email.includes('@')) {
