@@ -26,6 +26,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -217,6 +227,7 @@ function ProvidersSection({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [connectView, setConnectView] = useState(false);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState<string | null>(null);
 
   const allProviders = useMemo(() => providers?.all ?? [], [providers]);
   const connectedIds = useMemo(() => new Set(providers?.connected ?? []), [providers]);
@@ -226,17 +237,39 @@ function ProvidersSection({
     [allProviders, connectedIds],
   );
 
-  const handleDisconnect = useCallback(
+  const confirmAndDisconnect = useCallback(
     async (providerID: string) => {
       setDisconnecting(providerID);
+      setConfirmDisconnect(null);
       try {
         const client = getClient();
-        await client.auth.set({
-          providerID,
-          auth: { type: 'api', key: '' },
-        } as any);
+        
+        // Try the new auth.remove endpoint first
+        try {
+          await client.auth.remove({ providerID });
+        } catch (err) {
+          // Fallback to auth.set with empty key if remove endpoint is unavailable
+          // (e.g. 404/405 on older backend versions)
+          const isEndpointMissing = 
+            err instanceof Error && 
+            (err.message.includes('404') || 
+             err.message.includes('405') || 
+             err.message.includes('Not Found') ||
+             err.message.includes('Method Not Allowed'));
+          
+          if (isEndpointMissing) {
+            await client.auth.set({
+              providerID,
+              auth: { type: 'api', key: '' },
+            });
+          } else {
+            // Re-throw other errors to be caught by outer try-catch
+            throw err;
+          }
+        }
+        
         await client.global.dispose();
-        queryClient.invalidateQueries({ queryKey: opencodeKeys.providers() });
+        await queryClient.refetchQueries({ queryKey: opencodeKeys.providers() });
         onDirty();
       } catch {
         // ignore
@@ -306,7 +339,7 @@ function ProvidersSection({
                     </span>
                   </div>
                   <button
-                    onClick={() => handleDisconnect(p.id)}
+                    onClick={() => setConfirmDisconnect(p.id)}
                     disabled={isDisc}
                     className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                     title="Disconnect"
@@ -357,6 +390,35 @@ function ProvidersSection({
           </p>
         </div>
       )}
+
+      {/* Disconnect confirmation dialog */}
+      <AlertDialog open={!!confirmDisconnect} onOpenChange={(open) => !open && setConfirmDisconnect(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect provider?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDisconnect && (
+                <>
+                  Are you sure you want to disconnect{' '}
+                  <span className="font-medium text-foreground">
+                    {PROVIDER_LABELS[confirmDisconnect] || confirmDisconnect}
+                  </span>
+                  ? You will need to reconnect and re-authenticate to use this provider again.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDisconnect && confirmAndDisconnect(confirmDisconnect)}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
