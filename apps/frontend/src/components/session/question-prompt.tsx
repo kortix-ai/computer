@@ -27,7 +27,7 @@ function QuestionMarkdown({ content, className }: { content: string; className?:
 		<ReactMarkdown
 			remarkPlugins={[remarkGfm]}
 			components={{
-				p: ({ children }) => <p className="my-0.5 leading-snug">{children}</p>,
+				p: ({ children }) => <p className="my-1 leading-relaxed">{children}</p>,
 				strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
 				em: ({ children }) => <em className="text-muted-foreground">{children}</em>,
 				ul: ({ children }) => <ul className="my-0.5 pl-4 list-disc">{children}</ul>,
@@ -194,6 +194,29 @@ export function QuestionPrompt({
 		onReply(request.id, finalAnswers);
 	}, [answers, questions, request.id, onReply]);
 
+	useEffect(() => {
+		if (!isConfirm || replying) return;
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+			const target = e.target as HTMLElement | null;
+			if (target) {
+				const tag = target.tagName;
+				if (
+					tag === "INPUT" ||
+					tag === "TEXTAREA" ||
+					tag === "SELECT" ||
+					target.isContentEditable
+				) {
+					return;
+				}
+			}
+			e.preventDefault();
+			submit();
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [isConfirm, replying, submit]);
+
 	const reject = useCallback(() => {
 		setReplying(true);
 		onReject(request.id);
@@ -267,7 +290,7 @@ export function QuestionPrompt({
 											setEditing(false);
 										}}
 										className={cn(
-											"flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition-all duration-150 cursor-pointer whitespace-nowrap",
+											"flex items-center gap-1 px-2 py-0.5 text-sm font-medium rounded-md border transition-all duration-150 cursor-pointer whitespace-nowrap",
 											tab === i
 												? "bg-background/80 text-foreground border-border/70"
 												: "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70",
@@ -301,12 +324,12 @@ export function QuestionPrompt({
 									setTab(questions.length);
 									setEditing(false);
 								}}
-								className={cn(
-									"px-2 py-0.5 text-[11px] font-medium rounded-md border transition-all duration-150 cursor-pointer",
-									isConfirm
-										? "bg-background/80 text-foreground border-border/70"
-										: "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70",
-								)}
+							className={cn(
+								"px-2 py-0.5 text-sm font-medium rounded-md border transition-all duration-150 cursor-pointer",
+								isConfirm
+									? "bg-background/80 text-foreground border-border/70"
+									: "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70",
+							)}
 							>
 								Confirm
 							</button>
@@ -341,14 +364,14 @@ export function QuestionPrompt({
 												)}
 											</span>
 											<span
-												className={cn(
-													"text-[11px] leading-tight flex-1 min-w-0",
+										className={cn(
+													"text-sm leading-tight flex-1 min-w-0",
 													done ? "text-foreground" : "text-muted-foreground",
 												)}
 											>
 												<span className="truncate block">{q.header || q.question}</span>
 											</span>
-											<span className="text-[10px] text-muted-foreground truncate max-w-[40%] shrink-0">
+											<span className="text-sm text-muted-foreground truncate max-w-[40%] shrink-0">
 												{ans.length > 0 ? ans.join(", ") : "\u2014"}
 											</span>
 										</div>
@@ -356,8 +379,9 @@ export function QuestionPrompt({
 								})}
 								<div className="flex items-center justify-end pt-2">
 									<button
+										autoFocus={isConfirm}
 										onClick={submit}
-										className="px-4 py-1.5 text-xs font-medium rounded-lg bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer"
+										className="min-h-9 px-4 py-1.5 text-sm font-medium rounded-lg bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer"
 									>
 										Submit
 									</button>
@@ -366,11 +390,11 @@ export function QuestionPrompt({
 						) : currentQuestion ? (
 							<div className="space-y-1">
 								{/* Question text */}
-								<div className="text-xs text-foreground leading-snug max-h-[300px] overflow-y-auto">
-									<QuestionMarkdown
-										content={currentQuestion.question + (isMulti ? " *(select multiple)*" : "")}
-									/>
-								</div>
+							<div className="text-sm md:text-base font-medium text-foreground/95 leading-relaxed max-h-[300px] overflow-y-auto">
+								<QuestionMarkdown
+									content={currentQuestion.question + (isMulti ? " *(select multiple)*" : "")}
+								/>
+							</div>
 
 								{/* Options — compact rows */}
 								<div className="space-y-px">
@@ -426,12 +450,12 @@ export function QuestionPrompt({
 											onClick={() => selectOption(options.length)}
 											className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left cursor-pointer group border border-transparent hover:bg-muted/40 transition-colors"
 										>
-											<Pencil className="size-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 flex-shrink-0 transition-colors" />
-											<span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-												Type your own answer
-											</span>
-										</button>
-									)}
+									<Pencil className="size-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 flex-shrink-0 transition-colors" />
+									<span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+										Type your own answer
+									</span>
+								</button>
+							)}
 
 									{/* Custom input */}
 									{editing && (
@@ -453,12 +477,12 @@ export function QuestionPrompt({
 														setEditing(false);
 													}
 												}}
-												className="h-8 flex-1 min-w-0 px-3 text-xs bg-background/90 border border-border/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
-											/>
-											<button
-												type="submit"
-												className="h-8 px-2.5 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all duration-150 cursor-pointer shrink-0"
-											>
+											className="h-8 flex-1 min-w-0 px-3 text-sm bg-background/90 border border-border/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
+										/>
+										<button
+											type="submit"
+											className="h-8 px-2.5 text-sm font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all duration-150 cursor-pointer shrink-0"
+										>
 												{isMulti ? "Add" : "Go"}
 											</button>
 											<button
@@ -475,19 +499,19 @@ export function QuestionPrompt({
 								{/* Next button for multi-select */}
 								{!isSingle && isMulti && (
 									<div className="flex items-center justify-end">
-										<button
-											onClick={() => {
-												setTab(tab + 1);
-												setEditing(false);
-											}}
-											disabled={currentAnswers.length === 0}
-											className={cn(
-												"px-2.5 py-0.5 text-[11px] font-medium rounded-md transition-all",
-												currentAnswers.length > 0
-													? "bg-muted text-foreground hover:bg-muted/80 cursor-pointer"
-													: "bg-muted/30 text-muted-foreground/50 cursor-not-allowed",
-											)}
-										>
+									<button
+										onClick={() => {
+											setTab(tab + 1);
+											setEditing(false);
+										}}
+										disabled={currentAnswers.length === 0}
+										className={cn(
+											"min-h-9 px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
+											currentAnswers.length > 0
+												? "bg-muted text-foreground hover:bg-muted/80 cursor-pointer"
+												: "bg-muted/30 text-muted-foreground/50 cursor-not-allowed",
+										)}
+									>
 											Next
 										</button>
 									</div>
