@@ -672,7 +672,11 @@ export default function OnboardingPage() {
                   {isHetznerOnboarding ? (
                     <>
                       <p className="text-xs text-muted-foreground">{getHetznerProvisioningMessage(onboardingWaitSec)}</p>
-                      <p className="text-[11px] text-muted-foreground/70">Provisioning Hetzner sandbox... Connected when health is ready.</p>
+                      <p className="text-[11px] text-muted-foreground/70">
+                        {sandbox?.status === 'active'
+                          ? 'Connecting to your sandbox and starting onboarding...'
+                          : 'Preparing your Hetzner sandbox and waiting for health...'}
+                      </p>
                     </>
                   ) : (
                     <p className="text-xs text-muted-foreground">Setting up your workspace…</p>
