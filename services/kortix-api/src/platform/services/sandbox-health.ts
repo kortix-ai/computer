@@ -11,6 +11,10 @@
  */
 
 import { config } from '../../config';
+import {
+  LEGACY_LOCAL_SANDBOX_NAME,
+  getPrimaryLocalSandboxContainer,
+} from '../providers/local-docker-discovery';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -73,9 +77,14 @@ export function stopSandboxHealthMonitor(): void {
 async function checkSandboxHealth(): Promise<void> {
   state.lastCheck = Date.now();
 
+  const primaryContainer = await getPrimaryLocalSandboxContainer();
+  const containerName = primaryContainer?.Name?.replace(/^\//, '') || LEGACY_LOCAL_SANDBOX_NAME;
+  const hostPort = primaryContainer?.NetworkSettings?.Ports?.['8000/tcp']?.[0]?.HostPort;
   const baseUrl = config.SANDBOX_NETWORK
-    ? `http://kortix-sandbox:8000`
-    : `http://localhost:${config.SANDBOX_PORT_BASE}`;
+    ? `http://${containerName}:8000`
+    : hostPort
+      ? `http://localhost:${hostPort}`
+      : `http://localhost:${config.SANDBOX_PORT_BASE}`;
 
   try {
     // 1. Check basic reachability (health endpoint bypasses auth)
@@ -112,7 +121,7 @@ async function checkSandboxHealth(): Promise<void> {
     if (authRes.status === 401) {
       // Auth mismatch — try to sync key
       console.warn('[sandbox-health] Auth failed (401), attempting key sync...');
-      const synced = await attemptKeySync(baseUrl);
+      const synced = await attemptKeySync(containerName, baseUrl);
       if (!synced) {
         throw new Error('Auth failed and key sync unsuccessful');
       }
@@ -156,7 +165,7 @@ async function checkSandboxHealth(): Promise<void> {
  * Tries the secrets manager /env API first (preferred — triple-write + no restart needed).
  * Falls back to docker exec if the API is unreachable (e.g. kortix-master down).
  */
-async function attemptKeySync(baseUrl: string): Promise<boolean> {
+async function attemptKeySync(containerName: string, baseUrl: string): Promise<boolean> {
   const ourKey = config.INTERNAL_SERVICE_KEY;
   if (!ourKey) return false;
 
@@ -204,14 +213,14 @@ async function attemptKeySync(baseUrl: string): Promise<boolean> {
       // Auth failure on the /env API itself — fall back to docker exec
       if (res.status === 401 || res.status === 403) {
         console.warn(`[sandbox-health] /env API returned ${res.status}, falling back to docker exec...`);
-        if (await attemptKeySyncFallback(keysToSync)) return true;
+        if (await attemptKeySyncFallback(containerName, keysToSync)) return true;
       }
 
       console.warn(`[sandbox-health] /env API returned ${res.status}, retrying...`);
     } catch (err: any) {
       console.warn(`[sandbox-health] /env API unreachable (attempt ${attempt + 1}), trying docker exec fallback...`);
       // /env API not reachable — try docker exec fallback
-      if (await attemptKeySyncFallback(keysToSync)) return true;
+      if (await attemptKeySyncFallback(containerName, keysToSync)) return true;
     }
 
     // Backoff before retry
@@ -226,7 +235,7 @@ async function attemptKeySync(baseUrl: string): Promise<boolean> {
  * Fallback: write core env vars directly to s6 env dir via docker exec.
  * Used when the /env API is unreachable (e.g. kortix-master auth mismatch).
  */
-async function attemptKeySyncFallback(keys: Record<string, string>): Promise<boolean> {
+async function attemptKeySyncFallback(containerName: string, keys: Record<string, string>): Promise<boolean> {
   // Only works in local docker mode (not network mode)
   if (config.SANDBOX_NETWORK) {
     console.warn('[sandbox-health] Cannot use docker exec fallback in network mode');
@@ -245,7 +254,7 @@ async function attemptKeySyncFallback(keys: Record<string, string>): Promise<boo
       .join(' && ');
 
     execSync(
-      `docker exec kortix-sandbox bash -c "mkdir -p /run/s6/container_environment && ${writes}"`,
+      `docker exec ${containerName} bash -c "mkdir -p /run/s6/container_environment && ${writes}"`,
       { timeout: 15_000, stdio: 'pipe', env },
     );
 

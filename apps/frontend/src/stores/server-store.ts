@@ -142,6 +142,10 @@ export function resolveServerUrl(server: ServerEntry): string {
 const DEFAULT_SERVER_ID = 'default';
 const CLOUD_SANDBOX_SERVER_ID = 'cloud-sandbox';
 
+function getManagedSandboxServerId(provider: SandboxProvider, sandboxId: string): string {
+  return `sandbox:${provider}:${sandboxId}`;
+}
+
 function generateId(): string {
   return `srv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -156,8 +160,9 @@ const MANAGED_IDS = new Set([DEFAULT_SERVER_ID, CLOUD_SANDBOX_SERVER_ID]);
 
 /** True if this entry is a managed sandbox (not a custom user entry). */
 function isManagedEntry(s: ServerEntry | string): boolean {
+  if (typeof s !== 'string' && s.provider) return true;
   const id = typeof s === 'string' ? s : s.id;
-  return MANAGED_IDS.has(id);
+  return MANAGED_IDS.has(id) || id.startsWith('sandbox:');
 }
 
 function toApiPayload(s: ServerEntry) {
@@ -421,25 +426,9 @@ export const useServerStore = create<ServerStore>()(
 
       registerOrUpdateSandbox: (sandbox, options) => {
         const state = get();
-        const isLocal = options?.isLocal ?? false;
         const autoSwitch = options?.autoSwitch ?? false;
 
-        // In local mode, update the existing default entry — don't create a duplicate.
-        if (isLocal) {
-          const defaultEntry = state.servers.find((s) => s.id === DEFAULT_SERVER_ID);
-          if (defaultEntry) {
-            get().updateServerSilent(DEFAULT_SERVER_ID, {
-              mappedPorts: sandbox.mappedPorts,
-              provider: sandbox.provider,
-              sandboxId: sandbox.sandboxId,
-              ...(sandbox.label ? { label: sandbox.label } : {}),
-            });
-            return DEFAULT_SERVER_ID;
-          }
-        }
-
-        // Cloud mode: use the dedicated cloud-sandbox ID
-        const targetId = CLOUD_SANDBOX_SERVER_ID;
+        const targetId = getManagedSandboxServerId(sandbox.provider, sandbox.sandboxId);
         const existing = state.servers.find((s) => s.id === targetId);
 
         if (existing) {
@@ -472,7 +461,7 @@ export const useServerStore = create<ServerStore>()(
           const currentId = state.activeServerId;
           const noActiveServer = !currentId || !state.servers.some((s) => s.id === currentId);
           if (noActiveServer || currentId === DEFAULT_SERVER_ID) {
-            get().setActiveServer(isLocal ? DEFAULT_SERVER_ID : targetId, { auto: true });
+            get().setActiveServer(targetId, { auto: true });
           }
         }
 

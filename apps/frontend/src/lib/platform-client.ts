@@ -269,80 +269,11 @@ export async function createSandbox(opts?: {
   onProgress?: (progress: SandboxCreateProgress) => void;
 }): Promise<{ sandbox: SandboxInfo }> {
   if (opts?.provider === 'local_docker') {
-    const token = await getSupabaseAccessToken();
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    };
-
-    const initRes = await fetch(`${PLATFORM_URL}/platform/init/local`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        ...(opts?.name ? { name: opts.name } : {}),
-      }),
+    opts?.onProgress?.({
+      status: 'pulling',
+      progress: 10,
+      message: 'Provisioning Local Docker sandbox...',
     });
-
-    const initData = await initRes.json();
-    if (!initRes.ok) {
-      throw new Error(initData?.error || initData?.message || `Platform API error ${initRes.status}`);
-    }
-
-    if (initData.status === 'ready' && initData.data) {
-      return { sandbox: initData.data as SandboxInfo };
-    }
-
-    if (initData.status === 'error') {
-      throw new Error(initData.message || initData.error || 'Failed to create sandbox');
-    }
-
-    if (initData.status === 'pulling') {
-      const reportProgress = (data: { progress?: number; message?: string }) => {
-        opts?.onProgress?.({
-          status: 'pulling',
-          progress: Math.max(0, Math.min(100, Number(data.progress) || 0)),
-          message: data.message || 'Pulling sandbox image...',
-        });
-      };
-
-      reportProgress(initData);
-
-      for (let attempt = 0; attempt < 360; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        const statusRes = await fetch(`${PLATFORM_URL}/platform/init/local/status`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        const statusData = await statusRes.json();
-
-        if (!statusRes.ok) {
-          throw new Error(statusData?.error || statusData?.message || `Platform API error ${statusRes.status}`);
-        }
-
-        if (statusData.status === 'ready' && statusData.data) {
-          return { sandbox: statusData.data as SandboxInfo };
-        }
-
-        if (statusData.status === 'error') {
-          throw new Error(statusData.message || statusData.error || 'Failed to create sandbox');
-        }
-
-        reportProgress(statusData);
-      }
-
-      throw new Error('Timed out while pulling sandbox image');
-    }
-
-    if (initData.success && initData.data) {
-      return { sandbox: initData.data as SandboxInfo };
-    }
-
-    throw new Error(initData.error || initData.message || 'Failed to create sandbox');
   }
 
   const result = await platformFetch<SandboxInfo>('/platform/sandbox', {
@@ -406,8 +337,9 @@ export async function stopSandbox(): Promise<void> {
  * Remove (destroy) the active sandbox.
  * Calls the backend which destroys the Daytona VM and archives the DB row.
  */
-export async function removeSandbox(): Promise<void> {
-  const result = await platformFetch<void>('/platform/sandbox', {
+export async function removeSandbox(sandboxId?: string): Promise<void> {
+  const suffix = sandboxId ? `?sandbox_id=${encodeURIComponent(sandboxId)}` : '';
+  const result = await platformFetch<void>(`/platform/sandbox${suffix}`, {
     method: 'DELETE',
   });
 
@@ -428,11 +360,12 @@ export interface SSHSetupResult {
 }
 
 /**
- * Generate an SSH keypair and inject it into the active sandbox.
+ * Generate an SSH keypair and inject it into the selected sandbox.
  * Returns the private key and connection details for VS Code Remote SSH.
  */
-export async function setupSSH(): Promise<SSHSetupResult> {
-  const result = await platformFetch<SSHSetupResult>('/platform/sandbox/ssh/setup', {
+export async function setupSSH(sandboxId?: string): Promise<SSHSetupResult> {
+  const suffix = sandboxId ? `?sandbox_id=${encodeURIComponent(sandboxId)}` : '';
+  const result = await platformFetch<SSHSetupResult>(`/platform/sandbox/ssh/setup${suffix}`, {
     method: 'POST',
   });
 

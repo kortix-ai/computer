@@ -14,6 +14,7 @@
 
 import { config } from '../../config';
 import { execSync } from 'child_process';
+import { LEGACY_LOCAL_SANDBOX_NAME, inspectLocalSandboxContainer } from '../../platform/providers/local-docker-discovery';
 
 const KORTIX_MASTER_PORT = 8000;
 const FETCH_TIMEOUT_MS = 30_000;
@@ -26,7 +27,7 @@ const MAX_SYNC_ATTEMPTS = 3;
 let _syncAttempts = 0;
 let _serviceKeySynced = false;
 
-function trySyncServiceKey(): boolean {
+function trySyncServiceKey(sandboxId: string): boolean {
   if (_serviceKeySynced) return false;
   if (_syncAttempts >= MAX_SYNC_ATTEMPTS) {
     console.error(`[LOCAL-PREVIEW] INTERNAL_SERVICE_KEY sync failed after ${MAX_SYNC_ATTEMPTS} attempts, giving up`);
@@ -42,9 +43,9 @@ function trySyncServiceKey(): boolean {
       env.DOCKER_HOST = `unix://${config.DOCKER_HOST}`;
     }
 
-    console.log(`[LOCAL-PREVIEW] Syncing INTERNAL_SERVICE_KEY to sandbox container (attempt ${_syncAttempts}/${MAX_SYNC_ATTEMPTS})...`);
+    console.log(`[LOCAL-PREVIEW] Syncing INTERNAL_SERVICE_KEY to ${sandboxId} (attempt ${_syncAttempts}/${MAX_SYNC_ATTEMPTS})...`);
     execSync(
-      `docker exec kortix-sandbox bash -c "mkdir -p /run/s6/container_environment && ` +
+      `docker exec ${sandboxId} bash -c "mkdir -p /run/s6/container_environment && ` +
       `printf '%s' '${ourKey}' > /run/s6/container_environment/INTERNAL_SERVICE_KEY && ` +
       `sudo s6-svc -r /run/service/svc-kortix-master"`,
       { timeout: 15_000, stdio: 'pipe', env },
@@ -90,10 +91,17 @@ const STRIP_RESPONSE_HEADERS = new Set([
  * Inside Docker: http://{sandboxId}:8000 (Docker DNS)
  * On host (pnpm dev): http://localhost:{SANDBOX_PORT_BASE}
  */
-export function getSandboxBaseUrl(sandboxId: string): string {
+export async function getSandboxBaseUrl(sandboxId: string): Promise<string> {
   if (config.SANDBOX_NETWORK) {
     return `http://${sandboxId}:8000`;
   }
+
+  const info = await inspectLocalSandboxContainer(sandboxId);
+  if (info) {
+    const port = info.NetworkSettings?.Ports?.['8000/tcp']?.[0]?.HostPort;
+    if (port) return `http://localhost:${port}`;
+  }
+
   return `http://localhost:${config.SANDBOX_PORT_BASE}`;
 }
 
@@ -116,7 +124,7 @@ export async function proxyToSandbox(
   /** Override per-sandbox service key (used by Hetzner). */
   serviceKeyOverride?: string,
 ): Promise<Response> {
-  const sandboxBaseUrl = baseUrlOverride || getSandboxBaseUrl(sandboxId);
+  const sandboxBaseUrl = baseUrlOverride || await getSandboxBaseUrl(sandboxId);
   const targetUrl = port === KORTIX_MASTER_PORT
     ? `${sandboxBaseUrl}${path}${queryString}`
     : `${sandboxBaseUrl}/proxy/${port}${path}${queryString}`;
@@ -167,7 +175,7 @@ export async function proxyToSandbox(
 
   // On 401 from sandbox: service key mismatch. Sync our key and retry once.
   if (response.status === 401 && !_serviceKeySynced) {
-    const synced = trySyncServiceKey();
+    const synced = trySyncServiceKey(sandboxId);
     if (synced) {
       // Retry the request with the same key (now the sandbox should accept it)
       const retryResponse = await fetch(targetUrl, {
