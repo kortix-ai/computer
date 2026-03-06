@@ -396,7 +396,7 @@ function ProvidersSection({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect provider?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-xs">
               {confirmDisconnect && (
                 <>
                   Are you sure you want to disconnect{' '}
