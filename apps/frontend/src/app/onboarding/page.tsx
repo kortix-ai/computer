@@ -669,18 +669,7 @@ export default function OnboardingPage() {
               ) : (
                 <div className="flex flex-col items-center gap-3">
                   <LoadingDots />
-                  {isHetznerOnboarding ? (
-                    <>
-                      <p className="text-xs text-muted-foreground">{getHetznerProvisioningMessage(onboardingWaitSec)}</p>
-                      <p className="text-[11px] text-muted-foreground/70">
-                        {sandbox?.status === 'active'
-                          ? 'Connecting to your sandbox and starting onboarding...'
-                          : 'Preparing your Hetzner sandbox and waiting for health...'}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Setting up your workspace…</p>
-                  )}
+                  <p className="text-xs text-muted-foreground">Starting your workspace…</p>
                 </div>
               )}
             </div>
