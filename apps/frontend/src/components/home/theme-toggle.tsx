@@ -76,13 +76,6 @@ export function ThemeToggle({ variant = 'icon' }: ThemeToggleProps) {
             </SelectItem>
           </SelectContent>
         </Select>
-        {currentTheme && currentTheme.id !== 'default' && (
-          <span
-            className="h-2.5 w-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: currentTheme.accentColor }}
-            title={currentTheme.name}
-          />
-        )}
       </div>
     );
   }
@@ -99,13 +92,6 @@ export function ThemeToggle({ variant = 'icon' }: ThemeToggleProps) {
         <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-primary" />
         <span className="sr-only">Toggle theme</span>
       </Button>
-      {currentTheme && currentTheme.id !== 'default' && (
-        <span
-          className="h-2.5 w-2.5 rounded-full shrink-0"
-          style={{ backgroundColor: currentTheme.accentColor }}
-          title={currentTheme.name}
-        />
-      )}
     </div>
   );
 }

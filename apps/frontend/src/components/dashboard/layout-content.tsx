@@ -432,12 +432,20 @@ export default function DashboardLayoutContent({
 						return;
 					}
 				} else if (res.status >= 500) {
-					router.replace("/onboarding");
+					// Server error — treat as not onboarded
+					const { isBillingEnabled } = await import("@/lib/config");
+					router.replace(isBillingEnabled() ? "/subscription" : "/onboarding");
 					return;
 				}
 			} catch {
-				// Sandbox not reachable — treat as not onboarded
-				router.replace("/onboarding");
+				// Sandbox not reachable — if billing enabled, user likely has no
+				// subscription/sandbox yet, send them to pick a plan first.
+				const { isBillingEnabled } = await import("@/lib/config");
+				if (isBillingEnabled()) {
+					router.replace("/subscription");
+				} else {
+					router.replace("/onboarding");
+				}
 				return;
 			}
 

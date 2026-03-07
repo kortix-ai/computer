@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { SimpleFooter } from '@/components/home/simple-footer';
 import { PricingSection } from '@/components/billing/pricing';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreditsExplainedModal } from '@/components/billing/credits-explained-modal';
@@ -64,7 +63,6 @@ export default function PricingPage() {
 
       </article>
 
-      <SimpleFooter />
     </main>
   );
 }

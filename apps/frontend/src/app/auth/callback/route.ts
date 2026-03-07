@@ -154,7 +154,8 @@ export async function GET(request: NextRequest) {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token;
 
-        if (backendUrl && accessToken) {
+        const billingEnabled = process.env.NEXT_PUBLIC_BILLING_ENABLED === 'true';
+        if (billingEnabled && backendUrl && accessToken) {
           try {
             const accountStateRes = await fetch(`${backendUrl}/v1/billing/account-state`, {
               headers: {
@@ -170,10 +171,10 @@ export async function GET(request: NextRequest) {
               const hasSubscription = tierKey && tierKey !== 'none';
 
               if (!hasSubscription) {
-                console.log('⚠️ No subscription detected - redirecting to setting-up (fallback)');
-                finalDestination = '/setting-up';
+                console.log('⚠️ No subscription detected - redirecting to /subscription to choose a plan');
+                finalDestination = '/subscription';
               } else {
-                console.log('✅ Account already initialized via webhook');
+                console.log('✅ Account already has subscription, proceeding normally');
               }
             }
           } catch (err) {

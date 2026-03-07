@@ -1,193 +1,107 @@
 'use client';
 
-import { SimpleFooter } from '@/components/home/simple-footer';
-import { motion } from 'framer-motion';
-import { ArrowRight, MapPin } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-
-const values = [
-  {
-    title: "Ship fast",
-    description: "We ship often. If something isn't working, we'd rather find out now than in three months."
-  },
-  {
-    title: "No politics",
-    description: "Good ideas win, bad ones get called out. We argue, disagree, and figure things out together."
-  },
-  {
-    title: "Work from anywhere",
-    description: "Nomadic team. No office, no set hours. Be online when it matters."
-  }
-];
+import Image from 'next/image';
 
 const openings = [
   {
     title: "AI Engineer",
-    location: "Hybrid / Remote",
-    description: "You'll work on our AI agents, making them reliable, fast, and actually useful. Experience with LLMs and building AI products required.",
+    location: "Remote",
+    description: "Work on our AI agents — make them reliable, fast, and actually useful. LLM experience required.",
     href: "/careers/ai-engineer",
   },
   {
     title: "Product / Design Engineer",
-    location: "Hybrid / Remote",
-    description: "Own UX/UI and build new features end-to-end. Design it, ship it, iterate on it.",
+    location: "Remote",
+    description: "Own UX/UI end-to-end. Design it, ship it, iterate on it.",
     href: "/careers/design-engineer",
   },
-  {
-    title: "Infrastructure / SRE Engineer",
-    location: "Hybrid / Remote",
-    description: "Own our infrastructure and reliability. You'll optimize code and systems to scale while maintaining 99.99% uptime.",
-    href: "/careers/sre-engineer",
-  }
 ];
 
 export default function CareersPage() {
   return (
     <main className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-6 md:px-10 pt-32 md:pt-40 pb-20 md:pb-28">
-          <motion.div
-            className="space-y-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-muted border border-border">
-              <span className="text-sm font-medium text-foreground">We're hiring</span>
-            </div>
-            
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight text-balance">
-              Work at Kortix
-            </h1>
-            
-            <p className="text-foreground text-[1.375rem] md:text-[1.5rem] leading-[1.6] tracking-[-0.025em] font-medium max-w-2xl opacity-50">
-              We're building the ultimate AI worker. Join us.
-            </p>
-          </motion.div>
-        </div>
-      </section>
+      {/* Hero */}
+      <div className="max-w-2xl mx-auto px-6 pt-24 sm:pt-32 pb-10 sm:pb-12">
+        <p className="text-sm text-muted-foreground/70 mb-4">We{"'"}re hiring</p>
+        <h1 className="text-4xl sm:text-5xl font-medium tracking-tight text-foreground mb-6">
+          Work at Kortix
+        </h1>
+        <p className="text-sm text-muted-foreground/70 leading-relaxed max-w-lg">
+          Small team, high intensity, real ownership. If you{"'"}re good at what
+          you do, we{"'"}d like to talk.
+        </p>
+      </div>
 
-      {/* Values Section */}
-      <section className="border-t border-border">
-        <div className="max-w-4xl mx-auto px-6 md:px-10 py-20 md:py-28">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-2xl md:text-3xl font-medium tracking-tight mb-12">
-              How we work
-            </h2>
-          </motion.div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-            {values.map((value, index) => (
-              <motion.div
-                key={index}
-                className="space-y-3"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
+      {/* Content — matches homepage editorial style */}
+      <div className="max-w-2xl mx-auto px-6 pb-24 sm:pb-32">
+
+        {/* ── The Mantra ── */}
+        <div className="mb-16 flex justify-center">
+          <Image
+            src="/images/careers/shackleton.png"
+            alt="Men wanted for hazardous journey, small wages, bitter cold, long months of complete darkness, constant danger, safe return doubtful, honor and recognition in case of success. — Ernest Shackleton"
+            width={380}
+            height={253}
+            className="rounded-md opacity-80"
+            priority
+          />
+        </div>
+
+        {/* ── Open Positions ── */}
+        <div className="mb-16">
+          <h2 className="text-xs uppercase tracking-widest text-muted-foreground/40 mb-4">
+            Open Positions
+          </h2>
+          <div className="divide-y divide-border/50">
+            {openings.map((job) => (
+              <Link
+                key={job.title}
+                href={job.href}
+                className="group flex items-start justify-between gap-4 py-5 first:pt-0 last:pb-0"
               >
-                <h3 className="text-lg font-semibold">{value.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{value.description}</p>
-              </motion.div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground group-hover:underline underline-offset-4 transition-colors">
+                    {job.title}
+                  </p>
+                  <p className="text-sm text-muted-foreground/70 leading-relaxed mt-1">
+                    {job.description}
+                  </p>
+                  <p className="text-xs text-muted-foreground/40 mt-1.5">
+                    {job.location}
+                  </p>
+                </div>
+                <ArrowRight className="size-4 text-muted-foreground/30 group-hover:text-foreground shrink-0 mt-0.5 transition-colors" />
+              </Link>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* Open Positions */}
-      <section className="border-t border-border">
-        <div className="max-w-4xl mx-auto px-6 md:px-10 py-20 md:py-28">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-2xl md:text-3xl font-medium tracking-tight mb-4">
-              Open positions
-            </h2>
-            <p className="text-muted-foreground mb-12">
-              If you're good at what you do, we'd like to talk.
-            </p>
-          </motion.div>
-
-          <div className="space-y-4">
-            {openings.map((job, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
-              >
-                <Link
-                  href={job.href}
-                  className="group block p-6 rounded-2xl border border-border bg-card hover:bg-accent/50 hover:border-foreground/20 transition-all duration-300"
-                >
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold group-hover:text-foreground transition-colors">
-                        {job.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {job.description}
-                      </p>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {job.location}
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0 md:mt-1">
-                      <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                        View role
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
+        {/* ── Don't See Your Role? ── */}
+        <div className="mb-16">
+          <h2 className="text-xs uppercase tracking-widest text-muted-foreground/40 mb-4">
+            Don{"'"}t See Your Role?
+          </h2>
+          <p className="text-sm text-muted-foreground/70 leading-relaxed mb-4">
+            We{"'"}re always looking for exceptional people. If you{"'"}re passionate
+            about AI and want to build with us, reach out.
+          </p>
+          <Button asChild variant="outline" className="h-10 px-5 text-sm rounded-lg shadow-none">
+            <a href="mailto:marko@kortix.com">
+              Get in touch
+              <ArrowRight className="ml-1.5 size-3.5" />
+            </a>
+          </Button>
         </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="border-t border-border">
-        <div className="max-w-4xl mx-auto px-6 md:px-10 py-20 md:py-28">
-          <motion.div
-            className="text-center space-y-6"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-2xl md:text-3xl font-medium tracking-tight">
-              Don't see your role?
-            </h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              We're always looking for exceptional people. If you're passionate about AI and want to join our team, reach out.
-            </p>
-            <div className="pt-4">
-              <Button asChild size="lg" variant="outline">
-                <a href="mailto:marko@kortix.com">
-                  Get in touch
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </a>
-              </Button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+        {/* ── Closing ── */}
+        <p className="text-sm text-muted-foreground/40 text-center">
+          Honor and recognition in case of success.
+        </p>
+      </div>
 
-      <SimpleFooter />
     </main>
   );
 }
-

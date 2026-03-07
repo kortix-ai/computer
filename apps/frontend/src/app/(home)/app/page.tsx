@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Smartphone, Bell, Shield, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AppDownloadQR, APP_DOWNLOAD_URL } from '@/components/common/app-download-qr';
-import { SimpleFooter } from '@/components/home/simple-footer';
 
 // Mobile users are redirected at the edge by middleware (hyper-fast)
 // This page only renders for desktop users
@@ -182,7 +181,6 @@ export default function AppDownloadPage() {
 
       </div>
 
-      <SimpleFooter />
     </main>
   );
 }

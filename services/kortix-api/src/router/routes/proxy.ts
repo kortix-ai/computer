@@ -100,6 +100,7 @@ async function handleKortixProxy(
   let body = await getRequestBody(c, method);
 
   body = injectApiKey(service, headers, body, /* useKortixInjection */ true);
+  body = maybeNormalizeOpenAIResponsesInput(service, method, subPath, body, headers);
 
   // Route-specific billing overrides service default
   const billingToolName = matchedRoute.billingToolName || service.billingToolName;
@@ -166,6 +167,7 @@ async function handleKortixPassthrough(
       return undefined;
     })();
   body = maybeApplyAnthropicPruning(service, method, body, headers, sessionId);
+  body = maybeNormalizeOpenAIResponsesInput(service, method, subPath, body, headers);
 
   const billingToolName = service.billingToolName;
   const isLlm = service.isLlm === true;
@@ -223,7 +225,8 @@ async function handlePassthrough(
 ) {
   const targetUrl = `${service.targetBaseUrl}${subPath}${queryString}`;
   const headers = buildForwardHeaders(c);
-  const body = await getRequestBody(c, method);
+  let body = await getRequestBody(c, method);
+  body = maybeNormalizeOpenAIResponsesInput(service, method, subPath, body, headers);
 
   console.log(`[PROXY] ${service.name} (passthrough) ${method} ${subPath}`);
 
@@ -526,6 +529,98 @@ function maybeApplyAnthropicPruning(
     // Body not JSON or pruning failed — forward as-is
     return body;
   }
+}
+
+/**
+ * OpenAI Responses API is strict about input item shapes. Some clients send
+ * mixed/legacy message arrays (including reasoning parts) that can be accepted
+ * by chat/completions but rejected by /responses with 400 invalid_prompt.
+ *
+ * For /openai/responses requests we normalize input into a conservative shape:
+ *   [{ role: 'user'|'system'|'developer', content: '<text>' }, ...]
+ *
+ * This keeps conversations working instead of hard failing on schema mismatch.
+ */
+function maybeNormalizeOpenAIResponsesInput(
+  service: ProxyServiceConfig,
+  method: string,
+  subPath: string,
+  body: ArrayBuffer | string | undefined,
+  headers: Headers,
+): ArrayBuffer | string | undefined {
+  if (service.name !== 'openai') return body;
+  if (method !== 'POST') return body;
+  if (!body) return body;
+  if (subPath.split('?')[0] !== '/responses') return body;
+
+  try {
+    const text = typeof body === 'string' ? body : new TextDecoder().decode(body);
+    const parsed = JSON.parse(text) as Record<string, any>;
+    if (!Array.isArray(parsed.input)) return body;
+
+    const normalized: Array<{ role: 'user' | 'system' | 'developer'; content: string }> = [];
+
+    for (const item of parsed.input) {
+      if (typeof item === 'string') {
+        const t = item.trim();
+        if (t) normalized.push({ role: 'user', content: t });
+        continue;
+      }
+
+      if (Array.isArray(item)) {
+        const t = extractText(item).trim();
+        if (t) normalized.push({ role: 'user', content: t });
+        continue;
+      }
+
+      if (item && typeof item === 'object') {
+        const roleRaw = typeof item.role === 'string' ? item.role : 'user';
+        const role: 'user' | 'system' | 'developer' =
+          roleRaw === 'system' || roleRaw === 'developer' ? roleRaw : 'user';
+
+        const contentValue = item.content ?? item.text ?? item.output ?? item.input;
+        const t = extractText(contentValue).trim();
+        if (t) normalized.push({ role, content: t });
+      }
+    }
+
+    if (normalized.length === 0) {
+      normalized.push({ role: 'user', content: 'Continue.' });
+    }
+
+    parsed.input = normalized;
+    const newBody = JSON.stringify(parsed);
+    headers.set('Content-Length', new TextEncoder().encode(newBody).length.toString());
+    return newBody;
+  } catch {
+    return body;
+  }
+}
+
+function extractText(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => extractText(v))
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    // Common OpenAI/SDK content shapes.
+    if (typeof obj.text === 'string') return obj.text;
+    if (typeof obj.output_text === 'string') return obj.output_text;
+    if (typeof obj.content === 'string') return obj.content;
+    if (obj.content) return extractText(obj.content);
+    if (obj.output) return extractText(obj.output);
+    if (obj.input) return extractText(obj.input);
+  }
+
+  return '';
 }
 
 function buildForwardHeaders(c: any): Headers {

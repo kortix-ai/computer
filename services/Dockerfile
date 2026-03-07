@@ -62,6 +62,8 @@ COPY --from=deps /app/packages/opencode-channels/src ./packages/opencode-channel
 COPY --from=deps /app/packages/opencode-channels/package.json ./packages/opencode-channels/package.json
 COPY --from=deps /app/packages/opencode-channels/tsconfig.json ./packages/opencode-channels/tsconfig.json
 COPY --from=deps /app/packages/opencode-channels/tsconfig.build.json ./packages/opencode-channels/tsconfig.build.json
+COPY --from=deps /app/packages/agent-tunnel/src ./packages/agent-tunnel/src
+COPY --from=deps /app/packages/agent-tunnel/package.json ./packages/agent-tunnel/package.json
 
 # Copy the service (source + its node_modules if any)
 COPY --from=deps /app/services/${SERVICE} ./services/${SERVICE}
@@ -70,6 +72,11 @@ COPY --from=deps /app/services/${SERVICE} ./services/${SERVICE}
 # pnpm creates a workspace symlink in the service's node_modules that breaks after COPY
 # (symlink target is relative to deps stage layout). Replace with a direct copy of the
 # TS source and patch "main" to point at src/ since Bun runs TypeScript natively.
+RUN rm -f services/${SERVICE}/node_modules/agent-tunnel 2>/dev/null; \
+    mkdir -p services/${SERVICE}/node_modules/agent-tunnel
+COPY --from=deps /app/packages/agent-tunnel/src ./services/${SERVICE}/node_modules/agent-tunnel/src
+COPY --from=deps /app/packages/agent-tunnel/package.json ./services/${SERVICE}/node_modules/agent-tunnel/package.json
+
 RUN rm -f services/${SERVICE}/node_modules/opencode-channels 2>/dev/null; \
     mkdir -p services/${SERVICE}/node_modules/opencode-channels
 COPY --from=deps /app/packages/opencode-channels/src ./services/${SERVICE}/node_modules/opencode-channels/src
@@ -85,6 +92,11 @@ COPY --from=deps /app/packages/agent-tunnel/src ./services/${SERVICE}/node_modul
 COPY --from=deps /app/packages/agent-tunnel/package.json ./services/${SERVICE}/node_modules/agent-tunnel/package.json
 
 WORKDIR /app/services/${SERVICE}
+
+# Pre-create the data dir and give the bun user write access before dropping privileges.
+# The queue drainer writes to .kortix-data/queue at runtime; without this it fails with EACCES.
+RUN mkdir -p /app/services/${SERVICE}/.kortix-data && \
+    chown -R bun:bun /app/services/${SERVICE}/.kortix-data
 
 # Non-root user (bun image ships with 'bun' user)
 USER bun

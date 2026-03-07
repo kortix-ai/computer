@@ -489,7 +489,7 @@ if $BUILD_DOCKER && ! $DRY_RUN; then
           NEXT_PUBLIC_ENV_MODE=local \
           NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1 \
           NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
-          NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.placeholder \
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=local-build-placeholder-anon-key \
           NEXT_OUTPUT=standalone \
           pnpm run build
         )

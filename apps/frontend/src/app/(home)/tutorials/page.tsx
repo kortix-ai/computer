@@ -1,7 +1,6 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { SimpleFooter } from '@/components/home/simple-footer';
 import { 
   BookOpen, 
   Play, 
@@ -335,7 +334,6 @@ export default function TutorialsPage() {
         </div>
       </div>
 
-      <SimpleFooter />
     </main>
   );
 }

@@ -17,6 +17,8 @@ Four Docker images, all published to Docker Hub under `kortix/`:
 
 The installer script (`scripts/get-kortix.sh`) writes `~/.kortix/docker-compose.yml` + `.env` + CLI helper, pulls the images, and starts everything.
 
+For local development, it also supports `--local`, which skips registry pulls and uses your already-built local images instead.
+
 ---
 
 ## Building Docker Images
@@ -63,7 +65,7 @@ cd apps/frontend
 NEXT_PUBLIC_ENV_MODE=local \
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1 \
 NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.placeholder \
+NEXT_PUBLIC_SUPABASE_ANON_KEY=local-build-placeholder-anon-key \
 NEXT_OUTPUT=standalone \
 pnpm run build
 ```
@@ -167,6 +169,75 @@ docker build -f sandbox/Dockerfile -t kortix/computer:latest .
 ```
 
 This builds for your host platform only. Fast, but the image won't work on other architectures.
+
+### Shared local build script
+
+Use the dedicated script when you just want to rebuild the local installer images from source:
+
+```bash
+cd /path/to/computer
+bash scripts/build-local-images.sh
+```
+
+This builds the three images used by the installer:
+
+- `kortix/kortix-frontend:latest`
+- `kortix/kortix-api:latest`
+- `kortix/computer:latest`
+
+Optional:
+
+```bash
+# Build a different tag
+bash scripts/build-local-images.sh --tag dev
+
+# Also build the custom postgres image from source
+bash scripts/build-local-images.sh --include-postgres
+```
+
+### Fast local installer loop (`get-kortix.sh --local`)
+
+If you want `scripts/get-kortix.sh` to boot your freshly rebuilt local images instead of Docker Hub, either prebuild them with `scripts/build-local-images.sh` or let the installer do it for you with `--build-local`.
+
+```bash
+# 1. Rebuild the images the installer uses locally
+cd /path/to/computer
+bash scripts/build-local-images.sh
+
+# 2. Install/run using those local images
+bash scripts/get-kortix.sh --local
+
+# Or do both in one command
+bash scripts/get-kortix.sh --local --build-local
+```
+
+What `--local` does:
+
+- Uses `kortix/kortix-frontend:latest`, `kortix/kortix-api:latest`, and `kortix/computer:latest` by default
+- Verifies those images exist locally before starting
+- With `--build-local`, rebuilds those images from the current repo before starting
+- Skips `docker compose pull` and sandbox `docker pull`
+- Persists `KORTIX_LOCAL_IMAGES=1` in `~/.kortix/.env`, so `~/.kortix/kortix update` keeps using local images
+
+Once installed locally, you can also use the generated CLI:
+
+```bash
+kortix rebuild
+kortix update --build-local
+```
+
+Optional overrides:
+
+```bash
+# Use a different local tag
+bash scripts/get-kortix.sh --local --local-tag dev
+
+# Or override individual image refs explicitly
+KORTIX_FRONTEND_IMAGE=kortix/kortix-frontend:dev \
+KORTIX_API_IMAGE=kortix/kortix-api:dev \
+KORTIX_SANDBOX_IMAGE=kortix/computer:dev \
+bash scripts/get-kortix.sh --local
+```
 
 ---
 
