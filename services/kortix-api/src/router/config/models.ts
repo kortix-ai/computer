@@ -11,8 +11,6 @@ export interface ModelConfig {
   outputPer1M: number;  // Cost per 1M output tokens (USD)
   contextWindow: number;
   tier: 'free' | 'paid';
-  /** How this provider handles prompt caching. 'manual' = needs cache_control breakpoints (Anthropic). */
-  cachingStrategy?: 'manual' | 'automatic';
   cacheReadPer1M?: number;   // Cost per 1M cached-read tokens (USD)
   cacheWritePer1M?: number;  // Cost per 1M cache-write tokens (USD)
 }
@@ -34,7 +32,6 @@ export const MODELS: Record<string, ModelConfig> = {
     outputPer1M: 25.00,
     contextWindow: 200000,
     tier: 'paid',
-    cachingStrategy: 'manual',
     cacheReadPer1M: 0.50,
     cacheWritePer1M: 6.25,
   },
@@ -44,7 +41,6 @@ export const MODELS: Record<string, ModelConfig> = {
     outputPer1M: 15.00,
     contextWindow: 200000,
     tier: 'free',
-    cachingStrategy: 'manual',
     cacheReadPer1M: 0.30,
     cacheWritePer1M: 3.75,
   },
@@ -54,7 +50,6 @@ export const MODELS: Record<string, ModelConfig> = {
     outputPer1M: 4.00,
     contextWindow: 200000,
     tier: 'free',
-    cachingStrategy: 'manual',
     cacheReadPer1M: 0.08,
     cacheWritePer1M: 1.00,
   },
@@ -110,7 +105,7 @@ export const DEFAULT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
  *
  * Priority:
  * 1. models.dev live pricing (always current, refreshed every 24h) — pricing only
- * 2. MODELS registry — provides contextWindow, tier, cachingStrategy, cache prices,
+ * 2. MODELS registry — provides contextWindow, tier, and cache pricing,
  *    and acts as pricing fallback when models.dev hasn't loaded yet or is unknown
  * 3. Zero pricing (billing skipped) if completely unknown
  */
@@ -130,8 +125,6 @@ export function getModel(modelId: string): ModelConfig {
       // Merge registry metadata with live pricing
       contextWindow: registryEntry?.contextWindow ?? 128000,
       tier: registryEntry?.tier ?? 'paid',
-      cachingStrategy: registryEntry?.cachingStrategy
-        ?? (openrouterId.startsWith('anthropic/') ? 'manual' : undefined),
       cacheReadPer1M: registryEntry?.cacheReadPer1M,
       cacheWritePer1M: registryEntry?.cacheWritePer1M,
       // Pricing always from models.dev
@@ -151,7 +144,6 @@ export function getModel(modelId: string): ModelConfig {
     outputPer1M: 0,
     contextWindow: 128000,
     tier: 'paid',
-    cachingStrategy: openrouterId.startsWith('anthropic/') ? 'manual' : undefined,
   };
 }
 

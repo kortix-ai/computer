@@ -88,7 +88,6 @@ export function createDeployment(args: DeploymentArgs) {
                   { name: "SCHEDULER_ENABLED", value: "true" },
                   { name: "CHANNELS_ENABLED", value: "true" },
                   { name: "TUNNEL_ENABLED", value: "true" },
-                  { name: "SESSION_PRUNING_ENABLED", value: "true" },
                 ],
                 envFrom: [{ secretRef: { name: k8sSecretName } }],
                 resources: {

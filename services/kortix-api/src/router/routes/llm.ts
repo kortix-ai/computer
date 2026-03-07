@@ -2,8 +2,6 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppContext } from '../../types';
 import { proxyToOpenRouter, extractUsage, calculateCost, getModel, getAllModels } from '../services/llm';
-import { applySessionPruning } from '../services/session-pruning';
-import { injectCacheControl } from '../services/prompt-caching';
 import { checkCredits, deductLLMCredits } from '../services/billing';
 
 const llm = new Hono<{ Variables: AppContext }>();
@@ -52,14 +50,6 @@ llm.post('/chat/completions', async (c) => {
 
   // Get model config for billing
   const modelConfig = getModel(modelId);
-
-  // Session pruning: trim stale tool results to reduce context size (Anthropic only — optimizes cache-write costs)
-  if (modelConfig.cachingStrategy === 'manual') {
-    applySessionPruning(body, sessionId, modelConfig.contextWindow);
-  }
-
-  // Prompt caching: inject cache_control breakpoints for manual-caching providers (Anthropic)
-  injectCacheControl(body, modelConfig);
 
   // Proxy to OpenRouter
   const response = await proxyToOpenRouter(body, isStreaming);
