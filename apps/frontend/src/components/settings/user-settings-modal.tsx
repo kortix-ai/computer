@@ -1132,6 +1132,8 @@ function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRe
     const [threshold, setThreshold] = useState(String(autoTopup?.threshold ?? 5));
     const [amount, setAmount] = useState(String(autoTopup?.amount ?? 15));
     const [saving, setSaving] = useState(false);
+    const [openingPortal, setOpeningPortal] = useState(false);
+    const [hasPaymentMethod, setHasPaymentMethod] = useState<boolean | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
@@ -1143,6 +1145,40 @@ function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRe
             setAmount(String(autoTopup.amount));
         }
     }, [autoTopup]);
+
+    useEffect(() => {
+        let active = true;
+        const loadSetupStatus = async () => {
+            try {
+                const { getAutoTopupSetupStatus } = await import('@/lib/api/billing');
+                const status = await getAutoTopupSetupStatus();
+                if (active) setHasPaymentMethod(status.has_payment_method);
+            } catch {
+                if (active) setHasPaymentMethod(null);
+            }
+        };
+        loadSetupStatus();
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    const handleSetupDefaultPaymentMethod = async () => {
+        setError(null);
+        setOpeningPortal(true);
+        try {
+            const { createPortalSession } = await import('@/lib/api/billing');
+            const { portal_url } = await createPortalSession({
+                return_url: typeof window !== 'undefined' ? window.location.href : '/',
+            });
+            if (typeof window !== 'undefined') {
+                window.location.href = portal_url;
+            }
+        } catch (err: any) {
+            setError(err?.message ?? 'Failed to open billing portal');
+            setOpeningPortal(false);
+        }
+    };
 
     const handleSave = async () => {
         setError(null);
@@ -1184,6 +1220,22 @@ function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRe
             </div>
             {enabled && (
                 <div className="space-y-3 pl-0">
+                    {hasPaymentMethod === false && (
+                        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                            <p className="text-xs text-amber-200">
+                                Auto top-up needs a default payment method for off-session charges.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-2"
+                                onClick={handleSetupDefaultPaymentMethod}
+                                disabled={openingPortal}
+                            >
+                                {openingPortal ? 'Opening billing portal...' : 'Set up default payment method'}
+                            </Button>
+                        </div>
+                    )}
                     <div>
                         <label className="text-xs text-muted-foreground block mb-1">
                             When credit balance goes below (minimum $5)
@@ -1221,7 +1273,13 @@ function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRe
                     {success && <p className="text-xs text-green-500">Saved!</p>}
                 </div>
             )}
-            <Button size="sm" variant="outline" onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
+            <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSave}
+                disabled={saving || (enabled && hasPaymentMethod === false)}
+                className="w-full sm:w-auto"
+            >
                 {saving ? 'Saving...' : 'Save Auto Top-up Settings'}
             </Button>
         </div>
@@ -1799,4 +1857,3 @@ function TransactionsTab() {
         </div>
     );
 }
-
