@@ -1556,70 +1556,32 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
                 )}
             </div>
 
-            {/* Credit Breakdown - Grid adapts based on tier */}
-            <div className={cn(
-                "grid gap-2 sm:gap-4",
-                dailyCreditsInfo?.enabled 
-                    ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-4" 
-                    : "grid-cols-2 sm:grid-cols-2 md:grid-cols-3"
-            )}>
-                {/* Total Available Credits */}
+            {/* Credit Breakdown */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                {/* Credits — total spendable balance */}
                 <div className="relative overflow-hidden rounded-xl sm:rounded-[18px] border border-border bg-card p-3 sm:p-5">
                     <div className="flex flex-col gap-1.5 sm:gap-2">
                         <div className="flex items-center gap-1.5 sm:gap-2">
                             <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
-                            <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Total</span>
+                            <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Credits</span>
                         </div>
                         <div>
                             <div className="text-base sm:text-xl leading-none font-semibold">{formatCredits(totalCredits)}</div>
+                            {monthlyCredits > 0 && accountState?.subscription.current_period_end && (
+                                <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-1 sm:mt-1.5 truncate">
+                                    {formatCredits(monthlyCredits)} renews {formatDateFlexible(accountState.subscription.current_period_end)}
+                                </p>
+                            )}
+                            {dailyCreditsInfo?.enabled && (
+                                <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-1 sm:mt-1.5 truncate">
+                                    {formatCredits(dailyCredits)} daily · {hoursUntilDailyRefresh !== null ? `${hoursUntilDailyRefresh}h` : 'refreshes daily'}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Daily Credits - Only for free tier */}
-                {dailyCreditsInfo?.enabled && (
-                    <div className="relative overflow-hidden rounded-xl sm:rounded-[18px] border border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-transparent p-3 sm:p-5">
-                        <div className="flex flex-col gap-1.5 sm:gap-2">
-                            <div className="flex items-center gap-1.5 sm:gap-2">
-                                <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 flex-shrink-0" />
-                                <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Daily</span>
-                            </div>
-                            <div>
-                                <div className="text-base sm:text-xl leading-none font-semibold">{formatCredits(dailyCredits)}</div>
-                                <p className="text-[10px] sm:text-[11px] text-blue-500/80 mt-1 sm:mt-1.5 truncate">
-                                    {hoursUntilDailyRefresh !== null 
-                                        ? `${hoursUntilDailyRefresh}h`
-                                        : 'Daily'
-                                    }
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Monthly Credits - For paid tiers OR expiring credits display */}
-                {(!dailyCreditsInfo?.enabled || monthlyCredits > 0) && (
-                    <div className="relative overflow-hidden rounded-xl sm:rounded-[18px] border border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-transparent p-3 sm:p-5">
-                        <div className="flex flex-col gap-1.5 sm:gap-2">
-                            <div className="flex items-center gap-1.5 sm:gap-2">
-                                <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-500 flex-shrink-0" />
-                                <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Monthly</span>
-                            </div>
-                            <div>
-                                <div className="text-base sm:text-xl leading-none font-semibold">
-                                    {formatCredits(monthlyCredits)}
-                                </div>
-                                {accountState?.subscription.current_period_end && (
-                                    <p className="text-[10px] sm:text-[11px] text-orange-500/80 mt-1 sm:mt-1.5 truncate">
-                                        {formatDateFlexible(accountState.subscription.current_period_end)}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Extra Credits */}
+                {/* Extra — purchased non-expiring credits */}
                 <div className="relative overflow-hidden rounded-xl sm:rounded-[18px] border border-border bg-card p-3 sm:p-5">
                     <div className="flex flex-col gap-1.5 sm:gap-2">
                         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1628,7 +1590,7 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
                         </div>
                         <div>
                             <div className="text-base sm:text-xl leading-none font-semibold">{formatCredits(nonExpiringCredits)}</div>
-                            <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-1 sm:mt-1.5">Non-expiring</p>
+                            <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-1 sm:mt-1.5">Never expires</p>
                         </div>
                     </div>
                 </div>
