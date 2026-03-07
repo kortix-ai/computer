@@ -15,6 +15,7 @@ import { execSync } from 'child_process';
 import { config } from '../config';
 import { ALL_SANDBOX_ENV_KEYS, toLegacySchema } from '../providers/registry';
 import { supabaseAuth } from '../middleware/auth';
+import { getPrimaryLocalSandboxContainer } from '../platform/providers/local-docker-discovery';
 
 export const setupApp = new Hono<AppEnv>();
 
@@ -469,10 +470,8 @@ setupApp.get('/health', async (c) => {
 
   // Check sandbox container
   try {
-    const out = execSync('docker inspect kortix-sandbox --format "{{.State.Status}}"', {
-      stdio: 'pipe',
-      timeout: 5000,
-    }).toString().trim();
+    const info = await getPrimaryLocalSandboxContainer();
+    const out = info?.State?.Status || 'not_found';
     checks.sandbox = { ok: out === 'running', error: out !== 'running' ? `Status: ${out}` : undefined };
   } catch {
     checks.sandbox = { ok: false, error: 'Container not found' };

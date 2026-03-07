@@ -25,6 +25,7 @@ import { supabaseAuth } from '../middleware/auth';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { execSync } from 'child_process';
+import { getPrimaryLocalSandboxContainer } from '../platform/providers/local-docker-discovery';
 
 export const adminApp = new Hono<AppEnv>();
 
@@ -437,9 +438,8 @@ adminApp.get('/api/health', async (c) => {
   }
 
   try {
-    const out = execSync('docker inspect kortix-sandbox --format "{{.State.Status}}"', {
-      stdio: 'pipe', timeout: 5000,
-    }).toString().trim();
+    const info = await getPrimaryLocalSandboxContainer();
+    const out = info?.State?.Status || 'not_found';
     checks.sandbox = { ok: out === 'running', error: out !== 'running' ? `Status: ${out}` : undefined };
   } catch {
     checks.sandbox = { ok: false, error: 'Container not found' };

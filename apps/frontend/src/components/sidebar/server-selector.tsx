@@ -767,7 +767,7 @@ export function InstanceManagerDialog({
     if (server && (server.provider === 'daytona' || server.provider === 'local_docker' || server.provider === 'hetzner')) {
       setIsRemovingSandbox(true);
       try {
-        await removeSandbox();
+        await removeSandbox(server.sandboxId);
       } catch (err) {
         console.error('[InstanceManager] Failed to remove sandbox from backend:', err);
         // Still remove from local store so user isn't stuck
@@ -803,7 +803,8 @@ export function InstanceManagerDialog({
     setSSHError(null);
     setSSHResult(null);
     try {
-      const result = await setupSSH();
+      const activeServer = servers.find((server) => server.id === activeServerId);
+      const result = await setupSSH(activeServer?.sandboxId);
       setSSHResult(result);
       const meta: SSHAccessMeta = {
         ssh_command: result.ssh_command,
@@ -987,11 +988,11 @@ export function InstanceManagerDialog({
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => copyToClipboard('ssh kortix-sandbox', 'quick-short')}
+                        onClick={() => copyToClipboard(sshMeta.ssh_command, 'quick-short')}
                         className={copyButtonBaseClass}
                       >
                         {copiedField === 'quick-short' ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                        {copiedField === 'quick-short' ? 'Copied' : 'Copy ssh kortix-sandbox'}
+                        {copiedField === 'quick-short' ? 'Copied' : 'Copy SSH command'}
                       </button>
                       <button
                         type="button"

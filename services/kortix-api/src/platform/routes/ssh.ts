@@ -17,22 +17,12 @@ import { readFileSync, unlinkSync, mkdirSync, rmdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Docker from 'dockerode';
+import { and, eq } from 'drizzle-orm';
 import { config } from '../../config';
 import type { AuthVariables } from '../../types';
+import { LEGACY_LOCAL_SANDBOX_NAME, getDockerClient } from '../providers/local-docker-discovery';
 
 const sshRouter = new Hono<{ Variables: AuthVariables }>();
-
-function getDockerClient(): Docker {
-  if (!config.DOCKER_HOST) return new Docker();
-
-  if (config.DOCKER_HOST.startsWith('tcp://') || config.DOCKER_HOST.startsWith('http://')) {
-    const url = new URL(config.DOCKER_HOST);
-    return new Docker({ host: url.hostname, port: parseInt(url.port || '2375', 10) });
-  }
-
-  const socketPath = config.DOCKER_HOST.replace(/^unix:\/\//, '');
-  return new Docker({ socketPath });
-}
 
 async function runContainerCommand(container: Docker.Container, cmd: string): Promise<void> {
   const exec = await container.exec({
@@ -42,7 +32,7 @@ async function runContainerCommand(container: Docker.Container, cmd: string): Pr
   });
 
   await new Promise<void>((resolve, reject) => {
-    exec.start((err) => {
+    exec.start({}, (err) => {
       if (err) return reject(err);
       return resolve();
     });
@@ -65,7 +55,8 @@ async function runContainerCommand(container: Docker.Container, cmd: string): Pr
 
 sshRouter.post('/setup', async (c) => {
   try {
-    let containerName = 'kortix-sandbox';
+    let containerName = LEGACY_LOCAL_SANDBOX_NAME;
+    const requestedSandboxId = c.req.query('sandbox_id');
 
     // Try DB lookup for container name (optional — works without)
     try {
@@ -75,7 +66,6 @@ sshRouter.post('/setup', async (c) => {
         const { resolveAccountId } = await import('../../shared/resolve-account');
         const { db } = await import('../../shared/db');
         const { sandboxes } = await import('@kortix/db');
-        const { eq, and } = await import('drizzle-orm');
 
         const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY);
         const token = authHeader.replace('Bearer ', '');
@@ -83,9 +73,12 @@ sshRouter.post('/setup', async (c) => {
 
         if (user) {
           const accountId = await resolveAccountId(user.id);
-          const [sandbox] = await db.select().from(sandboxes)
-            .where(and(eq(sandboxes.accountId, accountId), eq(sandboxes.status, 'active')))
-            .limit(1);
+          const query = db.select().from(sandboxes).where(
+            requestedSandboxId
+              ? and(eq(sandboxes.accountId, accountId), eq(sandboxes.sandboxId, requestedSandboxId))
+              : and(eq(sandboxes.accountId, accountId), eq(sandboxes.status, 'active')),
+          ).limit(1);
+          const [sandbox] = await query;
 
           if (sandbox?.provider !== 'local_docker' && sandbox?.provider) {
             return c.json({ success: false, error: 'SSH is only available for Local Docker sandboxes.' }, 400);
@@ -140,7 +133,11 @@ sshRouter.post('/setup', async (c) => {
     console.log(`[SSH] Public key injected into container ${containerName}`);
 
     // Resolve host (VPS-aware)
-    const port = config.SANDBOX_PORT_BASE + 7;
+    const containerInfo = await container.inspect();
+    const port = parseInt(containerInfo.NetworkSettings?.Ports?.['22/tcp']?.[0]?.HostPort || '', 10);
+    if (!port) {
+      throw new Error('Sandbox SSH port is not published');
+    }
     let host = 'localhost';
     const fwdHost = c.req.header('x-forwarded-host') || c.req.header('host') || '';
     const fwdHostOnly = fwdHost.split(':')[0];

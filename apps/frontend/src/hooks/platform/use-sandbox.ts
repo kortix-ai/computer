@@ -17,6 +17,7 @@ import {
   getSandbox,
   ensureSandbox,
   getProviders,
+  listSandboxes,
   extractMappedPorts,
   type SandboxInfo,
   type SandboxProviderName,
@@ -64,6 +65,14 @@ function registerSandboxServer(sandbox: SandboxInfo) {
   if (shouldAutoSwitch && store.activeServerId !== serverId) {
     store.setActiveServer(serverId, { auto: true });
     useTabStore.getState().swapForServer(serverId, previousActiveId);
+  }
+}
+
+function registerSandboxServers(sandboxes: SandboxInfo[]) {
+  for (const sandbox of sandboxes) {
+    if (sandbox.status === 'active' && sandbox.external_id) {
+      registerSandboxServer(sandbox);
+    }
   }
 }
 
@@ -131,12 +140,27 @@ export function useSandbox() {
     refetchOnWindowFocus: false,
   });
 
+  const listQuery = useQuery({
+    queryKey: ['platform', 'sandboxes'],
+    queryFn: listSandboxes,
+    enabled: !!user,
+    staleTime: 0,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+
   // Register/update sandbox in server store whenever data changes
   useEffect(() => {
     if (query.data) {
       registerSandboxServer(query.data);
     }
   }, [query.data]);
+
+  useEffect(() => {
+    if (listQuery.data) {
+      registerSandboxServers(listQuery.data);
+    }
+  }, [listQuery.data]);
 
   return {
     sandbox: query.data ?? null,

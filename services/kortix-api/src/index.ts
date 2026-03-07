@@ -576,8 +576,8 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 
 /** Build WS target URL for a given sandbox/port/path. */
-function buildWsTargetUrl(sandboxId: string, port: number, remainingPath: string, searchParams: URLSearchParams): string {
-  const sandboxBaseUrl = getSandboxBaseUrl(sandboxId);
+async function buildWsTargetUrl(sandboxId: string, port: number, remainingPath: string, searchParams: URLSearchParams): Promise<string> {
+  const sandboxBaseUrl = await getSandboxBaseUrl(sandboxId);
   const wsBase = sandboxBaseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
   const targetPath = port === 8000 ? remainingPath : `/proxy/${port}${remainingPath}`;
 
@@ -653,7 +653,7 @@ export default {
 
       // ── WebSocket upgrade via subdomain ──────────────────────────────
       if (isWsUpgrade) {
-        const targetUrl = buildWsTargetUrl(sandboxId, port, url.pathname, url.searchParams);
+        const targetUrl = await buildWsTargetUrl(sandboxId, port, url.pathname, url.searchParams);
         const success = server.upgrade(req, {
           data: {
             targetUrl,
@@ -824,7 +824,7 @@ export default {
         const wsToken = wsBearerToken || wsCookieToken || wsQueryToken;
 
         if (wsToken && (await validatePreviewToken(wsToken))) {
-          const targetUrl = buildWsTargetUrl(wsSandboxId, wsPort, wsRemainingPath, url.searchParams);
+          const targetUrl = await buildWsTargetUrl(wsSandboxId, wsPort, wsRemainingPath, url.searchParams);
           const success = server.upgrade(req, {
             data: {
               targetUrl,

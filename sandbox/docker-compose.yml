@@ -1,8 +1,8 @@
-# Sandbox Docker Compose — single instance, fixed ports.
+# Sandbox Docker Compose — defaults to one instance, but supports many.
 #
 # This mirrors the local Docker provider behavior in kortix-api:
-# - container name is always `kortix-sandbox`
-# - host ports are stable so the frontend never chases random mappings
+# - set SANDBOX_CONTAINER_NAME / SANDBOX_VOLUME_NAME / COMPOSE_PROJECT_NAME to run multiple copies
+# - host ports stay stable only if you keep the default SANDBOX_PORT_* values
 #
 # Default host port range: 14000-14008
 # If you already have something running on that range, edit the mappings below.
@@ -26,6 +26,8 @@
 #
 # ────────────────────────────────────────────────────────────────────────────
 
+name: ${COMPOSE_PROJECT_NAME:-kortix-sandbox}
+
 services:
   desktop:
     pull_policy: never
@@ -37,7 +39,7 @@ services:
       cache_to:
         - type=local,dest=.buildx-cache/sandbox,mode=max
     image: kortix/computer:${SANDBOX_VERSION:-latest}
-    container_name: kortix-sandbox
+    container_name: ${SANDBOX_CONTAINER_NAME:-kortix-sandbox}
     cap_add:
       - SYS_ADMIN
     security_opt:
@@ -62,7 +64,7 @@ services:
       - KORTIX_API_URL=${KORTIX_API_URL:-http://host.docker.internal:8008}
       - KORTIX_TOKEN=${KORTIX_TOKEN:-}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:-}
-      - SANDBOX_ID=${SANDBOX_ID:-local}
+      - SANDBOX_ID=${SANDBOX_ID:-${SANDBOX_CONTAINER_NAME:-kortix-sandbox}}
       - PROJECT_ID=${PROJECT_ID:-local}
       - ENV_MODE=${ENV_MODE:-local}
     env_file:
@@ -71,15 +73,15 @@ services:
       - sandbox_data:/workspace
       - sandbox_data:/config
     ports:
-      - "127.0.0.1:14000:8000"  # Kortix Master (proxy entry point)
-      - "127.0.0.1:14001:3111"  # OpenCode Web UI
-      - "127.0.0.1:14002:6080"  # Desktop (noVNC)
-      - "127.0.0.1:14003:6081"  # Desktop (HTTPS)
-      - "127.0.0.1:14004:3210"  # Presentation Viewer
-      - "127.0.0.1:14005:9223"  # Agent Browser Stream (WS)
-      - "127.0.0.1:14006:9224"  # Agent Browser Viewer
-      - "127.0.0.1:14007:22"    # SSH
-      - "127.0.0.1:14008:3211"  # Static Web Server (standalone HTML/assets)
+      - "127.0.0.1:${SANDBOX_PORT_8000:-14000}:8000"  # Kortix Master (proxy entry point)
+      - "127.0.0.1:${SANDBOX_PORT_3111:-14001}:3111"  # OpenCode Web UI
+      - "127.0.0.1:${SANDBOX_PORT_6080:-14002}:6080"  # Desktop (noVNC)
+      - "127.0.0.1:${SANDBOX_PORT_6081:-14003}:6081"  # Desktop (HTTPS)
+      - "127.0.0.1:${SANDBOX_PORT_3210:-14004}:3210"  # Presentation Viewer
+      - "127.0.0.1:${SANDBOX_PORT_9223:-14005}:9223"  # Agent Browser Stream (WS)
+      - "127.0.0.1:${SANDBOX_PORT_9224:-14006}:9224"  # Agent Browser Viewer
+      - "127.0.0.1:${SANDBOX_PORT_22:-14007}:22"      # SSH
+      - "127.0.0.1:${SANDBOX_PORT_3211:-14008}:3211"  # Static Web Server (standalone HTML/assets)
     shm_size: "2gb"
     restart: unless-stopped
     healthcheck:
@@ -94,3 +96,4 @@ services:
 
 volumes:
   sandbox_data:
+    name: ${SANDBOX_VOLUME_NAME:-sandbox_data}
