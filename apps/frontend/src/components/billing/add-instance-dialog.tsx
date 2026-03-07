@@ -14,7 +14,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getHetznerServerTypes, createInstance, type HetznerServerType } from '@/lib/api/billing';
 import { toast } from '@/lib/toast';
-import { useSubscriptionStore } from '@/stores/subscription-store';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAccountState } from '@/hooks/billing';
 
 // Hetzner locations
 const LOCATIONS = [
@@ -48,7 +49,7 @@ export function AddInstanceDialog() {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refetch = useSubscriptionStore((s) => s.refetch);
+  const queryClient = useQueryClient();
 
   // Listen for custom event to open
   useEffect(() => {
@@ -92,7 +93,11 @@ export function AddInstanceDialog() {
         backgroundProvisioning: true,
       });
       toast.success('Instance provisioning started. It should be ready in 2-3 minutes.');
-      refetch();
+      // Force-refresh billing/instances state immediately and then again shortly
+      // after, so provisioning rows appear without requiring manual refresh.
+      invalidateAccountState(queryClient, true, true);
+      setTimeout(() => invalidateAccountState(queryClient, true, true), 2500);
+      setTimeout(() => invalidateAccountState(queryClient, true, true), 10000);
       setOpen(false);
     } catch (err: any) {
       setError(err?.message || 'Failed to create instance');
