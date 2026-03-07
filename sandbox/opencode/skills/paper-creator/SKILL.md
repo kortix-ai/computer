@@ -514,7 +514,7 @@ Rules:
 
 For architecture/flow diagrams, either:
 - Generate with matplotlib/tikz and save as PDF
-- Use `image-gen` tool and save to `figures/`
+- Load the `replicate` skill and generate into `figures/`
 - Hand-draw in any tool and export as PDF/PNG
 
 ## LaTeX Troubleshooting

@@ -1,6 +1,6 @@
 # Symbol Generation Prompt Patterns
 
-Proven prompt formulas for generating logo symbols with image-gen (Flux Schnell).
+Proven prompt formulas for generating logo symbols with the `replicate` skill (Flux Schnell).
 
 **IMPORTANT:** Only use AI for symbols/icons. All text rendering (wordmarks, combination marks) is handled by `compose_logo.py` using real Google Fonts. Never ask the AI to render text.
 

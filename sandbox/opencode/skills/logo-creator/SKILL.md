@@ -11,8 +11,8 @@ You are now a logo designer. Not an image generator — a designer. You research
 
 ## Core Philosophy
 
-1. **Research before generating.** Understand the brand, its competitors, and its visual landscape before touching image-gen.
-2. **Symbols from AI, text from fonts.** Generate symbols/icons with image-gen. NEVER rely on AI for text rendering — compose wordmarks and combination marks programmatically using Google Fonts via `compose_logo.py`.
+1. **Research before generating.** Understand the brand, its competitors, and its visual landscape before loading the `replicate` skill.
+2. **Symbols from AI, text from fonts.** Generate symbols/icons through the `replicate` skill. NEVER rely on AI for text rendering — compose wordmarks and combination marks programmatically using Google Fonts via `compose_logo.py`.
 3. **LOOK at every image.** After every generation or composition, use the `Read` tool to view the image file. Describe what you see. Judge it. This is non-negotiable — you cannot critique what you haven't seen.
 4. **Iterate with purpose.** Each round should be informed by what you saw wrong in the previous round. Not re-rolling dice.
 5. **Monochrome first.** A logo that doesn't work in black and white doesn't work.
@@ -21,14 +21,14 @@ You are now a logo designer. Not an image generator — a designer. You research
 
 ## Available Tools
 
-- **`image-gen`** — Generate symbols (`generate`), remove backgrounds (`remove_bg` via BRIA RMBG 2.0), upscale (`upscale`). Always specify `output_dir`.
+- **`replicate` skill** — Use it to discover and run the right Replicate model for symbol generation, upscaling, or background removal.
 - **`image-search`** — Search Google Images for competitor logos, visual references. Batch with `|||`.
 - **`web-search`** — Research the brand, industry, competitors. Batch with `|||`.
 - **`Read` tool** — **CRITICAL.** Use to view every generated/composed image. This is how you see and judge your own work.
 - **Bash** — Run scripts:
   - `scripts/compose_logo.py` — Combine symbol + Google Font text into all logo layouts
   - `scripts/create_logo_sheet.py` — Build HTML contact sheet for visual comparison
-  - `scripts/remove_bg.py` — Local background removal fallback (if `image-gen remove_bg` produces artifacts)
+  - `scripts/remove_bg.py` — Local background removal fallback (if the Replicate result produces artifacts)
 
 ---
 
@@ -73,9 +73,9 @@ Read("logos/brand/composed/brand-combo-horizontal.png")
 
 ## Background Removal
 
-The `image-gen` tool uses BRIA RMBG 2.0 for background removal. It's good but not perfect — especially on logo symbols it can leave halos or eat into thin lines.
+Replicate background-removal models are good but not perfect — especially on logo symbols they can leave halos or eat into thin lines.
 
-**Primary method:** `image-gen` with `action: "remove_bg"`
+**Primary method:** load the `replicate` skill and use an appropriate background-removal model.
 
 **If the result has artifacts** (gray halos, jagged edges, eaten details), use the local fallback:
 ```bash
@@ -143,7 +143,7 @@ logos/<brand-name>/
 **Goal:** Create the core symbol/icon.
 
 1. **Read `references/prompt-patterns.md`** for prompt formulas and universal anchors.
-2. **Generate 4-6 symbol variations** using `image-gen`:
+2. **Generate 4-6 symbol variations** using the `replicate` skill:
    - Use the logomark prompt pattern from the reference
    - Vary the CONCEPT across generations (different metaphors), not just style
    - Start monochrome: `Using only black (#000000). Monochrome design.`
@@ -155,7 +155,7 @@ logos/<brand-name>/
    - **If it fails 2+ criteria: regenerate with adjusted prompt.** Note what went wrong and fix it in the next prompt.
    - **If it passes: keep it and note what works well.**
 4. **Remove backgrounds** on the best 2-3 symbols:
-   - `image-gen` with `action: "remove_bg"`
+   - Use the `replicate` skill with a background-removal model
    - **Read the transparent PNG to check for halos/artifacts**
    - If bad: re-run with `scripts/remove_bg.py` (local fallback)
 5. **Build contact sheet, open it, and give the user the path:**
@@ -222,7 +222,7 @@ Each iteration = adjust parameters → re-run compose → **Read to verify** →
 ### Phase 5: Finalize & Deliver
 
 1. **Transparent versions** of approved compositions:
-   - `image-gen` `remove_bg` on final PNGs
+    - Use the `replicate` skill for final transparent exports
    - **Read to verify** clean edges
    - Fallback to `scripts/remove_bg.py` if needed
 2. **Dark-mode versions** if useful

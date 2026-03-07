@@ -32,7 +32,7 @@ You are loading the presentation creation skill. Follow these instructions for A
   - `export_pptx` — 3-layer PPTX (background + visual elements + editable text) via Playwright + python-pptx
   - `preview` — Returns the viewer URL for this presentation at `http://localhost:3210/presentations/<name>/`. The viewer service runs persistently — no server is started.
 - **`image-search`** — Search Google Images. Batch queries with `|||` separator.
-- **`image-gen`** — Generate images via Replicate (Flux Schnell). Actions: `generate`, `edit`, `upscale`, `remove_bg`.
+- **`replicate` skill** — Load when you need AI image or video generation for slide visuals.
 - **`web-search`** — Search the web via Tavily. Batch queries with `|||` separator.
 - **`scrape-webpage`** — Fetch and extract content from URLs via Firecrawl.
 
