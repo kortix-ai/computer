@@ -190,12 +190,44 @@ export function createAccountRouter(
         .limit(1);
 
       if (provisioning) {
-        const { getImagePullStatus } = await import('../providers/local-docker');
+        const { getImagePullStatus, LocalDockerProvider } = await import('../providers/local-docker');
         const pullStatus = getImagePullStatus();
 
         // Stale provisioning row: nothing is actually pulling (e.g. server restarted
-        // or previous attempt failed). Mark it as error and fall through to reprovision.
+        // or previous attempt failed). Check if the container is already running
+        // (the pull + create may have succeeded before the restart). If so, heal
+        // the row to 'active'. Otherwise mark as error and re-provision.
         if (pullStatus.state === 'idle' || pullStatus.state === 'error') {
+          // Check if container is already running (auto-heal)
+          try {
+            const dockerProvider = new LocalDockerProvider();
+            const existing = await dockerProvider.find();
+            if (existing && existing.status === 'running') {
+              console.log(`[PLATFORM] Auto-healing stale provisioning row ${provisioning.sandboxId} — container is running`);
+              const [healed] = await db
+                .update(sandboxes)
+                .set({
+                  externalId: existing.name,
+                  baseUrl: existing.baseUrl,
+                  status: 'active',
+                  metadata: {
+                    containerName: existing.name,
+                    containerId: existing.containerId,
+                    image: existing.image,
+                    mappedPorts: existing.mappedPorts,
+                  },
+                  updatedAt: new Date(),
+                })
+                .where(eq(sandboxes.sandboxId, provisioning.sandboxId))
+                .returning();
+              if (healed) {
+                return c.json({ success: true, data: serializeSandbox(healed), status: 'ready' });
+              }
+            }
+          } catch (healErr) {
+            console.warn(`[PLATFORM] Auto-heal check failed:`, healErr);
+          }
+
           console.warn(`[PLATFORM] Stale provisioning row ${provisioning.sandboxId} with pull state '${pullStatus.state}', cleaning up...`);
           await db
             .update(sandboxes)
@@ -368,8 +400,43 @@ export function createAccountRouter(
       }
 
       if (row.status === 'provisioning') {
-        const { getImagePullStatus } = await import('../providers/local-docker');
+        const { getImagePullStatus, LocalDockerProvider } = await import('../providers/local-docker');
         const pullStatus = getImagePullStatus();
+
+        // Auto-heal: if in-memory pull state is idle (e.g. server restarted after
+        // the pull + container creation succeeded), check if the container is
+        // actually running. If so, transition the DB row to 'active'.
+        if (pullStatus.state === 'idle' || pullStatus.state === 'done') {
+          try {
+            const provider = new LocalDockerProvider();
+            const existing = await provider.find();
+            if (existing && existing.status === 'running') {
+              console.log(`[PLATFORM] Auto-healing stale provisioning row ${row.sandboxId} — container is running`);
+              const [healed] = await db
+                .update(sandboxes)
+                .set({
+                  externalId: existing.name,
+                  baseUrl: existing.baseUrl,
+                  status: 'active',
+                  metadata: {
+                    containerName: existing.name,
+                    containerId: existing.containerId,
+                    image: existing.image,
+                    mappedPorts: existing.mappedPorts,
+                  },
+                  updatedAt: new Date(),
+                })
+                .where(eq(sandboxes.sandboxId, row.sandboxId))
+                .returning();
+              if (healed) {
+                return c.json({ success: true, status: 'ready', data: serializeSandbox(healed) });
+              }
+            }
+          } catch (healErr) {
+            console.warn(`[PLATFORM] Auto-heal check failed:`, healErr);
+          }
+        }
+
         return c.json({
           success: true,
           status: pullStatus.state === 'error' ? 'error' : 'pulling',

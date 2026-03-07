@@ -625,7 +625,58 @@ setupApp.post('/setup-complete', async (c) => {
     const accountId = await resolveAccountId(userId);
     await db
       .update(accounts)
-      .set({ setupCompleteAt: new Date(), updatedAt: new Date() })
+      .set({ setupCompleteAt: new Date(), setupWizardStep: 0, updatedAt: new Date() })
+      .where(eq(accounts.accountId, accountId));
+    return c.json({ ok: true });
+  } catch (e: any) {
+    return c.json({ ok: false, error: e?.message || String(e) }, 500);
+  }
+});
+
+/**
+ * GET /v1/setup/setup-wizard-step
+ * Returns the current setup wizard step from the database.
+ * { step: number } — 0 = not started / complete, 2 = provider setup, 3 = tool keys
+ */
+setupApp.get('/setup-wizard-step', async (c) => {
+  if (!hasDatabase) {
+    return c.json({ step: 0 });
+  }
+  try {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    const [account] = await db
+      .select({ setupWizardStep: accounts.setupWizardStep, setupCompleteAt: accounts.setupCompleteAt })
+      .from(accounts)
+      .where(eq(accounts.accountId, accountId))
+      .limit(1);
+    // If setup is already complete, step is 0 regardless of stored value
+    if (account?.setupCompleteAt) {
+      return c.json({ step: 0 });
+    }
+    return c.json({ step: account?.setupWizardStep ?? 0 });
+  } catch (e: any) {
+    return c.json({ step: 0, error: e?.message || String(e) }, 500);
+  }
+});
+
+/**
+ * POST /v1/setup/setup-wizard-step
+ * Update the current setup wizard step in the database.
+ * Body: { step: number }
+ */
+setupApp.post('/setup-wizard-step', async (c) => {
+  if (!hasDatabase) {
+    return c.json({ ok: false, error: 'Database not configured' }, 500);
+  }
+  try {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    const body = await c.req.json();
+    const step = typeof body.step === 'number' ? body.step : 0;
+    await db
+      .update(accounts)
+      .set({ setupWizardStep: step, updatedAt: new Date() })
       .where(eq(accounts.accountId, accountId));
     return c.json({ ok: true });
   } catch (e: any) {

@@ -532,13 +532,11 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   const handleProviderContinue = useCallback(() => {
     setWizardStep(3);
     onWizardStepChange?.(3);
-    sessionStorage.setItem('setup_wizard_step', '3');
   }, [onWizardStepChange]);
 
   // ── Tool keys done (step 3 → navigate to onboarding) ──
   const handleToolKeysContinue = useCallback(async () => {
-    // Setup wizard complete — clear persisted step and mark in DB
-    sessionStorage.removeItem('setup_wizard_step');
+    // Setup wizard complete — mark in DB
     sessionStorage.setItem('setup_complete', 'true');
 
     // Mark setup complete in the backend (fire-and-forget)
@@ -645,7 +643,6 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
         // Tell the parent we're entering step 2
         setWizardStep(2);
         onWizardStepChange?.(2);
-        sessionStorage.setItem('setup_wizard_step', '2');
 
         // Provision sandbox — if only one provider, auto-provision immediately.
         // If multiple providers, defer to step 2 where user picks.
@@ -662,6 +659,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
       } else {
         // Returning user: prefer direct client sign-in so session state is
         // immediately available to middleware + AuthProvider.
+        let signedInJwt: string | null = null;
         try {
           const supabase = createBrowserSupabaseClient();
           await supabase.auth.signOut({ scope: 'local' });
@@ -673,49 +671,79 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
           if (!clientSignInError && clientSignInData.session) {
             invalidateTokenCache();
             setBootstrapAuthToken(clientSignInData.session.access_token);
-            window.location.href = returnUrl || '/dashboard';
-            return;
+            signedInJwt = clientSignInData.session.access_token;
           }
         } catch {
           // Best-effort cleanup of stale local auth state.
         }
 
         // Fallback: server action sign-in (runtime env on server)
-        invalidateTokenCache();
-        setBootstrapAuthToken(null);
+        if (!signedInJwt) {
+          invalidateTokenCache();
+          setBootstrapAuthToken(null);
 
-        const formData = new FormData();
-        formData.set('email', email);
-        formData.set('password', password);
-        if (returnUrl) formData.set('returnUrl', returnUrl);
+          const formData = new FormData();
+          formData.set('email', email);
+          formData.set('password', password);
+          if (returnUrl) formData.set('returnUrl', returnUrl);
 
-        const result = await selfHostedSignIn(null, formData);
+          const result = await selfHostedSignIn(null, formData);
 
-        if (result.message) {
-          setErrorMessage(result.message);
-          setPending(false);
-          return;
-        }
+          if (result.message) {
+            setErrorMessage(result.message);
+            setPending(false);
+            return;
+          }
 
-        // Ensure browser session is established immediately in addition to
-        // server-set cookies. This avoids rare cases where middleware doesn't
-        // see a fresh session on the first navigation after login.
-        if (result.accessToken && result.refreshToken) {
-          try {
-            const supabase = createBrowserSupabaseClient();
-            await supabase.auth.setSession({
-              access_token: result.accessToken,
-              refresh_token: result.refreshToken,
-            });
-          } catch {
-            // Fallback to server cookies + full reload below.
+          // Ensure browser session is established immediately in addition to
+          // server-set cookies. This avoids rare cases where middleware doesn't
+          // see a fresh session on the first navigation after login.
+          if (result.accessToken && result.refreshToken) {
+            try {
+              const supabase = createBrowserSupabaseClient();
+              await supabase.auth.setSession({
+                access_token: result.accessToken,
+                refresh_token: result.refreshToken,
+              });
+              signedInJwt = result.accessToken;
+            } catch {
+              // Fallback to server cookies + full reload below.
+            }
+          }
+
+          // If we still don't have a JWT, fall back to the original redirect
+          if (!signedInJwt) {
+            window.location.href = result.redirectTo || returnUrl || '/dashboard';
+            return;
           }
         }
 
-        // Hard redirect — router.push() does a soft navigation that doesn't
-        // re-run middleware, so the auth cookie set by the server action
-        // wouldn't be picked up. A full page load ensures middleware sees it.
-        window.location.href = result.redirectTo || returnUrl || '/dashboard';
+        // Check setup status BEFORE redirecting. If setup wizard is not
+        // complete, show the wizard directly — avoids the dashboard → /auth
+        // redirect loop that causes session loss.
+        try {
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+          const setupRes = await fetch(`${backendUrl}/setup/setup-status`, {
+            headers: { 'Authorization': `Bearer ${signedInJwt}` },
+          });
+          if (setupRes.ok) {
+            const setupData = await setupRes.json();
+            if (!setupData.complete) {
+              // Setup not complete — show wizard step 2 immediately.
+              // Also persist the step to the backend DB.
+              setWizardStep(2);
+              onWizardStepChange?.(2);
+              setPending(false);
+              return;
+            }
+          }
+        } catch {
+          // Setup check failed — fall through to normal redirect
+        }
+
+        // Setup complete (or check failed) — hard redirect to dashboard.
+        // Hard redirect ensures middleware picks up the auth cookie.
+        window.location.href = returnUrl || '/dashboard';
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'An unexpected error occurred');
@@ -724,7 +752,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   };
 
   // ── Step 3: Tool API keys ──
-   if (isInstaller && wizardStep === 3) {
+   if (wizardStep === 3) {
     return (
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-5">
@@ -747,7 +775,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   }
 
   // ── Step 2: Provider setup ──
-  if (isInstaller && wizardStep === 2) {
+  if (wizardStep === 2) {
     // ── Sub-state: multiple providers, user hasn't chosen yet ──
     if (hasMultipleProviders && !chosenProvider) {
       return (

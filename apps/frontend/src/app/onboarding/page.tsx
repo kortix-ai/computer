@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 
 import { useRouter } from 'next/navigation';
 
-import { LogOut } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 
 import {
@@ -196,37 +195,6 @@ export default function OnboardingPage() {
       // best effort
     }
   }, [refetchSandbox]);
-
-  // ── Guard: if setup wizard is still in progress, redirect back to /auth ──
-  useEffect(() => {
-    // Fast path: sessionStorage hint
-    const wizardStep = sessionStorage.getItem('setup_wizard_step');
-    if (wizardStep && parseInt(wizardStep, 10) > 1) {
-      router.replace('/auth?setup=incomplete');
-      return;
-    }
-    // Skip backend check if we already know setup is complete
-    if (sessionStorage.getItem('setup_complete') === 'true') return;
-
-    // Check backend source of truth
-    const checkSetup = async () => {
-      try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
-        const res = await authenticatedFetch(`${backendUrl}/setup/setup-status`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.complete) {
-            router.replace('/auth?setup=incomplete');
-            return;
-          }
-          sessionStorage.setItem('setup_complete', 'true');
-        }
-      } catch {
-        // Backend unreachable — allow through, onboarding will handle it
-      }
-    };
-    checkSetup();
-  }, [router]);
 
   // ── Query param controls ───────────────────────────────────────
   // ?skip_onboarding → mark complete & go to dashboard
@@ -701,7 +669,14 @@ export default function OnboardingPage() {
               ) : (
                 <div className="flex flex-col items-center gap-3">
                   <LoadingDots />
-                  <p className="text-xs text-muted-foreground">Starting your workspace…</p>
+                  {isHetznerOnboarding ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">{getHetznerProvisioningMessage(onboardingWaitSec)}</p>
+                      <p className="text-[11px] text-muted-foreground/70">Provisioning Hetzner sandbox... Connected when health is ready.</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Setting up your workspace…</p>
+                  )}
                 </div>
               )}
             </div>
@@ -736,13 +711,12 @@ export default function OnboardingPage() {
 
       </AnimatePresence>
 
-      {/* Sign out (cloud only — onboarding/session phases where inline button isn't shown) */}
-      {(phase === 'onboarding') && (
+      {/* Sign out (cloud only) */}
+      {(phase === 'login' || phase === 'onboarding') && (
         <button
           onClick={() => signOut()}
-          className="absolute bottom-5 left-5 z-30 flex items-center gap-2 px-3.5 py-2 rounded-full text-[12px] font-medium text-foreground/50 hover:text-foreground/80 bg-foreground/[0.06] hover:bg-foreground/[0.12] backdrop-blur-md border border-foreground/[0.08] transition-all duration-200"
+          className="absolute bottom-4 left-4 z-30 px-3 py-1 text-[10px] text-foreground/20 hover:text-foreground/40 transition-colors"
         >
-          <LogOut className="h-3.5 w-3.5" />
           Sign out
         </button>
       )}

@@ -392,27 +392,19 @@ export default function DashboardLayoutContent({
 			return;
 		}
 
-		// If setup wizard is actively in progress (sessionStorage hint), redirect immediately.
-		const wizardStep = sessionStorage.getItem("setup_wizard_step");
-		if (wizardStep && parseInt(wizardStep, 10) > 1) {
-			router.replace("/auth?setup=incomplete");
-			return;
-		}
-
 		// Fast path: if we've already confirmed onboarding is complete this browser
-		// session, skip all network calls. Onboarding complete implies setup complete.
-		const cachedOnboarding = sessionStorage.getItem("onboarding_complete");
-		if (cachedOnboarding === "true") {
+		// session, skip the network call entirely. This eliminates ~50 requests to
+		// /env/ONBOARDING_COMPLETE per session.
+		const cached = sessionStorage.getItem("onboarding_complete");
+		if (cached === "true") {
 			setOnboardingChecked(true);
 			return;
 		}
 
-		const checkSetupAndOnboarding = async () => {
+		const checkOnboarding = async () => {
 			const { authenticatedFetch } = await import("@/lib/auth-token");
 
-			// 1. Check onboarding completion first (sandbox env var).
-			//    If onboarding is already done, the user definitely passed setup too
-			//    (even if setup_complete_at is null for pre-existing users).
+			// 1. Check onboarding first — if complete, setup is implicitly done too.
 			const instanceUrl = useServerStore.getState().getActiveServerUrl();
 
 			// Sandbox not registered yet (cloud mode race) — wait for the store
@@ -425,54 +417,45 @@ export default function DashboardLayoutContent({
 				if (res.ok) {
 					const data = await res.json();
 					if (data.ONBOARDING_COMPLETE === "true") {
-						// Onboarding done → setup is implicitly done too
+						// Onboarding complete — setup is implicitly done
 						sessionStorage.setItem("onboarding_complete", "true");
-						sessionStorage.setItem("setup_complete", "true");
 						setOnboardingChecked(true);
 						return;
 					}
 				} else if (res.status >= 500) {
 					// Server error — treat as not onboarded
-					const { isBillingEnabled } = await import("@/lib/config");
-					router.replace(isBillingEnabled() ? "/subscription" : "/onboarding");
+					router.replace("/onboarding");
 					return;
 				}
 			} catch {
-				// Sandbox not reachable — if billing enabled, user likely has no
-				// subscription/sandbox yet, send them to pick a plan first.
-				const { isBillingEnabled } = await import("@/lib/config");
-				if (isBillingEnabled()) {
-					router.replace("/subscription");
-				} else {
-					router.replace("/onboarding");
-				}
+				// Sandbox not reachable — treat as not onboarded
+				router.replace("/onboarding");
 				return;
 			}
 
-			// 2. Onboarding is NOT complete — check if setup wizard was completed (DB-backed).
-			//    This catches the case where user refreshed mid-setup before onboarding.
-			if (sessionStorage.getItem("setup_complete") !== "true") {
-				try {
-					const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8008/v1";
-					const setupRes = await authenticatedFetch(`${backendUrl}/setup/setup-status`, undefined, { retryOnAuthError: false });
-					if (setupRes.ok) {
-						const setupData = await setupRes.json();
-						if (!setupData.complete) {
-							// Setup not done — send back to auth wizard
-							router.replace("/auth?setup=incomplete");
-							return;
-						}
-						sessionStorage.setItem("setup_complete", "true");
+			// 2. Onboarding NOT complete — check if setup wizard was done (DB).
+			//    If setup is also not done, redirect to /auth to show the wizard.
+			//    The auth page will fetch the wizard step from the backend directly.
+			try {
+				const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8008/v1";
+				const setupRes = await authenticatedFetch(`${backendUrl}/setup/setup-status`, undefined, { retryOnAuthError: false });
+				if (setupRes.ok) {
+					const setupData = await setupRes.json();
+					if (!setupData.complete) {
+						// Setup not done — redirect to auth; the auth page
+						// fetches the wizard step from the backend DB directly
+						router.replace("/auth");
+						return;
 					}
-				} catch {
-					// Backend unreachable — fall through to onboarding redirect
 				}
+			} catch {
+				// Setup check failed — fall through to onboarding
 			}
 
-			// 3. Setup is complete but onboarding is not — go to onboarding
+			// 3. Setup done but onboarding not — go to onboarding
 			router.replace("/onboarding");
 		};
-		checkSetupAndOnboarding();
+		checkOnboarding();
 	}, [router, activeServerId, serverVersion]);
 
 	const isMaintenanceActive = (() => {

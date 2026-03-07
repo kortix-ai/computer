@@ -763,43 +763,74 @@ import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/clie
 function SelfHostedLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isLoading, supabase } = useAuth();
+  const { user, isLoading } = useAuth();
   const { installed, loading: statusLoading, sandboxProviders, defaultProvider } = useInstallStatus();
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
-  const [validatingSession, setValidatingSession] = useState(false);
   const [phase, setPhase] = useState<'lock' | 'form'>('lock');
-  const WIZARD_STEP_KEY = 'setup_wizard_step';
-  const persistedStep = typeof window !== 'undefined'
-    ? parseInt(sessionStorage.getItem(WIZARD_STEP_KEY) || '1', 10)
-    : 1;
-  const wizardStepRef = useRef(persistedStep);
-  const [wizardStep, setWizardStep] = useState(persistedStep);
+  const [wizardStepLoading, setWizardStepLoading] = useState(true);
+  const wizardStepRef = useRef(1);
+  const [wizardStep, setWizardStep] = useState(1);
   /** Whether sandbox status has been checked on page load (for authenticated returning users). */
   const [sandboxChecked, setSandboxChecked] = useState(false);
+
+  // Fetch wizard step from the backend once the user is authenticated.
+  // This replaces the old sessionStorage approach so the step survives
+  // across login/logout cycles and browser tab closes.
+  useEffect(() => {
+    if (isLoading || !user) {
+      // Not logged in yet — default to step 1, done loading
+      setWizardStepLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const fetchStep = async () => {
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const supabaseClient = createBrowserSupabaseClient();
+        const { data } = await supabaseClient.auth.getSession();
+        const jwt = data.session?.access_token;
+        if (!jwt) { if (!cancelled) setWizardStepLoading(false); return; }
+        const res = await fetch(`${backendUrl}/setup/setup-wizard-step`, {
+          headers: { 'Authorization': `Bearer ${jwt}` },
+        });
+        if (!cancelled && res.ok) {
+          const { step } = await res.json();
+          if (step > 0) {
+            wizardStepRef.current = step;
+            setWizardStep(step);
+          }
+        }
+      } catch {
+        // Failed to fetch — default to step 1
+      }
+      if (!cancelled) setWizardStepLoading(false);
+    };
+    fetchStep();
+    return () => { cancelled = true; };
+  }, [isLoading, user]);
+
   const handleWizardStepChange = useCallback((step: number) => {
     wizardStepRef.current = step;
     setWizardStep(step);
-    if (step > 1) {
-      sessionStorage.setItem(WIZARD_STEP_KEY, String(step));
-    } else {
-      sessionStorage.removeItem(WIZARD_STEP_KEY);
-    }
+    // Persist step to backend (fire-and-forget)
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const supabaseClient = createBrowserSupabaseClient();
+    supabaseClient.auth.getSession().then(({ data }) => {
+      const jwt = data.session?.access_token;
+      if (!jwt) return;
+      fetch(`${backendUrl}/setup/setup-wizard-step`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step }),
+      }).catch(() => {});
+    });
   }, []);
 
   // For authenticated users with an existing install, check if sandbox is
   // actually ready before redirecting. If not ready, drop them into wizard step 2.
   useEffect(() => {
-    if (isLoading || !user || installed !== true || sandboxChecked) return;
+    if (isLoading || wizardStepLoading || !user || installed !== true || sandboxChecked) return;
     if (wizardStepRef.current > 1) { setSandboxChecked(true); return; }
-
-    // If redirected here with ?setup=incomplete, skip async checks and show wizard
-    if (searchParams.get('setup') === 'incomplete') {
-      wizardStepRef.current = 2;
-      setWizardStep(2);
-      sessionStorage.setItem(WIZARD_STEP_KEY, '2');
-      setSandboxChecked(true);
-      return;
-    }
 
     const checkSandboxReady = async () => {
       try {
@@ -854,9 +885,7 @@ function SelfHostedLoginContent() {
 
           if (!setupComplete) {
             // Setup wizard not complete — drop to step 2 (provider setup)
-            wizardStepRef.current = 2;
-            setWizardStep(2);
-            sessionStorage.setItem(WIZARD_STEP_KEY, '2');
+            handleWizardStepChange(2);
             setSandboxChecked(true);
             return;
           }
@@ -864,9 +893,7 @@ function SelfHostedLoginContent() {
           setSandboxChecked(true);
         } else {
           // Sandbox not ready (error, none, pulling, etc.) — go to wizard step 2
-          wizardStepRef.current = 2;
-          setWizardStep(2);
-          sessionStorage.setItem(WIZARD_STEP_KEY, '2');
+          handleWizardStepChange(2);
           setSandboxChecked(true);
         }
       } catch {
@@ -875,23 +902,17 @@ function SelfHostedLoginContent() {
       }
     };
     checkSandboxReady();
-  }, [isLoading, user, installed, sandboxChecked, searchParams]);
+  }, [isLoading, wizardStepLoading, user, installed, sandboxChecked, handleWizardStepChange]);
 
   useEffect(() => {
-    if (isLoading || !user || !sandboxChecked) return;
+    if (isLoading || wizardStepLoading || !user || !sandboxChecked) return;
     // Fresh self-hosted install: do not auto-redirect to onboarding yet.
     // The installer wizard must complete provider + keys first.
     if (installed === false) return;
     if (wizardStepRef.current > 1) return;
-    const redirectParam = searchParams.get('redirect');
     const defaultDest = isBillingEnabled() ? '/subscription' : '/onboarding';
-    if (!redirectParam) { router.push(returnUrl || defaultDest); return; }
-    setValidatingSession(true);
-    supabase.auth.getUser().then(({ error }) => {
-      if (error) supabase.auth.signOut().finally(() => setValidatingSession(false));
-      else router.push(returnUrl || defaultDest);
-    });
-  }, [user, isLoading, installed, returnUrl, searchParams, supabase, router, wizardStep, sandboxChecked]);
+    router.push(returnUrl || defaultDest);
+  }, [user, isLoading, wizardStepLoading, installed, returnUrl, router, wizardStep, sandboxChecked]);
 
   // Keyboard controls: Enter/Space opens form, Escape closes it
   useEffect(() => {
@@ -907,7 +928,7 @@ function SelfHostedLoginContent() {
     return () => window.removeEventListener('keydown', handler);
   }, [phase]);
 
-  if (isLoading || validatingSession || statusLoading || (!sandboxChecked && installed !== false && user) || (sandboxChecked && installed !== false && user && wizardStepRef.current <= 1)) {
+  if (isLoading || wizardStepLoading || statusLoading || (!sandboxChecked && installed !== false && user) || (sandboxChecked && installed !== false && user && wizardStepRef.current <= 1)) {
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center">
         <KortixLoader size="medium" />
