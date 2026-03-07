@@ -122,6 +122,10 @@ export function createCloudSandboxRouter(
 
   router.post('/', async (c) => {
     const userId = c.get('userId');
+    let stripeSubscriptionItemId: string | null = null;
+    let createdSandboxId: string | null = null;
+    let createdExternalId: string | null = null;
+    let providerUsed: ProviderName | null = null;
 
     try {
       const body = await c.req.json().catch(() => ({}));
@@ -164,8 +168,6 @@ export function createCloudSandboxRouter(
 
       // For additional (non-included) Hetzner instances on paid plans,
       // create a Stripe subscription item with dynamic pricing.
-      let stripeSubscriptionItemId: string | null = null;
-
       if (!isIncluded && providerName === 'hetzner' && config.KORTIX_BILLING_INTERNAL_ENABLED) {
         const { getCreditAccount } = await import('../../billing/repositories/credit-accounts');
         const { getCustomerByAccountId } = await import('../../billing/repositories/customers');
@@ -242,6 +244,7 @@ export function createCloudSandboxRouter(
           stripeSubscriptionItemId,
         })
         .returning();
+      createdSandboxId = sandbox.sandboxId;
 
       // Create a sandbox-managed API key (kortix_sb_)
       const sandboxKey = await createApiKey({
@@ -261,6 +264,8 @@ export function createCloudSandboxRouter(
           KORTIX_TOKEN: sandboxKey.secretKey,
         },
       });
+      createdExternalId = result.externalId;
+      providerUsed = providerName;
 
       // Update sandbox row with provider details.
       const [updated] = await db
@@ -286,6 +291,55 @@ export function createCloudSandboxRouter(
         201,
       );
     } catch (err) {
+      // Best-effort rollback for additional-instance Stripe subscription item
+      if (stripeSubscriptionItemId) {
+        try {
+          const { getStripe } = await import('../../shared/stripe');
+          const stripe = getStripe();
+          await stripe.subscriptionItems.del(stripeSubscriptionItemId);
+          console.log(`[PLATFORM] Rolled back Stripe sub item ${stripeSubscriptionItemId} after sandbox create failure`);
+        } catch (rollbackErr) {
+          console.error(`[PLATFORM] Failed to roll back Stripe sub item ${stripeSubscriptionItemId}:`, rollbackErr);
+        }
+      }
+
+      // Best-effort cleanup for partially provisioned server
+      if (providerUsed && createdExternalId) {
+        try {
+          const provider = getProvider(providerUsed);
+          await provider.remove(createdExternalId);
+          console.log(`[PLATFORM] Rolled back provider resource ${createdExternalId} after sandbox create failure`);
+        } catch (cleanupErr) {
+          console.error(`[PLATFORM] Failed to clean up provider resource ${createdExternalId}:`, cleanupErr);
+        }
+      }
+
+      // Archive sandbox row if it was created but provisioning failed
+      if (createdSandboxId) {
+        try {
+          await db
+            .update(sandboxes)
+            .set({ status: 'archived', updatedAt: new Date() })
+            .where(eq(sandboxes.sandboxId, createdSandboxId));
+        } catch (archiveErr) {
+          console.error(`[PLATFORM] Failed to archive failed sandbox ${createdSandboxId}:`, archiveErr);
+        }
+      }
+
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('Hetzner API POST /servers returned 422')) {
+        console.error('[SANDBOX-CLOUD] create validation error:', err);
+        return c.json(
+          {
+            success: false,
+            error: message.includes('image disk is bigger than server type disk')
+              ? 'Selected server type is incompatible with the current snapshot size. Choose a larger instance.'
+              : 'Hetzner rejected server creation for this configuration.',
+          },
+          400,
+        );
+      }
+
       console.error('[SANDBOX-CLOUD] create error:', err);
       return c.json({ success: false, error: 'Failed to create sandbox' }, 500);
     }

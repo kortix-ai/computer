@@ -74,6 +74,51 @@ interface HetznerServer {
   labels: Record<string, string>;
 }
 
+interface HetznerImage {
+  id: number;
+  architecture: 'x86' | 'arm' | string;
+  disk_size: number;
+}
+
+let snapshotRequirementsCache:
+  | { snapshotId: string; diskSize: number; architecture: string; fetchedAt: number }
+  | null = null;
+const SNAPSHOT_REQUIREMENTS_TTL_MS = 5 * 60 * 1000;
+
+async function getSnapshotRequirements(): Promise<{ diskSize: number; architecture: string }> {
+  const snapshotId = config.HETZNER_SNAPSHOT_ID;
+  if (!snapshotId) {
+    throw new Error('HETZNER_SNAPSHOT_ID is not configured');
+  }
+
+  const now = Date.now();
+  if (
+    snapshotRequirementsCache &&
+    snapshotRequirementsCache.snapshotId === snapshotId &&
+    now - snapshotRequirementsCache.fetchedAt < SNAPSHOT_REQUIREMENTS_TTL_MS
+  ) {
+    return {
+      diskSize: snapshotRequirementsCache.diskSize,
+      architecture: snapshotRequirementsCache.architecture,
+    };
+  }
+
+  const data = await hetznerFetch<{ image: HetznerImage }>(`/images/${snapshotId}`);
+  const requirements = {
+    diskSize: data.image.disk_size,
+    architecture: data.image.architecture,
+  };
+
+  snapshotRequirementsCache = {
+    snapshotId,
+    diskSize: requirements.diskSize,
+    architecture: requirements.architecture,
+    fetchedAt: now,
+  };
+
+  return requirements;
+}
+
 // ─── API Helper ─────────────────────────────────────────────────────────────
 
 async function hetznerFetch<T = any>(
@@ -128,11 +173,18 @@ export async function listServerTypes(
   location?: string,
 ): Promise<ServerTypeWithPricing[]> {
   const loc = location || config.HETZNER_DEFAULT_LOCATION;
+  const { diskSize: minDiskSize, architecture: snapshotArchitecture } = await getSnapshotRequirements();
   const data = await hetznerFetch<{ server_types: HetznerServerType[] }>('/server_types?per_page=50');
 
   return data.server_types
     .filter((st) => ALLOWED_SERVER_TYPE_PREFIXES.some((p) => st.name.startsWith(p)))
     .filter((st) => st.prices.some((p) => p.location === loc))
+    .filter((st) => st.disk >= minDiskSize)
+    .filter((st) => {
+      if (snapshotArchitecture === 'x86') return st.architecture === 'x86';
+      if (snapshotArchitecture === 'arm') return st.architecture === 'arm';
+      return true;
+    })
     .map((st) => {
       const locPrice = st.prices.find((p) => p.location === loc)!;
       const monthly = parseFloat(locPrice?.price_monthly?.gross || '0');
