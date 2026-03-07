@@ -407,9 +407,15 @@ export default function DashboardLayoutContent({
 			// 1. Check onboarding first — if complete, setup is implicitly done too.
 			const instanceUrl = useServerStore.getState().getActiveServerUrl();
 
-			// Sandbox not registered yet (cloud mode race) — wait for the store
-			// to update (activeServerId/serverVersion change) before retrying.
-			if (!instanceUrl) return;
+			// Sandbox not registered yet, or platform/bootstrap requests failed.
+			// Do not deadlock the whole dashboard behind the skeleton while waiting
+			// for a server URL that may never arrive. Routes like Integrations and
+			// Settings should still render, and this effect will re-run if a sandbox
+			// is registered later.
+			if (!instanceUrl) {
+				setOnboardingChecked(true);
+				return;
+			}
 
 			try {
 				const res = await authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, undefined, { retryOnAuthError: false });
