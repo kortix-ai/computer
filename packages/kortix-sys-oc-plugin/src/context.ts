@@ -1,8 +1,8 @@
 /**
  * Memory Context Formatter
  *
- * Generates the <memory-context> block injected as a synthetic user message
- * at position 1 (cache-safe — system prompt untouched).
+ * Generates the <memory-context> block appended at the prompt tail so it stays
+ * out of the stable cached prefix.
  *
  * Three sections:
  *   1. Recent observations table — compact index of tool execution history

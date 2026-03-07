@@ -109,7 +109,7 @@ mem_save(text: string, type?: "episodic" | "semantic" | "procedural", tags?: str
 
 ## Cache Safety
 
-The LTM block is injected into the **latest user message** via `experimental.chat.messages.transform`, NOT into the system prompt. This preserves the KV cache:
+The LTM block is appended to the **end of the latest user message** via `experimental.chat.messages.transform`, NOT into the system prompt. This preserves the KV cache:
 
 - System prompt → **stable, cached**
 - Historical turns → **stable, cached**

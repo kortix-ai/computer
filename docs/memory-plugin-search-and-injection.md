@@ -295,7 +295,7 @@ unifiedSearch("docker deploy", { limit: 15, source: "both" })
 
 ### What gets injected
 
-On **every LLM call**, the `experimental.chat.messages.transform` hook prepends a block into the **last user message**. Two parts:
+On **every LLM call**, the `experimental.chat.messages.transform` hook appends a block to the **end of the latest user message**. Two parts:
 
 #### Part A: Session Context
 
@@ -535,7 +535,7 @@ All 6 OpenCode plugin hooks used by `index.ts`:
 | `tool.execute.after` | After any tool completes | Correlates args → extracts observation → SQLite + LSS |
 | `chat.message` | Each user message | Tracks session switch, increments prompt count, captures model |
 | `event` | Session lifecycle events | `session.created` → init session; `session.deleted` → mark complete |
-| `experimental.chat.messages.transform` | Every LLM call | Prepends `<session_context>` + `<long-term-memory>` to last user msg |
+| `experimental.chat.messages.transform` | Every LLM call | Appends `<session_context>` + `<long-term-memory>` at the end of the latest user msg |
 | `experimental.session.compacting` | Context window compression | Runs LLM consolidation (obs → LTM), injects LTM into compaction context |
 
 ### State tracked across hooks
