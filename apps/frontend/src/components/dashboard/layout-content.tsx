@@ -395,7 +395,7 @@ export default function DashboardLayoutContent({
 		// If setup wizard is actively in progress (sessionStorage hint), redirect immediately.
 		const wizardStep = sessionStorage.getItem("setup_wizard_step");
 		if (wizardStep && parseInt(wizardStep, 10) > 1) {
-			router.replace("/auth");
+			router.replace("/auth?setup=incomplete");
 			return;
 		}
 
@@ -459,7 +459,7 @@ export default function DashboardLayoutContent({
 						const setupData = await setupRes.json();
 						if (!setupData.complete) {
 							// Setup not done — send back to auth wizard
-							router.replace("/auth");
+							router.replace("/auth?setup=incomplete");
 							return;
 						}
 						sessionStorage.setItem("setup_complete", "true");

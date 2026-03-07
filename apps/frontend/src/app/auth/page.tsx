@@ -792,6 +792,15 @@ function SelfHostedLoginContent() {
     if (isLoading || !user || installed !== true || sandboxChecked) return;
     if (wizardStepRef.current > 1) { setSandboxChecked(true); return; }
 
+    // If redirected here with ?setup=incomplete, skip async checks and show wizard
+    if (searchParams.get('setup') === 'incomplete') {
+      wizardStepRef.current = 2;
+      setWizardStep(2);
+      sessionStorage.setItem(WIZARD_STEP_KEY, '2');
+      setSandboxChecked(true);
+      return;
+    }
+
     const checkSandboxReady = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
@@ -827,26 +836,31 @@ function SelfHostedLoginContent() {
             // Onboarding check failed — fall through to setup check
           }
 
-          // Not onboarded yet — check DB setup status
+          // Not onboarded yet — check DB setup status.
+          // If check fails for any reason, default to showing the wizard
+          // (safer than redirecting to a broken dashboard).
+          let setupComplete = false;
           try {
             const setupRes = await fetch(`${backendUrl}/setup/setup-status`, {
               headers: { 'Authorization': `Bearer ${jwt}` },
             });
             if (setupRes.ok) {
               const setupData = await setupRes.json();
-              if (!setupData.complete) {
-                // Setup wizard not complete — drop to step 2 (provider setup)
-                wizardStepRef.current = 2;
-                setWizardStep(2);
-                sessionStorage.setItem(WIZARD_STEP_KEY, '2');
-                setSandboxChecked(true);
-                return;
-              }
-              sessionStorage.setItem('setup_complete', 'true');
+              setupComplete = !!setupData.complete;
             }
           } catch {
-            // Setup status check failed — allow redirect
+            // Setup status check failed — treat as incomplete
           }
+
+          if (!setupComplete) {
+            // Setup wizard not complete — drop to step 2 (provider setup)
+            wizardStepRef.current = 2;
+            setWizardStep(2);
+            sessionStorage.setItem(WIZARD_STEP_KEY, '2');
+            setSandboxChecked(true);
+            return;
+          }
+          sessionStorage.setItem('setup_complete', 'true');
           setSandboxChecked(true);
         } else {
           // Sandbox not ready (error, none, pulling, etc.) — go to wizard step 2
@@ -861,7 +875,7 @@ function SelfHostedLoginContent() {
       }
     };
     checkSandboxReady();
-  }, [isLoading, user, installed, sandboxChecked]);
+  }, [isLoading, user, installed, sandboxChecked, searchParams]);
 
   useEffect(() => {
     if (isLoading || !user || !sandboxChecked) return;

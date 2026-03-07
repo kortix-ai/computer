@@ -202,7 +202,7 @@ export default function OnboardingPage() {
     // Fast path: sessionStorage hint
     const wizardStep = sessionStorage.getItem('setup_wizard_step');
     if (wizardStep && parseInt(wizardStep, 10) > 1) {
-      router.replace('/auth');
+      router.replace('/auth?setup=incomplete');
       return;
     }
     // Skip backend check if we already know setup is complete
@@ -216,7 +216,7 @@ export default function OnboardingPage() {
         if (res.ok) {
           const data = await res.json();
           if (!data.complete) {
-            router.replace('/auth');
+            router.replace('/auth?setup=incomplete');
             return;
           }
           sessionStorage.setItem('setup_complete', 'true');
