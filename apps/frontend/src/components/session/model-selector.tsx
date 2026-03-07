@@ -35,40 +35,14 @@ import { useModelStore } from '@/hooks/opencode/use-model-store';
 import type { FlatModel } from './session-chat-input';
 import type { ProviderListResponse } from '@/hooks/opencode/use-opencode-sessions';
 import { ConnectProviderContent } from '@/components/providers/connect-provider-content';
+import {
+  MODEL_SELECTOR_PROVIDER_IDS,
+  PROVIDER_LABELS,
+  ProviderLogo,
+} from '@/components/providers/provider-branding';
 
 // Re-export for consumers
 export { ConnectProviderContent } from '@/components/providers/connect-provider-content';
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const POPULAR_PROVIDERS = [
-  'kortix',
-  'opencode',
-  'anthropic',
-  'github-copilot',
-  'openai',
-  'google',
-  'openrouter',
-  'vercel',
-];
-
-const PROVIDER_LABELS: Record<string, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  google: 'Google',
-  xai: 'xAI',
-  moonshotai: 'Moonshot',
-  'moonshotai-cn': 'Moonshot',
-  opencode: 'OpenCode',
-  kortix: 'Kortix',
-  firmware: 'Firmware',
-  bedrock: 'AWS Bedrock',
-  openrouter: 'OpenRouter',
-  'github-copilot': 'GitHub Copilot',
-  vercel: 'Vercel',
-};
 
 // =============================================================================
 // Helpers
@@ -178,8 +152,8 @@ export function ManageModelsDialog({
     }
     const entries = Array.from(groups.entries());
     entries.sort((a, b) => {
-      const ai = POPULAR_PROVIDERS.indexOf(a[0]);
-      const bi = POPULAR_PROVIDERS.indexOf(b[0]);
+      const ai = MODEL_SELECTOR_PROVIDER_IDS.indexOf(a[0]);
+      const bi = MODEL_SELECTOR_PROVIDER_IDS.indexOf(b[0]);
       if (ai >= 0 && bi < 0) return -1;
       if (ai < 0 && bi >= 0) return 1;
       if (ai >= 0 && bi >= 0) return ai - bi;
@@ -355,8 +329,8 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
     }
     const entries = Array.from(groups.values());
     entries.sort((a, b) => {
-      const ai = POPULAR_PROVIDERS.indexOf(a.providerID);
-      const bi = POPULAR_PROVIDERS.indexOf(b.providerID);
+      const ai = MODEL_SELECTOR_PROVIDER_IDS.indexOf(a.providerID);
+      const bi = MODEL_SELECTOR_PROVIDER_IDS.indexOf(b.providerID);
       if (ai >= 0 && bi < 0) return -1;
       if (ai < 0 && bi >= 0) return 1;
       if (ai >= 0 && bi >= 0) return ai - bi;
@@ -414,10 +388,13 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                className={cn(
+                  "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200 cursor-pointer",
+                  open && "bg-muted text-foreground",
+                )}
               >
                 <span className="truncate max-w-[120px]">{displayName}</span>
-                <ChevronUp className={cn('size-3 transition-transform', open && 'rotate-180')} />
+                <ChevronUp className={cn('size-3 opacity-50 transition-transform duration-200', open && 'rotate-180')} />
               </button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -428,13 +405,13 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
           side="top"
           align="start"
           sideOffset={8}
-          className="w-[280px] p-0 overflow-hidden rounded-xl border"
+          className="w-[320px] p-0 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-background shadow-xl"
         >
-          <div className="flex flex-col h-[320px] overflow-hidden">
-            {/* Search bar with action buttons */}
-            <div className="flex items-center gap-1 p-2 border-b border-border/40 flex-shrink-0">
+          <div className="flex flex-col max-h-[380px] overflow-hidden">
+            {/* Search bar */}
+            <div className="flex items-center gap-2 p-3 border-b border-zinc-100 dark:border-zinc-800 flex-shrink-0">
               <div className="relative flex-1">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <input
                   ref={searchRef}
                   type="text"
@@ -442,19 +419,19 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full h-7 pl-7 pr-6 rounded-md text-xs bg-transparent focus:outline-none placeholder:text-muted-foreground/50 transition-colors"
+                  className="w-full h-9 pl-9 pr-8 rounded-lg text-sm bg-zinc-50 dark:bg-zinc-900 border-0 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 placeholder:text-muted-foreground/50 transition-colors"
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch('')}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0">
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -463,9 +440,9 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                         setOpen(false);
                         setConnectProviderOpen(true);
                       }}
-                      className="size-7 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                      className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <Plus className="h-4 w-4" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">Connect provider</TooltipContent>
@@ -478,9 +455,9 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                         setOpen(false);
                         setManageModelsOpen(true);
                       }}
-                      className="size-7 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                      className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      <SlidersHorizontal className="h-4 w-4" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">Manage models</TooltipContent>
@@ -489,12 +466,20 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
             </div>
 
             {/* Model list */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-1">
+            <div className="flex-1 min-h-0 overflow-y-auto p-2">
               {grouped.length > 0 ? (
                 grouped.map((group) => (
-                  <div key={group.providerID}>
-                    <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-2 pt-2 pb-0.5">
-                      {group.providerName}
+                  <div key={group.providerID} className="mb-3 last:mb-0">
+                    <div className="flex items-center gap-2 px-2 pb-2">
+                      <ProviderLogo providerID={group.providerID} name={group.providerName} size="small" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+                          {PROVIDER_LABELS[group.providerID] || group.providerName}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {group.models.length} {group.models.length === 1 ? 'model' : 'models'}
+                        </div>
+                      </div>
                     </div>
                     {group.models.map((model) => {
                       flatIndex++;
@@ -512,19 +497,24 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                             <button
                               type="button"
                               className={cn(
-                                'w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left text-[13px] transition-colors cursor-pointer',
-                                (isHighlighted || isSelected) ? 'bg-accent' : 'hover:bg-accent/50',
+                                'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-colors cursor-pointer',
+                                (isHighlighted || isSelected) ? 'bg-zinc-100 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
                               )}
                               onClick={() => handleSelect(model)}
                               onMouseEnter={() => setHighlightedIndex(idx)}
                             >
-                              <span className="truncate flex-1">{model.modelName}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-medium">{model.modelName}</div>
+                                <div className="text-[11px] text-muted-foreground/60 truncate mt-0.5">
+                                  {model.modelID}
+                                </div>
+                              </div>
                               {isFree && <Tag variant="free">Free</Tag>}
-                              {isLatestModel && <Tag variant="latest">Latest</Tag>}
-                              {isSelected && <Check className="h-3 w-3 text-foreground flex-shrink-0" />}
+                              {isLatestModel && <Tag variant="latest">New</Tag>}
+                              {isSelected && <Check className="h-4 w-4 text-foreground flex-shrink-0" />}
                             </button>
                           </TooltipTrigger>
-                          <TooltipContent side="right" align="start" sideOffset={12} className="p-2">
+                          <TooltipContent side="right" align="start" sideOffset={12} className="p-3">
                             <ModelTooltipContent model={model} isLatest={isLatestModel} isFree={isFree} />
                           </TooltipContent>
                         </Tooltip>
