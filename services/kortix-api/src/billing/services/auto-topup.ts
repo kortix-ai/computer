@@ -138,6 +138,9 @@ async function tryAutoTopup(accountId: string): Promise<void> {
 
   // Create an off-session payment intent using customer's default payment method
   try {
+    const chargeWindow = Math.floor(Date.now() / CHARGE_COOLDOWN_MS);
+    const idempotencyKey = `auto-topup:${accountId}:${amount.toFixed(2)}:${chargeWindow}`;
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // cents
       currency: 'usd',
@@ -151,6 +154,8 @@ async function tryAutoTopup(accountId: string): Promise<void> {
         threshold: String(threshold),
         amount: String(amount),
       },
+    }, {
+      idempotencyKey,
     });
 
     if (paymentIntent.status === 'succeeded') {

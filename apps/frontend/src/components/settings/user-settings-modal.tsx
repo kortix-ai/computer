@@ -1201,7 +1201,7 @@ function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRe
                     </div>
                     <div>
                         <label className="text-xs text-muted-foreground block mb-1">
-                            Reload credit balance to (minimum $15)
+                            Reload amount (minimum $15)
                         </label>
                         <div className="flex items-center gap-1">
                             <span className="text-sm text-muted-foreground">$</span>
@@ -1799,5 +1799,4 @@ function TransactionsTab() {
         </div>
     );
 }
-
 
