@@ -1607,7 +1607,7 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
                             </div>
                             <div>
                                 <div className="text-base sm:text-xl leading-none font-semibold">
-                                    {formatCredits(dailyCreditsInfo?.enabled ? monthlyCredits : (accountState?.credits.monthly || 0))}
+                                    {formatCredits(monthlyCredits)}
                                 </div>
                                 {accountState?.subscription.current_period_end && (
                                     <p className="text-[10px] sm:text-[11px] text-orange-500/80 mt-1 sm:mt-1.5 truncate">

@@ -30,13 +30,13 @@ export interface ModelConfig {
 export const MODELS: Record<string, ModelConfig> = {
   'anthropic/claude-opus-4.6': {
     openrouterId: 'anthropic/claude-opus-4.6',
-    inputPer1M: 5.00,
-    outputPer1M: 25.00,
+    inputPer1M: 15.00,
+    outputPer1M: 75.00,
     contextWindow: 200000,
     tier: 'paid',
     cachingStrategy: 'manual',
-    cacheReadPer1M: 0.50,
-    cacheWritePer1M: 6.25,
+    cacheReadPer1M: 1.50,
+    cacheWritePer1M: 18.75,
   },
   'anthropic/claude-sonnet-4.6': {
     openrouterId: 'anthropic/claude-sonnet-4.6',
@@ -50,13 +50,13 @@ export const MODELS: Record<string, ModelConfig> = {
   },
   'anthropic/claude-haiku-4.5': {
     openrouterId: 'anthropic/claude-haiku-4.5',
-    inputPer1M: 1.00,
-    outputPer1M: 5.00,
+    inputPer1M: 0.80,
+    outputPer1M: 4.00,
     contextWindow: 200000,
     tier: 'free',
     cachingStrategy: 'manual',
-    cacheReadPer1M: 0.10,
-    cacheWritePer1M: 1.25,
+    cacheReadPer1M: 0.08,
+    cacheWritePer1M: 1.00,
   },
   'openai/gpt-5.3-codex': {
     openrouterId: 'openai/gpt-5.3-codex',
