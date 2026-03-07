@@ -124,6 +124,7 @@ const envSchema = z.object({
   HETZNER_API_KEY:             optStr,
   HETZNER_DEFAULT_LOCATION:    optStrDefault('nbg1'),  // Nuremberg (cheapest EU)
   HETZNER_SNAPSHOT_ID:         optStr,                 // pre-built sandbox snapshot ID
+  HETZNER_SNAPSHOT_DESCRIPTION: optStr,                // fallback resolver by snapshot description
   HETZNER_SSH_KEY_ID:          optStr,                 // SSH key ID registered in Hetzner
   HETZNER_DEFAULT_SERVER_TYPE: optStrDefault('cpx22'),   // 2 vCPU / 4 GB shared (cx22 deprecated)
 
@@ -251,7 +252,13 @@ function validateEnv(): z.infer<typeof envSchema> {
   // ── Conditional: hetzner → need Hetzner keys ──────────────────────────
   if (providers.includes('hetzner')) {
     if (!raw.HETZNER_API_KEY)     issues.push({ var: 'HETZNER_API_KEY',     message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
-    if (!raw.HETZNER_SNAPSHOT_ID) issues.push({ var: 'HETZNER_SNAPSHOT_ID', message: 'Required when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"', level: 'error' });
+    if (!raw.HETZNER_SNAPSHOT_ID && !raw.HETZNER_SNAPSHOT_DESCRIPTION) {
+      issues.push({
+        var: 'HETZNER_SNAPSHOT_ID/HETZNER_SNAPSHOT_DESCRIPTION',
+        message: 'Set HETZNER_SNAPSHOT_ID or HETZNER_SNAPSHOT_DESCRIPTION when ALLOWED_SANDBOX_PROVIDERS includes "hetzner"',
+        level: 'error',
+      });
+    }
   }
 
   // ── Conditional: Pipedream integration → need credentials ──────────────
@@ -396,6 +403,7 @@ export const config = {
   HETZNER_API_KEY: env.HETZNER_API_KEY,
   HETZNER_DEFAULT_LOCATION: env.HETZNER_DEFAULT_LOCATION,
   HETZNER_SNAPSHOT_ID: env.HETZNER_SNAPSHOT_ID,
+  HETZNER_SNAPSHOT_DESCRIPTION: env.HETZNER_SNAPSHOT_DESCRIPTION || `kortix-sandbox-v${SANDBOX_VERSION}`,
   HETZNER_SSH_KEY_ID: env.HETZNER_SSH_KEY_ID,
   HETZNER_DEFAULT_SERVER_TYPE: env.HETZNER_DEFAULT_SERVER_TYPE,
 
