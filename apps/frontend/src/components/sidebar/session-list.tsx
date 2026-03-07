@@ -52,6 +52,7 @@ import {
 } from '@/hooks/opencode/use-opencode-sessions';
 import { useOpenCodeSessionStatusStore } from '@/stores/opencode-session-status-store';
 import { useOpenCodePendingStore } from '@/stores/opencode-pending-store';
+import { useDebouncedBusySessions } from '@/hooks/use-debounced-busy-sessions';
 import {
   Tooltip,
   TooltipContent,
@@ -174,7 +175,7 @@ function SessionItem({
             <TooltipContent side="right" className="text-xs">
               {pendingCount > 0
                 ? `${pendingCount} ${pendingCount === 1 ? 'question' : 'questions'} waiting for your input`
-                : 'Working on it…'}
+                : 'Working on it\u2026'}
             </TooltipContent>
           </Tooltip>
         )}
@@ -420,6 +421,9 @@ export function SessionList({ projectId }: SessionListProps = {}) {
   const permissions = useOpenCodePendingStore((s) => s.permissions);
   const questions = useOpenCodePendingStore((s) => s.questions);
 
+  // Debounced busy state — prevents green dot from flickering during reasoning
+  const debouncedBusy = useDebouncedBusySessions(statuses);
+
   // Track which tree nodes are manually expanded/collapsed
   const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
 
@@ -546,10 +550,10 @@ export function SessionList({ projectId }: SessionListProps = {}) {
     (sessionId: string) => {
       const pendingCount = getPendingCount(sessionId);
       // Matching SolidJS: permissions suppress busy indicator
-      const isBusy = pendingCount === 0 && statuses[sessionId]?.type === 'busy';
+      const isBusy = pendingCount === 0 && (debouncedBusy[sessionId] ?? false);
       return { isBusy: !!isBusy, pendingCount };
     },
-    [getPendingCount, statuses],
+    [getPendingCount, debouncedBusy],
   );
 
   // Filter to root sessions only for the top-level list.
@@ -568,13 +572,13 @@ export function SessionList({ projectId }: SessionListProps = {}) {
       const bPending = getPendingCount(b.id);
       if (aPending > 0 && bPending === 0) return -1;
       if (bPending > 0 && aPending === 0) return 1;
-      const aBusy = aPending === 0 && statuses[a.id]?.type === 'busy' ? 1 : 0;
-      const bBusy = bPending === 0 && statuses[b.id]?.type === 'busy' ? 1 : 0;
+      const aBusy = aPending === 0 && (debouncedBusy[a.id] ?? false) ? 1 : 0;
+      const bBusy = bPending === 0 && (debouncedBusy[b.id] ?? false) ? 1 : 0;
       if (aBusy > bBusy) return -1;
       if (bBusy > aBusy) return 1;
       return 0;
     });
-  }, [sessions, projectId, statuses, getPendingCount, forkIds]);
+  }, [sessions, projectId, debouncedBusy, getPendingCount, forkIds]);
 
   // Archived sessions
   const archivedSessions = useMemo(() => {
