@@ -60,6 +60,13 @@ export async function configureAutoTopup(accountId: string, cfg: AutoTopupConfig
   const error = validateAutoTopupConfig(cfg);
   if (error) throw new BillingError(error);
 
+  if (cfg.enabled) {
+    const paymentMethodId = await getUsableAutoTopupPaymentMethodId(accountId);
+    if (!paymentMethodId) {
+      throw new BillingError('No default payment method found. Please set up a default card in Billing before enabling auto-topup.');
+    }
+  }
+
   await updateCreditAccount(accountId, {
     autoTopupEnabled: cfg.enabled,
     autoTopupThreshold: String(cfg.threshold),
@@ -87,6 +94,13 @@ export async function getAutoTopupSettings(accountId: string) {
     enabled: Boolean(account.autoTopupEnabled),
     threshold: Number(account.autoTopupThreshold) || AUTO_TOPUP_MIN_THRESHOLD,
     amount: Number(account.autoTopupAmount) || AUTO_TOPUP_MIN_AMOUNT,
+  };
+}
+
+export async function getAutoTopupSetupStatus(accountId: string) {
+  const paymentMethodId = await getUsableAutoTopupPaymentMethodId(accountId);
+  return {
+    has_payment_method: Boolean(paymentMethodId),
   };
 }
 
@@ -136,6 +150,15 @@ async function tryAutoTopup(accountId: string): Promise<void> {
 
   const stripe = getStripe();
 
+  // Resolve a payment method for off-session charging.
+  // Stripe requires an attached/default PM for confirm=true + off_session.
+  const paymentMethodId = await getUsableAutoTopupPaymentMethodId(accountId);
+
+  if (!paymentMethodId) {
+    console.warn(`[AutoTopup] No saved payment method for ${accountId}; auto-topup skipped`);
+    return;
+  }
+
   // Create an off-session payment intent using customer's default payment method
   try {
     const chargeWindow = Math.floor(Date.now() / CHARGE_COOLDOWN_MS);
@@ -145,6 +168,7 @@ async function tryAutoTopup(accountId: string): Promise<void> {
       amount: Math.round(amount * 100), // cents
       currency: 'usd',
       customer: customer.id,
+      payment_method: paymentMethodId,
       off_session: true,
       confirm: true,
       description: `Auto-topup: $${amount} credits`,
@@ -185,5 +209,36 @@ async function tryAutoTopup(accountId: string): Promise<void> {
     await updateCreditAccount(accountId, {
       autoTopupLastCharged: new Date().toISOString(),
     } as any);
+  }
+}
+
+async function getUsableAutoTopupPaymentMethodId(accountId: string): Promise<string | null> {
+  const customer = await getCustomerByAccountId(accountId);
+  if (!customer) return null;
+
+  const stripe = getStripe();
+
+  try {
+    const stripeCustomer = await stripe.customers.retrieve(customer.id);
+    if (!('deleted' in stripeCustomer) || !stripeCustomer.deleted) {
+      const defaultPm = stripeCustomer.invoice_settings?.default_payment_method;
+      if (typeof defaultPm === 'string') {
+        return defaultPm;
+      }
+      if (defaultPm && typeof defaultPm === 'object' && 'id' in defaultPm) {
+        return defaultPm.id;
+      }
+    }
+
+    // Fallback: use first saved card payment method if no default is configured.
+    const methods = await stripe.paymentMethods.list({
+      customer: customer.id,
+      type: 'card',
+      limit: 1,
+    });
+    return methods.data[0]?.id ?? null;
+  } catch (err) {
+    console.warn(`[AutoTopup] Could not resolve payment method for ${accountId}:`, err);
+    return null;
   }
 }
