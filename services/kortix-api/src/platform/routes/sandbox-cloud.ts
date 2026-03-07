@@ -132,6 +132,7 @@ export function createCloudSandboxRouter(
       const requestedProvider = (body?.provider as ProviderName) || undefined;
       const requestedHetznerServerType = (body?.hetznerServerType as string | undefined) || undefined;
       const requestedLocation = (body?.location as string | undefined) || undefined;
+      const backgroundProvisioning = Boolean(body?.backgroundProvisioning);
       const providerName = requestedProvider || getDefaultProviderName();
       const customName = body?.name as string | undefined;
       const isIncluded = Boolean(body?.isIncluded); // only set by setup flow
@@ -254,7 +255,7 @@ export function createCloudSandboxRouter(
         type: 'sandbox',
       });
 
-      const result = await provider.create({
+      const providerCreateInput = {
         accountId,
         userId,
         name: sandboxName,
@@ -263,7 +264,81 @@ export function createCloudSandboxRouter(
         envVars: {
           KORTIX_TOKEN: sandboxKey.secretKey,
         },
-      });
+      };
+
+      // Background provisioning mode (used by billing Add Instance flow)
+      // returns quickly and continues provisioning asynchronously.
+      if (backgroundProvisioning && providerName === 'hetzner') {
+        console.log(`[PLATFORM] Starting background provisioning for sandbox ${sandbox.sandboxId} (${providerName})`);
+
+        void (async () => {
+          let bgExternalId: string | null = null;
+          try {
+            const result = await provider.create(providerCreateInput);
+            bgExternalId = result.externalId;
+
+            await db
+              .update(sandboxes)
+              .set({
+                externalId: result.externalId,
+                status: 'active',
+                baseUrl: result.baseUrl,
+                metadata: result.metadata,
+                config: { serviceKey: sandboxKey.secretKey },
+                updatedAt: new Date(),
+              })
+              .where(eq(sandboxes.sandboxId, sandbox.sandboxId));
+
+            console.log(
+              `[PLATFORM] Background-provisioned sandbox ${sandbox.sandboxId} via ${providerName} ` +
+              `(external: ${result.externalId}) for account ${accountId}`,
+            );
+          } catch (bgErr) {
+            console.error(`[PLATFORM] Background provisioning failed for sandbox ${sandbox.sandboxId}:`, bgErr);
+
+            if (stripeSubscriptionItemId) {
+              try {
+                const { getStripe } = await import('../../shared/stripe');
+                const stripe = getStripe();
+                await stripe.subscriptionItems.del(stripeSubscriptionItemId);
+                console.log(`[PLATFORM] Rolled back Stripe sub item ${stripeSubscriptionItemId} after background provisioning failure`);
+              } catch (rollbackErr) {
+                console.error(`[PLATFORM] Failed to roll back Stripe sub item ${stripeSubscriptionItemId}:`, rollbackErr);
+              }
+            }
+
+            if (bgExternalId) {
+              try {
+                await provider.remove(bgExternalId);
+                console.log(`[PLATFORM] Rolled back provider resource ${bgExternalId} after background provisioning failure`);
+              } catch (cleanupErr) {
+                console.error(`[PLATFORM] Failed to clean up provider resource ${bgExternalId}:`, cleanupErr);
+              }
+            }
+
+            try {
+              await db
+                .update(sandboxes)
+                .set({ status: 'error', updatedAt: new Date() })
+                .where(eq(sandboxes.sandboxId, sandbox.sandboxId));
+            } catch (markErr) {
+              console.error(`[PLATFORM] Failed to mark sandbox ${sandbox.sandboxId} as error:`, markErr);
+            }
+          }
+        })();
+
+        return c.json(
+          {
+            success: true,
+            data: serializeSandbox(sandbox),
+            created: true,
+            provisioning: true,
+          },
+          202,
+        );
+      }
+
+      const result = await provider.create(providerCreateInput);
       createdExternalId = result.externalId;
       providerUsed = providerName;
 

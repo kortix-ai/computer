@@ -39,6 +39,7 @@ function formatPrice(price: number): string {
 }
 
 export function AddInstanceDialog() {
+  const [step, setStep] = useState<'select' | 'review'>('select');
   const [open, setOpen] = useState(false);
   const [location, setLocation] = useState('ash');
   const [serverTypes, setServerTypes] = useState<HetznerServerType[]>([]);
@@ -75,6 +76,7 @@ export function AddInstanceDialog() {
     if (open) {
       fetchTypes(location);
       setSelected(null);
+      setStep('select');
     }
   }, [open, location, fetchTypes]);
 
@@ -87,8 +89,9 @@ export function AddInstanceDialog() {
         provider: 'hetzner',
         hetznerServerType: selected,
         location,
+        backgroundProvisioning: true,
       });
-      toast.success('Instance created successfully. It will be ready in 2-3 minutes.');
+      toast.success('Instance provisioning started. It should be ready in 2-3 minutes.');
       refetch();
       setOpen(false);
     } catch (err: any) {
@@ -103,6 +106,7 @@ export function AddInstanceDialog() {
   const shared = serverTypes.filter((t) => t.cpuType === 'shared');
   const dedicated = serverTypes.filter((t) => t.cpuType === 'dedicated');
   const selectedType = serverTypes.find((t) => t.name === selected);
+  const selectedLocation = LOCATIONS.find((loc) => loc.id === location);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -119,64 +123,106 @@ export function AddInstanceDialog() {
 
         <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-5">
           <div className="flex flex-col gap-4 pb-20">
-          {/* Location selector */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <MapPin className="h-3 w-3" />
-              Location
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {LOCATIONS.map((loc) => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onClick={() => setLocation(loc.id)}
-                  className={cn(
-                    'px-2.5 py-1.5 text-xs rounded-lg border transition-all cursor-pointer',
-                    location === loc.id
-                      ? 'border-primary/50 bg-primary/10 text-foreground font-medium'
-                      : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:border-border',
-                  )}
-                >
-                  {loc.flag} {loc.label}
-                </button>
-              ))}
-            </div>
-          </div>
+            {step === 'select' ? (
+              <>
+                {/* Location selector */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <MapPin className="h-3 w-3" />
+                    Location
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LOCATIONS.map((loc) => (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => setLocation(loc.id)}
+                        className={cn(
+                          'px-2.5 py-1.5 text-xs rounded-lg border transition-all cursor-pointer',
+                          location === loc.id
+                            ? 'border-primary/50 bg-primary/10 text-foreground font-medium'
+                            : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:border-border',
+                        )}
+                      >
+                        {loc.flag} {loc.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-          {/* Error */}
-          {error && (
-            <p className="text-xs text-destructive">{error}</p>
-          )}
+                {/* Error */}
+                {error && (
+                  <p className="text-xs text-destructive">{error}</p>
+                )}
 
-          {/* Loading */}
-          {loading && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
+                {/* Loading */}
+                {loading && (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                )}
 
-          {/* Server types */}
-          {!loading && serverTypes.length > 0 && (
-            <div className="space-y-3">
-              {shared.length > 0 && (
-                <ServerTypeGroup
-                  label="Shared vCPU"
-                  types={shared}
-                  selected={selected}
-                  onSelect={setSelected}
-                />
-              )}
-              {dedicated.length > 0 && (
-                <ServerTypeGroup
-                  label="Dedicated vCPU"
-                  types={dedicated}
-                  selected={selected}
-                  onSelect={setSelected}
-                />
-              )}
-            </div>
-          )}
+                {/* Server types */}
+                {!loading && serverTypes.length > 0 && (
+                  <div className="space-y-3">
+                    {shared.length > 0 && (
+                      <ServerTypeGroup
+                        label="Shared vCPU"
+                        types={shared}
+                        selected={selected}
+                        onSelect={setSelected}
+                      />
+                    )}
+                    {dedicated.length > 0 && (
+                      <ServerTypeGroup
+                        label="Dedicated vCPU"
+                        types={dedicated}
+                        selected={selected}
+                        onSelect={setSelected}
+                      />
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Review your instance details before provisioning.
+                </p>
+                {selectedType ? (
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Machine</span>
+                      <span className="text-sm font-medium text-foreground">{selectedType.name}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Location</span>
+                      <span className="text-sm text-foreground">{selectedLocation ? `${selectedLocation.flag} ${selectedLocation.label}` : location}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Resources</span>
+                      <span className="text-sm text-foreground">{selectedType.cores} cores / {formatMemory(selectedType.memory)} / {formatDisk(selectedType.disk)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Architecture</span>
+                      <span className="text-sm text-foreground uppercase">{selectedType.architecture}</span>
+                    </div>
+                    <div className="border-t border-border/40 pt-2 mt-2 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Hetzner base</span>
+                        <span className="text-sm text-muted-foreground">{formatPrice(selectedType.priceMonthly)}/mo</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Kortix total (incl. markup)</span>
+                        <span className="text-sm font-medium text-foreground">{formatPrice(selectedType.priceMonthlyMarkup)}/mo</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-destructive">No machine selected. Go back and choose a server type.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -193,17 +239,28 @@ export function AddInstanceDialog() {
               )}
             </div>
             <div className="flex gap-2">
+              {step === 'select' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOpen(false)}
+                  disabled={creating}
+                >
+                  Cancel
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStep('select')}
+                  disabled={creating}
+                >
+                  Back
+                </Button>
+              )}
               <Button
-                variant="outline"
                 size="sm"
-                onClick={() => setOpen(false)}
-                disabled={creating}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleCreate}
+                onClick={step === 'select' ? () => setStep('review') : handleCreate}
                 disabled={!selected || creating}
               >
                 {creating ? (
@@ -212,7 +269,7 @@ export function AddInstanceDialog() {
                     Creating...
                   </>
                 ) : (
-                  'Add Instance'
+                  step === 'select' ? 'Review' : 'Add Instance'
                 )}
               </Button>
             </div>

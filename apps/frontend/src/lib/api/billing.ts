@@ -725,10 +725,13 @@ export interface CreateInstanceRequest {
   location?: string;
   name?: string;
   isIncluded?: boolean;
+  backgroundProvisioning?: boolean;
 }
 
 export async function createInstance(request: CreateInstanceRequest): Promise<any> {
-  const response = await backendApi.post<any>('/platform/sandbox', request);
+  // Hetzner provisioning can take >30s before API returns success.
+  // Use a longer timeout to avoid client-side false "Request timeout" failures.
+  const response = await backendApi.post<any>('/platform/sandbox', request, { timeout: 180000 });
   if (response.error) throw response.error;
   return response.data!;
 }
