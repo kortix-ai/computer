@@ -205,12 +205,15 @@ export default function OnboardingPage() {
     const instanceUrl = getInstanceUrl();
 
     if (params.has('skip_onboarding')) {
-      // Directly mark complete and redirect — only allowed via query param
-      authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: 'true' }),
-      }).catch(() => {}).finally(() => router.replace('/dashboard'));
+      sessionStorage.setItem('onboarding_complete', 'true');
+      if (instanceUrl) {
+        authenticatedFetch(`${instanceUrl}/env/ONBOARDING_COMPLETE`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: 'true' }),
+        }).catch(() => {});
+      }
+      router.replace('/dashboard?skip_onboarding');
       return;
     }
 
