@@ -1767,42 +1767,57 @@ function ReasoningPartCard({
 
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
-			<div className="overflow-hidden">
-				<CollapsibleTrigger asChild>
-					<button
-						type="button"
-						className="w-full flex items-start gap-2 py-1 text-left group cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
-					>
-						<Brain className={cn("size-3.5 mt-[1px] text-muted-foreground/65", reasoningStreaming && "animate-pulse-heartbeat")} />
-						<div className="min-w-0 flex-1">
-							<div className="flex items-center gap-2">
-								{reasoningStreaming ? (
-									<>
-										<span className="relative flex size-2.5">
-											<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/40" />
-											<span className="relative inline-flex rounded-full size-2.5 bg-muted-foreground/60" />
-										</span>
-										<span className="text-xs font-medium text-muted-foreground/90 animate-text-shimmer">Reasoning</span>
-									</>
-								) : (
-									<span className="text-xs font-medium text-muted-foreground/90">Reasoning</span>
-								)}
-								{reasoningStreaming ? (
-									<span className="text-[10px] text-muted-foreground/70">{streamSeconds}s</span>
-								) : duration ? (
-									<span className="text-[10px] text-muted-foreground/70">{duration}</span>
-								) : null}
-								<ChevronRight className={cn("size-3.5 text-muted-foreground/60 transition-transform group-hover:text-muted-foreground/80", open && "rotate-90")} />
-							</div>
-						</div>
-					</button>
-				</CollapsibleTrigger>
-				<CollapsibleContent className="pl-[1.45rem] pr-1 pb-1">
-					<div className="text-muted-foreground/65 [&_.kortix-markdown]:italic [&_.kortix-markdown_div]:!text-[13px] [&_.kortix-markdown_div]:!leading-[1.45] [&_.kortix-markdown_div]:!text-muted-foreground/65 [&_.kortix-markdown_li]:!text-[13px] [&_.kortix-markdown_li]:!leading-[1.45] [&_.kortix-markdown_li]:!text-muted-foreground/65 [&_.kortix-markdown_strong]:!text-muted-foreground/70 [&_.kortix-markdown_em]:!text-muted-foreground/70">
+			<CollapsibleTrigger asChild>
+				<div
+					className={cn(
+						"flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg",
+						"bg-muted/20 border border-border/40",
+						"text-xs transition-colors select-none",
+						"cursor-pointer hover:bg-muted/40",
+						"max-w-full group",
+					)}
+				>
+					{/* Icon */}
+					<span className="flex-shrink-0">
+						<Brain className={cn("size-3.5 text-muted-foreground/65", reasoningStreaming && "animate-pulse-heartbeat")} />
+					</span>
+
+					{/* Title + duration */}
+					<div className="flex items-center gap-1.5 min-w-0 flex-1">
+						<span className="font-medium text-xs text-foreground whitespace-nowrap">
+							Reasoning
+						</span>
+						{reasoningStreaming ? (
+							<span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap">
+								{streamSeconds}s
+							</span>
+						) : duration ? (
+							<span className="text-[10px] px-1 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono whitespace-nowrap">
+								{duration}
+							</span>
+						) : null}
+					</div>
+
+					{/* Right side: spinner when streaming, chevron */}
+					{reasoningStreaming && (
+						<Loader2 className="size-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+					)}
+					<ChevronRight
+						className={cn(
+							"size-3 transition-transform flex-shrink-0 text-muted-foreground/50",
+							open && "rotate-90",
+						)}
+					/>
+				</div>
+			</CollapsibleTrigger>
+
+			<CollapsibleContent>
+				<div className="mt-1.5 mb-2 rounded-lg bg-muted/20 border border-border/30 text-xs overflow-hidden">
+					<div className="p-3 text-muted-foreground/65 [&_.kortix-markdown]:italic [&_.kortix-markdown_div]:!text-[13px] [&_.kortix-markdown_div]:!leading-[1.45] [&_.kortix-markdown_div]:!text-muted-foreground/65 [&_.kortix-markdown_li]:!text-[13px] [&_.kortix-markdown_li]:!leading-[1.45] [&_.kortix-markdown_li]:!text-muted-foreground/65 [&_.kortix-markdown_strong]:!text-muted-foreground/70 [&_.kortix-markdown_em]:!text-muted-foreground/70">
 						<ThrottledMarkdown content={part.text} isStreaming={false} />
 					</div>
-				</CollapsibleContent>
-			</div>
+				</div>
+			</CollapsibleContent>
 		</Collapsible>
 	);
 }
