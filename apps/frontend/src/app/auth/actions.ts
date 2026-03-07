@@ -71,16 +71,35 @@ export async function signUp(prevState: any, formData: FormData) {
     return { message: 'Please accept the terms and conditions' };
   }
 
-  const supabase = await createClient();
   const normalizedEmail = email.trim().toLowerCase();
 
+  // Check access control — if signups are closed and email isn't allowlisted, block
+  let shouldCreateUser = true;
+  try {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const res = await fetch(`${backendUrl}/access/check-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      shouldCreateUser = data.allowed;
+    }
+    // If fetch fails, fail-open (allow signup)
+  } catch {
+    // Fail open — allow signup if access control service is unreachable
+  }
+
+  if (!shouldCreateUser) {
+    return { signupClosed: true, message: 'Signups are currently closed. Request access below.' };
+  }
+
+  const supabase = await createClient();
+
   // Use magic link (passwordless) authentication - auto-creates account
-  // For desktop app, use custom protocol (kortix://auth/callback) - same as mobile
-  // For web, use standard origin (https://kortix.com/auth/callback)
-  // Include email in redirect URL so it's available if the link expires
   let emailRedirectTo: string;
   if (isDesktopApp && origin.startsWith('kortix://')) {
-    // Match mobile implementation - simple protocol URL with optional terms_accepted
     const params = new URLSearchParams();
     if (acceptedTerms) {
       params.set('terms_accepted', 'true');
@@ -105,12 +124,40 @@ export async function signUp(prevState: any, formData: FormData) {
     return { message: error.message || 'Could not send magic link' };
   }
 
-  // Return success message - user needs to check email
   return {
     success: true,
     message: 'Check your email for a magic link to complete sign up',
     email: email.trim().toLowerCase(),
   };
+}
+
+export async function requestAccess(prevState: any, formData: FormData) {
+  const email = formData.get('email') as string;
+  const company = formData.get('company') as string | undefined;
+  const useCase = formData.get('useCase') as string | undefined;
+
+  if (!email || !email.includes('@')) {
+    return { message: 'Please enter a valid email address' };
+  }
+
+  try {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    const res = await fetch(`${backendUrl}/access/request-access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        company: company?.trim() || undefined,
+        useCase: useCase?.trim() || undefined,
+      }),
+    });
+    if (res.ok) {
+      return { success: true, message: 'Your access request has been submitted. We\'ll be in touch!' };
+    }
+    return { message: 'Failed to submit request. Please try again.' };
+  } catch {
+    return { message: 'Failed to submit request. Please try again.' };
+  }
 }
 
 export async function forgotPassword(prevState: any, formData: FormData) {

@@ -1,0 +1,21 @@
+{
+  "name": "kortix-eks-infra",
+  "version": "1.0.0",
+  "description": "Pulumi EKS infrastructure for Kortix API",
+  "main": "index.ts",
+  "scripts": {
+    "preview": "pulumi preview --stack prod",
+    "up": "pulumi up --stack prod",
+    "destroy": "pulumi destroy --stack prod"
+  },
+  "dependencies": {
+    "@pulumi/aws": "^6.0.0",
+    "@pulumi/awsx": "^2.0.0",
+    "@pulumi/eks": "^3.0.0",
+    "@pulumi/kubernetes": "^4.0.0",
+    "@pulumi/pulumi": "^3.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

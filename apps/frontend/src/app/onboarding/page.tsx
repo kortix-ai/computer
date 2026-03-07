@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { useRouter } from 'next/navigation';
 
+import { LogOut } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 
 import {
@@ -704,12 +705,13 @@ export default function OnboardingPage() {
 
       </AnimatePresence>
 
-      {/* Sign out (cloud only) */}
-      {(phase === 'login' || phase === 'onboarding') && (
+      {/* Sign out (cloud only — onboarding/session phases where inline button isn't shown) */}
+      {(phase === 'onboarding') && (
         <button
           onClick={() => signOut()}
-          className="absolute bottom-4 left-4 z-30 px-3 py-1 text-[10px] text-foreground/20 hover:text-foreground/40 transition-colors"
+          className="absolute bottom-5 left-5 z-30 flex items-center gap-2 px-3.5 py-2 rounded-full text-[12px] font-medium text-foreground/50 hover:text-foreground/80 bg-foreground/[0.06] hover:bg-foreground/[0.12] backdrop-blur-md border border-foreground/[0.08] transition-all duration-200"
         >
+          <LogOut className="h-3.5 w-3.5" />
           Sign out
         </button>
       )}

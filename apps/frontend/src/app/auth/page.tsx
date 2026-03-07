@@ -5,8 +5,8 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect, Suspense, lazy, useRef, useCallback } from 'react';
-import { signUp, verifyOtp } from './actions';
+import { useState, useEffect, Suspense, lazy, useRef, useCallback, useActionState } from 'react';
+import { signUp, verifyOtp, requestAccess } from './actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Mail, MailCheck, Clock, ExternalLink, ChevronRight } from 'lucide-react';
 import { KortixLoader } from '@/components/ui/kortix-loader';
@@ -88,6 +88,65 @@ function getEmailProviderInfo(email: string) {
 
 type AuthPhase = 'lock' | 'form';
 
+function AccessRequestForm({ email, onSubmitted, onBack }: { email: string; onSubmitted: () => void; onBack: () => void }) {
+  const handleRequestAccess = async (_prev: any, formData: FormData) => {
+    formData.set('email', email);
+    const result = await requestAccess(_prev, formData);
+    if (result && typeof result === 'object' && 'success' in result && result.success) {
+      onSubmitted();
+    }
+    return result || {};
+  };
+
+  return (
+    <div className="bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-7">
+      <div className="flex flex-col items-center mb-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.06] border border-foreground/[0.08] mb-3">
+          <Mail className="h-4.5 w-4.5 text-foreground/50" />
+        </div>
+        <h1 className="text-[17px] font-medium text-foreground/90 tracking-tight">
+          Join the waitlist
+        </h1>
+        <p className="text-[13px] text-foreground/40 mt-1 text-center">
+          We&apos;re not accepting new signups right now.
+        </p>
+      </div>
+
+      <div className="bg-foreground/[0.04] border border-foreground/[0.08] rounded-xl px-3 py-2.5 mb-4">
+        <p className="text-[11px] text-foreground/35 mb-0.5">Requesting for</p>
+        <p className="text-[14px] text-foreground/80 font-medium">{email}</p>
+      </div>
+
+      <form className="space-y-3">
+        <Input
+          name="company"
+          placeholder="Company (optional)"
+          className="h-11 text-[15px] bg-foreground/[0.04] border-foreground/[0.08] rounded-xl"
+        />
+        <textarea
+          name="useCase"
+          placeholder="What will you build with Kortix?"
+          rows={3}
+          className="w-full rounded-xl bg-foreground/[0.04] border border-foreground/[0.08] text-[15px] text-foreground/80 placeholder:text-foreground/30 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/15 transition-colors"
+        />
+        <SubmitButton formAction={handleRequestAccess} className="w-full h-11 text-sm rounded-xl shadow-none" pendingText="Submitting...">
+          Request Access
+        </SubmitButton>
+      </form>
+
+      <div className="flex justify-center mt-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-[11px] text-foreground/25 hover:text-foreground/45 transition-colors"
+        >
+          &larr; Back to sign in
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -116,6 +175,10 @@ function LoginContent() {
 
   const [registrationSuccess, setRegistrationSuccess] = useState(!!isSuccessMessage);
   const [registrationEmail, setRegistrationEmail] = useState('');
+
+  const [signupClosed, setSignupClosed] = useState(false);
+  const [signupClosedEmail, setSignupClosedEmail] = useState('');
+  const [accessRequestSubmitted, setAccessRequestSubmitted] = useState(false);
 
   const [linkExpired, setLinkExpired] = useState(isExpired);
   const [expiredEmailState, setExpiredEmailState] = useState(expiredEmail);
@@ -195,16 +258,24 @@ function LoginContent() {
     formData.append('acceptedTerms', acceptedTerms.toString());
     if (isElectron()) formData.append('isDesktopApp', 'true');
     const result = await signUp(prevState, formData);
-    if (result && typeof result === 'object' && 'success' in result && result.success) {
-      if ('email' in result && result.email) {
-        setRegistrationEmail(result.email as string);
-        setRegistrationSuccess(true);
-        return result;
+    if (result && typeof result === 'object') {
+      if ('signupClosed' in result && result.signupClosed) {
+        const email = formData.get('email') as string;
+        setSignupClosedEmail(email?.trim().toLowerCase() || '');
+        setSignupClosed(true);
+        return {};
       }
-    }
-    if (result && typeof result === 'object' && 'message' in result) {
-      toast.error(t('signUpFailed'), { description: result.message as string, duration: 5000 });
-      return {};
+      if ('success' in result && result.success) {
+        if ('email' in result && result.email) {
+          setRegistrationEmail(result.email as string);
+          setRegistrationSuccess(true);
+          return result;
+        }
+      }
+      if ('message' in result) {
+        toast.error(t('signUpFailed'), { description: result.message as string, duration: 5000 });
+        return {};
+      }
     }
     return result;
   };
@@ -299,6 +370,61 @@ function LoginContent() {
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  /* ── Signup closed — access request form ── */
+  if (signupClosed) {
+    return (
+      <div className="fixed inset-0 overflow-hidden">
+        <WallpaperBackground />
+
+        <motion.div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <motion.div className="absolute inset-0 bg-background/20 backdrop-blur-[2px]" />
+
+          <motion.div
+            className="relative z-10 w-full max-w-[360px] mx-4"
+            initial={{ opacity: 0, y: 40, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {accessRequestSubmitted ? (
+              <div className="bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-7">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <MailCheck className="h-5 w-5 text-emerald-500" />
+                  </div>
+                  <div className="text-center">
+                    <h1 className="text-[17px] font-medium text-foreground/90 tracking-tight">
+                      You&apos;re on the list
+                    </h1>
+                    <p className="text-[13px] text-foreground/40 mt-1.5 max-w-[260px] mx-auto">
+                      We&apos;ll email <span className="text-foreground/60 font-medium">{signupClosedEmail}</span> when your access is ready.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setSignupClosed(false); setAccessRequestSubmitted(false); }}
+                    className="text-[11px] text-foreground/25 hover:text-foreground/45 transition-colors mt-1"
+                  >
+                    &larr; Back to sign in
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <AccessRequestForm
+                email={signupClosedEmail}
+                onSubmitted={() => setAccessRequestSubmitted(true)}
+                onBack={() => setSignupClosed(false)}
+              />
+            )}
+          </motion.div>
+        </motion.div>
       </div>
     );
   }

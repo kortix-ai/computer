@@ -68,3 +68,5 @@ services/kortix-api/.kortix-data/
 services/kortix-api/.sandbox-auth-token.json
 
 .nx/
+.pulumi
+.pulumi/

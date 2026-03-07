@@ -72,6 +72,11 @@ export {
   // WoA
   woaPostTypeEnum,
   woaPosts,
+  // Access Control
+  accessRequestStatusEnum,
+  platformSettings,
+  accessAllowlist,
+  accessRequests,
 } from './schema/kortix';
 
 export type {

@@ -919,6 +919,54 @@ export const tunnelAuditLogsRelations = relations(tunnelAuditLogs, ({ one }) => 
   }),
 }));
 
+// ─── Access Control ─────────────────────────────────────────────────────────
+
+export const accessRequestStatusEnum = kortixSchema.enum('access_request_status', [
+  'pending',
+  'approved',
+  'rejected',
+]);
+
+export const platformSettings = kortixSchema.table(
+  'platform_settings',
+  {
+    key: varchar('key', { length: 255 }).primaryKey(),
+    value: jsonb('value').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
+export const accessAllowlist = kortixSchema.table(
+  'access_allowlist',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    entryType: varchar('entry_type', { length: 20 }).notNull(), // 'email' | 'domain'
+    value: varchar('value', { length: 255 }).notNull(),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_access_allowlist_type_value').on(table.entryType, table.value),
+  ],
+);
+
+export const accessRequests = kortixSchema.table(
+  'access_requests',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    email: varchar('email', { length: 255 }).notNull(),
+    company: varchar('company', { length: 255 }),
+    useCase: text('use_case'),
+    status: accessRequestStatusEnum('status').default('pending').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_access_requests_email').on(table.email),
+    index('idx_access_requests_status').on(table.status),
+  ],
+);
+
 // ─── WoA (Wisdom of Agents) ─────────────────────────────────────────────────
 
 export const woaPostTypeEnum = kortixSchema.enum('woa_post_type', [
