@@ -642,13 +642,22 @@ function SelfHostedLoginContent() {
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
   const [validatingSession, setValidatingSession] = useState(false);
   const [phase, setPhase] = useState<'lock' | 'form'>('lock');
-  const wizardStepRef = useRef(1);
-  const [wizardStep, setWizardStep] = useState(1);
+  const WIZARD_STEP_KEY = 'setup_wizard_step';
+  const persistedStep = typeof window !== 'undefined'
+    ? parseInt(sessionStorage.getItem(WIZARD_STEP_KEY) || '1', 10)
+    : 1;
+  const wizardStepRef = useRef(persistedStep);
+  const [wizardStep, setWizardStep] = useState(persistedStep);
   /** Whether sandbox status has been checked on page load (for authenticated returning users). */
   const [sandboxChecked, setSandboxChecked] = useState(false);
   const handleWizardStepChange = useCallback((step: number) => {
     wizardStepRef.current = step;
     setWizardStep(step);
+    if (step > 1) {
+      sessionStorage.setItem(WIZARD_STEP_KEY, String(step));
+    } else {
+      sessionStorage.removeItem(WIZARD_STEP_KEY);
+    }
   }, []);
 
   // For authenticated users with an existing install, check if sandbox is
@@ -672,12 +681,52 @@ function SelfHostedLoginContent() {
         const statusData = await res.json();
 
         if (statusData.status === 'ready') {
-          // Sandbox is good — allow normal redirect flow
+          // Sandbox is provisioned — check if the user already completed
+          // onboarding (existing users). If so, setup was implicitly done.
+          try {
+            const obRes = await fetch(`${backendUrl}/setup/onboarding-status`, {
+              headers: { 'Authorization': `Bearer ${jwt}` },
+            });
+            if (obRes.ok) {
+              const obData = await obRes.json();
+              if (obData.complete) {
+                // Already fully onboarded — skip setup check
+                sessionStorage.setItem('setup_complete', 'true');
+                sessionStorage.setItem('onboarding_complete', 'true');
+                setSandboxChecked(true);
+                return;
+              }
+            }
+          } catch {
+            // Onboarding check failed — fall through to setup check
+          }
+
+          // Not onboarded yet — check DB setup status
+          try {
+            const setupRes = await fetch(`${backendUrl}/setup/setup-status`, {
+              headers: { 'Authorization': `Bearer ${jwt}` },
+            });
+            if (setupRes.ok) {
+              const setupData = await setupRes.json();
+              if (!setupData.complete) {
+                // Setup wizard not complete — drop to step 2 (provider setup)
+                wizardStepRef.current = 2;
+                setWizardStep(2);
+                sessionStorage.setItem(WIZARD_STEP_KEY, '2');
+                setSandboxChecked(true);
+                return;
+              }
+              sessionStorage.setItem('setup_complete', 'true');
+            }
+          } catch {
+            // Setup status check failed — allow redirect
+          }
           setSandboxChecked(true);
         } else {
           // Sandbox not ready (error, none, pulling, etc.) — go to wizard step 2
           wizardStepRef.current = 2;
           setWizardStep(2);
+          sessionStorage.setItem(WIZARD_STEP_KEY, '2');
           setSandboxChecked(true);
         }
       } catch {

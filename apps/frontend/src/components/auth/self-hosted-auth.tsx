@@ -532,10 +532,24 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
   const handleProviderContinue = useCallback(() => {
     setWizardStep(3);
     onWizardStepChange?.(3);
+    sessionStorage.setItem('setup_wizard_step', '3');
   }, [onWizardStepChange]);
 
   // ── Tool keys done (step 3 → navigate to onboarding) ──
-  const handleToolKeysContinue = useCallback(() => {
+  const handleToolKeysContinue = useCallback(async () => {
+    // Setup wizard complete — clear persisted step and mark in DB
+    sessionStorage.removeItem('setup_wizard_step');
+    sessionStorage.setItem('setup_complete', 'true');
+
+    // Mark setup complete in the backend (fire-and-forget)
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+    try {
+      const { authenticatedFetch: authFetch } = await import('@/lib/auth-token');
+      await authFetch(`${backendUrl}/setup/setup-complete`, { method: 'POST' });
+    } catch {
+      // Best effort — dashboard guard will catch incomplete state
+    }
+
     const target = returnUrl || '/onboarding';
 
     if (target.startsWith('/onboarding')) {
@@ -631,6 +645,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
         // Tell the parent we're entering step 2
         setWizardStep(2);
         onWizardStepChange?.(2);
+        sessionStorage.setItem('setup_wizard_step', '2');
 
         // Provision sandbox — if only one provider, auto-provision immediately.
         // If multiple providers, defer to step 2 where user picks.

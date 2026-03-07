@@ -196,6 +196,37 @@ export default function OnboardingPage() {
     }
   }, [refetchSandbox]);
 
+  // ── Guard: if setup wizard is still in progress, redirect back to /auth ──
+  useEffect(() => {
+    // Fast path: sessionStorage hint
+    const wizardStep = sessionStorage.getItem('setup_wizard_step');
+    if (wizardStep && parseInt(wizardStep, 10) > 1) {
+      router.replace('/auth');
+      return;
+    }
+    // Skip backend check if we already know setup is complete
+    if (sessionStorage.getItem('setup_complete') === 'true') return;
+
+    // Check backend source of truth
+    const checkSetup = async () => {
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8008/v1';
+        const res = await authenticatedFetch(`${backendUrl}/setup/setup-status`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.complete) {
+            router.replace('/auth');
+            return;
+          }
+          sessionStorage.setItem('setup_complete', 'true');
+        }
+      } catch {
+        // Backend unreachable — allow through, onboarding will handle it
+      }
+    };
+    checkSetup();
+  }, [router]);
+
   // ── Query param controls ───────────────────────────────────────
   // ?skip_onboarding → mark complete & go to dashboard
   // ?redo            → clear ONBOARDING_COMPLETE so the flow reruns

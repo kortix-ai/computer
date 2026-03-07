@@ -15,6 +15,10 @@ import { execSync } from 'child_process';
 import { config } from '../config';
 import { ALL_SANDBOX_ENV_KEYS, toLegacySchema } from '../providers/registry';
 import { supabaseAuth } from '../middleware/auth';
+import { eq } from 'drizzle-orm';
+import { accounts } from '@kortix/db';
+import { db, hasDatabase } from '../shared/db';
+import { resolveAccountId } from '../shared/resolve-account';
 
 export const setupApp = new Hono<AppEnv>();
 
@@ -579,3 +583,53 @@ setupApp.post('/onboarding-complete', async (c) => {
     return c.json({ ok: false, error: e?.message || String(e) }, 500);
   }
 });
+
+// ─── Setup Wizard Completion ────────────────────────────────────────────────
+// Tracks whether the user has completed the setup wizard (provider + tool keys).
+// Stored in the DB on accounts.setup_complete_at so it persists across
+// browsers/tabs/devices and cannot be accidentally cleared by the sandbox agent.
+
+/**
+ * GET /v1/setup/setup-status
+ * Returns { complete: boolean, completedAt: string | null }
+ */
+setupApp.get('/setup-status', async (c) => {
+  if (!hasDatabase) {
+    return c.json({ complete: false, completedAt: null });
+  }
+  try {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    const [account] = await db
+      .select({ setupCompleteAt: accounts.setupCompleteAt })
+      .from(accounts)
+      .where(eq(accounts.accountId, accountId))
+      .limit(1);
+    const complete = !!account?.setupCompleteAt;
+    return c.json({ complete, completedAt: account?.setupCompleteAt?.toISOString() ?? null });
+  } catch (e: any) {
+    return c.json({ complete: false, completedAt: null, error: e?.message || String(e) }, 500);
+  }
+});
+
+/**
+ * POST /v1/setup/setup-complete
+ * Mark the setup wizard as complete.
+ */
+setupApp.post('/setup-complete', async (c) => {
+  if (!hasDatabase) {
+    return c.json({ ok: false, error: 'Database not configured' }, 500);
+  }
+  try {
+    const userId = c.get('userId') as string;
+    const accountId = await resolveAccountId(userId);
+    await db
+      .update(accounts)
+      .set({ setupCompleteAt: new Date(), updatedAt: new Date() })
+      .where(eq(accounts.accountId, accountId));
+    return c.json({ ok: true });
+  } catch (e: any) {
+    return c.json({ ok: false, error: e?.message || String(e) }, 500);
+  }
+});
+

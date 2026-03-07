@@ -129,6 +129,7 @@ export const accounts = kortixSchema.table(
     accountId: uuid('account_id').defaultRandom().primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     personalAccount: boolean('personal_account').default(true).notNull(),
+    setupCompleteAt: timestamp('setup_complete_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
