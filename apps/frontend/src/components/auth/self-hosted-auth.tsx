@@ -127,7 +127,7 @@ const TOOL_SECRETS = [
 
 /* ─── Tool Secrets Step ───────────────────────────────────────────────────── */
 
-function ToolSecretsStep({ onContinue, onSkip }: { onContinue: () => void; onSkip: () => void }) {
+function ToolSecretsStep({ onContinue, onSkip, completing }: { onContinue: () => void; onSkip: () => void; completing?: boolean }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
@@ -214,19 +214,26 @@ function ToolSecretsStep({ onContinue, onSkip }: { onContinue: () => void; onSki
           variant="outline"
           onClick={onSkip}
           className="flex-1 h-10 text-[13px] rounded-xl shadow-none border-foreground/[0.08]"
-          disabled={saving}
+          disabled={saving || completing}
         >
-          Skip for now
+          {completing ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              Finishing…
+            </>
+          ) : (
+            'Skip for now'
+          )}
         </Button>
         <Button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || completing}
           className="flex-1 h-10 text-[13px] rounded-xl shadow-none"
         >
-          {saving ? (
+          {saving || completing ? (
             <>
               <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              Saving…
+              {saving ? 'Saving…' : 'Finishing setup…'}
             </>
           ) : filledCount > 0 ? (
             `Save & continue`
@@ -261,6 +268,7 @@ interface SelfHostedFormProps {
 export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxProviders = ['local_docker'], defaultProvider = 'local_docker', onWizardStepChange }: SelfHostedFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(initialStep);
   const [sandboxReady, setSandboxReady] = useState(false);
   const [pullProgress, setPullProgress] = useState<{ progress: number; message: string } | null>(null);
@@ -536,6 +544,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
 
   // ── Tool keys done (step 3 → navigate to onboarding) ──
   const handleToolKeysContinue = useCallback(async () => {
+    setCompleting(true);
     // Setup wizard complete — mark in DB
     sessionStorage.setItem('setup_complete', 'true');
 
@@ -769,6 +778,7 @@ export function SelfHostedForm({ returnUrl, installed, initialStep = 1, sandboxP
         <ToolSecretsStep
           onContinue={handleToolKeysContinue}
           onSkip={handleToolKeysContinue}
+          completing={completing}
         />
       </div>
     );
