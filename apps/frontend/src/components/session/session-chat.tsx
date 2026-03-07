@@ -2548,7 +2548,10 @@ function SessionTurn({
 						// Reasoning
 						if (isReasoningPart(part)) {
 							if (!part.text?.trim()) return null;
-							return <ReasoningPartCard key={part.id} part={part} isStreaming={working} />;
+							// Stop the reasoning timer when questions/permissions are pending —
+							// reasoning is done even though the session is still busy.
+							const reasoningActive = working && permissions.length === 0 && questions.length === 0;
+							return <ReasoningPartCard key={part.id} part={part} isStreaming={reasoningActive} />;
 						}
 
 						// Compaction indicator
