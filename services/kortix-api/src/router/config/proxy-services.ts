@@ -125,11 +125,14 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
 
     // ─── LLM Providers ─────────────────────────────────────────────────────
     //
-    // Dual-mode: Kortix-managed (Mode 1) routes through OpenRouter with
-    // Kortix's own key. Passthrough (Mode 2) forwards the user's own API
-    // key to the real upstream provider for platform-fee billing.
+    // Dual-mode:
+    // - Kortix-managed (Mode 1): uses Kortix-owned provider keys.
+    //   Anthropic/OpenAI go direct to native providers.
+    //   xAI/Gemini/Groq route through OpenRouter.
+    // - Passthrough (Mode 2): forwards the user's own API key to the real
+    //   upstream provider for platform-fee billing.
     //
-    // Mode 1 (Kortix token in auth): inject OPENROUTER_API_KEY, target OpenRouter
+    // Mode 1 (Kortix token in auth): inject provider key configured in service
     // Mode 2 (user key + X-Kortix-Token): passthrough to real provider
     //
     // The proxy handler picks targetBaseUrl for Mode 2/3 and
@@ -138,10 +141,8 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
     anthropic: {
       name: 'anthropic',
       targetBaseUrl: config.ANTHROPIC_API_URL,   // https://api.anthropic.com/v1
-      kortixTargetBaseUrl: config.OPENROUTER_API_URL, // https://openrouter.ai/api/v1
-      getKortixApiKey: () => config.OPENROUTER_API_KEY,
+      getKortixApiKey: () => config.ANTHROPIC_API_KEY,
       keyInjection: { type: 'header', headerName: 'x-api-key' },
-      kortixKeyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
       allowedRoutes: [
         { path: '/messages', methods: ['POST'] },
       ],
@@ -152,8 +153,7 @@ export function getProxyServices(): Record<string, ProxyServiceConfig> {
     openai: {
       name: 'openai',
       targetBaseUrl: config.OPENAI_API_URL,      // https://api.openai.com/v1
-      kortixTargetBaseUrl: config.OPENROUTER_API_URL,
-      getKortixApiKey: () => config.OPENROUTER_API_KEY,
+      getKortixApiKey: () => config.OPENAI_API_KEY,
       keyInjection: { type: 'header', headerName: 'Authorization', prefix: 'Bearer ' },
       allowedRoutes: [
         { path: '/chat/completions', methods: ['POST'] },

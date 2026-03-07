@@ -30,13 +30,13 @@ export interface ModelConfig {
 export const MODELS: Record<string, ModelConfig> = {
   'anthropic/claude-opus-4.6': {
     openrouterId: 'anthropic/claude-opus-4.6',
-    inputPer1M: 15.00,
-    outputPer1M: 75.00,
+    inputPer1M: 5.00,
+    outputPer1M: 25.00,
     contextWindow: 200000,
     tier: 'paid',
     cachingStrategy: 'manual',
-    cacheReadPer1M: 1.50,
-    cacheWritePer1M: 18.75,
+    cacheReadPer1M: 0.50,
+    cacheWritePer1M: 6.25,
   },
   'anthropic/claude-sonnet-4.6': {
     openrouterId: 'anthropic/claude-sonnet-4.6',
@@ -107,30 +107,42 @@ export const DEFAULT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 
 /**
  * Resolve a user-provided model ID to a ModelConfig.
- * - Known Kortix models → mapped config with pricing
- * - Unknown models → look up live pricing from models.dev (refreshed every 24 h)
- * - If models.dev has no pricing → fall back to zero (billing will skip)
+ *
+ * Priority:
+ * 1. models.dev live pricing (always current, refreshed every 24h) — pricing only
+ * 2. MODELS registry — provides contextWindow, tier, cachingStrategy, cache prices,
+ *    and acts as pricing fallback when models.dev hasn't loaded yet or is unknown
+ * 3. Zero pricing (billing skipped) if completely unknown
  */
 export function getModel(modelId: string): ModelConfig {
-  if (MODELS[modelId]) {
-    return MODELS[modelId];
-  }
-
-  // Strip "openrouter/" prefix if present
   const openrouterId = modelId.startsWith('openrouter/')
     ? modelId.replace('openrouter/', '')
     : modelId;
 
-  // Live pricing from models.dev — covers all major LLM providers
-  const livePricing = getModelPricing(modelId);
+  const registryEntry = MODELS[modelId] ?? MODELS[openrouterId];
+
+  // models.dev is source of truth for pricing — always wins if available
+  const livePricing = getModelPricing(modelId) ?? getModelPricing(openrouterId);
+
   if (livePricing) {
     return {
       openrouterId,
+      // Merge registry metadata with live pricing
+      contextWindow: registryEntry?.contextWindow ?? 128000,
+      tier: registryEntry?.tier ?? 'paid',
+      cachingStrategy: registryEntry?.cachingStrategy
+        ?? (openrouterId.startsWith('anthropic/') ? 'manual' : undefined),
+      cacheReadPer1M: registryEntry?.cacheReadPer1M,
+      cacheWritePer1M: registryEntry?.cacheWritePer1M,
+      // Pricing always from models.dev
       inputPer1M: livePricing.inputPer1M,
       outputPer1M: livePricing.outputPer1M,
-      contextWindow: 128000,
-      tier: 'paid',
     };
+  }
+
+  // models.dev unknown — fall back to hardcoded registry prices
+  if (registryEntry) {
+    return registryEntry;
   }
 
   return {

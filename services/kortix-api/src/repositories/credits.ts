@@ -177,12 +177,19 @@ export async function deductCredits(
       };
     }
 
-    return {
+    const output = {
       success: true,
       amountDeducted: data.amount_deducted,
       newBalance: data.new_total,
       transactionId: data.transaction_id,
     };
+
+    // Fire-and-forget: check if auto-topup should trigger after successful deduction.
+    // This repository path backs router billing (LLM/tool proxy), so auto-topup must run here.
+    const { checkAndTriggerAutoTopup } = await import('../billing/services/auto-topup');
+    void checkAndTriggerAutoTopup(accountId);
+
+    return output;
   } catch (err) {
     console.error('deductCredits error:', err);
     return { success: false, error: 'Deduction error' };

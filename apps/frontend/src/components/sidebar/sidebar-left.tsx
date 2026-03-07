@@ -55,6 +55,7 @@ const IntegrationsIcon = ({ className }: { className?: string }) => (
 );
 
 import { SessionList } from '@/components/sidebar/session-list';
+import { LegacyThreadsSection } from '@/components/sidebar/legacy-threads';
 import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
 
 import { UserMenu } from '@/components/sidebar/user-menu';
@@ -714,6 +715,8 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               <SessionList projectId={null} />
             </CollapsibleContent>
           </Collapsible>
+
+          <LegacyThreadsSection />
         </div>
       </SidebarContent>
 

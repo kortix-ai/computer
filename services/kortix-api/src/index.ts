@@ -32,6 +32,7 @@ import { tunnelApp, wsHandlers as tunnelWsHandlers, startTunnelService, stopTunn
 import { startSandboxHealthMonitor, stopSandboxHealthMonitor } from './platform/services/sandbox-health';
 import { accessControlApp } from './access-control';
 import { startAccessControlCache, stopAccessControlCache } from './shared/access-control-cache';
+import { legacyApp } from './legacy';
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 
@@ -233,6 +234,9 @@ app.route('/', channelsApp);                 // /v1/channels/*, /webhooks/*
 
 // Access control — public endpoints for signup gating
 app.route('/v1/access', accessControlApp); // /v1/access/signup-status, /v1/access/check-email, /v1/access/request-access
+
+// Legacy thread migration — authenticated endpoints
+app.route('/v1/legacy', legacyApp); // /v1/legacy/threads, /v1/legacy/threads/:id/migrate
 
 // Setup — install-status is public (needed before any user exists), rest requires auth.
 app.route('/v1/setup', setupApp);          // /v1/setup/install-status (public), rest (auth inside router)
