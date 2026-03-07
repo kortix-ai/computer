@@ -7,7 +7,7 @@ import {
 } from '../config/proxy-services';
 import { validateSecretKey } from '../../repositories/api-keys';
 import { isKortixToken } from '../../shared/crypto';
-import { config, PLATFORM_FEE_MARKUP } from '../../config';
+import { config, KORTIX_MARKUP, PLATFORM_FEE_MARKUP } from '../../config';
 import { checkCredits, deductToolCredits, deductLLMCredits } from '../services/billing';
 import { getModel, type ModelConfig } from '../config/models';
 import { calculateCost, extractUsage } from '../services/llm';
@@ -115,7 +115,21 @@ async function handleKortixProxy(
     duplex: 'half',
   });
 
-  // Bill the user (fire-and-forget, don't block response)
+  // LLM services: bill per-token at KORTIX_MARKUP (1.2×)
+  if (service.isLlm === true) {
+    if (upstream.ok) {
+      return billLlmKortixProxy(upstream, service, subPath, accountId);
+    }
+    // Upstream error — don't bill for failed requests
+    console.warn(`[PROXY] LLM kortix proxy ${service.name} upstream error ${upstream.status} — no billing`);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: upstream.headers,
+    });
+  }
+
+  // Non-LLM services: fixed per-call billing (fire-and-forget)
   deductToolCredits(
     accountId,
     billingToolName,
@@ -130,6 +144,144 @@ async function handleKortixProxy(
     statusText: upstream.statusText,
     headers: upstream.headers,
   });
+}
+
+// === Kortix-managed LLM Billing ===
+//
+// All Kortix-managed LLM calls are routed through OpenRouter, which returns
+// OpenAI-compatible responses regardless of the original provider (anthropic,
+// openai, gemini, xai, groq). So we always parse OpenAI-format usage here.
+
+async function billLlmKortixProxy(
+  upstream: Response,
+  service: ProxyServiceConfig,
+  subPath: string,
+  accountId: string,
+) {
+  const contentType = upstream.headers.get('Content-Type') || '';
+  const isStreaming = contentType.includes('text/event-stream');
+
+  if (isStreaming) {
+    const upstreamBody = upstream.body;
+    if (!upstreamBody) {
+      return new Response(null, { status: 502 });
+    }
+
+    const [clientStream, billingStream] = upstreamBody.tee();
+
+    // Fire-and-forget: extract usage from billing stream
+    extractUsageFromKortixProxyStream(billingStream, service, subPath, accountId);
+
+    return new Response(clientStream, {
+      status: upstream.status,
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+  }
+
+  // Non-streaming: read response, extract usage, bill, return
+  const responseBody = await upstream.json();
+
+  // OpenRouter always returns OpenAI-compatible format
+  const usage = extractUsage(responseBody);
+  const modelId = responseBody?.model || 'unknown';
+
+  if (usage && (usage.promptTokens > 0 || usage.completionTokens > 0)) {
+    const modelConfig = getModel(modelId);
+    const cost = calculateCost(
+      modelConfig,
+      usage.promptTokens,
+      usage.completionTokens,
+      usage.cachedTokens,
+      usage.cacheWriteTokens,
+      KORTIX_MARKUP,
+    );
+
+    deductLLMCredits(
+      accountId,
+      modelId,
+      usage.promptTokens,
+      usage.completionTokens,
+      cost,
+    ).catch((err) => console.error(`[PROXY] LLM kortix billing error: ${err}`));
+
+    console.log(`[PROXY] LLM kortix ${modelId}: ${usage.promptTokens}/${usage.completionTokens} tokens, cost=$${cost.toFixed(6)} (${KORTIX_MARKUP}x)`);
+  } else {
+    console.warn(`[PROXY] LLM kortix ${service.name}: no usage data in response — billing skipped`);
+  }
+
+  return new Response(JSON.stringify(responseBody), {
+    status: upstream.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Extract usage from an OpenRouter SSE stream and bill at KORTIX_MARKUP.
+ * OpenRouter always returns OpenAI-compatible SSE (usage in final chunk).
+ * Runs in background (fire-and-forget).
+ */
+async function extractUsageFromKortixProxyStream(
+  stream: ReadableStream<Uint8Array>,
+  service: ProxyServiceConfig,
+  subPath: string,
+  accountId: string,
+) {
+  try {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let detectedModel = 'unknown';
+    let lastUsage: { promptTokens: number; completionTokens: number; cachedTokens: number; cacheWriteTokens: number } | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+        try {
+          const chunk = JSON.parse(line.slice(6));
+          if (chunk.model) detectedModel = chunk.model;
+          if (chunk.usage) {
+            const details = chunk.usage.prompt_tokens_details;
+            lastUsage = {
+              promptTokens: chunk.usage.prompt_tokens ?? 0,
+              completionTokens: chunk.usage.completion_tokens ?? 0,
+              cachedTokens: details?.cached_tokens ?? 0,
+              cacheWriteTokens: details?.cache_write_tokens ?? 0,
+            };
+          }
+        } catch {
+          // Not valid JSON — skip
+        }
+      }
+    }
+
+    if (!lastUsage) {
+      console.warn(`[PROXY] LLM kortix stream (${service.name}): no usage data — billing skipped`);
+      return;
+    }
+
+    const { promptTokens, completionTokens, cachedTokens, cacheWriteTokens } = lastUsage;
+    if (promptTokens > 0 || completionTokens > 0) {
+      const modelConfig = getModel(detectedModel);
+      const cost = calculateCost(modelConfig, promptTokens, completionTokens, cachedTokens, cacheWriteTokens, KORTIX_MARKUP);
+      await deductLLMCredits(accountId, detectedModel, promptTokens, completionTokens, cost);
+      console.log(`[PROXY] LLM kortix stream ${detectedModel}: ${promptTokens}/${completionTokens} tokens, cost=$${cost.toFixed(6)} (${KORTIX_MARKUP}x)`);
+    } else {
+      console.warn(`[PROXY] LLM kortix stream (${service.name}): zero tokens — billing skipped`);
+    }
+  } catch (err) {
+    console.error(`[PROXY] Error extracting usage from kortix proxy stream:`, err);
+  }
 }
 
 // === Kortix user with own key: passthrough + bill at platform fee (0.1×) ===
