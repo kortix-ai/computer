@@ -101,8 +101,9 @@ export function useDebouncedBusySessions(
 
   // Cleanup on unmount only
   useEffect(() => {
+    const timers = timersRef.current;
     return () => {
-      for (const timer of Object.values(timersRef.current)) {
+      for (const timer of Object.values(timers)) {
         clearTimeout(timer);
       }
     };
