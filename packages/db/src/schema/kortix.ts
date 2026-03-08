@@ -923,6 +923,32 @@ export const tunnelAuditLogsRelations = relations(tunnelAuditLogs, ({ one }) => 
 
 // ─── Access Control ─────────────────────────────────────────────────────────
 
+// ─── Platform User Roles ────────────────────────────────────────────────────
+// Platform-level roles (not account-scoped). Controls admin access to the platform.
+
+export const platformRoleEnum = kortixSchema.enum('platform_role', [
+  'user',
+  'admin',
+  'super_admin',
+]);
+
+export const platformUserRoles = kortixSchema.table(
+  'platform_user_roles',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').notNull(),
+    role: platformRoleEnum('role').default('user').notNull(),
+    grantedBy: uuid('granted_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_platform_user_roles_account_id').on(table.accountId),
+    index('idx_platform_user_roles_role').on(table.role),
+  ],
+);
+
+// ─── Access Control ─────────────────────────────────────────────────────────
+
 export const accessRequestStatusEnum = kortixSchema.enum('access_request_status', [
   'pending',
   'approved',

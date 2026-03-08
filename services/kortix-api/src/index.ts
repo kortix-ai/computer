@@ -210,12 +210,23 @@ app.get('/v1/accounts', supabaseAuth, async (c: any) => {
   ]);
 });
 
-// GET /v1/user-roles — returns admin role status.
-// TODO: implement proper role checking against DB
+
 app.get('/v1/user-roles', supabaseAuth, async (c: any) => {
-  // For now, all authenticated users are non-admin.
-  // Self-hosted single-owner mode will set this to admin.
-  return c.json({ isAdmin: false, role: null });
+  const { eq } = await import('drizzle-orm');
+  const { platformUserRoles } = await import('@kortix/db');
+  const { db: database } = await import('./shared/db');
+
+  const accountId = c.get('userId') as string;
+  const [row] = await database
+    .select({ role: platformUserRoles.role })
+    .from(platformUserRoles)
+    .where(eq(platformUserRoles.accountId, accountId))
+    .limit(1);
+
+  const role = row?.role || 'user';
+  const isAdmin = role === 'admin' || role === 'super_admin';
+
+  return c.json({ isAdmin, role });
 });
 
 // ─── Mount Sub-Services ─────────────────────────────────────────────────────
