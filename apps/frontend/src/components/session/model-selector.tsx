@@ -1,13 +1,11 @@
 'use client';
 
-import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { useRef, useState, useMemo, useCallback } from 'react';
 import {
   Search,
-  ChevronUp,
+  ChevronDown,
   Check,
   X,
-  Plus,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -29,7 +27,6 @@ import {
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 
 import { useModelStore } from '@/hooks/opencode/use-model-store';
 import type { FlatModel } from './session-chat-input';
@@ -79,22 +76,23 @@ function formatContext(tokens: number): string {
   return `${Math.round(tokens / 1000)}K`;
 }
 
+function handleDivButtonKeyDown(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  onActivate: () => void,
+) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    onActivate();
+  }
+}
+
 // =============================================================================
 // Tag
 // =============================================================================
 
-export function Tag({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'free' | 'latest' | 'recommended' | 'custom' }) {
+export function Tag({ children }: { children: React.ReactNode; variant?: string }) {
   return (
-    <span
-      className={cn(
-        'px-1.5 py-0.5 rounded text-[10px] font-medium leading-none flex-shrink-0',
-        variant === 'free' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-        variant === 'latest' && 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-        variant === 'recommended' && 'bg-primary/10 text-primary',
-        variant === 'custom' && 'bg-muted text-muted-foreground',
-        variant === 'default' && 'bg-muted text-muted-foreground',
-      )}
-    >
+    <span className="px-1 py-0.5 rounded text-[10px] font-medium leading-none flex-shrink-0 bg-muted text-muted-foreground/60">
       {children}
     </span>
   );
@@ -194,63 +192,50 @@ export function ManageModelsDialog({
         {/* Fixed header */}
         <div className="px-5 pt-5 pb-0 space-y-3">
           <DialogHeader className="p-0">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-sm font-semibold">Manage Models</DialogTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-xs gap-1.5 rounded-lg"
-                onClick={() => {
-                  onOpenChange(false);
-                  onConnectProvider();
-                }}
-              >
-                <Plus className="h-3 w-3" />
-                Connect Provider
-              </Button>
-            </div>
-            <DialogDescription id="manage-models-desc" className="text-xs text-muted-foreground/60">
-              Choose which models appear in the model selector.
+            <DialogTitle className="text-sm font-medium">Models</DialogTitle>
+            <DialogDescription id="manage-models-desc" className="text-xs text-muted-foreground/50">
+              Toggle which models appear in the selector.
             </DialogDescription>
           </DialogHeader>
 
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
             <Input
-              placeholder="Search models..."
+              placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-sm rounded-lg"
-              autoFocus
+              className="pl-8 h-8 text-sm rounded-lg border-border/50 bg-transparent"
             />
           </div>
         </div>
 
         {/* Scrollable model list */}
-        <div className="overflow-y-auto px-5 pb-5 pt-1">
+        <div className="overflow-y-auto px-5 pb-5 pt-2">
           <div className="space-y-3">
             {grouped.map(([providerID, providerModels]) => (
               <div key={providerID}>
-                <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-1 pb-1">
+                <div className="text-[10px] text-muted-foreground/40 uppercase tracking-widest px-1 pb-1 font-medium">
                   {PROVIDER_LABELS[providerID] || providerModels[0]?.providerName || providerID}
                 </div>
-                <div className="rounded-lg border border-border/40 bg-card/50 divide-y divide-border/30">
+                <div className="divide-y divide-border/30">
                   {providerModels.map((model) => {
                     const key = { providerID: model.providerID, modelID: model.modelID };
                     const visible = modelStore.isVisible(key);
                     return (
                       <div
                         key={`${model.providerID}:${model.modelID}`}
-                        className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                        className="flex items-center justify-between gap-3 px-1 py-2 cursor-pointer hover:bg-muted/30 transition-colors rounded-md"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => modelStore.setVisibility(key, !visible)}
+                        onKeyDown={(event) => handleDivButtonKeyDown(event, () => modelStore.setVisibility(key, !visible))}
                       >
-                        <span className="text-sm truncate">{model.modelName}</span>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Switch
-                            checked={visible}
-                            onCheckedChange={(checked) => modelStore.setVisibility(key, checked)}
-                          />
-                        </div>
+                        <span className="text-sm truncate text-foreground/80">{model.modelName}</span>
+                        <Switch
+                          checked={visible}
+                          onClick={(event) => event.stopPropagation()}
+                          onCheckedChange={(checked) => modelStore.setVisibility(key, checked)}
+                        />
                       </div>
                     );
                   })}
@@ -258,7 +243,7 @@ export function ManageModelsDialog({
               </div>
             ))}
             {grouped.length === 0 && (
-              <div className="text-xs text-center py-8 text-muted-foreground/60">No models found</div>
+              <div className="text-xs text-center py-8 text-muted-foreground/40">No models found</div>
             )}
           </div>
         </div>
@@ -367,14 +352,15 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
 
   const flatList = useMemo(() => grouped.flatMap((g) => g.models), [grouped]);
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
       setTimeout(() => searchRef.current?.focus(), 50);
-    } else {
-      setSearch('');
-      setHighlightedIndex(-1);
+      return;
     }
-  }, [open]);
+    setSearch('');
+    setHighlightedIndex(-1);
+  }, []);
 
   const handleSelect = useCallback(
     (model: FlatModel) => {
@@ -408,92 +394,56 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen} modal={false}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-              >
-                <span className="truncate max-w-[120px]">{displayName}</span>
-                <ChevronUp className={cn('size-3 transition-transform', open && 'rotate-180')} />
-              </button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">Choose model</TooltipContent>
-        </Tooltip>
+      <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200 cursor-pointer",
+              open && "bg-muted text-foreground",
+            )}
+          >
+            <span className="truncate max-w-[140px]">{displayName}</span>
+            <ChevronDown className={cn('size-3 opacity-50 transition-transform duration-200', open && 'rotate-180')} />
+          </button>
+        </PopoverTrigger>
 
         <PopoverContent
           side="top"
           align="start"
           sideOffset={8}
-          className="w-[280px] p-0 overflow-hidden rounded-xl border"
+          className="w-[260px] p-0 overflow-hidden rounded-xl border border-border/60 shadow-lg"
         >
-          <div className="flex flex-col h-[320px] overflow-hidden">
-            {/* Search bar with action buttons */}
-            <div className="flex items-center gap-1 p-2 border-b border-border/40 flex-shrink-0">
-              <div className="relative flex-1">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  placeholder="Search models..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="w-full h-7 pl-7 pr-6 rounded-md text-xs bg-transparent focus:outline-none placeholder:text-muted-foreground/50 transition-colors"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch('')}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpen(false);
-                        setConnectProviderOpen(true);
-                      }}
-                      className="size-7 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">Connect provider</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpen(false);
-                        setManageModelsOpen(true);
-                      }}
-                      className="size-7 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-                    >
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">Manage models</TooltipContent>
-                </Tooltip>
-              </div>
+          <div className="flex flex-col h-[300px] overflow-hidden">
+            {/* Search bar */}
+            <div className="flex items-center px-3 py-2 border-b border-border/40 flex-shrink-0">
+              <Search className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 mr-2" />
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search models..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="flex-1 h-6 text-xs bg-transparent focus:outline-none placeholder:text-muted-foreground/40"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
             {/* Model list */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-1">
+            <div className="flex-1 min-h-0 overflow-y-auto py-1">
               {grouped.length > 0 ? (
                 grouped.map((group) => (
                   <div key={group.providerID}>
-                    <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-2 pt-2 pb-0.5">
+                    <div className="text-[10px] text-muted-foreground/40 uppercase tracking-widest px-3 pt-2.5 pb-0.5 font-medium">
                       {group.providerName}
                     </div>
                     {group.models.map((model) => {
@@ -512,16 +462,16 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                             <button
                               type="button"
                               className={cn(
-                                'w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left text-[13px] transition-colors cursor-pointer',
-                                (isHighlighted || isSelected) ? 'bg-accent' : 'hover:bg-accent/50',
+                                'w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-[13px] transition-colors cursor-pointer',
+                                (isHighlighted || isSelected) ? 'bg-muted/60' : 'hover:bg-muted/30',
                               )}
                               onClick={() => handleSelect(model)}
                               onMouseEnter={() => setHighlightedIndex(idx)}
                             >
                               <span className="truncate flex-1">{model.modelName}</span>
-                              {isFree && <Tag variant="free">Free</Tag>}
-                              {isLatestModel && <Tag variant="latest">Latest</Tag>}
-                              {isSelected && <Check className="h-3 w-3 text-foreground flex-shrink-0" />}
+                              {isFree && <Tag>Free</Tag>}
+                              {isLatestModel && <Tag>New</Tag>}
+                              {isSelected && <Check className="h-3 w-3 text-foreground/60 flex-shrink-0" />}
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" align="start" sideOffset={12} className="p-2">
@@ -533,10 +483,29 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                   </div>
                 ))
               ) : (
-                <div className="text-xs text-center py-8 text-muted-foreground/60">
-                  No models found
+                <div className="text-xs text-center py-8 text-muted-foreground/40">
+                  No models
                 </div>
               )}
+            </div>
+
+            {/* Footer actions */}
+            <div className="flex items-center gap-3 px-3 py-2 border-t border-border/40 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setConnectProviderOpen(true); }}
+                className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-pointer"
+              >
+                Connect provider
+              </button>
+              <span className="text-border/60">·</span>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setManageModelsOpen(true); }}
+                className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-pointer"
+              >
+                Manage models
+              </button>
             </div>
           </div>
         </PopoverContent>

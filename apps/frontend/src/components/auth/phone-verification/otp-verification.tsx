@@ -33,6 +33,8 @@ interface OtpVerificationProps {
   challengeId?: string;
 }
 
+const OTP_SLOT_IDS = ['digit-1', 'digit-2', 'digit-3', 'digit-4', 'digit-5', 'digit-6'] as const;
+
 export function OtpVerification({
   phoneNumber,
   onVerify,
@@ -184,16 +186,16 @@ export function OtpVerification({
               {t('enterSixDigitCode')}
             </Label>
             <div className="flex gap-2 justify-center">
-              {otp.map((digit, index) => (
+              {OTP_SLOT_IDS.map((slotId, index) => (
                 <Input
-                  key={index}
+                  key={slotId}
                   ref={(el) => {
                     inputRefs.current[index] = el;
                   }}
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
-                  value={digit}
+                  value={otp[index]}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={handlePaste}

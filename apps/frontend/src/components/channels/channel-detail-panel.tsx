@@ -244,7 +244,7 @@ export function ChannelEditDialog({ channel, open, onOpenChange }: ChannelEditDi
               </div>
               <div className="rounded-xl border p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Linked Instance</Label>
+                  <div className="text-xs font-medium leading-none">Linked Instance</div>
                   {channel.sandboxId ? (
                     <Button
                       variant="ghost"

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import { Cable, Plus, Monitor, Trash2, Search, X, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,8 @@ import { TunnelSettingsDialog } from './tunnel-settings-dialog';
 import { TunnelPermissionRequestDialog } from './tunnel-permission-request-dialog';
 import { toast } from 'sonner';
 
+const LOADING_CARD_SLOTS = ['connection-1', 'connection-2', 'connection-3', 'connection-4'] as const;
+
 function ConnectionItem({
   connection,
   onClick,
@@ -42,7 +44,7 @@ function ConnectionItem({
 
   return (
     <>
-      <motion.div
+      <m.div
         layout
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -50,7 +52,7 @@ function ConnectionItem({
         transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.4) }}
       >
         <SpotlightCard className="bg-card border border-border/50">
-          <div onClick={onClick} className="p-4 flex flex-col h-full cursor-pointer group">
+          <button type="button" onClick={onClick} className="p-4 flex flex-col h-full w-full cursor-pointer group text-left">
             <div className="flex items-center gap-3 mb-3">
               <div className={cn(
                 'flex items-center justify-center w-9 h-9 rounded-[10px] border shrink-0',
@@ -104,9 +106,9 @@ function ConnectionItem({
                 </Button>
               </div>
             </div>
-          </div>
+          </button>
         </SpotlightCard>
-      </motion.div>
+      </m.div>
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -155,8 +157,8 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
 function LoadingSkeleton() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="rounded-2xl border dark:bg-card p-4">
+      {LOADING_CARD_SLOTS.map((slot) => (
+        <div key={slot} className="rounded-2xl border dark:bg-card p-4">
           <div className="flex items-center gap-3 mb-3">
             <Skeleton className="h-9 w-9 rounded-[10px]" />
             <div className="flex-1 space-y-1.5">
@@ -210,7 +212,8 @@ export function TunnelOverview() {
   };
 
   return (
-    <div className="min-h-[100dvh]">
+    <LazyMotion features={domAnimation}>
+      <div className="min-h-[100dvh]">
       <div className="container mx-auto max-w-7xl px-3 sm:px-4 pt-6 sm:pt-8 pb-2 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both">
         <div className="mb-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -294,7 +297,8 @@ export function TunnelOverview() {
       />
 
       <TunnelPermissionRequestDialog />
-    </div>
+      </div>
+    </LazyMotion>
   );
 }
 

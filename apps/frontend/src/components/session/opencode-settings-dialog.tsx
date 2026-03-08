@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, useId } from 'react';
 import {
   Settings,
   Shield,
@@ -105,6 +105,16 @@ const PERMISSION_TYPES = [
 
 const ACTIONS = ['allow', 'ask', 'deny'] as const;
 
+function createEnvPair() {
+  return {
+    id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `env-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    key: '',
+    value: '',
+  };
+}
+
 // ============================================================================
 // Props
 // ============================================================================
@@ -128,6 +138,7 @@ function GeneralSection({
   onDraft: (key: string, value: unknown) => void;
 }) {
   const { data: providers } = useOpenCodeProviders();
+  const idBase = useId();
 
   const allModels = useMemo(() => {
     if (!providers?.all) return [];
@@ -144,18 +155,22 @@ function GeneralSection({
   const instructions = (draft.instructions as string[]) ?? config.instructions ?? [];
   const instructionsText = instructions.join('\n');
   const snapshot = (draft.snapshot as boolean | undefined) ?? config.snapshot ?? false;
+  const instructionsInputId = `${idBase}-custom-instructions`;
+  const defaultModelTriggerId = `${idBase}-default-model`;
+  const snapshotsSwitchId = `${idBase}-snapshots`;
 
   return (
     <div className="space-y-6">
       {/* Custom Instructions */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <label htmlFor={instructionsInputId} className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Custom Instructions
         </label>
         <p className="text-xs text-muted-foreground/60">
           Additional instruction file paths, one per line (e.g. docs/rules.md)
         </p>
         <Textarea
+          id={instructionsInputId}
           value={instructionsText}
           onChange={(e) => {
             const lines = e.target.value
@@ -171,14 +186,14 @@ function GeneralSection({
 
       {/* Default Model */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <label htmlFor={defaultModelTriggerId} className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Default Model
         </label>
         <Select
           value={model || '__auto__'}
           onValueChange={(v) => onDraft('model', v === '__auto__' ? undefined : v)}
         >
-          <SelectTrigger className="w-full font-mono text-sm rounded-xl cursor-pointer hover:bg-muted/40 transition-colors">
+          <SelectTrigger id={defaultModelTriggerId} className="w-full font-mono text-sm rounded-xl cursor-pointer hover:bg-muted/40 transition-colors">
             <SelectValue placeholder="Auto-detect" />
           </SelectTrigger>
           <SelectContent>
@@ -196,7 +211,7 @@ function GeneralSection({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <label htmlFor={snapshotsSwitchId} className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Snapshots
             </label>
             <p className="text-xs text-muted-foreground/60 mt-0.5">
@@ -204,6 +219,7 @@ function GeneralSection({
             </p>
           </div>
           <Switch
+            id={snapshotsSwitchId}
             checked={snapshot}
             onCheckedChange={(v) => onDraft('snapshot', v)}
           />
@@ -490,9 +506,9 @@ function PermissionsSection({
     <div className="space-y-6">
       {/* Global permission mode */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Global Permission Mode
-        </label>
+        </div>
         <p className="text-xs text-muted-foreground/60">
           Set a blanket permission level, or configure per-tool below.
         </p>
@@ -536,9 +552,9 @@ function PermissionsSection({
       {/* Per-tool permission overrides */}
       {!isGlobalMode && (
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Per-Tool Permissions
-          </label>
+          </div>
           <div className="rounded-xl border border-border/50 bg-card divide-y divide-border/30">
             {PERMISSION_TYPES.map(({ key, label, description }) => (
               <div
@@ -578,9 +594,9 @@ function PermissionsSection({
       {/* Tool enable/disable overrides */}
       {builtinToolIds.length > 0 && (
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Tool Overrides
-          </label>
+          </div>
           <p className="text-xs text-muted-foreground/60">
             Enable or disable individual tools.
           </p>
@@ -665,7 +681,7 @@ function McpServersSection() {
     transportType: 'stdio' as 'stdio' | 'http',
     command: '',
     url: '',
-    envPairs: [] as Array<{ key: string; value: string }>,
+    envPairs: [] as Array<{ id: string; key: string; value: string }>,
   });
   const [addError, setAddError] = useState('');
 
@@ -673,6 +689,11 @@ function McpServersSection() {
   const [authUrl, setAuthUrl] = useState('');
   const [authCode, setAuthCode] = useState('');
   const [authError, setAuthError] = useState('');
+  const idBase = useId();
+  const authCodeInputId = `${idBase}-auth-code`;
+  const addServerNameInputId = `${idBase}-add-server-name`;
+  const addServerCommandInputId = `${idBase}-add-server-command`;
+  const addServerUrlInputId = `${idBase}-add-server-url`;
 
   const servers = useMemo(() => {
     if (!mcpStatus) return [];
@@ -794,7 +815,7 @@ function McpServersSection() {
   }, [view, authCode, authCallbackMutation]);
 
   const addEnvPair = useCallback(() => {
-    setAddForm((f) => ({ ...f, envPairs: [...f.envPairs, { key: '', value: '' }] }));
+    setAddForm((f) => ({ ...f, envPairs: [...f.envPairs, createEnvPair()] }));
   }, []);
 
   const removeEnvPair = useCallback((index: number) => {
@@ -840,12 +861,12 @@ function McpServersSection() {
               and paste the code below.
             </p>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Authorization Code</label>
+              <label htmlFor={authCodeInputId} className="text-xs text-muted-foreground mb-1 block">Authorization Code</label>
               <Input
+                id={authCodeInputId}
                 placeholder="Paste code here..."
                 value={authCode}
                 onChange={(e) => setAuthCode(e.target.value)}
-                autoFocus
               />
             </div>
             {authError && (
@@ -907,18 +928,18 @@ function McpServersSection() {
         <form onSubmit={handleAddServer} className="space-y-4">
           {/* Name */}
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Server Name</label>
+            <label htmlFor={addServerNameInputId} className="text-xs text-muted-foreground mb-1 block">Server Name</label>
             <Input
+              id={addServerNameInputId}
               placeholder="my-server"
               value={addForm.name}
               onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
-              autoFocus
             />
           </div>
 
           {/* Transport Type */}
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground mb-1 block">Transport Type</label>
+            <div className="text-xs text-muted-foreground mb-1 block">Transport Type</div>
             <div className="flex gap-1.5">
               <button
                 type="button"
@@ -950,8 +971,9 @@ function McpServersSection() {
           {/* Transport-specific fields */}
           {addForm.transportType === 'stdio' ? (
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Command</label>
+              <label htmlFor={addServerCommandInputId} className="text-xs text-muted-foreground mb-1 block">Command</label>
               <Input
+                id={addServerCommandInputId}
                 placeholder="npx -y @modelcontextprotocol/server-github"
                 value={addForm.command}
                 onChange={(e) => setAddForm((f) => ({ ...f, command: e.target.value }))}
@@ -962,8 +984,9 @@ function McpServersSection() {
             </div>
           ) : (
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">URL</label>
+              <label htmlFor={addServerUrlInputId} className="text-xs text-muted-foreground mb-1 block">URL</label>
               <Input
+                id={addServerUrlInputId}
                 placeholder="https://mcp.example.com/sse"
                 value={addForm.url}
                 onChange={(e) => setAddForm((f) => ({ ...f, url: e.target.value }))}
@@ -974,7 +997,7 @@ function McpServersSection() {
           {/* Environment Variables */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground">Environment Variables</label>
+              <div className="text-xs text-muted-foreground">Environment Variables</div>
               <button
                 type="button"
                 onClick={addEnvPair}
@@ -987,7 +1010,7 @@ function McpServersSection() {
             {addForm.envPairs.length > 0 && (
               <div className="space-y-2">
                 {addForm.envPairs.map((pair, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div key={pair.id} className="flex gap-2 items-center">
                     <Input
                       placeholder="KEY"
                       value={pair.key}

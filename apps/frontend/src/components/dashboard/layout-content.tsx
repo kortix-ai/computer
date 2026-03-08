@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useConnectionToasts } from "@/components/dashboard/connecting-screen";
@@ -144,6 +144,12 @@ const RunningServicesPanel = lazy(() =>
 	})),
 );
 
+const DASHBOARD_SKELETON_KEYS = [
+	"dashboard-skeleton-1",
+	"dashboard-skeleton-2",
+	"dashboard-skeleton-3",
+] as const;
+
 // Skeleton shell that renders immediately for FCP
 function DashboardSkeleton() {
 	return (
@@ -153,8 +159,8 @@ function DashboardSkeleton() {
 				<div className="p-4 space-y-4">
 					<div className="h-8 w-32 bg-muted/40 rounded animate-pulse" />
 					<div className="space-y-2">
-						{[1, 2, 3].map((i) => (
-							<div key={i} className="h-10 bg-muted/30 rounded animate-pulse" />
+						{DASHBOARD_SKELETON_KEYS.map((key) => (
+							<div key={key} className="h-10 bg-muted/30 rounded animate-pulse" />
 						))}
 					</div>
 				</div>
@@ -332,7 +338,6 @@ export default function DashboardLayoutContent({
 	children,
 }: DashboardLayoutContentProps) {
 	const { user, isLoading } = useAuth();
-	const router = useRouter();
 	const { data: systemStatus, isLoading: systemStatusLoading } =
 		useSystemStatusQuery();
 	const maintenanceNotice = systemStatus?.maintenanceNotice;
@@ -363,13 +368,6 @@ export default function DashboardLayoutContent({
 		}
 	}, [user]);
 
-	// Check authentication status
-	useEffect(() => {
-		if (!isLoading && !user) {
-			router.push("/auth");
-		}
-	}, [user, isLoading, router]);
-
 	// Hard gate: redirect to /onboarding if not complete
 	// Checks the sandbox instance directly via /env/ONBOARDING_COMPLETE
 	// Skip with ?skip_onboarding query param
@@ -385,9 +383,11 @@ export default function DashboardLayoutContent({
 	const activeServerId = useServerStore((s) => s.activeServerId);
 	const serverVersion = useServerStore((s) => s.serverVersion);
 	const [onboardingChecked, setOnboardingChecked] = useState(false);
+	const [onboardingRedirectPath, setOnboardingRedirectPath] = useState<string | null>(null);
 	useEffect(() => {
 		const params = new URLSearchParams(window.location.search);
 		if (params.has("skip_onboarding")) {
+			setOnboardingRedirectPath(null);
 			setOnboardingChecked(true);
 			return;
 		}
@@ -397,6 +397,7 @@ export default function DashboardLayoutContent({
 		// /env/ONBOARDING_COMPLETE per session.
 		const cached = sessionStorage.getItem("onboarding_complete");
 		if (cached === "true") {
+			setOnboardingRedirectPath(null);
 			setOnboardingChecked(true);
 			return;
 		}
@@ -415,25 +416,26 @@ export default function DashboardLayoutContent({
 				if (res.ok) {
 					const data = await res.json();
 					if (data.ONBOARDING_COMPLETE !== "true") {
-						router.replace("/onboarding");
+						setOnboardingRedirectPath("/onboarding");
 						return;
 					}
 					// Cache the successful result for this browser session
 					sessionStorage.setItem("onboarding_complete", "true");
 				} else if (res.status >= 500) {
 					// Server error — treat as not onboarded
-					router.replace("/onboarding");
+					setOnboardingRedirectPath("/onboarding");
 					return;
 				}
 			} catch {
 				// Sandbox not reachable — treat as not onboarded
-				router.replace("/onboarding");
+				setOnboardingRedirectPath("/onboarding");
 				return;
 			}
+			setOnboardingRedirectPath(null);
 			setOnboardingChecked(true);
 		};
 		checkOnboarding();
-	}, [router, activeServerId, serverVersion]);
+	}, [activeServerId, serverVersion]);
 
 	const isMaintenanceActive = (() => {
 		if (
@@ -463,11 +465,15 @@ export default function DashboardLayoutContent({
 		return now < start && now < end;
 	})();
 
-	if (isLoading || !onboardingChecked) {
-		return <DashboardSkeleton />;
+	if (!isLoading && !user) {
+		redirect("/auth");
 	}
 
-	if (!user) {
+	if (onboardingRedirectPath) {
+		redirect(onboardingRedirectPath);
+	}
+
+	if (isLoading || !onboardingChecked) {
 		return <DashboardSkeleton />;
 	}
 

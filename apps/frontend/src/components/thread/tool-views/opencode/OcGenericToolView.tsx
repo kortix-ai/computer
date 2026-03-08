@@ -286,12 +286,13 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
 
   return (
     <div className="space-y-2">
-      {sections.map((section, i) => {
+      {sections.map((section) => {
+        const sectionKey = `${section.type}:${'text' in section ? section.text : ''}:${'summary' in section ? section.summary : ''}`;
         switch (section.type) {
           case 'warning':
             return (
               <div
-                key={i}
+                key={sectionKey}
                 className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-yellow-500/5 border border-yellow-500/15"
               >
                 <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-yellow-500" />
@@ -304,7 +305,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'error':
             return (
               <div
-                key={i}
+                key={sectionKey}
                 className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/15"
               >
                 <Ban className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-red-400" />
@@ -323,7 +324,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
 
           case 'traceback':
             return (
-              <div key={i}>
+              <div key={sectionKey}>
                 <button
                   onClick={() => setShowTrace((v) => !v)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
@@ -342,21 +343,21 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
                 {showTrace && (
                   <div className="mt-1 rounded-lg bg-muted/20 border border-border/30 overflow-hidden">
                     <pre className="p-3 font-mono text-[10px] leading-relaxed text-muted-foreground/60 whitespace-pre-wrap break-all max-h-80 overflow-auto">
-                      {section.lines.map((line, li) => {
-                        if (/^\s+File "/.test(line)) {
-                          return (
-                            <span key={li} className="text-muted-foreground/80">
-                              {line}
-                              {'\n'}
-                            </span>
-                          );
-                        }
-                        return (
-                          <span key={li}>
-                            {line}
-                            {'\n'}
-                          </span>
-                        );
+						{section.lines.map((line) => {
+							if (/^\s+File "/.test(line)) {
+								return (
+									<span key={line} className="text-muted-foreground/80">
+										{line}
+										{'\n'}
+									</span>
+								);
+							}
+							return (
+								<span key={line}>
+									{line}
+									{'\n'}
+								</span>
+							);
                       })}
                     </pre>
                   </div>
@@ -367,7 +368,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'install':
             return (
               <div
-                key={i}
+                key={sectionKey}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15"
               >
                 <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
@@ -380,7 +381,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'info':
             return (
               <div
-                key={i}
+                key={sectionKey}
                 className="flex items-center gap-2.5 px-3 py-1.5 text-xs text-muted-foreground font-mono"
               >
                 <span className="size-1.5 rounded-full bg-muted-foreground/30 flex-shrink-0" />
@@ -391,7 +392,7 @@ function StructuredOutputDisplay({ sections }: { sections: OutputSectionType[] }
           case 'plain':
             return (
               <PreWithPaths
-                key={i}
+                key={sectionKey}
                 text={section.text}
                 className="px-3 py-1.5 font-mono text-xs leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
               />
@@ -472,8 +473,8 @@ function ObservationReportCard({ report }: { report: ObservationReport }) {
             Facts
           </span>
           <ul className="space-y-1.5">
-            {report.facts.map((fact, idx) => (
-              <li key={`${report.id}-${idx}`} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
+            {report.facts.map((fact) => (
+              <li key={`${report.id}-${fact}`} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
                 <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-primary/70 flex-shrink-0" />
                 <span>{fact}</span>
               </li>
@@ -650,8 +651,9 @@ function CodeSection({ label, content, lang }: { label: string; content: string;
 
   return (
     <div className="rounded-lg border border-border overflow-hidden bg-card">
-      <div
-        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
+      <button
+        type="button"
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? (
@@ -666,7 +668,7 @@ function CodeSection({ label, content, lang }: { label: string; content: string;
         <span className="text-[10px] text-muted-foreground flex-shrink-0">
           {lineCount} lines
         </span>
-      </div>
+      </button>
       {expanded && (
         <div className="border-t border-border">
           <CodeHighlight

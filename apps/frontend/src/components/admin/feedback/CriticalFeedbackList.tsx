@@ -10,6 +10,9 @@ import { Star, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
+const STAR_SLOTS = [1, 2, 3, 4, 5] as const;
+const CRITICAL_FEEDBACK_SKELETON_ROWS = ['critical-feedback-skeleton-1', 'critical-feedback-skeleton-2', 'critical-feedback-skeleton-3'] as const;
+
 export function CriticalFeedbackList() {
   const router = useRouter();
   const { data: criticalFeedback, isLoading } = useAdminCriticalFeedback(10);
@@ -20,13 +23,13 @@ export function CriticalFeedbackList() {
     
     return (
       <div className="flex items-center gap-0.5">
-        {[...Array(5)].map((_, i) => {
-          if (i < fullStars) {
-            return <Star key={i} className="h-3 w-3 fill-yellow-500 text-yellow-500" />;
-          } else if (i === fullStars && hasHalfStar) {
-            return <Star key={i} className="h-3 w-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
+        {STAR_SLOTS.map((starSlot) => {
+          if (starSlot <= fullStars) {
+            return <Star key={starSlot} className="h-3 w-3 fill-yellow-500 text-yellow-500" />;
+          } else if (starSlot === fullStars + 1 && hasHalfStar) {
+            return <Star key={starSlot} className="h-3 w-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />;
           } else {
-            return <Star key={i} className="h-3 w-3 text-muted-foreground/30" />;
+            return <Star key={starSlot} className="h-3 w-3 text-muted-foreground/30" />;
           }
         })}
         <span className="ml-1 text-xs font-medium text-red-600 dark:text-red-400">{rating.toFixed(1)}</span>
@@ -46,8 +49,8 @@ export function CriticalFeedbackList() {
       <CardContent className="p-0">
         {isLoading ? (
           <div className="p-4 space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full" />
+            {CRITICAL_FEEDBACK_SKELETON_ROWS.map((rowId) => (
+              <Skeleton key={rowId} className="h-20 w-full" />
             ))}
           </div>
         ) : !criticalFeedback || criticalFeedback.length === 0 ? (

@@ -410,8 +410,16 @@ function CollapsibleSection({
     <div className="rounded-lg border border-border overflow-hidden bg-card">
       {/* Section header */}
       <div
+        role="button"
+        tabIndex={0}
         className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors group"
         onClick={handleToggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleToggle();
+          }
+        }}
       >
         {isExpanded ? (
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -468,7 +476,7 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
           case 'warning':
             return (
               <div
-                key={i}
+                key={`warning:${section.text}`}
                 className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-yellow-500/5 border border-yellow-500/15"
               >
                 <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-yellow-500" />
@@ -481,7 +489,7 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
           case 'error':
             return (
               <div
-                key={i}
+                key={`error:${section.errorType || ''}:${section.summary}`}
                 className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/15"
               >
                 <Ban className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-red-400" />
@@ -500,7 +508,7 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
 
           case 'traceback':
             return (
-              <div key={i}>
+              <div key={`traceback:${section.lines[0] || section.lines.length}`}>
                 <button
                   onClick={() => setShowTrace((v) => !v)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer w-full text-left"
@@ -522,14 +530,14 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
                       {section.lines.map((line, li) => {
                         if (/^\s+File "/.test(line)) {
                           return (
-                            <span key={li} className="text-muted-foreground/80">
+                            <span key={line} className="text-muted-foreground/80">
                               {line}
                               {'\n'}
                             </span>
                           );
                         }
                         return (
-                          <span key={li}>
+                          <span key={line}>
                             {line}
                             {'\n'}
                           </span>
@@ -544,7 +552,7 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
           case 'install':
             return (
               <div
-                key={i}
+                key={`install:${section.text}`}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15"
               >
                 <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
@@ -557,7 +565,7 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
           case 'info':
             return (
               <div
-                key={i}
+                key={`info:${section.text}`}
                 className="flex items-center gap-2.5 px-3 py-1.5 text-xs text-muted-foreground font-mono"
               >
                 <span className="size-1.5 rounded-full bg-muted-foreground/30 flex-shrink-0" />
@@ -568,7 +576,7 @@ function GenericStructuredOutputDisplay({ sections }: { sections: OutputSectionT
           case 'plain':
             return (
               <pre
-                key={i}
+                key={`plain:${section.text}`}
                 className="px-3 py-1.5 font-mono text-xs leading-relaxed text-foreground/70 whitespace-pre-wrap break-words"
               >
                 {section.text}
@@ -679,8 +687,8 @@ function GenericToolErrorDisplay({
           <span className="text-xs font-medium text-red-400">{displayType}</span>
         </div>
         <div className="px-3 py-2.5 space-y-2.5">
-          {validationIssues.map((issue, i) => (
-            <div key={i} className="space-y-1.5">
+          {validationIssues.map((issue) => (
+            <div key={issue.path.join('.') || issue.message} className="space-y-1.5">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-400/70 mt-0.5" />
                 <div className="min-w-0 flex-1">
@@ -698,9 +706,9 @@ function GenericToolErrorDisplay({
                 <div className="ml-5">
                   <div className="text-[10px] text-muted-foreground/50 mb-1">Expected one of:</div>
                   <div className="flex flex-wrap gap-1">
-                    {issue.values.map((val, vi) => (
+                    {issue.values.map((val) => (
                       <span
-                        key={vi}
+                        key={val}
                         className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/40 text-muted-foreground/70 font-mono"
                       >
                         {val}

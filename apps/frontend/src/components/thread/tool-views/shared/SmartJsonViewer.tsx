@@ -110,15 +110,17 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div 
+      <button
+        type="button"
         className={cn(
-          "flex items-start gap-1 cursor-pointer hover:bg-muted/50 rounded px-1 -ml-1 py-0.5 transition-colors group",
+          "flex w-full items-start gap-1 rounded px-1 -ml-1 py-0.5 text-left transition-colors group hover:bg-muted/50",
           !isExpanded && "items-center"
         )}
         onClick={(e) => {
           e.stopPropagation();
           if (!isEmpty) setIsExpanded(!isExpanded);
         }}
+        aria-expanded={!isEmpty ? isExpanded : undefined}
       >
         <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
           {!isEmpty && (
@@ -153,9 +155,9 @@ export const SmartJsonViewer: React.FC<SmartJsonViewerProps> = ({
              onClick={handleCopy}
            >
              {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-           </Button>
-        )}
-      </div>
+            </Button>
+         )}
+      </button>
 
       {isExpanded && !isEmpty && (
         <div className="flex flex-col">

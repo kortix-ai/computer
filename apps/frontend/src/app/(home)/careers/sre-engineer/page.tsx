@@ -1,8 +1,13 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Infrastructure / SRE Engineer',
+  description:
+    'Help keep Kortix infrastructure fast, reliable, and ready to scale.',
+};
 
 const responsibilities = [
   "Build and maintain infrastructure on AWS ECS and related services",

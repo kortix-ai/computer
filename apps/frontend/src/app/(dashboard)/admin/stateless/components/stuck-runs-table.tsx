@@ -585,9 +585,9 @@ export function StuckRunsTable({
           {detailRun && (
             <div className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Run ID
-                </label>
+                </p>
                 <div className="flex items-center gap-2">
                   <code className="text-sm font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
                     {detailRun.run_id}
@@ -605,27 +605,27 @@ export function StuckRunsTable({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Owner
-                  </label>
+                  </p>
                   <p className="text-sm font-mono">{detailRun.owner || "None"}</p>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
-                  </label>
+                  </p>
                   <Badge variant="outline">{detailRun.status || "unknown"}</Badge>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Reason
-                  </label>
+                  </p>
                   {getReasonBadge(detailRun.reason)}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Duration
-                  </label>
+                  </p>
                   <p className={cn("text-sm font-mono", getDurationSeverity(detailRun.duration))}>
                     {formatDuration(detailRun.duration)}
                   </p>
@@ -634,15 +634,15 @@ export function StuckRunsTable({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Heartbeat Age
-                  </label>
+                  </p>
                   <p className="text-sm font-mono">{formatDuration(detailRun.heartbeat_age)}</p>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Last Heartbeat
-                  </label>
+                  </p>
                   <p className="text-sm">
                     {detailRun.heartbeat
                       ? new Date(detailRun.heartbeat * 1000).toLocaleString()

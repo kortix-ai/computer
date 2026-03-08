@@ -251,6 +251,14 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
     }
   };
 
+  const handleFullscreenTriggerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!enableFullscreen || e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleFullscreenOpen();
+    }
+  };
+
   const renderChartForFullscreen = async () => {
     try {
       // Check cache first for fullscreen
@@ -605,7 +613,11 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
           minHeight: '200px',
           width: '100%'
         }}
+        role={enableFullscreen ? 'button' : 'presentation'}
+        tabIndex={enableFullscreen ? 0 : undefined}
+        aria-label={enableFullscreen ? 'Open diagram in fullscreen' : undefined}
         onClick={enableFullscreen ? handleFullscreenOpen : undefined}
+        onKeyDown={enableFullscreen ? handleFullscreenTriggerKeyDown : undefined}
       >
         <div
           ref={containerRef}
@@ -684,12 +696,13 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
             </div>
 
             {/* Canvas area */}
-            <div
-              ref={canvasRef}
-              className="flex-1 min-h-0 relative overflow-hidden bg-muted/10 cursor-move touch-none select-none"
-              onClick={(e) => e.stopPropagation()} // Prevent dialog from closing on canvas clicks
-              onMouseDown={(e) => {
-                e.stopPropagation(); // Prevent dialog from closing
+      <div
+        ref={canvasRef}
+        className="flex-1 min-h-0 relative overflow-hidden bg-muted/10 cursor-move touch-none select-none"
+        role="presentation"
+        onClick={(e) => e.stopPropagation()} // Prevent dialog from closing on canvas clicks
+        onMouseDown={(e) => {
+          e.stopPropagation(); // Prevent dialog from closing
                 handleMouseDown(e);
               }}
               onMouseMove={handleMouseMove}

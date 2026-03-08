@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Menu,
   ChevronRight,
@@ -85,7 +85,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { useIsMobile } from '@/hooks/utils';
+import { useIsMobile, useLocationSearch } from '@/hooks/utils';
 import { cn } from '@/lib/utils';
 import { useAdminRole } from '@/hooks/admin';
 import { useDocumentModalStore } from '@/stores/use-document-modal-store';
@@ -287,15 +287,23 @@ const changeTypeColor: Record<string, string> = {
 function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
   const { updateAvailable, latestVersion, changelog, update, isUpdating, updateResult } = useGlobalSandboxUpdate();
   const router = useRouter();
-  const [dismissed, setDismissed] = React.useState(false);
-  const [mounted, setMounted] = React.useState(false);
 
   const dismissKey = `sidebar-update-dismissed-${latestVersion}`;
+  const [dismissed, setDismissed] = React.useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    try {
+      return localStorage.getItem(dismissKey) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   React.useEffect(() => {
-    setMounted(true);
     try {
-      if (localStorage.getItem(dismissKey) === 'true') setDismissed(true);
+      setDismissed(localStorage.getItem(dismissKey) === 'true');
     } catch {}
   }, [dismissKey]);
 
@@ -312,7 +320,7 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
     );
   };
 
-  if (!mounted || !updateAvailable || dismissed || updateResult?.success) return null;
+  if (!updateAvailable || dismissed || updateResult?.success) return null;
 
   // ── Collapsed state: icon with pulse dot ──
   if (collapsed) {
@@ -358,11 +366,11 @@ function SidebarUpdateIndicator({ collapsed }: { collapsed: boolean }) {
       {/* Change list */}
       {previewChanges.length > 0 && (
         <div className="px-3 pb-1.5 space-y-0.5">
-          {previewChanges.map((change, i) => {
+          {previewChanges.map((change) => {
             const Icon = changeTypeIcon[change.type] ?? Zap;
             const color = changeTypeColor[change.type] ?? 'text-muted-foreground';
             return (
-              <div key={i} className="flex items-start gap-1.5">
+              <div key={`${change.type}:${change.text}`} className="flex items-start gap-1.5">
                 <Icon className={cn('h-3 w-3 mt-[1px] flex-shrink-0', color)} />
                 <span className="text-[11px] text-muted-foreground leading-tight line-clamp-1">{change.text}</span>
               </div>
@@ -427,7 +435,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const isMobile = useIsMobile();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const search = useLocationSearch();
 
   // Project filtering for session list removed — projects page merged into workspace
 
@@ -485,7 +493,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
-  }, [pathname, searchParams, isMobile, setOpenMobile]);
+  }, [pathname, search, isMobile, setOpenMobile]);
 
   // Listen for right sidebar expansion → collapse left
   useEffect(() => {
@@ -546,11 +554,18 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           {state === 'collapsed' && (
             <div
               className="group/collapsed absolute inset-0 flex items-center justify-center cursor-pointer"
-              onClick={() => {
-                setOpen(true);
-                window.dispatchEvent(new CustomEvent('sidebar-left-toggled', { detail: { expanded: true } }));
-              }}
             >
+              <button
+                type="button"
+                className="absolute inset-0 hidden items-center justify-center group-hover/collapsed:flex"
+                onClick={() => {
+                  setOpen(true);
+                  window.dispatchEvent(new CustomEvent('sidebar-left-toggled', { detail: { expanded: true } }));
+                }}
+                aria-label="Expand sidebar"
+              >
+                <ChevronRight className="h-3.5 w-3.5 text-sidebar-foreground" />
+              </button>
               {/* Symbol — hides on hover */}
               <Link href="/dashboard" onClick={(e) => {
                 e.preventDefault();
@@ -569,7 +584,6 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                   className="flex-shrink-0"
                 />
               </Link>
-              <ChevronRight className="h-3.5 w-3.5 text-sidebar-foreground hidden group-hover/collapsed:block" />
             </div>
           )}
           <div className={cn(
@@ -727,5 +741,3 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     </Sidebar>
   );
 }
-
-

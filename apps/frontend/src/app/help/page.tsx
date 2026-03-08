@@ -1,5 +1,4 @@
-'use client';
-
+import type { Metadata } from 'next';
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
@@ -7,6 +6,12 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Help Center',
+  description:
+    'Find help articles and answers about billing, credits, and using Kortix.',
+};
 
 export default function HelpCenterPage() {
   return (

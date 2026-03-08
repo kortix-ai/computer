@@ -33,10 +33,9 @@ export function FileSearch() {
     enabled: debouncedQuery.length > 0,
   });
 
-  // Reset selection when results change
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [results]);
+  const activeSelectedIndex = results && results.length > 0
+    ? Math.min(selectedIndex, results.length - 1)
+    : 0;
 
   const handleSelect = useCallback(
     (path: string) => {
@@ -86,17 +85,25 @@ export function FileSearch() {
         });
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (results[selectedIndex]) {
-          handleSelect(results[selectedIndex]);
+        if (results[activeSelectedIndex]) {
+          handleSelect(results[activeSelectedIndex]);
         }
       }
     },
-    [closeSearch, results, selectedIndex, handleSelect, scrollItemIntoView],
+    [activeSelectedIndex, closeSearch, results, handleSelect, scrollItemIntoView],
   );
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={closeSearch}>
-      <div className="mx-auto max-w-lg mt-4 px-4" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          closeSearch();
+        }
+      }}
+    >
+      <div className="mx-auto max-w-lg mt-4 px-4">
         <div className="rounded-lg border border-border bg-card shadow-2xl overflow-hidden">
           {/* Search input */}
           <div className="flex items-center gap-2 px-3 border-b">
@@ -110,6 +117,7 @@ export function FileSearch() {
               className="border-0 shadow-none focus-visible:ring-0 px-0 h-10"
             />
             <button
+              type="button"
               onClick={closeSearch}
               className="p-1 rounded hover:bg-muted"
             >
@@ -153,7 +161,7 @@ export function FileSearch() {
                     className={cn(
                       'flex items-center gap-2 w-full px-3 py-2 text-sm text-left',
                       'transition-colors',
-                      index === selectedIndex
+                      index === activeSelectedIndex
                         ? 'bg-muted'
                         : 'hover:bg-muted',
                     )}

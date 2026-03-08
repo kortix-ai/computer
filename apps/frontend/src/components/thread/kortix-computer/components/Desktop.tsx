@@ -1005,6 +1005,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
               src="https://heprlhlltebrxydgtsjs.supabase.co/storage/v1/object/public/image-uploads/backgrounds/computer-bg-dark.jpg"
               alt="Desktop wallpaper"
               fill
+              sizes="100vw"
               className="object-cover"
               unoptimized
             />
@@ -1014,6 +1015,7 @@ export const SandboxDesktop = memo(function SandboxDesktop({
               src="https://heprlhlltebrxydgtsjs.supabase.co/storage/v1/object/public/image-uploads/backgrounds/computer-bg-light.jpg"
               alt="Desktop wallpaper"
               fill
+              sizes="100vw"
               className="object-cover"
               unoptimized
             />

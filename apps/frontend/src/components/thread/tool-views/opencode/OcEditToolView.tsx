@@ -42,21 +42,75 @@ function getDirectory(path: string | undefined): string {
 function DiffLinesView({ patch, filename }: { patch: string; filename: string }) {
   const diffLines = useMemo(() => patch.split('\n').slice(4), [patch]);
 
+  const diffEntries = useMemo(() => {
+    let leftNum = 0;
+    let rightNum = 0;
+
+    return diffLines.map((line) => {
+      if (line.startsWith('@@')) {
+        const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (match) {
+          leftNum = parseInt(match[1], 10) - 1;
+          rightNum = parseInt(match[2], 10) - 1;
+        }
+
+        return {
+          line,
+          codeLine: '',
+          key: `hunk:${leftNum + 1}:${rightNum + 1}:${line}`,
+        };
+      }
+
+      if (line.startsWith('+')) {
+        rightNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `add:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line.startsWith('-')) {
+        leftNum += 1;
+        return {
+          line,
+          codeLine: line.substring(1),
+          key: `del:${leftNum}:${rightNum}:${line.substring(1)}`,
+        };
+      }
+
+      if (line === '') {
+        leftNum += 1;
+        rightNum += 1;
+        return {
+          line,
+          codeLine: '',
+          key: `ctx:${leftNum}:${rightNum}:`,
+        };
+      }
+
+      leftNum += 1;
+      rightNum += 1;
+      const content = line.startsWith(' ') ? line.substring(1) : line;
+      return {
+        line,
+        codeLine: content,
+        key: `ctx:${leftNum}:${rightNum}:${content}`,
+      };
+    });
+  }, [diffLines]);
+
   // Extract code content (without +/-/space prefix) for highlighting
   const codeLines = useMemo(
-    () =>
-      diffLines.map((line) => {
-        if (line.startsWith('@@') || line === '') return '';
-        return line.length > 0 ? line.substring(1) : '';
-      }),
-    [diffLines],
+    () => diffEntries.map((entry) => entry.codeLine),
+    [diffEntries],
   );
 
   const highlighted = useDiffHighlight(codeLines, filename);
 
   return (
     <pre className="p-3 font-mono text-[11px] leading-[1.6] select-text whitespace-pre-wrap break-all">
-      {diffLines.map((line, i) => {
+      {diffEntries.map(({ key, line }, i) => {
         const isAdd = line.startsWith('+');
         const isDel = line.startsWith('-');
         const isHunk = line.startsWith('@@');
@@ -68,7 +122,7 @@ function DiffLinesView({ patch, filename }: { patch: string; filename: string })
 
         if (isHunk || line === '') {
           return (
-            <div key={i} className={cls}>
+            <div key={key} className={cls}>
               {line || ' '}
             </div>
           );
@@ -80,7 +134,7 @@ function DiffLinesView({ patch, filename }: { patch: string; filename: string })
         if (highlightedTokens) {
           const html = renderHighlightedLine(highlightedTokens, codeLines[i]);
           return (
-            <div key={i} className={cls}>
+            <div key={key} className={cls}>
               <span
                 className={cn(
                   isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -96,7 +150,7 @@ function DiffLinesView({ patch, filename }: { patch: string; filename: string })
 
         return (
           <div
-            key={i}
+            key={key}
             className={cn(
               cls,
               isAdd && 'text-emerald-600 dark:text-emerald-400',
@@ -222,9 +276,10 @@ function SideBySideDiffView({ patch, filename }: { patch: string; filename: stri
             const leftTokens = leftHighlighted?.[i];
             const rightTokens = rightHighlighted?.[i];
             const isLeftHunk = row.left.content.startsWith('@@');
+            const rowKey = `${row.left.num ?? 'n'}:${row.left.type}:${row.left.content}|${row.right.num ?? 'n'}:${row.right.type}:${row.right.content}`;
 
             return (
-              <tr key={i}>
+              <tr key={rowKey}>
                 {/* Left side (old) */}
                 <td className="w-8 min-w-8 text-right pr-2 select-none text-muted-foreground/30 align-top border-r border-border/20">
                   {row.left.num ?? ''}

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
+import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import { Building2, User, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StepWrapper } from '../shared/step-wrapper';
@@ -64,115 +64,117 @@ export const UserTypeStep = () => {
 
   return (
     <StepWrapper>
-      <div className="max-w-4xl mx-auto">
-        <AnimatePresence mode="wait">
-          {/* Step 1: User Type Selection */}
-          {step === 'type' && (
-            <motion.div
-              key="type-selection"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              className="text-center space-y-8"
-            >
-              <div>
-                <h1 className="text-4xl font-medium mb-3">Welcome to Kortix</h1>
-                <p className="text-lg text-muted-foreground">Choose your account type</p>
-              </div>
+      <LazyMotion features={domAnimation}>
+        <div className="max-w-4xl mx-auto">
+          <AnimatePresence mode="wait">
+            {/* Step 1: User Type Selection */}
+            {step === 'type' && (
+              <m.div
+                key="type-selection"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+                className="text-center space-y-8"
+              >
+                <div>
+                  <h1 className="text-4xl font-medium mb-3">Welcome to Kortix</h1>
+                  <p className="text-lg text-muted-foreground">Choose your account type</p>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                <Button
-                  variant="outline"
-                  className="h-32 flex flex-col items-center justify-center space-y-3 text-center hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
-                  onClick={() => handleTypeSelect('individual')}
-                >
-                  <User className="h-8 w-8 text-primary" />
-                  <div>
-                    <div className="font-semibold text-base">Individual</div>
-                    <div className="text-sm text-muted-foreground">Personal use</div>
-                  </div>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-32 flex flex-col items-center justify-center space-y-3 text-center hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
-                  onClick={() => handleTypeSelect('company')}
-                >
-                  <Building2 className="h-8 w-8 text-primary" />
-                  <div>
-                    <div className="font-semibold text-base">Company</div>
-                    <div className="text-sm text-muted-foreground">Team & business</div>
-                  </div>
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 2: Company Size */}
-          {step === 'size' && (
-            <motion.div
-              key="size-selection"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              className="text-center space-y-6"
-            >
-              <h2 className="text-3xl font-medium">Company size?</h2>
-
-              <div className="grid grid-cols-1 gap-3 max-w-lg mx-auto">
-                {companySizes.map((size) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                   <Button
-                    key={size.id}
                     variant="outline"
-                    className="h-16 flex items-center justify-between px-6 hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
-                    onClick={() => handleSizeSelect(size.id)}
+                    className="h-32 flex flex-col items-center justify-center space-y-3 text-center hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
+                    onClick={() => handleTypeSelect('individual')}
                   >
-                    <div className="text-left">
-                      <div className="font-semibold">{size.label}</div>
-                      <div className="text-sm text-muted-foreground">{size.description}</div>
+                    <User className="h-8 w-8 text-primary" />
+                    <div>
+                      <div className="font-semibold text-base">Individual</div>
+                      <div className="text-sm text-muted-foreground">Personal use</div>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </Button>
-                ))}
-              </div>
-            </motion.div>
-          )}
 
-          {/* Step 3: Role Selection */}
-          {step === 'role' && (
-            <motion.div
-              key="role-selection"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              className="text-center space-y-6"
-            >
-              <h2 className="text-3xl font-medium">What's your role?</h2>
-
-              <div className="grid grid-cols-1 gap-3 max-w-lg mx-auto">
-                {roles.map((roleOption) => (
                   <Button
-                    key={roleOption.id}
                     variant="outline"
-                    className="h-16 flex items-center justify-between px-6 hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
-                    onClick={() => handleRoleSelect(roleOption.id)}
+                    className="h-32 flex flex-col items-center justify-center space-y-3 text-center hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
+                    onClick={() => handleTypeSelect('company')}
                   >
-                    <div className="text-left">
-                      <div className="font-semibold">{roleOption.label}</div>
-                      <div className="text-sm text-muted-foreground">{roleOption.description}</div>
+                    <Building2 className="h-8 w-8 text-primary" />
+                    <div>
+                      <div className="font-semibold text-base">Company</div>
+                      <div className="text-sm text-muted-foreground">Team & business</div>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </Button>
-                ))}
-              </div>
-            </motion.div>
-          )}
+                </div>
+              </m.div>
+            )}
 
-        </AnimatePresence>
-      </div>
+            {/* Step 2: Company Size */}
+            {step === 'size' && (
+              <m.div
+                key="size-selection"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+                className="text-center space-y-6"
+              >
+                <h2 className="text-3xl font-medium">Company size?</h2>
+
+                <div className="grid grid-cols-1 gap-3 max-w-lg mx-auto">
+                  {companySizes.map((size) => (
+                    <Button
+                      key={size.id}
+                      variant="outline"
+                      className="h-16 flex items-center justify-between px-6 hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
+                      onClick={() => handleSizeSelect(size.id)}
+                    >
+                      <div className="text-left">
+                        <div className="font-semibold">{size.label}</div>
+                        <div className="text-sm text-muted-foreground">{size.description}</div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  ))}
+                </div>
+              </m.div>
+            )}
+
+            {/* Step 3: Role Selection */}
+            {step === 'role' && (
+              <m.div
+                key="role-selection"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+                className="text-center space-y-6"
+              >
+                <h2 className="text-3xl font-medium">What's your role?</h2>
+
+                <div className="grid grid-cols-1 gap-3 max-w-lg mx-auto">
+                  {roles.map((roleOption) => (
+                    <Button
+                      key={roleOption.id}
+                      variant="outline"
+                      className="h-16 flex items-center justify-between px-6 hover:border-foreground/50 hover:bg-accent/50 transition-all duration-200"
+                      onClick={() => handleRoleSelect(roleOption.id)}
+                    >
+                      <div className="text-left">
+                        <div className="font-semibold">{roleOption.label}</div>
+                        <div className="text-sm text-muted-foreground">{roleOption.description}</div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  ))}
+                </div>
+              </m.div>
+            )}
+
+          </AnimatePresence>
+        </div>
+      </LazyMotion>
     </StepWrapper>
   );
 };

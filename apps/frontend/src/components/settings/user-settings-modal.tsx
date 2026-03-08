@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import {
     Dialog,
     DialogContent,
@@ -127,9 +127,7 @@ export function UserSettingsModal({
     defaultTab = 'general',
     returnUrl = typeof window !== 'undefined' ? window?.location?.href || '/' : '/',
 }: UserSettingsModalProps) {
-    const router = useRouter();
     const isMobile = useIsMobile();
-    const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
     const [showPlanModal, setShowPlanModal] = useState(false);
     const billingActive = isBillingEnabled();
 
@@ -144,18 +142,6 @@ export function UserSettingsModal({
 
     // Flat list for mobile horizontal scroll
     const allTabs = [...preferenceTabs, ...accountTabs];
-    
-    useEffect(() => {
-        setActiveTab(defaultTab);
-    }, [defaultTab]);
-
-    const handleTabClick = (tabId: TabId) => {
-        if (tabId === 'plan') {
-            setShowPlanModal(true);
-        } else {
-            setActiveTab(tabId);
-        }
-    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -169,29 +155,135 @@ export function UserSettingsModal({
                 hideCloseButton={true}
             >
                 <DialogTitle className="sr-only">Settings</DialogTitle>
-                
-                {isMobile ? (
-                    /* Mobile Layout - Full Screen */
-                    <div className="flex flex-col h-screen w-screen overflow-hidden">
-                        {/* Mobile Header */}
-                        <div className="px-4 py-3 border-b border-border flex-shrink-0 bg-background">
-                            <div className="flex items-center justify-between">
-                                <div className="text-lg font-semibold">Settings</div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => onOpenChange(false)}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
+                <UserSettingsModalBody
+                    key={defaultTab}
+                    open={open}
+                    isMobile={isMobile}
+                    defaultTab={defaultTab}
+                    returnUrl={returnUrl}
+                    allTabs={allTabs}
+                    tabGroups={tabGroups}
+                    onOpenChange={onOpenChange}
+                    onOpenPlanModal={() => setShowPlanModal(true)}
+                />
+
+                {/* Full-screen Plan Selection Modal */}
+                <PlanSelectionModal
+                    open={showPlanModal}
+                    onOpenChange={setShowPlanModal}
+                    returnUrl={returnUrl}
+                />
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function UserSettingsModalBody({
+    open,
+    isMobile,
+    defaultTab,
+    returnUrl,
+    allTabs,
+    tabGroups,
+    onOpenChange,
+    onOpenPlanModal,
+}: {
+    open: boolean;
+    isMobile: boolean;
+    defaultTab: TabId;
+    returnUrl: string;
+    allTabs: Tab[];
+    tabGroups: { label: string; tabs: Tab[] }[];
+    onOpenChange: (open: boolean) => void;
+    onOpenPlanModal: () => void;
+}) {
+    const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
+
+    const handleTabClick = (tabId: TabId) => {
+        if (tabId === 'plan') {
+            onOpenPlanModal();
+        } else {
+            setActiveTab(tabId);
+        }
+    };
+
+    return isMobile ? (
+        <div className="flex flex-col h-screen w-screen overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex-shrink-0 bg-background">
+                <div className="flex items-center justify-between">
+                    <div className="text-lg font-semibold">Settings</div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+
+            <div className="px-3 py-2.5 border-b border-border flex-shrink-0 bg-background">
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {allTabs.map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => handleTabClick(tab.id)}
+                                disabled={tab.disabled}
+                                className={cn(
+                                    "flex items-center gap-2 px-3 py-2 text-sm rounded-lg whitespace-nowrap flex-shrink-0 transition-colors",
+                                    isActive
+                                        ? "bg-muted text-foreground font-medium"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                )}
+                            >
+                                <Icon className="h-4 w-4 flex-shrink-0" />
+                                <span>{tab.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-x-hidden overflow-y-auto">
+                <div className="w-full max-w-full">
+                    {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
+                    {activeTab === 'appearance' && <AppearanceTab />}
+                    {activeTab === 'sounds' && <SoundsTab />}
+                    {activeTab === 'notifications' && <NotificationsTab />}
+                    {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
+                    {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={onOpenPlanModal} isActive={activeTab === 'billing'} />}
+                    {activeTab === 'transactions' && <TransactionsTab />}
+                    {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
+                </div>
+            </div>
+        </div>
+    ) : (
+        <div className="flex flex-row h-[700px]">
+            <div className="bg-background flex-shrink-0 w-56 p-4 border-r border-border">
+                <div className="flex justify-start mb-3">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                    {tabGroups.map((group) => (
+                        <div key={group.label}>
+                            <div className="px-4 pb-1.5">
+                                <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">{group.label}</span>
                             </div>
-                        </div>
-                        
-                        {/* Mobile Tabs - Horizontal Scroll */}
-                        <div className="px-3 py-2.5 border-b border-border flex-shrink-0 bg-background">
-                            <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                {allTabs.map((tab) => {
+                            <div className="flex flex-col gap-0.5">
+                                {group.tabs.map((tab) => {
                                     const Icon = tab.icon;
                                     const isActive = activeTab === tab.id;
 
@@ -201,9 +293,9 @@ export function UserSettingsModal({
                                             onClick={() => handleTabClick(tab.id)}
                                             disabled={tab.disabled}
                                             className={cn(
-                                                "flex items-center gap-2 px-3 py-2 text-sm rounded-lg whitespace-nowrap flex-shrink-0 transition-colors",
+                                                "w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-colors",
                                                 isActive
-                                                    ? "bg-muted text-foreground font-medium"
+                                                    ? "bg-muted text-foreground"
                                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                                             )}
                                         >
@@ -214,94 +306,21 @@ export function UserSettingsModal({
                                 })}
                             </div>
                         </div>
-                        
-                        {/* Mobile Content - Scrollable */}
-                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                            <div className="w-full max-w-full">
-                                {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
-                                {activeTab === 'appearance' && <AppearanceTab />}
-                                {activeTab === 'sounds' && <SoundsTab />}
-                                {activeTab === 'notifications' && <NotificationsTab />}
-                                {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
-                                {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
-                                {activeTab === 'transactions' && <TransactionsTab />}
-                                {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    /* Desktop Layout - Side by Side */
-                    <div className="flex flex-row h-[700px]">
-                        {/* Desktop Sidebar */}
-                        <div className="bg-background flex-shrink-0 w-56 p-4 border-r border-border">
-                            <div className="flex justify-start mb-3">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => onOpenChange(false)}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
+                    ))}
+                </div>
+            </div>
 
-                            {/* Desktop Tabs - Grouped */}
-                            <div className="flex flex-col gap-4">
-                                {tabGroups.map((group) => (
-                                    <div key={group.label}>
-                                        <div className="px-4 pb-1.5">
-                                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">{group.label}</span>
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            {group.tabs.map((tab) => {
-                                                const Icon = tab.icon;
-                                                const isActive = activeTab === tab.id;
-
-                                                return (
-                                                    <button
-                                                        key={tab.id}
-                                                        onClick={() => handleTabClick(tab.id)}
-                                                        disabled={tab.disabled}
-                                                        className={cn(
-                                                            "w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-colors",
-                                                            isActive
-                                                                ? "bg-muted text-foreground"
-                                                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                                        )}
-                                                    >
-                                                        <Icon className="h-4 w-4 flex-shrink-0" />
-                                                        <span>{tab.label}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Desktop Content */}
-                        <div className="flex-1 overflow-y-auto min-h-0 w-full max-w-full">
-                            {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
-                            {activeTab === 'appearance' && <AppearanceTab />}
-                            {activeTab === 'sounds' && <SoundsTab />}
-                            {activeTab === 'notifications' && <NotificationsTab />}
-                            {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
-                            {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={() => setShowPlanModal(true)} isActive={activeTab === 'billing'} />}
-                            {activeTab === 'transactions' && <TransactionsTab />}
-                            {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
-                        </div>
-                    </div>
-                )}
-
-                {/* Full-screen Plan Selection Modal */}
-                <PlanSelectionModal
-                    open={showPlanModal}
-                    onOpenChange={setShowPlanModal}
-                    returnUrl={returnUrl}
-                />
-            </DialogContent>
-        </Dialog>
+            <div className="flex-1 overflow-y-auto min-h-0 w-full max-w-full">
+                {activeTab === 'general' && <GeneralTab onClose={() => onOpenChange(false)} />}
+                {activeTab === 'appearance' && <AppearanceTab />}
+                {activeTab === 'sounds' && <SoundsTab />}
+                {activeTab === 'notifications' && <NotificationsTab />}
+                {activeTab === 'shortcuts' && <KeyboardShortcutsTab />}
+                {activeTab === 'billing' && <BillingTab returnUrl={returnUrl} onOpenPlanModal={onOpenPlanModal} isActive={activeTab === 'billing'} />}
+                {activeTab === 'transactions' && <TransactionsTab />}
+                {activeTab === 'referrals' && <ReferralsTab isActive={open && activeTab === 'referrals'} />}
+            </div>
+        </div>
     );
 }
 
@@ -506,7 +525,7 @@ function GeneralTab({ onClose }: { onClose: () => void }) {
             <div className="space-y-4">
                 {/* Profile Picture Section */}
                 <div className="space-y-3">
-                    <Label>{t('profilePicture.title')}</Label>
+                    <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{t('profilePicture.title')}</div>
                     <div className="flex items-center gap-4">
                         <div className="relative group">
                             <Avatar className="h-16 w-16 border-2 border-border">
@@ -702,7 +721,7 @@ function GeneralTab({ onClose }: { onClose: () => void }) {
                                 </div>
 
                                 <div className="space-y-3">
-                                    <Label className="text-sm">{t('deleteAccount.chooseDeletionType')}</Label>
+                                    <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{t('deleteAccount.chooseDeletionType')}</div>
                                     <RadioGroup value={deletionType} onValueChange={(value) => setDeletionType(value as 'grace-period' | 'immediate')}>
                                         <div className="flex items-start gap-2 sm:gap-3 rounded-md border p-3 sm:p-4">
                                             <RadioGroupItem value="grace-period" id="grace-period" className="mt-0.5 flex-shrink-0" />
@@ -831,7 +850,7 @@ function KeyboardShortcutsTab() {
 
             {/* All shortcuts reference */}
             <div className="space-y-3">
-                <Label className="text-sm font-medium">All shortcuts</Label>
+                <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">All shortcuts</div>
                 <div className="rounded-md border divide-y">
                     {shortcuts.map((s) => (
                         <div key={s.label} className="flex items-center justify-between px-3 py-2.5">
@@ -1128,6 +1147,8 @@ function NotificationToggle({ icon: Icon, label, description, enabled, onToggle,
 
 function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRefetch: () => void }) {
     const autoTopup = accountState?.auto_topup;
+    const thresholdInputId = 'auto-topup-threshold';
+    const amountInputId = 'auto-topup-amount';
     const [enabled, setEnabled] = useState(autoTopup?.enabled ?? false);
     const [threshold, setThreshold] = useState(String(autoTopup?.threshold ?? 5));
     const [amount, setAmount] = useState(String(autoTopup?.amount ?? 15));
@@ -1185,12 +1206,13 @@ function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRe
             {enabled && (
                 <div className="space-y-3 pl-0">
                     <div>
-                        <label className="text-xs text-muted-foreground block mb-1">
+                        <label htmlFor={thresholdInputId} className="text-xs text-muted-foreground block mb-1">
                             When credit balance goes below (minimum $5)
                         </label>
                         <div className="flex items-center gap-1">
                             <span className="text-sm text-muted-foreground">$</span>
                             <input
+                                id={thresholdInputId}
                                 type="number"
                                 min={5}
                                 value={threshold}
@@ -1200,12 +1222,13 @@ function AutoTopupSection({ accountState, onRefetch }: { accountState: any; onRe
                         </div>
                     </div>
                     <div>
-                        <label className="text-xs text-muted-foreground block mb-1">
+                        <label htmlFor={amountInputId} className="text-xs text-muted-foreground block mb-1">
                             Reload credit balance to (minimum $15)
                         </label>
                         <div className="flex items-center gap-1">
                             <span className="text-sm text-muted-foreground">$</span>
                             <input
+                                id={amountInputId}
                                 type="number"
                                 min={15}
                                 value={amount}
@@ -1527,12 +1550,14 @@ function BillingTab({ returnUrl, onOpenPlanModal, isActive }: { returnUrl: strin
                         <div className="flex items-center gap-2">
                             {planIcon && (
                                 <div className="rounded-full py-0.5 flex items-center justify-center">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img 
+                                    <Image 
                                         src={planIcon} 
                                         alt={planName} 
+                                        width={planIcon.includes('/pro.svg') ? 55 : 50}
+                                        height={24}
                                         className="h-6 w-auto" 
                                         style={{ height: '24px', width: 'auto' }}
+                                        unoptimized
                                     />
                                 </div>
                             )}
@@ -1837,5 +1862,3 @@ function TransactionsTab() {
         </div>
     );
 }
-
-

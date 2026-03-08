@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useMemo } from 'react';
 import { Globe, CheckCircle, AlertCircle, ExternalLink, ChevronRight, ChevronDown, FileText, FileJson, AlertTriangle } from 'lucide-react';
 import { ToolViewProps } from '../types';
@@ -28,6 +29,26 @@ function getPathname(url: string): string {
   } catch {
     return '';
   }
+}
+
+function FaviconImage({ src, className }: { src: string; className: string }) {
+  const [isVisible, setIsVisible] = useState(true);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={16}
+      height={16}
+      unoptimized
+      className={className}
+      onError={() => setIsVisible(false)}
+    />
+  );
 }
 
 function parseError(output: string): { statusCode: string | null; message: string } {
@@ -189,7 +210,7 @@ export function OcWebFetchToolView({
         <CardContent className="p-0 h-full flex-1 overflow-hidden">
           <ScrollArea className="h-full w-full">
             <div className="p-3 space-y-1.5">
-              {scrapeData.results.map((result, idx) => {
+              {scrapeData.results.map((result) => {
                 const rDomain = getDomain(result.url);
                 const favicon = getFaviconUrl(result.url);
                 const snippet = result.content
@@ -198,7 +219,7 @@ export function OcWebFetchToolView({
 
                 return (
                   <a
-                    key={idx}
+                    key={result.url}
                     href={result.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -206,12 +227,9 @@ export function OcWebFetchToolView({
                   >
                     <div className="size-6 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                       {favicon ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <FaviconImage
                           src={favicon}
-                          alt=""
                           className="size-4 rounded"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : (
                         <Globe className="size-3.5 text-muted-foreground/50" />
@@ -400,9 +418,11 @@ function ContentDisplay({
   return (
     <div className="rounded-lg border border-border overflow-hidden bg-card">
       {/* Clickable header row */}
-      <div
-        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
+      <button
+        type="button"
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-muted transition-colors"
         onClick={onToggle}
+        aria-expanded={expanded}
       >
         {expanded ? (
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -419,7 +439,7 @@ function ContentDisplay({
         <span className="text-[10px] text-muted-foreground flex-shrink-0">
           {lineCount} lines
         </span>
-      </div>
+      </button>
 
       {/* Expandable content */}
       {expanded && (

@@ -54,6 +54,8 @@ interface NewAPIKeyData {
   expiresInDays: string;
 }
 
+const API_KEY_LOADING_ROW_SLOTS = ['api-key-row-1', 'api-key-row-2'] as const;
+
 function CopyButton({ value, label, size = 'sm' }: { value: string; label?: string; size?: 'sm' | 'icon' }) {
   const [copied, setCopied] = useState(false);
 
@@ -362,7 +364,6 @@ export default function APIKeysPage() {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && newKeyData.title.trim()) handleCreateAPIKey();
                       }}
-                      autoFocus
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -412,8 +413,8 @@ export default function APIKeysPage() {
           <div className="rounded-2xl border bg-card overflow-hidden">
             {isLoading ? (
               <div className="divide-y">
-                {[1, 2].map((i) => (
-                  <div key={i} className="px-4 py-4 animate-pulse">
+                {API_KEY_LOADING_ROW_SLOTS.map((slot) => (
+                  <div key={slot} className="px-4 py-4 animate-pulse">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-muted" />
                       <div className="flex-1 space-y-2">

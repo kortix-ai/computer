@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ interface ShellScopeEditorProps {
 }
 
 export function ShellScopeEditor({ scope, onChange }: ShellScopeEditorProps) {
+  const id = useId();
   const [commandInput, setCommandInput] = useState('');
 
   const addCommand = (cmd?: string) => {
@@ -43,21 +44,22 @@ export function ShellScopeEditor({ scope, onChange }: ShellScopeEditorProps) {
     <div className="space-y-4">
       {/* Allowed Commands */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-muted-foreground">Allowed Commands</Label>
+        <Label htmlFor={`${id}-commands`} className="text-xs font-medium text-muted-foreground">Allowed Commands</Label>
         {scope.commands.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {scope.commands.map((cmd) => (
-              <Badge key={cmd} variant="secondary" className="gap-1 pr-1 font-mono text-xs">
-                {cmd}
-                <button onClick={() => removeCommand(cmd)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
+                <Badge key={cmd} variant="secondary" className="gap-1 pr-1 font-mono text-xs">
+                  {cmd}
+                  <button type="button" aria-label={`Remove command ${cmd}`} onClick={() => removeCommand(cmd)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
             ))}
           </div>
         )}
         <div className="flex gap-1.5">
           <input
+            id={`${id}-commands`}
             type="text"
             value={commandInput}
             onChange={(e) => setCommandInput(e.target.value)}
@@ -65,7 +67,7 @@ export function ShellScopeEditor({ scope, onChange }: ShellScopeEditorProps) {
             placeholder="e.g. git, node, python"
             className="flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
-          <Button variant="outline" size="sm" onClick={() => addCommand()} disabled={!commandInput.trim()}>
+          <Button type="button" variant="outline" size="sm" onClick={() => addCommand()} disabled={!commandInput.trim()} aria-label="Add command">
             <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -86,8 +88,9 @@ export function ShellScopeEditor({ scope, onChange }: ShellScopeEditorProps) {
 
       {/* Working Directory */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-muted-foreground">Working Directory</Label>
+        <Label htmlFor={`${id}-working-directory`} className="text-xs font-medium text-muted-foreground">Working Directory</Label>
         <input
+          id={`${id}-working-directory`}
           type="text"
           value={scope.workingDir || ''}
           onChange={(e) => onChange({ ...scope, workingDir: e.target.value || undefined })}

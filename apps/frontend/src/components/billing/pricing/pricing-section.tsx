@@ -79,6 +79,7 @@ function PricingCard({
             src="/kortix-computer.png"
             alt="Kortix Pro cloud computer"
             fill
+            sizes="(max-width: 767px) 100vw, 50vw"
             className="object-contain object-top scale-110 -translate-y-2"
             priority
           />

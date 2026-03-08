@@ -12,7 +12,7 @@ export function CookieVisibility() {
   if (shouldShow) return null;
 
   return (
-    <style jsx global>{`
+    <style>{`
       .cky-btn-revisit-wrapper {
         display: none !important;
       }

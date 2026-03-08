@@ -120,10 +120,10 @@ export function AddInstanceDialog() {
         <div className="flex flex-col gap-4 px-5 pb-5 overflow-y-auto">
           {/* Location selector */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
               <MapPin className="h-3 w-3" />
-              Location
-            </label>
+              Choose a location
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {LOCATIONS.map((loc) => (
                 <button

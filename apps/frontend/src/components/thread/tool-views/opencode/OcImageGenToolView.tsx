@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import Image from 'next/image';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image as ImageIcon,
   CheckCircle,
@@ -70,6 +71,11 @@ export function OcImageGenToolView({
 
   const config = ACTION_CONFIG[action] || ACTION_CONFIG.generate;
   const imageSource = parsed.url || parsed.path;
+  const [showImage, setShowImage] = useState(Boolean(imageSource));
+
+  useEffect(() => {
+    setShowImage(Boolean(imageSource));
+  }, [imageSource]);
 
   if (isStreaming && !toolResult) {
     return (
@@ -96,14 +102,17 @@ export function OcImageGenToolView({
         <ScrollArea className="h-full w-full">
           <div className="p-3 space-y-3">
             {/* Image preview */}
-            {imageSource && (
+            {imageSource && showImage && (
               <div className="flex justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={imageSource}
                   alt={prompt || 'Generated image'}
+                  width={1600}
+                  height={1200}
+                  unoptimized
+                  sizes="(max-width: 768px) 100vw, 768px"
                   className="max-w-full max-h-[400px] rounded-lg border border-border object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onError={() => setShowImage(false)}
                 />
               </div>
             )}

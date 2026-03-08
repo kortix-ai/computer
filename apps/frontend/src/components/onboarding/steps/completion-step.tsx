@@ -1,12 +1,27 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { LazyMotion, domAnimation, m } from 'framer-motion';
 import { CheckCircle2, ArrowRight, Sparkles, Zap, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { allAgents } from '../shared/data';
 import { IconRenderer } from '../shared/icon-renderer';
 import { userContext } from '../shared/context';
+
+const SPARKLE_POSITIONS = [
+  { id: 'sparkle-1', left: '8%', top: '12%' },
+  { id: 'sparkle-2', left: '18%', top: '74%' },
+  { id: 'sparkle-3', left: '27%', top: '28%' },
+  { id: 'sparkle-4', left: '34%', top: '86%' },
+  { id: 'sparkle-5', left: '43%', top: '16%' },
+  { id: 'sparkle-6', left: '52%', top: '62%' },
+  { id: 'sparkle-7', left: '61%', top: '9%' },
+  { id: 'sparkle-8', left: '68%', top: '80%' },
+  { id: 'sparkle-9', left: '76%', top: '32%' },
+  { id: 'sparkle-10', left: '83%', top: '66%' },
+  { id: 'sparkle-11', left: '91%', top: '18%' },
+  { id: 'sparkle-12', left: '95%', top: '52%' },
+] as const;
 
 export const CompletionStep = () => {
   // Get the configured agents from global context
@@ -17,95 +32,96 @@ export const CompletionStep = () => {
   );
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-200px)] relative overflow-hidden">
-      {/* Background sparkles animation */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[...Array(12)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute"
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{
-              opacity: [0, 1, 0],
-              scale: [0, 1, 0],
-              rotate: [0, 180, 360]
-            }}
-            transition={{
-              duration: 3,
-              delay: i * 0.2,
-              repeat: Infinity,
-              repeatDelay: 2
-            }}
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-          >
-            <Sparkles className="h-4 w-4 text-primary/30" />
-          </motion.div>
-        ))}
-      </div>
+    <LazyMotion features={domAnimation}>
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)] relative overflow-hidden">
+        {/* Background sparkles animation */}
+        <div className="absolute inset-0 pointer-events-none">
+          {SPARKLE_POSITIONS.map((sparkle, index) => (
+            <m.div
+              key={sparkle.id}
+              className="absolute"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{
+                opacity: [0, 1, 0],
+                scale: [0.95, 1, 0.95],
+                rotate: [0, 180, 360]
+              }}
+              transition={{
+                duration: 3,
+                delay: index * 0.2,
+                repeat: Infinity,
+                repeatDelay: 2
+              }}
+              style={{
+                left: sparkle.left,
+                top: sparkle.top,
+              }}
+            >
+              <Sparkles className="h-4 w-4 text-primary/30" />
+            </m.div>
+          ))}
+        </div>
 
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{
-          duration: 0.8,
-          type: "spring",
-          stiffness: 100,
-          damping: 15
-        }}
-        className="text-center max-w-3xl mx-auto space-y-8 relative z-10"
-      >
-        {/* Grandiose success icon with crown */}
-        <motion.div
-          initial={{ scale: 0, opacity: 0, rotate: -180 }}
-          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+        <m.div
+          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{
+            duration: 0.8,
             type: "spring",
-            stiffness: 200,
+            stiffness: 100,
             damping: 15,
-            delay: 0.3
           }}
-          className="relative mx-auto mb-6"
+          className="text-center max-w-3xl mx-auto space-y-8 relative z-10"
         >
-          <div className="w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center mx-auto relative">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 rounded-full border-2 border-dashed border-primary/20"
-            />
-            <Crown className="h-12 w-12 text-primary" />
-          </div>
-        </motion.div>
-
-        {/* Grandiose main message */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.6 }}
-          className="space-y-4"
-        >
-
-          <h1 className="text-4xl md:text-5xl font-medium bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent leading-tight">
-            Your AI Workforce
-            <br />
-            is Ready to Dominate!
-          </h1>
-
-          <motion.p
-            className="text-lg text-muted-foreground max-w-xl mx-auto"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
+          {/* Grandiose success icon with crown */}
+          <m.div
+            initial={{ scale: 0.95, opacity: 0, rotate: -180 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 200,
+              damping: 15,
+              delay: 0.3
+            }}
+            className="relative mx-auto mb-6"
           >
-            AI Workforce
-            are now configured, trained, and ready to revolutionize your workflow
-          </motion.p>
-        </motion.div>
+            <div className="w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center mx-auto relative">
+              <m.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-2 border-dashed border-primary/20"
+              />
+              <Crown className="h-12 w-12 text-primary" />
+            </div>
+          </m.div>
 
-      </motion.div>
-    </div>
+          {/* Grandiose main message */}
+          <m.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.6 }}
+            className="space-y-4"
+          >
+
+            <h1 className="text-4xl md:text-5xl font-medium bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent leading-tight">
+              Your AI Workforce
+              <br />
+              is Ready to Dominate!
+            </h1>
+
+            <m.p
+              className="text-lg text-muted-foreground max-w-xl mx-auto"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+            >
+              AI Workforce
+              are now configured, trained, and ready to revolutionize your workflow
+            </m.p>
+          </m.div>
+
+        </m.div>
+      </div>
+    </LazyMotion>
   );
 };
-

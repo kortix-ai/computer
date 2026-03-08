@@ -98,6 +98,13 @@ export function KortixLoader({
 }: KortixLoaderProps) {
   const { resolvedTheme } = useTheme();
   const loaderSize = customSize || SIZE_MAP[size];
+  const styles = `
+    @keyframes kortix-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  `;
   
   // Track mounted state to prevent hydration mismatch
   const [mounted, setMounted] = React.useState(false);
@@ -169,13 +176,7 @@ export function KortixLoader({
               : 'none',
         }}
       />
-      <style jsx>{`
-        @keyframes kortix-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
+      <style>{styles}</style>
     </div>
   );
 }

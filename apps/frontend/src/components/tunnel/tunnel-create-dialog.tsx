@@ -39,9 +39,12 @@ type Step = 'name' | 'permissions' | 'connect';
 
 function renderHighlightedCommand(command: string): React.ReactNode[] {
   const tokens = command.trim().split(/\s+/);
+  const tokenCounts = new Map<string, number>();
   let previousToken = '';
 
   return tokens.map((token, index) => {
+    const occurrence = (tokenCounts.get(token) ?? 0) + 1;
+    tokenCounts.set(token, occurrence);
     let className = 'text-foreground/90';
 
     if (index === 0) {
@@ -59,7 +62,7 @@ function renderHighlightedCommand(command: string): React.ReactNode[] {
     previousToken = token;
 
     return (
-      <React.Fragment key={`${token}-${index}`}>
+      <React.Fragment key={`${token}-${occurrence}`}>
         <span className={className}>{token}</span>
         {index < tokens.length - 1 ? ' ' : null}
       </React.Fragment>
@@ -157,7 +160,6 @@ function NameStep({
           onKeyDown={(e) => e.key === 'Enter' && onNext()}
           className="w-full rounded-lg border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
           placeholder={defaultName}
-          autoFocus
         />
         <p className="text-[11px] text-muted-foreground">
           Leave empty to use &quot;{defaultName}&quot;

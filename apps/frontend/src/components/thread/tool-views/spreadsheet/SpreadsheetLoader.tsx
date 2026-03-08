@@ -1,6 +1,12 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
+const MINI_GRID_CELL_SLOTS = Array.from({ length: 24 }, (_, index) => `mini-grid-cell-${index + 1}`);
+const LOADER_ROW_SLOTS = Array.from({ length: 50 }, (_, index) => `loader-row-${index + 1}`);
+const LOADER_COLUMN_SLOTS = Array.from({ length: 11 }, (_, index) => `loader-col-${index + 1}`);
+
+const shouldShowCellPulse = (rowIndex: number, colIndex: number) => rowIndex < 10 && (rowIndex * 11 + colIndex) % 9 === 0;
+
 interface SpreadsheetLoaderProps {
   mode?: 'mini' | 'max';
 }
@@ -17,9 +23,9 @@ export function SpreadsheetLoader({ mode = 'max' }: SpreadsheetLoaderProps) {
         </div>
         <div className="flex-1 relative">
             <div className="absolute inset-0 grid grid-cols-4 grid-rows-6 gap-[1px] bg-border/50 p-[1px]">
-                 {[...Array(24)].map((_, i) => (
-                    <div key={i} className="bg-background" />
-                 ))}
+                 {MINI_GRID_CELL_SLOTS.map((slot) => (
+                    <div key={slot} className="bg-background" />
+                  ))}
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
                  <div className="flex flex-col items-center gap-2 bg-background/80 p-4 rounded-lg backdrop-blur-sm shadow-sm">
@@ -78,17 +84,17 @@ export function SpreadsheetLoader({ mode = 'max' }: SpreadsheetLoaderProps) {
         </div>
         <div className="flex-1 overflow-hidden relative">
            <div className="absolute inset-0 overflow-hidden">
-             {[...Array(50)].map((_, i) => (
-               <div key={i} className="flex h-[28px] border-b">
-                 <div className="w-10 flex-none border-r bg-muted/10 flex items-center justify-center">
-                   <span className="text-[10px] text-muted-foreground">{i + 1}</span>
-                 </div>
-                 {[...Array(11)].map((_, j) => (
-                   <div key={j} className="w-24 flex-none border-r relative group">
-                      {Math.random() > 0.9 && i < 10 && (
-                        <div className="absolute inset-1 rounded-sm bg-muted/20 animate-pulse" />
-                      )}
-                   </div>
+             {LOADER_ROW_SLOTS.map((rowSlot, rowIndex) => (
+               <div key={rowSlot} className="flex h-[28px] border-b">
+                  <div className="w-10 flex-none border-r bg-muted/10 flex items-center justify-center">
+                    <span className="text-[10px] text-muted-foreground">{rowIndex + 1}</span>
+                  </div>
+                  {LOADER_COLUMN_SLOTS.map((colSlot, colIndex) => (
+                    <div key={`${rowSlot}-${colSlot}`} className="w-24 flex-none border-r relative group">
+                       {shouldShowCellPulse(rowIndex, colIndex) && (
+                         <div className="absolute inset-1 rounded-sm bg-muted/20 animate-pulse" />
+                       )}
+                    </div>
                  ))}
                  <div className="flex-1" />
                </div>

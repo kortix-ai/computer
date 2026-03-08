@@ -12,7 +12,7 @@ import {
   type LLMAnalysisResponse,
   type LLMAnalysisRequest 
 } from '@/hooks/admin/use-admin-feedback';
-import { 
+import {
   Sparkles, 
   AlertTriangle,
   CheckCircle2, 
@@ -23,6 +23,8 @@ import {
   Zap,
   ArrowRight
 } from 'lucide-react';
+
+const EFFORT_DOT_SLOTS = [1, 2, 3] as const;
 
 export function LLMAnalysisPanel() {
   const [focusArea, setFocusArea] = useState<string>('all');
@@ -51,10 +53,10 @@ export function LLMAnalysisPanel() {
     const count = effort === 'small' ? 1 : effort === 'medium' ? 2 : 3;
     return (
       <div className="flex gap-0.5">
-        {[1, 2, 3].map((i) => (
+        {EFFORT_DOT_SLOTS.map((slot) => (
           <div 
-            key={i} 
-            className={`w-1.5 h-1.5 rounded-full ${i <= count ? 'bg-secondary' : 'bg-muted'}`} 
+            key={`effort-dot-${slot}`} 
+            className={`w-1.5 h-1.5 rounded-full ${slot <= count ? 'bg-secondary' : 'bg-muted'}`} 
           />
         ))}
       </div>
@@ -152,9 +154,9 @@ export function LLMAnalysisPanel() {
                     Key Themes
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {analysis.key_themes.map((theme, i) => (
+                    {analysis.key_themes.map((theme) => (
                       <span 
-                        key={i} 
+                        key={theme} 
                         className="px-3 py-1.5 rounded-full text-sm font-medium bg-secondary/10 text-secondary"
                       >
                         {theme}
@@ -174,8 +176,8 @@ export function LLMAnalysisPanel() {
                       <h4 className="font-semibold">What's Working</h4>
                     </div>
                     <ul className="space-y-2">
-                      {analysis.positive_highlights.map((highlight, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm">
+                      {analysis.positive_highlights.map((highlight) => (
+                        <li key={highlight} className="flex items-start gap-2 text-sm">
                           <span className="text-secondary mt-0.5 shrink-0">✓</span>
                           <span className="text-muted-foreground">{highlight}</span>
                         </li>
@@ -192,8 +194,8 @@ export function LLMAnalysisPanel() {
                       <h4 className="font-semibold">Needs Attention</h4>
                     </div>
                     <div className="space-y-2">
-                      {analysis.improvement_areas.slice(0, 4).map((area, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm">
+                      {analysis.improvement_areas.slice(0, 4).map((area) => (
+                        <div key={`${area.area}:${area.severity}`} className="flex items-center gap-2 text-sm">
                           <div className={`w-2 h-2 rounded-full shrink-0 ${
                             area.severity === 'high' ? 'bg-destructive' : 'bg-secondary'
                           }`} />
@@ -213,9 +215,9 @@ export function LLMAnalysisPanel() {
                     Improvement Details
                   </h4>
                   <div className="space-y-3">
-                    {analysis.improvement_areas.map((area, i) => (
+                    {analysis.improvement_areas.map((area) => (
                       <div 
-                        key={i} 
+                        key={`${area.area}:${area.severity}`} 
                         className={`rounded-lg border-l-4 p-4 ${getSeverityStyles(area.severity)}`}
                       >
                         <div className="flex items-start justify-between gap-4 mb-2">
@@ -239,8 +241,8 @@ export function LLMAnalysisPanel() {
                         </div>
                         {area.user_quotes.length > 0 && (
                           <div className="mt-3 pl-3 border-l-2 border-muted">
-                            {area.user_quotes.slice(0, 2).map((quote, qi) => (
-                              <p key={qi} className="text-xs italic text-muted-foreground mb-1">
+                            {area.user_quotes.slice(0, 2).map((quote) => (
+                              <p key={`${area.area}:${quote}`} className="text-xs italic text-muted-foreground mb-1">
                                 "{quote}"
                               </p>
                             ))}
@@ -259,9 +261,9 @@ export function LLMAnalysisPanel() {
                     Recommended Actions
                   </h4>
                   <div className="space-y-3">
-                    {analysis.actionable_recommendations.map((rec, i) => (
+                    {analysis.actionable_recommendations.map((rec) => (
                       <div 
-                        key={i} 
+                        key={`${rec.recommendation}:${rec.priority}`} 
                         className="group rounded-xl border bg-card p-4 hover:border-secondary/50 transition-colors"
                       >
                         <div className="flex items-start gap-4">

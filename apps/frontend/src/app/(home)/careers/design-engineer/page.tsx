@@ -1,8 +1,13 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Product / Design Engineer',
+  description:
+    'Help design and ship polished product experiences for Kortix.',
+};
 
 const responsibilities = [
   "Own features end-to-end: design, build, ship, iterate",

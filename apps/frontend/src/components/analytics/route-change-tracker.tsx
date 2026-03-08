@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { trackRouteChange } from '@/lib/analytics/gtm';
+import { useLocationSearch } from '@/hooks/utils';
 
 /**
  * RouteChangeTracker Component
@@ -13,9 +14,9 @@ import { trackRouteChange } from '@/lib/analytics/gtm';
  * This solves the SPA tracking problem where page views aren't
  * automatically tracked on client-side navigation.
  */
-export function RouteChangeTracker() {
+function RouteChangeTrackerContent() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const search = useLocationSearch();
   const isInitialMount = useRef(true);
   
   useEffect(() => {
@@ -25,17 +26,24 @@ export function RouteChangeTracker() {
       
       // Small delay to ensure document.title is set
       const timeoutId = setTimeout(() => {
-        trackRouteChange(pathname, searchParams?.toString());
+        trackRouteChange(pathname, search.startsWith('?') ? search.slice(1) : search);
       }, 100);
       
       return () => clearTimeout(timeoutId);
     }
     
     // Track subsequent route changes
-    trackRouteChange(pathname, searchParams?.toString());
-  }, [pathname, searchParams]);
+    trackRouteChange(pathname, search.startsWith('?') ? search.slice(1) : search);
+  }, [pathname, search]);
   
   // This component doesn't render anything
   return null;
 }
 
+export function RouteChangeTracker() {
+  return (
+    <Suspense fallback={null}>
+      <RouteChangeTrackerContent />
+    </Suspense>
+  );
+}

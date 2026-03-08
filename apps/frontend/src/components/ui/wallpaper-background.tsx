@@ -24,11 +24,14 @@ export const WallpaperBackground = memo(function WallpaperBackground() {
         className="absolute inset-0 pointer-events-none overflow-hidden"
         aria-hidden="true"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={wallpaper.svgUrl}
           alt=""
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[140vw] min-w-[700px] h-auto sm:w-[160vw] sm:min-w-[1000px] md:min-w-[1200px] lg:w-[162vw] lg:min-w-[1620px] object-contain select-none invert dark:invert-0"
+          fill
+          priority
+          unoptimized
+          sizes="100vw"
+          className="object-contain select-none invert dark:invert-0 scale-[1.4] sm:scale-[1.6] lg:scale-[1.62]"
           draggable={false}
         />
       </div>
@@ -46,6 +49,7 @@ export const WallpaperBackground = memo(function WallpaperBackground() {
           src={wallpaper.darkUrl!}
           alt=""
           fill
+          sizes="100vw"
           className="object-cover select-none"
           unoptimized
           priority
@@ -57,6 +61,7 @@ export const WallpaperBackground = memo(function WallpaperBackground() {
           src={wallpaper.lightUrl!}
           alt=""
           fill
+          sizes="100vw"
           className="object-cover select-none"
           unoptimized
           priority

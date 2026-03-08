@@ -1,8 +1,13 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'AI Engineer',
+  description:
+    'Join Kortix to build reliable AI agents that complete real work end to end.',
+};
 
 const responsibilities = [
   "Build and maintain AI agents that handle real tasks end-to-end",

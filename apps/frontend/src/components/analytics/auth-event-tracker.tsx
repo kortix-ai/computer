@@ -1,21 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { trackSignUp, trackLogin, AuthMethod } from '@/lib/analytics/gtm';
+import { useLocationSearch } from '@/hooks/utils';
 
 /**
  * Tracks auth events (sign_up, login) from URL parameters
  * after OAuth/magic link redirects
  */
-export function AuthEventTracker() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+function AuthEventTrackerContent() {
   const pathname = usePathname();
+  const search = useLocationSearch();
 
   useEffect(() => {
-    const authEvent = searchParams?.get('auth_event');
-    const authMethod = searchParams?.get('auth_method');
+    const searchParams = new URLSearchParams(search);
+    const authEvent = searchParams.get('auth_event');
+    const authMethod = searchParams.get('auth_method');
 
     if (authEvent && authMethod) {
       // Map provider to AuthMethod format
@@ -31,7 +32,7 @@ export function AuthEventTracker() {
       }
 
       // Clean up URL params after tracking
-      const params = new URLSearchParams(searchParams?.toString() || '');
+      const params = new URLSearchParams(searchParams.toString());
       params.delete('auth_event');
       params.delete('auth_method');
       
@@ -42,8 +43,15 @@ export function AuthEventTracker() {
       // Replace URL without triggering navigation
       window.history.replaceState({}, '', newUrl);
     }
-  }, [searchParams, pathname, router]);
+  }, [search, pathname]);
 
   return null;
 }
 
+export function AuthEventTracker() {
+  return (
+    <Suspense fallback={null}>
+      <AuthEventTrackerContent />
+    </Suspense>
+  );
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import {
   Dialog,
@@ -36,12 +37,16 @@ export function ImagePreview({ src, alt = 'Image preview', children }: ImagePrev
           <VisuallyHidden>
             <DialogTitle>{alt}</DialogTitle>
           </VisuallyHidden>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={alt}
-            className="max-w-full max-h-[85vh] object-contain mx-auto rounded"
-          />
+          <div className="relative h-[85vh] w-full">
+            <Image
+              src={src}
+              alt={alt}
+              fill
+              unoptimized
+              sizes="90vw"
+              className="object-contain mx-auto rounded"
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </>

@@ -71,14 +71,19 @@ function renderShellHighlighted(text: string) {
 
 function renderSshConfigHighlighted(config: string) {
   const lines = config.split('\n');
+  const lineCounts = new Map<string, number>();
+
   return lines.map((line, index) => {
+    const occurrence = (lineCounts.get(line) ?? 0) + 1;
+    lineCounts.set(line, occurrence);
+
     if (!line.trim()) {
-      return <React.Fragment key={`cfg-${index}`}>{index < lines.length - 1 ? '\n' : null}</React.Fragment>;
+      return <React.Fragment key={`cfg-${occurrence}`}>{index < lines.length - 1 ? '\n' : null}</React.Fragment>;
     }
     const match = line.match(/^(\s*)(\S+)(\s+)(.+)$/);
     if (!match) {
       return (
-        <React.Fragment key={`cfg-${index}`}>
+        <React.Fragment key={`cfg-${line}-${occurrence}`}>
           <span className="text-zinc-200">{line}</span>
           {index < lines.length - 1 ? '\n' : null}
         </React.Fragment>
@@ -86,7 +91,7 @@ function renderSshConfigHighlighted(config: string) {
     }
     const [, indent, key, spacing, value] = match;
     return (
-      <React.Fragment key={`cfg-${index}`}>
+      <React.Fragment key={`cfg-${key}-${value}-${occurrence}`}>
         <span>{indent}</span>
         <span className="text-cyan-300">{key}</span>
         <span>{spacing}</span>
@@ -389,7 +394,7 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
                   <div className="mt-3 space-y-3">
                     {/* Combined one-liner */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">One-liner (Setup + Connect)</label>
+                      <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">One-liner (Setup + Connect)</p>
                       <div className="flex items-center gap-1.5">
                         <code className="flex-1 min-w-0 text-[10px] font-mono bg-[#0b1020] border border-[#1f2a44] rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-all select-all text-zinc-200 shadow-inner">
                           {renderShellHighlighted(oneLiner)}
@@ -402,7 +407,7 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
 
                     {/* Private Key */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Private Key</label>
+                      <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Private Key</p>
                       <div className="relative">
                         <pre className="max-w-full text-[10px] font-mono bg-muted/20 border border-border/40 rounded-md px-2.5 py-2 whitespace-pre-wrap break-all select-all text-foreground/60 overflow-x-hidden max-h-[140px] overflow-y-auto">
                           {pk}
@@ -420,7 +425,7 @@ export function SSHKeyDialog({ open, onOpenChange }: SSHKeyDialogProps) {
 
                     {/* Public Key */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Public Key</label>
+                      <p className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">Public Key</p>
                       <div className="flex items-center gap-1.5">
                         <code className="flex-1 min-w-0 text-[10px] font-mono bg-muted/30 border border-border/40 rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-all select-all text-foreground/70">
                           {sshResult.public_key}

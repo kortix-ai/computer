@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useMemo } from 'react';
 import {
   Search,
@@ -34,6 +35,26 @@ interface WebSearchQueryResult {
   query: string;
   answer?: string;
   sources: WebSearchSource[];
+}
+
+function FaviconImage({ src, className }: { src: string; className: string }) {
+  const [isVisible, setIsVisible] = useState(true);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={16}
+      height={16}
+      unoptimized
+      className={className}
+      onError={() => setIsVisible(false)}
+    />
+  );
 }
 
 function parseWebSearchOutput(output: string | any): WebSearchQueryResult[] {
@@ -238,15 +259,15 @@ export function OcWebSearchToolView({
         {queryResults.length > 0 ? (
           <ScrollArea className="h-full w-full">
             <div className="p-3 space-y-3">
-              {queryResults.map((qr, qi) => {
+	              {queryResults.map((qr, qi) => {
                 const isMulti = queryResults.length > 1;
                 const isExpanded = expandedQuery === qi;
 
                 return (
-                  <div
-                    key={qi}
-                    className="rounded-lg border border-border/60 bg-card overflow-hidden"
-                  >
+	                  <div
+	                    key={qr.query}
+	                    className="rounded-lg border border-border/60 bg-card overflow-hidden"
+	                  >
                     {/* Query header */}
                     {isMulti && (
                       <button
@@ -290,25 +311,22 @@ export function OcWebSearchToolView({
                                 Sources
                               </div>
                             )}
-                            {qr.sources.map((src, si) => {
-                              const favicon = getFaviconUrl(src.url);
-                              const domain = getDomain(src.url);
-                              return (
-                                <a
-                                  key={si}
-                                  href={src.url}
+	                            {qr.sources.map((src) => {
+	                              const favicon = getFaviconUrl(src.url);
+	                              const domain = getDomain(src.url);
+	                              return (
+	                                <a
+	                                  key={src.url}
+	                                  href={src.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="group flex items-start gap-3 p-3 -mx-1 rounded-lg hover:bg-muted/40 transition-colors"
                                 >
                                   <div className="size-6 rounded-md bg-muted/60 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
                                     {favicon ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
+                                      <FaviconImage
                                         src={favicon}
-                                        alt=""
                                         className="size-4 rounded"
-                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                       />
                                     ) : (
                                       <Globe className="size-3.5 text-muted-foreground/50" />

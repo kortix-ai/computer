@@ -48,6 +48,7 @@ import { TextWithPaths } from '@/components/common/clickable-path';
 import { ImageRenderer } from './image-renderer';
 import { VideoRenderer } from './video-renderer';
 import { FileContentRenderer } from '@/features/files/components/file-content-renderer';
+import Image from 'next/image';
 
 // ── Lazy-load heavy renderers ──────────────────────────────────────────────
 
@@ -147,6 +148,26 @@ function FileCard({ title, fileName, path }: { title?: string; fileName: string;
         <div className="text-xs text-muted-foreground/50 font-mono truncate mt-0.5">{path}</div>
       </div>
     </div>
+  );
+}
+
+function FaviconImage({ src, className }: { src: string; className: string }) {
+  const [isVisible, setIsVisible] = useState(true);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={24}
+      height={24}
+      unoptimized
+      className={className}
+      onError={() => setIsVisible(false)}
+    />
   );
 }
 
@@ -278,13 +299,7 @@ export function ShowContentRenderer({
         >
           <div className="flex items-center justify-center size-10 rounded-lg bg-muted/30 flex-shrink-0 overflow-hidden">
             {favicon ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={favicon}
-                alt=""
-                className="size-6 rounded"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
+              <FaviconImage src={favicon} className="size-6 rounded" />
             ) : (
               <Globe className="size-5 text-muted-foreground/50" />
             )}
@@ -510,11 +525,13 @@ export function ShowContentRenderer({
   // HTML — sandboxed iframe
   // ═════════════════════════════════════════════════════════════════════════
   if (isHtml && content && htmlBlobUrl) {
+    const iframeTitle = title?.trim() ? title : 'HTML Preview';
+
     return (
       <div className="overflow-hidden">
         <iframe
           src={htmlBlobUrl}
-          title={title || 'HTML Preview'}
+          title={iframeTitle}
           className="w-full border-0 bg-white"
           style={{ height: arCSS ? undefined : '540px', aspectRatio: arCSS || undefined }}
           sandbox="allow-scripts allow-same-origin"
@@ -638,9 +655,9 @@ export function ShowCarousel({ items, LocalhostPreview }: ShowCarouselProps) {
               </span>
             )}
             <div className="flex items-center gap-1.5">
-              {items.map((_, i) => (
+              {items.map((item, i) => (
                 <button
-                  key={i}
+                  key={`${item.type}:${item.path ?? item.url ?? item.title ?? item.content ?? i}`}
                   type="button"
                   onClick={() => goTo(i)}
                   className={cn(

@@ -11,14 +11,13 @@
  * All provider connection flows go through this one component.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useId } from 'react';
 import {
   Search,
   ArrowLeft,
   Loader2,
   ExternalLink,
   AlertCircle,
-  ChevronRight,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -42,13 +41,6 @@ const POPULAR_PROVIDERS = [
   'vercel',
 ];
 
-const PROVIDER_HINTS: Record<string, string> = {
-  opencode: 'Recommended',
-  anthropic: 'Bring your own key',
-  openai: 'Bring your own key',
-  'github-copilot': 'Use existing subscription',
-};
-
 // =============================================================================
 // ConnectProviderContent
 // =============================================================================
@@ -63,6 +55,7 @@ export function ConnectProviderContent({
   onProviderConnected?: () => void;
 }) {
   const queryClient = useQueryClient();
+  const idBase = useId();
 
   // --- Navigation state ---
   type View =
@@ -344,102 +337,94 @@ export function ConnectProviderContent({
   const showOAuthAuto = view.type === 'connect' && currentMethod?.type === 'oauth' && oauthMethod === 'auto' && oauthState === 'complete';
   const showOAuthPending = view.type === 'connect' && currentMethod?.type === 'oauth' && oauthState === 'pending';
   const showOAuthError = view.type === 'connect' && oauthState === 'error';
+  const customProviderIdInputId = `${idBase}-custom-provider-id`;
+  const customProviderNameInputId = `${idBase}-custom-provider-name`;
+  const customBaseUrlInputId = `${idBase}-custom-base-url`;
+  const customApiKeyInputId = `${idBase}-custom-api-key`;
+  const customModelIdInputId = `${idBase}-custom-model-id`;
+  const customModelNameInputId = `${idBase}-custom-model-name`;
+  const providerApiKeyInputId = `${idBase}-provider-api-key`;
+  const providerOauthCodeInputId = `${idBase}-provider-oauth-code`;
 
   return (
     <>
       {/* Header */}
-      <div className="flex items-center gap-2 pb-1">
+      <div className="flex items-center gap-2 pb-3">
         {view.type !== 'list' && (
           <button
             type="button"
             onClick={handleBack}
-            className="p-1 -ml-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+            className="p-1 -ml-1 rounded-md text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
           </button>
         )}
-        <h3 className="text-sm font-semibold flex-1">
-          {view.type === 'custom' && 'Custom Provider'}
+        <h3 className="text-xs font-medium text-muted-foreground flex-1">
+          {view.type === 'custom' && 'Custom provider'}
           {view.type === 'connect' && `Connect ${selectedProviderData?.name || view.providerID}`}
-          {view.type === 'list' && 'Connect Provider'}
+          {view.type === 'list' && 'Connect a provider'}
         </h3>
       </div>
 
       {/* ============ PROVIDER LIST ============ */}
       {view.type === 'list' && (
         <>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
             <Input
-              placeholder="Search providers..."
+              placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-sm rounded-lg"
-              autoFocus
+              className="pl-8 h-8 text-sm rounded-lg border-border/50 bg-transparent"
             />
           </div>
 
-          <div className="flex-1 min-h-0 mt-2 overflow-y-auto -mx-1">
-            {/* Custom provider */}
-            {(!search || 'custom'.includes(search.toLowerCase())) && (
-              <button
-                type="button"
-                onClick={() => setView({ type: 'custom' })}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer group"
-              >
-                <span className="text-sm flex-1">Custom provider</span>
-                <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wide">Custom</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
-              </button>
-            )}
-
+          <div className="flex-1 min-h-0 overflow-y-auto -mx-1">
             {/* Popular providers */}
-            {popularGroup.length > 0 && (
-              <>
-                <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-3 pt-3 pb-1">
-                  Popular
-                </div>
-                {popularGroup.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleSelectProvider(p.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer group"
-                  >
-                    <span className="text-sm flex-1">{p.name}</span>
-                    {PROVIDER_HINTS[p.id] && (
-                      <span className="text-[10px] text-muted-foreground/50 font-medium">
-                        {PROVIDER_HINTS[p.id]}
-                      </span>
-                    )}
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
-                  </button>
-                ))}
-              </>
+            {popularGroup.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSelectProvider(p.id)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-muted/40 transition-colors cursor-pointer"
+              >
+                <span className="text-sm flex-1 text-foreground/80">{p.name}</span>
+              </button>
+            ))}
+
+            {/* Separator if both groups exist */}
+            {popularGroup.length > 0 && otherGroup.length > 0 && (
+              <div className="my-1 border-t border-border/30" />
             )}
 
             {/* Other providers */}
-            {otherGroup.length > 0 && (
+            {otherGroup.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSelectProvider(p.id)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-muted/40 transition-colors cursor-pointer"
+              >
+                <span className="text-sm flex-1 text-foreground/80">{p.name}</span>
+              </button>
+            ))}
+
+            {/* Custom provider */}
+            {(!search || 'custom'.includes(search.toLowerCase())) && (
               <>
-                <div className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider px-3 pt-3 pb-1">
-                  Other
-                </div>
-                {otherGroup.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleSelectProvider(p.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer group"
-                  >
-                    <span className="text-sm flex-1">{p.name}</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
-                  </button>
-                ))}
+                {filteredProviders.length > 0 && <div className="my-1 border-t border-border/30" />}
+                <button
+                  type="button"
+                  onClick={() => setView({ type: 'custom' })}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-muted/40 transition-colors cursor-pointer"
+                >
+                  <span className="text-sm flex-1 text-muted-foreground/60">Custom provider</span>
+                </button>
               </>
             )}
 
             {filteredProviders.length === 0 && !search.toLowerCase().startsWith('custom') && (
-              <div className="text-xs text-center py-8 text-muted-foreground/60">No providers found</div>
+              <div className="text-xs text-center py-8 text-muted-foreground/40">No providers found</div>
             )}
           </div>
         </>
@@ -456,27 +441,33 @@ export function ConnectProviderContent({
           </p>
           <div className="space-y-2.5">
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Provider ID</label>
-              <Input placeholder="my-provider" value={customForm.providerID} onChange={(e) => setCustomForm((f) => ({ ...f, providerID: e.target.value }))} className="h-8 text-sm rounded-lg" autoFocus />
+              <label htmlFor={customProviderIdInputId} className="text-[11px] font-medium text-muted-foreground mb-1 block">Provider ID</label>
+              <Input id={customProviderIdInputId} placeholder="my-provider" value={customForm.providerID} onChange={(e) => setCustomForm((f) => ({ ...f, providerID: e.target.value }))} className="h-8 text-sm rounded-lg" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Display Name</label>
-              <Input placeholder="My Provider" value={customForm.name} onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))} className="h-8 text-sm rounded-lg" />
+              <label htmlFor={customProviderNameInputId} className="text-[11px] font-medium text-muted-foreground mb-1 block">Display Name</label>
+              <Input id={customProviderNameInputId} placeholder="My Provider" value={customForm.name} onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))} className="h-8 text-sm rounded-lg" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Base URL</label>
-              <Input placeholder="https://api.example.com/v1" value={customForm.baseURL} onChange={(e) => setCustomForm((f) => ({ ...f, baseURL: e.target.value }))} className="h-8 text-sm rounded-lg" />
+              <label htmlFor={customBaseUrlInputId} className="text-[11px] font-medium text-muted-foreground mb-1 block">Base URL</label>
+              <Input id={customBaseUrlInputId} placeholder="https://api.example.com/v1" value={customForm.baseURL} onChange={(e) => setCustomForm((f) => ({ ...f, baseURL: e.target.value }))} className="h-8 text-sm rounded-lg" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">API Key <span className="font-normal text-muted-foreground/50">(optional)</span></label>
-              <Input placeholder="sk-..." type="password" value={customForm.apiKey} onChange={(e) => setCustomForm((f) => ({ ...f, apiKey: e.target.value }))} className="h-8 text-sm rounded-lg" />
+              <label htmlFor={customApiKeyInputId} className="text-[11px] font-medium text-muted-foreground mb-1 block">API Key <span className="font-normal text-muted-foreground/50">(optional)</span></label>
+              <Input id={customApiKeyInputId} placeholder="sk-..." type="password" value={customForm.apiKey} onChange={(e) => setCustomForm((f) => ({ ...f, apiKey: e.target.value }))} className="h-8 text-sm rounded-lg" />
               <p className="text-[10px] text-muted-foreground/50 mt-1">Use {'{env:VAR_NAME}'} to read from environment</p>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Model</label>
+              <p className="text-[11px] font-medium text-muted-foreground mb-1">Model fields</p>
               <div className="flex gap-2">
-                <Input placeholder="Model ID" value={customForm.modelId} onChange={(e) => setCustomForm((f) => ({ ...f, modelId: e.target.value }))} className="flex-1 h-8 text-sm rounded-lg" />
-                <Input placeholder="Display Name" value={customForm.modelName} onChange={(e) => setCustomForm((f) => ({ ...f, modelName: e.target.value }))} className="flex-1 h-8 text-sm rounded-lg" />
+                <div className="flex-1">
+                  <label htmlFor={customModelIdInputId} className="sr-only">Model ID</label>
+                  <Input id={customModelIdInputId} placeholder="Model ID" value={customForm.modelId} onChange={(e) => setCustomForm((f) => ({ ...f, modelId: e.target.value }))} className="flex-1 h-8 text-sm rounded-lg" />
+                </div>
+                <div className="flex-1">
+                  <label htmlFor={customModelNameInputId} className="sr-only">Display name</label>
+                  <Input id={customModelNameInputId} placeholder="Display Name" value={customForm.modelName} onChange={(e) => setCustomForm((f) => ({ ...f, modelName: e.target.value }))} className="flex-1 h-8 text-sm rounded-lg" />
+                </div>
               </div>
             </div>
           </div>
@@ -503,13 +494,12 @@ export function ConnectProviderContent({
               <div className="space-y-1">
                 {authMethods.map((method, i) => (
                   <button
-                    key={i}
+                    key={`${method.type}:${method.label}`}
                     type="button"
                     onClick={() => selectMethod(view.providerID, authMethods, i)}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer text-sm group"
                   >
                     <span className="flex-1">{method.type === 'api' ? 'API Key' : method.label || 'OAuth'}</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                   </button>
                 ))}
               </div>
@@ -531,8 +521,8 @@ export function ConnectProviderContent({
                 </p>
               )}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">API Key</label>
-                <Input placeholder="Enter API key..." type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="h-8 text-sm rounded-lg" autoFocus />
+                <label htmlFor={providerApiKeyInputId} className="text-[11px] font-medium text-muted-foreground mb-1 block">API Key</label>
+                <Input id={providerApiKeyInputId} placeholder="Enter API key..." type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="h-8 text-sm rounded-lg" />
               </div>
               {error && (
                 <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 rounded-lg px-3 py-2">
@@ -561,8 +551,8 @@ export function ConnectProviderContent({
                 {' '}and paste the code below.
               </p>
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Authorization code</label>
-                <Input placeholder="Enter code..." type="text" value={oauthCode} onChange={(e) => setOauthCode(e.target.value)} className="h-8 text-sm rounded-lg" autoFocus />
+                <label htmlFor={providerOauthCodeInputId} className="text-[11px] font-medium text-muted-foreground mb-1 block">Authorization code</label>
+                <Input id={providerOauthCodeInputId} placeholder="Enter code..." type="text" value={oauthCode} onChange={(e) => setOauthCode(e.target.value)} className="h-8 text-sm rounded-lg" />
               </div>
               {error && (
                 <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 rounded-lg px-3 py-2">

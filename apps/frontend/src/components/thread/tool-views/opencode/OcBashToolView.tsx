@@ -185,14 +185,14 @@ function SessionMessagesList({ messages }: { messages: ParsedSessionMessage[] })
             </div>
             {msg.tools && (
               <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                {msg.tools.split(',').map((t, i) => {
+                {msg.tools.split(',').map((t) => {
                   const trimmed = t.trim();
                   const nameMatch = trimmed.match(/^(\w+)\s*\((\w+)\)/);
                   const name = nameMatch?.[1] || trimmed;
                   const status = nameMatch?.[2] || '';
                   return (
                     <span
-                      key={i}
+                      key={`${msg.index}:${trimmed}`}
                       className={cn(
                         'text-[10px] px-1.5 py-0.5 rounded border',
                         status === 'completed'
@@ -400,9 +400,9 @@ export function OcBashToolView({
               </div>
             ) : null}
 
-            {metadata.map((meta, i) => (
+            {metadata.map((meta) => (
               <div
-                key={i}
+                key={`${meta.message}:${meta.timeoutMs ?? 'none'}`}
                 className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border text-xs ${
                   meta.isTimeout
                     ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50'

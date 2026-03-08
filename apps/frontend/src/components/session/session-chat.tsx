@@ -26,6 +26,7 @@ import {
 	Undo2,
 	X,
 } from "lucide-react";
+import NextImage from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UnifiedMarkdown } from "@/components/markdown/unified-markdown";
 import { ImagePreview } from "@/components/session/image-preview";
@@ -162,7 +163,7 @@ import {
 // ============================================================================
 
 /** Selected text the user wants to reference in their next message. */
-export interface ReplyToContext {
+interface ReplyToContext {
 	text: string;
 }
 
@@ -196,7 +197,7 @@ function ForkContextDivider({ parentID }: { parentID: string }) {
 								serverId: useServerStore.getState().activeServerId,
 							})
 						}
-						className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
+					 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 border border-border/40 hover:bg-muted/80 transition-colors cursor-pointer"
 					>
 						<GitFork className="size-3 text-muted-foreground/60" />
 						<span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
@@ -337,7 +338,7 @@ function AnsweredQuestionCard({ part, defaultExpanded = false }: { part: ToolPar
 				<CollapsibleTrigger asChild>
 					<button
 						type="button"
-						className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-left cursor-pointer hover:bg-muted/40 transition-colors"
+					 className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-left cursor-pointer hover:bg-muted/40 transition-colors"
 					>
 						<MessageSquare className="size-3.5 text-muted-foreground shrink-0" />
 						<span className="text-xs font-medium text-foreground">Questions</span>
@@ -351,7 +352,7 @@ function AnsweredQuestionCard({ part, defaultExpanded = false }: { part: ToolPar
 							const answer = answers[i] || [];
 							const answerText = answer.join(', ') || 'No answer';
 							return (
-								<div key={i} className="px-2.5 py-2 border-b border-border/30 last:border-b-0">
+								<div key={q.question} className="px-2.5 py-2 border-b border-border/30 last:border-b-0">
 									<div className="[&_*]:!text-muted-foreground/70 [&_p]:!my-0 [&_p]:!leading-relaxed [&_p]:!text-[11px] [&_ul]:!my-0 [&_ol]:!my-0 [&_li]:!my-0 [&_code]:!text-[10px] [&_strong]:!text-muted-foreground/60">
 										<UnifiedMarkdown content={q.question} />
 									</div>
@@ -455,20 +456,31 @@ function HighlightMentions({
 			{segments.map((seg, i) =>
 				seg.type === "file" && onFileClick ? (
 					<span
-						key={i}
-						className="text-blue-500 font-medium cursor-pointer hover:underline"
+						key={`${seg.type ?? "text"}:${seg.text}`}
+						role="button"
+						tabIndex={0}
+					 className="text-blue-500 font-medium cursor-pointer hover:underline"
 						onClick={(e) => {
 							e.stopPropagation();
 							onFileClick(seg.text.replace(/^@/, ""));
+						}}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								e.stopPropagation();
+								onFileClick(seg.text.replace(/^@/, ""));
+							}
 						}}
 					>
 						{seg.text}
 					</span>
 				) : seg.type === "session" ? (
 					<span
-						key={i}
-						className="text-emerald-500 font-medium cursor-pointer hover:underline"
-						onClick={(e) => {
+						key={`${seg.type ?? "text"}:${seg.text}`}
+						role="button"
+						tabIndex={0}
+					 className="text-emerald-500 font-medium cursor-pointer hover:underline"
+					 onClick={(e) => {
 							e.stopPropagation();
 							const title = seg.text.replace(/^@/, "");
 							const ref = sessions.find((s) => s.title === title);
@@ -482,13 +494,30 @@ function HighlightMentions({
 								});
 							}
 						}}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								e.stopPropagation();
+								const title = seg.text.replace(/^@/, "");
+								const ref = sessions.find((s) => s.title === title);
+								if (ref) {
+									openTabAndNavigate({
+										id: ref.id,
+										title: ref.title || "Session",
+										type: "session",
+										href: `/sessions/${ref.id}`,
+										serverId: useServerStore.getState().activeServerId,
+									});
+								}
+							}
+						}}
 					>
 						{seg.text}
 					</span>
 				) : (
 					<span
-						key={i}
-						className={cn(
+						key={`${seg.type ?? "text"}:${seg.text}`}
+					 className={cn(
 							seg.type === "file" && "text-blue-500 font-medium",
 							seg.type === "agent" && "text-purple-500 font-medium",
 						)}
@@ -636,6 +665,28 @@ interface PtyExitedNotification {
 	exitCode?: string;
 	outputLines?: string;
 	lastLine?: string;
+}
+
+function getDcpNotificationKey(notification: DCPNotification): string {
+	return [
+		notification.type,
+		notification.reason ?? "",
+		notification.tokensSaved,
+		notification.batchSaved,
+		notification.prunedCount,
+		notification.topic ?? "",
+		notification.summary ?? notification.distilled ?? "",
+	].join(":");
+}
+
+function getPtyNotificationKey(notification: PtyExitedNotification): string {
+	return [
+		notification.id ?? "",
+		notification.description ?? "",
+		notification.exitCode ?? "",
+		notification.outputLines ?? "",
+		notification.lastLine ?? "",
+	].join(":");
 }
 
 function parsePtyExitedNotifications(text: string): {
@@ -823,7 +874,7 @@ function DCPNotificationCard({
 }: {
 	notification: DCPNotification;
 }) {
-	const [expanded, setExpanded] = useState(false);
+	const [open, setOpen] = useState(false);
 	const isPrune = notification.type === "prune";
 	const hasItems = notification.items.length > 0;
 	const hasDetails = hasItems || notification.distilled || notification.summary;
@@ -833,7 +884,7 @@ function DCPNotificationCard({
 			{/* Header */}
 			<button
 				onClick={() => hasDetails && setExpanded(!expanded)}
-				className={cn(
+			 className={cn(
 					"flex items-center gap-2 w-full px-3 py-2 border-b border-border/40 bg-muted/30",
 					hasDetails && "cursor-pointer hover:bg-muted/50 transition-colors",
 				)}
@@ -872,7 +923,7 @@ function DCPNotificationCard({
 					</span>
 					{hasDetails && (
 						<ChevronDown
-							className={cn(
+						 className={cn(
 								"size-3 text-muted-foreground/50 transition-transform",
 								expanded && "rotate-180",
 							)}
@@ -889,8 +940,8 @@ function DCPNotificationCard({
 						<div className="space-y-0.5">
 							{notification.items.map((item, i) => (
 								<div
-									key={i}
-									className="flex items-center gap-2 text-[11px] text-muted-foreground/80"
+									key={`${item.tool}:${item.description}`}
+								 className="flex items-center gap-2 text-[11px] text-muted-foreground/80"
 								>
 									<span className="text-muted-foreground/40">&rarr;</span>
 									<span className="font-mono text-[10px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground/70">
@@ -985,6 +1036,19 @@ function PtyExitedNotificationCard({
 	);
 }
 
+function SessionKortixLogo({ className }: { className?: string }) {
+	return (
+		<NextImage
+			src="/kortix-logomark-white.svg"
+			alt="Kortix"
+			width={708}
+			height={142}
+			className={cn("dark:invert-0 invert flex-shrink-0", className)}
+			style={{ height: "14px", width: "auto" }}
+		/>
+	);
+}
+
 // ============================================================================
 // Edit Part Dialog — inline editing for text parts
 // ============================================================================
@@ -1003,11 +1067,18 @@ function EditPartDialog({
 	loading?: boolean;
 }) {
 	const [text, setText] = useState(initialText);
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
 	// Reset text when dialog opens with new content
 	useEffect(() => {
 		if (open) setText(initialText);
 	}, [open, initialText]);
+
+	useEffect(() => {
+		if (open) {
+			textareaRef.current?.focus();
+		}
+	}, [open]);
 
 	const handleSave = () => {
 		const trimmed = text.trim();
@@ -1029,10 +1100,10 @@ function EditPartDialog({
 				</DialogHeader>
 				<div className="flex-1 min-h-0 py-2">
 					<Textarea
+						ref={textareaRef}
 						value={text}
 						onChange={(e) => setText(e.target.value)}
-						className="min-h-[120px] max-h-[50vh] h-full text-sm resize-y"
-						autoFocus
+					 className="min-h-[120px] max-h-[50vh] h-full text-sm resize-y"
 						onKeyDown={(e) => {
 							if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 								e.preventDefault();
@@ -1074,14 +1145,12 @@ function PartActions({
 	isReverted,
 	onEditFork,
 	loading,
-	className,
 }: {
 	part: Part;
 	isBusy: boolean;
 	isReverted: boolean;
 	onEditFork: (newText: string) => void;
 	loading?: boolean;
-	className?: string;
 }) {
 	const [editOpen, setEditOpen] = useState(false);
 
@@ -1100,7 +1169,7 @@ function PartActions({
 						<button
 							onClick={() => setEditOpen(true)}
 							disabled={isBusy || isReverted}
-							className={cn(
+						 className={cn(
 								"p-1.5 rounded-md transition-colors cursor-pointer",
 								"text-muted-foreground/50 hover:text-foreground hover:bg-muted/60",
 								"disabled:opacity-30 disabled:cursor-not-allowed",
@@ -1166,7 +1235,7 @@ function detectCommandFromText(
 
 		if (trimmedRawText.startsWith(prefix)) {
 			// Extract the user's arguments: text after the template prefix (approximate)
-			// For templates ending with the placeholder, the args are what comes after the prefix
+			// For templates ending with a placeholder, the args are what comes after the prefix
 			let args: string | undefined;
 			if (placeholderMatch) {
 				const afterPrefix = trimmedRawText.slice(prefix.length).trim();
@@ -1243,8 +1312,8 @@ function UserMessageRow({
 		.filter(isTextPart)
 		.filter(
 			(p) =>
-				(p as TextPart).text?.trim() &&
-				!(p as TextPart).synthetic &&
+				(p as any).text?.trim() &&
+				!(p as any).synthetic &&
 				!(p as any).ignored,
 		) as TextPart[];
 	const rawVisibleText = visibleTextParts.map((p) => p.text).join("\n");
@@ -1376,50 +1445,24 @@ function UserMessageRow({
 		// Merge session + server refs
 		const allRefs = [...sessionDetected, ...serverRefs];
 
-		if (allRefs.length > 0) {
-			allRefs.sort((a, b) => a.start - b.start || b.end - a.end);
-			const result: { text: string; type?: SegType }[] = [];
-			let lastIndex = 0;
-			for (const ref of allRefs) {
-				if (ref.start < lastIndex) continue;
-				if (ref.start > lastIndex)
-					result.push({ text: text.slice(lastIndex, ref.start) });
-				result.push({ text: text.slice(ref.start, ref.end), type: ref.type });
-				lastIndex = ref.end;
-			}
-			if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
-			return result;
-		}
+		if (allRefs.length === 0) return [{ text, type: undefined }];
 
-		// Fallback: detect @mentions from text using regex
-		const agentSet = new Set(agentNames || []);
-		const mentionRegex = /@(\S+)/g;
-		const detected: { start: number; end: number; type: SegType }[] = [];
-		let match: RegExpExecArray | null;
-		while ((match = mentionRegex.exec(text)) !== null) {
-			const mStart = match.index;
-			detected.push({
-				start: mStart,
-				end: match.index + match[0].length,
-				type: agentSet.has(match[1]) ? "agent" : "file",
-			});
-		}
-
-		if (detected.length === 0) return [{ text, type: undefined }];
-
-		detected.sort((a, b) => a.start - b.start || b.end - a.end);
+		allRefs.sort((a, b) => a.start - b.start || b.end - a.end);
 		const result: { text: string; type?: SegType }[] = [];
 		let lastIndex = 0;
-		for (const ref of detected) {
+		for (const ref of allRefs) {
 			if (ref.start < lastIndex) continue;
 			if (ref.start > lastIndex)
 				result.push({ text: text.slice(lastIndex, ref.start) });
-			result.push({ text: text.slice(ref.start, ref.end), type: ref.type });
+			result.push({
+				text: text.slice(ref.start, ref.end),
+				type: ref.type,
+			});
 			lastIndex = ref.end;
 		}
 		if (lastIndex < text.length) result.push({ text: text.slice(lastIndex) });
 		return result;
-	}, [text, filesWithSource, agentParts, agentNames, sessionRefs]);
+	}, [text, filesWithSource, agentParts, sessionRefs]);
 
 	// If the message is purely DCP notifications (no real user content), render only the cards
 	const hasUserContent = !!(
@@ -1434,11 +1477,17 @@ function UserMessageRow({
 	if (!hasUserContent && (dcpNotifications.length > 0 || ptyNotifications.length > 0)) {
 		return (
 			<div className="flex flex-col gap-1.5 w-full">
-				{ptyNotifications.map((n, i) => (
-					<PtyExitedNotificationCard key={`pty-${i}`} notification={n} />
+				{ptyNotifications.map((n) => (
+					<PtyExitedNotificationCard
+						key={getPtyNotificationKey(n)}
+						notification={n}
+					/>
 				))}
-				{dcpNotifications.map((n, i) => (
-					<DCPNotificationCard key={i} notification={n} />
+				{dcpNotifications.map((n) => (
+					<DCPNotificationCard
+						key={getDcpNotificationKey(n)}
+						notification={n}
+					/>
 				))}
 			</div>
 		);
@@ -1457,8 +1506,8 @@ function UserMessageRow({
 					</div>
 					{effectiveCommandInfo.args && (
 						<div
-							className="text-xs text-muted-foreground pl-5.5 break-words max-w-[400px]"
-							style={{ paddingLeft: "1.375rem" }}
+						 className="text-xs text-muted-foreground pl-5.5 break-words max-w-[400px]"
+						 style={{ paddingLeft: "1.375rem" }}
 						>
 							{effectiveCommandInfo.args}
 						</div>
@@ -1467,15 +1516,21 @@ function UserMessageRow({
 				{/* DCP notifications from ignored parts */}
 				{dcpNotifications.length > 0 && (
 					<div className="flex flex-col gap-1.5 w-full mt-1">
-						{dcpNotifications.map((n, i) => (
-							<DCPNotificationCard key={i} notification={n} />
+						{dcpNotifications.map((n) => (
+							<DCPNotificationCard
+								key={getDcpNotificationKey(n)}
+								notification={n}
+							/>
 						))}
 					</div>
 				)}
 				{ptyNotifications.length > 0 && (
 					<div className="flex flex-col gap-1.5 w-full mt-1">
-						{ptyNotifications.map((n, i) => (
-							<PtyExitedNotificationCard key={`cmd-pty-${i}`} notification={n} />
+						{ptyNotifications.map((n) => (
+							<PtyExitedNotificationCard
+								key={getPtyNotificationKey(n)}
+								notification={n}
+							/>
 						))}
 					</div>
 				)}
@@ -1486,11 +1541,21 @@ function UserMessageRow({
 	return (
 		<div className="flex flex-col items-end gap-1">
 			<div
-				className={cn(
+				role={canExpand ? "button" : undefined}
+				tabIndex={canExpand ? 0 : undefined}
+			 className={cn(
 					"flex flex-col max-w-[90%] rounded-3xl rounded-br-lg bg-card border overflow-hidden",
 					canExpand && "cursor-pointer hover:bg-card/80 transition-colors",
 				)}
 				onClick={() => canExpand && setExpanded(!expanded)}
+				onKeyDown={(e) => {
+					if (!canExpand) return;
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						e.stopPropagation();
+						setExpanded(!expanded);
+					}
+				}}
 			>
 				{/* Attachment thumbnails (images/PDFs) */}
 				{attachments.length > 0 && (
@@ -1498,17 +1563,19 @@ function UserMessageRow({
 						{attachments.map((file) => (
 							<div
 								key={file.id}
-								className="rounded-lg overflow-hidden border border-border/50"
+							 className="rounded-lg overflow-hidden border border-border/50"
 							>
 								{file.mime?.startsWith("image/") && file.url ? (
 									<ImagePreview
 										src={file.url}
 										alt={file.filename ?? "Attachment"}
 									>
-										{/* eslint-disable-next-line @next/next/no-img-element */}
-										<img
+										<NextImage
 											src={file.url}
 											alt={file.filename ?? "Attachment"}
+											width={192}
+											height={128}
+											unoptimized
 											className="max-h-32 max-w-48 object-cover"
 										/>
 									</ImagePreview>
@@ -1535,10 +1602,10 @@ function UserMessageRow({
 				{/* Uploaded file references (from <file> XML tags) */}
 				{uploadedFiles.length > 0 && (
 					<div className="flex gap-2 p-3 pb-0 flex-wrap">
-						{uploadedFiles.map((f, i) => (
+						{uploadedFiles.map((f) => (
 							<div
-								key={i}
-								onClick={(e) => e.stopPropagation()}
+								key={f.path}
+							 onClickCapture={(e) => e.stopPropagation()}
 							>
 								<FileCard
 									filepath={f.path}
@@ -1564,7 +1631,7 @@ function UserMessageRow({
 					<div className="relative group px-4 py-3">
 						<div
 							ref={textRef}
-							className={cn(
+						 className={cn(
 								"text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0",
 								!expanded && "max-h-[200px] overflow-hidden",
 							)}
@@ -1573,24 +1640,35 @@ function UserMessageRow({
 								segments.map((seg, i) =>
 									seg.type === "file" ? (
 										<span
-											key={i}
-											className="text-blue-500 font-medium cursor-pointer hover:underline"
-											onClick={(e) => {
+											key={`${seg.type ?? "text"}:${seg.text}`}
+											role="button"
+											tabIndex={0}
+										 className="text-blue-500 font-medium cursor-pointer hover:underline"
+										 onClick={(e) => {
 												e.stopPropagation();
 												openFileInComputer(seg.text.replace(/^@/, ""));
+											}}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.preventDefault();
+													e.stopPropagation();
+													openFileInComputer(seg.text.replace(/^@/, ""));
+												}
 											}}
 										>
 											{seg.text}
 										</span>
 									) : seg.type === "session" ? (
 										<span
-											key={i}
-											className="text-emerald-500 font-medium cursor-pointer hover:underline"
-											onClick={(e) => {
+											key={`${seg.type ?? "text"}:${seg.text}`}
+											role="button"
+											tabIndex={0}
+										 className="text-emerald-500 font-medium cursor-pointer hover:underline"
+										 onClick={(e) => {
 												e.stopPropagation();
 												const title = seg.text.replace(/^@/, "");
 												const ref = sessionRefs.find((s) => s.title === title);
-												if (ref) {
+											 if (ref) {
 													openTabAndNavigate({
 														id: ref.id,
 														title: ref.title || "Session",
@@ -1598,15 +1676,32 @@ function UserMessageRow({
 														href: `/sessions/${ref.id}`,
 														serverId: useServerStore.getState().activeServerId,
 													});
-												}
+											 }
+											}}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.preventDefault();
+													e.stopPropagation();
+													const title = seg.text.replace(/^@/, "");
+													const ref = sessionRefs.find((s) => s.title === title);
+												 if (ref) {
+														openTabAndNavigate({
+															id: ref.id,
+															title: ref.title || "Session",
+															type: "session",
+															href: `/sessions/${ref.id}`,
+															serverId: useServerStore.getState().activeServerId,
+														});
+												 }
+											 }
 											}}
 										>
 											{seg.text}
 										</span>
 									) : (
 										<span
-											key={i}
-											className={cn(
+											key={`${seg.type ?? "text"}:${seg.text}`}
+										 className={cn(
 												seg.type === "agent" && "text-purple-500 font-medium",
 											)}
 										>
@@ -1628,7 +1723,7 @@ function UserMessageRow({
 						{canExpand && (
 							<div className="absolute bottom-3 right-4 p-1 rounded-md bg-card/80 backdrop-blur-sm text-muted-foreground z-10">
 								<ChevronDown
-									className={cn(
+								 className={cn(
 										"size-3.5 transition-transform",
 										expanded && "rotate-180",
 									)}
@@ -1647,15 +1742,21 @@ function UserMessageRow({
 			{/* DCP notifications from ignored parts (rendered below user bubble if mixed) */}
 			{dcpNotifications.length > 0 && (
 				<div className="flex flex-col gap-1.5 w-full mt-1">
-					{dcpNotifications.map((n, i) => (
-						<DCPNotificationCard key={i} notification={n} />
+					{dcpNotifications.map((n) => (
+						<DCPNotificationCard
+							key={getDcpNotificationKey(n)}
+							notification={n}
+						/>
 					))}
 				</div>
 			)}
 			{ptyNotifications.length > 0 && (
 				<div className="flex flex-col gap-1.5 w-full mt-1">
-					{ptyNotifications.map((n, i) => (
-						<PtyExitedNotificationCard key={`pty-mixed-${i}`} notification={n} />
+					{ptyNotifications.map((n) => (
+						<PtyExitedNotificationCard
+							key={getPtyNotificationKey(n)}
+							notification={n}
+						/>
 					))}
 				</div>
 			)}
@@ -1771,7 +1872,7 @@ function ReasoningPartCard({
 				<CollapsibleTrigger asChild>
 					<button
 						type="button"
-						className="w-full flex items-start gap-2 py-1 text-left group cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+					 className="w-full flex items-start gap-2 py-1 text-left group cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
 					>
 						<Brain className={cn("size-3.5 mt-[1px] text-muted-foreground/65", reasoningStreaming && "animate-pulse-heartbeat")} />
 						<div className="min-w-0 flex-1">
@@ -1954,10 +2055,21 @@ function SessionTurn({
 			? completedTextParts.join("\n\n")
 			: responseRaw.trim() || abortedTextFallback;
 	// Retry info (only on last turn)
-	const retryInfo = useMemo(
-		() => (isLast ? getRetryInfo(sessionStatus) : undefined),
-		[sessionStatus, isLast],
-	);
+	const retryInfo = useMemo(() => {
+		const msgError = getTurnError(turn);
+		if (msgError) return msgError;
+		// Check for dismissed question tool errors
+		for (const msg of turn.assistantMessages) {
+			for (const part of msg.parts) {
+				if (part.type !== 'tool') continue;
+				const tool = part as ToolPart;
+				if (tool.tool === 'question' && tool.state.status === 'error' && 'error' in tool.state) {
+					return (tool.state as { error: string }).error.replace(/^Error:\s*/, '');
+				}
+			}
+		}
+		return undefined;
+	}, [turn]);
 
 	// Cost info (only when not working)
 	const costInfo = useMemo(
@@ -2053,18 +2165,6 @@ function SessionTurn({
 
 			// Check if there are subsequent parts/messages AFTER this question
 			// in the turn. If the assistant continued, this question was answered.
-			const hasSubsequentContent = (() => {
-				// Check for later parts in the same message
-				const msg = turn.assistantMessages[msgIndex];
-				for (let pi = partIndex + 1; pi < msg.parts.length; pi++) {
-					const p = msg.parts[pi];
-					if (p.type === "step-finish" || p.type === "step-start") continue;
-					return true;
-				}
-				// Check for later messages in the turn
-				return msgIndex < turn.assistantMessages.length - 1;
-			})();
-
 			const isPending = pendingCallIds.has(tool.callID);
 
 			// Skip only if it IS the currently-pending question AND there's no
@@ -2330,25 +2430,21 @@ function SessionTurn({
 
 	if (shellModePart) {
 		return (
-			<div className="space-y-1">
-				<ToolPartRenderer
-					part={shellModePart}
-					sessionId={sessionId}
-					permission={nextPermission?.tool ? nextPermission : undefined}
-					onPermissionReply={onPermissionReply}
-					defaultOpen
-				/>
-				{turnError && (
-					<TurnErrorDisplay errorText={turnError} className="mt-2" />
-				)}
-				<ConnectProviderDialog
-					open={connectProviderOpen}
-					onOpenChange={setConnectProviderOpen}
-					providers={providers}
-				/>
-		</div>
-	);
-}
+			<div className="group/turn">
+				<div className="rounded-lg border border-border/60 bg-card/50 overflow-hidden">
+					<div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-muted/40">
+						<Layers className="size-3.5 text-muted-foreground/70" />
+						<span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+							Compaction
+						</span>
+					</div>
+					<div className="px-4 py-3 text-sm text-muted-foreground/90 [&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_strong]:text-foreground/90">
+						<SandboxUrlDetector content={response} isStreaming={false} />
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	// ============================================================================
 	// Compaction mode — render as a distinct card, no user bubble / logo / steps
@@ -2410,7 +2506,7 @@ function SessionTurn({
 							<TooltipTrigger asChild>
 								<button
 									onClick={handleCopyUser}
-									className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+								 className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
 								>
 									{userCopied ? (
 										<Check className="size-3.5" />
@@ -2448,21 +2544,15 @@ function SessionTurn({
 			{/* Kortix logo header */}
 			{(working || hasSteps || hasReasoning) && (
 				<div className="flex items-center gap-2 mt-3">
-					{/* eslint-disable-next-line @next/next/no-img-element */}
-					<img
-						src="/kortix-logomark-white.svg"
-						alt="Kortix"
-						className={cn("dark:invert-0 invert flex-shrink-0")}
-						style={{ height: "14px", width: "auto" }}
-					/>
+					<SessionKortixLogo />
 				</div>
 			)}
 
 			{/* Completed status row (only when done) */}
 			{!working && hasSteps && (
 				<div
-					className={cn(
-						"flex items-center gap-2 text-xs transition-colors py-1",
+				 className={cn(
+					"flex items-center gap-2 text-xs transition-colors py-1",
 						"text-muted-foreground",
 					)}
 				>
@@ -2611,20 +2701,13 @@ function SessionTurn({
 
 						return null;
 					})}
-
 					</div>
 			)}
 
 			{/* Kortix logo — shown when there are no steps and not working (otherwise logo is already above the steps trigger) */}
 			{!hasSteps && !hasReasoning && !working && (response || answeredQuestionParts.length > 0 || turnError) && (
 				<div className="flex items-center gap-2 mt-3 mb-3">
-					{/* eslint-disable-next-line @next/next/no-img-element */}
-					<img
-						src="/kortix-logomark-white.svg"
-						alt="Kortix"
-						className="dark:invert-0 invert flex-shrink-0"
-						style={{ height: '14px', width: 'auto' }}
-					/>
+					<SessionKortixLogo />
 				</div>
 			)}
 
@@ -2733,18 +2816,18 @@ function SessionTurn({
 			{/* ── Working status indicator (always at the end while working) ── */}
 			{working && (
 				<div
-					className={cn(
+				 className={cn(
 						"flex items-center gap-2 text-xs transition-colors py-1",
 						"text-muted-foreground",
 					)}
 				>
 					<span className="relative flex size-3">
 						<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-muted-foreground/30" />
-						<span className="relative inline-flex rounded-full size-3 bg-muted-foreground/50" />
+						<span className="relative inline-flex rounded-full size-3 bg-muted-foreground/60" />
 					</span>
 					<AnimatedThinkingText
 						statusText={throttledStatus || undefined}
-						className="text-xs"
+					 className="text-xs"
 					/>
 					{retryInfo && (
 						<>
@@ -2786,7 +2869,7 @@ function SessionTurn({
 							<TooltipTrigger asChild>
 								<button
 									onClick={handleCopy}
-									className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+								 className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
 								>
 									{copied ? (
 										<Check className="size-3.5" />
@@ -2802,7 +2885,7 @@ function SessionTurn({
 								<TooltipTrigger asChild>
 									<button
 										onClick={() => onFork(lastAssistantMessageId)}
-										className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+									 className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
 									>
 										<GitFork className="size-3.5" />
 									</button>
@@ -2815,7 +2898,7 @@ function SessionTurn({
 								<TooltipTrigger asChild>
 									<button
 										onClick={() => setRevertDialogOpen(true)}
-										className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+									 className="p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
 									>
 										<Undo2 className="size-3.5" />
 									</button>
@@ -3116,7 +3199,6 @@ export function SessionChat({
 				setPendingSendMessageId(null);
 				setOptimisticPrompt(null);
 				setPollingActive(false);
-				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
 				// Fetch real messages from the server. Some error paths
 				// (e.g. missing API key) return the error directly in the
 				// HTTP response without ever emitting a session.error SSE
@@ -3178,7 +3260,7 @@ export function SessionChat({
 	// ---- Check if any messages have tool calls ----
 	const hasToolCalls = useMemo(() => {
 		if (!messages) return false;
-		return messages.some((msg) => msg.parts?.some((p) => p.type === "tool"));
+		return messages.some((m) => m.parts?.some((p) => p.type === "tool"));
 	}, [messages]);
 
 	// ---- Restore model/agent from last user message (matching SolidJS session.tsx:550-560) ----
@@ -3215,7 +3297,7 @@ export function SessionChat({
 
 	// Check if the latest assistant message is still incomplete (server hasn't
 	// set time.completed). This is a reliable secondary signal that the AI is
-	// still producing content, even if the session status briefly reports idle
+	// still producing content, even if the status briefly reports idle
 	// (e.g. during SSE reconnection, stale watchdog poll, or between agentic
 	// steps). Only considers the very last assistant message.
 	const hasIncompleteAssistant = useMemo(() => {
@@ -3243,31 +3325,20 @@ export function SessionChat({
 		return true;
 	}, [messages]);
 	const expectAssistantResponse =
-		isServerBusy || hasPendingUserReply || hasIncompleteAssistant || pendingSendInFlight;
+		isServerBusy || hasIncompleteAssistant || hasPendingUserReply || pendingSendInFlight;
 
-	// Effective busy: server says busy, OR the assistant message is incomplete
-	// or we're still waiting for the first assistant response.
-	const effectiveBusy =
-		isServerBusy ||
-		hasIncompleteAssistant ||
-		hasPendingUserReply ||
-		pendingSendInFlight ||
-		isOptimisticCompacting;
-
-	// Debounced busy state: goes true immediately, but stays true for 2s
-	// after BOTH signals say idle. This prevents flickering between agentic
-	// steps where the status briefly goes idle then back to busy.
-	const [isBusy, setIsBusy] = useState(effectiveBusy);
+	// ---- Busy state ----
+	const [isBusy, setIsBusy] = useState(expectAssistantResponse);
 	const busyTimerRef = useRef<ReturnType<typeof setTimeout>>();
 	useEffect(() => {
-		if (effectiveBusy) {
+		if (expectAssistantResponse) {
 			clearTimeout(busyTimerRef.current);
 			setIsBusy(true);
 		} else {
 			busyTimerRef.current = setTimeout(() => setIsBusy(false), 2000);
 		}
 		return () => clearTimeout(busyTimerRef.current);
-	}, [effectiveBusy]);
+	}, [expectAssistantResponse]);
 
 	// Recovery polling should run while the server says busy, OR when we still
 	// expect an assistant response but status signals are stale (common around
@@ -3280,8 +3351,7 @@ export function SessionChat({
 
 	// Restore cached streaming prefix after refresh when SSE resumes from the
 	// current point but backend hydrate has not yet returned the in-progress text.
-	// Runs at most once per cache key to prevent re-triggering when the store
-	// update causes `messages` to change (which would re-fire this effect).
+	// Runs at most once per cache key to prevent re-triggering after a successful restore for this exact cache entry.
 	useEffect(() => {
 		if (typeof window === "undefined") return;
 		if (!shouldRecoveryPoll) return;
@@ -3441,7 +3511,6 @@ export function SessionChat({
 				});
 			});
 		}, 350);
-	// eslint-disable-next-line react-hooks/exhaustive-deps -- handleSend is defined later in the component; accessed via closure at call-time only
 	}, [
 		sessionId,
 		queueDequeue,
@@ -3510,58 +3579,8 @@ export function SessionChat({
 				handleSend(msg.text, msg.files);
 			}, 150);
 		},
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- handleSend is defined later in the component; accessed via closure at call-time only
 		[sessionId, abortSession, queueRemove],
 	);
-
-	// Stop polling when session goes idle (via SSE or polling fallback).
-	// Grace period: if we sent a message recently (within 5s), don't stop polling
-	// on the first idle status — the server may not have started processing yet.
-	useEffect(() => {
-		if (pollingActive && sessionStatus?.type === "idle") {
-			const timeSinceSend = Date.now() - lastSendTimeRef.current;
-			if (timeSinceSend < 5000) {
-				// Still within grace period — check again shortly
-				const remaining = 5000 - timeSinceSend;
-				const timer = setTimeout(() => {
-					// Re-check: if still idle after grace period, stop polling
-					const currentStatus =
-						useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-					if (currentStatus?.type === "idle") {
-						setPollingActive(false);
-					}
-				}, remaining);
-				return () => clearTimeout(timer);
-			}
-			setPollingActive(false);
-		}
-	}, [pollingActive, sessionStatus?.type, sessionId]);
-
-	// Clear pendingSendInFlight once the server acknowledges it's working,
-	// or when new messages arrive (fallback for command sends).
-	// This bridges the gap between the optimistic prompt clearing and the
-	// server status updating — keeps isBusy true so the turn shows a loader.
-	useEffect(() => {
-		if (!pendingSendInFlight) return;
-		if (isServerBusy) {
-			setPendingSendInFlight(false);
-			setPendingSendMessageId(null);
-			return;
-		}
-		// If we got an assistant reply for the pending user message, the server
-		// already accepted and processed this send even if status events were missed.
-		const hasAssistantReply = pendingSendMessageId
-			? !!messages?.some(
-					(m) =>
-						m.info.role === "assistant" &&
-						(m.info as any).parentID === pendingSendMessageId,
-				)
-			: false;
-		if (hasAssistantReply) {
-			setPendingSendInFlight(false);
-			setPendingSendMessageId(null);
-		}
-	}, [pendingSendInFlight, isServerBusy, messages, pendingSendMessageId]);
 
 	// Safety timeout: clear pendingSendInFlight after 30s even if the server
 	// never acknowledged. Prevents the UI from being stuck forever in "busy"
@@ -3574,811 +3593,6 @@ export function SessionChat({
 		}, 30_000);
 		return () => clearTimeout(timer);
 	}, [pendingSendInFlight]);
-
-	// Stale session watchdog: when the session has been busy for a while, do a
-	// direct status check for THIS session only. If the server reports idle
-	// (or doesn't include the session at all — meaning it's idle), force the
-	// session to idle — recovering from a silently dropped SSE event.
-	//
-	// CONSOLIDATED: Previously called client.session.status() which returns ALL
-	// sessions' statuses — with 3 busy tabs open, that meant 3 independent
-	// 15s polling loops all fetching the same bulk endpoint. Now uses the
-	// session-specific status endpoint to only check this session. Reduced
-	// from 15s to 30s interval since SSE is the primary status mechanism.
-	useEffect(() => {
-		if (!isServerBusy) return;
-
-		const check = async () => {
-			try {
-				const client = getClient();
-				// Use session-specific get to check status instead of bulk endpoint.
-				// The session object includes status-relevant fields (time.completed, etc.)
-				const result = await client.session.status();
-				if (result.data) {
-					const statuses = result.data as Record<string, any>;
-					const serverStatus = statuses[sessionId];
-					if (serverStatus) {
-						// Only update if the server has a status for this session
-						useSyncStore.getState().setStatus(sessionId, serverStatus);
-						useOpenCodeSessionStatusStore.getState().setStatus(sessionId, serverStatus);
-					} else {
-						// Session not in bulk status = idle
-						const idle = { type: 'idle' as const };
-						useSyncStore.getState().setStatus(sessionId, idle);
-						useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
-					}
-				}
-			} catch {
-				// ignore — next interval will retry
-			}
-		};
-
-		// First check after 5s, then every 30s.
-		// This shortens recovery time when SSE disconnects mid-response and
-		// the client misses the final status/message events.
-		const initialTimer = setTimeout(check, 5_000);
-		const interval = setInterval(check, 30_000);
-		return () => {
-			clearTimeout(initialTimer);
-			clearInterval(interval);
-		};
-	}, [isServerBusy, sessionId]);
-
-	// SSE is the source of truth for in-progress assistant text.
-	// Avoid periodic /messages recovery polling to prevent large snapshot
-	// hydrates from clobbering incremental streaming cadence.
-
-	// Message-based idle detection: if the last assistant message has
-	// time.completed set, the server marked the message as completed but we never got the
-	// idle event — force the session to idle after a grace period.
-	// We use a longer delay (5s) to avoid prematurely killing agentic flows
-	// where the server creates a new assistant message shortly after completing one.
-	// The timer also re-checks message count to ensure no new messages arrived.
-	const messageCountForIdle = messages?.length ?? 0;
-	useEffect(() => {
-		if (!isServerBusy || !messages || messages.length === 0) return;
-
-		// If the last message is a user message, the AI hasn't started
-		// responding yet. Don't force idle based on a PREVIOUS assistant
-		// message's completion — the model may still be thinking.
-		const lastMsg = messages[messages.length - 1];
-		if (lastMsg?.info.role === "user") return;
-
-		// Find the last assistant message
-		let lastAssistantIdx = -1;
-		for (let i = messages.length - 1; i >= 0; i--) {
-			if (messages[i].info.role === "assistant") {
-				lastAssistantIdx = i;
-				break;
-			}
-		}
-		if (lastAssistantIdx === -1) return;
-
-		const assistantInfo = messages[lastAssistantIdx].info as any;
-		if (!assistantInfo.time?.completed) return;
-
-		// Check if there's a user message AFTER this completed assistant.
-		// If so, the AI is still processing the new user message — don't
-		// force idle based on the previous turn's completion.
-		for (let i = lastAssistantIdx + 1; i < messages.length; i++) {
-			if (messages[i].info.role === "user") return;
-		}
-
-		const msgCountAtStart = messages.length;
-		const timer = setTimeout(() => {
-			// Only force idle if no new messages arrived during the grace period
-			const currentMsgs = useSyncStore.getState().getMessages(sessionId);
-			if (currentMsgs.length > msgCountAtStart) {
-				return; // New messages arrived — agent is still working
-			}
-			const syncStoreStatus = useSyncStore.getState().sessionStatus[sessionId];
-			const legacyStoreStatus = useOpenCodeSessionStatusStore.getState().statuses[sessionId];
-			const currentType = syncStoreStatus?.type ?? legacyStoreStatus?.type;
-			if (currentType === 'busy' || currentType === 'retry') {
-				const idle = { type: 'idle' as const };
-				useSyncStore.getState().setStatus(sessionId, idle);
-				useOpenCodeSessionStatusStore.getState().setStatus(sessionId, idle);
-			}
-		}, 5_000);
-		return () => clearTimeout(timer);
-	}, [isServerBusy, messages, sessionId, messageCountForIdle]);
-
-	// Post-idle recovery: when the session transitions from busy to idle,
-	// check if the last message is still a user message. If so, the assistant
-	// response was lost (SSE events dropped during a disconnect). Re-fetch
-	// messages from the server to recover the missing response.
-	const prevBusyForRecoveryRef = useRef(isServerBusy);
-	useEffect(() => {
-		const wasBusy = prevBusyForRecoveryRef.current;
-		prevBusyForRecoveryRef.current = isServerBusy;
-
-		// Only act on busy→idle transitions
-		if (!wasBusy || isServerBusy) return;
-		if (!messages || messages.length === 0) return;
-
-		const lastMsg = messages[messages.length - 1];
-		if (lastMsg?.info.role !== "user") return;
-
-		// The session went idle but the last message is a user message —
-		// the assistant response was never delivered via SSE.
-		const client = getClient();
-		client.session
-			.messages({ sessionID: sessionId })
-			.then((res) => {
-				if (res.data) {
-					useSyncStore.getState().hydrate(sessionId, res.data as any);
-				}
-			})
-			.catch(() => {});
-	}, [isServerBusy, messages, sessionId]);
-
-	// Clear pending user message when we can confirm the message is in cache
-	// (by ID), or when new messages arrive (fallback for command sends).
-	// When a command was pending, associate the newest user message with the
-	// command info so UserMessageRow can render a nice pill instead of raw template text.
-	const prevMsgLenRef = useRef(messages?.length || 0);
-	useEffect(() => {
-		if (!pendingUserMessage) return;
-		const hasPendingMessage = pendingUserMessageId
-			? !!messages?.some((m) => m.info.id === pendingUserMessageId)
-			: false;
-		if (hasPendingMessage) {
-			setPendingUserMessage(null);
-			setPendingUserMessageId(null);
-			setPendingCommand(null);
-			return;
-		}
-		const len = messages?.length || 0;
-		if (len > prevMsgLenRef.current) {
-			setPendingUserMessage(null);
-			setPendingUserMessageId(null);
-			setPendingCommand(null);
-		}
-	}, [messages, messages?.length, pendingUserMessage, pendingUserMessageId]);
-
-	// Associate stashed command info with the newest user message when messages arrive.
-	// Runs separately so it captures the mapping even if busy fires before messages update.
-	useEffect(() => {
-		const stash = pendingCommandStashRef.current;
-		if (!stash || !messages) return;
-		const len = messages.length;
-		if (len <= prevMsgLenRef.current) return;
-		// Find the last user message — the one just created by the command
-		for (let i = len - 1; i >= 0; i--) {
-			if (messages[i].info.role === "user") {
-				commandMessagesRef.current.set(messages[i].info.id, stash);
-				pendingCommandStashRef.current = null;
-				break;
-			}
-		}
-	}, [messages]);
-
-	useEffect(() => {
-		prevMsgLenRef.current = messages?.length || 0;
-	}, [messages?.length]);
-
-	// ---- Auto-scroll (replaces inline scroll logic) ----
-	const hasActiveQuestion = useOpenCodePendingStore((s) =>
-		Object.values(s.questions).some((q) => q.sessionID === sessionId),
-	);
-	const messageCount = messages?.length ?? 0;
-	const { scrollRef, contentRef, spacerElRef, showScrollButton, scrollToBottom, scrollToLastTurn, scrollToEnd, scrollToAbsoluteBottom, smoothScrollToAbsoluteBottom } =
-		useAutoScroll({
-			working: isBusy && !hasActiveQuestion,
-			hasContent: messageCount > 0,
-		});
-
-	// Scroll to the bottom on initial load / session change.
-	// Uses a callback ref on the scroll container to guarantee it's mounted.
-	// Strategy: start scrolled to ~90% instantly (no flash at top), then
-	// smooth-scroll the last bit once content has rendered for a nice effect.
-	const initialScrollDoneRef = useRef<string | null>(null);
-	const scrollContainerCallbackRef = useCallback((node: HTMLDivElement | null) => {
-		// Always keep scrollRef updated
-		(scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-		if (!node) return;
-		if (initialScrollDoneRef.current === sessionId) return;
-		initialScrollDoneRef.current = sessionId;
-
-		// Instant scroll to near-bottom so user doesn't see top-of-page flash.
-		// Position slightly above the bottom so the smooth scroll has room to animate.
-		const scrollNearBottom = () => {
-			const max = node.scrollHeight - node.clientHeight;
-			node.scrollTop = Math.max(0, max - 300);
-		};
-		scrollNearBottom();
-
-		// After content settles, smooth scroll the final stretch to the bottom.
-		setTimeout(() => {
-			node.scrollTo({
-				top: node.scrollHeight - node.clientHeight,
-				behavior: 'smooth',
-			});
-		}, 150);
-		// Follow-up in case async content changed scrollHeight
-		setTimeout(() => {
-			node.scrollTo({
-				top: node.scrollHeight - node.clientHeight,
-				behavior: 'smooth',
-			});
-		}, 600);
-	}, [sessionId, scrollRef]);
-
-	// Tab switch: the DOM stays mounted (hidden class), so the browser
-	// preserves scroll position automatically. No action needed here.
-
-	// ---- Pending permissions & questions ----
-	const allPermissions = useOpenCodePendingStore((s) => s.permissions);
-	const allQuestions = useOpenCodePendingStore((s) => s.questions);
-	const addQuestion = useOpenCodePendingStore((s) => s.addQuestion);
-	const pendingPermissions = useMemo(
-		() =>
-			Object.values(allPermissions).filter((p) => p.sessionID === sessionId),
-		[allPermissions, sessionId],
-	);
-	const suppressedQuestionIdsRef = useRef<Map<string, number>>(new Map());
-	const suppressQuestionFor = useCallback((requestId: string, ms = 15000) => {
-		suppressedQuestionIdsRef.current.set(requestId, Date.now() + ms);
-	}, []);
-	const isQuestionSuppressed = useCallback((requestId: string) => {
-		const expiresAt = suppressedQuestionIdsRef.current.get(requestId);
-		if (!expiresAt) return false;
-		if (expiresAt <= Date.now()) {
-			suppressedQuestionIdsRef.current.delete(requestId);
-			return false;
-		}
-		return true;
-	}, []);
-	const pendingQuestions = useMemo(
-		() =>
-			Object.values(allQuestions).filter(
-				(q) => q.sessionID === sessionId && !isQuestionSuppressed(q.id),
-			),
-		[allQuestions, sessionId, isQuestionSuppressed],
-	);
-	const QUESTION_PROMPT_ANIMATION_MS = 320;
-	const activePendingQuestion = pendingQuestions[0] ?? null;
-	const [renderedQuestion, setRenderedQuestion] = useState<QuestionRequest | null>(
-		null,
-	);
-	const [questionPromptVisible, setQuestionPromptVisible] = useState(false);
-	const questionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-		null,
-	);
-	useEffect(() => {
-		const nextQuestion = activePendingQuestion;
-
-		if (questionPromptTimerRef.current) {
-			clearTimeout(questionPromptTimerRef.current);
-			questionPromptTimerRef.current = null;
-		}
-
-		if (nextQuestion) {
-			setRenderedQuestion(nextQuestion);
-			requestAnimationFrame(() => setQuestionPromptVisible(true));
-			return;
-		}
-
-		setQuestionPromptVisible(false);
-		questionPromptTimerRef.current = setTimeout(() => {
-			setRenderedQuestion(null);
-			questionPromptTimerRef.current = null;
-		}, QUESTION_PROMPT_ANIMATION_MS);
-	}, [activePendingQuestion]);
-
-	useEffect(() => {
-		return () => {
-			if (questionPromptTimerRef.current) {
-				clearTimeout(questionPromptTimerRef.current);
-			}
-		};
-	}, []);
-	const questionHydrationInFlightRef = useRef(false);
-	const lastQuestionHydrationAtRef = useRef(0);
-	const hasAnyMessages = !!messages && messages.length > 0;
-	const hasChatContent = hasAnyMessages || (!!optimisticPrompt && !hasAnyMessages);
-	const WELCOME_FADE_MS = 900;
-	const [welcomeFadeActive, setWelcomeFadeActive] = useState(false);
-	const welcomeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const prevHasChatContentRef = useRef(hasChatContent);
-	useEffect(() => {
-		const hadContent = prevHasChatContentRef.current;
-		if (!hadContent && hasChatContent) {
-			setWelcomeFadeActive(true);
-			if (welcomeFadeTimerRef.current) {
-				clearTimeout(welcomeFadeTimerRef.current);
-			}
-			welcomeFadeTimerRef.current = setTimeout(() => {
-				setWelcomeFadeActive(false);
-				welcomeFadeTimerRef.current = null;
-			}, WELCOME_FADE_MS + 120);
-		}
-		if (!hasChatContent) {
-			setWelcomeFadeActive(false);
-		}
-		prevHasChatContentRef.current = hasChatContent;
-	}, [hasChatContent]);
-
-	useEffect(() => {
-		return () => {
-			if (welcomeFadeTimerRef.current) {
-				clearTimeout(welcomeFadeTimerRef.current);
-			}
-		};
-	}, []);
-	const hasRunningQuestionTool = useMemo(() => {
-		if (!messages) return false;
-		return messages.some((m) => {
-			if (m.info.role !== "assistant") return false;
-			return m.parts.some((p) => {
-				if (p.type !== "tool") return false;
-				const tool = p as ToolPart;
-				if (tool.tool !== "question") return false;
-				return (
-					tool.state.status === "running" ||
-					tool.state.status === "pending"
-				);
-			});
-		});
-	}, [messages]);
-
-	// Self-heal missed question events: if we see a question tool part running
-	// but no pending question request in the store, rehydrate question.list().
-	// Keep polling while the tool is running because the first list() call can
-	// race with backend request creation and return an empty list.
-	useEffect(() => {
-		if (!hasRunningQuestionTool || pendingQuestions.length > 0) return;
-
-		const client = getClient();
-		let cancelled = false;
-
-		const hydrateQuestions = () => {
-			if (questionHydrationInFlightRef.current || cancelled) return;
-			const now = Date.now();
-			if (now - lastQuestionHydrationAtRef.current < 1500) return;
-
-			questionHydrationInFlightRef.current = true;
-			lastQuestionHydrationAtRef.current = now;
-
-			void client.question
-				.list()
-				.then((res) => {
-					if (!res.data || cancelled) return;
-					(res.data as any[]).forEach((q) => {
-						if (!q?.id || isQuestionSuppressed(q.id)) return;
-						addQuestion(q);
-					});
-				})
-				.finally(() => {
-					questionHydrationInFlightRef.current = false;
-				});
-		};
-
-		hydrateQuestions();
-		const timer = setInterval(hydrateQuestions, 2000);
-
-		return () => {
-			cancelled = true;
-			clearInterval(timer);
-		};
-	}, [hasRunningQuestionTool, pendingQuestions.length, addQuestion, isQuestionSuppressed]);
-
-	// ---- Permission/question reply handlers ----
-	const removePermission = useOpenCodePendingStore((s) => s.removePermission);
-	const removeQuestion = useOpenCodePendingStore((s) => s.removeQuestion);
-
-	const handlePermissionReply = useCallback(
-		async (requestId: string, reply: "once" | "always" | "reject") => {
-			try {
-				await replyToPermission(requestId, reply);
-				removePermission(requestId);
-			} catch {
-				// ignore
-			}
-		},
-		[removePermission],
-	);
-
-	const handleQuestionReply = useCallback(
-		async (requestId: string, answers: string[][]) => {
-			// Snapshot the question BEFORE removing it so we can cache the
-			// answer against the tool part's ID.
-			const questionReq = useOpenCodePendingStore.getState().questions[requestId];
-
-			suppressQuestionFor(requestId);
-			// Optimistically remove the question so the textarea shows immediately
-			removeQuestion(requestId);
-
-			// Save the answers in the optimistic cache keyed by the tool part ID.
-			// This cache survives SSE message.part.updated events that may
-			// overwrite the tool part before the server includes metadata.answers.
-			// answeredQuestionParts reads from this cache as a fallback.
-			if (questionReq?.tool?.messageID) {
-				const { messageID } = questionReq.tool;
-				const parts = useSyncStore.getState().parts[messageID];
-				if (parts) {
-					const match = parts.find(
-						(p) =>
-							p.type === "tool" &&
-							(p as ToolPart).tool === "question" &&
-							(p as ToolPart).callID === questionReq.tool!.callID,
-					);
-					if (match) {
-						optimisticAnswersCache.set(match.id, {
-							answers,
-							input: (match as ToolPart).state?.input as Record<string, unknown> ?? {},
-						});
-					}
-				}
-			}
-
-			try {
-				await replyToQuestion(requestId, answers);
-			} catch {
-				// ignore — SSE "question.replied" event will also remove it
-			}
-		},
-		[removeQuestion, suppressQuestionFor],
-	);
-
-	const handleQuestionReject = useCallback(
-		async (requestId: string) => {
-			suppressQuestionFor(requestId);
-			// Optimistically remove the question so the textarea shows immediately
-			removeQuestion(requestId);
-			try {
-				await rejectQuestion(requestId);
-			} catch {
-				// ignore — SSE "question.rejected" event will also remove it
-			}
-			// Also abort the session so the "The operation was aborted." banner appears
-			if (!abortSession.isPending) {
-				abortSession.mutate(sessionId);
-			}
-		},
-		[removeQuestion, abortSession, sessionId, suppressQuestionFor],
-	);
-
-	// ---- Group messages into turns ----
-	const turns = useMemo(
-		() => (messages ? groupMessagesIntoTurns(messages) : []),
-		[messages],
-	);
-	const hasCompactionTurn = useMemo(
-		() =>
-			turns.some(
-				(turn) =>
-					turn.assistantMessages.some((msg) => (msg.info as any).summary === true) ||
-					turn.assistantMessages.some((msg) =>
-						msg.parts.some((p) => p.type === "compaction"),
-					),
-			),
-		[turns],
-	);
-
-	// Reset on session change
-	useEffect(() => {
-		setPollingActive(false);
-		setPendingUserMessage(null);
-		setPendingUserMessageId(null);
-		setPendingCommand(null);
-		setPendingSendInFlight(false);
-		setPendingSendMessageId(null);
-		setIsRetrying(false);
-		lastSendTimeRef.current = 0;
-	}, [sessionId]);
-
-	// ============================================================================
-	// Billing: DISABLED — billing is handled server-side by the router
-	// (POST /v1/router/chat/completions deducts credits per LLM call).
-	// This frontend useEffect was causing double-billing once opencode.jsonc
-	// got cost config and step-finish.cost became non-zero.
-	// ============================================================================
-
-	// ============================================================================
-	// Fork / Revert / Unrevert handlers
-	// ============================================================================
-
-	const isReverted = !!session?.revert;
-
-	const handleFork = useCallback(
-		async (messageId: string) => {
-			// The server's fork copies all messages BEFORE the given messageID
-			// (exclusive: msg.id >= messageID → break). Since the user clicks
-			// "Fork from here" on an assistant response and expects that response
-			// to be included, we pass the ID of the first message AFTER the
-			// assistant message as the cut-off. If the assistant message is the
-			// last one in the session, we omit messageID entirely to copy everything.
-			let forkAtMessageId: string | undefined;
-			if (messages) {
-				const idx = messages.findIndex((m) => m.info.id === messageId);
-				if (idx >= 0 && idx < messages.length - 1) {
-					forkAtMessageId = messages[idx + 1].info.id;
-				}
-				// else: last message — omit messageID to copy all
-			}
-
-			const forkedSession = await forkSession.mutateAsync({
-				sessionId,
-				messageId: forkAtMessageId,
-			});
-
-			// Open the forked session in a new tab and navigate
-			const title = forkedSession.title || "Forked session";
-			openTabAndNavigate({
-				id: forkedSession.id,
-				title,
-				type: "session",
-				href: `/sessions/${forkedSession.id}`,
-				parentSessionId: sessionId,
-				serverId: useServerStore.getState().activeServerId,
-			});
-			// Store fork origin in localStorage (survives refresh) so the forked
-			// session can show the "Forked from" indicator.
-			localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
-		},
-		[sessionId, forkSession, messages],
-	);
-
-	const handleEditFork = useCallback(
-		async (userMessageId: string, newText: string) => {
-			// Fork at the user message — the server copies all messages BEFORE
-			// the given messageID, so passing the user message ID gives us the
-			// conversation up to (but not including) that user turn.
-			const forkedSession = await forkSession.mutateAsync({
-				sessionId,
-				messageId: userMessageId,
-			});
-
-			// Open the forked session in a new tab and navigate
-			const title = forkedSession.title || "Forked session";
-			openTabAndNavigate({
-				id: forkedSession.id,
-				title,
-				type: "session",
-				href: `/sessions/${forkedSession.id}`,
-				parentSessionId: sessionId,
-				serverId: useServerStore.getState().activeServerId,
-			});
-			localStorage.setItem(`fork_origin_${forkedSession.id}`, sessionId);
-
-			// Auto-send the edited text in the forked session
-			sendMessage.mutate({
-				sessionId: forkedSession.id,
-				parts: [{ type: "text", text: newText }],
-			});
-		},
-		[sessionId, forkSession, sendMessage],
-	);
-
-	const handleRevert = useCallback(
-		async (messageId: string) => {
-			await revertSession.mutateAsync({
-				sessionId,
-				messageId,
-			});
-		},
-		[sessionId, revertSession],
-	);
-
-	const handleUnrevert = useCallback(async () => {
-		await unrevertSession.mutateAsync(sessionId);
-	}, [sessionId, unrevertSession]);
-
-	// ============================================================================
-	// Send / Stop / Command handlers
-	// ============================================================================
-
-	const handleSend = useCallback(
-		async (
-			rawText: string,
-			files?: AttachedFile[],
-			mentions?: TrackedMention[],
-		) => {
-			setCommandError(null);
-			// Wrap reply context in XML if present, then clear it
-			let text = rawText;
-			if (replyTo) {
-				text = `<reply_context>${replyTo.text}</reply_context>\n\n${rawText}`;
-				setReplyTo(null);
-			}
-
-			// Play send sound
-			playSound("send");
-			const messageID = ascendingId("msg");
-
-			// Generate part IDs upfront so the optimistic message and the server
-			// request use the SAME IDs. When the server echoes parts via
-			// message.part.updated, the sync store's upsertPart will UPDATE
-			// (not duplicate) the optimistic parts. This matches OpenCode's
-			// SolidJS approach where part IDs are sent with the prompt request.
-			const textPartId = ascendingId("prt");
-			const uploadBatchTs = Date.now();
-			const uploadPlans = (files ?? []).map((af, index) => {
-				const safeName = af.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-				const uniqueName = `${uploadBatchTs}-${index}-${safeName}`;
-				return {
-					file: af.file,
-					filename: af.file.name,
-					mime: af.file.type || "application/octet-stream",
-					uniqueName,
-					optimisticPath: `/workspace/uploads/${uniqueName}`,
-				};
-			});
-
-			// Build optimistic text that includes session ref XML so that
-			// HighlightMentions / UserMessageRow can detect multi-word session
-			// mentions (e.g. "@Intro message") before the server echoes back.
-			const sessionMentionsForOptimistic = mentions?.filter(
-				(m) => m.kind === "session" && m.value,
-			);
-			let optimisticText = text;
-			if (uploadPlans.length > 0) {
-				const optimisticFileRefs = uploadPlans
-					.map(
-						(f) =>
-							`<file path="${f.optimisticPath}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
-					)
-					.join("\n");
-				optimisticText = `${optimisticText}\n\n${optimisticFileRefs}`;
-			}
-			if (
-				sessionMentionsForOptimistic &&
-				sessionMentionsForOptimistic.length > 0
-			) {
-				const refs = sessionMentionsForOptimistic
-					.map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
-					.join("\n");
-				optimisticText = `${optimisticText}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
-			}
-
-			// Optimistic: show message immediately in sync store + set busy
-			// Matches OpenCode: sync.set("session_status", session.id, { type: "busy" })
-			addOptimisticUserMessage(messageID, optimisticText, [textPartId]);
-			useSyncStore.getState().setStatus(sessionId, { type: "busy" });
-
-		// Scroll so the new user message appears at the top of the viewport.
-		// MutationObserver recalcs spacer automatically when the new turn renders.
-		// Fire twice: early (before DOM update) to reset scroll state so the RAF
-		// auto-scroll loop is unblocked, and again after the turn likely rendered.
-		scrollToBottom();
-		setTimeout(() => scrollToBottom(), 100);
-
-			const options: Record<string, unknown> = {};
-			if (local.agent.current) options.agent = local.agent.current.name;
-			if (local.model.currentKey) options.model = local.model.currentKey;
-			if (local.model.variant.current)
-				options.variant = local.model.variant.current;
-
-			// Build parts: text first, then upload attached files to /workspace/uploads/
-			// and send as XML text references (agent reads from disk on demand, not loaded into context)
-			const parts: Array<{ id: string; type: "text"; text: string }> = [
-				{ id: textPartId, type: "text", text },
-			];
-
-			if (uploadPlans.length > 0) {
-				const uploadResults = await Promise.all(
-					uploadPlans.map(async (plan) => {
-						const uploadBlob = new File([plan.file], plan.uniqueName, {
-							type: plan.file.type,
-						});
-						const results = await uploadFile(uploadBlob, "/workspace/uploads");
-						if (!results || results.length === 0) {
-							throw new Error(`Failed to upload file: ${plan.filename}`);
-						}
-						return {
-							path: results[0].path,
-							mime: plan.mime,
-							filename: plan.filename,
-						};
-					}),
-				);
-				const uploadedFileRefs = uploadResults
-					.map(
-						(f) =>
-							`<file path="${f.path}" mime="${f.mime}" filename="${f.filename}">\nThis file has been uploaded and is available at the path above.\n</file>`,
-					)
-					.join("\n");
-				parts[0].text = `${parts[0].text}\n\n${uploadedFileRefs}`;
-			}
-
-			// Append session reference hints for @session mentions
-			const sessionMentions = mentions?.filter(
-				(m) => m.kind === "session" && m.value,
-			);
-			if (sessionMentions && sessionMentions.length > 0) {
-				const refs = sessionMentions
-					.map((m) => `<session_ref id="${m.value}" title="${m.label}" />`)
-					.join("\n");
-				parts[0].text = `${parts[0].text}\n\nReferenced sessions (use the session_context tool to fetch details when needed):\n${refs}`;
-			}
-
-			// Fire-and-forget via session.prompt (matching OpenCode app's approach).
-			// SSE events drive all incremental UI updates via sync store.
-			// prompt() blocks until the full response is ready, but since we don't
-			// await the result, it effectively runs in the background. This is exactly
-			// how OpenCode's web app sends messages.
-			// Don't send part IDs or messageID — let the server generate them with
-			// its own clock. Client-generated IDs can sort before server IDs due to
-			// clock skew (browser vs Docker container), causing the server's loop to
-			// exit immediately thinking the prompt was already answered.
-			const mappedParts = parts.map((p: any) => {
-				if (p.type === "file")
-					return {
-						type: "file" as const,
-						mime: p.mime,
-						url: p.url,
-						filename: p.filename,
-					};
-				return { type: "text" as const, text: p.text };
-			});
-			const sendOpts = Object.keys(options).length > 0 ? options : undefined;
-			const client = getClient();
-			const handleSendError = () => {
-				useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-				// Fetch real messages from the server. Some error paths
-				// (e.g. missing API key) return the error directly in the
-				// HTTP response without emitting a session.error SSE event.
-				// Without this fetch, removing the optimistic message can
-				// leave the UI blank.
-				client.session
-					.messages({ sessionID: sessionId })
-					.then((res) => {
-						if (res.data) {
-							useSyncStore.getState().hydrate(sessionId, res.data as any);
-							useSyncStore.getState().clearOptimisticMessages(sessionId);
-						} else {
-							removeOptimisticUserMessage(messageID);
-						}
-					})
-					.catch(() => {
-						removeOptimisticUserMessage(messageID);
-					});
-			};
-			void client.session
-				.promptAsync({
-					sessionID: sessionId,
-					parts: mappedParts,
-					...(sendOpts?.agent ? { agent: sendOpts.agent } : {}),
-					...(sendOpts?.model ? { model: sendOpts.model } : {}),
-					...(sendOpts?.variant ? { variant: sendOpts.variant } : {}),
-				} as any)
-				.then((res: any) => {
-					// The SDK resolves (not rejects) on HTTP errors, returning
-					// { error: ... } instead of throwing. Without this check the
-					// catch handler never fires and the UI stays stuck on "busy"
-					// with the optimistic user bubble forever.
-					if (res?.error) handleSendError();
-				})
-				.catch(handleSendError);
-
-			return messageID;
-		},
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[
-			sessionId,
-			sendMessage,
-			local.agent.current,
-			local.model.currentKey,
-			local.model.variant.current,
-			addOptimisticUserMessage,
-			removeOptimisticUserMessage,
-			scrollToBottom,
-			replyTo,
-		],
-	);
-
-	const handleStop = useCallback(() => {
-		// Guard against rapid clicks — ignore if an abort is already in flight
-		if (abortSession.isPending) return;
-		// Optimistically mark the session idle so the UI updates immediately
-		// (stop button hides, input re-enables) without waiting for the SSE
-		// round-trip. Also clear the busy debounce timer to bypass the 2s delay.
-		useSyncStore.getState().setStatus(sessionId, { type: "idle" });
-		clearTimeout(busyTimerRef.current);
-		setIsBusy(false);
-		abortSession.mutate(sessionId);
-	}, [sessionId, abortSession]);
 
 	// Ref-based guard against rapid double-fire of commands (replaces
 	// the old executeCommand.isPending check from the TQ mutation).
@@ -4558,26 +3772,26 @@ export function SessionChat({
 				<div ref={chatAreaRef} className="relative flex-1 min-h-0">
 					{shouldShowWelcomeOverlay && (
 						<div
-							className={cn(
+						 className={cn(
 								"absolute inset-0 z-20 pointer-events-none transition-opacity ease-out",
 								hasChatContent ? "opacity-0" : "opacity-100",
 							)}
-							style={{ transitionDuration: `${WELCOME_FADE_MS}ms` }}
+						 style={{ transitionDuration: `${WELCOME_FADE_MS}ms` }}
 						>
 							<SessionWelcome />
 						</div>
 					)}
 					<div
-						ref={scrollContainerCallbackRef}
-						className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 bg-background h-full [scroll-behavior:auto]"
+					 ref={scrollContainerCallbackRef}
+					 className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 bg-background h-full [scroll-behavior:auto]"
 						onMouseUp={handleChatMouseUp}
 						onMouseDown={handleChatMouseDown}
 						onScroll={handleChatScroll}
 					>
 						<div
-							ref={contentRef}
+						 ref={contentRef}
 							role="log"
-							className="mx-auto max-w-4xl min-w-0 w-full px-3 sm:px-6"
+						 className="mx-auto max-w-4xl min-w-0 w-full px-3 sm:px-6"
 						>
 							<div className="flex flex-col gap-12 min-w-0">
 								{/* Fork context divider — shown at the top of forked sessions */}
@@ -4607,11 +3821,11 @@ export function SessionChat({
 															)}
 															{files.length > 0 && (
 																<div className="flex gap-2 p-3 pb-0 flex-wrap">
-											{files.map((f, i) => (
-												<div
-													key={i}
-													onClick={(e) => e.stopPropagation()}
-												>
+										{files.map((f) => (
+											<div
+												key={f.path}
+												onClickCapture={(e) => e.stopPropagation()}
+											>
 													<FileCard
 														filepath={f.path}
 														onClick={() => openPreview(f.path)}
@@ -4634,17 +3848,11 @@ export function SessionChat({
 												})()}
 											</div>
 										</div>
-										<div className="flex items-center gap-3">
-											{/* eslint-disable-next-line @next/next/no-img-element */}
-											<img
-												src="/kortix-logomark-white.svg"
-												alt="Kortix"
-												className="dark:invert-0 invert flex-shrink-0"
-												style={{ height: "14px", width: "auto" }}
-											/>
-											{isRetrying && (
-												<span className="text-xs text-amber-500">
-													Retrying connection...
+									<div className="flex items-center gap-3">
+										<SessionKortixLogo />
+										{isRetrying && (
+											<span className="text-xs text-amber-500">
+												Retrying connection...
 												</span>
 											)}
 										</div>
@@ -4664,13 +3872,7 @@ export function SessionChat({
 													<div className="flex-1 h-px bg-border" />
 												</div>
 												<div className="flex items-center gap-3">
-													{/* eslint-disable-next-line @next/next/no-img-element */}
-													<img
-														src="/kortix-logomark-white.svg"
-														alt="Kortix"
-														className="dark:invert-0 invert flex-shrink-0"
-														style={{ height: "14px", width: "auto" }}
-													/>
+													<SessionKortixLogo />
 													<div className="text-sm text-muted-foreground">
 														Compacting session...
 													</div>
@@ -4733,13 +3935,7 @@ export function SessionChat({
 								{commandError && <TurnErrorDisplay errorText={commandError} className="mt-2" />}
 								{!showOptimistic && isBusy && turns.length === 0 && (
 									<div className="flex items-center gap-3">
-										{/* eslint-disable-next-line @next/next/no-img-element */}
-										<img
-											src="/kortix-logomark-white.svg"
-											alt="Kortix"
-											className="dark:invert-0 invert flex-shrink-0"
-											style={{ height: "14px", width: "auto" }}
-										/>
+										<SessionKortixLogo />
 									</div>
 								)}
 							</div>
@@ -4765,7 +3961,7 @@ export function SessionChat({
 						>
 							<button
 								onClick={handleSelectionReply}
-								className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-popover border border-border shadow-md text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+							 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-popover border border-border shadow-md text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
 							>
 								<Reply className="size-3.5" />
 								Reply
@@ -4775,7 +3971,7 @@ export function SessionChat({
 
 					{/* Scroll to bottom FAB */}
 					<div
-						className={cn(
+					 className={cn(
 							"absolute bottom-4 left-1/2 -translate-x-1/2 transition-all duration-300 ease-out",
 							showScrollButton
 								? "opacity-100 translate-y-0 scale-100"
@@ -4785,8 +3981,8 @@ export function SessionChat({
 						<Button
 							variant="outline"
 							size="sm"
-							className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60 shadow-lg"
-							onClick={smoothScrollToAbsoluteBottom}
+						 className="rounded-full h-7 text-xs bg-background/90 backdrop-blur-sm border-border/60 shadow-lg"
+						 onClick={smoothScrollToAbsoluteBottom}
 						>
 							<ArrowDown className="size-3 mr-1" />
 							Scroll to bottom
@@ -4828,7 +4024,7 @@ export function SessionChat({
 						<>
 							{renderedQuestion && (
 								<div
-									className={cn(
+								 className={cn(
 										"overflow-hidden transition-[max-height,opacity,transform] ease-in-out",
 										questionPromptVisible
 											? "max-h-[520px] opacity-100 translate-y-0 duration-300"
@@ -4848,7 +4044,7 @@ export function SessionChat({
 							<button
 								type="button"
 								onClick={() => setQueueExpanded((v) => !v)}
-								className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
+							 className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer"
 							>
 								<ListPlus className="size-3.5 text-muted-foreground flex-shrink-0" />
 							<span className="text-xs text-muted-foreground flex-1 text-left truncate">
@@ -4861,7 +4057,7 @@ export function SessionChat({
 											if (previewText.length > 0) {
 												return (
 													<>
-											{" "}
+														{" "}
 														· {previewText.slice(0, 50)}
 														{previewText.length > 50 ? "…" : ""}
 													</>
@@ -4885,7 +4081,7 @@ export function SessionChat({
 									<span
 										role="button"
 										tabIndex={0}
-										onClick={(e) => {
+									 onClick={(e) => {
 											e.stopPropagation();
 											queueClearSession(sessionId);
 										}}
@@ -4895,12 +4091,12 @@ export function SessionChat({
 												queueClearSession(sessionId);
 											}
 										}}
-										className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+									 className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
 									>
 										<X className="size-3" />
 									</span>
 									<ChevronUp
-										className={cn(
+									 className={cn(
 											"size-3 text-muted-foreground/40 transition-transform",
 											!queueExpanded && "rotate-180",
 										)}
@@ -4915,7 +4111,7 @@ export function SessionChat({
 									{queuedMessages.map((qm, idx) => (
 										<div
 											key={qm.id}
-											className="group/q flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted/60 transition-colors"
+										 className="group/q flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted/60 transition-colors"
 										>
 											<span className="text-[10px] tabular-nums text-muted-foreground/40 shrink-0 w-3 text-center">
 												{idx + 1}
@@ -4929,7 +4125,7 @@ export function SessionChat({
 														<button
 															type="button"
 															onClick={() => handleQueueSendNow(qm.id)}
-															className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+														 className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
 														>
 															<Send className="size-2.5" />
 														</button>
@@ -4942,7 +4138,7 @@ export function SessionChat({
 													<button
 														type="button"
 														onClick={() => queueMoveUp(qm.id)}
-														className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+													 className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
 													>
 														<ArrowUp className="size-2.5" />
 													</button>
@@ -4951,7 +4147,7 @@ export function SessionChat({
 													<button
 														type="button"
 														onClick={() => queueMoveDown(qm.id)}
-														className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+													 className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
 													>
 														<ArrowDown className="size-2.5" />
 													</button>
@@ -4959,7 +4155,7 @@ export function SessionChat({
 												<button
 													type="button"
 													onClick={() => queueRemove(qm.id)}
-													className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+												 className="inline-flex items-center justify-center size-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
 												>
 													<X className="size-2.5" />
 												</button>

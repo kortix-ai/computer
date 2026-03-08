@@ -77,6 +77,7 @@ import { KortixLoader } from '@/components/ui/kortix-loader';
 import { cn } from '@/lib/utils';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { exportDocument, type ExportFormat } from '@/lib/utils/document-export';
+import Image from 'next/image';
 
 interface MarkdownToolbarProps {
   editor: Editor;
@@ -89,6 +90,137 @@ interface MarkdownToolbarProps {
   isFloatingMenu?: boolean; // Used in FloatingMenu context
   hasChanges?: boolean; // Whether there are unsaved changes
   sandboxId?: string; // Sandbox ID for uploading images
+}
+
+type MarkdownSaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+interface MarkdownToolbarButtonProps {
+  onClick: () => void;
+  isActive?: boolean;
+  disabled?: boolean;
+  icon: React.ElementType;
+  tooltip: string;
+  shortcut?: string;
+}
+
+function MarkdownToolbarButton({
+  onClick,
+  isActive = false,
+  disabled = false,
+  icon: Icon,
+  tooltip,
+  shortcut,
+}: MarkdownToolbarButtonProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          onClick={onClick}
+          disabled={disabled}
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'h-8 w-8 p-0',
+            isActive && 'bg-accent text-accent-foreground'
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="flex items-center gap-2">
+        <span>{tooltip}</span>
+        {shortcut && (
+          <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded font-mono">
+            {shortcut}
+          </kbd>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ToolbarImagePreview({
+  src,
+  className,
+}: {
+  src: string;
+  className: string;
+}) {
+  const [isVisible, setIsVisible] = useState(true);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <Image
+      src={src}
+      alt="Preview"
+      width={640}
+      height={320}
+      unoptimized
+      className={className}
+      onError={() => setIsVisible(false)}
+    />
+  );
+}
+
+interface MarkdownSaveButtonProps {
+  onSave?: () => void;
+  saveState: MarkdownSaveState;
+  hasChanges: boolean;
+}
+
+function MarkdownSaveButton({ onSave, saveState, hasChanges }: MarkdownSaveButtonProps) {
+  if (!onSave) return null;
+
+  switch (saveState) {
+    case 'saving':
+      return (
+        <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2">
+          <KortixLoader size="small" />
+          <span className="text-xs">Saving</span>
+        </Button>
+      );
+    case 'saved':
+      return (
+        <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2 text-green-600">
+          <Check className="h-4 w-4" />
+          <span className="text-xs">Saved</span>
+        </Button>
+      );
+    case 'error':
+      return (
+        <Button variant="ghost" size="sm" onClick={onSave} className="gap-1.5 h-8 px-2 text-red-500 hover:bg-red-50 hover:text-red-600">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-xs">Retry</span>
+        </Button>
+      );
+    default:
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSave}
+              disabled={!hasChanges}
+              className="gap-1.5 h-8 px-2"
+            >
+              <Save className="h-4 w-4" />
+              <span className="text-xs">Save</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {hasChanges ? (
+              <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
+            ) : (
+              'No changes to save'
+            )}
+          </TooltipContent>
+        </Tooltip>
+      );
+  }
 }
 
 export function MarkdownToolbar({ 
@@ -261,47 +393,6 @@ export function MarkdownToolbar({
     }
   }, [editor, fileName]);
 
-  const ToolbarButton = ({
-    onClick,
-    isActive = false,
-    disabled = false,
-    icon: Icon,
-    tooltip,
-    shortcut,
-  }: {
-    onClick: () => void;
-    isActive?: boolean;
-    disabled?: boolean;
-    icon: React.ElementType;
-    tooltip: string;
-    shortcut?: string;
-  }) => (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          onClick={onClick}
-          disabled={disabled}
-          variant="ghost"
-          size="sm"
-          className={cn(
-            'h-8 w-8 p-0',
-            isActive && 'bg-accent text-accent-foreground'
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="flex items-center gap-2">
-        <span>{tooltip}</span>
-        {shortcut && (
-          <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded font-mono">
-            {shortcut}
-          </kbd>
-        )}
-      </TooltipContent>
-    </Tooltip>
-  );
-
   const insertLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href;
     const url = window.prompt('Enter URL:', previousUrl);
@@ -445,65 +536,13 @@ export function MarkdownToolbar({
   }, [editor]);
 
 
-  const SaveButton = () => {
-    if (!onSave) return null;
-
-    switch (saveState) {
-      case 'saving':
-        return (
-          <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2">
-            <KortixLoader size="small" />
-            <span className="text-xs">Saving</span>
-          </Button>
-        );
-      case 'saved':
-        return (
-          <Button variant="ghost" size="sm" disabled className="gap-1.5 h-8 px-2 text-green-600">
-            <Check className="h-4 w-4" />
-            <span className="text-xs">Saved</span>
-          </Button>
-        );
-      case 'error':
-        return (
-          <Button variant="ghost" size="sm" onClick={onSave} className="gap-1.5 h-8 px-2 text-red-500 hover:bg-red-50 hover:text-red-600">
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-xs">Retry</span>
-          </Button>
-        );
-      default:
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={onSave} 
-                disabled={!hasChanges}
-                className="gap-1.5 h-8 px-2"
-              >
-                <Save className="h-4 w-4" />
-                <span className="text-xs">Save</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {hasChanges ? (
-                <>Save changes <kbd className="ml-1.5 px-1 py-0.5 text-[10px] bg-muted rounded font-mono">⌘S</kbd></>
-              ) : (
-                'No changes to save'
-              )}
-            </TooltipContent>
-          </Tooltip>
-        );
-    }
-  };
-
   const toolbarContent = (
     <>
       {/* Save/Discard - Left side, only in main toolbar when actions not hidden */}
       {!isBubbleMenu && !isFloatingMenu && !hideActions && (
         <>
           <div className="flex items-center gap-1 shrink-0">
-            <SaveButton />
+            <MarkdownSaveButton onSave={onSave} saveState={saveState} hasChanges={hasChanges} />
             {hasChanges && onDiscard && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -544,14 +583,14 @@ export function MarkdownToolbar({
       {!isBubbleMenu && !isFloatingMenu && (
         <>
           <div className="flex items-center shrink-0">
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().undo().run()}
               disabled={!canUndo}
               icon={Undo}
               tooltip="Undo"
               shortcut="⌘Z"
             />
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().redo().run()}
               disabled={!canRedo}
               icon={Redo}
@@ -599,21 +638,21 @@ export function MarkdownToolbar({
 
       {/* Text formatting */}
       <div className="flex items-center shrink-0">
-        <ToolbarButton
+        <MarkdownToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           isActive={isBold}
           icon={Bold}
           tooltip="Bold"
           shortcut="⌘B"
         />
-        <ToolbarButton
+        <MarkdownToolbarButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
           isActive={isItalic}
           icon={Italic}
           tooltip="Italic"
           shortcut="⌘I"
         />
-        <ToolbarButton
+        <MarkdownToolbarButton
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           isActive={isUnderline}
           icon={UnderlineIcon}
@@ -622,13 +661,13 @@ export function MarkdownToolbar({
         />
         {!isBubbleMenu && (
           <>
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().toggleStrike().run()}
               isActive={isStrike}
               icon={Strikethrough}
               tooltip="Strikethrough"
             />
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().toggleCode().run()}
               isActive={isCode}
               icon={Code}
@@ -643,19 +682,19 @@ export function MarkdownToolbar({
         <>
           <Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
           <div className="flex items-center shrink-0">
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().toggleBulletList().run()}
               isActive={isBulletList}
               icon={List}
               tooltip="Bullet List"
             />
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
               isActive={isOrderedList}
               icon={ListOrdered}
               tooltip="Numbered List"
             />
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().toggleTaskList().run()}
               isActive={isTaskList}
               icon={ListTodo}
@@ -670,19 +709,19 @@ export function MarkdownToolbar({
         <>
           <Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
           <div className="flex items-center shrink-0">
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().toggleBlockquote().run()}
               isActive={isBlockquote}
               icon={Quote}
               tooltip="Quote"
             />
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().toggleCodeBlock().run()}
               isActive={isCodeBlock}
               icon={Code}
               tooltip="Code Block"
             />
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={() => editor.chain().focus().setHorizontalRule().run()}
               icon={Minus}
               tooltip="Divider"
@@ -696,15 +735,15 @@ export function MarkdownToolbar({
         <>
           <Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
           <div className="flex items-center shrink-0">
-            <ToolbarButton
+            <MarkdownToolbarButton
               onClick={insertLink}
               isActive={isLink}
               icon={LinkIcon}
               tooltip="Link"
               shortcut="⌘K"
             />
-            <ToolbarButton onClick={openImageDialog} icon={ImageIcon} tooltip="Image" />
-            <ToolbarButton onClick={insertTable} icon={TableIcon} tooltip="Table" />
+            <MarkdownToolbarButton onClick={openImageDialog} icon={ImageIcon} tooltip="Image" />
+            <MarkdownToolbarButton onClick={insertTable} icon={TableIcon} tooltip="Table" />
           </div>
         </>
       )}
@@ -841,7 +880,8 @@ export function MarkdownToolbar({
             </TabsTrigger>
           </TabsList>
           <TabsContent value="upload" className="space-y-4 pt-4">
-            <div
+            <button
+              type="button"
               className={cn(
                 "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
                 "hover:border-primary hover:bg-muted/50",
@@ -858,10 +898,8 @@ export function MarkdownToolbar({
               />
               {imagePreview ? (
                 <div className="space-y-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <ToolbarImagePreview
                     src={imagePreview}
-                    alt="Preview"
                     className="max-h-40 mx-auto rounded-lg object-contain"
                   />
                   <p className="text-sm text-muted-foreground">Click to change image</p>
@@ -879,7 +917,7 @@ export function MarkdownToolbar({
                   </p>
                 </div>
               )}
-            </div>
+            </button>
           </TabsContent>
           <TabsContent value="url" className="space-y-4 pt-4">
             <div className="space-y-2">
@@ -896,14 +934,9 @@ export function MarkdownToolbar({
             </div>
             {imageUrl && (
               <div className="border rounded-lg p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <ToolbarImagePreview
                   src={imageUrl}
-                  alt="Preview"
                   className="max-h-40 mx-auto rounded object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
                 />
               </div>
             )}
@@ -951,4 +984,3 @@ export function MarkdownToolbar({
     </TooltipProvider>
   );
 }
-

@@ -85,7 +85,7 @@ export function OcQuestionToolView({
               const hasAnswer = answer.length > 0;
 
               return (
-                <div key={i} className="space-y-1.5">
+                <div key={q.header || q.question} className="space-y-1.5">
                   {q.header && (
                     <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                       {q.header}
@@ -96,11 +96,11 @@ export function OcQuestionToolView({
 
                   {q.options && q.options.length > 0 && (
                     <div className="space-y-1">
-                      {q.options.map((opt, j) => {
+                      {q.options.map((opt) => {
                         const isSelected = hasAnswer && answer.includes(opt.label);
                         return (
                           <div
-                            key={j}
+                            key={opt.label}
                             className={cn(
                               'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors',
                               isSelected ? 'bg-muted' : 'bg-transparent',

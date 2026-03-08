@@ -461,10 +461,21 @@ function TabItem({
     [index, onDragOver]
   );
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleClick(e as unknown as React.MouseEvent);
+      }
+    },
+    [handleClick]
+  );
+
   return (
     <div
       role="tab"
       aria-selected={isActive}
+      tabIndex={0}
       draggable
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -472,6 +483,7 @@ function TabItem({
       onDragEnd={onDragEnd}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}
       className={cn(
         'group relative flex items-center text-xs select-none cursor-pointer',

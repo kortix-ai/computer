@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { getPlanIcon } from './plan-utils';
 
-export type TierBadgeSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
-export type TierBadgeVariant = 'default' | 'circle';
+type TierBadgeSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
+type TierBadgeVariant = 'default' | 'circle';
 
 interface TierBadgeProps {
   /** Plan name (e.g., 'Basic', 'Plus', 'Pro', 'Ultra') */
@@ -72,6 +73,8 @@ export function TierBadge({
 }: TierBadgeProps) {
   const planIcon = getPlanIcon(planName, isLocal);
   const config = sizeConfig[size];
+  const intrinsicWidth = planIcon?.includes('/pro.svg') ? 55 : 50;
+  const intrinsicHeight = 24;
 
   // If no icon (e.g., Basic tier), return null or text only
   if (!planIcon) {
@@ -96,13 +99,14 @@ export function TierBadge({
           className
         )}
       >
-        {/* Use regular img for SVG icons to avoid Next.js Image aspect ratio warnings */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={planIcon}
           alt={planName}
+          width={intrinsicWidth}
+          height={intrinsicHeight}
           className="object-contain"
           style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+          unoptimized
         />
       </div>
     );
@@ -113,15 +117,15 @@ export function TierBadge({
   // Use regular img for SVG icons to avoid Next.js Image aspect ratio warnings
   return (
     <div className="flex items-center">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={planIcon}
         alt={planName}
+        width={intrinsicWidth}
+        height={intrinsicHeight}
         className={cn("object-contain", className)}
         style={{ height: `${config.height}px`, width: 'auto' }}
+        unoptimized
       />
     </div>
   );
 }
-
-

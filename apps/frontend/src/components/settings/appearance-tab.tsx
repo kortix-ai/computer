@@ -78,11 +78,13 @@ function WallpaperCard({
           /* SVG brandmark — theme-aware: dark bg in dark mode, light bg in light mode */
           <>
             <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-950 flex items-center justify-center overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={wallpaper.thumbnailUrl}
                 alt={wallpaper.name}
-                className="w-[200%] h-auto object-contain select-none opacity-30 dark:opacity-30 invert dark:invert-0"
+                fill
+                unoptimized
+                sizes="160px"
+                className="object-contain select-none opacity-30 dark:opacity-30 invert dark:invert-0 scale-[2]"
                 draggable={false}
               />
             </div>
@@ -154,11 +156,6 @@ export function AppearanceTab() {
     (s) => s.preferences.wallpaperId ?? DEFAULT_WALLPAPER_ID
   );
   const setWallpaperId = useUserPreferencesStore((s) => s.setWallpaperId);
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
 
   React.useEffect(() => {
     if (!THEMES.some((theme) => theme.id === themeId)) {
@@ -183,13 +180,13 @@ export function AppearanceTab() {
 
       <div className="space-y-5 sm:space-y-6">
         <div>
-          <label className="text-xs font-medium text-muted-foreground mb-2 block">
+          <p className="text-xs font-medium text-muted-foreground mb-2 block">
             Color Mode
-          </label>
+          </p>
           <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
             {BASE_MODES.map((mode) => {
               const Icon = mode.icon;
-              const isActive = mounted && baseMode === mode.value;
+              const isActive = baseMode === mode.value;
               return (
                 <button
                   key={mode.value}
@@ -213,9 +210,9 @@ export function AppearanceTab() {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <ImageIcon className="size-4 text-muted-foreground" />
-            <label className="text-xs font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Wallpaper
-            </label>
+            </p>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {WALLPAPERS.map((wp) => (
@@ -232,9 +229,9 @@ export function AppearanceTab() {
         <div className="border-t pt-4">
           <div className="flex items-center gap-2 mb-2">
             <Palette className="size-4 text-muted-foreground" />
-            <label className="text-xs font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Theme Palette
-            </label>
+            </p>
           </div>
 
           <div className="flex flex-col gap-0.5">

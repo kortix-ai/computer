@@ -66,8 +66,8 @@ export function SentimentPieChart() {
                   dataKey="value"
                   strokeWidth={0}
                 >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  {chartData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
                   ))}
                 </Pie>
                 <ChartTooltip 
@@ -80,8 +80,8 @@ export function SentimentPieChart() {
               </PieChart>
             </ChartContainer>
             <div className="flex flex-wrap justify-center gap-4 mt-2">
-              {chartData.map((entry, index) => (
-                <div key={index} className="flex items-center gap-2">
+              {chartData.map((entry) => (
+                <div key={entry.name} className="flex items-center gap-2">
                   <div 
                     className="w-3 h-3 rounded-full" 
                     style={{ backgroundColor: entry.fill }}

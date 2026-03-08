@@ -64,7 +64,6 @@ import { OcGetMemToolView } from './OcGetMemToolView';
 
 /**
  * Registry entries for OpenCode tools.
- * Call `toolViewRegistry.registerMany(ocToolViewRegistrations)` to activate.
  */
 export const ocToolViewRegistrations: Record<string, ToolViewComponent> = {
   // Shell / command execution

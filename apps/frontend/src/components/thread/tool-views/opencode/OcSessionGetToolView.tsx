@@ -159,13 +159,13 @@ export function OcSessionGetToolView({
                   </button>
                   {showTodos && (
                     <div className="border-t border-border/30 px-3 py-2 space-y-1">
-                      {data.todos.map((todo, i) => {
+                      {data.todos.map((todo) => {
                         const isComplete = todo.startsWith('[completed]') || todo.startsWith('[x]');
                         const isProgress = todo.startsWith('[in_progress]') || todo.startsWith('[~]');
                         const content = todo.replace(/^\[[\w_]+\]\s*/, '');
                         return (
-                          <div key={i} className="flex items-start gap-2 text-xs">
-                            <input type="checkbox" checked={isComplete} readOnly className="mt-0.5 rounded border-border" />
+                          <div key={todo} className="flex items-start gap-2 text-xs">
+                            <input type="checkbox" checked={isComplete} readOnly aria-label={`Todo: ${content}`} className="mt-0.5 rounded border-border" />
                             <span className={cn(
                               isComplete && 'line-through text-muted-foreground',
                               isProgress && 'font-medium',

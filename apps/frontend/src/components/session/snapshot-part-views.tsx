@@ -176,12 +176,12 @@ export function OcPatchPartView({ part, onViewDiff }: OcPatchPartViewProps) {
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-1 ml-5 pl-3 border-l border-border/40 space-y-0.5 py-1">
-          {fileEntries.map((entry, i) => (
-            <div key={i} className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] text-muted-foreground">
-              <FileEdit className="size-3 text-blue-400/60 flex-shrink-0" />
-              <span className="font-mono truncate" title={entry.path}>
-                {entry.path}
+			<div className="mt-1 ml-5 pl-3 border-l border-border/40 space-y-0.5 py-1">
+				{fileEntries.map((entry) => (
+					<div key={entry.path} className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] text-muted-foreground">
+						<FileEdit className="size-3 text-blue-400/60 flex-shrink-0" />
+						<span className="font-mono truncate" title={entry.path}>
+							{entry.path}
               </span>
             </div>
           ))}
@@ -283,12 +283,12 @@ export function SnapshotTimelineEntry({ item, isLast, onViewDiff }: SnapshotTime
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="mt-1 space-y-0.5">
-                {item.files!.map((file, i) => (
-                  <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80 font-mono pl-1">
-                    <FileEdit className="size-2.5 text-blue-400/50 flex-shrink-0" />
-                    <span className="truncate">{file}</span>
-                  </div>
+				<div className="mt-1 space-y-0.5">
+					{item.files!.map((file) => (
+						<div key={file} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80 font-mono pl-1">
+							<FileEdit className="size-2.5 text-blue-400/50 flex-shrink-0" />
+							<span className="truncate">{file}</span>
+						</div>
                 ))}
               </div>
             </CollapsibleContent>

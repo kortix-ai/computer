@@ -336,6 +336,7 @@ export function FileContentRenderer({
                 onClick={() => handleSave(latestContentRef.current)}
                 disabled={isSaving}
                 title="Save"
+                aria-label={isSaving ? `Saving ${fileName}` : `Save ${fileName}`}
               >
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -353,6 +354,8 @@ export function FileContentRenderer({
                 className={cn('h-7 w-7', isJsonTreeView && 'text-primary')}
                 onClick={() => setIsJsonTreeView((v) => !v)}
                 title={isJsonTreeView ? 'View source' : 'Tree view'}
+                aria-label={isJsonTreeView ? 'Switch to JSON source view' : 'Switch to JSON tree view'}
+                aria-pressed={isJsonTreeView}
               >
                 <Braces className="h-4 w-4" />
               </Button>
@@ -366,6 +369,8 @@ export function FileContentRenderer({
                 className={cn('h-7 w-7', isMarkdownPreview && 'text-primary')}
                 onClick={() => setIsMarkdownPreview((v) => !v)}
                 title={isMarkdownPreview ? 'View source' : 'Preview'}
+                aria-label={isMarkdownPreview ? 'Switch to markdown source view' : 'Switch to markdown preview'}
+                aria-pressed={isMarkdownPreview}
               >
                 {isMarkdownPreview ? (
                   <Code className="h-4 w-4" />
@@ -385,6 +390,7 @@ export function FileContentRenderer({
               onClick={handleDownload}
               disabled={!fileContent && !blobUrl && !rawBlob}
               title="Download"
+              aria-label={`Download ${fileName}`}
             >
               <Download className="h-4 w-4" />
             </Button>
@@ -632,7 +638,8 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
     const count = value.length;
     return (
       <div>
-        <div
+        <button
+          type="button"
           style={{ paddingLeft: depth * 20 }}
           className="cursor-pointer hover:bg-muted/30 rounded-sm transition-colors inline-flex items-center gap-1"
           onClick={() => setIsCollapsed((v) => !v)}
@@ -646,12 +653,24 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
           ) : (
             <span className="text-muted-foreground/30">[</span>
           )}
-        </div>
+        </button>
         {!isCollapsed && (
           <>
-            {value.map((item, idx) => (
-              <JsonNode key={idx} value={item} keyName={null} depth={depth + 1} />
-            ))}
+            {value.map((item, idx) => {
+              const itemKeyBase = JSON.stringify(item) ?? String(item);
+              const occurrence = value
+                .slice(0, idx)
+                .filter((existingItem) => JSON.stringify(existingItem) === itemKeyBase).length + 1;
+
+              return (
+                <JsonNode
+                  key={`${itemKeyBase}-${occurrence}`}
+                  value={item}
+                  keyName={null}
+                  depth={depth + 1}
+                />
+              );
+            })}
             <div style={{ paddingLeft: depth * 20 }} className="text-muted-foreground/30">]</div>
           </>
         )}
@@ -664,7 +683,8 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
     const count = entries.length;
     return (
       <div>
-        <div
+        <button
+          type="button"
           style={{ paddingLeft: depth * 20 }}
           className="cursor-pointer hover:bg-muted/30 rounded-sm transition-colors inline-flex items-center gap-1"
           onClick={() => setIsCollapsed((v) => !v)}
@@ -678,7 +698,7 @@ function JsonNode({ value, keyName, depth }: { value: unknown; keyName: string |
           ) : (
             <span className="text-muted-foreground/30">{'{'}</span>
           )}
-        </div>
+        </button>
         {!isCollapsed && (
           <>
             {entries.map(([k, v]) => (

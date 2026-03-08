@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { useTabStore } from '@/stores/tab-store';
 
 /**
@@ -21,22 +21,19 @@ export default function PreviewPage({
   params: Promise<{ port: string }>;
 }) {
   const { port } = use(params);
-  const router = useRouter();
   const { tabs, setActiveTab } = useTabStore();
+  const tabId = `preview:${port}`;
+  const existingTab = tabs[tabId];
 
   useEffect(() => {
-    const tabId = `preview:${port}`;
-    const existingTab = tabs[tabId];
-
     if (existingTab) {
-      // Tab exists - activate it
       setActiveTab(tabId);
-    } else {
-      // No tab for this port - redirect to dashboard
-      // The preview tab can only be created with proper sandbox URL context
-      router.replace('/dashboard');
     }
-  }, [port, tabs, setActiveTab, router]);
+  }, [existingTab, setActiveTab, tabId]);
+
+  if (!existingTab) {
+    redirect('/dashboard');
+  }
 
   // The actual preview content is rendered by SessionTabsContainer in layout-content.tsx
   // This page renders nothing visible - it just ensures the tab is activated

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { renderSharePageImage } from '@/lib/og/render-share-page-image';
 
 // Add route segment config for caching
 export const runtime = 'edge'; // Use edge runtime for better performance
@@ -14,30 +15,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch(`https://api.orshot.com/v1/studio/render`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.ORSHOT_API_KEY}`,
-      },
-      body: JSON.stringify({
-        templateId: 10,
-        modifications: {
-          title,
-        },
-        response: {
-          type: 'binary',
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Orshot API error: ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    const arrayBuffer = await blob.arrayBuffer();
-    const image = Buffer.from(arrayBuffer);
+    const image = await renderSharePageImage(title);
 
     return new NextResponse(image, {
       status: 200,

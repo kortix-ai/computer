@@ -129,8 +129,8 @@ export function OcGetMemToolView({
                         <Badge variant="secondary" className="h-5 text-[10px] font-medium">{report.facts.length}</Badge>
                       </div>
                       <ul className="space-y-1.5">
-                        {report.facts.map((fact, idx) => (
-                          <li key={`${report.id}-${idx}`} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
+                        {report.facts.map((fact) => (
+                          <li key={`${report.id}-${fact}`} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
                             <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-emerald-500/90 flex-shrink-0" />
                             <span>{fact}</span>
                           </li>

@@ -11,6 +11,8 @@ import { useRetentionData, type RetentionData } from '@/hooks/admin/use-admin-an
 import { UserEmailLink } from './user-email-link';
 import type { RetentionTabProps } from '../types';
 
+const RETENTION_ROW_SKELETON_SLOTS = ['retention-row-1', 'retention-row-2', 'retention-row-3', 'retention-row-4', 'retention-row-5'] as const;
+
 export function RetentionTab({ onUserClick }: RetentionTabProps) {
   const [params, setParams] = useState({
     page: 1,
@@ -137,8 +139,8 @@ export function RetentionTab({ onUserClick }: RetentionTabProps) {
         <div className="p-0">
           {isLoading ? (
             <div className="p-5 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+              {RETENTION_ROW_SKELETON_SLOTS.map((slot) => (
+                <Skeleton key={slot} className="h-12 w-full" />
               ))}
             </div>
           ) : (

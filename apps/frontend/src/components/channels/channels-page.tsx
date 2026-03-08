@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import { useChannels, type ChannelConfig } from '@/hooks/channels';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -71,6 +71,17 @@ const getChannelLabel = (channelType: string) => {
   return labels[channelType] || channelType;
 };
 
+const CHANNEL_SKELETON_KEYS = [
+  'channel-skeleton-1',
+  'channel-skeleton-2',
+  'channel-skeleton-3',
+  'channel-skeleton-4',
+  'channel-skeleton-5',
+  'channel-skeleton-6',
+  'channel-skeleton-7',
+  'channel-skeleton-8',
+] as const;
+
 const ChannelListItem = ({
   channel,
   onClick,
@@ -83,7 +94,7 @@ const ChannelListItem = ({
   const Icon = getChannelIcon(channel.channelType);
 
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -91,7 +102,17 @@ const ChannelListItem = ({
       transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.6) }}
     >
       <SpotlightCard className="bg-card border border-border/50">
-        <div onClick={onClick} className="p-4 sm:p-5 flex flex-col h-full cursor-pointer">
+        <div
+          onClick={onClick}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            onClick();
+          }}
+          className="p-4 sm:p-5 flex flex-col h-full cursor-pointer"
+          role="button"
+          tabIndex={0}
+        >
           <div className="flex items-center gap-3 mb-3">
             <div className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-muted border border-border/50 shrink-0">
               <Icon className="h-4.5 w-4.5 text-foreground" />
@@ -115,13 +136,13 @@ const ChannelListItem = ({
             {channel.sandbox?.name || 'Not linked to instance'}
           </p>
           <div className="mt-auto flex justify-end">
-            <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs">
+            <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs" tabIndex={-1}>
               Manage
             </Button>
           </div>
         </div>
       </SpotlightCard>
-    </motion.div>
+    </m.div>
   );
 };
 
@@ -146,8 +167,8 @@ const EmptyState = ({ onCreateClick }: { onCreateClick: () => void }) => (
 
 const LoadingSkeleton = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-      <div key={i} className="rounded-2xl border dark:bg-card p-4 sm:p-5">
+    {CHANNEL_SKELETON_KEYS.map((key) => (
+      <div key={key} className="rounded-2xl border dark:bg-card p-4 sm:p-5">
         <div className="flex items-center gap-3 mb-3">
           <Skeleton className="h-9 w-9 rounded-[10px]" />
           <div className="flex-1 space-y-2">
@@ -251,7 +272,8 @@ export function ChannelsPage() {
   }
 
   return (
-    <div className="min-h-[100dvh]">
+    <LazyMotion features={domAnimation}>
+      <div className="min-h-[100dvh]">
       <div className="container mx-auto max-w-7xl px-3 sm:px-4 py-4 sm:py-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-500 fill-mode-both">
         <PageHeader icon={Radio}>
           <div className="space-y-2 sm:space-y-4">
@@ -350,6 +372,7 @@ export function ChannelsPage() {
         onOpenChange={setShowCreateDialog}
         onCreated={handleChannelCreated}
       />
-    </div>
+      </div>
+    </LazyMotion>
   );
 }

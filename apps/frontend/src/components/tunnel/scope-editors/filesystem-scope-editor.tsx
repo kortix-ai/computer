@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { X, Plus, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ interface FilesystemScopeEditorProps {
 }
 
 export function FilesystemScopeEditor({ scope, onChange }: FilesystemScopeEditorProps) {
+  const id = useId();
   const [pathInput, setPathInput] = useState('');
   const [excludeInput, setExcludeInput] = useState('');
   const [excludesOpen, setExcludesOpen] = useState((scope.excludePatterns?.length ?? 0) > 0);
@@ -85,13 +86,13 @@ export function FilesystemScopeEditor({ scope, onChange }: FilesystemScopeEditor
 
       {/* Allowed Paths */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-muted-foreground">Allowed Paths</Label>
+        <Label htmlFor={`${id}-allowed-paths`} className="text-xs font-medium text-muted-foreground">Allowed Paths</Label>
         {scope.paths.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {scope.paths.map((p) => (
               <Badge key={p} variant="secondary" className="gap-1 pr-1 font-mono text-xs">
                 {p}
-                <button onClick={() => removePath(p)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
+                <button type="button" aria-label={`Remove allowed path ${p}`} onClick={() => removePath(p)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
@@ -100,6 +101,7 @@ export function FilesystemScopeEditor({ scope, onChange }: FilesystemScopeEditor
         )}
         <div className="flex gap-1.5">
           <input
+            id={`${id}-allowed-paths`}
             type="text"
             value={pathInput}
             onChange={(e) => setPathInput(e.target.value)}
@@ -107,7 +109,7 @@ export function FilesystemScopeEditor({ scope, onChange }: FilesystemScopeEditor
             placeholder="/home/user/projects"
             className="flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
-          <Button variant="outline" size="sm" onClick={addPath} disabled={!pathInput.trim()}>
+          <Button type="button" variant="outline" size="sm" onClick={addPath} disabled={!pathInput.trim()} aria-label="Add allowed path">
             <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -129,7 +131,7 @@ export function FilesystemScopeEditor({ scope, onChange }: FilesystemScopeEditor
                 {scope.excludePatterns!.map((p) => (
                   <Badge key={p} variant="secondary" className="gap-1 pr-1 font-mono text-xs">
                     {p}
-                    <button onClick={() => removeExclude(p)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
+                    <button type="button" aria-label={`Remove exclude pattern ${p}`} onClick={() => removeExclude(p)} className="ml-0.5 rounded hover:bg-muted-foreground/20">
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>
@@ -138,6 +140,7 @@ export function FilesystemScopeEditor({ scope, onChange }: FilesystemScopeEditor
             )}
             <div className="flex gap-1.5">
               <input
+                id={`${id}-exclude-patterns`}
                 type="text"
                 value={excludeInput}
                 onChange={(e) => setExcludeInput(e.target.value)}
@@ -145,7 +148,7 @@ export function FilesystemScopeEditor({ scope, onChange }: FilesystemScopeEditor
                 placeholder="node_modules/**"
                 className="flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
-              <Button variant="outline" size="sm" onClick={addExclude} disabled={!excludeInput.trim()}>
+              <Button type="button" variant="outline" size="sm" onClick={addExclude} disabled={!excludeInput.trim()} aria-label="Add exclude pattern">
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>

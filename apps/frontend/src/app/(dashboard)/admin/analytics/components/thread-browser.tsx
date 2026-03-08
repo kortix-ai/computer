@@ -19,6 +19,14 @@ import {
 import { UserEmailLink } from './user-email-link';
 import type { ThreadBrowserProps } from '../types';
 
+const THREAD_BROWSER_SKELETON_ROWS = [
+  'thread-browser-skeleton-1',
+  'thread-browser-skeleton-2',
+  'thread-browser-skeleton-3',
+  'thread-browser-skeleton-4',
+  'thread-browser-skeleton-5',
+] as const;
+
 export function ThreadBrowser({
   categoryFilter,
   tierFilter,
@@ -274,8 +282,8 @@ export function ThreadBrowser({
         {/* Table */}
         {isLoading ? (
           <div className="p-4 pt-0 space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
+            {THREAD_BROWSER_SKELETON_ROWS.map((rowId) => (
+              <Skeleton key={rowId} className="h-14 w-full" />
             ))}
           </div>
         ) : (

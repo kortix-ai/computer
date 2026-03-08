@@ -45,6 +45,28 @@ function generateSubdomain(): string {
   return `${adj}-${noun}-${id}.style.dev`;
 }
 
+function createDeploymentFile() {
+  return {
+    id:
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `deployment-file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    path: '',
+    content: '',
+  };
+}
+
+function createDeploymentEnvVar() {
+  return {
+    id:
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `deployment-env-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    key: '',
+    value: '',
+  };
+}
+
 // ─── Source type config ─────────────────────────────────────────────────────
 
 type UISourceType = DeploymentSource | 'workspace';
@@ -159,6 +181,14 @@ function FolderBrowserItem({
   onSelect: () => void;
   depth: number;
 }) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect();
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -168,10 +198,14 @@ function FolderBrowserItem({
           : 'text-foreground hover:bg-muted/50',
       )}
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
       }}
+      onKeyDown={handleKeyDown}
     >
       {node.type === 'directory' && (
         <button
@@ -570,8 +604,8 @@ export function CreateDeploymentDialog({
   const [code, setCode] = useState('');
 
   // Files fields
-  const [files, setFiles] = useState<Array<{ path: string; content: string }>>([
-    { path: '', content: '' },
+  const [files, setFiles] = useState<Array<{ id: string; path: string; content: string }>>([
+    createDeploymentFile(),
   ]);
 
   // Tar field
@@ -589,7 +623,7 @@ export function CreateDeploymentDialog({
   const [framework, setFramework] = useState('');
   const [buildCommand, setBuildCommand] = useState('');
   const [buildOutDir, setBuildOutDir] = useState('');
-  const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([]);
+  const [envVars, setEnvVars] = useState<Array<{ id: string; key: string; value: string }>>([]);
   const [staticOnly, setStaticOnly] = useState(false);
 
   const resetForm = useCallback(() => {
@@ -599,7 +633,7 @@ export function CreateDeploymentDialog({
     setBranch('');
     setRootPath('');
     setCode('');
-    setFiles([{ path: '', content: '' }]);
+    setFiles([createDeploymentFile()]);
     setTarUrl('');
     setWorkspacePath(null);
     setWorkspaceFolderName('');
@@ -798,14 +832,14 @@ export function CreateDeploymentDialog({
   };
 
   // File list management
-  const addFile = () => setFiles((prev) => [...prev, { path: '', content: '' }]);
+  const addFile = () => setFiles((prev) => [...prev, createDeploymentFile()]);
   const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
   const updateFile = (index: number, field: 'path' | 'content', value: string) => {
     setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, [field]: value } : f)));
   };
 
   // Env var management
-  const addEnvVar = () => setEnvVars((prev) => [...prev, { key: '', value: '' }]);
+  const addEnvVar = () => setEnvVars((prev) => [...prev, createDeploymentEnvVar()]);
   const removeEnvVar = (index: number) => setEnvVars((prev) => prev.filter((_, i) => i !== index));
   const updateEnvVar = (index: number, field: 'key' | 'value', value: string) => {
     setEnvVars((prev) => prev.map((e, i) => (i === index ? { ...e, [field]: value } : e)));
@@ -816,6 +850,16 @@ export function CreateDeploymentDialog({
   const textareaClass =
     'w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono min-h-[100px] resize-y';
   const labelClass = 'block text-sm font-medium text-foreground mb-1.5';
+  const domainsInputId = 'deployment-domains';
+  const sourceRefInputId = 'deployment-source-ref';
+  const branchInputId = 'deployment-branch';
+  const rootPathInputId = 'deployment-root-path';
+  const codeTextareaId = 'deployment-code';
+  const tarUrlInputId = 'deployment-tar-url';
+  const entrypointInputId = 'deployment-entrypoint';
+  const frameworkInputId = 'deployment-framework';
+  const buildCommandInputId = 'deployment-build-command';
+  const buildOutDirInputId = 'deployment-build-out-dir';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -835,7 +879,7 @@ export function CreateDeploymentDialog({
         <div className="space-y-6 py-2">
           {/* Source Type Selector */}
           <div>
-            <label className={labelClass}>Source Type</label>
+            <p className={labelClass}>Source Type</p>
             <div className="grid grid-cols-5 gap-2">
               {sourceTypes.map((st) => {
                 const Icon = st.icon;
@@ -861,11 +905,12 @@ export function CreateDeploymentDialog({
 
           {/* Domain */}
           <div>
-            <label className={labelClass}>
+            <label htmlFor={domainsInputId} className={labelClass}>
               Domain <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
               <input
+                id={domainsInputId}
                 type="text"
                 value={domains}
                 onChange={(e) => setDomains(e.target.value)}
@@ -889,9 +934,9 @@ export function CreateDeploymentDialog({
           {/* Source-specific fields */}
           {sourceType === 'workspace' && (
             <div>
-              <label className={labelClass}>
+              <p className={labelClass}>
                 Select Folder <span className="text-red-500">*</span>
-              </label>
+              </p>
               <div className="rounded-xl border overflow-hidden">
                 {/* Selected folder indicator */}
                 {workspacePath && (
@@ -961,10 +1006,11 @@ export function CreateDeploymentDialog({
           {sourceType === 'git' && (
             <div className="space-y-4">
               <div>
-                <label className={labelClass}>
+                <label htmlFor={sourceRefInputId} className={labelClass}>
                   Repository URL <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id={sourceRefInputId}
                   type="text"
                   value={sourceRef}
                   onChange={(e) => setSourceRef(e.target.value)}
@@ -974,8 +1020,9 @@ export function CreateDeploymentDialog({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelClass}>Branch</label>
+                  <label htmlFor={branchInputId} className={labelClass}>Branch</label>
                   <input
+                    id={branchInputId}
                     type="text"
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
@@ -984,8 +1031,9 @@ export function CreateDeploymentDialog({
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Root Path</label>
+                  <label htmlFor={rootPathInputId} className={labelClass}>Root Path</label>
                   <input
+                    id={rootPathInputId}
                     type="text"
                     value={rootPath}
                     onChange={(e) => setRootPath(e.target.value)}
@@ -999,10 +1047,11 @@ export function CreateDeploymentDialog({
 
           {sourceType === 'code' && (
             <div>
-              <label className={labelClass}>
+              <label htmlFor={codeTextareaId} className={labelClass}>
                 Code <span className="text-red-500">*</span>
               </label>
               <textarea
+                id={codeTextareaId}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder={'// Your application code\nconsole.log("Hello, World!");'}
@@ -1015,9 +1064,9 @@ export function CreateDeploymentDialog({
           {sourceType === 'files' && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className={labelClass}>
+                <p className={labelClass}>
                   Files <span className="text-red-500">*</span>
-                </label>
+                </p>
                 <Button type="button" variant="ghost" size="sm" onClick={addFile}>
                   <Plus className="h-3 w-3 mr-1" />
                   Add File
@@ -1025,7 +1074,7 @@ export function CreateDeploymentDialog({
               </div>
               <div className="space-y-3">
                 {files.map((file, i) => (
-                  <div key={i} className="rounded-xl border p-3 space-y-2">
+                  <div key={file.id} className="rounded-xl border p-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
@@ -1059,10 +1108,11 @@ export function CreateDeploymentDialog({
 
           {sourceType === 'tar' && (
             <div>
-              <label className={labelClass}>
+              <label htmlFor={tarUrlInputId} className={labelClass}>
                 Tarball URL <span className="text-red-500">*</span>
               </label>
               <input
+                id={tarUrlInputId}
                 type="text"
                 value={tarUrl}
                 onChange={(e) => setTarUrl(e.target.value)}
@@ -1095,8 +1145,9 @@ export function CreateDeploymentDialog({
               <div className="mt-4 space-y-4 pl-6 border-l-2 border-border/40">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={labelClass}>Entrypoint</label>
+                    <label htmlFor={entrypointInputId} className={labelClass}>Entrypoint</label>
                     <input
+                      id={entrypointInputId}
                       type="text"
                       value={entrypoint}
                       onChange={(e) => setEntrypoint(e.target.value)}
@@ -1105,8 +1156,9 @@ export function CreateDeploymentDialog({
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Framework</label>
+                    <label htmlFor={frameworkInputId} className={labelClass}>Framework</label>
                     <input
+                      id={frameworkInputId}
                       type="text"
                       value={framework}
                       onChange={(e) => setFramework(e.target.value)}
@@ -1117,8 +1169,9 @@ export function CreateDeploymentDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={labelClass}>Build Command</label>
+                    <label htmlFor={buildCommandInputId} className={labelClass}>Build Command</label>
                     <input
+                      id={buildCommandInputId}
                       type="text"
                       value={buildCommand}
                       onChange={(e) => setBuildCommand(e.target.value)}
@@ -1127,8 +1180,9 @@ export function CreateDeploymentDialog({
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Build Output Dir</label>
+                    <label htmlFor={buildOutDirInputId} className={labelClass}>Build Output Dir</label>
                     <input
+                      id={buildOutDirInputId}
                       type="text"
                       value={buildOutDir}
                       onChange={(e) => setBuildOutDir(e.target.value)}
@@ -1153,7 +1207,7 @@ export function CreateDeploymentDialog({
                 {/* Environment Variables */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className={labelClass}>Environment Variables</label>
+                    <p className={labelClass}>Environment Variables</p>
                     <Button type="button" variant="ghost" size="sm" onClick={addEnvVar}>
                       <Plus className="h-3 w-3 mr-1" />
                       Add
@@ -1162,7 +1216,7 @@ export function CreateDeploymentDialog({
                   {envVars.length > 0 && (
                     <div className="space-y-2">
                       {envVars.map((ev, i) => (
-                        <div key={i} className="flex items-center gap-2">
+                        <div key={ev.id} className="flex items-center gap-2">
                           <input
                             type="text"
                             value={ev.key}
