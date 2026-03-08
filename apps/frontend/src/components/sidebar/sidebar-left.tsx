@@ -26,6 +26,8 @@ import {
   FolderOpen,
   Brain,
   History,
+  ArrowRightLeft,
+  CheckCircle2,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -56,7 +58,7 @@ const IntegrationsIcon = ({ className }: { className?: string }) => (
 );
 
 import { SessionList } from '@/components/sidebar/session-list';
-import { useLegacyThreads } from '@/hooks/legacy/use-legacy-threads';
+import { useLegacyThreads, useMigrateAllLegacyThreads, useMigrateAllStatus } from '@/hooks/legacy/use-legacy-threads';
 import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
 
 import { UserMenu } from '@/components/sidebar/user-menu';
@@ -87,6 +89,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useIsMobile, useLocationSearch } from '@/hooks/utils';
 import { cn } from '@/lib/utils';
 import { useAdminRole } from '@/hooks/admin';
@@ -438,7 +450,25 @@ function SidebarSections() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
 
+  const migrateAll = useMigrateAllLegacyThreads();
+  const [migrateAllStarted, setMigrateAllStarted] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const { data: migrateStatus } = useMigrateAllStatus(migrateAllStarted);
+
   const hasLegacy = !legacyLoading && legacyData && legacyData.threads.length > 0;
+  const isMigrating = migrateStatus?.status === 'running';
+  const migrateDone = migrateStatus?.status === 'done';
+
+  const handleMigrateAll = React.useCallback(async () => {
+    const server = useServerStore.getState();
+    const active = server.servers.find((s) => s.id === server.activeServerId);
+    if (!active?.sandboxId) return;
+
+    setMigrateAllStarted(true);
+    try {
+      await migrateAll.mutateAsync({ sandboxExternalId: active.sandboxId });
+    } catch {}
+  }, [migrateAll]);
 
   const handleLegacyClick = (threadId: string, name: string) => {
     openTabAndNavigate({
@@ -470,10 +500,10 @@ function SidebarSections() {
 
       {hasLegacy && (
         <div className="flex-shrink-0 py-2">
-          <div className="px-3">
+          <div className="px-3 flex items-center">
             <button
               onClick={() => setLegacyOpen((o) => !o)}
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+              className="flex items-center gap-3 flex-1 px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
             >
               <History className="h-4 w-4 flex-shrink-0" />
               <span className="flex-1 text-left">Previous Chats</span>
@@ -485,7 +515,63 @@ function SidebarSections() {
                 !legacyOpen && '-rotate-90',
               )} />
             </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmOpen(true); }}
+                  disabled={isMigrating || migrateDone || migrateAll.isPending}
+                  className={cn(
+                    'flex items-center justify-center h-7 w-7 rounded-lg flex-shrink-0 transition-colors duration-150',
+                    migrateDone
+                      ? 'text-emerald-500'
+                      : isMigrating || migrateAll.isPending
+                        ? 'text-muted-foreground cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent cursor-pointer',
+                  )}
+                >
+                  {migrateDone ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : isMigrating || migrateAll.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {migrateDone
+                  ? `All converted${migrateStatus && migrateStatus.failed > 0 ? ` (${migrateStatus.failed} failed)` : ''}`
+                  : isMigrating
+                    ? `Converting ${migrateStatus?.completed ?? 0}/${migrateStatus?.total ?? 0}...`
+                    : 'Convert all to sessions'}
+              </TooltipContent>
+            </Tooltip>
           </div>
+          {/* Progress bar — always visible when migrating */}
+          {(isMigrating || migrateAll.isPending) && migrateStatus && migrateStatus.total > 0 && (
+            <div className="px-6 pb-1.5">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] text-muted-foreground">
+                  Converting {migrateStatus.completed}/{migrateStatus.total}
+                  {migrateStatus.failed > 0 && <span className="text-destructive"> · {migrateStatus.failed} failed</span>}
+                </span>
+              </div>
+              <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+                  style={{ width: `${Math.round(((migrateStatus.completed + migrateStatus.failed) / migrateStatus.total) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {migrateDone && migrateStatus && (
+            <div className="px-6 pb-1.5">
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                Converted {migrateStatus.completed} chats
+                {migrateStatus.failed > 0 && <span className="text-destructive"> · {migrateStatus.failed} failed</span>}
+              </span>
+            </div>
+          )}
           {legacyOpen && (
             <div className="max-h-[40vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <div className="px-4 pb-2">
@@ -514,6 +600,21 @@ function SidebarSections() {
           )}
         </div>
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Convert all previous chats?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will convert {legacyData?.total ?? 0} previous chats into sessions. The process runs in the background, but may take a few minutes depending on the number of chats.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMigrateAll}>Convert all</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

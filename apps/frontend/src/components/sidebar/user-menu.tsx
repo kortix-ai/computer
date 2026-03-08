@@ -162,7 +162,6 @@ export function UserMenu({ user }: UserMenuProps) {
     <>
       <SidebarMenu>
         <SidebarMenuItem className="relative">
-          {/* Referral + Upgrade above user card (billing only) */}
           {billingActive && (
             <div className="absolute bottom-full left-0 right-0 mb-2 px-0 group-data-[collapsible=icon]:hidden z-50 flex flex-col gap-2">
               <SpotlightCard className="bg-zinc-200/60 dark:bg-zinc-800/60 backdrop-blur-md">
@@ -191,12 +190,11 @@ export function UserMenu({ user }: UserMenuProps) {
               )}
             </div>
           )}
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="bg-transparent hover:bg-transparent data-[state=open]:bg-transparent border-[1.5px] border-border h-[48px] p-2 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!w-8 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:!mx-auto"
+                className='bg-muted/40 hover:bg-muted/20 rounded-2xl border'
               >
                 <Avatar className="h-8 w-8 rounded-full flex-shrink-0">
                   <AvatarImage src={user.avatar} alt={user.name} />
@@ -213,25 +211,19 @@ export function UserMenu({ user }: UserMenuProps) {
                 <ChevronsUpDown className="ml-auto size-3.5 flex-shrink-0 group-data-[collapsible=icon]:hidden" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-
             <DropdownMenuContent
               className="w-(--radix-dropdown-menu-trigger-width) min-w-56 p-2"
               side={isMobile ? 'bottom' : 'top'}
               align="start"
               sideOffset={4}
             >
-              {/* Server instances */}
               <ServerSelector />
               <DropdownMenuSeparator className="my-1" />
-
-              {/* Account (Plan, Billing) + Settings */}
               <DropdownMenuLabel className="text-muted-foreground text-xs px-2 py-1.5">General</DropdownMenuLabel>
               <DropdownMenuGroup>
                 {accountItems.map(renderRegistryItem)}
                 {generalItems.map(renderRegistryItem)}
               </DropdownMenuGroup>
-
-              {/* Admin */}
               {adminItems.length > 0 && (
                 <>
                   <DropdownMenuSeparator className="my-1" />
@@ -241,7 +233,6 @@ export function UserMenu({ user }: UserMenuProps) {
                   </DropdownMenuGroup>
                 </>
               )}
-
               <div className="px-2 py-1.5">
                 <div className="flex gap-0.5 p-0.5 bg-muted/50 rounded-md w-fit">
                   {themeOptions.map((mode) => {
@@ -268,15 +259,12 @@ export function UserMenu({ user }: UserMenuProps) {
                   })}
                 </div>
               </div>
-
               <DropdownMenuSeparator className="my-1" />
               {viewItems.map(renderRegistryItem)}
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
-
-      {/* Modals */}
       <UserSettingsModal
         open={showSettingsModal}
         onOpenChange={setShowSettingsModal}

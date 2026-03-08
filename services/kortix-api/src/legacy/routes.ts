@@ -80,6 +80,77 @@ legacyApp.post('/threads/:threadId/migrate', async (c: any) => {
   return c.json(result);
 });
 
+// ── Migrate All (background) ──────────────────────────────────────────────
+
+interface MigrateAllJob {
+  status: 'running' | 'done' | 'error';
+  total: number;
+  completed: number;
+  failed: number;
+  errors: string[];
+}
+
+const migrateAllJobs = new Map<string, MigrateAllJob>();
+
+legacyApp.post('/migrate-all', async (c: any) => {
+  const accountId = c.get('userId') as string;
+  const { sandboxExternalId } = await c.req.json<{ sandboxExternalId: string }>();
+
+  if (!sandboxExternalId) {
+    return c.json({ error: 'sandboxExternalId required' }, 400);
+  }
+
+  const existing = migrateAllJobs.get(accountId);
+  if (existing?.status === 'running') {
+    return c.json({ error: 'Migration already in progress', ...existing }, 409);
+  }
+
+  // Get all unmigrated threads
+  const { threads } = await getThreadsByAccount(accountId, 500, 0);
+  if (threads.length === 0) {
+    return c.json({ status: 'done', total: 0, completed: 0, failed: 0, errors: [] });
+  }
+
+  const job: MigrateAllJob = { status: 'running', total: threads.length, completed: 0, failed: 0, errors: [] };
+  migrateAllJobs.set(accountId, job);
+
+  // Process in background
+  (async () => {
+    for (const thread of threads) {
+      try {
+        if (thread.migrated_session_id) {
+          job.completed++;
+          continue;
+        }
+        const legacyMessages = await getMessagesByThread(thread.thread_id);
+        const session = transformThread(thread.name, thread.created_at, thread.updated_at);
+        const { messages, parts } = transformMessages(session, legacyMessages);
+        const realSessionId = await writeSessionToSandbox(sandboxExternalId, session, messages, parts);
+        await markThreadMigrated(thread.thread_id, realSessionId);
+        job.completed++;
+        console.log(`[legacy] Migrated ${job.completed}/${job.total}: ${thread.thread_id}`);
+      } catch (err: any) {
+        job.failed++;
+        job.errors.push(`${thread.thread_id}: ${err.message}`);
+        console.error(`[legacy] Failed to migrate ${thread.thread_id}:`, err.message);
+      }
+    }
+    job.status = 'done';
+    console.log(`[legacy] Migrate-all complete: ${job.completed} ok, ${job.failed} failed`);
+  })();
+
+  return c.json(job);
+});
+
+legacyApp.get('/migrate-all/status', async (c: any) => {
+  const accountId = c.get('userId') as string;
+  const job = migrateAllJobs.get(accountId);
+  if (!job) {
+    return c.json({ status: 'idle', total: 0, completed: 0, failed: 0, errors: [] });
+  }
+  return c.json(job);
+});
+
 ensureMigrationColumn().catch((err) =>
   console.error('[legacy] Failed to add migrated_session_id column:', err),
 );

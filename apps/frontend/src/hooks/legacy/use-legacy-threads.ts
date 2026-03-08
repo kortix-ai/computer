@@ -92,4 +92,48 @@ export function useMigrateLegacyThread() {
   });
 }
 
-export type { LegacyThread, LegacyMessage, MigrationResult };
+interface MigrateAllStatus {
+  status: 'idle' | 'running' | 'done' | 'error';
+  total: number;
+  completed: number;
+  failed: number;
+  errors: string[];
+}
+
+export function useMigrateAllLegacyThreads() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sandboxExternalId }: { sandboxExternalId: string }) =>
+      legacyFetch<MigrateAllStatus>(`/migrate-all`, {
+        method: 'POST',
+        body: JSON.stringify({ sandboxExternalId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['legacy-threads'] });
+      queryClient.invalidateQueries({ queryKey: ['opencode', 'sessions'] });
+    },
+  });
+}
+
+export function useMigrateAllStatus(enabled: boolean) {
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: ['legacy-migrate-all-status'],
+    queryFn: () => legacyFetch<MigrateAllStatus>(`/migrate-all/status`),
+    enabled,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data?.status === 'running') return 2000;
+      // When done, refresh threads and sessions
+      if (data?.status === 'done') {
+        queryClient.invalidateQueries({ queryKey: ['legacy-threads'] });
+        queryClient.invalidateQueries({ queryKey: ['opencode', 'sessions'] });
+      }
+      return false;
+    },
+  });
+}
+
+export type { LegacyThread, LegacyMessage, MigrationResult, MigrateAllStatus };
