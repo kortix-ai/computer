@@ -15,44 +15,24 @@ import { Hono } from 'hono'
 import { describeRoute, resolver } from 'hono-openapi'
 import { config } from '../config'
 import { ProxyErrorResponse } from '../schemas/common'
+import {
+  FETCH_TIMEOUT_MS,
+  MAX_RETRIES,
+  RETRY_DELAY_MS,
+  isTransientError,
+  isConnectionRefused,
+  buildUpstreamHeaders,
+  readBodyOnce,
+  createClientAbort,
+  detectSSE,
+  getFetchSignal,
+} from './proxy-utils'
 
 const proxyRouter = new Hono()
 
 const BLOCKED_PORTS = new Set([config.PORT])
-const FETCH_TIMEOUT_MS = 30_000
-const MAX_RETRIES = 2
-const RETRY_DELAY_MS = 300
 
-const STRIP_REQUEST_HEADERS = new Set([
-  'host',
-  'authorization',
-  'service-worker',
-  'connection',
-  'keep-alive',
-  'te',
-  'upgrade',
-])
-
-/**
- * Transient socket errors that may succeed on immediate retry.
- * These happen when the TCP connection is torn down mid-flight
- * (browser tab close, proxy timeout, network hiccup).
- */
-const TRANSIENT_ERROR_PATTERNS = [
-  'ECONNRESET',
-  'EPIPE',
-  'ECONNABORTED',
-  'ERR_STREAM_DESTROYED',
-  'socket hang up',
-]
-
-function isTransientError(errMsg: string): boolean {
-  return TRANSIENT_ERROR_PATTERNS.some(p => errMsg.includes(p))
-}
-
-function isConnectionRefused(errMsg: string): boolean {
-  return errMsg.includes('ECONNREFUSED') || errMsg.includes('Unable to connect')
-}
+const EXTRA_STRIP = new Set(['authorization'])
 
 proxyRouter.all('/:port{[0-9]+}/*',
   describeRoute({
@@ -83,35 +63,19 @@ proxyRouter.all('/:port{[0-9]+}/*',
     const remainingPath = url.pathname.slice(prefix.length) || '/'
     const targetUrl = `http://localhost:${port}${remainingPath}${url.search}`
 
-    const headers = new Headers()
-    for (const [key, value] of c.req.raw.headers.entries()) {
-      if (STRIP_REQUEST_HEADERS.has(key.toLowerCase())) continue
-      headers.set(key, value)
-    }
+    const headers = buildUpstreamHeaders(c, EXTRA_STRIP)
     headers.set('Host', `localhost:${port}`)
 
-    const acceptsSSE = (c.req.header('accept') || '').includes('text/event-stream')
+    const acceptsSSE = detectSSE(c)
 
-    // ── Read body once (reusable across retries) ──────────────────────────
     let body: ArrayBuffer | undefined
-    if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
-      try {
-        body = await c.req.raw.arrayBuffer()
-      } catch {
-        return c.json({ error: 'Failed to read request body' }, 400)
-      }
+    try {
+      body = await readBodyOnce(c)
+    } catch {
+      return c.json({ error: 'Failed to read request body' }, 400)
     }
 
-    // ── Client disconnect propagation ─────────────────────────────────────
-    const clientAbort = new AbortController()
-    const clientSignal = c.req.raw.signal
-    if (clientSignal) {
-      if (clientSignal.aborted) {
-        clientAbort.abort()
-      } else {
-        clientSignal.addEventListener('abort', () => clientAbort.abort(), { once: true })
-      }
-    }
+    const clientAbort = createClientAbort(c)
 
     // ── Retry loop ────────────────────────────────────────────────────────
     let lastError = ''
@@ -123,9 +87,7 @@ proxyRouter.all('/:port{[0-9]+}/*',
       }
 
       try {
-        const signal = acceptsSSE
-          ? clientAbort.signal
-          : AbortSignal.timeout(FETCH_TIMEOUT_MS)
+        const signal = getFetchSignal(acceptsSSE, clientAbort)
 
         const response = await fetch(targetUrl, {
           method: c.req.method,

@@ -13,6 +13,7 @@ import { syncAuthToSecrets, startWatcher as startAuthWatcher } from './services/
 import envRouter from './routes/env'
 import lssRouter from './routes/lss'
 import proxyRouter from './routes/proxy'
+import webProxyRouter from './routes/web-proxy'
 import updateRouter, { recoverFromCrashedUpdate, cleanupStaleStagingDirs } from './routes/update'
 import deployRouter from './routes/deploy'
 import servicesRouter from './routes/services'
@@ -308,6 +309,9 @@ app.route('/api/integrations', integrationsRouter)
 
 // Dynamic port proxy — /proxy/:port/* forwards to localhost:{port} inside the sandbox
 app.route('/proxy', proxyRouter)
+
+// Web forward proxy — /web-proxy/{scheme}/{host}/{path} fetches any URL from inside the sandbox
+app.route('/web-proxy', webProxyRouter)
 
 // File management — direct sandbox filesystem access for downloads, uploads, etc.
 // Mounted BEFORE the catch-all OpenCode proxy so it works regardless of OpenCode version.

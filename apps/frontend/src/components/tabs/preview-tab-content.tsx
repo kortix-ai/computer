@@ -20,6 +20,11 @@ import {
   rewriteLocalhostUrl,
   toInternalUrl,
   proxyUrlToInternal,
+  buildWebProxyUrl,
+  parseWebProxyUrl,
+  isWebProxyUrl,
+  isExternalUrl,
+  normalizeExternalInput,
 } from '@/lib/utils/sandbox-url';
 
 interface PreviewTabContentProps {
@@ -53,6 +58,10 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   const [isAddressEditing, setIsAddressEditing] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
+  const isExternalBrowsing = useMemo(() => {
+    return !port && !!originalUrl && !originalUrl.startsWith('http://localhost') && !originalUrl.startsWith('http://127.0.0.1');
+  }, [port, originalUrl]);
+
   // Navigation history
   const [history, setHistory] = useState<string[]>([rawPreviewUrl].filter(Boolean));
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -85,9 +94,13 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   // Sync address bar when tab metadata changes externally
   useEffect(() => {
     if (!isAddressEditing) {
-      setAddressValue(originalUrl || (port ? `http://localhost:${port}/` : ''));
+      if (isExternalBrowsing) {
+        setAddressValue(originalUrl);
+      } else {
+        setAddressValue(originalUrl || (port ? `http://localhost:${port}/` : ''));
+      }
     }
-  }, [originalUrl, port, isAddressEditing]);
+  }, [originalUrl, port, isAddressEditing, isExternalBrowsing]);
 
   // Refresh the iframe when the tab is re-opened (refreshCounter bumped by openTab)
   const prevCounterRef = useRef(refreshCounter);
@@ -133,6 +146,36 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
 
   /** Navigate to a new URL within the sandbox. */
   const navigateTo = useCallback((url: string) => {
+    const externalUrl = normalizeExternalInput(url);
+    if (externalUrl && isExternalUrl(externalUrl)) {
+      const newProxyUrl = buildWebProxyUrl(externalUrl, serverUrl);
+      if (!newProxyUrl) return;
+
+      let displayHost: string;
+      try { displayHost = new URL(externalUrl).hostname; } catch { displayHost = externalUrl; }
+
+      updateTabMetadata({
+        id: tabId,
+        title: displayHost,
+        type: 'preview',
+        href: `/p/web`,
+        metadata: { url: newProxyUrl, port: 0, originalUrl: externalUrl, path: '/' },
+      });
+
+      setAddressValue(externalUrl);
+
+      setHistory((prev) => {
+        const trimmed = prev.slice(0, historyIndex + 1);
+        return [...trimmed, newProxyUrl];
+      });
+      setHistoryIndex((prev) => prev + 1);
+
+      setIsLoading(true);
+      setHasError(false);
+      setRefreshKey((k) => k + 1);
+      return;
+    }
+
     const parsed = parseLocalhostUrl(url);
     if (!parsed) return;
 
@@ -140,7 +183,6 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     const newProxyUrl = rewriteLocalhostUrl(newPort, newPath, serverUrl, subdomainOpts);
     const newInternalUrl = toInternalUrl(newPort, newPath);
 
-    // Update tab metadata
     updateTabMetadata({
       id: tabId,
       title: `localhost:${newPort}`,
@@ -149,17 +191,14 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
       metadata: { url: newProxyUrl, port: newPort, originalUrl: newInternalUrl, path: newPath },
     });
 
-    // Update address bar
     setAddressValue(newInternalUrl);
 
-    // Update history (trim forward history when navigating from a back state)
     setHistory((prev) => {
       const trimmed = prev.slice(0, historyIndex + 1);
       return [...trimmed, newProxyUrl];
     });
     setHistoryIndex((prev) => prev + 1);
 
-    // Reset loading state
     setIsLoading(true);
     setHasError(false);
     setRefreshKey((k) => k + 1);
@@ -173,15 +212,12 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     let url = addressValue.trim();
     if (!url) return;
 
-    // Auto-prepend http:// if just typing localhost:PORT
     if (/^localhost:\d+/.test(url)) {
       url = `http://${url}`;
     }
-    // Auto-prepend http://localhost: if just typing a port number
     if (/^\d{1,5}$/.test(url)) {
       url = `http://localhost:${url}`;
     }
-    // Auto-prepend http://localhost: if typing :PORT
     if (/^:\d{1,5}/.test(url)) {
       url = `http://localhost${url}`;
     }
@@ -197,7 +233,27 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     const newIndex = historyIndex - 1;
     setHistoryIndex(newIndex);
     const prevUrl = history[newIndex];
-    // Parse port from proxy URL (supports both subdomain and path-based)
+
+    if (isWebProxyUrl(prevUrl)) {
+      const targetUrl = parseWebProxyUrl(prevUrl);
+      if (targetUrl) {
+        let displayHost: string;
+        try { displayHost = new URL(targetUrl).hostname; } catch { displayHost = targetUrl; }
+        updateTabMetadata({
+          id: tabId,
+          title: displayHost,
+          type: 'preview',
+          href: `/p/web`,
+          metadata: { url: prevUrl, port: 0, originalUrl: targetUrl, path: '/' },
+        });
+        setAddressValue(targetUrl);
+        setIsLoading(true);
+        setHasError(false);
+        setRefreshKey((k) => k + 1);
+        return;
+      }
+    }
+
     const internal = proxyUrlToInternal(prevUrl, activeServer?.mappedPorts);
     if (internal) {
       const parsed = parseLocalhostUrl(internal);
@@ -223,7 +279,27 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
     const newIndex = historyIndex + 1;
     setHistoryIndex(newIndex);
     const nextUrl = history[newIndex];
-    // Parse port from proxy URL (supports both subdomain and path-based)
+
+    if (isWebProxyUrl(nextUrl)) {
+      const targetUrl = parseWebProxyUrl(nextUrl);
+      if (targetUrl) {
+        let displayHost: string;
+        try { displayHost = new URL(targetUrl).hostname; } catch { displayHost = targetUrl; }
+        updateTabMetadata({
+          id: tabId,
+          title: displayHost,
+          type: 'preview',
+          href: `/p/web`,
+          metadata: { url: nextUrl, port: 0, originalUrl: targetUrl, path: '/' },
+        });
+        setAddressValue(targetUrl);
+        setIsLoading(true);
+        setHasError(false);
+        setRefreshKey((k) => k + 1);
+        return;
+      }
+    }
+
     const internal = proxyUrlToInternal(nextUrl, activeServer?.mappedPorts);
     if (internal) {
       const parsed = parseLocalhostUrl(internal);
@@ -258,8 +334,9 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
   // Display URL (the internal localhost URL for clean look)
   const displayUrl = useMemo(() => {
     if (isAddressEditing) return addressValue;
+    if (isExternalBrowsing) return originalUrl;
     return addressValue || (port ? `localhost:${port}` : rawPreviewUrl);
-  }, [isAddressEditing, addressValue, port, rawPreviewUrl]);
+  }, [isAddressEditing, addressValue, port, rawPreviewUrl, isExternalBrowsing, originalUrl]);
 
   if (!tab) {
     return (
@@ -301,7 +378,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
                   setTimeout(() => addressInputRef.current?.select(), 0);
                 }}
                 onBlur={() => setIsAddressEditing(false)}
-                placeholder="Type localhost:PORT or just a port number..."
+                placeholder="Type a URL or localhost:PORT..."
                 className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
                 autoFocus
               />
@@ -316,8 +393,8 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
             <div>
               <p className="text-sm font-medium text-foreground">Internal Browser</p>
               <p className="text-xs mt-1.5 leading-relaxed">
-                Browse any service running inside the sandbox.
-                Type a URL like <span className="font-mono text-foreground/80">localhost:3000</span> or just a port number in the address bar above.
+                Browse any website or service running inside the sandbox.
+                Type a URL like <span className="font-mono text-foreground/80">google.com</span> or <span className="font-mono text-foreground/80">localhost:3000</span> in the address bar above.
               </p>
             </div>
           </div>
@@ -376,21 +453,29 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
               onChange={(e) => setAddressValue(e.target.value)}
               onFocus={() => {
                 setIsAddressEditing(true);
-                setAddressValue(originalUrl || (port ? `http://localhost:${port}/` : ''));
+                if (isExternalBrowsing) {
+                  setAddressValue(originalUrl);
+                } else {
+                  setAddressValue(originalUrl || (port ? `http://localhost:${port}/` : ''));
+                }
                 setTimeout(() => addressInputRef.current?.select(), 0);
               }}
               onBlur={() => setIsAddressEditing(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   setIsAddressEditing(false);
-                  setAddressValue(originalUrl || (port ? `http://localhost:${port}/` : ''));
+                  if (isExternalBrowsing) {
+                    setAddressValue(originalUrl);
+                  } else {
+                    setAddressValue(originalUrl || (port ? `http://localhost:${port}/` : ''));
+                  }
                   addressInputRef.current?.blur();
                 }
               }}
-              placeholder="localhost:PORT"
+              placeholder="Type a URL or localhost:PORT..."
               className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground truncate"
             />
-            {port > 0 && !isAddressEditing && (
+            {port > 0 && !isAddressEditing && !isExternalBrowsing && (
               <span className="ml-2 shrink-0 px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">
                 :{port}
               </span>
@@ -430,7 +515,9 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
               <div>
                 <p className="text-sm font-medium">Failed to load preview</p>
                 <p className="text-xs mt-1">
-                  The service on port {port} may not be running yet.
+                  {isExternalBrowsing
+                    ? 'Could not reach the target website.'
+                    : `The service on port ${port} may not be running yet.`}
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={handleRefresh}>
@@ -445,7 +532,7 @@ export function PreviewTabContent({ tabId }: PreviewTabContentProps) {
           key={refreshKey}
           ref={iframeRef}
           src={previewUrl}
-          title={`Preview :${port}`}
+          title={isExternalBrowsing ? `Browse: ${originalUrl}` : `Preview :${port}`}
           className="w-full h-full border-0"
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads allow-modals"
           onLoad={handleLoad}

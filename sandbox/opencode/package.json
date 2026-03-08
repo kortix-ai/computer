@@ -4,7 +4,8 @@
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.13.0",
-    "@opencode-ai/plugin": "1.2.20",
+    "@morphllm/morphsdk": "^0.2.134",
+    "@opencode-ai/plugin": "1.2.21",
     "@tavily/core": "^0.7.1",
     "agent-tunnel": "npm:@kortix/agent-tunnel@^0.1.0",
     "jsonc-parser": "^3.3.1",
