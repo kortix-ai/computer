@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   Heart,
   ChevronRight,
+  Moon,
 } from 'lucide-react';
 import { useAccountState } from '@/hooks/billing';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,6 +42,7 @@ import { ReferralDialog } from '@/components/referrals/referral-dialog';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { trackCtaUpgrade } from '@/lib/analytics/gtm';
 import { ServerSelector } from '@/components/sidebar/server-selector';
+import { useSleep } from '@/components/dashboard/sleep-overlay';
 import {
   getItemsByGroup,
   themeOptions,
@@ -80,6 +82,7 @@ export function UserMenu({ user }: UserMenuProps) {
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab>('general');
   const { isOpen: isReferralDialogOpen, openDialog: openReferralDialog, closeDialog: closeReferralDialog } = useReferralDialog();
   const { theme, setTheme } = useTheme();
+  const { sleep } = useSleep();
 
 
   const isFreeTier = billingActive && (
@@ -256,6 +259,10 @@ export function UserMenu({ user }: UserMenuProps) {
                 </div>
               </div>
               <DropdownMenuSeparator className="my-1" />
+              <DropdownMenuItem onClick={sleep} className="gap-2 p-2 cursor-pointer">
+                <Moon className="h-4 w-4" />
+                <span>Sleep</span>
+              </DropdownMenuItem>
               {viewItems.map(renderRegistryItem)}
             </DropdownMenuContent>
           </DropdownMenu>

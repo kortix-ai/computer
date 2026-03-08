@@ -82,6 +82,12 @@ const MobileAppInterstitial = lazy(() =>
 	})),
 );
 
+const SleepOverlay = lazy(() =>
+	import("@/components/dashboard/sleep-overlay").then((mod) => ({
+		default: mod.SleepOverlay,
+	})),
+);
+
 const TechnicalIssueBanner = lazy(() =>
 	import("@/components/announcements/technical-issue-banner").then((mod) => ({
 		default: mod.TechnicalIssueBanner,
@@ -515,6 +521,9 @@ export default function DashboardLayoutContent({
 
 	return (
 		<NovuInboxProvider>
+			<Suspense fallback={null}>
+				<SleepOverlay />
+			</Suspense>
 			<AppProviders
 				showSidebar={true}
 				defaultSidebarOpen={true}
