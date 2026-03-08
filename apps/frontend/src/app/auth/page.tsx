@@ -99,46 +99,48 @@ function AccessRequestForm({ email, onSubmitted, onBack }: { email: string; onSu
   };
 
   return (
-    <div className="bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-7">
-      <div className="flex flex-col items-center mb-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.06] border border-foreground/[0.08] mb-3">
-          <Mail className="h-4.5 w-4.5 text-foreground/50" />
+    <div className="bg-background/75 dark:bg-background/70 backdrop-blur-2xl border border-foreground/[0.08] rounded-2xl p-9 max-w-md w-full">
+      <div className="flex flex-col items-center mb-7">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.06] border border-foreground/[0.08] mb-4">
+          <Mail className="h-5 w-5 text-foreground/50" />
         </div>
-        <h1 className="text-[17px] font-medium text-foreground/90 tracking-tight">
-          Join the waitlist
+        <h1 className="text-[22px] font-semibold text-foreground/95 tracking-tight">
+          Get Early Access
         </h1>
-        <p className="text-[13px] text-foreground/40 mt-1 text-center">
-          We&apos;re not accepting new signups right now.
+        <p className="text-[14px] text-foreground/45 mt-1.5 text-center leading-relaxed">
+          We&apos;re onboarding new users in batches.
+          <br />
+          Reserve your spot and we&apos;ll notify you.
         </p>
       </div>
 
-      <div className="bg-foreground/[0.04] border border-foreground/[0.08] rounded-xl px-3 py-2.5 mb-4">
+      <div className="bg-foreground/[0.04] border border-foreground/[0.08] rounded-xl px-4 py-3 mb-5">
         <p className="text-[11px] text-foreground/35 mb-0.5">Requesting for</p>
-        <p className="text-[14px] text-foreground/80 font-medium">{email}</p>
+        <p className="text-[15px] text-foreground/80 font-medium">{email}</p>
       </div>
 
-      <form className="space-y-3">
+      <form className="space-y-3.5">
         <Input
           name="company"
           placeholder="Company (optional)"
-          className="h-11 text-[15px] bg-foreground/[0.04] border-foreground/[0.08] rounded-xl"
+          className="h-12 text-[15px] bg-foreground/[0.04] border-foreground/[0.08] rounded-xl"
         />
         <textarea
           name="useCase"
           placeholder="What will you build with Kortix?"
           rows={3}
-          className="w-full rounded-xl bg-foreground/[0.04] border border-foreground/[0.08] text-[15px] text-foreground/80 placeholder:text-foreground/30 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/15 transition-colors"
+          className="w-full rounded-xl bg-foreground/[0.04] border border-foreground/[0.08] text-[15px] text-foreground/80 placeholder:text-foreground/30 px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/15 transition-colors"
         />
-        <SubmitButton formAction={handleRequestAccess} className="w-full h-11 text-sm rounded-xl shadow-none" pendingText="Submitting...">
-          Request Access
+        <SubmitButton formAction={handleRequestAccess} className="w-full h-10 text-[15px] font-medium rounded-xl shadow-none" pendingText="Submitting...">
+          Request Early Access
         </SubmitButton>
       </form>
 
-      <div className="flex justify-center mt-4">
+      <div className="flex justify-center mt-5">
         <button
           type="button"
           onClick={onBack}
-          className="text-[11px] text-foreground/25 hover:text-foreground/45 transition-colors"
+          className="text-[12px] text-foreground/25 hover:text-foreground/45 transition-colors"
         >
           &larr; Back to sign in
         </button>

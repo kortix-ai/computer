@@ -72,6 +72,9 @@ export {
   // WoA
   woaPostTypeEnum,
   woaPosts,
+  // Platform User Roles
+  platformRoleEnum,
+  platformUserRoles,
   // Access Control
   accessRequestStatusEnum,
   platformSettings,

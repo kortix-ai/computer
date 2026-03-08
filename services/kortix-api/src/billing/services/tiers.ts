@@ -77,7 +77,7 @@ interface StripePriceConfig {
 
 const STRIPE_PRICES_PROD: StripePriceConfig = {
   subscriptions: {
-    free: { monthly: 'price_1RILb4G6l1KZGqIrK4QLrx9i' },
+    free: { monthly: 'price_1RIGvuG6l1KZGqIrw14abxeL' },
     pro:  { monthly: 'price_1RILb4G6l1KZGqIrhomjgDnO' }, // TODO: create prod Pro price and replace
     // Legacy price → tier mappings (for webhook resolution of existing subs)
     tier_2_20:     { monthly: 'price_1RILb4G6l1KZGqIrhomjgDnO', yearly: 'price_1ReHB5G6l1KZGqIrD70I1xqM', yearlyCommitment: 'price_1RqtqiG6l1KZGqIrhjVPtE1s' },
