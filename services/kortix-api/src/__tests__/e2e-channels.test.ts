@@ -16,15 +16,17 @@ import {
   OTHER_USER_ID,
   OTHER_USER_EMAIL,
 } from './helpers';
+import { db } from '../shared/db';
+import { sandboxes } from '@kortix/db';
+import { eq } from 'drizzle-orm';
 
 const HAS_DB = !!process.env.DATABASE_URL;
 
 describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', () => {
-  const app = createTestApp({ mountCron: true, mountChannels: true });
+  const app = createTestApp({ mountChannels: true });
   const otherApp = createTestApp({
     userId: OTHER_USER_ID,
     userEmail: OTHER_USER_EMAIL,
-    mountCron: true,
     mountChannels: true,
   });
 
@@ -35,14 +37,14 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
   beforeAll(async () => {
     await cleanupTestData();
 
-    // Create a sandbox to attach channels to (via cron sandboxes route)
-    const res = await jsonPost(app, '/v1/cron/sandboxes', {
+    const [sandbox] = await db.insert(sandboxes).values({
+      accountId: TEST_USER_ID,
       name: 'channel-test-sandbox',
-      base_url: 'http://localhost:9999',
+      baseUrl: 'http://localhost:9999',
       status: 'active',
-    });
-    const body = await res.json();
-    sandboxId = body.data.sandboxId;
+      provider: 'local_docker',
+    }).returning();
+    sandboxId = sandbox.sandboxId;
   });
 
   afterAll(async () => {
@@ -307,14 +309,14 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
     });
 
     it('Deleting sandbox cascades to channel configs', async () => {
-      // Create a new sandbox with a channel (via cron sandboxes route)
-      const sbRes = await jsonPost(app, '/v1/cron/sandboxes', {
+      const [sandbox] = await db.insert(sandboxes).values({
+        accountId: TEST_USER_ID,
         name: 'cascade-test',
-        base_url: 'http://localhost:7777',
+        baseUrl: 'http://localhost:7777',
         status: 'active',
-      });
-      const sbBody = await sbRes.json();
-      const cascadeSandboxId = sbBody.data.sandboxId;
+        provider: 'local_docker',
+      }).returning();
+      const cascadeSandboxId = sandbox.sandboxId;
 
       const chRes = await jsonPost(app, '/v1/channels', {
         sandbox_id: cascadeSandboxId,
@@ -325,7 +327,7 @@ describe.skipIf(!HAS_DB)('Channels — Config CRUD, Enable/Disable, Messages', (
       const cascadeChannelId = chBody.data.channelConfigId;
 
       // Delete the sandbox
-      await jsonDelete(app, `/v1/cron/sandboxes/${cascadeSandboxId}`);
+      await db.delete(sandboxes).where(eq(sandboxes.sandboxId, cascadeSandboxId));
 
       // Channel should be gone (cascade delete)
       const getRes = await jsonGet(app, `/v1/channels/${cascadeChannelId}`);

@@ -224,7 +224,7 @@ python scripts/tts.py sound "gentle rain on a window" -o rain.mp3 --duration 30
 |---|---|---|
 | `ELEVENLABS_API_KEY` | Yes | Your ElevenLabs API key (also accepts `ELEVEN_API_KEY`) |
 
-Add to `sandbox/.env` and `sandbox/opencode/.env`:
+Add to `sandbox/.env` (or the active OpenCode config dir `.env` during local materialization):
 ```
 ELEVENLABS_API_KEY=your_key_here
 ```

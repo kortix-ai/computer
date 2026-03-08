@@ -116,7 +116,6 @@ export function createDeployment(args: DeploymentArgs) {
                   { name: "KORTIX_ROUTER_INTERNAL_ENABLED", value: "true" },
                   { name: "KORTIX_BILLING_INTERNAL_ENABLED", value: "true" },
                   { name: "KORTIX_DEPLOYMENTS_ENABLED", value: "false" },
-                  { name: "SCHEDULER_ENABLED", value: "true" },
                   { name: "CHANNELS_ENABLED", value: "true" },
                   { name: "TUNNEL_ENABLED", value: "true" },
                   { name: "KORTIX_URL", value: "https://new-api.kortix.com/v1/router" },

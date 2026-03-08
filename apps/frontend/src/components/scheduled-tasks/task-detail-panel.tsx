@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,7 @@ import {
   AlertTriangle,
   SkipForward,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { ScheduleBuilder } from './schedule-builder';
 import {
@@ -39,9 +41,14 @@ import {
   type Execution,
   type SessionMode,
   type ExecutionStatus,
+  useSandboxAgents,
 } from '@/hooks/scheduled-tasks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useSandbox } from '@/hooks/platform/use-sandbox';
+import { useServerStore } from '@/stores/server-store';
+import { ensureSandbox } from '@/lib/platform-client';
+import { ScheduledTaskAgentSelector } from './agent-selector';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -118,6 +125,9 @@ interface TaskDetailPanelProps {
 }
 
 export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
+  const router = useRouter();
+  const { sandbox } = useSandbox();
+  const [sandboxId, setSandboxId] = useState<string | null>(trigger.sandboxId ?? null);
   const [tab, setTab] = useState<'settings' | 'executions'>('settings');
   const [name, setName] = useState(trigger.name);
   const [cronExpr, setCronExpr] = useState(trigger.cronExpr);
@@ -131,9 +141,39 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
   const deleteMutation = useDeleteTrigger();
   const toggleMutation = useToggleTrigger();
   const runMutation = useRunTrigger();
+  const { data: agents = [], isLoading: agentsLoading } = useSandboxAgents(sandboxId);
   const { data: executions = [] } = useTriggerExecutions(
     tab === 'executions' ? trigger.triggerId : '',
   );
+
+  useEffect(() => {
+    if (!trigger.sandboxId && sandboxId) return;
+    if (trigger.sandboxId) {
+      setSandboxId(trigger.sandboxId);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const result = await ensureSandbox();
+        setSandboxId(result.sandbox.sandbox_id);
+        return;
+      } catch {}
+
+      if (sandbox?.sandbox_id) {
+        setSandboxId(sandbox.sandbox_id);
+        return;
+      }
+
+      const store = useServerStore.getState();
+      for (const server of store.servers) {
+        if (server.sandboxId) {
+          setSandboxId(server.sandboxId);
+          return;
+        }
+      }
+    })();
+  }, [sandbox?.sandbox_id, sandboxId, trigger.sandboxId]);
 
   // Sync state when trigger prop changes
   React.useEffect(() => {
@@ -328,13 +368,22 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
 
             {/* Agent Name */}
             <div className="space-y-2">
-              <Label htmlFor="edit-agent">Agent Name</Label>
-              <Input
-                id="edit-agent"
-                value={agentName}
-                onChange={(e) => { setAgentName(e.target.value); markDirty(); }}
-                placeholder="@kortix-main (optional)"
-              />
+              <Label>Agent</Label>
+              {agentsLoading ? (
+                <div className="flex items-center gap-2 h-9 px-3 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading agents...
+                </div>
+              ) : (
+                <ScheduledTaskAgentSelector
+                  agents={agents}
+                  selectedAgent={agentName}
+                  onSelect={(value) => {
+                    setAgentName(value);
+                    markDirty();
+                  }}
+                />
+              )}
             </div>
 
             {/* Info */}
@@ -437,11 +486,11 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
                 </p>
               </div>
             ) : (
-              executions.map((exec) => (
-                <ExecutionItem key={exec.executionId} execution={exec} />
-              ))
-            )}
-          </div>
+                executions.map((exec) => (
+                  <ExecutionItem key={exec.executionId} execution={exec} onOpenSession={(sessionId) => router.push(`/sessions/${sessionId}`)} />
+                ))
+              )}
+            </div>
         )}
       </div>
     </div>
@@ -450,13 +499,29 @@ export function TaskDetailPanel({ trigger, onClose }: TaskDetailPanelProps) {
 
 // ─── Execution Item ─────────────────────────────────────────────────────────
 
-function ExecutionItem({ execution }: { execution: Execution }) {
+function ExecutionItem({
+  execution,
+  onOpenSession,
+}: {
+  execution: Execution;
+  onOpenSession: (sessionId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const canOpenSession = !!execution.sessionId;
 
   return (
     <div
-      className="rounded-lg border p-3 text-sm cursor-pointer hover:bg-muted/30 transition-colors"
-      onClick={() => setExpanded(!expanded)}
+      className={cn(
+        'rounded-lg border p-3 text-sm transition-colors',
+        canOpenSession ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default'
+      )}
+      onClick={() => {
+        if (execution.sessionId) {
+          onOpenSession(execution.sessionId);
+          return;
+        }
+        setExpanded(!expanded);
+      }}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -469,10 +534,16 @@ function ExecutionItem({ execution }: { execution: Execution }) {
           )}
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {execution.sessionId && <ExternalLink className="h-3.5 w-3.5" />}
           <span>{formatDuration(execution.durationMs)}</span>
           <span>{execution.startedAt ? new Date(execution.startedAt).toLocaleString() : '--'}</span>
         </div>
       </div>
+      {execution.sessionId && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          Open session `{execution.sessionId}`
+        </div>
+      )}
       {expanded && execution.errorMessage && (
         <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-950/30 text-xs text-red-700 dark:text-red-300 whitespace-pre-wrap">
           {execution.errorMessage}

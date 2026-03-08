@@ -139,11 +139,6 @@ const envSchema = z.object({
   // ── Internal Service Key (auto-generated if missing — never fails) ───────
   INTERNAL_SERVICE_KEY:        optStr,
 
-  // ── Scheduler / Cron (optional) ──────────────────────────────────────────
-  SCHEDULER_ENABLED:           optBoolTrue,
-  CRON_TICK_SECRET:            optStr,
-  CRON_API_URL:                optStr,
-
   // ── Channels (optional) ──────────────────────────────────────────────────
   CHANNELS_ENABLED:            optBoolTrue,
   CHANNELS_PUBLIC_URL:         optStr,
@@ -261,8 +256,6 @@ function validateEnv(): z.infer<typeof envSchema> {
     if (!raw.STRIPE_SECRET_KEY)    issues.push({ var: 'STRIPE_SECRET_KEY',    message: 'Required when KORTIX_BILLING_INTERNAL_ENABLED is true', level: 'error' });
     if (!raw.STRIPE_WEBHOOK_SECRET) issues.push({ var: 'STRIPE_WEBHOOK_SECRET', message: 'Required when KORTIX_BILLING_INTERNAL_ENABLED is true', level: 'error' });
   }
-
-  // CRON_API_URL is auto-derived from PORT + DOCKER_HOST — no validation needed
 
   // ── Warnings (non-fatal but worth knowing) ─────────────────────────────
   if (!raw.OPENROUTER_API_KEY) {
@@ -446,20 +439,6 @@ export const config = {
     }
     return process.env.INTERNAL_SERVICE_KEY!;
   },
-
-  // ─── Scheduler (Cron) ─────────────────────────────────────────────────────
-  SCHEDULER_ENABLED: env.SCHEDULER_ENABLED,
-  CRON_TICK_SECRET: env.CRON_TICK_SECRET,
-  /**
-   * URL that pg_cron uses to call back into the API for trigger execution.
-   * Auto-derived from PORT if not explicitly set:
-   *   - If DOCKER_HOST is set (DB likely in Docker) → http://host.docker.internal:<PORT>
-   *   - Otherwise → http://localhost:<PORT>
-   */
-  CRON_API_URL: env.CRON_API_URL
-    || (env.DOCKER_HOST
-      ? `http://host.docker.internal:${env.PORT}`
-      : `http://localhost:${env.PORT}`),
 
   // ─── Channels ───────────────────────────────────────────────────────────────
   CHANNELS_ENABLED: env.CHANNELS_ENABLED,

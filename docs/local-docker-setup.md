@@ -533,7 +533,7 @@ docker exec kortix-sandbox curl -sf http://kortix-api:8008/v1/health
 
 | Var | Used by | Purpose |
 |---|---|---|
-| `KORTIX_API_URL` | sandbox container | Base URL the sandbox uses to call the API. Default: `http://host.docker.internal:8008` (host dev). Consumers append service paths like `/v1/router`, `/v1/cron`, etc. |
+| `KORTIX_API_URL` | sandbox container | Base URL the sandbox uses to call the API. Default: `http://host.docker.internal:8008` (host dev). Consumers append service paths like `/v1/router` and integrations APIs. |
 | `KORTIX_NETWORK` | `docker-compose.docker.yml` | External Docker network to join (default: `kortix_default`) |
 | `SANDBOX_NETWORK` | `kortix-api` (`local-docker.ts`) | Network for programmatically-created sandbox containers |
 | `KORTIX_URL` | `kortix-api` | URL the API gives to sandboxes for callbacks |
@@ -555,7 +555,7 @@ Schema is managed declaratively using `drizzle-kit push` — no migration files.
 
 | Schema | Tables | Config |
 |---|---|---|
-| `kortix` | sandboxes, integrations, sandbox_integrations, triggers, executions, deployments, server_entries, api_keys, channel_configs, channel_sessions, channel_messages, channel_identity_map | `schemaFilter: ['kortix']` |
+| `kortix` | sandboxes, integrations, sandbox_integrations, deployments, server_entries, api_keys, channel_configs, channel_sessions, channel_messages, channel_identity_map | `schemaFilter: ['kortix']` |
 | `public` | credit_accounts, credit_ledger, credit_usage, credit_purchases, account_deletion_requests, api_keys | `schemaFilter: ['public']`, `tablesFilter` whitelist |
 
 ### Key files
@@ -570,9 +570,8 @@ Schema is managed declaratively using `drizzle-kit push` — no migration files.
 ```
 1. ensureSchema()        — drizzle-kit push creates/updates all tables
 2. bootstrapLocalIdentity() — inserts local sandbox row into kortix.sandboxes
-3. startScheduler()      — configures pg_cron
-4. startChannelService() — starts Slack/Telegram adapters
-5. startDrainer()        — starts message queue drainer
+3. startChannelService() — starts Slack/Telegram adapters
+4. startDrainer()        — starts message queue drainer
 ```
 
 All services start AFTER schema push completes. If schema push fails, services still start (graceful degradation).

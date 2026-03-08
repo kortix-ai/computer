@@ -1,7 +1,4 @@
 {
-  "scripts": {
-    "postinstall": "bash patches/apply.sh"
-  },
   "dependencies": {
     "@code-yeongyu/comment-checker": "^0.7.0",
     "@mendable/firecrawl-js": "^4.13.0",

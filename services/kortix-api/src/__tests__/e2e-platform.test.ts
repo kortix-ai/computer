@@ -36,7 +36,6 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     dockerProvider,
     daytonaProvider,
     defaultProvider: 'local_docker',
-    mountCron: false,
   });
 
   // Separate app for cross-user isolation tests
@@ -46,7 +45,6 @@ describe.skipIf(!HAS_DB)('Platform — Sandbox Lifecycle', () => {
     dockerProvider: createMockProvider('local_docker'),
     daytonaProvider: createMockProvider('daytona'),
     defaultProvider: 'local_docker',
-    mountCron: false,
   });
 
   beforeAll(async () => {

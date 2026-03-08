@@ -1,6 +1,6 @@
 {
   "name": "@kortix/kortix-oc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "description": "Standalone Kortix OpenCode runtime package with materialized config assets and plugin runtime",
@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./manifest": "./src/manifest.ts",
     "./materialize": "./src/materialize.ts",
-    "./verify": "./src/verify.ts"
+    "./verify": "./src/verify.ts",
+    "./package.json": "./package.json"
   },
   "bin": {
     "kortix-oc": "bin/kortix-oc.ts"
@@ -29,7 +30,8 @@
     "typecheck": "tsc --noEmit",
     "test:plugin": "bun test tests/plugin/kortix-sys",
     "verify:runtime": "bun run bin/kortix-oc.ts verify",
-    "materialize:sandbox": "bun run bin/kortix-oc.ts link ../../sandbox/opencode"
+    "materialize:tmp": "bun run bin/kortix-oc.ts materialize /tmp/kortix-opencode --clean",
+    "pack:check": "npm pack --json --dry-run"
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.2.21",

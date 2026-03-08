@@ -37,6 +37,20 @@ if [ ! -L /config ] && [ ! -d /config ]; then
     ln -s /workspace /config
 fi
 
+# Ensure the workspace has a default project-local OpenCode config entrypoint.
+# The actual source of truth lives in /opt/kortix-oc and /opt/opencode; this
+# symlink only gives tools and skills a stable `.opencode/...` path when they
+# run from /workspace.
+if [ -L /workspace/.opencode ]; then
+    TARGET=$(readlink /workspace/.opencode 2>/dev/null || true)
+    if [ "$TARGET" != "/opt/opencode" ]; then
+        rm -f /workspace/.opencode
+        ln -s /opt/opencode /workspace/.opencode
+    fi
+elif [ ! -e /workspace/.opencode ]; then
+    ln -s /opt/opencode /workspace/.opencode
+fi
+
 chown -R abc:abc /workspace 2>/dev/null || true
 
 echo "[startup] Starting s6-overlay via PID namespace..."

@@ -303,24 +303,10 @@ describe('Billing no-DB guard', () => {
   });
 });
 
-// ─── Scheduler no-DB guard tests ────────────────────────────────────────────
-
-describe('Scheduler no-DB guard', () => {
-  it('hasDatabase is false when DATABASE_URL is empty', async () => {
+describe('Database guard checks', () => {
+  it('hasDatabase is exposed as a boolean', async () => {
     const { hasDatabase } = await import('../shared/db');
-    // In test env, DATABASE_URL should be empty (or may be set)
-    // We just verify the export exists and is boolean
     expect(typeof hasDatabase).toBe('boolean');
-  });
-
-  it('startScheduler source code checks hasDatabase', async () => {
-    // Verify the guard exists in the source
-    const content = readFileSync(
-      resolve(__dirname, '../cron/services/scheduler.ts'),
-      'utf-8'
-    );
-    expect(content).toContain('hasDatabase');
-    expect(content).toContain('no DATABASE_URL configured');
   });
 
   it('account-state route source checks hasDatabase', async () => {

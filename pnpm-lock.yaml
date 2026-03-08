@@ -840,6 +840,9 @@ importers:
       '@scalar/hono-api-reference':
         specifier: ^0.9.45
         version: 0.9.48(hono@4.12.3)
+      croner:
+        specifier: ^9.1.0
+        version: 9.1.0
       hono:
         specifier: ^4.0.0
         version: 4.12.3
@@ -859,36 +862,6 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
-
-  sandbox/opencode:
-    dependencies:
-      '@mendable/firecrawl-js':
-        specifier: ^4.13.0
-        version: 4.15.2
-      '@morphllm/morphsdk':
-        specifier: ^0.2.134
-        version: 0.2.135(zod@3.25.76)
-      '@opencode-ai/plugin':
-        specifier: 1.2.21
-        version: 1.2.21
-      '@tavily/core':
-        specifier: ^0.7.1
-        version: 0.7.2
-      agent-tunnel:
-        specifier: npm:@kortix/agent-tunnel@^0.1.0
-        version: link:../../packages/agent-tunnel
-      envsitter-guard:
-        specifier: latest
-        version: 0.0.4
-      jsonc-parser:
-        specifier: ^3.3.1
-        version: 3.3.1
-      opencode-pty:
-        specifier: 0.2.3
-        version: 0.2.3(typescript@5.9.3)
-      replicate:
-        specifier: ^1.4.0
-        version: 1.4.0
 
   services/kortix-api:
     dependencies:

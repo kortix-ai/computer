@@ -11,7 +11,7 @@ const UPDATE_LOCK_FILE = '/tmp/.kortix-update-lock';
 const UPDATE_STATUS_FILE = '/tmp/.kortix-update-status.json';
 
 // Directories managed by symlinks (atomic swap targets)
-const SYMLINK_DIRS = ['kortix-master', 'opencode', 'agent-browser-viewer', 'kortix'] as const;
+const SYMLINK_DIRS = ['kortix-master', 'opencode', 'agent-browser-viewer', 'kortix', 'kortix-oc'] as const;
 
 async function getChangelog(version: string) {
   try {

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { backendApi } from '@/lib/api-client';
+import { authenticatedFetch } from '@/lib/auth-token';
+import { ensureSandbox, getSandboxUrl } from '@/lib/platform-client';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -9,8 +10,8 @@ export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | '
 
 export interface Trigger {
   triggerId: string;
-  sandboxId: string;
-  accountId: string;
+  sandboxId?: string;
+  accountId?: string;
   name: string;
   description: string | null;
   cronExpr: string;
@@ -34,7 +35,7 @@ export interface Trigger {
 export interface Execution {
   executionId: string;
   triggerId: string;
-  sandboxId: string;
+  sandboxId?: string;
   status: ExecutionStatus;
   sessionId: string | null;
   startedAt: string | null;
@@ -48,7 +49,7 @@ export interface Execution {
 }
 
 export interface CreateTriggerData {
-  sandbox_id: string;
+  sandbox_id?: string;
   name: string;
   description?: string;
   cron_expr: string;
@@ -111,80 +112,87 @@ interface ApiRunResponse {
   };
 }
 
+async function getCronBaseUrl(): Promise<string> {
+  const { sandbox } = await ensureSandbox();
+  return `${getSandboxUrl(sandbox)}/kortix/cron`;
+}
+
+async function getSandboxBaseUrl(): Promise<string> {
+  const { sandbox } = await ensureSandbox();
+  return getSandboxUrl(sandbox);
+}
+
+async function fetchCronJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const baseUrl = await getCronBaseUrl();
+  const response = await authenticatedFetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers as Record<string, string> | undefined),
+    },
+  });
+
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body?.error || body?.message || `Request failed with ${response.status}`);
+  }
+  return body as T;
+}
+
 const fetchTriggers = async (sandboxId?: string): Promise<Trigger[]> => {
   const params = new URLSearchParams();
   if (sandboxId) params.set('sandbox_id', sandboxId);
   const qs = params.toString() ? `?${params.toString()}` : '';
-  const response = await backendApi.get<ApiListResponse>(`/cron/triggers${qs}`);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to fetch triggers');
-  }
-  return response.data!.data;
+  const response = await fetchCronJson<ApiListResponse>(`/triggers${qs}`);
+  return response.data;
 };
 
 const fetchTrigger = async (triggerId: string): Promise<Trigger> => {
-  const response = await backendApi.get<ApiSingleResponse>(`/cron/triggers/${triggerId}`);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to fetch trigger');
-  }
-  return response.data!.data;
+  const response = await fetchCronJson<ApiSingleResponse>(`/triggers/${triggerId}`);
+  return response.data;
 };
 
 const createTrigger = async (data: CreateTriggerData): Promise<Trigger> => {
-  const response = await backendApi.post<ApiSingleResponse>('/cron/triggers', data);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to create trigger');
-  }
-  return response.data!.data;
+  const { sandbox_id: _sandboxId, ...payload } = data;
+  const response = await fetchCronJson<ApiSingleResponse>('/triggers', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.data;
 };
 
 const updateTrigger = async ({ id, data }: { id: string; data: UpdateTriggerData }): Promise<Trigger> => {
-  const response = await backendApi.patch<ApiSingleResponse>(`/cron/triggers/${id}`, data);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to update trigger');
-  }
-  return response.data!.data;
+  const response = await fetchCronJson<ApiSingleResponse>(`/triggers/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return response.data;
 };
 
 const deleteTrigger = async (id: string): Promise<void> => {
-  const response = await backendApi.delete(`/cron/triggers/${id}`);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to delete trigger');
-  }
+  await fetchCronJson(`/triggers/${id}`, { method: 'DELETE' });
 };
 
 const pauseTrigger = async (id: string): Promise<Trigger> => {
-  const response = await backendApi.post<ApiSingleResponse>(`/cron/triggers/${id}/pause`);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to pause trigger');
-  }
-  return response.data!.data;
+  const response = await fetchCronJson<ApiSingleResponse>(`/triggers/${id}/pause`, { method: 'POST' });
+  return response.data;
 };
 
 const resumeTrigger = async (id: string): Promise<Trigger> => {
-  const response = await backendApi.post<ApiSingleResponse>(`/cron/triggers/${id}/resume`);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to resume trigger');
-  }
-  return response.data!.data;
+  const response = await fetchCronJson<ApiSingleResponse>(`/triggers/${id}/resume`, { method: 'POST' });
+  return response.data;
 };
 
 const runTrigger = async (id: string): Promise<{ execution_id: string; status: string; message: string }> => {
-  const response = await backendApi.post<ApiRunResponse>(`/cron/triggers/${id}/run`);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to run trigger');
-  }
-  return response.data!.data;
+  const response = await fetchCronJson<ApiRunResponse>(`/triggers/${id}/run`, { method: 'POST' });
+  return response.data;
 };
 
 const fetchExecutions = async (triggerId: string, limit = 50, offset = 0): Promise<Execution[]> => {
-  const response = await backendApi.get<ApiExecutionsResponse>(
-    `/cron/executions/by-trigger/${triggerId}?limit=${limit}&offset=${offset}`,
+  const response = await fetchCronJson<ApiExecutionsResponse>(
+    `/executions/by-trigger/${triggerId}?limit=${limit}&offset=${offset}`,
   );
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to fetch executions');
-  }
-  return response.data!.data;
+  return response.data;
 };
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
@@ -293,23 +301,38 @@ export interface SandboxAgent {
 }
 
 const fetchSandboxModels = async (sandboxId: string): Promise<SandboxProvider[]> => {
-  const response = await backendApi.get<{ success: boolean; data: SandboxProvider[] }>(
-    `/cron/sandboxes/${sandboxId}/models`,
-  );
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to fetch models');
+  const baseUrl = await getSandboxBaseUrl();
+  const response = await authenticatedFetch(`${baseUrl}/config/providers`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models (${response.status})`);
   }
-  return response.data!.data;
+
+  const data = await response.json() as Record<string, unknown> | unknown[];
+  const rawProviders: any[] = Array.isArray(data) ? data : ((data.providers || []) as any[]);
+  return rawProviders.map((provider: any) => ({
+    id: provider.id || '',
+    name: provider.name || provider.id || '',
+    models: Object.values(provider.models || {}).map((model: any) => ({
+      id: model.id || '',
+      name: model.name || model.id || '',
+    })),
+  }));
 };
 
 const fetchSandboxAgents = async (sandboxId: string): Promise<SandboxAgent[]> => {
-  const response = await backendApi.get<{ success: boolean; data: SandboxAgent[] }>(
-    `/cron/sandboxes/${sandboxId}/agents`,
-  );
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to fetch agents');
+  const baseUrl = await getSandboxBaseUrl();
+  const response = await authenticatedFetch(`${baseUrl}/agent`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch agents (${response.status})`);
   }
-  return response.data!.data;
+
+  const data = await response.json() as Record<string, unknown> | unknown[];
+  const rawAgents: any[] = Array.isArray(data) ? data : ((data.agents || Object.values(data)) as any[]);
+  return rawAgents.map((agent: any) => ({
+    name: agent.name || '',
+    description: agent.description,
+    mode: agent.mode,
+  }));
 };
 
 export const useSandboxModels = (sandboxId?: string | null) => {

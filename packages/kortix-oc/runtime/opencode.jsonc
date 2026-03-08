@@ -4,14 +4,12 @@
   "plugin": [
     "opencode-pty",
     "envsitter-guard",
-    "./plugin/worktree.ts",
-    "./plugin/kortix-sys",
-    "./plugin/agent-tunnel/index.ts",
-    "./plugin/morph.ts"
+    "./plugin/kortix-oc.ts"
   ],
   "skills": {
     "paths": ["./plugin/kortix-sys/skills"]
   },
+  "command": {},
   "autoupdate": true,
   "default_agent": "kortix",
   "agent": {

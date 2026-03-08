@@ -114,12 +114,6 @@ else
   fail "compose sets DATABASE_URL for kortix-api"
 fi
 
-if grep -q 'CRON_TICK_SECRET' "$SCRIPT"; then
-  pass "generates CRON_TICK_SECRET"
-else
-  fail "generates CRON_TICK_SECRET"
-fi
-
 if grep -q 'supabase-db-data' "$SCRIPT"; then
   pass "compose has persistent database volume"
 else

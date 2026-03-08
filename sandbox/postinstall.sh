@@ -24,13 +24,13 @@ fi
 PKG_VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').version)" 2>/dev/null || echo "0.0.0")
 echo "[sandbox-postinstall] Deploying @kortix/sandbox@$PKG_VERSION..."
 
-KORTIX_OC_RUNTIME=$(node -e "try{const path=require('path');const pkg=require.resolve('@kortix/kortix-oc/package.json',{paths:['$PKG_DIR']});console.log(path.join(path.dirname(pkg),'runtime'))}catch{process.exit(1)}" 2>/dev/null || true)
-if [ -z "$KORTIX_OC_RUNTIME" ] || [ ! -d "$KORTIX_OC_RUNTIME" ]; then
-  echo "[sandbox-postinstall] ERROR: @kortix/kortix-oc runtime not found" >&2
+KORTIX_OC_PACKAGE=$(node -e "try{const path=require('path');const pkg=require.resolve('@kortix/kortix-oc/package.json',{paths:['$PKG_DIR']});console.log(path.dirname(pkg))}catch{process.exit(1)}" 2>/dev/null || true)
+if [ -z "$KORTIX_OC_PACKAGE" ] || [ ! -d "$KORTIX_OC_PACKAGE" ]; then
+  echo "[sandbox-postinstall] ERROR: @kortix/kortix-oc package not found" >&2
   exit 1
 fi
-OC_SOURCE_DIR="$KORTIX_OC_RUNTIME"
-echo "[sandbox-postinstall] Using @kortix/kortix-oc runtime from $OC_SOURCE_DIR"
+KORTIX_OC_RUNTIME="$KORTIX_OC_PACKAGE/runtime"
+echo "[sandbox-postinstall] Using @kortix/kortix-oc package from $KORTIX_OC_PACKAGE"
 
 fail_update() {
   echo "[sandbox-postinstall] ERROR: $1" >&2
@@ -72,11 +72,13 @@ if [ "$MODE" = "staging" ]; then
   OC_DIR="$STAGING/opencode"
   BV_DIR="$STAGING/agent-browser-viewer"
   KX_DIR="$STAGING/kortix"
+  KO_DIR="$STAGING/kortix-oc"
 else
   KM_DIR="/opt/kortix-master"
   OC_DIR="/opt/opencode"
   BV_DIR="/opt/agent-browser-viewer"
   KX_DIR="/opt/kortix"
+  KO_DIR="/opt/kortix-oc"
 fi
 
 # ── Kortix Master ────────────────────────────────────────────────────────────
@@ -93,6 +95,13 @@ fi
 
 # ── OpenCode config/agents/tools/skills ──────────────────────────────────────
 echo "[sandbox-postinstall] Building opencode..."
+echo "[sandbox-postinstall] Syncing kortix-oc package..."
+mkdir -p "$KO_DIR"
+rsync -a --delete \
+  --exclude='node_modules' \
+  --exclude='bun.lock' \
+  "$KORTIX_OC_PACKAGE/" "$KO_DIR/"
+
 mkdir -p "$OC_DIR"
 
 if [ "$MODE" = "staging" ] && [ -L /opt/opencode ]; then
@@ -107,20 +116,16 @@ if [ "$MODE" = "staging" ] && [ -L /opt/opencode ]; then
   fi
 fi
 
-rsync -a --delete \
-  --exclude='node_modules' \
-  --exclude='bun.lock' \
-  --exclude='.local' \
-  "$OC_SOURCE_DIR/" "$OC_DIR/"
+if ! (cd "$KO_DIR" && bun run bin/kortix-oc.ts materialize "$OC_DIR" --clean); then
+  fail_update "failed to materialize opencode runtime"
+fi
 
 if ! (cd "$OC_DIR" && bun install); then
   fail_update "bun install failed for opencode"
 fi
 
-# Re-apply binary patches explicitly (in case postinstall didn't trigger)
-if [ -f "$OC_SOURCE_DIR/patches/patch-opencode-streaming.js" ]; then
-  echo "[sandbox-postinstall] Applying opencode binary patches..."
-  node "$OC_SOURCE_DIR/patches/patch-opencode-streaming.js" || fail_update "failed to apply opencode streaming patch"
+if ! bash "$KO_DIR/runtime/patches/apply.sh" "$OC_DIR"; then
+  fail_update "failed to apply opencode patches"
 fi
 
 # ── s6 service scripts ──────────────────────────────────────────────────────
@@ -239,7 +244,7 @@ if id abc &>/dev/null; then
 else
   SANDBOX_USER="1000"
 fi
-chown -R "$SANDBOX_USER:$SANDBOX_USER" "$KM_DIR" "$OC_DIR" "$KX_DIR" 2>/dev/null || true
+chown -R "$SANDBOX_USER:$SANDBOX_USER" "$KM_DIR" "$OC_DIR" "$KX_DIR" "$KO_DIR" 2>/dev/null || true
 [ -d "$BV_DIR" ] && chown -R "$SANDBOX_USER:$SANDBOX_USER" "$BV_DIR" 2>/dev/null || true
 
 # ── pip packages ─────────────────────────────────────────────────────────────

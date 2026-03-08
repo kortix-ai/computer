@@ -1,6 +1,6 @@
 # Kortix
 
-Self-host your AI Computer.
+Self-host your AI Computer
 
 ## Quick Start
 

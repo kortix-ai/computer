@@ -31,6 +31,7 @@ import { useServerStore } from '@/stores/server-store';
 import { ensureSandbox } from '@/lib/platform-client';
 import { toast } from 'sonner';
 import { ScheduleBuilder } from './schedule-builder';
+import { ScheduledTaskAgentSelector } from './agent-selector';
 
 interface TaskConfigDialogProps {
   open: boolean;
@@ -285,23 +286,11 @@ export function TaskConfigDialog({ open, onOpenChange, onCreated }: TaskConfigDi
                     Loading agents...
                   </div>
                 ) : (
-                  <Select
-                    value={agentName || DEFAULT_VALUE}
-                    onValueChange={(v) => setAgentName(v === DEFAULT_VALUE ? '' : v)}
-                  >
-                    <SelectTrigger className="cursor-pointer hover:bg-muted/40 transition-colors">
-                      <SelectValue placeholder="Default agent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={DEFAULT_VALUE} className="cursor-pointer data-[highlighted]:bg-muted/70">Default agent</SelectItem>
-                      {agents?.map((agent) => (
-                        <SelectItem key={agent.name} value={agent.name} className="cursor-pointer data-[highlighted]:bg-muted/70">
-                          {agent.name}
-                          {agent.description ? ` — ${agent.description}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ScheduledTaskAgentSelector
+                    agents={agents ?? []}
+                    selectedAgent={agentName}
+                    onSelect={setAgentName}
+                  />
                 )}
                 <p className="text-xs text-muted-foreground">
                   Which agent handles the prompt

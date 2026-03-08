@@ -5,8 +5,7 @@
   "license": "Elastic-2.0",
   "private": false,
   "scripts": {
-    "postinstall": "bash postinstall.sh",
-    "sync:opencode": "bun run ../packages/kortix-oc/bin/kortix-oc.ts link ./opencode && (cd ./opencode && bun install)"
+    "postinstall": "bash postinstall.sh"
   },
   "files": [
     "kortix-master/src/",
@@ -22,7 +21,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@kortix/kortix-oc": "workspace:*",
+    "@kortix/kortix-oc": "workspace:0.1.1",
     "opencode-ai": "1.2.17",
     "agent-browser": "^0.10.0"
   },

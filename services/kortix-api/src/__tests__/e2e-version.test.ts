@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'bun:test';
 import { createTestApp, jsonGet } from './helpers';
 
-const app = createTestApp({ mountCron: false, mountPlatform: false });
+const app = createTestApp({ mountPlatform: false });
 
 describe('Version endpoint', () => {
   it('GET /v1/platform/sandbox/version returns 200 with version string', async () => {

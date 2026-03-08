@@ -11,7 +11,6 @@ import { BillingError } from './errors';
 import { router } from './router';
 import { billingApp } from './billing';
 import { platformApp } from './platform';
-import { cronApp, startScheduler, stopScheduler, getSchedulerStatus } from './cron';
 import { channelsApp, startChannelService, stopChannelService, getChannelServiceStatus } from './channels';
 import { daytonaProxyApp } from './daytona-proxy';
 import { getSandboxBaseUrl, proxyToSandbox } from './daytona-proxy/routes/local-preview';
@@ -91,7 +90,6 @@ app.get('/health', (c) => {
     service: 'kortix-api',
     timestamp: new Date().toISOString(),
     env: config.ENV_MODE,
-    scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
     tunnel: getTunnelServiceStatus(),
   });
@@ -104,7 +102,6 @@ app.get('/v1/health', (c) => {
     service: 'kortix-api',
     timestamp: new Date().toISOString(),
     env: config.ENV_MODE,
-    scheduler: getSchedulerStatus(),
     channels: getChannelServiceStatus(),
     tunnel: getTunnelServiceStatus(),
   });
@@ -224,7 +221,6 @@ app.get('/v1/user-roles', supabaseAuth, async (c: any) => {
 app.route('/v1/router', router);        // /v1/router/chat/completions, /v1/router/models, /v1/router/web-search, /v1/router/tavily/*, etc.
 app.route('/v1/billing', billingApp);   // /v1/billing/account-state, /v1/billing/webhooks/*, /v1/billing/setup/*
 app.route('/v1/platform', platformApp); // /v1/platform/providers, /v1/platform/sandbox/*, /v1/platform/sandbox/version
-app.route('/v1/cron', cronApp);         // /v1/cron/sandboxes/*, /v1/cron/triggers/*, /v1/cron/executions/*
 if (config.KORTIX_DEPLOYMENTS_ENABLED) {
   const { deploymentsApp } = await import('./deployments');
   app.route('/v1/deployments', deploymentsApp); // /v1/deployments/*
@@ -337,8 +333,6 @@ app.notFound((c) => {
 });
 
 // ─── Auto-register local Docker sandbox in DB ──────────────────────────────
-// When local_docker is an allowed provider, ensure there's a sandbox record
-// in the DB so cron triggers can discover it via GET /v1/cron/sandboxes.
 
 async function ensureLocalSandboxRegistered() {
   const { db } = await import('./shared/db');
@@ -377,7 +371,7 @@ async function ensureLocalSandboxRegistered() {
   console.log('[startup] No local sandbox registered yet — will be created on first login via POST /init');
 }
 
-// === Start Server & Scheduler ===
+// === Start Server ===
 
 console.log(`
 ╔═══════════════════════════════════════════════════════════╗
@@ -391,7 +385,6 @@ console.log(`
 ║    /v1/router     (search, LLM, proxy)                    ║
 ║    /v1/billing    (subscriptions, credits, webhooks)       ║
 ║    /v1/platform   (sandbox lifecycle)                      ║
-║    /v1/cron       (scheduled triggers)                     ║
 ${config.KORTIX_DEPLOYMENTS_ENABLED ? '║    /v1/deployments (deploy lifecycle)                      ║\n' : ''}║    /v1/integrations (OAuth integrations)                    ║
 ║    /v1/setup      (setup & env management)                 ║
 ║    /v1/queue      (persistent message queue)               ║
@@ -403,7 +396,6 @@ ${config.KORTIX_DEPLOYMENTS_ENABLED ? '║    /v1/deployments (deploy lifecycle)
 ║  Stripe:     ${config.STRIPE_SECRET_KEY ? '✓ Configured'.padEnd(42) : '✗ NOT SET'.padEnd(42)}║
 ║  Billing:    ${(config.KORTIX_BILLING_INTERNAL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Channels:   ${(config.CHANNELS_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
-║  Scheduler:  ${(config.SCHEDULER_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Tunnel:     ${(config.TUNNEL_ENABLED ? 'ENABLED' : 'DISABLED').padEnd(42)}║
 ║  Providers:  ${config.ALLOWED_SANDBOX_PROVIDERS.join(', ').padEnd(42)}║
 ╚═══════════════════════════════════════════════════════════╝
@@ -425,7 +417,6 @@ ensureSchema()
   .then(async () => {
     schemaReady = true;
     startAccessControlCache();
-    startScheduler().catch((err) => console.error('[startup] Scheduler failed to start:', err));
     startChannelService();
     startDrainer();
     startTunnelService();
@@ -444,7 +435,6 @@ ensureSchema()
     console.error('[startup] ensureSchema failed, starting services anyway:', err);
     schemaReady = true; // Tables may already exist — allow requests through
     startAccessControlCache();
-    startScheduler().catch((e) => console.error('[startup] Scheduler failed to start:', e));
     startChannelService();
     startDrainer();
     startTunnelService();
@@ -461,7 +451,6 @@ ensureSchema()
 // Graceful shutdown
 function shutdown(signal: string) {
   console.log(`\n[${signal}] Shutting down gracefully...`);
-  stopScheduler();
   stopChannelService();
   stopDrainer();
   stopModelPricing();

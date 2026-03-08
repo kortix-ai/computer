@@ -219,15 +219,6 @@ function getAdminKeySchema(): Record<string, KeyGroup> {
         { key: 'INTERNAL_SERVICE_KEY', label: 'Internal Service Key', secret: true },
       ],
     },
-    scheduler: {
-      title: 'Scheduler',
-      description: 'Cron trigger configuration.',
-      keys: [
-        { key: 'SCHEDULER_ENABLED', label: 'Scheduler Enabled' },
-        { key: 'CRON_TICK_SECRET', label: 'Cron Tick Secret', secret: true },
-        { key: 'CRON_API_URL', label: 'Cron API URL' },
-      ],
-    },
     integrations: {
       title: 'Integrations',
       description: 'Pipedream and Slack OAuth integration keys.',
@@ -458,7 +449,6 @@ adminApp.get('/api/status', async (c) => {
     port: config.PORT,
     sandboxVersion: (await import('../config')).SANDBOX_VERSION,
     allowedProviders: config.ALLOWED_SANDBOX_PROVIDERS,
-    schedulerEnabled: config.SCHEDULER_ENABLED,
     channelsEnabled: config.CHANNELS_ENABLED,
     billingEnabled: config.KORTIX_BILLING_INTERNAL_ENABLED,
     daytonaEnabled: config.isDaytonaEnabled(),

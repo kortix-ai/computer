@@ -28,7 +28,6 @@ describe.skipIf(!HAS_DB)('Platform — API Keys (kortix schema)', () => {
     dockerProvider: createMockProvider('local_docker'),
     daytonaProvider: createMockProvider('daytona'),
     defaultProvider: 'local_docker',
-    mountCron: false,
   });
 
   const otherApp = createTestApp({
@@ -37,7 +36,6 @@ describe.skipIf(!HAS_DB)('Platform — API Keys (kortix schema)', () => {
     dockerProvider: createMockProvider('local_docker'),
     daytonaProvider: createMockProvider('daytona'),
     defaultProvider: 'local_docker',
-    mountCron: false,
   });
 
   let sandboxId: string;

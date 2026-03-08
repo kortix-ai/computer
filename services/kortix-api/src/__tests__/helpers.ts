@@ -3,19 +3,19 @@
  *
  * Provides:
  * - createTestApp() — Hono app mimicking the monolith with auth bypassed + injectable mock providers
- * - getTestDb()     — shared Drizzle DB instance for assertions / cron routes
- * - cleanupTestData() — deletes all test rows (executions → triggers → sandboxes)
+ * - getTestDb()     — shared Drizzle DB instance for assertions
+ * - cleanupTestData() — deletes all test rows from the shared kortix schema
  * - Mock provider factories
  * - Request helpers (jsonPost, jsonGet, jsonPatch, jsonDelete)
  *
  * IMPORTANT: This file must be importable WITHOUT DATABASE_URL being set.
- * DB-dependent modules (routes/platform, routes/cron-*) are loaded dynamically
+ * DB-dependent modules (routes/platform, routes/channels, etc.) are loaded dynamically
  * in createTestApp() only when DATABASE_URL is available.
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
-import { createDb, type Database, sandboxes, triggers, executions, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys } from '@kortix/db';
+import { createDb, type Database, sandboxes, deployments, channelConfigs, channelSessions, channelMessages, channelIdentityMap, kortixApiKeys } from '@kortix/db';
 import { BillingError } from '../errors';
 import type { AuthVariables } from '../types';
 
@@ -161,8 +161,6 @@ export interface TestAppOptions {
   defaultProvider?: ProviderName;
   /** Override available providers list */
   availableProviders?: ProviderName[];
-  /** Whether to mount cron routes (requires DATABASE_URL). Default: false */
-  mountCron?: boolean;
   /** Whether to mount platform routes (requires DATABASE_URL). Default: true if DATABASE_URL set */
   mountPlatform?: boolean;
   /** Whether to mount deployment routes (requires DATABASE_URL). Default: false */
@@ -173,7 +171,7 @@ export interface TestAppOptions {
 
 /**
  * Build the Hono app shell with health, system-status, version, 404, and error handlers.
- * Platform and cron routes are mounted only when DATABASE_URL is available.
+ * Platform routes are mounted only when DATABASE_URL is available.
  */
 export function createTestApp(opts: TestAppOptions = {}) {
   const userId = opts.userId || TEST_USER_ID;
@@ -284,21 +282,6 @@ export function createTestApp(opts: TestAppOptions = {}) {
     }
   }
 
-  // ─── Cron routes (module-level db — requires DATABASE_URL) ─────────────
-  if (opts.mountCron && hasDb) {
-    try {
-      const { sandboxesRouter } = require('../cron/routes/sandboxes');
-      const { triggersRouter } = require('../cron/routes/triggers');
-      const { executionsRouter } = require('../cron/routes/executions');
-
-      app.route('/v1/cron/sandboxes', sandboxesRouter);
-      app.route('/v1/cron/triggers', triggersRouter);
-      app.route('/v1/cron/executions', executionsRouter);
-    } catch (e) {
-      console.warn('[test] Failed to mount cron routes:', e);
-    }
-  }
-
   // ─── Deployment routes (module-level db — requires DATABASE_URL) ───────
   if (opts.mountDeployments && hasDb) {
     try {
@@ -375,8 +358,6 @@ export async function cleanupTestData(): Promise<void> {
   // Original tables
   await db.delete(kortixApiKeys).execute();
   await db.delete(deployments).execute();
-  await db.delete(executions).execute();
-  await db.delete(triggers).execute();
   await db.delete(sandboxes).execute();
 }
 

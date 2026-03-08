@@ -10,7 +10,7 @@ Cross-session context retrieval for the OpenCode agent. Two tools let the agent 
 Agent calls session_list / session_get
         │
         ▼
-  OpenCode Plugin (sandbox/opencode/plugin/session.ts)
+  OpenCode Plugin (`packages/kortix-oc/runtime/plugin/kortix-sys/src/index.ts`)
         │
         ├─► OpenCode SDK (session.list / session.get / session.messages / session.todo)
         │       └─► opencode.db (SQLite at /workspace/.local/share/opencode/)
@@ -101,11 +101,11 @@ The plugin reads env vars via `getEnv()` which checks `process.env` first, then 
 
 ### Plugin Registration
 
-In `sandbox/opencode/opencode.jsonc`:
+In the materialized OpenCode config (`/opt/opencode/opencode.jsonc` in sandbox, generated from `packages/kortix-oc/runtime/opencode.jsonc`):
 
 ```jsonc
 {
-  "plugin": ["opencode-pty", "./plugin/worktree.ts", "./plugin/session.ts"]
+  "plugin": ["opencode-pty", "envsitter-guard", "/opt/kortix-oc/runtime/plugin/kortix-oc.ts"]
 }
 ```
 
@@ -128,7 +128,7 @@ The SDK reads from SQLite. Legacy JSON paths are available for raw bash access.
 
 | File | Description |
 |------|-------------|
-| `sandbox/opencode/plugin/session.ts` | Plugin source (~350 lines) |
-| `sandbox/opencode/opencode.jsonc` | Plugin registration |
-| `.opencode/plugin/session.ts` | Symlink to above |
-| `.opencode/opencode.jsonc` | Symlink to above |
+| `packages/kortix-oc/runtime/plugin/kortix-sys/src/index.ts` | Plugin source |
+| `packages/kortix-oc/runtime/opencode.jsonc` | Source config template |
+| `/opt/kortix-oc/runtime/plugin/kortix-oc.ts` | Runtime wrapper plugin |
+| `/opt/opencode/opencode.jsonc` | Materialized sandbox config |

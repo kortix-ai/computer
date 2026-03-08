@@ -4,6 +4,7 @@ export const RUNTIME_EXPECTED_FILES = [
   "package.json",
   "tsconfig.json",
   "agents/kortix.md",
+  "plugin/kortix-oc.ts",
   "commands/onboarding.md",
   "commands/work-loop.md",
   "commands/ulw-loop.md",

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { linkRuntime, materializeRuntime } from "../src/materialize"
+import { materializeRuntime } from "../src/materialize"
 import { verifyRuntime } from "../src/verify"
 
 const [, , command, ...args] = process.argv
@@ -26,16 +26,5 @@ if (command === "materialize") {
   process.exit(0)
 }
 
-if (command === "link") {
-  const targetDir = args.find((arg) => !arg.startsWith("--"))
-  if (!targetDir) {
-    console.error("Usage: kortix-oc link <target-path>")
-    process.exit(1)
-  }
-  const output = linkRuntime(targetDir)
-  console.log(`Linked runtime to ${output}`)
-  process.exit(0)
-}
-
-console.error("Usage: kortix-oc <verify|materialize|link>")
+console.error("Usage: kortix-oc <verify|materialize>")
 process.exit(1)

@@ -18,7 +18,7 @@ let dotenvCache: Record<string, string> | null = null;
 function findDotenvPath(): string | null {
   // Try multiple starting points — __dirname may differ when bundled
   const startDirs = [
-    dirname(dirname(__dirname)),  // tools/lib/ → tools/ → sandbox/opencode/
+    dirname(dirname(__dirname)),  // tools/lib/ → tools/ → materialized OpenCode config dir
     process.cwd(),                // wherever OpenCode was started from
   ];
 
@@ -83,7 +83,7 @@ function getDotenv(): Record<string, string> {
  *
  * 1. s6 env dir file     — `/run/s6/container_environment/{key}` (always fresh, ~1μs tmpfs read)
  * 2. `process.env[key]`  — Docker env, manually exported (native dev without s6)
- * 3. `.env` file          — nearest `.env` walking up from sandbox/opencode/ (native dev fallback)
+ * 3. `.env` file          — nearest `.env` walking up from the materialized OpenCode config dir (native dev fallback)
  *
  * s6 is checked first so that env var updates from the secrets manager
  * (kortix-master /env API) take effect immediately — no service restart needed.

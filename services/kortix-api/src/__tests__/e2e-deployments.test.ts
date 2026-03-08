@@ -28,7 +28,6 @@ describe.skipIf(!HAS_DB)('Deployments — CRUD & Lifecycle (Freestyle-backed)', 
   const app = createTestApp({
     dockerProvider,
     defaultProvider: 'local_docker',
-    mountCron: false,
     mountDeployments: true,
   });
 
@@ -37,7 +36,6 @@ describe.skipIf(!HAS_DB)('Deployments — CRUD & Lifecycle (Freestyle-backed)', 
     userEmail: OTHER_USER_EMAIL,
     dockerProvider: createMockProvider('local_docker'),
     defaultProvider: 'local_docker',
-    mountCron: false,
     mountDeployments: true,
   });
 

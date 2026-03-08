@@ -500,7 +500,7 @@ Quick reference below; the `session-search` skill has the complete decision tree
 
 ## Commands
 
-Slash commands trigger structured workflows. Defined at `/opt/opencode/commands/` as markdown files with frontmatter.
+Slash commands trigger structured workflows. Their source markdown lives in `@kortix/kortix-oc/runtime/commands/`, and materialization compiles them inline into `/opt/opencode/opencode.jsonc` so the sandbox does not need a checked-in `/opt/opencode/commands/` tree.
 
 | Command | File | Purpose |
 |---|---|---|
@@ -578,7 +578,7 @@ Main config at `/opt/opencode/opencode.jsonc`:
 - **Default agent**: `kortix`
 - **Built-in agents**: `build`, `plan`, `explore`, `general` are available but not default (disable lines are commented out in config)
 - **Permission**: `allow` (all tool calls auto-approved)
-- **Plugins**: `opencode-pty`, `./plugin/worktree.ts`, `kortix-sys-oc-plugin` (memory + session tools)
+- **Plugins**: `opencode-pty`, `envsitter-guard`, and the single Kortix wrapper plugin referenced from `/opt/kortix-oc/runtime/plugin/kortix-oc.ts`
 - **MCP servers**: Context7 (remote, for documentation lookup)
 - **Provider**: Kortix router (OpenAI-compatible) with two models: `kortix/basic` and `kortix/power`
 - **Auto-update**: enabled (`autoupdate: true`)

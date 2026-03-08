@@ -14,12 +14,12 @@ This package ships:
 
 ```bash
 bun run bin/kortix-oc.ts verify
-bun run bin/kortix-oc.ts link ../../sandbox/opencode
+bun run bin/kortix-oc.ts materialize /tmp/kortix-opencode --clean
 bun run test:plugin
 ```
 
 ## Notes
 
-OpenCode plugins can directly provide hooks and tools, but markdown-backed commands, agents, and skills still need filesystem-backed config assets. This package centralizes those assets in one place and stages them into the target runtime directory.
+OpenCode plugins can directly provide hooks and tools, but agents, tools, and skills still need filesystem-backed config assets. Commands are compiled into inline `command` config during materialization so the repo does not need a checked-in `sandbox/opencode/` tree.
 
 `computer/packages/kortix-sys-oc-plugin` has been absorbed into this package. The canonical plugin runtime now lives at `computer/packages/kortix-oc/runtime/plugin/kortix-sys`.

@@ -87,11 +87,6 @@ write_env "services/kortix-api/.env" \
   "$(kv PIPEDREAM_PROJECT_ID)" \
   "$(kv PIPEDREAM_ENVIRONMENT development)" \
   "" \
-  "# Scheduler" \
-  "$(kv SCHEDULER_ENABLED true)" \
-  "$(kv CRON_TICK_SECRET)" \
-  "# CRON_API_URL auto-derived from PORT + DOCKER_HOST" \
-  "" \
   "# LLM Providers (optional — cloud routing)" \
   "$(kv OPENROUTER_API_KEY)" \
   "$(kv OPENAI_API_KEY)" \

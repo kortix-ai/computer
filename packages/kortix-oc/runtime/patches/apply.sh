@@ -6,9 +6,10 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+TARGET_ROOT="${1:-$ROOT_DIR}"
 
 # ── Patch 1: opencode-pty spawn.txt (adds anti-pattern guidance) ────────────
-TARGET="$ROOT_DIR/node_modules/opencode-pty/src/plugin/pty/tools/spawn.txt"
+TARGET="$TARGET_ROOT/node_modules/opencode-pty/src/plugin/pty/tools/spawn.txt"
 PATCH="$SCRIPT_DIR/opencode-pty-spawn.txt"
 
 if [ -f "$TARGET" ] && [ -f "$PATCH" ]; then

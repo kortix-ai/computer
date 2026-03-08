@@ -317,9 +317,10 @@ publish our own fork. We control which version runs in every sandbox via exact p
 sandbox/package.json
   "dependencies": {
     "opencode-ai": "1.2.10"        ← CLI version (exact pin, no ^ or ~)
+    "@kortix/kortix-oc": "workspace:0.1.1" ← local workspace pin; publishes as exact `0.1.1`
   }
 
-sandbox/opencode/package.json
+packages/kortix-oc/runtime/package.json
   "dependencies": {
     "@opencode-ai/plugin": "1.2.10" ← plugin version (exact pin, SDK is transitive dep)
   }
@@ -334,7 +335,8 @@ sandbox/opencode/package.json
    CLI anywhere in the sandbox. It only changes when you publish a new `@kortix/sandbox`
    with a different pin.
 4. **Release script doesn't touch it** — Step 3 (bump versions) only stamps the top-level
-   `"version"` field in `sandbox/package.json`. It does **not** modify `dependencies.opencode-ai`.
+   `"version"` field in `sandbox/package.json`. It does **not** modify `dependencies.opencode-ai`
+   or the pinned `dependencies.@kortix/kortix-oc` target version.
 
 ### Two paths consume the pin
 
@@ -359,27 +361,31 @@ npm view opencode-ai versions --json
 When running sandboxes update to `@kortix/sandbox@0.8.0`, `postinstall.sh` sees the
 version mismatch and installs `opencode-ai@1.3.0`.
 
-### How to bump the SDK / plugin version
+### How to bump the OpenCode runtime package / SDK / plugin version
 
 The SDK (`@opencode-ai/sdk`) is a **transitive dependency** of `@opencode-ai/plugin`.
 To update:
 
 ```bash
-# 1. Update sandbox/opencode/package.json
+# 1. Publish a new @kortix/kortix-oc version if the runtime changed
+
+# 2. Update packages/kortix-oc/runtime/package.json
 #    "@opencode-ai/plugin": "1.2.10"  →  "@opencode-ai/plugin": "1.3.0"
 
-# 2. Update apps/frontend/package.json (if SDK types changed)
+# 3. Update sandbox/package.json
+#    "@kortix/kortix-oc": "workspace:0.1.1"  →  "workspace:0.1.2"
+
+# 4. Update apps/frontend/package.json (if SDK types changed)
 #    "@opencode-ai/sdk": "^1.2.10"  →  "@opencode-ai/sdk": "^1.3.0"
 #    Then: pnpm install --filter Kortix-Computer-Frontend
 
-# 3. Release as usual
+# 5. Release as usual
 ```
 
 ### How to keep OpenCode the same across a release
 
-Just don't touch the `"opencode-ai"` or `"@opencode-ai/plugin"` values. A sandbox-only
-release (new agents, skills, tools, configs, etc.) will ship with the exact same CLI and
-SDK versions as before.
+Just don't touch the `"opencode-ai"`, `"@kortix/kortix-oc"`, or `"@opencode-ai/plugin"`
+values. A sandbox-only release will ship with the exact same CLI and OpenCode runtime as before.
 
 ## Artifact Tracking
 

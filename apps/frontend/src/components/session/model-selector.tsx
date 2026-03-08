@@ -53,6 +53,64 @@ function formatContext(tokens: number): string {
   return `${Math.round(tokens / 1000)}K`;
 }
 
+const RECOMMENDED_MODEL_MATCHERS = [
+  {
+    label: 'Sonnet 4.6',
+    matches: (model: FlatModel) =>
+      model.providerID === 'anthropic' &&
+      (model.modelID === 'claude-sonnet-4-6' || model.modelName.toLowerCase().includes('sonnet 4.6')),
+  },
+  {
+    label: 'Opus 4.6',
+    matches: (model: FlatModel) =>
+      model.providerID === 'anthropic' &&
+      (model.modelID === 'claude-opus-4-6' || model.modelName.toLowerCase().includes('opus 4.6')),
+  },
+  {
+    label: 'GLM-5',
+    matches: (model: FlatModel) =>
+      (model.providerID === 'zhipuai' || model.providerID === 'zhipuai-cn') &&
+      (model.modelID.toLowerCase().includes('glm-5') || model.modelName.toLowerCase().includes('glm-5')),
+  },
+  {
+    label: 'Kimi K2.5',
+    matches: (model: FlatModel) => {
+      const haystack = `${model.modelID} ${model.modelName}`.toLowerCase();
+      return haystack.includes('kimi') && (haystack.includes('k2.5') || haystack.includes('k2'));
+    },
+  },
+  {
+    label: 'MiniMax M2.5',
+    matches: (model: FlatModel) => {
+      const haystack = `${model.modelID} ${model.modelName}`.toLowerCase();
+      return haystack.includes('minimax') && haystack.includes('m2.5');
+    },
+  },
+  {
+    label: 'GPT-5.4',
+    matches: (model: FlatModel) =>
+      model.providerID === 'openai' &&
+      (model.modelID === 'gpt-5.4' || model.modelName.toLowerCase().includes('gpt-5.4')),
+  },
+] as const;
+
+function getRecommendedModels(models: FlatModel[]) {
+  const used = new Set<string>();
+  const recommended: FlatModel[] = [];
+
+  for (const matcher of RECOMMENDED_MODEL_MATCHERS) {
+    const match = models.find((model) => {
+      const key = `${model.providerID}:${model.modelID}`;
+      return !used.has(key) && matcher.matches(model);
+    });
+    if (!match) continue;
+    used.add(`${match.providerID}:${match.modelID}`);
+    recommended.push(match);
+  }
+
+  return recommended;
+}
+
 // =============================================================================
 // Tag
 // =============================================================================
@@ -339,7 +397,30 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
     return entries;
   }, [visibleModels]);
 
-  const flatList = useMemo(() => grouped.flatMap((g) => g.models), [grouped]);
+  const recommendedModels = useMemo(
+    () => (search ? [] : getRecommendedModels(visibleModels)),
+    [search, visibleModels],
+  );
+
+  const recommendedKeys = useMemo(
+    () => new Set(recommendedModels.map((model) => `${model.providerID}:${model.modelID}`)),
+    [recommendedModels],
+  );
+
+  const groupedWithoutRecommended = useMemo(
+    () => grouped
+      .map((group) => ({
+        ...group,
+        models: group.models.filter((model) => !recommendedKeys.has(`${model.providerID}:${model.modelID}`)),
+      }))
+      .filter((group) => group.models.length > 0),
+    [grouped, recommendedKeys],
+  );
+
+  const flatList = useMemo(
+    () => [...recommendedModels, ...groupedWithoutRecommended.flatMap((g) => g.models)],
+    [recommendedModels, groupedWithoutRecommended],
+  );
 
   useEffect(() => {
     if (open) {
@@ -467,8 +548,65 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
 
             {/* Model list */}
             <div className="flex-1 min-h-0 overflow-y-auto p-2">
-              {grouped.length > 0 ? (
-                grouped.map((group) => (
+              {flatList.length > 0 ? (
+                <>
+                  {recommendedModels.length > 0 && (
+                    <div className="mb-3 last:mb-0">
+                      <div className="flex items-center justify-between px-2 pb-2">
+                        <div>
+                          <div className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+                            Recommended
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Best picks right now
+                          </div>
+                        </div>
+                        <Tag variant="recommended">Starter Set</Tag>
+                      </div>
+                      {recommendedModels.map((model) => {
+                        flatIndex++;
+                        const idx = flatIndex;
+                        const isSelected =
+                          selectedModel?.providerID === model.providerID &&
+                          selectedModel?.modelID === model.modelID;
+                        const isHighlighted = idx === highlightedIndex;
+                        const isLatestModel = modelStore.isLatest({ providerID: model.providerID, modelID: model.modelID });
+                        const isFree = model.providerID === 'opencode' && (!model.cost || model.cost.input === 0);
+
+                        return (
+                          <Tooltip key={`${model.providerID}:${model.modelID}`}>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className={cn(
+                                  'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-colors cursor-pointer',
+                                  (isHighlighted || isSelected) ? 'bg-zinc-100 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
+                                )}
+                                onClick={() => handleSelect(model)}
+                                onMouseEnter={() => setHighlightedIndex(idx)}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-medium">{model.modelName}</div>
+                                  <div className="text-[11px] text-muted-foreground/60 truncate mt-0.5">
+                                    {PROVIDER_LABELS[model.providerID] || model.providerName}
+                                  </div>
+                                </div>
+                                <Tag variant="recommended">Recommended</Tag>
+                                {isFree && <Tag variant="free">Free</Tag>}
+                                {isLatestModel && <Tag variant="latest">New</Tag>}
+                                {isSelected && <Check className="h-4 w-4 text-foreground flex-shrink-0" />}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="start" sideOffset={12} className="p-3">
+                              <ModelTooltipContent model={model} isLatest={isLatestModel} isFree={isFree} />
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {groupedWithoutRecommended.map((group) => (
                   <div key={group.providerID} className="mb-3 last:mb-0">
                     <div className="flex items-center gap-2 px-2 pb-2">
                       <ProviderLogo providerID={group.providerID} name={group.providerName} size="small" />
@@ -521,7 +659,8 @@ export function ModelSelector({ models, selectedModel, onSelect, providers }: Mo
                       );
                     })}
                   </div>
-                ))
+                  ))}
+                </>
               ) : (
                 <div className="text-xs text-center py-8 text-muted-foreground/60">
                   No models found

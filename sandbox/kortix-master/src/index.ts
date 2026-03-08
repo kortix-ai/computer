@@ -20,7 +20,9 @@ import servicesRouter from './routes/services'
 import integrationsRouter from './routes/integrations'
 import memoryRouter from './routes/memory'
 import coreRouter from './routes/core'
+import cronRouter from './routes/cron'
 import { coreSupervisor } from './services/core-supervisor'
+import { getCronManager } from './services/cron-manager'
 import { config } from './config'
 import { HealthResponse, PortsResponse } from './schemas/common'
 
@@ -101,6 +103,8 @@ await cleanupStaleStagingDirs().catch(err =>
 await coreSupervisor.start().catch(err =>
   console.error('[Kortix Master] core supervisor start error:', err)
 )
+
+getCronManager().start()
 
 // Global middleware
 app.use('*', logger())
@@ -300,6 +304,9 @@ if (config.KORTIX_DEPLOYMENTS_ENABLED) {
 
 // Services — unified "what's running" for the frontend
 app.route('/kortix/services', servicesRouter)
+
+// Scheduled tasks
+app.route('/kortix/cron', cronRouter)
 
 // Core supervisor management
 app.route('/kortix/core', coreRouter)

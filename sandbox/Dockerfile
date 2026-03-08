@@ -145,23 +145,24 @@ RUN --mount=type=cache,target=/root/.npm \
     && rm /tmp/sandbox-pkg-versions.json \
     && opencode --version
 
-# ── OpenCode (agents, tools, skills) ────────────────────────────────────────
+# ── OpenCode (materialized from kortix-oc package) ──────────────────────────
 # Use --chown on COPY to avoid a separate chown layer (saves ~320MB duplication).
 # UID 1000 matches PUID=1000 set in docker-compose (init-adduser remaps abc to this).
-# packages/kortix-oc/runtime is the sole authored OpenCode runtime source.
-COPY --chown=1000:1000 packages/kortix-oc/runtime/ /opt/opencode/
+COPY --chown=1000:1000 packages/kortix-oc/ /opt/kortix-oc/
 RUN --mount=type=cache,target=/root/.npm \
-    npm cache clean --force \
+    cd /opt/kortix-oc \
+    && bun run bin/kortix-oc.ts materialize /opt/opencode --clean \
+    && npm cache clean --force \
     && cd /opt/opencode \
     && npm install --no-audit --no-fund --omit=optional --ignore-scripts \
-    && bash patches/apply.sh \
+    && bash /opt/kortix-oc/runtime/patches/apply.sh /opt/opencode \
     && npm cache clean --force \
     && rm -rf /root/.npm/_cacache /root/.npm/_logs
 
 # ── OpenCode binary patches ─────────────────────────────────────────────────
 # Apply patches to the compiled Bun binary (tool-input streaming, etc.).
 # Also runs via postinstall, but explicit step ensures it runs during build.
-RUN node /opt/opencode/patches/patch-opencode-streaming.js
+RUN node /opt/kortix-oc/runtime/patches/patch-opencode-streaming.js
 
 # Replace glibc-linked bun-pty .so with musl-compiled version from builder stage.
 # bun-pty ships .so files compiled against glibc, but Alpine uses musl.
@@ -219,7 +220,7 @@ RUN mkdir -p /opt/kortix \
     && chown -R 1000:1000 /opt/kortix
 
 # ── ACID Update System: versioned staging dir + symlinks ─────────────────────
-# Move the four updatable directories into a versioned staging dir, then create
+# Move the five updatable directories into a versioned staging dir, then create
 # symlinks at the original paths. This enables atomic updates via symlink swap.
 # postinstall.sh detects the symlinks and stages to a new versioned dir instead
 # of mutating the live system. update.ts atomically swaps the symlinks.
@@ -230,10 +231,12 @@ RUN PKG_VERSION=$(node -e "const fs=require('fs');const v=JSON.parse(fs.readFile
     && mv /opt/opencode "$STAGING/opencode" \
     && mv /opt/agent-browser-viewer "$STAGING/agent-browser-viewer" \
     && mv /opt/kortix "$STAGING/kortix" \
+    && mv /opt/kortix-oc "$STAGING/kortix-oc" \
     && ln -s "$STAGING/kortix-master" /opt/kortix-master \
     && ln -s "$STAGING/opencode" /opt/opencode \
     && ln -s "$STAGING/agent-browser-viewer" /opt/agent-browser-viewer \
     && ln -s "$STAGING/kortix" /opt/kortix \
+    && ln -s "$STAGING/kortix-oc" /opt/kortix-oc \
     && echo "{\"version\":\"$PKG_VERSION\",\"status\":\"staged\",\"stagedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$STAGING/.manifest" \
     && chown -R 1000:1000 "$STAGING"
 

@@ -3,7 +3,6 @@ packages:
   - 'packages/*'
   - 'services/*'
   - 'sandbox/*'
-  - '!sandbox/opencode'
   - 'infra/*'
 
 catalog:
