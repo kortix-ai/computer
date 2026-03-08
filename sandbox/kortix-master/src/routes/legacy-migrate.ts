@@ -44,4 +44,24 @@ legacyMigrateRouter.post('/migrate', async (c) => {
   }
 })
 
+legacyMigrateRouter.get('/schema', async (c) => {
+  if (!existsSync(OPENCODE_DB_PATH)) {
+    return c.json({ error: 'OpenCode database not found' }, 503)
+  }
+  let db: Database | null = null
+  try {
+    db = new Database(OPENCODE_DB_PATH, { readonly: true })
+    const tables = db.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all()
+    const schema: Record<string, any> = {}
+    for (const t of tables as any[]) {
+      schema[t.name] = db.query(`PRAGMA table_info('${t.name}')`).all()
+    }
+    db.close()
+    return c.json(schema)
+  } catch (err: any) {
+    if (db) db.close()
+    return c.json({ error: err.message }, 500)
+  }
+})
+
 export default legacyMigrateRouter

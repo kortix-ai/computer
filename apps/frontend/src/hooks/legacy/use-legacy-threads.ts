@@ -87,6 +87,7 @@ export function useMigrateLegacyThread() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['legacy-threads'] });
+      queryClient.invalidateQueries({ queryKey: ['opencode', 'sessions'] });
     },
   });
 }

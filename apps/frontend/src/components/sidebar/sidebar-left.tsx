@@ -25,6 +25,7 @@ import {
   Loader2,
   FolderOpen,
   Brain,
+  History,
 } from 'lucide-react';
 import posthog from 'posthog-js';
 
@@ -55,7 +56,7 @@ const IntegrationsIcon = ({ className }: { className?: string }) => (
 );
 
 import { SessionList } from '@/components/sidebar/session-list';
-import { LegacyThreadsSection } from '@/components/sidebar/legacy-threads';
+import { useLegacyThreads } from '@/hooks/legacy/use-legacy-threads';
 import { useGlobalSandboxUpdate } from '@/hooks/platform/use-global-sandbox-update';
 
 import { UserMenu } from '@/components/sidebar/user-menu';
@@ -420,6 +421,96 @@ function UserProfileSection({ user }: { user: { name: string; email: string; ava
 }
 
 // ============================================================================
+// Sessions + Legacy Threads Accordion
+// ============================================================================
+
+function SidebarSections() {
+  const [legacyOpen, setLegacyOpen] = React.useState(false);
+  const { data: legacyData, isLoading: legacyLoading } = useLegacyThreads();
+  const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const hasLegacy = !legacyLoading && legacyData && legacyData.threads.length > 0;
+
+  const handleLegacyClick = (threadId: string, name: string) => {
+    openTabAndNavigate({
+      id: `legacy:${threadId}`,
+      title: name || 'Previous Chat',
+      type: 'page',
+      href: `/legacy/${threadId}`,
+    });
+    if (isMobile) setOpenMobile(false);
+  };
+
+  return (
+    <div className="flex flex-col min-h-0 flex-1">
+      {/* Sessions — always visible, takes remaining space */}
+      <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
+        <div className="px-3 flex-shrink-0">
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
+              <ListTree className="h-4 w-4 flex-shrink-0" />
+              <span className="flex-1 text-left">Sessions</span>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+            </button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <SessionList projectId={null} />
+        </CollapsibleContent>
+      </Collapsible>
+
+      {hasLegacy && (
+        <div className="flex-shrink-0 py-2">
+          <div className="px-3">
+            <button
+              onClick={() => setLegacyOpen((o) => !o)}
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer"
+            >
+              <History className="h-4 w-4 flex-shrink-0" />
+              <span className="flex-1 text-left">Previous Chats</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                {legacyData!.total}
+              </span>
+              <ChevronDown className={cn(
+                'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
+                !legacyOpen && '-rotate-90',
+              )} />
+            </button>
+          </div>
+          {legacyOpen && (
+            <div className="max-h-[40vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="px-4 pb-2">
+                <div className="space-y-0.5">
+                  {legacyData!.threads.map((thread) => {
+                    const isActive = pathname?.includes(thread.thread_id);
+                    return (
+                      <button
+                        key={thread.thread_id}
+                        onClick={() => handleLegacyClick(thread.thread_id, thread.name)}
+                        className={cn(
+                          'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[13px] cursor-pointer',
+                          'transition-colors duration-150',
+                          isActive
+                            ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                        )}
+                      >
+                        <span className="flex-1 truncate text-left">{thread.name || 'Untitled'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Main Sidebar
 // ============================================================================
 
@@ -701,22 +792,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           </nav>
 
 
-          <Collapsible defaultOpen className="flex flex-col min-h-0 flex-1">
-            <div className="px-3 flex-shrink-0">
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 cursor-pointer group">
-                  <ListTree className="h-4 w-4 flex-shrink-0" />
-                  <span className="flex-1 text-left">Sessions</span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
-                </button>
-              </CollapsibleTrigger>
-            </div>
-            <CollapsibleContent className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <SessionList projectId={null} />
-            </CollapsibleContent>
-          </Collapsible>
-
-          <LegacyThreadsSection />
+          <SidebarSections />
         </div>
       </SidebarContent>
 

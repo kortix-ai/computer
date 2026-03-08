@@ -382,7 +382,7 @@ export default function LegacyThreadPage({
 			</div>
 
 			<div className="flex-1 overflow-y-auto">
-				<div className="max-w-3xl mx-auto px-5 py-6 space-y-8">
+				<div className="max-w-4xl mx-auto px-6 py-6 space-y-8">
 					{turns.map((turn, i) => (
 						<LegacyTurn
 							key={turn.id}
@@ -394,52 +394,47 @@ export default function LegacyThreadPage({
 				</div>
 			</div>
 
-			<div className="flex-shrink-0 border-border/50 px-5 py-8">
-				<div className="max-w-3xl mx-auto flex gap-3">
-					<button
-						onClick={() => handleFork(turns.length - 1)}
-						disabled={forking || migrating || turns.length === 0}
-						className={cn(
-							'flex-1 flex items-center justify-center gap-2 rounded-3xl border border-border/40 px-4 py-6 text-sm transition-colors',
-							forking || migrating
-								? 'bg-muted/20 text-muted-foreground/40 cursor-not-allowed'
-								: 'bg-muted/20 text-muted-foreground/60 hover:bg-muted/40 hover:text-foreground hover:border-border/60 cursor-pointer',
-						)}
-					>
-						{forking ? (
-							<>
-								<Loader2 className="size-3.5 animate-spin flex-shrink-0" />
-								Creating...
-							</>
-						) : (
-							<>
-								<GitFork className="size-3.5 flex-shrink-0" />
-								Continue in new chat
-							</>
-						)}
-					</button>
-					<button
-						onClick={handleMigrate}
-						disabled={forking || migrating || turns.length === 0}
-						className={cn(
-							'flex-1 flex items-center justify-center gap-2 rounded-3xl border border-border/40 px-4 py-6 text-sm transition-colors',
-							forking || migrating
-								? 'bg-muted/20 text-muted-foreground/40 cursor-not-allowed'
-								: 'bg-muted/20 text-muted-foreground/60 hover:bg-muted/40 hover:text-foreground hover:border-border/60 cursor-pointer',
-						)}
-					>
-						{migrating ? (
-							<>
-								<Loader2 className="size-3.5 animate-spin flex-shrink-0" />
-								Converting...
-							</>
-						) : (
-							<>
-								<ArrowRightLeft className="size-3.5 flex-shrink-0" />
-								Convert to session
-							</>
-						)}
-					</button>
+			<div className="mx-auto w-full max-w-4xl relative shrink-0 px-2 sm:px-4 pb-6">
+				<div className="w-full bg-card border border-border rounded-[24px] overflow-hidden relative">
+					<div className="pointer-events-none select-none blur-[2px] opacity-40">
+						<div className="px-4 pt-4 pb-6 min-h-[96px]">
+							<span className="text-[15px] text-muted-foreground">What do you want to build?</span>
+						</div>
+						<div className="flex items-center justify-between mb-1.5 pl-2 pr-1.5">
+							<div className="flex items-center gap-1">
+								<div className="h-8 w-8 rounded-xl bg-muted/40" />
+								<div className="w-px h-4 bg-border mx-1" />
+								<div className="h-6 w-16 rounded-lg bg-muted/40" />
+								<div className="h-6 w-20 rounded-lg bg-muted/40" />
+							</div>
+							<div className="h-8 w-8 rounded-full bg-muted/40" />
+						</div>
+					</div>
+					<div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[24px]">
+						<p className="text-sm text-muted-foreground">This is a legacy chat. Convert it to continue.</p>
+						<button
+							onClick={handleMigrate}
+							disabled={forking || migrating || turns.length === 0}
+							className={cn(
+								'flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors',
+								forking || migrating
+									? 'bg-primary/50 text-primary-foreground/50 cursor-not-allowed'
+									: 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer',
+							)}
+						>
+							{migrating ? (
+								<>
+									<Loader2 className="size-3.5 animate-spin" />
+									Converting...
+								</>
+							) : (
+								<>
+									<ArrowRightLeft className="size-3.5" />
+									Convert to session
+								</>
+							)}
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
