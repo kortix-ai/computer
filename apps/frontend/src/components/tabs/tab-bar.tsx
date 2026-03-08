@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { motion, useSpring, useTransform } from 'framer-motion';
 import {
   X,
   MessageCircle,
@@ -477,14 +478,14 @@ function TabItem({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group relative flex items-center text-xs select-none cursor-pointer',
-        'transition-all duration-200 ease-out',
+        'group p-2 relative flex items-center text-xs select-none cursor-pointer',
+        'transition-[height,color] duration-200 ease-out',
         isDashboard
           ? 'w-9 md:w-10 justify-center px-0'
           : 'gap-2 pl-3 pr-2 max-w-[200px] min-w-[100px]',
         isActive
-          ? 'h-[36px] md:h-[40px] rounded-t-[8px] bg-muted text-foreground'
-          : 'h-[32px] md:h-[36px] rounded-t-[6px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]',
+          ? 'h-[36px] md:h-[40px] text-foreground'
+          : 'h-[28px] md:h-[32px] mb-[4px] rounded-[8px] text-muted-foreground hover:text-foreground',
       )}
     >
       {/* Drag-over indicator */}
@@ -561,8 +562,6 @@ function TabItem({
           <X className="h-2.5 w-2.5" />
         </button>
       )}
-
-
     </div>
   );
 }
@@ -1082,6 +1081,80 @@ export function TabBar() {
     window.history.pushState(null, '', '/dashboard');
   }, [setActiveTab]);
 
+  // ─── Morph border: measure active tab position ─────────────────────────
+  const springConfig = { stiffness: 500, damping: 40, mass: 0.8 };
+  const morphLeft = useSpring(0, springConfig);
+  const morphWidth = useSpring(0, springConfig);
+
+  useLayoutEffect(() => {
+    if (!activeTabId || !scrollRef.current || !tabBarRef.current) return;
+    const el = scrollRef.current.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
+    if (!el) return;
+    const barRect = tabBarRef.current.getBoundingClientRect();
+    const tRect = el.getBoundingClientRect();
+    morphLeft.set(tRect.left - barRect.left);
+    morphWidth.set(tRect.width);
+  }, [activeTabId, orderedTabs, morphLeft, morphWidth]);
+
+  const R = 12; // top corner radius — matches content area's rounded-tl-xl (12px)
+  const ER = 10; // ear radius
+  const SVG_H = 46;
+
+  // Single continuous path: floor → left ear (concave) → tab walls → top corners → right ear (concave) → floor
+  // The concave ears are achieved by drawing the FILL path with cubic beziers that curve OUTWARD
+  const morphPath = useTransform(
+    [morphLeft, morphWidth],
+    ([l, w]: number[]) => {
+      const barW = (tabBarRef.current?.offsetWidth ?? 2000);
+      const tabL = l as number;
+      const tabR = tabL + (w as number);
+      const f = SVG_H; // floor y
+      const t = 8;     // top y — enough room so the border stroke isn't clipped by overflow-hidden
+      // Clamp the left ear so it doesn't go off-screen
+      const leftEarStart = Math.max(0, tabL - ER);
+      const hasLeftEar = tabL > ER;
+      const hasRightEar = tabR + ER < barW;
+      const rightEarEnd = Math.min(barW, tabR + ER);
+
+      const parts: string[] = [];
+
+      // Floor line from left edge to left ear
+      parts.push(`M -1,${f + 1}`); // start below floor to avoid gap
+      parts.push(`L -1,${f}`);
+      parts.push(`L ${leftEarStart},${f}`);
+
+      if (hasLeftEar) {
+        // Left concave ear
+        parts.push(`C ${tabL},${f} ${tabL},${f} ${tabL},${f - ER}`);
+      } else {
+        // No room for ear — go straight up
+        parts.push(`L ${tabL},${f}`);
+        parts.push(`L ${tabL},${f - ER}`);
+      }
+
+      // Left wall up → top-left corner → top edge → top-right corner → right wall down
+      parts.push(`L ${tabL},${t + R}`);
+      parts.push(`Q ${tabL},${t} ${tabL + R},${t}`);
+      parts.push(`L ${tabR - R},${t}`);
+      parts.push(`Q ${tabR},${t} ${tabR},${t + R}`);
+      parts.push(`L ${tabR},${f - ER}`);
+
+      if (hasRightEar) {
+        // Right concave ear
+        parts.push(`C ${tabR},${f} ${tabR},${f} ${rightEarEnd},${f}`);
+      } else {
+        parts.push(`L ${tabR},${f}`);
+        parts.push(`L ${rightEarEnd},${f}`);
+      }
+
+      // Floor line to right edge
+      parts.push(`L ${barW + 1},${f}`);
+      parts.push(`L ${barW + 1},${f + 1}`); // below floor to avoid gap
+
+      return parts.join(' ');
+    },
+  );
+
   // Always render the bar so the bg-sidebar strip above the content curve is consistent
   if (orderedTabs.length === 0) {
     return <div className="flex-shrink-0 bg-sidebar h-[42px] md:h-[46px]" />;
@@ -1091,15 +1164,29 @@ export function TabBar() {
     <>
       <div
         ref={tabBarRef}
-        className="flex-shrink-0 flex items-end bg-sidebar h-[42px] md:h-[46px] relative overflow-hidden"
+        className="flex-shrink-0 flex items-end bg-sidebar h-[42px] md:h-[46px] relative"
         role="tablist"
       >
-        {/* The content area's border-t provides the floor line; no extra line needed here */}
+        {/* Morphing border SVG — positioned over the full tab bar width, overflow visible so floor stroke isn't clipped */}
+        {activeTabId && (
+          <svg
+            className="absolute bottom-0 left-0 w-full pointer-events-none z-30"
+            style={{ height: SVG_H }}
+            overflow="visible"
+            preserveAspectRatio="none"
+          >
+            <motion.path
+              d={morphPath}
+              className="fill-background stroke-border/50"
+              strokeWidth={1}
+            />
+          </svg>
+        )}
 
         <div
           ref={scrollRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-end overflow-x-auto px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+          className="flex-1 flex items-end overflow-x-auto px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative z-40"
         >
           {orderedTabs.map((tab, index) => {
             const pending = tab.type === 'session' ? getPendingCount(tab.id) : 0;

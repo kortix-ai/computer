@@ -205,7 +205,6 @@ function SessionTabsContainer({ children }: { children: React.ReactNode }) {
 		<div
 			className={cn(
 				"bg-background flex-1 min-h-0 flex flex-col overflow-hidden relative",
-				"md:rounded-tl-xl md:rounded-tr-xl md:border-t md:border-l md:border-r md:border-border/50",
 			)}
 		>
 			{/* Pre-mounted session tabs — always rendered, shown/hidden via CSS */}
@@ -556,11 +555,12 @@ export default function DashboardLayoutContent({
 					<Suspense fallback={null}>
 						<CommandPalette />
 					</Suspense>
-					{/* UpdateBanner removed — update indicator lives in the sidebar footer */}
 					<Suspense fallback={null}>
 						<OnboardingProvider>
 							<TabBar />
-							<SessionTabsContainer>{children}</SessionTabsContainer>
+							<div className="flex-1 min-h-0 flex flex-col md:border-l md:border-r md:border-border/50 overflow-hidden">
+								<SessionTabsContainer>{children}</SessionTabsContainer>
+							</div>
 						</OnboardingProvider>
 					</Suspense>
 					<Suspense fallback={null}>
