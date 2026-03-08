@@ -29,6 +29,7 @@ const { cluster } = createEksCluster({
   vpcId: vpc.vpcId,
   publicSubnetIds: vpc.publicSubnetIds,
   privateSubnetIds: vpc.privateSubnetIds,
+  albSgId: albSg.id,
 });
 
 const k8sProvider = new k8s.Provider("k8s-provider", {

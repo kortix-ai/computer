@@ -102,7 +102,7 @@ jobs:
           for i in $(seq 1 30); do
             STATUS=$(curl -sk -o /dev/null -w '%{http_code}' \
               "https://${INGRESS_HOST}/v1/health" \
-              -H "Host: api.kortix.com" || true)
+              -H "Host: v2-prod.kortix.com" || true)
             if [ "$STATUS" = "200" ]; then
               echo "Health check passed"
               exit 0

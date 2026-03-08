@@ -16,6 +16,7 @@ interface EksArgs {
   vpcId: pulumi.Output<string>;
   publicSubnetIds: pulumi.Output<string[]>;
   privateSubnetIds: pulumi.Output<string[]>;
+  albSgId?: pulumi.Output<string>;
 }
 
 export function createEksCluster(args: EksArgs) {
@@ -84,6 +85,17 @@ export function createEksCluster(args: EksArgs) {
     labels: { role: "workers" },
     tags: { ...commonTags, Name: "kortix-worker" },
   });
+  if (args.albSgId) {
+    new aws.ec2.SecurityGroupRule("alb-to-pods-8008", {
+      type: "ingress",
+      securityGroupId: cluster.eksCluster.vpcConfig.clusterSecurityGroupId,
+      sourceSecurityGroupId: args.albSgId,
+      fromPort: 8008,
+      toPort: 8008,
+      protocol: "tcp",
+      description: "Allow ALB to reach pods on 8008",
+    });
+  }
 
   return { cluster, nodeGroup };
 }
