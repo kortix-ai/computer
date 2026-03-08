@@ -18,10 +18,38 @@ interface DeploymentArgs {
   externalSecret: k8s.apiextensions.CustomResource;
   imageUri: pulumi.Output<string>;
   podRoleArn: pulumi.Output<string>;
+  ghcrToken?: pulumi.Output<string>;
 }
 
 export function createDeployment(args: DeploymentArgs) {
   const labels = { app: appName };
+
+  // Optional GHCR image pull secret (for private forks)
+  let ghcrPullSecret: k8s.core.v1.Secret | undefined;
+  if (args.ghcrToken) {
+    ghcrPullSecret = new k8s.core.v1.Secret(
+      "ghcr-pull-secret",
+      {
+        metadata: {
+          name: "ghcr-pull-secret",
+          namespace: namespace,
+        },
+        type: "kubernetes.io/dockerconfigjson",
+        stringData: {
+          ".dockerconfigjson": args.ghcrToken.apply((token) =>
+            JSON.stringify({
+              auths: {
+                "ghcr.io": {
+                  auth: btoa(`kortix-ai:${token}`),
+                },
+              },
+            }),
+          ),
+        },
+      },
+      { provider: args.k8sProvider, dependsOn: [args.ns] },
+    );
+  }
 
   const serviceAccount = new k8s.core.v1.ServiceAccount(
     "kortix-api-sa",
@@ -64,6 +92,9 @@ export function createDeployment(args: DeploymentArgs) {
               runAsNonRoot: true,
               runAsUser: 1000,
             },
+            ...(ghcrPullSecret
+              ? { imagePullSecrets: [{ name: "ghcr-pull-secret" }] }
+              : {}),
             topologySpreadConstraints: [
               {
                 maxSkew: 1,
@@ -80,14 +111,21 @@ export function createDeployment(args: DeploymentArgs) {
                 env: [
                   { name: "PORT", value: String(appPort) },
                   { name: "ENV_MODE", value: "cloud" },
-                  { name: "INTERNAL_KORTIX_ENV", value: "prod" },
-                  { name: "ALLOWED_SANDBOX_PROVIDERS", value: "daytona" },
+                  { name: "INTERNAL_KORTIX_ENV", value: "staging" },
+                  { name: "ALLOWED_SANDBOX_PROVIDERS", value: "hetzner" },
                   { name: "KORTIX_ROUTER_INTERNAL_ENABLED", value: "true" },
                   { name: "KORTIX_BILLING_INTERNAL_ENABLED", value: "true" },
                   { name: "KORTIX_DEPLOYMENTS_ENABLED", value: "false" },
                   { name: "SCHEDULER_ENABLED", value: "true" },
                   { name: "CHANNELS_ENABLED", value: "true" },
                   { name: "TUNNEL_ENABLED", value: "true" },
+                  { name: "KORTIX_URL", value: "https://new-api.kortix.com/v1/router" },
+                  { name: "SANDBOX_IMAGE", value: "heyagi/sandbox:latest" },
+                  { name: "FRONTEND_URL", value: "https://kortix.com" },
+                  { name: "CRON_API_URL", value: "https://new-api.kortix.com" },
+                  { name: "CHANNELS_PUBLIC_URL", value: "https://new-api.kortix.com" },
+                  { name: "INTEGRATION_AUTH_PROVIDER", value: "pipedream" },
+                  { name: "PIPEDREAM_ENVIRONMENT", value: "production" },
                 ],
                 envFrom: [{ secretRef: { name: k8sSecretName } }],
                 resources: {
@@ -127,7 +165,7 @@ export function createDeployment(args: DeploymentArgs) {
     },
     {
       provider: args.k8sProvider,
-      dependsOn: [args.ns, args.externalSecret, serviceAccount],
+      dependsOn: [args.ns, args.externalSecret, serviceAccount, ...(ghcrPullSecret ? [ghcrPullSecret] : [])],
     },
   );
 
