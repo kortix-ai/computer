@@ -68,11 +68,11 @@ legacyApp.post('/threads/:threadId/migrate', async (c: any) => {
   const session = transformThread(thread.name, thread.created_at, thread.updated_at);
   const { messages, parts } = transformMessages(session, legacyMessages);
 
-  await writeSessionToSandbox(sandboxExternalId, session, messages, parts);
-  await markThreadMigrated(threadId, session.id);
+  const realSessionId = await writeSessionToSandbox(sandboxExternalId, session, messages, parts);
+  await markThreadMigrated(threadId, realSessionId);
 
   const result: MigrationResult = {
-    sessionId: session.id,
+    sessionId: realSessionId,
     messagesImported: messages.length,
     partsImported: parts.length,
   };

@@ -10,27 +10,89 @@ export async function writeSessionToSandbox(
   session: TransformedSession,
   messages: TransformedMessage[],
   parts: TransformedPart[],
-): Promise<void> {
+): Promise<string> {
   const { baseUrl, serviceKey } = await resolveSandboxEndpoint(sandboxExternalId);
-  const sql = buildMigrationSQL(session, messages, parts);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(serviceKey ? { 'Authorization': `Bearer ${serviceKey}` } : {}),
+  };
 
-  const response = await fetch(`${baseUrl}/legacy/migrate`, {
+  const realSessionId = await createSessionViaOpenCode(baseUrl, headers, session);
+
+  const remapped = remapSessionId(session.id, realSessionId, messages, parts);
+
+  const sql = buildMigrationSQL(remapped.messages, remapped.parts);
+  await executeMigrationSQL(baseUrl, headers, sql, realSessionId);
+
+  return realSessionId;
+}
+
+async function createSessionViaOpenCode(
+  baseUrl: string,
+  headers: Record<string, string>,
+  session: TransformedSession,
+): Promise<string> {
+  const res = await fetch(`${baseUrl}/session`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${serviceKey}`,
-    },
-    body: JSON.stringify({ sql, sessionId: session.id }),
+    headers,
+    body: JSON.stringify({
+      title: session.title,
+      directory: '/home/daytona',
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`OpenCode POST /session failed (${res.status}): ${body}`);
+  }
+
+  const data = await res.json().catch(() => null) as any;
+  const id = data?.id;
+  if (!id) {
+    throw new Error('OpenCode created session but returned no ID');
+  }
+
+  console.log('[legacy] OpenCode session created:', id);
+  return id;
+}
+
+function remapSessionId(
+  oldId: string,
+  newId: string,
+  messages: TransformedMessage[],
+  parts: TransformedPart[],
+): { messages: TransformedMessage[]; parts: TransformedPart[] } {
+  return {
+    messages: messages.map((m) => ({ ...m, sessionID: newId })),
+    parts: parts.map((p) => ({ ...p, sessionID: newId })),
+  };
+}
+
+async function executeMigrationSQL(
+  baseUrl: string,
+  headers: Record<string, string>,
+  sql: string,
+  sessionId: string,
+): Promise<void> {
+  const res = await fetch(`${baseUrl}/legacy/migrate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ sql, sessionId }),
     signal: AbortSignal.timeout(30_000),
   });
 
-  const result = await response.json().catch(() => null) as any;
+  const result = await res.json().catch(() => null) as any;
 
-  if (!response.ok) {
-    throw new Error(`Migration request failed (${response.status}): ${JSON.stringify(result)}`);
+  if (!res.ok) {
+    throw new Error(`Migration SQL failed (${res.status}): ${JSON.stringify(result)}`);
   }
 
   console.log('[legacy] Migration result:', JSON.stringify(result));
+
+  if (result?.verification && !result.verification.sessionFound) {
+    throw new Error('Migration SQL executed but session not found in DB');
+  }
 }
 
 async function resolveSandboxEndpoint(externalId: string): Promise<{ baseUrl: string; serviceKey: string }> {
@@ -68,14 +130,11 @@ async function resolveSandboxEndpoint(externalId: string): Promise<{ baseUrl: st
 }
 
 function buildMigrationSQL(
-  session: TransformedSession,
   messages: TransformedMessage[],
   parts: TransformedPart[],
 ): string {
   const lines: string[] = [];
-
   lines.push('BEGIN TRANSACTION;');
-  lines.push(buildSessionInsert(session));
 
   for (const msg of messages) {
     lines.push(buildMessageInsert(msg));
@@ -86,12 +145,7 @@ function buildMigrationSQL(
   }
 
   lines.push('COMMIT;');
-
   return lines.join('\n');
-}
-
-function buildSessionInsert(session: TransformedSession): string {
-  return `INSERT OR IGNORE INTO session (id, slug, project_id, workspace_id, directory, parent_id, title, version, created_at, updated_at, summary, share, permission, revert) VALUES (${esc(session.id)}, ${esc(session.id.slice(4, 12))}, ${esc('default')}, ${esc('')}, ${esc('/home/daytona')}, ${esc('')}, ${esc(session.title)}, ${esc('0.0.0')}, ${session.createdAt}, ${session.updatedAt}, ${esc('{}')}, ${esc('{}')}, ${esc('{}')}, ${esc('{}')});`;
 }
 
 function buildMessageInsert(msg: TransformedMessage): string {
