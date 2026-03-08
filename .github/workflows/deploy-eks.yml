@@ -18,7 +18,7 @@ permissions:
 
 env:
   AWS_REGION: us-west-2
-  GHCR_IMAGE: ghcr.io/kortix-ai/suna
+  GHCR_IMAGE: ghcr.io/kortix-ai/computer
   EKS_CLUSTER: kortix-prod
 
 jobs:

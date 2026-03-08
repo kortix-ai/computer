@@ -21,7 +21,7 @@ const config = new pulumi.Config("kortix-eks");
 const acmCertificateArn = config.require("acmCertificateArn");
 const imageTag = config.get("imageTag") || "latest";
 
-const ghcrImage = "ghcr.io/kortix-ai/suna";
+const ghcrImage = "ghcr.io/kortix-ai/computer";
 
 const { vpc, albSg } = createVpc();
 
